@@ -595,7 +595,7 @@ end)
           if b then
             let* tx_rollup = tx_rollup in
             let destination = Alpha_context.Destination.Tx_rollup tx_rollup in
-            let entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint in
+            let entrypoint = Alpha_context.Entrypoint.deposit in
             return
               (Typed_contract.Internal_for_tests.typed_exn
                  arg_ty

@@ -93,7 +93,7 @@ let internal_operation (type kind)
             destination = Tx_rollup destination;
             (* Dummy amount used for the external untyped view of internal transactions *)
             amount = Tez.zero;
-            entrypoint = Tx_rollup.deposit_entrypoint;
+            entrypoint = Entrypoint.deposit;
             parameters = Script.lazy_expr unparsed_parameters;
           }
     | Transaction_to_sc_rollup {destination; entrypoint; unparsed_parameters; _}

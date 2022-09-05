@@ -1791,8 +1791,6 @@ module Tx_rollup : sig
 
   val encoding : t Data_encoding.t
 
-  val deposit_entrypoint : Entrypoint.t
-
   val originate : context -> (context * t) tzresult Lwt.t
 
   module Set : Set.S with type elt = t

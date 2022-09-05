@@ -2183,7 +2183,7 @@ module Typed_contract = struct
 
   let entrypoint : type a. a typed_contract -> Entrypoint.t = function
     | Typed_implicit _ -> Entrypoint.default
-    | Typed_tx_rollup _ -> Tx_rollup.deposit_entrypoint
+    | Typed_tx_rollup _ -> Entrypoint.deposit
     | Typed_originated {entrypoint; _} | Typed_sc_rollup {entrypoint; _} ->
         entrypoint
 

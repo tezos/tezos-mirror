@@ -4552,7 +4552,7 @@ and parse_contract :
                       Typed_originated {arg_ty; contract_hash; entrypoint} )) ))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >|=? fun ctxt ->
-      if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
+      if Entrypoint.(is_deposit entrypoint) then
         (* /!\ This pattern matching needs to remain in sync with
            [parse_tx_rollup_deposit_parameters]. *)
         match arg with

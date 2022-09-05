@@ -135,7 +135,7 @@ let extract_messages_from_block block_info rollup_id =
           (ITransaction_result
             (Transaction_to_tx_rollup_result {ticket_hash; _})) )
       when Tx_rollup.equal dst rollup_id
-           && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
+           && Entrypoint.(entrypoint = Entrypoint.deposit) ->
         (* Deposit message *)
         ( Option.bind (Data_encoding.force_decode parameters)
         @@ fun parameters ->

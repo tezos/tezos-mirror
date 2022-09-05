@@ -64,10 +64,6 @@ val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t
 
-(** The entrypoint a layer-1 contract can use to deposit Michelson tickets
-    into a transaction rollup. *)
-val deposit_entrypoint : Entrypoint_repr.t
-
 module Set : Set.S with type elt = t
 
 module Map : Map.S with type key = t
