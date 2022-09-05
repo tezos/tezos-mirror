@@ -353,7 +353,7 @@ module V2_0_0 = struct
         match result with None -> return false | Some (_, ()) -> return true
 
     let produce_origination_proof context boot_sector =
-      let open Lwt_result_syntax in
+      let open Lwt_tzresult_syntax in
       let*! state = initial_state context in
       let*! result =
         Context.produce_proof context state (fun state ->

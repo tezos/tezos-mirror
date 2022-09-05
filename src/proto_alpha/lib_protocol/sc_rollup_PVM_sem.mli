@@ -249,8 +249,7 @@ module type S = sig
       [p] covering the specialization of a PVM, from the
       [initial_state] up to the genesis state wherein the
       [boot_sector] has been installed. *)
-  val produce_origination_proof :
-    context -> string -> (proof, error) result Lwt.t
+  val produce_origination_proof : context -> string -> proof tzresult Lwt.t
 
   (** The following type is inhabited by the proofs that a given [output]
       is part of the outbox of a given [state]. *)
