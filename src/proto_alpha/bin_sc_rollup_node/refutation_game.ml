@@ -94,12 +94,13 @@ module Make (Interpreter : Interpreter.S) :
     let* inbox = Inbox.inbox_of_hash node_ctxt hash in
     let* ctxt = Node_context.checkout_context node_ctxt hash in
     let*! messages_tree = Context.MessageTrees.find ctxt in
-    let*! history, history_proof =
+    let* history, history_proof =
       Context.Inbox.form_history_proof
         node_ctxt.context
         history
         inbox
         messages_tree
+      >|= Environment.wrap_tzresult
     in
     let module P = struct
       include PVM

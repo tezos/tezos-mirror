@@ -160,26 +160,21 @@ module V1 = struct
       (Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp)
       history
 
-  type history = {
-    events : history_proof Hash.Map.t;
-        (** The history proofs stored in the history structure, indexed by
-            inboxes hashes. *)
-    sequence : Hash.t Int64_map.t;
-        (** An additional map from int64 indexes to inboxes hashes, to be able
-            to remove old entries when the structure is full.  *)
-    capacity : int64;
-        (** The max number of the entries in the structure. Once the maximum size
-            is reached, older entries are deleted to free space for new ones. *)
-    next_index : int64;
-        (** The index to use for the next entry to add in the structure. *)
-    oldest_index : int64;
-        (** The oldest index of the (oldest) entry that has been added to the
-            data structure. If the history is empty, [oldest_index] is
-            equal to [next_index]. *)
-    size : int64;
-        (** Counts the number of entries that are stored in history. It
-            satisfies the invariant: `0 <= size <= capacity` *)
-  }
+  (** Construct an inbox [history] with a given [capacity]. If you
+      are running a rollup node, [capacity] needs to be large enough to
+      remember any levels for which you may need to produce proofs. *)
+  module History =
+    Bounded_history_repr.Make
+      (Hash)
+      (struct
+        type t = history_proof
+
+        let pp = pp_history_proof
+
+        let equal = equal_history_proof
+
+        let encoding = history_proof_encoding
+      end)
 
   (*
 
@@ -405,20 +400,14 @@ module type Merkelized_operations = sig
 
   val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
 
-  val history_encoding : history Data_encoding.t
-
-  val pp_history : Format.formatter -> history -> unit
-
-  val history_at_genesis : capacity:int64 -> history
-
   val add_messages :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     Raw_level_repr.t ->
     Sc_rollup_inbox_message_repr.serialized list ->
     tree option ->
-    (tree * history * t) tzresult Lwt.t
+    (tree * History.t * t) tzresult Lwt.t
 
   val add_messages_no_history :
     inbox_context ->
@@ -433,10 +422,10 @@ module type Merkelized_operations = sig
 
   val form_history_proof :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     tree option ->
-    (history * history_proof) Lwt.t
+    (History.t * history_proof) tzresult Lwt.t
 
   val take_snapshot : t -> history_proof
 
@@ -467,7 +456,7 @@ module type Merkelized_operations = sig
 
   val produce_proof :
     inbox_context ->
-    history ->
+    History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
     (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
@@ -477,12 +466,11 @@ module type Merkelized_operations = sig
   module Internal_for_tests : sig
     val eq_tree : tree -> tree -> bool
 
-    val history_at_genesis : capacity:int64 -> next_index:int64 -> history
-
-    val history_hashes : history -> Hash.t list
-
     val produce_inclusion_proof :
-      history -> history_proof -> history_proof -> inclusion_proof option
+      History.t ->
+      history_proof ->
+      history_proof ->
+      inclusion_proof option tzresult
   end
 end
 
@@ -579,135 +567,11 @@ struct
            Sc_rollup_inbox_message_repr.unsafe_of_string (Bytes.to_string bs))
          bytes
 
-  let history_encoding : history Data_encoding.t =
-    let open Data_encoding in
-    let events_encoding = Hash.Map.encoding history_proof_encoding in
-    let sequence_encoding =
-      conv
-        (fun m -> Int64_map.bindings m)
-        (List.fold_left (fun m (k, v) -> Int64_map.add k v m) Int64_map.empty)
-        (list (tup2 int64 Hash.encoding))
-    in
-    conv
-      (fun {events; sequence; capacity; next_index; oldest_index; size} ->
-        (events, sequence, capacity, next_index, oldest_index, size))
-      (fun (events, sequence, capacity, next_index, oldest_index, size) ->
-        {events; sequence; capacity; next_index; oldest_index; size})
-      (obj6
-         (req "events" events_encoding)
-         (req "sequence" sequence_encoding)
-         (req "capacity" int64)
-         (req "next_index" int64)
-         (req "oldest_index" int64)
-         (req "size" int64))
-
-  let pp_history fmt history =
-    Hash.Map.bindings history.events |> fun bindings ->
-    Int64_map.bindings history.sequence |> fun sequence_bindings ->
-    let pp_binding fmt (hash, history_proof) =
-      Format.fprintf
-        fmt
-        "@[%a -> %a@;@]"
-        Hash.pp
-        hash
-        pp_history_proof
-        history_proof
-    in
-    let pp_sequence_binding fmt (counter, hash) =
-      Format.fprintf fmt "@[%s -> %a@;@]" (Int64.to_string counter) Hash.pp hash
-    in
-    Format.fprintf
-      fmt
-      "@[<hov 2>History:@;\
-      \ { capacity: %Ld;@;\
-      \ current size: %Ld;@;\
-      \ oldest index: %Ld;@;\
-      \ next_index : %Ld;@;\
-      \ bindings: %a;@;\
-      \ sequence: %a; }@]"
-      history.capacity
-      history.size
-      history.oldest_index
-      history.next_index
-      (Format.pp_print_list pp_binding)
-      bindings
-      (Format.pp_print_list pp_sequence_binding)
-      sequence_bindings
-
-  let history_at_genesis ~capacity =
-    let next_index = 0L in
-    {
-      events = Hash.Map.empty;
-      sequence = Int64_map.empty;
-      capacity;
-      next_index;
-      oldest_index = next_index;
-      size = 0L;
-    }
-
   (** [no_history] creates an empty history with [capacity] set to
       zero---this makes the [remember] function a no-op. We want this
       behaviour in the protocol because we don't want to store
       previous levels of the inbox. *)
-  let no_history = history_at_genesis ~capacity:0L
-
-  (** [remember ptr cell history] extends [history] with a new
-      mapping from [ptr] to [cell]. If [history] is full, the
-      oldest mapping is removed. If the history capacity is less
-      or equal to zero or if [ptr] is already present, then [history]
-      is returned unchanged, unless it's associated to a content different
-      from [cell], in which case a failwith is triggered. *)
-  let remember ptr cell history =
-    if Compare.Int64.(history.capacity <= 0L) then history
-    else
-      match Hash.Map.find ptr history.events with
-      | Some cell' when not (equal_history_proof cell cell') ->
-          Format.kasprintf
-            failwith
-            "Internal error: %a already exists in history with a different \
-             proof"
-            Hash.pp
-            ptr
-      | _ -> (
-          let events = Hash.Map.add ptr cell history.events in
-          let current_index = history.next_index in
-          let next_index = Int64.succ current_index in
-          let history =
-            {
-              events;
-              sequence = Int64_map.add current_index ptr history.sequence;
-              capacity = history.capacity;
-              next_index;
-              oldest_index = history.oldest_index;
-              size = Int64.succ history.size;
-            }
-          in
-          (* A negative size means that [history.capacity] is set to [Int64.max_int]
-             and that the structure is full, so adding a new entry makes the size
-             overflows. In this case, we remove an element in the else branch to
-             keep the size of the history equal to [Int64.max_int] at most. *)
-          if
-            Compare.Int64.(
-              history.size > 0L && history.size <= history.capacity)
-          then history
-          else
-            let l = history.oldest_index in
-            match Int64_map.find l history.sequence with
-            | None ->
-                (* If history.size > history.capacity > 0, there is necessarily
-                   an entry whose index is history.oldest_index in [sequence]. *)
-                assert false
-            | Some h ->
-                let sequence = Int64_map.remove l history.sequence in
-                let events = Hash.Map.remove h events in
-                {
-                  next_index = history.next_index;
-                  capacity = history.capacity;
-                  size = history.capacity;
-                  oldest_index = Int64.succ history.oldest_index;
-                  sequence;
-                  events;
-                })
+  let no_history = History.empty ~capacity:0L
 
   let take_snapshot inbox =
     let prev_cell = inbox.old_levels_messages in
@@ -721,18 +585,18 @@ struct
     Bytes.to_string level_bytes
 
   let form_history_proof ctxt history inbox level_tree =
-    let open Lwt_syntax in
-    let* () =
-      let* tree =
+    let open Lwt_tzresult_syntax in
+    let*! () =
+      let*! tree =
         match level_tree with
-        | Some tree -> return tree
+        | Some tree -> Lwt.return tree
         | None -> new_level_tree ctxt inbox.level
       in
       P.commit_tree ctxt [key_of_level inbox.level] tree
     in
     let prev_cell = inbox.old_levels_messages in
     let prev_cell_ptr = hash_skip_list_cell prev_cell in
-    let history = remember prev_cell_ptr prev_cell history in
+    let*? history = History.remember prev_cell_ptr prev_cell history in
     let cell =
       Skip_list.next ~prev_cell ~prev_cell_ptr (current_level_hash inbox)
     in
@@ -751,18 +615,18 @@ struct
       This function and {!form_history_proof} are the only places we
       begin new level trees. *)
   let archive_if_needed ctxt history inbox new_level level_tree =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     if Raw_level_repr.(inbox.level = new_level) then
       match level_tree with
       | Some tree -> return (history, inbox, tree)
       | None ->
-          let* tree = new_level_tree ctxt new_level in
+          let*! tree = new_level_tree ctxt new_level in
           return (history, inbox, tree)
     else
       let* history, old_levels_messages =
         form_history_proof ctxt history inbox level_tree
       in
-      let* tree = new_level_tree ctxt new_level in
+      let*! tree = new_level_tree ctxt new_level in
       let inbox =
         {
           starting_level_of_current_commitment_period =
@@ -790,7 +654,7 @@ struct
         Raw_level_repr.(level < inbox.level)
         (Invalid_level_add_messages level)
     in
-    let*! history, inbox, level_tree =
+    let* history, inbox, level_tree =
       archive_if_needed ctxt history inbox level level_tree
     in
     let* level_tree, inbox =
@@ -1151,8 +1015,8 @@ struct
   let produce_proof ctxt history inbox (l, n) =
     let open Lwt_tzresult_syntax in
     let cell_ptr = hash_skip_list_cell inbox in
-    let history = remember cell_ptr inbox history in
-    let deref ptr = Hash.Map.find_opt ptr history.events in
+    let*? history = History.remember cell_ptr inbox history in
+    let deref ptr = History.find ptr history in
     let compare hash =
       let*! tree = P.lookup_tree ctxt hash in
       match tree with
@@ -1273,37 +1137,15 @@ struct
   module Internal_for_tests = struct
     let eq_tree = Tree.equal
 
-    let history_at_genesis ~capacity ~next_index =
-      {
-        (history_at_genesis ~capacity) with
-        next_index;
-        oldest_index = next_index;
-      }
-
-    let history_hashes {sequence; oldest_index; _} =
-      let l = Int64_map.bindings sequence in
-      (* All entries with an index greater than oldest_index are well ordered.
-         There are put in the [lp] list. Entries with an index smaller than
-         oldest_index are also well ordered, but they should come after
-         elements in [lp]. This happens in theory when the index reaches
-         max_int and then overflows. *)
-      let ln, lp =
-        List.partition_map
-          (fun (n, h) ->
-            if Compare.Int64.(n < oldest_index) then Left h else Right h)
-          l
-      in
-      (* do a tail recursive concatenation lp @ ln *)
-      List.rev_append (List.rev lp) ln
-
     let produce_inclusion_proof history a b =
+      let open Tzresult_syntax in
       let cell_ptr = hash_skip_list_cell b in
       let target_index = Skip_list.index a in
-      let history = remember cell_ptr b history in
-      let deref ptr = Hash.Map.find_opt ptr history.events in
+      let* history = History.remember cell_ptr b history in
+      let deref ptr = History.find ptr history in
       Skip_list.back_path ~deref ~cell_ptr ~target_index
       |> Option.map (lift_ptr_path deref)
-      |> Option.join
+      |> Option.join |> return
   end
 end
 

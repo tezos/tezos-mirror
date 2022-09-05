@@ -48,7 +48,7 @@ val inbox_of_hash :
 (** [history_of_hash node_ctxt block_hash] returns the rollup inbox history at
     the end of the given validation of [block_hash]. *)
 val history_of_hash :
-  Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.history tzresult Lwt.t
+  Node_context.t -> Block_hash.t -> Sc_rollup.Inbox.History.t tzresult Lwt.t
 
 (** [start ()] initializes the inbox to track the messages being published. *)
 val start : unit -> unit Lwt.t

@@ -1064,7 +1064,7 @@ type player_client = {
   inbox :
     Store_inbox.inbox_context
     * Store_inbox.tree option
-    * Inbox.history
+    * Inbox.History.t
     * Inbox.t;
   levels_and_inputs : (int * string list) list;
 }
@@ -1135,7 +1135,7 @@ module Player_client = struct
     let open Lwt_syntax in
     let open Store_inbox in
     let* inbox = empty ctxt rollup origination_level in
-    let history = history_at_genesis ~capacity:10000L in
+    let history = Inbox.History.empty ~capacity:10000L in
     let rec aux history inbox level_tree = function
       | [] -> return (ctxt, level_tree, history, inbox)
       | (level, payloads) :: rst ->
@@ -1292,8 +1292,9 @@ let operation_publish_commitment ctxt rollup predecessor inbox_level
 let build_proof ~player_client start_tick (game : Game.t) =
   let open Lwt_result_syntax in
   let inbox_context, messages_tree, history, inbox = player_client.inbox in
-  let*! history, history_proof =
+  let* history, history_proof =
     Store_inbox.form_history_proof inbox_context history inbox messages_tree
+    >|= Environment.wrap_tzresult
   in
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
@@ -1321,7 +1322,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
     end
   end in
   let*! proof = Sc_rollup.Proof.produce (module P) game.level in
-  Lwt.return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
+  return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 
 (** [next_move ~number_of_sections ~player_client game] produces
     the next move in the refutation game.
@@ -1330,7 +1331,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
     produces a proof. Otherwise, provides another dissection.
 *)
 let next_move ~number_of_sections ~player_client (game : Game.t) =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let disputed_sections =
     disputed_sections ~our_states:player_client.states game.dissection
   in
@@ -1376,7 +1377,7 @@ let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
         player_turn.player.pkh
     in
     let game, _, _ = WithExceptions.Option.get ~loc:__LOC__ game_opt in
-    let*! refutation =
+    let* refutation =
       next_move ~number_of_sections ~player_client:player_turn game
     in
     let* incr = Incremental.begin_construction block in

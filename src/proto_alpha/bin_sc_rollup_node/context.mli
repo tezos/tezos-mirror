@@ -153,8 +153,6 @@ module Inbox : sig
 
   type history_proof = Sc_rollup.Inbox.history_proof
 
-  type history = Sc_rollup.Inbox.history
-
   include
     Sc_rollup.Inbox.Merkelized_operations
       with type tree = MessageTrees.value

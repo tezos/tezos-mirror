@@ -94,8 +94,7 @@ module State = struct
         let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
         let block_level = Raw_level.of_int32_exn block_level in
         if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
-          return
-          @@ Sc_rollup.Inbox.history_at_genesis ~capacity:(Int64.of_int 60000)
+          return @@ Sc_rollup.Inbox.History.empty ~capacity:60000L
         else
           failwith
             "The inbox history for hash %a is missing."

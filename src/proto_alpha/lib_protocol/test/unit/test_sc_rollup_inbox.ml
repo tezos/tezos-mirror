@@ -82,7 +82,7 @@ let setup_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   create_context () >>=? fun ctxt ->
   let* inbox = empty ctxt rollup level in
-  let history = history_at_genesis ~capacity:10000L in
+  let history = History.empty ~capacity:10000L in
   populate_inboxes ctxt level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
   match level_tree with
@@ -137,20 +137,26 @@ let test_get_message_payload payloads =
     payloads
 
 let test_inclusion_proof_production (list_of_payloads, n) =
+  let open Lwt_result_syntax in
   setup_inbox_with_messages list_of_payloads
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
-  Internal_for_tests.produce_inclusion_proof
-    history
-    (old_levels_messages old_inbox)
-    (old_levels_messages inbox)
-  |> function
+  let*? res =
+    Internal_for_tests.produce_inclusion_proof
+      history
+      (old_levels_messages old_inbox)
+      (old_levels_messages inbox)
+    |> Environment.wrap_tzresult
+  in
+  match res with
   | None ->
       fail
-      @@ err
-           "It should be possible to produce an inclusion proof between two \
-            versions of the same inbox."
+        [
+          err
+            "It should be possible to produce an inclusion proof between two \
+             versions of the same inbox.";
+        ]
   | Some proof ->
       fail_unless
         (verify_inclusion_proof
@@ -160,20 +166,26 @@ let test_inclusion_proof_production (list_of_payloads, n) =
         (err "The produced inclusion proof is invalid.")
 
 let test_inclusion_proof_verification (list_of_payloads, n) =
+  let open Lwt_result_syntax in
   setup_inbox_with_messages list_of_payloads
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
   let old_inbox = Stdlib.List.nth inboxes n in
-  Internal_for_tests.produce_inclusion_proof
-    history
-    (old_levels_messages old_inbox)
-    (old_levels_messages inbox)
-  |> function
+  let*? res =
+    Internal_for_tests.produce_inclusion_proof
+      history
+      (old_levels_messages old_inbox)
+      (old_levels_messages inbox)
+    |> Environment.wrap_tzresult
+  in
+  match res with
   | None ->
       fail
-      @@ err
-           "It should be possible to produce an inclusion proof between two \
-            versions of the same inbox."
+        [
+          err
+            "It should be possible to produce an inclusion proof between two \
+             versions of the same inbox.";
+        ]
   | Some proof ->
       let old_inbox' = Stdlib.List.nth inboxes (Random.int (1 + n)) in
       fail_unless
@@ -272,7 +284,7 @@ let setup_node_inbox_with_messages list_of_payloads f =
   let* index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
   let* inbox = empty ctxt rollup level in
-  let history = history_at_genesis ~capacity:10000L in
+  let history = History.empty ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
     | payloads :: ps -> (
@@ -350,11 +362,15 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
   let exp_input = next_input list_of_payloads l n in
   setup_node_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox _inboxes ->
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox (Some current_level_tree)
+    >|= Environment.wrap_tzresult
   in
-  let* result = Node.produce_proof ctxt history history_proof (l, n) in
+  let*! result =
+    Node.produce_proof ctxt history history_proof (l, n)
+    >|= Environment.wrap_tzresult
+  in
   match result with
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox built from the same messages
@@ -363,24 +379,27 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
       @@ fun _ctxt _current_level_tree _history inbox _inboxes ->
       let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
-      let* verification = verify_proof (l, n) snapshot proof in
+      let*! verification =
+        verify_proof (l, n) snapshot proof >|= Environment.wrap_tzresult
+      in
       match verification with
       | Ok v_input ->
           fail_unless
             (v_input = input && v_input = exp_input)
             (err "Proof verified but did not match")
-      | Error _ -> fail (err "Proof verification failed"))
-  | Error _ -> fail (err "Proof production failed")
+      | Error _ -> fail [err "Proof verification failed"])
+  | Error _ -> fail [err "Proof production failed"]
 
 let test_inbox_proof_verification (list_of_payloads, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
   setup_node_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox _inboxes ->
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox (Some current_level_tree)
+    >|= Environment.wrap_tzresult
   in
-  let* result = Node.produce_proof ctxt history history_proof (l, n) in
+  let*! result = Node.produce_proof ctxt history history_proof (l, n) in
   match result with
   | Ok (proof, _input) -> (
       (* We now switch to a protocol inbox built from the same messages
@@ -392,43 +411,48 @@ let test_inbox_proof_verification (list_of_payloads, l, n) =
       | Some inbox -> (
           let snapshot = take_snapshot inbox in
           let proof = node_proof_to_protocol_proof proof in
-          let* verification = verify_proof (l, n) snapshot proof in
+          let*! verification =
+            verify_proof (l, n) snapshot proof >|= Environment.wrap_tzresult
+          in
           match verification with
-          | Ok _ -> fail (err "Proof should not be valid")
+          | Ok _ -> fail [err "Proof should not be valid"]
           | Error _ -> return (ok ()))
-      | None -> fail (err "inboxes was empty"))
-  | Error _ -> fail (err "Proof production failed")
+      | None -> fail [err "inboxes was empty"])
+  | Error _ -> fail [err "Proof production failed"]
 
 let test_empty_inbox_proof (level, n) =
-  let open Lwt_syntax in
-  let* index = Tezos_context_memory.Context.init "foo" in
+  let open Lwt_result_syntax in
+  let*! index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
-  let* inbox = Node.empty ctxt rollup level in
-  let history = Node.history_at_genesis ~capacity:10000L in
+  let*! inbox = Node.empty ctxt rollup level in
+  let history = History.empty ~capacity:10000L in
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox None
+    >|= Environment.wrap_tzresult
   in
-  let* result =
+  let*! result =
     Node.produce_proof ctxt history history_proof (Raw_level_repr.root, n)
+    >|= Environment.wrap_tzresult
   in
   match result with
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox for verification. *)
       create_context ()
       >>=? fun ctxt ->
-      let* inbox = empty ctxt rollup level in
+      let*! inbox = empty ctxt rollup level in
       let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
-      let* verification =
+      let*! verification =
         verify_proof (Raw_level_repr.root, n) snapshot proof
+        >|= Environment.wrap_tzresult
       in
       match verification with
       | Ok v_input ->
           fail_unless
             (v_input = input && v_input = None)
             (err "Proof verified but did not match")
-      | Error _ -> fail (err "Proof verification failed"))
-  | Error _ -> fail (err "Proof production failed")
+      | Error _ -> fail [err "Proof verification failed"])
+  | Error _ -> fail [err "Proof production failed"]
 
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
@@ -463,7 +487,7 @@ let init_inboxes_histories_with_different_capacities
     create_context () >>=? fun ctxt ->
     let* inbox = empty ctxt rollup level in
     let history =
-      Sc_rollup_inbox_repr.Internal_for_tests.history_at_genesis
+      Sc_rollup_inbox_repr.History.Internal_for_tests.empty
         ~capacity
         ~next_index
     in
@@ -502,9 +526,9 @@ let test_history_length
   let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
   let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
   let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
-  let hh0 = I.Internal_for_tests.history_hashes history0 in
-  let hh1 = I.Internal_for_tests.history_hashes history1 in
-  let hh2 = I.Internal_for_tests.history_hashes history2 in
+  let hh0 = I.History.Internal_for_tests.keys history0 in
+  let hh1 = I.History.Internal_for_tests.keys history1 in
+  let hh2 = I.History.Internal_for_tests.keys history2 in
   (* The first history is supposed to have exactly 0 elements *)
   let* () =
     let len = List.length hh0 in
@@ -542,9 +566,9 @@ let test_history_prefix params =
   let _level_tree0, history0, _inbox0, _inboxes0 = no_history in
   let _level_tree1, history1, _inbox1, _inboxes1 = small_history in
   let _level_tree2, history2, _inbox2, _inboxes2 = big_history in
-  let hh0 = I.Internal_for_tests.history_hashes history0 in
-  let hh1 = I.Internal_for_tests.history_hashes history1 in
-  let hh2 = I.Internal_for_tests.history_hashes history2 in
+  let hh0 = I.History.Internal_for_tests.keys history0 in
+  let hh1 = I.History.Internal_for_tests.keys history1 in
+  let hh2 = I.History.Internal_for_tests.keys history2 in
   let check_is_suffix sub super =
     let rec aux super to_remove =
       let* () =
@@ -594,12 +618,17 @@ let test_inclusion_proofs_depending_on_history_capacity
           history.")
   in
   let proof s v =
+    let open Result_syntax in
+    let* v = v |> Environment.wrap_tzresult in
     Option.to_result ~none:[err (s ^ ": Expecting some inclusion proof.")] v
   in
   (* Producing inclusion proofs using history1 and history2 should succeeed.
      But, we should not be able to produce any proof with history0 as bound
      is 0. *)
-  let ip0 = I.Internal_for_tests.produce_inclusion_proof history0 hp hp in
+  let*? ip0 =
+    I.Internal_for_tests.produce_inclusion_proof history0 hp hp
+    |> Environment.wrap_tzresult
+  in
   let*? ip1 =
     proof "history1"
     @@ I.Internal_for_tests.produce_inclusion_proof history1 hp hp

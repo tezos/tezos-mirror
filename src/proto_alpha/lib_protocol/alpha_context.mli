@@ -2931,8 +2931,6 @@ module Sc_rollup : sig
 
     type history_proof
 
-    type history
-
     module Hash : sig
       include S.HASH
 
@@ -2940,6 +2938,11 @@ module Sc_rollup : sig
 
       val to_context_hash : t -> Context_hash.t
     end
+
+    module History :
+      Bounded_history_repr.S
+        with type key = Hash.t
+         and type value = history_proof
 
     type serialized_proof
 
@@ -2954,20 +2957,14 @@ module Sc_rollup : sig
 
       val new_level_tree : inbox_context -> Raw_level.t -> tree Lwt.t
 
-      val history_encoding : history Data_encoding.t
-
-      val pp_history : Format.formatter -> history -> unit
-
-      val history_at_genesis : capacity:int64 -> history
-
       val add_messages :
         inbox_context ->
-        history ->
+        History.t ->
         t ->
         Raw_level.t ->
         Message.serialized list ->
         tree option ->
-        (tree * history * t) tzresult Lwt.t
+        (tree * History.t * t) tzresult Lwt.t
 
       val add_messages_no_history :
         inbox_context ->
@@ -2982,10 +2979,10 @@ module Sc_rollup : sig
 
       val form_history_proof :
         inbox_context ->
-        history ->
+        History.t ->
         t ->
         tree option ->
-        (history * history_proof) Lwt.t
+        (History.t * history_proof) tzresult Lwt.t
 
       val take_snapshot : t -> history_proof
 
@@ -3016,22 +3013,22 @@ module Sc_rollup : sig
 
       val produce_proof :
         inbox_context ->
-        history ->
+        History.t ->
         history_proof ->
         Raw_level.t * Z.t ->
         (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
 
+      (*xx*)
       module Internal_for_tests : sig
         val eq_tree : tree -> tree -> bool
 
-        val history_at_genesis : capacity:int64 -> next_index:int64 -> history
-
-        val history_hashes : history -> Hash.t list
-
         val produce_inclusion_proof :
-          history -> history_proof -> history_proof -> inclusion_proof option
+          History.t ->
+          history_proof ->
+          history_proof ->
+          inclusion_proof option tzresult
       end
     end
 
@@ -3437,7 +3434,7 @@ module Sc_rollup : sig
 
         val inbox : Inbox.history_proof
 
-        val history : Inbox.history
+        val history : Inbox.History.t
       end
     end
 

@@ -318,9 +318,9 @@ module Histories = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Sc_rollup.Inbox.history
+  type value = Sc_rollup.Inbox.History.t
 
-  let value_encoding = Sc_rollup.Inbox.history_encoding
+  let value_encoding = Sc_rollup.Inbox.History.encoding
 end)
 
 module Commitments = Make_append_only_map (struct
