@@ -114,11 +114,6 @@ module Instance = struct
   [@@deriving show]
 end
 
-let pp_ref out = function
-  | Values.NullRef rt -> Format.fprintf out "NullRef (%a)" Types.pp_ref_type rt
-  | Values.ExternRef n -> Format.fprintf out "ExternRef(%a)" pp_int32 n
-  | _ -> Stdlib.failwith "Unsupported value ref"
-
 let pp_chunk_byte_vector out chunks =
   let bs = Lwt_main.run @@ Chunked_byte_vector.to_string chunks in
   (* We just show the hash of the chunk in order to avoid too much noise. *)
@@ -146,7 +141,7 @@ let pp_table out t =
     "@[<hv 2>{ty = %a;@; content = (%a)}@]"
     Types.pp_table_type
     ty
-    (pp_vector pp_ref)
+    (pp_vector Values.pp_ref_)
     c
 
 let pp_memory out memory =
@@ -182,7 +177,7 @@ let pp_map pp out map =
   let pp_name_list = pp_list Format.pp_print_int in
   pp_list (pp_pair pp_name_list pp) out (Instance.NameMap.loaded_bindings map)
 
-let pp_elems out ref = pp_vector pp_ref out !ref
+let pp_elems out ref = pp_vector Values.pp_ref_ out !ref
 
 let pp_blocks_table = pp_vector (pp_vector Ast.pp_instr)
 
@@ -263,7 +258,7 @@ let rec pp_admin_instr' out instr =
         block
         index
   | Plain instr -> Format.fprintf out "Plain @[<hv 2>%a@]" Ast.pp_instr' instr
-  | Refer ref_ -> Format.fprintf out "Refer @[<hv 2>%a@]" pp_ref ref_
+  | Refer ref_ -> Format.fprintf out "Refer @[<hv 2>%a@]" Values.pp_ref_ ref_
   | Invoke func ->
       Format.fprintf out "Invoke @[<hv 2>%a@]" Instance.pp_func_inst func
   | Trapping msg ->
