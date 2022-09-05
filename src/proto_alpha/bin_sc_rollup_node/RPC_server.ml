@@ -27,28 +27,28 @@ open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-let get_head_exn store =
+let get_head store =
   let open Lwt_result_syntax in
   let*! head = Layer1.current_head_hash store in
   match head with None -> failwith "No head" | Some head -> return head
 
 let get_state_info_exn store =
   let open Lwt_result_syntax in
-  let* head = get_head_exn store in
+  let* head = get_head store in
   let*! state = Store.StateInfo.get store head in
   return state
 
 let get_dal_slot_subscriptions_exn store =
   let open Lwt_result_syntax in
-  let* head = get_head_exn store in
+  let* head = get_head store in
   let*! slot_subscriptions = Store.Dal_slot_subscriptions.find store head in
   match slot_subscriptions with
   | None -> failwith "No slot subscriptions"
   | Some slot_subscriptions -> return slot_subscriptions
 
-let get_dal_slots_exn store =
+let get_dal_slots store =
   let open Lwt_result_syntax in
-  let* head = get_head_exn store in
+  let* head = get_head store in
   let*! slot_headers = Store.Dal_slots.list_values store ~primary_key:head in
   return slot_headers
 
@@ -140,9 +140,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
   module PVM = PVM
 
-  let get_state_exn (node_ctxt : Node_context.t) =
+  let get_state (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
-    let* head = get_head_exn node_ctxt.store in
+    let* head = get_head node_ctxt.store in
     let* ctxt = Node_context.checkout_context node_ctxt head in
     let*! state = PVM.State.find ctxt in
     match state with None -> failwith "No state" | Some state -> return state
@@ -153,7 +153,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.current_total_ticks ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn node_ctxt in
+        let* state = get_state node_ctxt in
         let*! tick = PVM.get_tick state in
         return tick)
 
@@ -163,7 +163,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.current_state_hash ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn node_ctxt in
+        let* state = get_state node_ctxt in
         let*! hash = PVM.state_hash state in
         return hash)
 
@@ -173,7 +173,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Local.current_state_value ())
       (fun {key} () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn node_ctxt in
+        let* state = get_state node_ctxt in
         let path = String.split_on_char '/' key in
         let*! value = PVM.State.lookup state path in
         match value with
@@ -226,7 +226,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.current_status ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state_exn node_ctxt in
+        let* state = get_state node_ctxt in
         let*! status = PVM.get_status state in
         return (PVM.string_of_status status))
 
@@ -240,7 +240,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.dal_slots ())
-      (fun () () -> get_dal_slots_exn store)
+      (fun () () -> get_dal_slots store)
 
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
