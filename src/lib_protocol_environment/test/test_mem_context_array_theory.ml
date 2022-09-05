@@ -86,22 +86,22 @@ let pp_print_value fmt v = Format.fprintf fmt "%s" (Bytes.to_string v)
 
 (* We're done with generators. *)
 
-(* Test that [Test_mem_context.domain] is correct. Important because
+(* Test that [Test_mem_context_common.domain] is correct. Important because
    this function is used in the test of the second axiom of array theory:
    [test_get_set_other]. Also this serves as a specification of
-   [Test_mem_context.domain]. *)
+   [Test_mem_context_common.domain]. *)
 let test_domain_spec (ctxt, k) =
   if k = [] then
     (* This is a bit puzzling, but the empty key is special; because
        of the implementation of memory_context.ml's [Context.mem] method which
        returns true on the empty key. This means the empty key
        is considered to exist in an empty context, on which,
-       [Test_mem_contex.domain] appropriately returns an empty list. One
+       [Test_mem_contex_common.domain] appropriately returns an empty list. One
        could complexify this test to support this case, but I didn't want
        to spend too much time on this; we're testing a test after all here. *)
     QCheck2.assume_fail ()
   else
-    let domain = Lwt_main.run @@ Test_mem_context.domain ctxt in
+    let domain = Lwt_main.run @@ Test_mem_context_common.domain ctxt in
     qcheck_eq
       ~pp:Format.pp_print_bool
       (Lwt_main.run @@ Context.mem ctxt k)
@@ -123,7 +123,7 @@ let test_get_set (ctxt, (k, v)) =
  * This is the second axiom of array theory *)
 let test_get_set_other (ctxt, (k1, v)) =
   let ctxt' = Lwt_main.run @@ Context.add ctxt k1 v in
-  let keys = Lwt_main.run @@ Test_mem_context.domain ctxt' in
+  let keys = Lwt_main.run @@ Test_mem_context_common.domain ctxt' in
   let check_key k2 =
     if k1 = k2 then true
     else
@@ -138,9 +138,9 @@ let test_get_set_other (ctxt, (k1, v)) =
   List.for_all check_key keys
 
 let test_set_domain (ctxt, (k, v)) =
-  let domain = Lwt_main.run @@ Test_mem_context.domain ctxt in
+  let domain = Lwt_main.run @@ Test_mem_context_common.domain ctxt in
   let ctxt' = Lwt_main.run @@ Context.add ctxt k v in
-  let domain' = Lwt_main.run @@ Test_mem_context.domain ctxt' in
+  let domain' = Lwt_main.run @@ Test_mem_context_common.domain ctxt' in
   List.for_all
     (fun in_domain' ->
       equal_key in_domain' k || List.mem ~equal:equal_key in_domain' domain)
@@ -149,7 +149,7 @@ let test_set_domain (ctxt, (k, v)) =
 let () =
   let test_domain =
     Test.make
-      ~name:"Test_mem_context.domain's specification "
+      ~name:"Test_mem_context_common.domain's specification "
       (Gen.pair context_gen key_gen)
       test_domain_spec
   in

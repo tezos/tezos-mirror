@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,18 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Invocation:
-     dune exec src/lib_protocol_environment/test/test.exe
-   or for a superset of these tests:
-     dune build @src/lib_protocol_environment/runtest
-*)
+let fold_keys s root ~init ~f =
+  Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
+      match Context.Tree.kind v with
+      | `Value -> f (root @ k) acc
+      | `Tree -> Lwt.return acc)
 
-let () =
-  Alcotest_lwt.run
-    "tezos-shell-context"
-    [
-      ("mem_context", Test_mem_context.tests);
-      ("cache", Test_cache.tests);
-      ("data_encoding", Test_data_encoding.tests);
-    ]
-  |> Lwt_main.run
+let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+
+let domain ctxt = keys ctxt []

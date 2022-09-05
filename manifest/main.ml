@@ -1931,7 +1931,12 @@ let octez_shell_context =
 
 let _octez_protocol_environment_tests =
   tests
-    ["test"; "test_mem_context_array_theory"]
+    [
+      "test_mem_context";
+      "test_mem_context_array_theory";
+      "test_cache";
+      "test_data_encoding";
+    ]
     ~path:"src/lib_protocol_environment/test"
     ~opam:"tezos-protocol-environment"
     ~deps:

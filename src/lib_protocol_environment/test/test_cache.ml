@@ -771,3 +771,6 @@ let tests =
     (name, speed, fun () -> Lwt.return (f ()))
   in
   List.map to_alcotest_lwt qtests
+
+let () =
+  Alcotest_lwt.run "tezos-shell-context" [("cache", tests)] |> Lwt_main.run
