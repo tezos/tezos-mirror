@@ -271,7 +271,21 @@ module Make (T : Tree_encoding.TREE) :
       in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-    let get_output _ _ = Lwt.return ""
+    let out_encoding =
+      Tree_encoding.scope
+        ["wasm"; "value"; "output"]
+        Wasm_encoding.output_buffer_encoding
+
+    let get_output output_info tree =
+      let open Lwt_syntax in
+      let open Wasm_pvm_sig in
+      let {outbox_level; message_index} = output_info in
+      let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
+      let* output_buffer = Tree_encoding_runner.decode out_encoding tree in
+      let+ payload =
+        Wasm.Output_buffer.get output_buffer outbox_level message_index
+      in
+      Bytes.to_string payload
 
     let get_info tree =
       let open Lwt_syntax in

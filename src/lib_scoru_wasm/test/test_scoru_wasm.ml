@@ -36,6 +36,7 @@ let () =
     [
       ("Input", Test_input.tests);
       ("Output", Test_output.tests);
+      ("Set/get", Test_get_set.tests);
       ("AST Generators", Test_ast_generators.tests);
       ("WASM Encodings", Test_wasm_encoding.tests);
       ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
