@@ -47,11 +47,17 @@ val return : 'a -> 'a t
 
 (** [conv f g enc] transforms from one encoding to a different one using
     [f] for mapping the results decoded using [enc], and [g] for mapping from
-    the input. *)
+    the input.
+
+    It is the user's responsibility to ensure that [f] and [g] are inverses,
+    that is, that [f (g x) = g (f x)] for all [x]. *)
 val conv : ('a -> 'b) -> ('b -> 'a) -> 'a t -> 'b t
 
 (** [conv_lwt f g enc] is the same as [conv] but where [f] and [g] are
-    effectful (produce lwt promises). *)
+    effectful (produce lwt promises).
+
+    It is the user's responsibility to ensure that [f] and [g] are inverses,
+    that is, that [f (g x) = g (f x)] for all [x]. *)
 val conv_lwt : ('a -> 'b Lwt.t) -> ('b -> 'a Lwt.t) -> 'a t -> 'b t
 
 (** [tup2 ~flatten e1 e2] combines [e1] and [e2] into an encoder for pairs.
