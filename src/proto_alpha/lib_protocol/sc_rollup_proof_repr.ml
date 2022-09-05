@@ -106,7 +106,7 @@ let valid snapshot commit_level ~pvm_name proof =
         check_inbox_proof snapshot inbox_proof (Raw_level_repr.root, Z.zero)
     | First_after (level, counter), Some inbox_proof ->
         check_inbox_proof snapshot inbox_proof (level, Z.succ counter)
-    | _ ->
+    | No_input_required, Some _ | Initial, None | First_after _, None ->
         proof_error
           (Format.asprintf
              "input_requested is %a, inbox proof is %a"
