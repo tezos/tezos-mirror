@@ -773,7 +773,7 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
-(** Run [tezos-client set deposits limit for <src> to <limit>] *)
+(** Run [tezos-client set deposits limit for <src> to <limit>]. *)
 val set_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -783,7 +783,7 @@ val set_deposits_limit :
   t ->
   string Lwt.t
 
-(** Run [tezos-client unset deposits limit for <src>] *)
+(** Run [tezos-client unset deposits limit for <src>]. *)
 val unset_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -792,7 +792,7 @@ val unset_deposits_limit :
   t ->
   string Lwt.t
 
-(** Run [tezos-client increase the paid storage of <contract> by <amount> bytes from <payer>] *)
+(** Run [tezos-client increase the paid storage of <contract> by <amount> bytes from <payer>]. *)
 val increase_paid_storage :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -800,6 +800,24 @@ val increase_paid_storage :
   contract:string ->
   amount:int ->
   payer:string ->
+  t ->
+  string Lwt.t
+
+(** Run [tezos-client get contract used storage space for <contract>]. *)
+val used_storage_space :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  contract:string ->
+  t ->
+  string Lwt.t
+
+(** Run [tezos-client get contract paid storage space for <contract>]. *)
+val paid_storage_space :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  contract:string ->
   t ->
   string Lwt.t
 
@@ -833,7 +851,7 @@ val drain_delegate :
    [src] should be named [from] and probably have type [Account.t] *)
 
 (** Run [tezos-client originate contract alias transferring amount from src
-    running prg]. Returns the originated contract hash *)
+    running prg]. Returns the originated contract hash. *)
 val originate_contract :
   ?hooks:Process.hooks ->
   ?log_output:bool ->
