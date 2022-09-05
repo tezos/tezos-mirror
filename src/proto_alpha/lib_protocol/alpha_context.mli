@@ -1365,12 +1365,19 @@ module Seed : sig
     context -> seed_computation_status tzresult Lwt.t
 end
 
+(** Big maps are a data structure storing key-value associations, just like
+    regular maps, but here the whole content of the structure is not loaded in
+    memory when interacting with it.
+    They are thus suitable for a Michelson contract, for instance, when there are a
+    lot of bindings, but only a few items are accessed at each contract call. *)
 module Big_map : sig
+  (** A big map is referenced in the storage by its identifier. *)
   module Id : sig
     type t = Lazy_storage_kind.Big_map.Id.t
 
     val encoding : t Data_encoding.t
 
+    (** Big map argument for a RPC call. *)
     val rpc_arg : t RPC_arg.arg
 
     (** In the protocol, to be used in parse_data only *)
@@ -1380,17 +1387,23 @@ module Big_map : sig
     val unparse_to_z : t -> Z.t
   end
 
+  (** Create a fresh big map in the context. *)
   val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
 
+  (** Carbonated membership of a key (from its hash) in a big map. *)
   val mem :
     context -> Id.t -> Script_expr_hash.t -> (context * bool) tzresult Lwt.t
 
+  (** Carbonated retrieval of the value associated to a key (from its hash) in
+      a big map, if any. *)
   val get_opt :
     context ->
     Id.t ->
     Script_expr_hash.t ->
     (context * Script.expr option) tzresult Lwt.t
 
+  (** Carbonated retrieval of the key and value types of the bindings in a big
+      map referenced by its identifier, if this identifier is actually bound to a big map in the context. *)
   val exists :
     context ->
     Id.t ->
@@ -1411,14 +1424,18 @@ module Big_map : sig
     Id.t ->
     (context * (Script_expr_hash.t * Script.expr) list) tzresult Lwt.t
 
+  (** The type of big map updates. When [value = None], the potential binding
+      associated to the [key] will be removed. *)
   type update = {
     key : Script_repr.expr;
+        (** The key is ignored by an update but is shown in the receipt. *)
     key_hash : Script_expr_hash.t;
     value : Script_repr.expr option;
   }
 
   type updates = update list
 
+  (** The types of keys and values in a big map. *)
   type alloc = {key_type : Script_repr.expr; value_type : Script_repr.expr}
 end
 
@@ -1438,6 +1455,7 @@ module Sapling : sig
     val unparse_to_z : t -> Z.t (* To be used in unparse_data only *)
   end
 
+  (** Create a fresh sapling state in the context. *)
   val fresh : temporary:bool -> context -> (context * Id.t) tzresult Lwt.t
 
   type diff = private {
@@ -1504,6 +1522,7 @@ module Sapling : sig
     string ->
     (context * (Int64.t * state) option) tzresult Lwt.t
 
+  (** See {!Lazy_storage_kind.Sapling_state.alloc}. *)
   type alloc = {memo_size : Memo_size.t}
 
   type updates = diff
@@ -2379,6 +2398,8 @@ module Bond_id : sig
   end
 end
 
+(** This module re-exports definitions from {!Zk_rollup_repr} and
+    {!Zk_rollup_storage}. *)
 module Zk_rollup : sig
   module Address : S.HASH
 
@@ -2388,12 +2409,14 @@ module Zk_rollup : sig
 
   val to_scalar : t -> scalar
 
+  (** This module re-exports definitions from {!Zk_rollup_state_repr}. *)
   module State : sig
     type t = scalar array
 
     val encoding : t Data_encoding.t
   end
 
+  (** This module re-exports definitions from {!Zk_rollup_account_repr}. *)
   module Account : sig
     module SMap : Map.S with type key = string
 
@@ -2411,6 +2434,7 @@ module Zk_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  (** This module re-exports definitions from {!Zk_rollup_operation_repr}. *)
   module Operation : sig
     type t = {
       op_code : int;
@@ -2769,7 +2793,9 @@ module Vote : sig
   val clear_current_proposal : context -> context Lwt.t
 end
 
+(** This module exposes definitions for the data-availability layer. *)
 module Dal : sig
+  (** This module re-exports definitions from {!Dal_slot_repr.Index}. *)
   module Slot_index : sig
     type t
 
@@ -2784,6 +2810,8 @@ module Dal : sig
     val compare : t -> t -> int
   end
 
+  (** This module re-exports definitions from {!Dal_endorsement_repr} and
+      {!Raw_context.Dal}. *)
   module Endorsement : sig
     type t
 
@@ -2800,6 +2828,8 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  (** This module re-exports definitions from {!Dal_slot_repr},
+      {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
     type header = Dal.commitment
 
@@ -2822,6 +2852,7 @@ module Dal : sig
   end
 end
 
+(** This module re-exports definitions from {!Dal_errors_repr}. *)
 module Dal_errors : sig
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3168
      do not expose these errors and return them in functions
@@ -4645,6 +4676,7 @@ module Ticket_balance : sig
 end
 
 module First_level_of_protocol : sig
+  (** Get the level of the first block of this protocol. *)
   val get : context -> Raw_level.t tzresult Lwt.t
 end
 
@@ -4658,9 +4690,15 @@ module Consensus : sig
        and type slot_set := Slot.Set.t
        and type round := Round.t
 
+  (** [store_endorsement_branch context branch] sets the "endorsement branch"
+      (see {!Storage.Tenderbake.Endorsement_branch} to [branch] in both the disk
+      storage and RAM. *)
   val store_endorsement_branch :
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 
+  (** [store_grand_parent_branch context branch] sets the "grand-parent branch"
+      (see {!Storage.Tenderbake.Grand_parent_branch} to [branch] in both the
+      disk storage and RAM. *)
   val store_grand_parent_branch :
     context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
 end
