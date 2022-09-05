@@ -681,7 +681,7 @@ module Make (Context : P) :
 
       let name = "output_counter"
 
-      let encoding = Data_encoding.z
+      let encoding = Data_encoding.n
 
       let pp = Z.pp_print
     end)
