@@ -3093,6 +3093,7 @@ let _octez_scoru_wasm_tests =
         qcheck_alcotest;
         alcotest_lwt;
         tezt_lib;
+        octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
