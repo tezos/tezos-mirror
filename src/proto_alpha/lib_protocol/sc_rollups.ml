@@ -129,6 +129,9 @@ let wrapped_proof_kind_exn : wrapped_proof -> Kind.t = function
   | Arith_pvm_with_proof _ -> Kind.Example_arith
   | Wasm_2_0_0_pvm_with_proof _ -> Kind.Wasm_2_0_0
 
+(* TODO: #3704
+   Change to an encoding that produces bytes
+*)
 let wrapped_proof_encoding =
   let open Data_encoding in
   let encoding =

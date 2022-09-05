@@ -669,6 +669,10 @@ let generate_sc_rollup_originate random_state :
     let origination_proof =
       Lwt_main.run (Sc_rollup_helpers.origination_proof ~boot_sector kind)
     in
+    let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+    let origination_proof =
+      Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+    in
     Sc_rollup_originate {kind; boot_sector; origination_proof; parameters_ty}
   in
   generate_manager random_state gen_sc_originate

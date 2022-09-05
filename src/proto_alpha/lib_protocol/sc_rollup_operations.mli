@@ -67,7 +67,7 @@ val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
-  origination_proof:Sc_rollup.wrapped_proof ->
+  origination_proof:string ->
   parameters_ty:Script_repr.lazy_expr ->
   (origination_result * context) tzresult Lwt.t
 
@@ -99,4 +99,7 @@ module Internal_for_tests : sig
     source:public_key_hash ->
     output_proof:string ->
     (execute_outbox_message_result * context) tzresult Lwt.t
+
+  val origination_proof_of_string :
+    string -> Sc_rollup.Kind.t -> Sc_rollup.wrapped_proof tzresult Lwt.t
 end

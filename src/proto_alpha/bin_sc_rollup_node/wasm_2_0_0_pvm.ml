@@ -31,11 +31,18 @@ open Alpha_context
 
     It is imperative that this is aligned with the protocol's implementation.
 *)
-module Wasm_2_0_0_proof_format = Context.Proof (struct
-  include Sc_rollup.State_hash
+module Wasm_2_0_0_proof_format =
+  Context.Proof
+    (struct
+      include Sc_rollup.State_hash
 
-  let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
-end)
+      let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
+    end)
+    (struct
+      let proof_encoding =
+        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+        .tree_proof_encoding
+    end)
 
 module Impl : Pvm.S = struct
   include Sc_rollup.Wasm_2_0_0PVM.Make (Wasm_2_0_0_proof_format)

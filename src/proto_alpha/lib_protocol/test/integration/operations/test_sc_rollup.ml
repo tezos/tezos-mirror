@@ -764,6 +764,10 @@ let test_originating_with_invalid_boot_sector_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Example_arith
   in
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let origination_proof =
+    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+  in
   let*! res =
     init_and_originate
       ~boot_sector:"another boot sector"
@@ -785,9 +789,30 @@ let test_originating_with_invalid_kind_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Wasm_2_0_0
   in
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let origination_proof =
+    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+  in
   let*! res =
     init_and_originate
       ~boot_sector:"a boot sector"
+      ~origination_proof
+      Context.T1
+      "unit"
+  in
+  match res with
+  | Error
+      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
+      :: _) ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
+
+let test_originating_with_random_proof () =
+  let origination_proof = "bad proof" in
+  let*! res =
+    init_and_originate
+      ~boot_sector:"some boot sector"
       ~origination_proof
       Context.T1
       "unit"
@@ -1645,6 +1670,10 @@ let tests =
       "originating with invalid kind proof"
       `Quick
       test_originating_with_invalid_kind_proof;
+    Tztest.tztest
+      "originating with random proof"
+      `Quick
+      test_originating_with_random_proof;
     Tztest.tztest
       "originating with valid type"
       `Quick
