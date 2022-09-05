@@ -23,17 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Filter = struct
-  module Proto = Registerer.Registered
-  module Default_Filters = Shell_plugin.No_filter (Proto)
-  module Mempool = Default_Filters.Mempool
-end
-
 module RPC = struct
   module Proto = Registerer.Registered
   include Plugin.RPC
 end
-
-let () = Shell_plugin.register_filter (module Filter)
 
 let () = Shell_plugin.register_rpc (module RPC)
