@@ -53,6 +53,12 @@ val set_delegate : t
 (** Entrypoint "remove_delegate" *)
 val remove_delegate : t
 
+(** Deposit entrypoint "deposit" *)
+val deposit : t
+
+(** Checks whether an entrypoint is the deposit entrypoint *)
+val is_deposit : t -> bool
+
 (** Converts an annot to an entrypoint.
     Returns an error if the string is too long or is "default". *)
 val of_annot_strict :
