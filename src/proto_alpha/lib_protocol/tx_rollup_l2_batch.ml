@@ -96,7 +96,7 @@ module V1 = struct
 
   (* --- [operation_content]                                                    *)
 
-  let compact_operation_content =
+  let compact_binary_operation_content =
     let open Data_encoding.Compact in
     union
       [
@@ -127,6 +127,103 @@ module V1 = struct
           (fun (destination, ticket_hash, qty) ->
             Transfer {destination; ticket_hash; qty});
       ]
+
+  let non_tz4_public_key_hash_encoding =
+    let open Data_encoding in
+    conv_with_guard
+      (fun pkh -> pkh)
+      (fun (pkh : Signature.public_key_hash) ->
+        match pkh with
+        | (Ed25519 _ | Secp256k1 _ | P256 _) as pkh -> Ok pkh
+        | Bls _ ->
+            Error
+              "Withdraw to tz4 address is not supported in the deprecated \
+               encoding.")
+      Signature.Public_key_hash.encoding
+
+  (** JSON encoding for [operation_content] which allows to represent
+      withdrawals to tz4 accounts. The [deprecated_] variants are kept for
+      backward compatibility purpose. *)
+  let json_operation_content =
+    let open Data_encoding in
+    let withdraw_deprecated destination =
+      obj3
+        (req "destination" destination)
+        (req "ticket_hash" Alpha_context.Ticket_hash.encoding)
+        (req "qty" (Compact.make ~tag_size Tx_rollup_l2_qty.compact_encoding))
+    in
+    let withdraw =
+      merge_objs
+        (obj1 (req "direction" (constant "withdraw")))
+        (withdraw_deprecated Signature.Public_key_hash.encoding)
+    in
+    let transfer_deprecated =
+      obj3
+        (req "destination" (Indexable.encoding Tx_rollup_l2_address.encoding))
+        (req "ticket_hash" (Compact.make ~tag_size Ticket_indexable.compact))
+        (req "qty" (Compact.make ~tag_size Tx_rollup_l2_qty.compact_encoding))
+    in
+    let transfer =
+      merge_objs
+        (obj1 (req "direction" (constant "transfer")))
+        transfer_deprecated
+    in
+    matching
+      (function
+        | Withdraw {destination; ticket_hash; qty} ->
+            matched 0 withdraw ((), (destination, ticket_hash, qty))
+        | Transfer {destination; ticket_hash; qty} ->
+            matched 1 transfer ((), (destination, ticket_hash, qty)))
+      [
+        case
+          Json_only
+          ~title:"withdraw"
+          withdraw
+          (function
+            | Withdraw {destination; ticket_hash; qty} ->
+                Some ((), (destination, ticket_hash, qty))
+            | _ -> None)
+          (fun ((), (destination, ticket_hash, qty)) ->
+            Withdraw {destination; ticket_hash; qty});
+        case
+          Json_only
+          ~title:"transfer"
+          transfer
+          (function
+            | Transfer {destination; ticket_hash; qty} ->
+                Some ((), (destination, ticket_hash, qty))
+            | _ -> None)
+          (fun ((), (destination, ticket_hash, qty)) ->
+            Transfer {destination; ticket_hash; qty});
+        case
+          Json_only
+          ~title:"deprecated_withdraw"
+          (withdraw_deprecated non_tz4_public_key_hash_encoding)
+          (function
+            | Withdraw {destination; ticket_hash; qty} ->
+                Some (destination, ticket_hash, qty)
+            | _ -> None)
+          (fun (destination, ticket_hash, qty) ->
+            Withdraw {destination; ticket_hash; qty});
+        case
+          Json_only
+          ~title:"deprecated_transfer"
+          transfer_deprecated
+          (function
+            | Transfer {destination; ticket_hash; qty} ->
+                Some (destination, ticket_hash, qty)
+            | _ -> None)
+          (fun (destination, ticket_hash, qty) ->
+            Transfer {destination; ticket_hash; qty});
+      ]
+
+  let compact_operation_content =
+    (* This is equivalent to Data_encoding.Compact.splitted *)
+    Data_encoding.Compact.conv
+      ~json:json_operation_content
+      (fun x -> x)
+      (fun x -> x)
+      compact_binary_operation_content
 
   let operation_content_encoding =
     Data_encoding.Compact.make ~tag_size compact_operation_content
