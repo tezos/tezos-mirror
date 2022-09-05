@@ -64,7 +64,8 @@ let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
   let middleware =
-    Tezos_rpc_http_server.RPC_middleware.query_forwarder forwarding_endpoint
+    Tezos_rpc_http_server.RPC_middleware.proxy_server_query_forwarder
+      forwarding_endpoint
   in
   Lwt.catch
     (fun () ->
