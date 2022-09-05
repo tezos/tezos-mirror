@@ -170,6 +170,15 @@ let map_concat_kont_encoding enc_a enc_b =
         (fun j -> MC_Join j);
     ]
 
+let exports_acc_encoding =
+  conv
+    (fun (exports_memory_0, exports) -> {exports_memory_0; exports})
+    (fun {exports_memory_0; exports} -> (exports_memory_0, exports))
+    (tup2
+       ~flatten:true
+       (value ["exports-memory-0"] Data_encoding.bool)
+       (scope ["exports"] Wasm_encoding.extern_map_encoding))
+
 let init_kont_encoding ~host_funcs =
   tagged_union tag_encoding
   @@ [
@@ -233,7 +242,7 @@ let init_kont_encoding ~host_funcs =
            @@ fold_left_kont_encoding
                 (lazy_vec_encoding
                    Parser.(no_region_encoding Export.export_encoding))
-                Wasm_encoding.extern_map_encoding))
+                exports_acc_encoding))
         (function IK_Exports (inst, fold) -> Some (inst, fold) | _ -> None)
         (function inst, fold -> IK_Exports (inst, fold));
       case

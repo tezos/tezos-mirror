@@ -239,6 +239,7 @@ struct
           (* End of the linking phase *)
           let* init_kont =
             Wasm.Eval.init_step
+              ~check_module_exports:Exports_memory_0
               ~module_reg
               ~self
               host_funcs

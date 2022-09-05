@@ -1741,6 +1741,8 @@ let create_elem_step ~module_reg inst :
     (eval_const_step module_reg)
     tick
 
+type exports_acc = {exports : extern NameMap.t; exports_memory_0 : bool}
+
 type init_kont =
   | IK_Start
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
@@ -1751,9 +1753,10 @@ type init_kont =
   | IK_Aggregate_concat :
       module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
-  | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
+  | IK_Exports of module_inst * (Ast.export, exports_acc) fold_left_kont
   | IK_Elems of
-      module_inst * (create_elem_kont, elem_segment, elem_inst) tick_map_kont
+      module_inst
+      * (create_elem_kont, Ast.elem_segment, elem_inst) tick_map_kont
   | IK_Datas of module_inst * (data_segment, data_inst) map_kont
   | IK_Es_elems of module_inst * (elem_segment, admin_instr) map_concat_kont
   | IK_Es_datas of
@@ -1772,7 +1775,12 @@ let section_next_init_kont :
   | Func -> IK_Aggregate (inst0, Global, tick_map_kont m.it.globals)
   | Global -> IK_Aggregate (inst0, Table, tick_map_kont m.it.tables)
   | Table -> IK_Aggregate (inst0, Memory, tick_map_kont m.it.memories)
-  | Memory -> IK_Exports (inst0, fold_left_kont m.it.exports (NameMap.create ()))
+  | Memory ->
+      IK_Exports
+        ( inst0,
+          fold_left_kont
+            m.it.exports
+            {exports = NameMap.create (); exports_memory_0 = false} )
 
 let section_inner_kont :
     type kont a b. module_key -> (kont, a, b) init_section -> a -> kont =
@@ -1822,8 +1830,20 @@ let section_update_module_ref : type kont a b. (kont, a, b) init_section -> bool
   | Table -> false
   | Memory -> true
 
-let init_step ~module_reg ~self host_funcs (m : module_)
-    (exts : extern Vector.t) = function
+let is_memory_0_export (export : export) =
+  match export.it.edesc.it with
+  | MemoryExport var ->
+      (* Modules may currently only have 1 memory which has index 0. This means
+         if memory at index 0 is exported, the entire memory is exported. *)
+      Int32.(equal var.it zero)
+  | _ -> false
+
+type memory_export_rules = Exports_memory_0 | No_memory_export_rules
+
+exception Missing_memory_0_export
+
+let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
+    host_funcs (m : module_) (exts : extern Vector.t) = function
   | IK_Start ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
@@ -1875,14 +1895,22 @@ let init_step ~module_reg ~self host_funcs (m : module_)
       let+ tick = concat_step tick in
       IK_Aggregate_concat (inst0, sec, tick)
   | IK_Exports (inst0, tick) when fold_left_completed tick ->
-      let inst0 = {inst0 with exports = tick.acc} in
+      (match check_module_exports with
+      | Exports_memory_0 ->
+          if not tick.acc.exports_memory_0 then raise Missing_memory_0_export
+      | No_memory_export_rules -> ()) ;
+      let inst0 = {inst0 with exports = tick.acc.exports} in
       Lwt.return (IK_Elems (inst0, tick_map_kont m.it.elems))
   | IK_Exports (inst0, tick) ->
       let+ tick =
-        fold_left_s_step tick (fun map export ->
+        fold_left_s_step tick (fun acc export ->
             let* k, v = create_export inst0 export in
             let+ k = Instance.Vector.to_list k in
-            NameMap.set k v map)
+            {
+              exports = NameMap.set k v acc.exports;
+              exports_memory_0 =
+                acc.exports_memory_0 || is_memory_0_export export;
+            })
       in
       IK_Exports (inst0, tick)
   | IK_Elems (inst0, tick) when tick_map_completed tick ->

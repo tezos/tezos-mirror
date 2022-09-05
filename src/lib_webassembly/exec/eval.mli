@@ -174,6 +174,8 @@ type ('kont, 'a, 'b) tick_map_kont = {
 
 type create_elem_kont = (eval_const_kont, Ast.const, ref_) tick_map_kont
 
+type exports_acc = {exports : extern NameMap.t; exports_memory_0 : bool}
+
 type init_kont =
   | IK_Start  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
@@ -184,7 +186,7 @@ type init_kont =
   | IK_Aggregate_concat :
       module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
-  | IK_Exports of module_inst * (Ast.export, extern NameMap.t) fold_left_kont
+  | IK_Exports of module_inst * (Ast.export, exports_acc) fold_left_kont
   | IK_Elems of
       module_inst
       * (create_elem_kont, Ast.elem_segment, elem_inst) tick_map_kont
@@ -200,11 +202,18 @@ type init_kont =
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
 
+type memory_export_rules = Exports_memory_0 | No_memory_export_rules
+
+(** This is raised when an initialisation function detects that the module does
+    not export its main memory. *)
+exception Missing_memory_0_export
+
 (** Small-step execution of the [init] process. See {!init}.
 
     @raise Invalid_argument if called with [IK_Stop]. There is no
     transition from the terminal state. *)
 val init_step :
+  ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
   self:module_key ->
   Host_funcs.registry ->
