@@ -250,14 +250,14 @@ let qcheck_wrap = qcheck_wrap ~rand:state
 
 let alias_float_test =
   QCheck.Test.make
-    ~count:100
+    ~count:10
     ~name:"alias_float"
     QCheck.(list_of_size (Gen.int_range 1 20) pos_float)
     Test_float.make
 
 let alias_z_test =
   QCheck.Test.make
-    ~count:100
+    ~count:10
     ~name:"alias_z"
     QCheck.(
       list_of_size

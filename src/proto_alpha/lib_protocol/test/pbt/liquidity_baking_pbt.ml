@@ -125,8 +125,9 @@ let positive_pools env state =
 let validate_xtz_balance :
     Contract.t -> ValidationMachine.t -> bool tzresult Lwt.t =
  fun contract state ->
-  ValidationMachine.Symbolic.get_xtz_balance contract state >>=? fun expected ->
-  ValidationMachine.Concrete.get_xtz_balance contract state >>=? fun amount ->
+  let open Lwt_result_syntax in
+  let* expected = ValidationMachine.Symbolic.get_xtz_balance contract state in
+  let* amount = ValidationMachine.Concrete.get_xtz_balance contract state in
   return (amount = expected)
 
 (** [validate_tzbtc_balance c env (blk, state)] returns [true] iff the
@@ -135,10 +136,14 @@ let validate_xtz_balance :
 let validate_tzbtc_balance :
     Contract.t -> Contract.t env -> ValidationMachine.t -> bool tzresult Lwt.t =
  fun contract env state ->
-  ValidationMachine.Symbolic.get_tzbtc_balance contract env state
-  >>=? fun expected ->
-  ValidationMachine.Concrete.get_tzbtc_balance contract env state
-  >>=? fun amount -> return (expected = amount)
+  let open Lwt_result_syntax in
+  let* expected =
+    ValidationMachine.Symbolic.get_tzbtc_balance contract env state
+  in
+  let* amount =
+    ValidationMachine.Concrete.get_tzbtc_balance contract env state
+  in
+  return (expected = amount)
 
 (** [validate_liquidity_balance c env (blk, state)] returns [true] if
     the contract [c] holds the same amount of liquidity in [blk] and
@@ -146,10 +151,14 @@ let validate_tzbtc_balance :
 let validate_liquidity_balance :
     Contract.t -> Contract.t env -> ValidationMachine.t -> bool tzresult Lwt.t =
  fun contract env state ->
-  ValidationMachine.Symbolic.get_liquidity_balance contract env state
-  >>=? fun expected ->
-  ValidationMachine.Concrete.get_liquidity_balance contract env state
-  >>=? fun amount -> return (expected = amount)
+  let open Lwt_result_syntax in
+  let* expected =
+    ValidationMachine.Symbolic.get_liquidity_balance contract env state
+  in
+  let* amount =
+    ValidationMachine.Concrete.get_liquidity_balance contract env state
+  in
+  return (expected = amount)
 
 (** [validate_balances c env (blk, state)] returns true iff the
     contract [c] holds the same amount of tez, tzbtc and liquidity in
@@ -168,10 +177,13 @@ let validate_balances :
     CPMM has distributed the same amount of liquidity tokens in its
     concrete and symbolic parts of [state]. *)
 let validate_cpmm_total_liquidity env state =
-  ValidationMachine.Concrete.get_cpmm_total_liquidity env state
-  >>=? fun concrete_cpmm_total_liquidity ->
-  ValidationMachine.Symbolic.get_cpmm_total_liquidity env state
-  >>=? fun ghost_cpmm_total_liquidity ->
+  let open Lwt_result_syntax in
+  let* concrete_cpmm_total_liquidity =
+    ValidationMachine.Concrete.get_cpmm_total_liquidity env state
+  in
+  let* ghost_cpmm_total_liquidity =
+    ValidationMachine.Symbolic.get_cpmm_total_liquidity env state
+  in
   return (concrete_cpmm_total_liquidity = ghost_cpmm_total_liquidity)
 
 (** [validate_consistency env (blk, state)] checks if the accounts in
@@ -196,28 +208,32 @@ let validate_consistency :
 let validate_storage :
     Contract.t env -> ConcreteMachine.t -> bool tzresult Lwt.t =
  fun env blk ->
-  Cpmm_repr.Storage.get (B blk) ~contract:env.cpmm_contract
-  >>=? fun cpmm_storage ->
+  let open Lwt_result_syntax in
+  let* cpmm_storage =
+    Cpmm_repr.Storage.get (B blk) ~contract:env.cpmm_contract
+  in
   all_true
     [
       (* 1. Check the CPMM's [xtzPool] is equal to the actual CPMM balance *)
-      ( ConcreteMachine.get_xtz_balance env.cpmm_contract blk
-      >>=? fun cpmm_xtz -> return (cpmm_xtz = Tez.to_mutez cpmm_storage.xtzPool)
-      );
+      (let* cpmm_xtz = ConcreteMachine.get_xtz_balance env.cpmm_contract blk in
+       return (cpmm_xtz = Tez.to_mutez cpmm_storage.xtzPool));
       (* 2. Check the CPMM’s [lqtTotal] is correct wrt. liquidity contract *)
-      ( Lqt_fa12_repr.Storage.get (B blk) ~contract:env.liquidity_contract
-      >>=? fun liquidity_storage ->
-        return (cpmm_storage.lqtTotal = liquidity_storage.totalSupply) );
+      (let* liquidity_storage =
+         Lqt_fa12_repr.Storage.get (B blk) ~contract:env.liquidity_contract
+       in
+       return (cpmm_storage.lqtTotal = liquidity_storage.totalSupply));
       (* 3. Check the CPMM’s [tokenPool] is correct *)
-      ( ConcreteMachine.get_tzbtc_balance env.cpmm_contract env blk
-      >>=? fun cpmm_tzbtc ->
-        return (Z.to_int cpmm_storage.tokenPool = cpmm_tzbtc) );
+      (let* cpmm_tzbtc =
+         ConcreteMachine.get_tzbtc_balance env.cpmm_contract env blk
+       in
+       return (Z.to_int cpmm_storage.tokenPool = cpmm_tzbtc));
     ]
 
 (** [machine_validation_tests] is a list of asynchronous tests aiming
     at asserting the correctness and consistencies of the machines
     themselves. *)
 let machine_validation_tests =
+  let open Lwt_result_syntax in
   [
     QCheck2.Test.make
       ~count:10
@@ -227,8 +243,8 @@ let machine_validation_tests =
       (fun (specs, scenario) ->
         extract_qcheck_tzresult
           (let invariant = validate_consistency in
-           ValidationMachine.build ~invariant specs >>=? fun (state, env) ->
-           ValidationMachine.run ~invariant scenario env state >>=? fun _ ->
+           let* state, env = ValidationMachine.build ~invariant specs in
+           let* _ = ValidationMachine.run ~invariant scenario env state in
            return_unit));
     QCheck2.Test.make
       ~count:10
@@ -238,8 +254,8 @@ let machine_validation_tests =
       (fun (specs, scenario) ->
         extract_qcheck_tzresult
           (let invariant = validate_storage in
-           ConcreteMachine.build ~invariant specs >>=? fun (state, env) ->
-           ConcreteMachine.run ~invariant scenario env state >>=? fun _ ->
+           let* state, env = ConcreteMachine.build ~invariant specs in
+           let* _ = ConcreteMachine.run ~invariant scenario env state in
            return_unit));
     QCheck2.Test.make
       ~count:50_000

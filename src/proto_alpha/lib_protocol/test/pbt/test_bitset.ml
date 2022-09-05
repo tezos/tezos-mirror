@@ -40,7 +40,7 @@ let gen_storage =
   let* bool_vector = list bool in
   match
     List.fold_left_i_e
-      (fun i storage v -> if v then add storage i else ok storage)
+      (fun i storage v -> if v then add storage i else Ok storage)
       empty
       bool_vector
   with
