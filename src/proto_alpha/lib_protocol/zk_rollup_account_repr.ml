@@ -32,7 +32,11 @@ type static = {
   nb_ops : int;
 }
 
-type dynamic = {state : Zk_rollup_state_repr.t}
+type dynamic = {
+  state : Zk_rollup_state_repr.t;
+  paid_l2_operations_storage_space : Z.t;
+  used_l2_operations_storage_space : Z.t;
+}
 
 type t = {static : static; dynamic : dynamic}
 
@@ -71,9 +75,26 @@ let encoding =
   in
   let dynamic_encoding =
     conv
-      (fun {state} -> state)
-      (fun state -> {state})
-      (obj1 (req "state" Zk_rollup_state_repr.encoding))
+      (fun {
+             state;
+             paid_l2_operations_storage_space;
+             used_l2_operations_storage_space;
+           } ->
+        ( state,
+          paid_l2_operations_storage_space,
+          used_l2_operations_storage_space ))
+      (fun ( state,
+             paid_l2_operations_storage_space,
+             used_l2_operations_storage_space ) ->
+        {
+          state;
+          paid_l2_operations_storage_space;
+          used_l2_operations_storage_space;
+        })
+      (obj3
+         (req "state" Zk_rollup_state_repr.encoding)
+         (req "paid_l2_operations_storage_space" n)
+         (req "used_l2_operations_storage_space" n))
   in
   conv
     (fun {static; dynamic} -> (static, dynamic))

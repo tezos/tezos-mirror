@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Representation of tickets for the ZKRU.
-    This data is used byt the [Zk_rollup_publish] operation to compute the
+    This data is used by the [Zk_rollup_publish] operation to compute the
     ticket hashes needed to transfer tickets from the ZK Rollup to an
     implicit account.
 *)

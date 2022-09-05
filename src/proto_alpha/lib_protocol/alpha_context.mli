@@ -2353,7 +2353,11 @@ module Zk_rollup : sig
       nb_ops : int;
     }
 
-    type dynamic = {state : State.t}
+    type dynamic = {
+      state : State.t;
+      paid_l2_operations_storage_space : Z.t;
+      used_l2_operations_storage_space : Z.t;
+    }
 
     type t = {static : static; dynamic : dynamic}
 
