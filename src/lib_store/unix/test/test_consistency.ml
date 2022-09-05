@@ -292,9 +292,19 @@ let make_tests =
   in
   List.map (fun (hm, test) -> (hm, test hm)) List.(product history_modes tests)
 
-let tests =
-  ( "consistency",
-    List.map
-      (fun (history_mode, test) ->
-        wrap_test ~block_cache_limit:1 ~history_mode ~manual_close:true test)
-      make_tests )
+let () =
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-store"
+       [
+         ( "consistency",
+           List.map
+             (fun (history_mode, test) ->
+               wrap_test
+                 ~block_cache_limit:1
+                 ~history_mode
+                 ~manual_close:true
+                 test)
+             make_tests );
+       ]

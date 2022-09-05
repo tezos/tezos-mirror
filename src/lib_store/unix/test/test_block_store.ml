@@ -720,3 +720,9 @@ let tests : string * unit Alcotest_lwt.test_case list =
       ]
   in
   ("block store", test_cases)
+
+let () =
+  let open Lwt_syntax in
+  Lwt_main.run
+    (let* () = Tezos_base_unix.Internal_event_unix.init () in
+     Alcotest_lwt.run "tezos-store" [tests])

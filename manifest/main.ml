@@ -5082,7 +5082,16 @@ let _octez_micheline_rewriting_tests =
 
 let _octez_store_tests =
   tests
-    ["test"; "test_locator"]
+    [
+      "test";
+      "test_consistency";
+      "test_locator";
+      "test_cemented_store";
+      "test_block_store";
+      "test_protocol_store";
+      "test_store";
+      "test_testchain";
+    ]
     ~path:"src/lib_store/unix/test"
     ~opam:"tezos-store"
     ~deps:
@@ -5115,6 +5124,26 @@ let _octez_store_tests =
          run these tests in the CI. *)
       Dune.
         [
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_cemented_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_block_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_protocol_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_testchain" []);
           alias_rule
             "runtest"
             ~package:"tezos-store"
