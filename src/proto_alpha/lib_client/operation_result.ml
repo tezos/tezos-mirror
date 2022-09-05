@@ -791,8 +791,9 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_zk_rollup_origination_result
       (Zk_rollup_origination_result
-        {consumed_gas; originated_zk_rollup; size = _; balance_updates}) =
+        {consumed_gas; originated_zk_rollup; storage_size; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
+    pp_storage_size ppf storage_size ;
     Format.fprintf ppf "@,Address: %a" Zk_rollup.Address.pp originated_zk_rollup ;
     pp_balance_updates ppf balance_updates
   in

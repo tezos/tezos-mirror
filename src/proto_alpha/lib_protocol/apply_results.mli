@@ -276,7 +276,9 @@ and _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;
       consumed_gas : Gas.Arith.fp;
-      size : Z.t;
+      (* Number of bytes allocated by the ZKRU origination.
+         Used to burn storage fees. *)
+      storage_size : Z.t;
     }
       -> Kind.zk_rollup_origination successful_manager_operation_result
 

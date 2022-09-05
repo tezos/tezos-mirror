@@ -34,12 +34,12 @@ type t = {
 let int_to_scalar x = Zk_rollup_scalar.of_z (Z.of_int x)
 
 let pkh_to_scalar x =
-  Zk_rollup_scalar.of_bytes
-    (Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding x)
+  Zk_rollup_scalar.of_bits
+    (Data_encoding.Binary.to_string_exn Signature.Public_key_hash.encoding x)
 
 let ticket_hash_to_scalar ticket_hash =
-  Zk_rollup_scalar.of_bytes
-  @@ Data_encoding.Binary.to_bytes_exn Ticket_hash_repr.encoding ticket_hash
+  Zk_rollup_scalar.of_bits
+  @@ Data_encoding.Binary.to_string_exn Ticket_hash_repr.encoding ticket_hash
 
 let to_scalar_array {op_code; price; l1_dst; rollup_id; payload} =
   Array.concat

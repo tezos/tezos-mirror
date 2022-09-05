@@ -50,22 +50,24 @@ let () =
     (fun () -> Zk_rollup_negative_nb_ops)
 
 let assert_feature_enabled ctxt =
-  fail_unless (Constants.zk_rollup_enable ctxt) Zk_rollup_feature_disabled
+  error_unless (Constants.zk_rollup_enable ctxt) Zk_rollup_feature_disabled
 
 let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
     ~init_state ~nb_ops =
-  assert_feature_enabled ctxt >>=? fun () ->
-  fail_when Compare.Int.(nb_ops < 0) Zk_rollup_negative_nb_ops >>=? fun () ->
-  Zk_rollup.originate
-    ctxt
-    {
-      public_parameters;
-      state_length = Array.length init_state;
-      circuits_info;
-      nb_ops;
-    }
-    ~init_state
-  >>=? fun (ctxt, originated_zk_rollup, size) ->
+  let open Lwt_result_syntax in
+  let*? () = assert_feature_enabled ctxt in
+  let*? () = error_when Compare.Int.(nb_ops < 0) Zk_rollup_negative_nb_ops in
+  let+ ctxt, originated_zk_rollup, storage_size =
+    Zk_rollup.originate
+      ctxt
+      {
+        public_parameters;
+        state_length = Array.length init_state;
+        circuits_info;
+        nb_ops;
+      }
+      ~init_state
+  in
   let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
   let result =
     Apply_results.Zk_rollup_origination_result
@@ -75,7 +77,7 @@ let originate ~ctxt_before_op ~ctxt ~public_parameters ~circuits_info
         (* TODO https://gitlab.com/tezos/tezos/-/issues/3544
            Carbonate ZKRU operations *)
         consumed_gas;
-        size;
+        storage_size;
       }
   in
-  return (ctxt, result, [])
+  (ctxt, result, [])

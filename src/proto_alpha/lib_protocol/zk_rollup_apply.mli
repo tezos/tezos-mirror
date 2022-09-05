@@ -48,7 +48,7 @@ type error +=
         activated.}
     }
 *)
-val assert_feature_enabled : t -> unit tzresult Lwt.t
+val assert_feature_enabled : t -> unit tzresult
 
 (** [originate ~ctxt_before_op ~ctxt ~public_parameters ~transcript
                ~circuits_info ~init_state ~nb_ops]

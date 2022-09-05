@@ -877,7 +877,7 @@ module Dal : sig
 end
 
 module Zk_rollup : sig
-  (** Zero ZK rollup.
+  (** ZK rollup.
 
       Each ZK rollup is associated to:
 

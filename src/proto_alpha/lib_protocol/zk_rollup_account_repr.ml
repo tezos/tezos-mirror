@@ -36,12 +36,25 @@ type dynamic = {state : Zk_rollup_state_repr.t}
 
 type t = {static : static; dynamic : dynamic}
 
+let circuits_info_encoding : bool SMap.t Data_encoding.t =
+  let open Data_encoding in
+  conv_with_guard
+    (fun m -> List.of_seq @@ SMap.to_seq m)
+    (fun l ->
+      let m = SMap.of_seq @@ List.to_seq l in
+      if
+        (* Check that the list has no duplicated keys *)
+        Compare.List_length_with.(l <> SMap.cardinal m)
+      then Error "Zk_rollup_origination: circuits_info has duplicated keys"
+      else Ok m)
+    (list (tup2 string bool))
+
 let encoding =
   let open Data_encoding in
   let static_encoding =
     let circuits_info_encoding =
       conv
-        (fun m -> List.of_seq @@ SMap.to_seq m)
+        SMap.bindings
         (fun l -> SMap.of_seq @@ List.to_seq l)
         (list (tup2 string bool))
     in

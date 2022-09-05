@@ -393,6 +393,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Transfer_ticket_result {paid_storage_size_diff; _} ->
             Ok paid_storage_size_diff
         | Sc_rollup_originate_result {size; _} -> Ok size
+        | Zk_rollup_origination_result {storage_size; _} -> Ok storage_size
         | Transaction_result (Transaction_to_tx_rollup_result _) ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
                Storage fees for transaction rollup.
@@ -415,8 +416,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         | Sc_rollup_cement_result _ | Sc_rollup_publish_result _
         | Sc_rollup_refute_result _ | Sc_rollup_timeout_result _
         | Sc_rollup_recover_bond_result _
-        | Sc_rollup_dal_slot_subscribe_result _ | Zk_rollup_origination_result _
-          ->
+        | Sc_rollup_dal_slot_subscribe_result _ ->
             Ok Z.zero)
     | Skipped _ ->
         error_with "Cannot estimate storage of skipped operation"

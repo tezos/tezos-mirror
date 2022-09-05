@@ -1,6 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* MIT License                                                               *)
+(* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -77,30 +77,32 @@ type op_code
 module Bound : sig
   type 'a t = private Z.t
 
-  val max_balance : balance t
+  val bound_balance : balance t
 
-  val max_amount : amount t
+  val bound_amount : amount t
 
-  val max_fee : fee t
+  val bound_fee : fee t
 
-  val max_op_code : op_code t
+  val bound_op_code : op_code t
 
   val v : 'a t -> Z.t
 end = struct
   type 'a t = Z.t
 
-  (** Maximum ticket balance, as found in the price field of an operation's
-      header *)
-  let max_balance = Z.(shift_left one 20)
+  (** These bounds are exclusive. *)
 
-  (** Maximum ticket amount, used for fee circuit *)
-  let max_amount = Z.(shift_left one 20)
+  (** Upper bound for ticket balance, as found in the price field of an
+      operation's header *)
+  let bound_balance = Z.(shift_left one 20)
 
-  (** Maximum fee amount for one public operation *)
-  let max_fee = Z.(shift_left one 10)
+  (** Upper bound for ticket amount, used for fee circuit *)
+  let bound_amount = Z.(shift_left one 20)
 
-  (** Maximum value for op code *)
-  let max_op_code = Z.(shift_left one 1)
+  (** Upper bound for fee amount of one public operation *)
+  let bound_fee = Z.(shift_left one 10)
+
+  (** Upper bound for op code *)
+  let bound_op_code = Z.one
 
   let v x = x
 end
@@ -138,9 +140,9 @@ module Types = struct
     (** Dummy values for these types. Useful to get the circuit without having
         the actual inputs. *)
     module Dummy = struct
-      let op_code = Bounded.make ~bound:Bound.max_op_code Z.zero
+      let op_code = Bounded.make ~bound:Bound.bound_op_code Z.zero
 
-      let balance = Bounded.make ~bound:Bound.max_balance Z.zero
+      let balance = Bounded.make ~bound:Bound.bound_balance Z.zero
 
       let tezos_pkh = Environment.Signature.Public_key_hash.zero
 
@@ -182,7 +184,8 @@ module Types = struct
 
     open Encodings (L)
 
-    let op_code_encoding ~safety = Bounded_e.encoding ~safety Bound.max_op_code
+    let op_code_encoding ~safety =
+      Bounded_e.encoding ~safety Bound.bound_op_code
 
     let encoding_to_scalar e x =
       let bs = Data_encoding.Binary.to_bytes_exn e x in
@@ -202,9 +205,9 @@ module Types = struct
         (encoding_of_scalar Signature.Public_key_hash.encoding)
         scalar_encoding
 
-    let amount_encoding ~safety = Bounded_e.encoding ~safety Bound.max_amount
+    let amount_encoding ~safety = Bounded_e.encoding ~safety Bound.bound_amount
 
-    let fee_encoding ~safety = Bounded_e.encoding ~safety Bound.max_fee
+    let fee_encoding ~safety = Bounded_e.encoding ~safety Bound.bound_fee
 
     let ticket_encoding ~safety (bound : 'a Bound.t) :
         ('a ticket, 'a ticket_u, _) encoding =
@@ -216,7 +219,7 @@ module Types = struct
         (obj2_encoding scalar_encoding (Bounded_e.encoding ~safety bound))
 
     let ticket_balance_encoding ~safety =
-      ticket_encoding ~safety Bound.max_balance
+      ticket_encoding ~safety Bound.bound_balance
 
     let header_encoding ~safety : (header, header_u, _) encoding =
       conv
@@ -361,8 +364,7 @@ end = struct
     (* zkr1PxS4vgvBsf6XVHRSB7UJKcrTWee8Dp7Wx *)
     Hex.to_bytes_exn (`Hex "c9a524d4db6514471775c380231afc10f2ef6ba3")
 
-  let dummy_ticket_hash =
-    Hex.to_bytes_exn (`Hex (String.init (2 * 32) @@ Fun.const '0'))
+  let dummy_ticket_hash = Bytes.make 32 '0'
 
   let _of_proto_state : Zk_rollup.State.t -> Types.P.state =
    fun s -> Bls12_381.Fr.is_one s.(0)
@@ -392,7 +394,7 @@ end = struct
              VC.predicate_op
                ~old_state:false
                ~new_state:true
-               ~fee:(T.Bounded.make ~bound:Bound.max_fee Z.zero)
+               ~fee:(T.Bounded.make ~bound:Bound.bound_fee Z.zero)
                ~exit_validity:false
                ~rollup_id:Dummy.tezos_pkh
                dummy_op );
@@ -400,14 +402,14 @@ end = struct
              VC.predicate_batch
                ~old_state:false
                ~new_state:true
-               ~fees:(T.Bounded.make ~bound:Bound.max_amount Z.zero)
+               ~fees:(T.Bounded.make ~bound:Bound.bound_amount Z.zero)
                ~rollup_id:Dummy.tezos_pkh
                (Stdlib.List.init Params.batch_size (Fun.const dummy_op)) );
            ( "fee",
              VC.predicate_fees
                ~old_state:false
                ~new_state:false
-               ~fees:(T.Bounded.make ~bound:Bound.max_amount Z.zero) );
+               ~fees:(T.Bounded.make ~bound:Bound.bound_amount Z.zero) );
          ]
 
   let circuits =
