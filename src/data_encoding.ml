@@ -32,7 +32,7 @@ module Encoding = struct
 
   let uint_like_n ?max_value () =
     let json =
-      let max_value = (1 lsl 30) - 1 in
+      let max_value = Binary_size.max_int `Uint30 in
       ranged_int 0 max_value
     in
     let binary = uint_like_n ?max_value () in
@@ -40,8 +40,8 @@ module Encoding = struct
 
   let int_like_z ?min_value ?max_value () =
     let json =
-      let max_value = (1 lsl 30) - 1 in
-      let min_value = -(1 lsl 30) in
+      let max_value = Binary_size.max_int `Int31 in
+      let min_value = Binary_size.min_int `Int31 in
       ranged_int min_value max_value
     in
     let binary = int_like_z ?min_value ?max_value () in

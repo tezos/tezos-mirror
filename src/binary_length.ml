@@ -30,11 +30,9 @@ let fixed_length e =
   | `Fixed n -> Some n
   | `Dynamic | `Variable -> None
 
-let n_length value =
-  let bits = Z.numbits value in
-  if bits = 0 then 1 else (bits + 6) / 7
+let n_length = Encoding.n_length
 
-let z_length value = (Z.numbits value + 1 + 6) / 7
+let z_length = Encoding.z_length
 
 let rec length : type x. x Encoding.t -> x -> int =
  fun e value ->

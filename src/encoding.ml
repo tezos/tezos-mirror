@@ -280,6 +280,12 @@ let check_not_variable name e =
         name
   | `Dynamic | `Fixed _ -> ()
 
+let n_length value =
+  let bits = Z.numbits value in
+  if bits = 0 then 1 else (bits + 6) / 7
+
+let z_length value = (Z.numbits value + 1 + 6) / 7
+
 (* [Mu_visited] is intended for internal use only. It is used to record visit
    to recursion nodes ([Mu]) to avoid infinite recursion. See [is_zeroable] for
    an example of use. *)
@@ -543,7 +549,7 @@ let with_decoding_guard guard encoding =
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
 
-let int_like_n_or_z ?min_value ?max_value name like =
+let int_like_n_or_z ?min_value ?max_value name sizer like =
   let max_value =
     match max_value with
     | None -> Binary_size.max_int `Int31
@@ -560,11 +566,7 @@ let int_like_n_or_z ?min_value ?max_value name like =
   in
   if max_value < min_value then invalid_arg name ;
   let max_size =
-    if max_value < 1 lsl 6 && min_value > -(1 lsl 6) then 1
-    else if max_value < 1 lsl 13 && min_value > -(1 lsl 13) then 2
-    else if max_value < 1 lsl 20 && min_value > -(1 lsl 20) then 3
-    else if max_value < 1 lsl 27 && min_value > -(1 lsl 27) then 4
-    else 5
+    max (sizer @@ Z.of_int min_value) (sizer @@ Z.of_int max_value)
   in
   check_size
     max_size
@@ -599,10 +601,10 @@ let int_like_n_or_z ?min_value ?max_value name like =
        like)
 
 let uint_like_n ?max_value () =
-  int_like_n_or_z ~min_value:0 ?max_value "Data_encoding.uint_like_n" n
+  int_like_n_or_z ~min_value:0 ?max_value "Data_encoding.uint_like_n" n_length n
 
 let int_like_z ?min_value ?max_value () =
-  int_like_n_or_z ?min_value ?max_value "Data_encoding.int_like_z" z
+  int_like_n_or_z ?min_value ?max_value "Data_encoding.int_like_z" z_length z
 
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}

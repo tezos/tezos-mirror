@@ -522,3 +522,7 @@ val raw_splitted :
 val is_nullable : 'a encoding -> bool
 
 val is_zeroable : 'a encoding -> bool
+
+val z_length : Z.t -> int
+
+val n_length : Z.t -> int
