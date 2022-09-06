@@ -86,8 +86,8 @@ type _ ty =
   | UInt16 : int ty
   | Int31 : int ty
   | RangedInt : int * int -> int ty
-  | UInt30_as_N : int -> int ty
-  | Int31_as_Z : int * int -> int ty
+  | UInt30_like_N : int -> int ty
+  | Int31_like_Z : int * int -> int ty
   | Int32 : int32 ty
   | Int64 : int64 ty
   | Float : float ty
@@ -173,8 +173,8 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | UInt16 -> Crowbar.pp ppf "uint16"
   | Int31 -> Crowbar.pp ppf "int31"
   | RangedInt (low, high) -> Crowbar.pp ppf "rangedint:[%d;%d]" low high
-  | UInt30_as_N high -> Crowbar.pp ppf "uint30asn:[0;%d]" high
-  | Int31_as_Z (low, high) -> Crowbar.pp ppf "int31asz:[%d;%d]" low high
+  | UInt30_like_N high -> Crowbar.pp ppf "uint30asn:[0;%d]" high
+  | Int31_like_Z (low, high) -> Crowbar.pp ppf "int31asz:[%d;%d]" low high
   | Int32 -> Crowbar.pp ppf "int32"
   | Int64 -> Crowbar.pp ppf "int64"
   | Float -> Crowbar.pp ppf "float"
@@ -312,12 +312,12 @@ let any_ty_ground_gen =
             AnyTy (RangedInt (low, high)));
         map [uint30] (fun a ->
             if a = 0 then Crowbar.bad_test () ;
-            AnyTy (UInt30_as_N a));
+            AnyTy (UInt30_like_N a));
         map [int31; int31] (fun a b ->
             if a = b then Crowbar.bad_test () ;
             let low = min a b in
             let high = max a b in
-            AnyTy (Int31_as_Z (low, high)));
+            AnyTy (Int31_like_Z (low, high)));
         const @@ AnyTy Int32;
         const @@ AnyTy Int64;
         const @@ AnyTy Float;
@@ -534,15 +534,15 @@ let full_rangedint low high : int full =
       else map [range (high - low)] (fun v -> v + low))
     (Data_encoding.ranged_int low high)
 
-let full_uint30_as_n high : int full =
+let full_uint30_like_n high : int full =
   make_int
-    (UInt30_as_N high)
+    (UInt30_like_N high)
     (Crowbar.range high)
     (Data_encoding.uint_like_n ~max_value:high ())
 
-let full_int31_as_z low high : int full =
+let full_int31_like_z low high : int full =
   make_int
-    (Int31_as_Z (low, high))
+    (Int31_like_Z (low, high))
     Crowbar.(
       if low < 0 && high > 0 then
         (* special casing this avoids overflow on 32bit machines *)
@@ -1990,8 +1990,8 @@ let rec full_of_ty : type a. a ty -> a full = function
   | UInt16 -> full_uint16
   | Int31 -> full_int31
   | RangedInt (low, high) -> full_rangedint low high
-  | UInt30_as_N high -> full_uint30_as_n high
-  | Int31_as_Z (low, high) -> full_int31_as_z low high
+  | UInt30_like_N high -> full_uint30_like_n high
+  | Int31_like_Z (low, high) -> full_int31_like_z low high
   | Int32 -> full_int32
   | Int64 -> full_int64
   | Float -> full_float
