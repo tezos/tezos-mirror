@@ -494,9 +494,7 @@ module Scripts = struct
               ty
               v
             >>=? fun (data, _ctxt) ->
-            unparse_stack (rest_ty, rest) >|=? fun rest ->
-            let data = Micheline.strip_locations data in
-            data :: rest
+            unparse_stack (rest_ty, rest) >|=? fun rest -> data :: rest
       in
       unparse_stack (stack_ty, stack)
 
@@ -1446,7 +1444,7 @@ module Scripts = struct
           (Micheline.root expr)
         >>=? fun (data, ctxt) ->
         Script_ir_translator.unparse_data ctxt unparsing_mode typ data
-        >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
+        >|=? fun (normalized, _ctxt) -> normalized) ;
     Registration.register0
       ~chunked:true
       S.normalize_script
@@ -1456,7 +1454,7 @@ module Scripts = struct
           ctxt
           unparsing_mode
           (Micheline.root script)
-        >|=? fun (normalized, _ctxt) -> Micheline.strip_locations normalized) ;
+        >|=? fun (normalized, _ctxt) -> normalized) ;
     Registration.register0 ~chunked:true S.normalize_type (fun ctxt () typ ->
         let open Script_typed_ir in
         let ctxt = Gas.set_unlimited ctxt in
@@ -1725,8 +1723,7 @@ module Contract = struct
               script
             >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
             unparse_data ctxt unparsing_mode storage_type storage
-            >|=? fun (storage, _ctxt) ->
-            Some (Micheline.strip_locations storage)) ;
+            >|=? fun (storage, _ctxt) -> Some storage) ;
     (* Patched RPC: get_script *)
     Registration.register1
       ~chunked:true
@@ -1841,7 +1838,7 @@ module Big_map = struct
                   (Micheline.root value)
                 >>=? fun (value, ctxt) ->
                 unparse_data ctxt unparsing_mode value_type value
-                >|=? fun (value, _ctxt) -> Micheline.strip_locations value))
+                >|=? fun (value, _ctxt) -> value))
 
   let big_map_get_normalized ctxt block id key ~unparsing_mode =
     RPC_context.make_call2

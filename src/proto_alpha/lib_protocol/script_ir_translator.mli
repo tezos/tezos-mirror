@@ -191,13 +191,13 @@ val unparse_data :
   Script_ir_unparser.unparsing_mode ->
   ('a, _) Script_typed_ir.ty ->
   'a ->
-  (Script.node * context) tzresult Lwt.t
+  (Script.expr * context) tzresult Lwt.t
 
 val unparse_code :
   context ->
   Script_ir_unparser.unparsing_mode ->
   Script.node ->
-  (Script.node * context) tzresult Lwt.t
+  (Script.expr * context) tzresult Lwt.t
 
 val parse_instr :
   elab_conf:Script_ir_translator_config.elab_config ->

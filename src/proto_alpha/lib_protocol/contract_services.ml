@@ -357,7 +357,7 @@ let register () =
               (Micheline.root value)
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
-            >|=? fun (value, _ctxt) -> Some (Micheline.strip_locations value))
+            >|=? fun (value, _ctxt) -> Some value)
   in
   let do_big_map_get_all ?offset ?length ctxt id =
     let open Script_ir_translator in
@@ -381,8 +381,7 @@ let register () =
               (Micheline.root value)
             >>=? fun (value, ctxt) ->
             unparse_data ctxt Readable value_type value
-            >|=? fun (value, ctxt) ->
-            (ctxt, Micheline.strip_locations value :: rev_values))
+            >|=? fun (value, ctxt) -> (ctxt, value :: rev_values))
           (Ok (ctxt, []))
           key_values
         >|=? fun (_ctxt, rev_values) -> List.rev rev_values
@@ -423,7 +422,7 @@ let register () =
             script
           >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
           unparse_data ctxt Readable storage_type storage
-          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
+          >|=? fun (storage, _ctxt) -> Some storage) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type

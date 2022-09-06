@@ -63,7 +63,6 @@ let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
       ty
       payload
   in
-  let payload = Micheline.strip_locations payload in
   (Sc_rollup.Inbox_message.Internal {payload; sender; source}, ctxt)
 
 let transactions_batch_of_internal ctxt transactions =
@@ -132,7 +131,6 @@ module Internal_for_tests = struct
     let* unparsed_parameters, ctxt =
       Script_ir_translator.unparse_data ctxt Optimized parameters_ty parameters
     in
-    let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
     return
       ( Transaction
           {

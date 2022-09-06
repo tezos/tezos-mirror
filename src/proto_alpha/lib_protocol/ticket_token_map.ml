@@ -126,7 +126,6 @@ let to_ticket_receipt ctxt ~owner ticket_token_map =
         let loc = Micheline.dummy_location in
         let* contents, ctxt =
           Script_ir_unparser.unparse_comparable_data
-            ~loc
             ctxt
             Script_ir_unparser.Optimized_legacy
             contents_type
@@ -141,8 +140,6 @@ let to_ticket_receipt ctxt ~owner ticket_token_map =
         let ty = Script.strip_annotations ty_unstripped in
         let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost ty) in
         let contents_type = Micheline.strip_locations ty in
-        let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost contents) in
-        let contents = Micheline.strip_locations contents in
         let ticket_token = Ticket_receipt.{ticketer; contents_type; contents} in
         let update =
           Ticket_receipt.{ticket_token; updates = [{account = owner; amount}]}

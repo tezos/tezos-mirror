@@ -440,7 +440,7 @@ let apply ctxt gas capture_ty capture lam =
     Micheline.(
       Seq
         ( loc,
-          Prim (loc, I_PUSH, [ty_expr; const_expr], [])
+          Prim (loc, I_PUSH, [ty_expr; Micheline.root const_expr], [])
           :: Prim (loc, I_PAIR, [], [])
           :: expr ))
   in
@@ -545,7 +545,8 @@ let make_transaction_to_tx_rollup (type t) ctxt ~destination ~amount
     ( Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt tp
     >>? fun (ty, ctxt) ->
       let unparsed_parameters =
-        Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
+        Micheline.Seq
+          (Micheline.dummy_location, [Micheline.root unparsed_parameters; ty])
       in
       Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
       >|? fun ctxt ->
@@ -559,20 +560,10 @@ let make_transaction_to_sc_rollup ctxt ~destination ~amount ~entrypoint
   error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
   >>?= fun () ->
   unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      ( Transaction_to_sc_rollup
-          {
-            destination;
-            entrypoint;
-            parameters_ty;
-            parameters;
-            unparsed_parameters;
-          },
-        ctxt ) )
+  >|=? fun (unparsed_parameters, ctxt) ->
+  ( Transaction_to_sc_rollup
+      {destination; entrypoint; parameters_ty; parameters; unparsed_parameters},
+    ctxt )
 
 (** [emit_event] generates an internal operation that will effect an event emission
     if the contract code returns this successfully. *)
@@ -583,8 +574,6 @@ let emit_event (type t tc) (ctxt, sc) gas ~(event_type : (t, tc) ty)
   let lazy_storage_diff = None in
   unparse_data ctxt Optimized event_type event_data
   >>=? fun (unparsed_data, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>?= fun ctxt ->
-  let unparsed_data = Micheline.strip_locations unparsed_data in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let operation = Event {ty = unparsed_ty; tag; unparsed_data} in
   let iop = {source = Contract.Originated sc.self; operation; nonce} in
@@ -597,14 +586,10 @@ let make_transaction_to_zk_rollup (type t) ctxt ~destination ~amount
   error_unless Tez.(amount = zero) Rollup_invalid_transaction_amount
   >>?= fun () ->
   unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  Lwt.return
-    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-    >|? fun ctxt ->
-      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-      ( Transaction_to_zk_rollup
-          {destination; parameters_ty; parameters; unparsed_parameters},
-        ctxt ) )
+  >|=? fun (unparsed_parameters, ctxt) ->
+  ( Transaction_to_zk_rollup
+      {destination; parameters_ty; parameters; unparsed_parameters},
+    ctxt )
 
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to a destination and
@@ -632,25 +617,19 @@ let transfer (type t) (ctxt, sc) gas amount location
         ~temporary:true
       >>=? fun (parameters, lazy_storage_diff, ctxt) ->
       unparse_data ctxt Optimized parameters_ty parameters
-      >>=? fun (unparsed_parameters, ctxt) ->
-      Lwt.return
-        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-        >|? fun ctxt ->
-          let unparsed_parameters =
-            Micheline.strip_locations unparsed_parameters
-          in
-          ( Transaction_to_smart_contract
-              {
-                destination;
-                amount;
-                entrypoint;
-                location;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
-            lazy_storage_diff,
-            ctxt ) )
+      >|=? fun (unparsed_parameters, ctxt) ->
+      ( Transaction_to_smart_contract
+          {
+            destination;
+            amount;
+            entrypoint;
+            location;
+            parameters_ty;
+            parameters;
+            unparsed_parameters;
+          },
+        lazy_storage_diff,
+        ctxt )
   | Typed_tx_rollup {arg_ty = parameters_ty; tx_rollup = destination} ->
       make_transaction_to_tx_rollup
         ctxt
@@ -701,9 +680,8 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
     ~to_update
     ~temporary:true
   >>=? fun (init, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let unparsed_storage = Micheline.strip_locations storage in
+  unparse_data ctxt Optimized storage_type init
+  >>=? fun (unparsed_storage, ctxt) ->
   Contract.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, preorigination) ->
   let operation =

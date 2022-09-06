@@ -580,12 +580,14 @@ let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
     ( Script_ir_translator.unparse_data ctxt Script_ir_unparser.Readable ty x
     >>=? fun (actual_readable, ctxt) ->
-      (if actual_readable = expected_readable then return ctxt
+      (if actual_readable = Micheline.strip_locations expected_readable then
+       return ctxt
       else Alcotest.failf "Error in readable unparsing: %s" loc)
       >>=? fun ctxt ->
       Script_ir_translator.unparse_data ctxt Script_ir_unparser.Optimized ty x
       >>=? fun (actual_optimized, ctxt) ->
-      if actual_optimized = expected_optimized then return ctxt
+      if actual_optimized = Micheline.strip_locations expected_optimized then
+        return ctxt
       else Alcotest.failf "Error in optimized unparsing: %s" loc )
 
 let test_unparse_comb_data () =
@@ -676,7 +678,9 @@ let test_optimal_comb () =
     wrap_error_lwt
       ( Script_ir_translator.unparse_data ctxt Script_ir_unparser.Optimized ty v
       >>=? fun (unparsed, ctxt) ->
-        let unparsed_canonical, unparsed_size = size_of_micheline unparsed in
+        let unparsed_canonical, unparsed_size =
+          size_of_micheline (Micheline.root unparsed)
+        in
         List.iter_es (fun other_repr ->
             let other_repr_canonical, other_repr_size =
               size_of_micheline other_repr

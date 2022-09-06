@@ -153,19 +153,15 @@ let check_comparable :
       error (Comparable_type_expected (loc, t))
 
 let pack_node unparsed ctxt =
-  Gas.consume ctxt (Script.strip_locations_cost unparsed) >>? fun ctxt ->
   let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      expr_encoding
-      (Micheline.strip_locations unparsed)
+    Data_encoding.(Binary.to_bytes_exn (tup2 (Fixed.string 1) expr_encoding))
+      ("\x05", unparsed)
   in
-  Gas.consume ctxt (Script.serialized_cost bytes) >|? fun ctxt ->
-  let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
   (bytes, ctxt)
 
 let pack_comparable_data ctxt ty data =
-  unparse_comparable_data ~loc:() ctxt Optimized_legacy ty data
-  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
+  unparse_comparable_data ctxt Optimized_legacy ty data
+  >|=? fun (unparsed, ctxt) -> pack_node unparsed ctxt
 
 let hash_bytes ctxt bytes =
   Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
@@ -4935,7 +4931,9 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   Script_map.map_es_in_context
     (fun ctxt _name {input_ty; output_ty; view_code} ->
       unparse_code ctxt ~stack_depth:0 mode view_code
-      >|=? fun (view_code, ctxt) -> ({input_ty; output_ty; view_code}, ctxt))
+      >|=? fun (view_code, ctxt) ->
+      let view_code = Micheline.root view_code in
+      ({input_ty; output_ty; view_code}, ctxt))
     ctxt
     views
   >>=? fun (views, ctxt) ->
@@ -4960,20 +4958,17 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
         [
           Prim (loc, K_parameter, [arg_type], []);
           Prim (loc, K_storage, [storage_type], []);
-          Prim (loc, K_code, [code], []);
+          Prim (loc, K_code, [Micheline.root code], []);
         ]
         @ views )
   in
   return
-    ( {
-        code = lazy_expr (strip_locations code);
-        storage = lazy_expr (strip_locations storage);
-      },
+    ( {code = lazy_expr (strip_locations code); storage = lazy_expr storage},
       ctxt )
 
 let pack_data_with_mode ctxt ty data ~mode =
-  unparse_data ~stack_depth:0 ctxt mode ty data >>=? fun (unparsed, ctxt) ->
-  Lwt.return @@ pack_node unparsed ctxt
+  unparse_data ~stack_depth:0 ctxt mode ty data >|=? fun (unparsed, ctxt) ->
+  pack_node unparsed ctxt
 
 let hash_data ctxt ty data =
   pack_data_with_mode ctxt ty data ~mode:Optimized_legacy
@@ -5025,18 +5020,12 @@ let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
   List.fold_left_es
     (fun (acc, ctxt) (key_hash, key, value) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
-      unparse_comparable_data ~loc:() ctxt mode key_type key
-      >>=? fun (key_node, ctxt) ->
-      Gas.consume ctxt (Script.strip_locations_cost key_node) >>?= fun ctxt ->
-      let key = Micheline.strip_locations key_node in
+      unparse_comparable_data ctxt mode key_type key >>=? fun (key, ctxt) ->
       (match value with
       | None -> return (None, ctxt)
       | Some x ->
           unparse_data ~stack_depth:0 ctxt mode value_type x
-          >>=? fun (node, ctxt) ->
-          Lwt.return
-            ( Gas.consume ctxt (Script.strip_locations_cost node) >|? fun ctxt ->
-              (Some (Micheline.strip_locations node), ctxt) ))
+          >|=? fun (node, ctxt) -> (Some node, ctxt))
       >|=? fun (value, ctxt) ->
       let diff_item = Big_map.{key; key_hash; value} in
       (diff_item :: acc, ctxt))

@@ -44,7 +44,6 @@ let of_ex_token ctxt ~owner
   >>?= fun ctxt ->
   let ty = Script.strip_annotations cont_ty_unstripped in
   Script_ir_unparser.unparse_comparable_data
-    ~loc
     ctxt
     Script_ir_unparser.Optimized_legacy
     contents_type
@@ -69,4 +68,10 @@ let of_ex_token ctxt ~owner
     Script_typed_ir.address_t
     owner_address
   >>=? fun (owner, ctxt) ->
-  Lwt.return (Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner)
+  Lwt.return
+    (Ticket_hash.make
+       ctxt
+       ~ticketer:(Micheline.root ticketer)
+       ~ty
+       ~contents:(Micheline.root contents)
+       ~owner:(Micheline.root owner))

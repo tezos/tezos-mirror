@@ -195,6 +195,9 @@ let serialization_cost size =
        size
        Micheline_encoding.micheline_size_dependent_cost
 
+(* Compute the cost of serializing a given term. *)
+let micheline_serialization_cost v = serialization_cost (expr_size v)
+
 (* Compute the cost of deserializing a term of given [size]. *)
 let deserialization_cost size =
   Gas_limit_repr.atomic_step_cost
@@ -236,15 +239,6 @@ let bytes_node_cost s = serialization_cost_estimated_from_bytes (Bytes.length s)
 
 let deserialized_cost expr =
   Gas_limit_repr.atomic_step_cost @@ deserialization_cost (expr_size expr)
-
-let serialized_cost bytes =
-  let cost =
-    let size = Bytes.length bytes in
-    S.add (serialization_cost_estimated_from_bytes size)
-    @@ (* N_IConcat_bytes_pair inlined here *)
-    S.add (S.safe_int 65) (S.shift_right (S.safe_int size) 4)
-  in
-  Gas_limit_repr.atomic_step_cost cost
 
 let force_decode_cost lexpr =
   Data_encoding.apply_lazy

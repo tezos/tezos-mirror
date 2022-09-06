@@ -396,7 +396,7 @@ let comb_witness2 :
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
-let rec unparse_comparable_data :
+let rec unparse_comparable_data_rec :
     type a loc.
     loc:loc ->
     context ->
@@ -433,17 +433,23 @@ let rec unparse_comparable_data :
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
   | Pair_t (tl, tr, _, YesYes), pair ->
       let r_witness = comb_witness2 tr in
-      let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
-      let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
+      let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
   | Union_t (tl, tr, _, YesYes), v ->
-      let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
-      let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
+      let unparse_l ctxt v = unparse_comparable_data_rec ~loc ctxt mode tl v in
+      let unparse_r ctxt v = unparse_comparable_data_rec ~loc ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
   | Option_t (t, _, Yes), v ->
-      let unparse_v ctxt v = unparse_comparable_data ~loc ctxt mode t v in
+      let unparse_v ctxt v = unparse_comparable_data_rec ~loc ctxt mode t v in
       unparse_option ~loc unparse_v ctxt v
   | Never_t, _ -> .
+
+let account_for_future_serialization_cost unparsed_data ctxt =
+  Gas.consume ctxt (Script.strip_locations_cost unparsed_data) >>? fun ctxt ->
+  let unparsed_data = Micheline.strip_locations unparsed_data in
+  Gas.consume ctxt (Script.micheline_serialization_cost unparsed_data)
+  >|? fun ctxt -> (unparsed_data, ctxt)
 
 (* -- Unparsing data of any type -- *)
 
@@ -474,7 +480,7 @@ end
 module Data_unparser (P : MICHELSON_PARSER) = struct
   open Script_tc_errors
 
-  let rec unparse_data :
+  let rec unparse_data_rec :
       type a ac.
       context ->
       stack_depth:int ->
@@ -487,7 +493,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     let non_terminal_recursion ctxt mode ty a =
       if Compare.Int.(stack_depth > 10_000) then
         fail Script_tc_errors.Unparsing_too_many_recursive_calls
-      else unparse_data ctxt ~stack_depth:(stack_depth + 1) mode ty a
+      else unparse_data_rec ctxt ~stack_depth:(stack_depth + 1) mode ty a
     in
     let loc = Micheline.dummy_location in
     match (ty, a) with
@@ -539,7 +545,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         P.opened_ticket_type loc t >>?= fun t ->
         let destination : Destination.t = Contract ticketer in
         let addr = {destination; entrypoint = Entrypoint.default} in
-        (unparse_data [@tailcall])
+        (unparse_data_rec [@tailcall])
           ctxt
           ~stack_depth
           mode
@@ -548,14 +554,14 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     | Set_t (t, _), set ->
         List.fold_left_es
           (fun (l, ctxt) item ->
-            unparse_comparable_data ~loc ctxt mode t item
+            unparse_comparable_data_rec ~loc ctxt mode t item
             >|=? fun (item, ctxt) -> (item :: l, ctxt))
           ([], ctxt)
           (Script_set.fold (fun e acc -> e :: acc) set [])
         >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
     | Map_t (kt, vt, _), map ->
         let items = Script_map.fold (fun k v acc -> (k, v) :: acc) map [] in
-        unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
+        unparse_items_rec ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
         >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
     | Big_map_t (_kt, _vt, _), Big_map {id = Some id; diff = {size; _}; _}
       when Compare.Int.( = ) size 0 ->
@@ -577,7 +583,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         (* this can't fail if the original type is well-formed
            because [option vt] is always strictly smaller than [big_map kt vt] *)
         option_t loc vt >>?= fun vt ->
-        unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
+        unparse_items_rec ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
         >|=? fun (items, ctxt) ->
         ( Micheline.Prim
             ( loc,
@@ -599,12 +605,12 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
             (fun (a, _) (b, _) -> Script_comparable.compare_comparable kt b a)
             items
         in
-        unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
+        unparse_items_rec ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
         >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
     | Lambda_t _, Lam (_, original_code) ->
-        unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
+        unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) mode original_code
     | Lambda_t _, LamRec (_, original_code) ->
-        unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
+        unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) mode original_code
         >|=? fun (body, ctxt) ->
         (Micheline.Prim (loc, D_Lambda_rec, [body], []), ctxt)
     | Never_t, _ -> .
@@ -664,7 +670,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
              ~plaintext_size:(Script_timelock.get_plaintext_size s))
           Script_timelock.chest_encoding
 
-  and unparse_items :
+  and unparse_items_rec :
       type k v vc.
       context ->
       stack_depth:int ->
@@ -677,20 +683,20 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
     List.fold_left_es
       (fun (l, ctxt) (k, v) ->
         let loc = Micheline.dummy_location in
-        unparse_comparable_data ~loc ctxt mode kt k >>=? fun (key, ctxt) ->
-        unparse_data ctxt ~stack_depth:(stack_depth + 1) mode vt v
+        unparse_comparable_data_rec ~loc ctxt mode kt k >>=? fun (key, ctxt) ->
+        unparse_data_rec ctxt ~stack_depth:(stack_depth + 1) mode vt v
         >|=? fun (value, ctxt) ->
         (Prim (loc, D_Elt, [key; value], []) :: l, ctxt))
       ([], ctxt)
       items
 
-  and unparse_code ctxt ~stack_depth mode code =
+  and unparse_code_rec ctxt ~stack_depth mode code =
     let elab_conf = Script_ir_translator_config.make ~legacy:true () in
     Gas.consume ctxt Unparse_costs.unparse_instr_cycle >>?= fun ctxt ->
     let non_terminal_recursion ctxt mode code =
       if Compare.Int.(stack_depth > 10_000) then
         fail Unparsing_too_many_recursive_calls
-      else unparse_code ctxt ~stack_depth:(stack_depth + 1) mode code
+      else unparse_code_rec ctxt ~stack_depth:(stack_depth + 1) mode code
     in
     match code with
     | Prim (loc, I_PUSH, [ty; data], annot) ->
@@ -715,7 +721,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
           t
           data
         >>=? fun (data, ctxt) ->
-        unparse_data ctxt ~stack_depth:(stack_depth + 1) mode t data
+        unparse_data_rec ctxt ~stack_depth:(stack_depth + 1) mode t data
         >>=? fun (data, ctxt) ->
         return (Prim (loc, I_PUSH, [ty; data], annot), ctxt)
     | Seq (loc, items) ->
@@ -737,4 +743,29 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
         >>=? fun (items, ctxt) ->
         return (Prim (loc, prim, List.rev items, annot), ctxt)
     | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
+
+  let unparse_data ctxt ~stack_depth mode ty v =
+    unparse_data_rec ctxt ~stack_depth mode ty v
+    >>=? fun (unparsed_data, ctxt) ->
+    Lwt.return (account_for_future_serialization_cost unparsed_data ctxt)
+
+  let unparse_code ctxt ~stack_depth mode v =
+    unparse_code_rec ctxt ~stack_depth mode v >>=? fun (unparsed_data, ctxt) ->
+    Lwt.return (account_for_future_serialization_cost unparsed_data ctxt)
+
+  let unparse_items ctxt ~stack_depth mode ty vty vs =
+    unparse_items_rec ctxt ~stack_depth mode ty vty vs
+    >>=? fun (unparsed_datas, ctxt) ->
+    List.fold_left_e
+      (fun (acc, ctxt) unparsed_data ->
+        account_for_future_serialization_cost unparsed_data ctxt
+        >|? fun (unparsed_data, ctxt) -> (unparsed_data :: acc, ctxt))
+      ([], ctxt)
+      unparsed_datas
+    >>?= fun (unparsed_datas, ctxt) -> return (List.rev unparsed_datas, ctxt)
 end
+
+let unparse_comparable_data ctxt mode ty v =
+  unparse_comparable_data_rec ctxt ~loc:() mode ty v
+  >>=? fun (unparsed_data, ctxt) ->
+  Lwt.return (account_for_future_serialization_cost unparsed_data ctxt)

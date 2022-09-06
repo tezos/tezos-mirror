@@ -126,7 +126,6 @@ let string_of_ticket_token ctxt
     wrap
     @@ Script_ir_unparser.unparse_comparable_data
          ctxt
-         ~loc:()
          Script_ir_unparser.Readable
          contents_type
          contents
@@ -137,7 +136,7 @@ let string_of_ticket_token ctxt
        Contract.pp
        ticketer
        Michelson_v1_printer.print_expr
-       (Micheline.strip_locations x)
+       x
 
 let string_of_destination_and_amounts cas =
   Format.asprintf
@@ -326,7 +325,7 @@ let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
             Transaction_to_smart_contract
               {
                 amount = Tez.zero;
-                unparsed_parameters = Micheline.strip_locations params_node;
+                unparsed_parameters = params_node;
                 entrypoint = Entrypoint.default;
                 destination;
                 location = Micheline.dummy_location;
@@ -357,7 +356,7 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
           operation =
             Transaction_to_tx_rollup
               {
-                unparsed_parameters = Micheline.strip_locations params_node;
+                unparsed_parameters = params_node;
                 destination = tx_rollup;
                 parameters_ty;
                 parameters;

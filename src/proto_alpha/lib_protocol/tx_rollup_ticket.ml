@@ -59,10 +59,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   >>?= fun ticket_ty ->
   let ticket = Script_typed_ir.{ticketer; contents; amount} in
   Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-  >>=? fun (parameters_expr, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost parameters_expr)
-  >>?= fun ctxt ->
-  let unparsed_parameters = Micheline.strip_locations parameters_expr in
+  >>=? fun (unparsed_parameters, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let op =
     Script_typed_ir.Internal_operation
@@ -76,7 +73,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
               unparsed_parameters;
               destination;
               entrypoint;
-              location = Micheline.location parameters_expr;
+              location = Micheline.dummy_location;
               parameters_ty = ticket_ty;
               parameters = ticket;
             };

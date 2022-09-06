@@ -49,7 +49,6 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
     let* x, ctxt =
       wrap
       @@ Script_ir_unparser.unparse_comparable_data
-           ~loc:()
            ctxt
            Script_ir_unparser.Readable
            contents_type
@@ -61,7 +60,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
         Contract.pp
         ticketer
         Michelson_v1_printer.print_expr
-        (Micheline.strip_locations x)
+        x
         Z.pp_print
         amount
     in
