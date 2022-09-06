@@ -549,21 +549,7 @@ let with_decoding_guard guard encoding =
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
 
-let int_like_n_or_z ?min_value ?max_value name sizer like =
-  let max_value =
-    match max_value with
-    | None -> Binary_size.max_int `Int31
-    | Some max_value ->
-        if Binary_size.max_int `Int31 < max_value then invalid_arg name ;
-        max_value
-  in
-  let min_value =
-    match min_value with
-    | None -> Binary_size.min_int `Int31
-    | Some min_value ->
-        if min_value < Binary_size.min_int `Int31 then invalid_arg name ;
-        min_value
-  in
+let int_like_n_or_z ~min_value ~max_value name sizer like =
   if max_value < min_value then invalid_arg name ;
   let max_size =
     max (sizer @@ Z.of_int min_value) (sizer @@ Z.of_int max_value)
@@ -600,11 +586,11 @@ let int_like_n_or_z ?min_value ?max_value name sizer like =
          Z.to_int z)
        like)
 
-let uint_like_n ?max_value () =
-  int_like_n_or_z ~min_value:0 ?max_value "Data_encoding.uint_like_n" n_length n
+let uint_like_n ~max_value () =
+  int_like_n_or_z ~min_value:0 ~max_value "Data_encoding.uint_like_n" n_length n
 
-let int_like_z ?min_value ?max_value () =
-  int_like_n_or_z ?min_value ?max_value "Data_encoding.int_like_z" z_length z
+let int_like_z ~min_value ~max_value () =
+  int_like_n_or_z ~min_value ~max_value "Data_encoding.int_like_z" z_length z
 
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
