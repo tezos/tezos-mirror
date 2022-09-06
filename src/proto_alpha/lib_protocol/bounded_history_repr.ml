@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type NAME = sig
+  val name : string
+end
+
 module type KEY = sig
   type t
 
@@ -74,7 +78,7 @@ module type S = sig
   end
 end
 
-module Make (Key : KEY) (Value : VALUE) :
+module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
   S with type key = Key.t and type value = Value.t = struct
   type key = Key.t
 
@@ -176,13 +180,18 @@ module Make (Key : KEY) (Value : VALUE) :
       }
 
   let () =
+    assert (not (String.equal Name.name "")) ;
     register_error_kind
       `Temporary
-      ~id:"Bounded_history_repr.key_bound_to_different_value"
-      ~title:"Key already bound to a different value."
+      ~id:
+        (Format.sprintf
+           "Bounded_history_repr.%s.key_bound_to_different_value"
+           Name.name)
+      ~title:(Name.name ^ ": Key already bound to a different value.")
       ~description:
-        "Remember called with a key that is already bound to a different\n\
-        \        value."
+        (Name.name
+       ^ ": Remember called with a key that is already bound to a different\n\
+         \        value.")
       Data_encoding.(
         obj3
           (req "key" Key.encoding)

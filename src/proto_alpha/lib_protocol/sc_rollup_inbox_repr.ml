@@ -165,6 +165,9 @@ module V1 = struct
       remember any levels for which you may need to produce proofs. *)
   module History =
     Bounded_history_repr.Make
+      (struct
+        let name = "inbox_history"
+      end)
       (Hash)
       (struct
         type t = history_proof
