@@ -2817,6 +2817,8 @@ module Dal : sig
 
     val pp : Format.formatter -> t -> unit
 
+    val equal : t -> t -> bool
+
     val register_slot : context -> t -> (context * bool) tzresult
 
     val find : context -> Raw_level.t -> t list option tzresult Lwt.t

@@ -30,6 +30,8 @@ module Header = struct
      commitment should be given here. *)
   type t = Dal.commitment
 
+  let equal = Dal.Commitment.equal
+
   let encoding = Dal.Commitment.encoding
 
   let pp ppf commitment =
@@ -55,6 +57,8 @@ module Index = struct
   let to_int slot_index = slot_index [@@ocaml.inline always]
 
   let compare = Compare.Int.compare
+
+  let equal = Compare.Int.equal
 end
 
 type header = Header.t
@@ -64,6 +68,11 @@ let zero = Dal.Commitment.zero
 type t = {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
+
+let equal ({level; index; header} : t) s2 =
+  Raw_level_repr.equal level s2.level
+  && Index.equal index s2.index
+  && Header.equal header s2.header
 
 let encoding =
   let open Data_encoding in
