@@ -52,9 +52,19 @@ type info = {
   input_request : input_request;  (** The current VM input request. *)
 }
 
+module type Internal_for_tests = sig
+  type tree
+
+  type tick_state
+
+  val get_tick_state : tree -> tick_state Lwt.t
+end
+
 (** This module type defines a WASM VM API used for smart-contract rollups. *)
 module type S = sig
   type tree
+
+  type tick_state
 
   (** [compute_step] forwards the VM by one compute tick. If the VM is expecting
       input, it gets stuck. If the VM is already stuck, this function may
@@ -77,6 +87,9 @@ module type S = sig
   (** [get_info] provides a typed view of the current machine state. Should not
       raise. *)
   val get_info : tree -> info Lwt.t
+
+  module Internal_for_tests :
+    Internal_for_tests with type tree := tree and type tick_state := tick_state
 end
 
 (* Encodings *)

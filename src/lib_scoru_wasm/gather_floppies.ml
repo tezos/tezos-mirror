@@ -106,6 +106,11 @@ module type S = sig
   include Wasm_pvm_sig.S
 
   module Internal_for_tests : sig
+    include
+      Wasm_pvm_sig.Internal_for_tests
+        with type tree := tree
+         and type tick_state := tick_state
+
     val initial_tree_from_boot_sector : empty_tree:tree -> string -> tree Lwt.t
   end
 end
@@ -113,8 +118,10 @@ end
 module Make
     (T : Tree_encoding.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
-  S with type tree = T.tree = struct
+  S with type tree = T.tree and type tick_state = Wasm.tick_state = struct
   type tree = Wasm.tree
+
+  type tick_state = Wasm.tick_state
 
   module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
 
@@ -412,6 +419,8 @@ module Make
               })
 
   module Internal_for_tests = struct
+    include Wasm.Internal_for_tests
+
     let initial_tree_from_boot_sector ~empty_tree boot_sector =
       match origination_kernel_loading_step boot_sector with
       | Some state ->

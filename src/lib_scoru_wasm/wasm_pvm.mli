@@ -23,6 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type tick_state =
+  | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
+  | Init of {
+      self : Tezos_webassembly_interpreter.Instance.module_key;
+      ast_module : Tezos_webassembly_interpreter.Ast.module_;
+      init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
+    }
+  | Eval of Tezos_webassembly_interpreter.Eval.config
+  | Stuck of Wasm_pvm_errors.t
+
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 
-module Make (T : Tree_encoding.TREE) : Gather_floppies.S with type tree = T.tree
+module Make (T : Tree_encoding.TREE) :
+  Gather_floppies.S with type tree = T.tree and type tick_state = tick_state
