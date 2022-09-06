@@ -543,68 +543,22 @@ let with_decoding_guard guard encoding =
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
 
-let uint_like_n ?max_value () =
-  let max_value =
-    match max_value with
-    | None -> Binary_size.max_int `Uint30
-    | Some max_value ->
-        if
-          max_value <= Binary_size.min_int `Uint30
-          || Binary_size.max_int `Uint30 < max_value
-        then invalid_arg "Data_encoding.uint_like_n" ;
-        max_value
-  in
-  let max_size =
-    if max_value < 1 lsl 7 then 1
-    else if max_value < 1 lsl 14 then 2
-    else if max_value < 1 lsl 21 then 3
-    else if max_value < 1 lsl 28 then 4
-    else 5
-  in
-  check_size
-    max_size
-    (conv
-       (fun i ->
-         if i < 0 || i > max_value then
-           raise
-             Binary_error_types.(
-               Write_error (Invalid_int {min = 0; v = i; max = max_value})) ;
-         Z.of_int i)
-       (fun z ->
-         (if Z.compare z (Z.of_int max_value) > 0 then
-          let i =
-            if Z.compare z (Z.of_int (Binary_size.max_int `Uint30)) > 0 then
-              Binary_size.max_int `Uint30
-              (* we avoid overflow on 32 bit machines by just giving the max value *)
-            else Z.to_int z
-          in
-          raise
-            Binary_error_types.(
-              Read_error (Invalid_int {min = 0; v = i; max = max_value}))) ;
-         (* we don't need to check [Z.compare z Z.zero < 0] because it can never
-            happen: [n] (used as the last argument of the [conv]) returns
-            positive Zs only *)
-         Z.to_int z)
-       n)
-
-let int_like_z ?min_value ?max_value () =
+let int_like_n_or_z ?min_value ?max_value name like =
   let max_value =
     match max_value with
     | None -> Binary_size.max_int `Int31
     | Some max_value ->
-        if Binary_size.max_int `Int31 < max_value then
-          invalid_arg "Data_encoding.int_like_z" ;
+        if Binary_size.max_int `Int31 < max_value then invalid_arg name ;
         max_value
   in
   let min_value =
     match min_value with
     | None -> Binary_size.min_int `Int31
     | Some min_value ->
-        if min_value < Binary_size.min_int `Int31 then
-          invalid_arg "Data_encoding.int_like_z" ;
+        if min_value < Binary_size.min_int `Int31 then invalid_arg name ;
         min_value
   in
-  if max_value < min_value then invalid_arg "Data_encoding.int_like_z" ;
+  if max_value < min_value then invalid_arg name ;
   let max_size =
     if max_value < 1 lsl 6 && min_value > -(1 lsl 6) then 1
     else if max_value < 1 lsl 13 && min_value > -(1 lsl 13) then 2
@@ -642,7 +596,13 @@ let int_like_z ?min_value ?max_value () =
             Binary_error_types.(
               Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          Z.to_int z)
-       z)
+       like)
+
+let uint_like_n ?max_value () =
+  int_like_n_or_z ~min_value:0 ?max_value "Data_encoding.uint_like_n" n
+
+let int_like_z ?min_value ?max_value () =
+  int_like_n_or_z ?min_value ?max_value "Data_encoding.int_like_z" z
 
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
