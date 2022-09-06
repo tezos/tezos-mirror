@@ -25,17 +25,6 @@
 
 open Base
 
-(* A very similar function is available in js_of_ocaml-lwt
-   (taking seconds instead of milliseconds though), but we don't want to depend
-   on all of js_of_ocaml-lwt just for this function. *)
-let timeout_lwt ~milliseconds =
-  let promise, resolver = Lwt.task () in
-  let timeout =
-    Js_of_ocaml.Dom_html.setTimeout (Lwt.wakeup resolver) milliseconds
-  in
-  (Lwt.on_cancel promise @@ fun () -> Js_of_ocaml.Dom_html.clearTimeout timeout) ;
-  promise
-
 module Scheduler : Test.SCHEDULER = struct
   type request = Run_test of {test_title : string}
 
@@ -52,10 +41,7 @@ module Scheduler : Test.SCHEDULER = struct
     | Some test ->
         let clean_up () = unit in
         let* test_result =
-          Test.run_one
-            ~sleep:(fun seconds -> timeout_lwt ~milliseconds:(seconds *. 1000.))
-            ~clean_up
-            test
+          Test.run_one ~sleep:Js_of_ocaml_lwt.Lwt_js.sleep ~clean_up test
         in
         return (Test_result test_result)
 

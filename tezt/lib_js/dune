@@ -9,6 +9,7 @@
   re
   ezjsonm
   js_of_ocaml
+  js_of_ocaml-lwt
   tezt.core)
  (js_of_ocaml)
  (flags

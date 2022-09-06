@@ -190,6 +190,12 @@ let js_of_ocaml =
     "js_of_ocaml"
     V.(at_least "4.0.0" && less_than "5.0.0")
 
+let js_of_ocaml_lwt =
+  external_lib
+    ~js_compatible:true
+    "js_of_ocaml-lwt"
+    V.(at_least "4.0.0" && less_than "5.0.0")
+
 let json_data_encoding =
   external_lib
     ~js_compatible:true
@@ -2968,7 +2974,7 @@ let tezt_js_lib =
     ~js_compatible:true
     ~bisect_ppx:false
     ~optional:true
-    ~deps:[re; ezjsonm; js_of_ocaml; tezt_core_lib |> open_]
+    ~deps:[re; ezjsonm; js_of_ocaml; js_of_ocaml_lwt; tezt_core_lib |> open_]
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?synopsis l =
   tezt_without_tezt_lib_dependency
