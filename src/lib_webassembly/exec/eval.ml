@@ -904,14 +904,35 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
       | exn -> Lwt.fail exn)
 
-let eval_const module_reg (inst : module_key) (const : const) : value Lwt.t =
+type eval_const_kont = EC_Next of config | EC_Stop of value
+
+let eval_const_kont inst (const : const) =
   let c =
     config (Host_funcs.empty ()) inst [] [From_block (const.it, 0l) @@ const.at]
   in
-  let+ vs = eval module_reg c in
-  match vs with
-  | [v] -> v
-  | _ -> Crash.error const.at "wrong number of results on stack"
+  EC_Next c
+
+let eval_const_completed = function EC_Stop v -> Some v | _ -> None
+
+let eval_const_step module_reg = function
+  | EC_Next {code = vs, []; _} -> (
+      match vs with
+      | [v] -> Lwt.return (EC_Stop v)
+      | _ -> Crash.error Source.no_region "wrong number of results on stack")
+  | EC_Next c ->
+      let+ c = step module_reg c in
+      EC_Next c
+  | EC_Stop _ -> assert false
+
+let eval_const module_reg (inst : module_key) (const : const) : value Lwt.t =
+  let rec go k =
+    match eval_const_completed k with
+    | Some v -> Lwt.return v
+    | None ->
+        let* k = eval_const_step module_reg k in
+        go k
+  in
+  go (eval_const_kont inst const)
 
 (* Modules *)
 
