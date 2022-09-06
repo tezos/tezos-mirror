@@ -71,7 +71,7 @@ type slot = t
 
 type slot_index = Index.t
 
-let equal ({published_level; index; header} : t) s2 =
+let slot_equal ({published_level; index; header} : t) s2 =
   Raw_level_repr.equal published_level s2.published_level
   && Index.equal index s2.index
   && Header.equal header s2.header
@@ -120,7 +120,7 @@ module Page = struct
       page_index
 end
 
-let encoding =
+let slot_encoding =
   let open Data_encoding in
   conv
     (fun {published_level; index; header} -> (published_level, index, header))
@@ -130,7 +130,7 @@ let encoding =
        (req "index" Data_encoding.uint8)
        (req "header" Header.encoding))
 
-let pp fmt {published_level; index; header} =
+let pp_slot fmt {published_level; index; header} =
   Format.fprintf
     fmt
     "published_level: %a index: %a header: %a"
@@ -186,7 +186,7 @@ module Slots_history = struct
   module Leaf = struct
     type t = slot
 
-    let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
+    let to_bytes = Data_encoding.Binary.to_bytes_exn slot_encoding
   end
 
   module Content_prefix = struct
@@ -270,3 +270,9 @@ module Slots_history = struct
 
   include V1
 end
+
+let encoding = slot_encoding
+
+let pp = pp_slot
+
+let equal = slot_equal
