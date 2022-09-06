@@ -66,6 +66,12 @@ module String : sig
   module Set : Tezos_error_monad.TzLwtreslib.Set.S with type elt = t
 end
 
+module Bytes : sig
+  include module type of Bytes
+
+  include module type of Tezos_stdlib.TzBytes
+end
+
 module Time = Time
 module Fitness = Fitness
 module User_activated = User_activated
