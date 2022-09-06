@@ -30,7 +30,7 @@ let expect_fail_serialise ?max_value i =
   | Some _ -> raise (Failure "Unexpected success")
 
 let expect_fail_serialise () =
-  if Sys.word_size = 64 then expect_fail_serialise Int32.(to_int max_int) ;
+  if Sys.int_size >= 32 then expect_fail_serialise Int32.(to_int max_int) ;
   expect_fail_serialise (-1) ;
   expect_fail_serialise ~max_value:1 2 ;
   expect_fail_serialise ~max_value:2 (-1)

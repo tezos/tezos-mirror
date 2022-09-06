@@ -40,8 +40,8 @@ let expect_fail_serialise ?min_value ?max_value i =
       raise (Failure msg)
 
 let expect_fail_serialise () =
-  if Sys.word_size = 64 then expect_fail_serialise Int32.(to_int max_int) ;
-  if Sys.word_size = 64 then expect_fail_serialise Int32.(to_int min_int) ;
+  if Sys.int_size >= 32 then expect_fail_serialise Int32.(to_int max_int) ;
+  if Sys.int_size >= 32 then expect_fail_serialise Int32.(to_int min_int) ;
   expect_fail_serialise ~max_value:1 2 ;
   expect_fail_serialise ~max_value:(-100) 0 ;
   expect_fail_serialise ~max_value:(-100) (-3) ;
