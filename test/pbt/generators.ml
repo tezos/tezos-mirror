@@ -310,11 +310,8 @@ let any_ty_ground_gen =
             let low = min a b in
             let high = max a b in
             AnyTy (RangedInt (low, high)));
-        map [uint30] (fun a ->
-            if a = 0 then Crowbar.bad_test () ;
-            AnyTy (UInt30_like_N a));
+        map [uint30] (fun a -> AnyTy (UInt30_like_N a));
         map [int31; int31] (fun a b ->
-            if a = b then Crowbar.bad_test () ;
             let low = min a b in
             let high = max a b in
             AnyTy (Int31_like_Z (low, high)));
@@ -537,7 +534,7 @@ let full_rangedint low high : int full =
 let full_uint30_like_n high : int full =
   make_int
     (UInt30_like_N high)
-    (Crowbar.range high)
+    (Crowbar.range (high + 1))
     (Data_encoding.uint_like_n ~max_value:high ())
 
 let full_int31_like_z low high : int full =
@@ -546,8 +543,8 @@ let full_int31_like_z low high : int full =
     Crowbar.(
       if low < 0 && high > 0 then
         (* special casing this avoids overflow on 32bit machines *)
-        choose [range high; map [range (-low)] (fun v -> -v)]
-      else map [range (high - low)] (fun v -> v + low))
+        choose [range (high + 1); map [range (-(low + 1))] (fun v -> -v)]
+      else map [range (high - low + 1)] (fun v -> v + low))
     (Data_encoding.int_like_z ~min_value:low ~max_value:high ())
 
 let full_int32 : int32 full =

@@ -187,7 +187,7 @@ module Encoding : sig
       maximum value in the range, and the de/serialisation process fails before
       attempting any conversion if the size is exceeded.
 
-      @raise [Invalid_argument] if [max_value <= 0] or
+      @raise [Invalid_argument] if [max_value < 0] or
       [max_value > (1 lsl 30) - 1] *)
   val uint_like_n : ?max_value:int -> unit -> int encoding
 
@@ -210,7 +210,7 @@ module Encoding : sig
       encoding's range, and the de/serialisation process fails before attempting
       any conversion if the size is exceeded.
 
-      @raise [Invalid_argument] if [max_value <= min_value]
+      @raise [Invalid_argument] if [max_value < min_value]
 
       @raise [Invalid_argument] if [max_value > (1 lsl 30) - 1]
 

@@ -866,7 +866,7 @@ In JSON it is represented as a string in decimal notation.
 [z].
 
 The [min_value] and [max_value] bounds are inclusive. The combinator raises
-an exception if [min_value >= max_value]. It also raises an exception if the
+an exception if [min_value > max_value]. It also raises an exception if the
 range extends beyond the range of integers which can be represented by [int31].
 If not given, [min_value] and [max_value] default to the [int31] range.
 
@@ -880,7 +880,7 @@ In JSON, the values are represented as a float.
 for ranged positive integers represented in the same way as [n].
 
 The [max_value] bound is inclusive. The combinator raises an exception if
-[max_value <= 0] or if [max_value] is greater than the upper limit of [int31].
+[max_value < 0] or if [max_value] is greater than the upper limit of [int31].
 If not givem, [max_value] defaults to the [int31] upper bound.
 
 Unlike a simple [conv Z.of_int Z.to_int n], the combinator [uint_like_n]
