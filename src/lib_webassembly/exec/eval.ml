@@ -230,6 +230,7 @@ type config = {
   input : input_inst;
   output : output_inst;
   step_kont : step_kont;
+  durable : Lazy_map.tree option;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
 }
@@ -237,7 +238,7 @@ type config = {
 let frame inst locals = {inst; locals}
 
 let config ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
-    host_funcs ?frame_arity inst vs es =
+    ?durable host_funcs ?frame_arity inst vs es =
   let frame = frame inst (Vector.empty ()) in
   let label_kont =
     label_kont
@@ -255,6 +256,7 @@ let config ?(input = Input_buffer.alloc ()) ?(output = Output_buffer.alloc ())
     input;
     output;
     step_kont = SK_Start (frame_stack, Vector.empty ());
+    durable;
     host_funcs;
     stack_size_limit = 300;
   }
@@ -349,7 +351,9 @@ let invoke_step (module_reg : module_reg) c frame at = function
               in
               let* inst = resolve_module_ref module_reg frame.inst in
               let* args = Vector.to_list args in
-              let+ res = f c.input c.output inst.memories (List.rev args) in
+              let+ res =
+                f c.input c.output c.durable inst.memories (List.rev args)
+              in
               let vs' = Vector.prepend_list res vs' in
               Inv_stop {code = (vs', es); fresh_frame = None})
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
@@ -1386,7 +1390,7 @@ let rec eval module_reg (c : config) : value list Lwt.t =
 (* Functions & Constants *)
 
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
-    ?(output = Output_buffer.alloc ()) host_funcs (func : func_inst)
+    ?(output = Output_buffer.alloc ()) ?durable host_funcs (func : func_inst)
     (vs : value list) : value list Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
@@ -1408,6 +1412,7 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
     config
       ~input
       ~output
+      ?durable
       host_funcs
       ~frame_arity:n
       inst

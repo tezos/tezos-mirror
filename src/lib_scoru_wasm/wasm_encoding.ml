@@ -1115,7 +1115,8 @@ let output_buffer_encoding =
 let config_encoding ~host_funcs =
   conv
     (fun (input, output, step_kont, stack_size_limit) ->
-      Eval.{input; output; step_kont; host_funcs; stack_size_limit})
+      Eval.
+        {input; output; step_kont; host_funcs; stack_size_limit; durable = None})
     (fun Eval.{input; output; step_kont; stack_size_limit; _} ->
       (input, output, step_kont, stack_size_limit))
     (tup4

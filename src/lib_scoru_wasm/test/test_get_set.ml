@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -227,6 +227,7 @@ let test_set_input () =
       {
         input = Input_buffer.alloc ();
         output = Output_buffer.alloc ();
+        durable = None;
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
@@ -279,6 +280,7 @@ let test_get_output () =
       {
         input = Input_buffer.alloc ();
         output;
+        durable = None;
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;

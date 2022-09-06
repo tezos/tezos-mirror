@@ -249,6 +249,9 @@ struct
           in
           Lwt.return (Init {self; ast_module; init_kont})
       | Eval eval_config ->
+          let eval_config =
+            {eval_config with durable = Some (Durable.to_tree durable)}
+          in
           let+ eval_config = Wasm.Eval.step module_reg eval_config in
           Eval eval_config
       | Stuck e -> Lwt.return (Stuck e)
@@ -292,13 +295,20 @@ struct
         | Stuck _ -> (Wasm_pvm_sig.Input_required, tick_state)
         | _ -> (Wasm_pvm_sig.No_input_required, tick_state)
       in
-      (* Update the tick state and input-request and increment the current tick *)
+      let durable =
+        match pvm_state.tick_state with
+        | Eval {durable = Some tree; _} -> Durable.of_tree tree
+        | _ -> pvm_state.durable
+      in
+      (* Update the tick state, input-request, durable and increment the
+         current tick *)
       let pvm_state =
         {
           pvm_state with
           tick_state;
           input_request;
           current_tick = Z.succ pvm_state.current_tick;
+          durable;
         }
       in
 

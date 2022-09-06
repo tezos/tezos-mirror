@@ -97,7 +97,7 @@ let read_input_name = "tezos_read_input"
 
 let read_input =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer memories inputs ->
+    (fun input_buffer output_buffer _durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [
@@ -133,7 +133,7 @@ let write_output_type =
 
 let write_output =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer memories inputs ->
+    (fun input_buffer output_buffer _durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
