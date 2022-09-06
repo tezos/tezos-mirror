@@ -111,6 +111,14 @@ module type S = sig
     'state ->
     'value t ->
     ('state * context) tzresult
+
+  (** Lwt-aware variant of {!fold}. *)
+  val fold_es :
+    context ->
+    (context -> 'state -> key -> 'value -> ('state * context) tzresult Lwt.t) ->
+    'state ->
+    'value t ->
+    ('state * context) tzresult Lwt.t
 end
 
 (** This module is used to provide the function for consuming gas when

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
+
 (** A module for handling ticket-tokens. A ticket-token represents the
     combination of a ticketer (creator of a ticket) and the content. That is,
     a ticket comprises a ticket-token and an amount.
@@ -32,7 +34,7 @@
     ticket-token consists of a pair of ticketer and contents. *)
 type ex_token =
   | Ex_token : {
-      ticketer : Alpha_context.Contract.t;
+      ticketer : Contract.t;
       contents_type : 'a Script_typed_ir.comparable_ty;
       contents : 'a;
     }

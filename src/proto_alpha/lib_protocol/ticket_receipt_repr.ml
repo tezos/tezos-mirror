@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+type update = {account : Destination_repr.t; amount : Z.t}
 
-type ex_token =
-  | Ex_token : {
-      ticketer : Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+type ticket_token = {
+  ticketer : Contract_repr.t;
+  contents_type : Script_repr.expr;
+  contents : Script_repr.expr;
+}
 
-let token_and_amount_of_ex_ticket
-    (Ticket_scanner.Ex_ticket
-      (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
-  (Ex_token {ticketer; contents_type; contents}, amount)
+type item = {ticket_token : ticket_token; updates : update list}
+
+type t = item list
+
+let update_encoding =
+  let open Data_encoding in
+  conv
+    (fun {account; amount} -> (account, amount))
+    (fun (account, amount) -> {account; amount})
+    (obj2 (req "account" Destination_repr.encoding) (req "amount" z))
+
+let ticket_token_encoding =
+  let open Data_encoding in
+  conv
+    (fun {ticketer; contents_type; contents} ->
+      (ticketer, contents_type, contents))
+    (fun (ticketer, contents_type, contents) ->
+      {ticketer; contents_type; contents})
+    (obj3
+       (req "ticketer" Contract_repr.encoding)
+       (req "content_type" Script_repr.expr_encoding)
+       (req "content" Script_repr.expr_encoding))
+
+let item_encoding =
+  let open Data_encoding in
+  conv
+    (fun {ticket_token; updates} -> (ticket_token, updates))
+    (fun (ticket_token, updates) -> {ticket_token; updates})
+    (obj2
+       (req "ticket_token" ticket_token_encoding)
+       (req "updates" (list update_encoding)))
+
+let encoding = Data_encoding.list item_encoding

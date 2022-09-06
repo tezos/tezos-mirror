@@ -1995,6 +1995,7 @@ type execution_result = {
   lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
   ticket_diffs : Z.t Ticket_token_map.t;
+  ticket_receipt : Ticket_receipt.t;
 }
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -2087,13 +2088,14 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   (* Collect the ticket diffs *)
   Ticket_accounting.ticket_diffs
     ctxt
+    ~self_contract
     ~arg_type_has_tickets
     ~storage_type_has_tickets
     ~arg
     ~old_storage
     ~new_storage
     ~lazy_storage_diff:(Option.value ~default:[] lazy_storage_diff)
-  >>=? fun (ticket_diffs, ctxt) ->
+  >>=? fun (ticket_diffs, ticket_receipt, ctxt) ->
   (* We consume gas after the fact in order to not have to instrument
      [script_size] (for efficiency).
      This is safe, as we already pay gas proportional to storage size
@@ -2108,6 +2110,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         lazy_storage_diff = lazy_storage_diff_all;
         operations;
         ticket_diffs;
+        ticket_receipt;
       },
       ctxt )
 

@@ -115,6 +115,31 @@ let assert_equal_ticket_diffs ~loc ctxt given expected =
     (List.sort String.compare tbs1)
     (List.sort String.compare tbs2)
 
+let assert_equal_ticket_receipt ~loc given expected =
+  let open Lwt_result_syntax in
+  let make_receipt_item (ticketer, content, updates) =
+    wrap
+    @@ let*? ticketer = Contract.of_b58check ticketer in
+       let contents = Expr.from_string (Printf.sprintf "%S" content) in
+       let contents_type = Expr.from_string "string" in
+       let ticket_token = Ticket_receipt.{ticketer; contents_type; contents} in
+       let updates =
+         List.map
+           (fun (account, amount) ->
+             let account = Destination.Contract account in
+             let amount = Z.of_int amount in
+             Ticket_receipt.{account; amount})
+           updates
+       in
+       return Ticket_receipt.{ticket_token; updates}
+  in
+  let* expected = List.map_es make_receipt_item expected in
+  Assert.equal_with_encoding
+    ~loc
+    (Data_encoding.list Ticket_receipt.item_encoding)
+    expected
+    given
+
 let updates_of_key_values ctxt ~key_type ~value_type key_values =
   let open Lwt_result_syntax in
   List.fold_right_es
@@ -421,15 +446,17 @@ let type_has_tickets ctxt ty =
   Environment.wrap_tzresult @@ Ticket_scanner.type_has_tickets ctxt ty
 
 (** Test that adding a ticket to a lazy storage diff is picked up. *)
-let assert_ticket_diffs ctxt ~loc ~arg_type ~storage_type ~arg ~old_storage
-    ~new_storage ~lazy_storage_diff expected =
+let assert_ticket_diffs ctxt ~loc ~self_contract ~arg_type ~storage_type ~arg
+    ~old_storage ~new_storage ~lazy_storage_diff ~expected_diff
+    ~expected_receipt =
   let open Lwt_result_syntax in
   let*? arg_type_has_tickets, ctxt = type_has_tickets ctxt arg_type in
   let*? storage_type_has_tickets, ctxt = type_has_tickets ctxt storage_type in
-  let* ticket_diff, ctxt =
+  let* ticket_diff, ticket_receipt, ctxt =
     wrap
       (Ticket_accounting.ticket_diffs
          ctxt
+         ~self_contract
          ~arg_type_has_tickets
          ~storage_type_has_tickets
          ~arg
@@ -440,7 +467,8 @@ let assert_ticket_diffs ctxt ~loc ~arg_type ~storage_type ~arg ~old_storage
   let*? ticket_diffs, ctxt =
     Environment.wrap_tzresult @@ Ticket_token_map.to_list ctxt ticket_diff
   in
-  assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected
+  let* () = assert_equal_ticket_diffs ~loc ctxt ticket_diffs expected_diff in
+  assert_equal_ticket_receipt ~loc ticket_receipt expected_receipt
 
 let assert_balance = Ticket_helpers.assert_balance
 
@@ -464,7 +492,7 @@ let string_ticket_token = Ticket_helpers.string_ticket_token
 let test_diffs_empty () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
@@ -475,54 +503,67 @@ let test_diffs_empty () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:unit_t
     ~storage_type:int_ticket_big_map_ty
     ~arg:()
     ~old_storage:empty_big_map
     ~new_storage:empty_big_map
     ~lazy_storage_diff:[]
-    []
+    ~expected_diff:[]
+    ~expected_receipt:[]
 
 (** Test that sending one ticket as an argument, when the new storage is empty
-      results in an negative diff. *)
+      results in:
+    - Negative diff
+    - Empty receipt (since no ticket was added/removed from storage) *)
 let test_diffs_tickets_in_args () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let arg = string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 in
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:ticket_string_type
     ~storage_type:unit_t
     ~arg
     ~old_storage:()
     ~new_storage:()
     ~lazy_storage_diff:[]
-    [(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1)]
+    ~expected_diff:[(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1)]
+    ~expected_receipt:[]
 
 (** Test adding a ticket to the args, which is also accounted for in the new
-      storage, results in an empty diff. *)
+      storage, results in:
+    - Empty diff
+    - Receipt with positive update (since one ticket was added to storage) *)
 let test_diffs_tickets_in_args_and_storage () =
   let open Lwt_result_syntax in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let arg = string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 in
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:ticket_string_type
     ~storage_type:ticket_string_list_type
     ~arg
     ~old_storage:(boxed_list [])
     ~new_storage:(boxed_list [arg])
     ~lazy_storage_diff:[]
-    [(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0)]
+    ~expected_diff:[(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0)]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, 1)])]
 
 (** Test that adding two tickets in the args, and only one new ticket in the
-      storage results in a negative diff. *)
+      storage results in:
+    - Negative diff
+    - Receipt with single positive update (since one ticket was added to storage) *)
 let test_diffs_drop_one_ticket () =
   let open Lwt_result_syntax in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let arg =
     boxed_list
       [
@@ -536,41 +577,50 @@ let test_diffs_drop_one_ticket () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:ticket_string_list_type
     ~storage_type:ticket_string_list_type
     ~arg
     ~old_storage:(boxed_list [])
     ~new_storage
     ~lazy_storage_diff:[]
-    [
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -1);
-    ]
+    ~expected_diff:
+      [
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -1);
+      ]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, 1)])]
 
-(** Test that adding a new ticket to the storage results in a positive
-    balance. *)
+(** Test that adding a new ticket to the storage results in:
+    - Positive diff
+    - Receipt with single positive update *)
 let test_diffs_adding_new_ticket_to_storage () =
   let open Lwt_result_syntax in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let new_storage =
     boxed_list [string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1]
   in
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:Script_typed_ir.unit_t
     ~storage_type:ticket_string_list_type
     ~arg:()
     ~old_storage:(boxed_list [])
     ~new_storage
     ~lazy_storage_diff:[]
-    [(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1)]
+    ~expected_diff:[(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1)]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, 1)])]
 
-(** Test that removing one ticket from the storage results in a negative
-    diff. *)
+(** Test that removing one ticket from the storage results in:
+    - Negative diff
+    - Receipt with negative update *)
 let test_diffs_remove_from_storage () =
   let open Lwt_result_syntax in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let old_storage =
     boxed_list
       [
@@ -584,22 +634,28 @@ let test_diffs_remove_from_storage () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:Script_typed_ir.unit_t
     ~storage_type:ticket_string_list_type
     ~arg:()
     ~old_storage
     ~new_storage
     ~lazy_storage_diff:[]
-    [
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -2);
-    ]
+    ~expected_diff:
+      [
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 0);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -2);
+      ]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", [(contract, -2)])]
 
-(* Test adding ticket through lazy-storage diff results in a positive diff. *)
+(* Test adding ticket through lazy-storage diff results in:
+   - Positive diff
+   - Receipt with positive update *)
 let test_diffs_lazy_storage_alloc () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
-  let* _contract, ctxt = init () in
+  let* contract, ctxt = init () in
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_t ~value_type:ticket_string_type
   in
@@ -621,15 +677,20 @@ let test_diffs_lazy_storage_alloc () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:int_ticket_big_map_ty
     ~storage_type:int_ticket_big_map_ty
     ~arg:empty_big_map
     ~old_storage:empty_big_map
     ~new_storage:empty_big_map
     ~lazy_storage_diff:[lazy_storage_diff]
-    [(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1)]
+    ~expected_diff:[(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1)]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, 1)])]
 
-(* Test removing a big map containing a ticket results in a negative diff. *)
+(* Test removing a big map containing a ticket results in:
+   - Negative diff
+   - Receipt with negative update *)
 let test_diffs_remove_from_big_map () =
   let open Lwt_result_syntax in
   let open Script_typed_ir in
@@ -657,13 +718,16 @@ let test_diffs_remove_from_big_map () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:unit_t
     ~storage_type:int_ticket_big_map_ty
     ~arg:()
     ~old_storage:empty_big_map
     ~new_storage:empty_big_map
     ~lazy_storage_diff:[lazy_storage_diff]
-    [(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1)]
+    ~expected_diff:[(("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1)]
+    ~expected_receipt:
+      [("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, -1)])]
 
 (** Test copying a big-map. *)
 let test_diffs_copy_big_map () =
@@ -702,16 +766,23 @@ let test_diffs_copy_big_map () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:unit_t
     ~storage_type:int_ticket_big_map_ty
     ~arg:()
     ~old_storage:empty_big_map
     ~new_storage:empty_big_map
     ~lazy_storage_diff:[lazy_storage_diff]
-    [
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), 1);
-    ]
+    ~expected_diff:
+      [
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), 1);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), 1);
+      ]
+    ~expected_receipt:
+      [
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, 1)]);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", [(contract, 1)]);
+      ]
 
 (** Test that adding and removing items from an existing big-map results
       yield corresponding ticket-token diffs. *)
@@ -767,16 +838,23 @@ let test_diffs_add_to_existing_big_map () =
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:unit_t
     ~storage_type:int_ticket_big_map_ty
     ~arg:()
     ~old_storage
     ~new_storage:old_storage
     ~lazy_storage_diff:[lazy_storage_diff]
-    [
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), 2);
-    ]
+    ~expected_diff:
+      [
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), 2);
+      ]
+    ~expected_receipt:
+      [
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red", [(contract, -1)]);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue", [(contract, 2)]);
+      ]
 
 (** Test a combination of updates. *)
 let test_diffs_args_storage_and_lazy_diffs () =
@@ -842,6 +920,7 @@ let test_diffs_args_storage_and_lazy_diffs () =
       empty_big_map )
   in
   (*
+    Diff:
       Before script execution:
        - Args: 1 red, 1 blue
        - Old storage : 1 red, 1 blue, 1 green
@@ -852,22 +931,40 @@ let test_diffs_args_storage_and_lazy_diffs () =
        - Total: 1 red, 1 blue, 2 green, 1 yellow
       Net diff:
         - -1 red, -1 blue, +1 green, +1 yellow
+     Receipt (diff in storage):
+      Before script execution:
+       - Old storage : 1 red, 1 blue, 1 green
+       - Total: 1 red, 1 blue, 1 green
+      After execution:
+       - New_storage: 1 green, 1 yellow
+       - Lazy-diff: 1 red, 1 blue, 1 green
+       - Total: 1 red, 1 blue, 2 green, 1 yellow
+      Net diff:
+        - +1 green, +1 yellow
+
     *)
   assert_ticket_diffs
     ctxt
     ~loc:__LOC__
+    ~self_contract:contract
     ~arg_type:ticket_string_list_type
     ~storage_type:list_big_map_pair_type
     ~arg
     ~old_storage
     ~new_storage
     ~lazy_storage_diff:[lazy_storage_diff]
-    [
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -1);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green"), 1);
-      (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "yellow"), 1);
-    ]
+    ~expected_diff:
+      [
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "red"), -1);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "blue"), -1);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green"), 1);
+        (("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "yellow"), 1);
+      ]
+    ~expected_receipt:
+      [
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "yellow", [(contract, 1)]);
+        ("KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq", "green", [(contract, 1)]);
+      ]
 
 (** Test that attempting to transfer a ticket that exceeds the budget fails. *)
 let test_update_invalid_transfer () =

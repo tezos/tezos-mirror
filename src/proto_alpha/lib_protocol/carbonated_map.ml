@@ -72,6 +72,13 @@ module type S = sig
     'state ->
     'value t ->
     ('state * context) tzresult
+
+  val fold_es :
+    context ->
+    (context -> 'state -> key -> 'value -> ('state * context) tzresult Lwt.t) ->
+    'state ->
+    'value t ->
+    ('state * context) tzresult Lwt.t
 end
 
 module type GAS = sig
@@ -185,6 +192,15 @@ module Make_builder (C : COMPARABLE) = struct
     let fold ctxt f empty {map; size} =
       G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
       M.fold_e
+        (fun key value (acc, ctxt) ->
+          (* Invoking [f] must also account for gas. *)
+          f ctxt acc key value)
+        map
+        (empty, ctxt)
+
+    let fold_es ctxt f empty {map; size} =
+      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>?= fun ctxt ->
+      M.fold_es
         (fun key value (acc, ctxt) ->
           (* Invoking [f] must also account for gas. *)
           f ctxt acc key value)

@@ -81,6 +81,7 @@ type successful_transaction_result =
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       originated_contracts : Contract_hash.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;

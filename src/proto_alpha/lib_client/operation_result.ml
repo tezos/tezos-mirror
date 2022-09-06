@@ -510,6 +510,49 @@ let pp_balance_updates ppf balance_updates =
         (Format.pp_print_list pp_one)
         balance_updates
 
+let pp_ticket_receipt ppf ticket_receipt =
+  let open Ticket_receipt in
+  let pp_amount ppf amount =
+    Format.fprintf
+      ppf
+      "%s%a"
+      (if Z.(zero < amount) then "+" else "")
+      Z.pp_print
+      amount
+  in
+  let pp_account_update ppf {account; amount} =
+    Format.fprintf ppf "%a ... %a" Destination.pp account pp_amount amount
+  in
+  let pp_account_updates ppf updates =
+    Format.fprintf
+      ppf
+      "@[<v 2>Account updates:@,%a@]"
+      (Format.pp_print_list pp_account_update)
+      updates
+  in
+  let pp_item ppf {ticket_token; updates} =
+    let {ticketer; contents_type; contents} = ticket_token in
+    Format.fprintf
+      ppf
+      "Ticketer: %a@,Content type: %a@,Content: %a@,%a"
+      Contract.pp
+      ticketer
+      Michelson_v1_printer.print_expr
+      contents_type
+      Michelson_v1_printer.print_expr
+      contents
+      pp_account_updates
+      updates
+  in
+  match ticket_receipt with
+  | [] -> ()
+  | ticket_updates ->
+      Format.fprintf
+        ppf
+        "@,@[<v 2>Ticket updates:@,%a@]"
+        (Format.pp_print_list pp_item)
+        ticket_updates
+
 let pp_consumed_gas ppf consumed_gas =
   Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
 
@@ -574,6 +617,7 @@ let pp_transaction_result ppf = function
   | Transaction_to_contract_result
       {
         balance_updates;
+        ticket_receipt;
         consumed_gas;
         storage;
         originated_contracts;
@@ -602,7 +646,8 @@ let pp_transaction_result ppf = function
       pp_storage_size ppf storage_size ;
       pp_paid_storage_size_diff ppf paid_storage_size_diff ;
       pp_consumed_gas ppf consumed_gas ;
-      pp_balance_updates ppf balance_updates
+      pp_balance_updates ppf balance_updates ;
+      pp_ticket_receipt ppf ticket_receipt
   | Transaction_to_tx_rollup_result
       {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
       pp_consumed_gas ppf consumed_gas ;

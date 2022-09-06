@@ -311,6 +311,7 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
         storage = None;
         lazy_storage_diff = None;
         balance_updates;
+        ticket_receipt = [];
         originated_contracts = [];
         consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
         storage_size = Z.zero;
@@ -381,6 +382,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                    lazy_storage_diff;
                    operations;
                    ticket_diffs;
+                   ticket_receipt;
                  },
                  ctxt ) ->
       update_script_storage_and_ticket_balances
@@ -413,6 +415,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                 storage = Some storage;
                 lazy_storage_diff;
                 balance_updates;
+                ticket_receipt;
                 originated_contracts;
                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                 storage_size = new_size;
@@ -1481,6 +1484,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               storage = payload.storage;
               lazy_storage_diff = payload.lazy_storage_diff;
               balance_updates;
+              ticket_receipt = payload.ticket_receipt;
               originated_contracts = payload.originated_contracts;
               consumed_gas = payload.consumed_gas;
               storage_size = payload.storage_size;
@@ -2395,6 +2399,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                         lazy_storage_diff;
                         operations;
                         ticket_diffs;
+                        ticket_receipt;
                       },
                       ctxt ) ->
            match operations with
@@ -2436,6 +2441,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                         storage = Some storage;
                         lazy_storage_diff;
                         balance_updates;
+                        ticket_receipt;
                         (* At this point in application the
                            origination nonce has not been initialized
                            so it's not possible to originate new
