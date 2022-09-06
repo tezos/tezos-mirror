@@ -60,6 +60,14 @@ using a particular label for the instance names, you can use
 NODE_INSTANCE_LABEL=my_instance_label
 ```
 
+If you need hardware metrics, note that, by default, the storage stat considered is the used space of the whole disk.
+Optionnally you can enable storage monitoring with ``filecheck``:
+
+```sh
+STORAGE_MODE=filecheck
+```
+
+
 ### Distribution
 
 Grafana dashboards (JSON files) are automatically released on git tags to [GitLab packages of this project](https://gitlab.com/nomadic-labs/grafazos/-/packages).
