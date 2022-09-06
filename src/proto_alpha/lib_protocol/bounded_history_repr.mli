@@ -34,6 +34,10 @@ This data structure is basically a bounded association table that stores
 }
 *)
 
+module type NAME = sig
+  val name : string
+end
+
 (** The required interface for keys stored in the table. *)
 module type KEY = sig
   type t
@@ -110,5 +114,5 @@ module type S = sig
   end
 end
 
-module Make (Key : KEY) (Value : VALUE) :
+module Make (Name : NAME) (Key : KEY) (Value : VALUE) :
   S with type key = Key.t and type value = Value.t
