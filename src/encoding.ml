@@ -551,9 +551,9 @@ let with_decoding_guard guard encoding =
 
 let int_like_n_or_z ~min_value ~max_value name sizer like =
   if max_value < min_value then invalid_arg name ;
-  let max_size =
-    max (sizer @@ Z.of_int min_value) (sizer @@ Z.of_int max_value)
-  in
+  let z_max_value = Z.of_int max_value in
+  let z_min_value = Z.of_int min_value in
+  let max_size = max (sizer z_min_value) (sizer z_max_value) in
   check_size
     max_size
     (conv
@@ -565,7 +565,7 @@ let int_like_n_or_z ~min_value ~max_value name sizer like =
                  (Invalid_int {min = min_value; v = i; max = max_value})) ;
          Z.of_int i)
        (fun z ->
-         (if Z.compare z (Z.of_int min_value) < 0 then
+         (if Z.compare z z_min_value < 0 then
           let i =
             if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
               Binary_size.min_int `Int31
@@ -574,7 +574,7 @@ let int_like_n_or_z ~min_value ~max_value name sizer like =
           raise
             Binary_error_types.(
               Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
-         (if Z.compare z (Z.of_int max_value) > 0 then
+         (if Z.compare z z_max_value > 0 then
           let i =
             if Z.compare z (Z.of_int (Binary_size.max_int `Int31)) > 0 then
               Binary_size.max_int `Int31
