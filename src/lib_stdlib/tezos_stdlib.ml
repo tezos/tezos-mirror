@@ -29,6 +29,7 @@ module Lwt_pipe = Lwt_pipe
 module Lwt_utils = Lwt_utils
 module Memory = Memory
 module Tag = Tag
+module TzBytes = TzBytes
 module TzEndian = TzEndian
 module TzFilename = TzFilename
 module TzList = TzList

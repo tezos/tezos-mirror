@@ -438,7 +438,10 @@ let octez_stdlib =
     ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
     ~ocaml:V.(at_least "4.14")
     ~js_compatible:true
+    ~js_of_ocaml:
+      [[S "javascript_files"; G (Dune.of_atom_list ["tzBytes_js.js"])]]
     ~inline_tests:ppx_expect
+    ~foreign_stubs:{language = C; flags = []; names = ["tzBytes_c"]}
 
 let _octez_stdlib_tests =
   tests
@@ -450,6 +453,7 @@ let _octez_stdlib_tests =
       "test_fallbackArray";
       "test_functionalArray";
       "test_hash_queue";
+      "test_tzBytes";
     ]
     ~path:"src/lib_stdlib/test"
     ~opam:"tezos-stdlib"

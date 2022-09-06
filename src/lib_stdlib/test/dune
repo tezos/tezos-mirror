@@ -9,7 +9,8 @@
   test_tzString
   test_fallbackArray
   test_functionalArray
-  test_hash_queue)
+  test_hash_queue
+  test_tzBytes)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -58,6 +59,11 @@
  (action (run %{dep:./test_hash_queue.exe})))
 
 (rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_tzBytes.exe})))
+
+(rule
  (alias runtest_js)
  (package tezos-stdlib)
  (action (run node %{dep:./test_bits.bc.js})))
@@ -91,3 +97,8 @@
  (alias runtest_js)
  (package tezos-stdlib)
  (action (run node %{dep:./test_hash_queue.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_tzBytes.bc.js})))
