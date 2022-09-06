@@ -56,6 +56,9 @@ val register_host_funcs :
 
 exception Bad_input
 
+(** A durable key was given by the kernel with a longer-than-allowed length. *)
+exception Key_too_large of int
+
 module Internal_for_tests : sig
   (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
        ~num_bytes] reads num_bytes from the memory of module_inst starting at
@@ -92,4 +95,13 @@ module Internal_for_tests : sig
     int Lwt.t
 
   val read_input : Tezos_webassembly_interpreter.Instance.func_inst
+
+  (** [store_has] returns whether a key corresponds to a value and/or subtrees.
+      Namely, it returns the following enum:
+      - [0]: There is no value at [key], nor subtrees under [key].
+      - [1]: There is a value at [key], but no subtrees under [key].
+      - [2]: There is no value at [key], but there are subtrees under [key].
+      - [3]: There is a value at [key], and subtrees under [key].
+  *)
+  val store_has : Tezos_webassembly_interpreter.Instance.func_inst
 end

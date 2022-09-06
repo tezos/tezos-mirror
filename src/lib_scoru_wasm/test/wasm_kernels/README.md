@@ -51,3 +51,15 @@ git checkout 0c98b17c4599d6f656312b16f17798406d491d77
 
 ./scripts/build-unit-kernel.sh "test-write-debug"
 ```
+
+## [test-store-has.wasm](./test-store-has.wasm)
+This kernel is designed to test the `store_has` host function behaviour, on different keys in *durable storage*.
+
+It may be originated directly within a boot sector.
+
+To build the `test-store-has.wasm` kernel, run the following from the checked-out `trili/kernel` repo:
+```shell
+git checkout 4788b8a882efbc9c19621ab43d617b2bdd5b1baf
+
+./scripts/build-unit-kernel.sh "test-store-has"
+```

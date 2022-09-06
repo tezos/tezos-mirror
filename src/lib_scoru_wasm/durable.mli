@@ -54,6 +54,9 @@ val to_storage : t -> Tezos_webassembly_interpreter.Durable_storage.t
     - a step only contains alphanumeric ascii, or dots ('.') *)
 type key
 
+(** [max_key_length] is the maximum length of a key in bytes. *)
+val max_key_length : int
+
 (** raise @Invalid_key *)
 val key_of_string_exn : string -> key
 
@@ -63,3 +66,6 @@ val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
 
 (** raise @Not_found *)
 val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t
+
+(** [count_subtrees durable key] returns the number of subtrees under [key]. *)
+val count_subtrees : t -> key -> int Lwt.t

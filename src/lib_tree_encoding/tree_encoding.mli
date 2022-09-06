@@ -266,6 +266,8 @@ module type TREE = sig
   val find : tree -> key -> value option Lwt.t
 
   val find_tree : tree -> key -> tree option Lwt.t
+
+  val length : tree -> key -> int Lwt.t
 end
 
 type wrapped_tree

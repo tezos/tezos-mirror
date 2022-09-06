@@ -46,6 +46,8 @@ module type S = sig
   val find : tree -> key -> value option Lwt.t
 
   val find_tree : tree -> key -> tree option Lwt.t
+
+  val length : tree -> key -> int Lwt.t
 end
 
 type 'tree backend = (module S with type tree = 'tree)
@@ -70,6 +72,9 @@ let find : type tree. tree backend -> tree -> key -> value option Lwt.t =
 
 let find_tree : type tree. tree backend -> tree -> key -> tree option Lwt.t =
  fun (module T) tree key -> T.find_tree tree key
+
+let length : type tree. tree backend -> tree -> key -> int Lwt.t =
+ fun (module T) tree key -> T.length tree key
 
 type wrapped_tree = Wrapped_tree : 'tree * 'tree backend -> wrapped_tree
 
@@ -98,6 +103,8 @@ module Wrapped : S with type tree = wrapped_tree = struct
     let open Lwt.Syntax in
     let+ t' = find_tree b t key in
     match t' with Some t' -> Some (Wrapped_tree (t', b)) | None -> None
+
+  let length (Wrapped_tree (t, b)) key = length b t key
 
   let find (Wrapped_tree (t, b)) key = find b t key
 
