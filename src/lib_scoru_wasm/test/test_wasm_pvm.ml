@@ -52,6 +52,16 @@ let test_write_debug_kernel = "test-write-debug"
 *)
 let test_store_has_kernel = "test-store-has"
 
+(* Kernel checking the return value of store_list_size host func.
+
+   This kernel expects a collection of values to exist:
+   - `/durable/one/two`
+   - `/durable/one/three`
+   - `/durable/one/four`
+   and asserts that `store_list_size(/one) = 3`.
+*)
+let test_store_list_size_kernel = "test-store-list-size"
+
 (** [check_error kind reason error] checks a Wasm PVM error [error] is of a
     given [kind] with a possible [reason].
 
@@ -181,20 +191,20 @@ let should_run_debug_kernel kernel =
   (* The kernel should not fail. *)
   assert (not @@ is_stuck state_after_first_message)
 
+let add_value tree key_steps =
+  let open Lazy_containers in
+  let open Test_encodings_util in
+  let value = Chunked_byte_vector.of_string "a very long value" in
+  Tree_encoding_runner.encode
+    (Tree_encoding.scope
+       ("durable" :: List.append key_steps ["_"])
+       Tree_encoding.chunked_byte_vector)
+    value
+    tree
+
 let should_run_store_has_kernel kernel =
   let open Lwt_syntax in
   let* tree = initial_boot_sector_from_kernel kernel in
-  let add_value tree key_steps =
-    let open Lazy_containers in
-    let open Test_encodings_util in
-    let value = Chunked_byte_vector.of_string "a very long value" in
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["_"])
-         Tree_encoding.chunked_byte_vector)
-      value
-      tree
-  in
   let* tree = add_value tree ["hi"; "bye"] in
   let* tree = add_value tree ["hello"] in
   let* tree = add_value tree ["hello"; "universe"] in
@@ -219,6 +229,38 @@ let should_run_store_has_kernel kernel =
   in
   (* The kernel is now expected to fail, the PVM should be in stuck state. *)
   assert (is_stuck state_after_first_message)
+
+let should_run_store_list_size_kernel kernel =
+  let open Lwt_syntax in
+  let* tree = initial_boot_sector_from_kernel kernel in
+  let* tree = add_value tree ["one"; "two"] in
+  let* tree = add_value tree ["one"; "three"] in
+  let* tree = add_value tree ["one"; "four"] in
+  (* Make the first ticks of the WASM PVM (parsing of origination
+     message, parsing and init of the kernel), to switch it to
+     “Input_requested” mode. *)
+  let* tree = eval_until_input_requested tree in
+  (* Feeding it with one input *)
+  let* tree = set_input_step "test" 0 tree in
+  (* Adding a value at ["one"] should not affect the count. *)
+  let* tree = add_value tree ["one"] in
+  (* running until waiting for input *)
+  let* tree = eval_until_input_requested tree in
+  let* state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
+  assert (not @@ is_stuck state_after_first_message) ;
+  (* We now add another value - this will cause the kernel
+     assertion on this path to fail, as there are now four subtrees. *)
+  let* tree = set_input_step "test" 1 tree in
+  let* tree = add_value tree ["one"; "five"] in
+  let* tree = eval_until_input_requested tree in
+  let+ state_after_second_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  (* The kernel is now expected to fail, the PVM should be in stuck state. *)
+  assert (is_stuck state_after_second_message)
 
 let test_with_kernel kernel test () =
   let open Lwt_result_syntax in
@@ -264,4 +306,10 @@ let tests =
       "Test store-has kernel"
       `Quick
       (test_with_kernel test_store_has_kernel should_run_store_has_kernel);
+    tztest
+      "Test store-list-size kernel"
+      `Quick
+      (test_with_kernel
+         test_store_list_size_kernel
+         should_run_store_list_size_kernel);
   ]

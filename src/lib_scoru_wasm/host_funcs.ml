@@ -247,6 +247,32 @@ let store_has =
           (durable, [Values.(Num (I32 (I32.of_int_s r)))])
       | _ -> raise Bad_input)
 
+let store_list_size_name = "tezos_store_list_size"
+
+let store_list_size_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Types.[NumType I64Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let store_list_size =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
+          let key_length = Int32.to_int key_length in
+          if key_length > Durable.max_key_length then
+            raise (Key_too_large key_length) ;
+          let* memory = retrieve_memory memories in
+          let* key = Memory.load_bytes memory key_offset key_length in
+          let tree = Durable.of_storage_exn durable in
+          let key = Durable.key_of_string_exn key in
+          let+ num_subtrees = Durable.count_subtrees tree key in
+          (durable, [Values.(Num (I64 (I64.of_int_s num_subtrees)))])
+      | _ -> raise Bad_input)
+
 let lookup_opt name =
   match name with
   | "read_input" ->
@@ -256,6 +282,8 @@ let lookup_opt name =
   | "write_debug" ->
       Some (ExternFunc (HostFunc (write_debug_type, write_debug_name)))
   | "store_has" -> Some (ExternFunc (HostFunc (store_has_type, store_has_name)))
+  | "store_list_size" ->
+      Some (ExternFunc (HostFunc (store_list_size_type, store_list_size_name)))
   | _ -> None
 
 let lookup name =
@@ -271,6 +299,7 @@ let register_host_funcs registry =
       (write_output_name, write_output);
       (write_debug_name, write_debug);
       (store_has_name, store_has);
+      (store_list_size_name, store_list_size);
     ]
 
 module Internal_for_tests = struct
@@ -283,4 +312,7 @@ module Internal_for_tests = struct
   let read_input = Func.HostFunc (read_input_type, read_input_name)
 
   let store_has = Func.HostFunc (store_has_type, store_has_name)
+
+  let store_list_size =
+    Func.HostFunc (store_list_size_type, store_list_size_name)
 end
