@@ -156,7 +156,7 @@ module Make
          (value ["gather-floppies"; "last-input-info"]
          @@ Data_encoding.option input_info_encoding)
          (value ["gather-floppies"; "internal-tick"] Data_encoding.n)
-         (scope ["durable"; "kernel"; "boot.wasm"] chunked_byte_vector)
+         (scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector)
 
   (** [increment_ticks state] increments the number of ticks as stored
       in [state], or set it to [1] in case it has not been initialized

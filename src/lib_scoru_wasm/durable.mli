@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,25 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+(** [t] allows a [wrapped_tree] to be manipulated as a tree of
+    [chunked_byte_vector] *)
+type t
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-    ]
-  |> Lwt_main.run
+(** [key] was too long, or contained invalid steps. *)
+exception Invalid_key of string
+
+(** A value was not found in the durable store. *)
+exception Not_found
+
+(** [encoding] is a [Tree_encoding] for [t]. *)
+val encoding : t Tree_encoding.t
+
+val of_tree : Lazy_containers.Lazy_map.tree -> t
+
+val to_tree : t -> Lazy_containers.Lazy_map.tree
+
+(** [key] is the type that indexes [t]. It enforces several constraints:
+    - a key's length is bounded.
+    - a key is a series of non-empty steps, where
+    - a step is preceded by '/'
+    - a step only contains alphanumeric ascii, or dots ('.') *)
+type key
+
+(** raise @Invalid_key *)
+val key_of_string_exn : string -> key
+
+(** [find_value durable key] optionally looks for the value encoded at [key]
+    in [durable]. *)
+val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
+
+(** raise @Not_found *)
+val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t

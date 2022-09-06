@@ -178,7 +178,10 @@ let find_status tree =
 let get_chunks_count tree =
   let open Lwt.Syntax in
   let+ len =
-    find tree ["durable"; "kernel"; "boot.wasm"; "length"] Data_encoding.int64
+    find
+      tree
+      ["durable"; "kernel"; "boot.wasm"; "_"; "length"]
+      Data_encoding.int64
   in
   Option.fold ~none:0 ~some:Int64.to_int len
 
