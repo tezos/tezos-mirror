@@ -11,7 +11,7 @@ is used among other things to hash blocks, operations and contexts:
 
 At the time of writing, this function is a thin wrapper which
 concatenates the list of bytes and passes it to the ``blake2b``
-implementation provided by `HACL* <https://github.com/project-everest/hacl-star>`_.
+implementation provided by `HACL* <https://github.com/hacl-star/hacl-star>`_.
 
 Step 1: Defining the benchmark
 ------------------------------
