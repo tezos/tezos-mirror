@@ -86,27 +86,30 @@ module Make (Interpreter : Interpreter.S) :
 
   let generate_proof configuration node_ctxt game start_state =
     let open Lwt_result_syntax in
-    let*! hash =
+    let*! snapshot_hash =
       Layer1.hash_of_level
         node_ctxt.Node_context.store
-        (Raw_level.to_int32 game.inbox_level)
+        (Int32.pred Raw_level.(to_int32 game.start_level))
     in
-    let* history = Inbox.history_of_hash node_ctxt hash in
-    let* inbox = Inbox.inbox_of_hash node_ctxt hash in
-    let* ctxt = Node_context.checkout_context node_ctxt hash in
-    let*! messages_tree = Context.MessageTrees.find ctxt in
-    let* history, history_proof =
+    let* snapshot_inbox = Inbox.inbox_of_hash node_ctxt snapshot_hash in
+    let* snapshot_history = Inbox.history_of_hash node_ctxt snapshot_hash in
+    let* snapshot_ctxt =
+      Node_context.checkout_context node_ctxt snapshot_hash
+    in
+    let snapshot_ctxt_index = Context.index snapshot_ctxt in
+    let*! snapshot_messages_tree = Context.MessageTrees.find snapshot_ctxt in
+    let* snapshot_history, snapshot =
       Context.Inbox.form_history_proof
-        node_ctxt.context
-        history
-        inbox
-        messages_tree
+        snapshot_ctxt_index
+        snapshot_history
+        snapshot_inbox
+        snapshot_messages_tree
       >|= Environment.wrap_tzresult
     in
     let module P = struct
       include PVM
 
-      let context = node_ctxt.context
+      let context = snapshot_ctxt_index
 
       let state = start_state
 
@@ -119,21 +122,21 @@ module Make (Interpreter : Interpreter.S) :
       module Inbox_with_history = struct
         include Context.Inbox
 
-        let history = history
+        let history = snapshot_history
 
-        let inbox = history_proof
+        let inbox = snapshot
       end
     end in
     let* proof =
       trace
         (Sc_rollup_node_errors.Cannot_produce_proof
-           (inbox, history, game.inbox_level))
+           (snapshot_inbox, snapshot_history, game.inbox_level))
       @@ (Sc_rollup.Proof.produce (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
     let*! res =
       Sc_rollup.Proof.valid
-        history_proof
+        snapshot
         game.inbox_level
         ~pvm_name:game.pvm_name
         proof

@@ -93,6 +93,8 @@ let empty index = {index; tree = IStore.Tree.empty ()}
 
 let is_empty ctxt = IStore.Tree.is_empty ctxt.tree
 
+let index context = context.index
+
 module Proof (Hash : sig
   type t
 
