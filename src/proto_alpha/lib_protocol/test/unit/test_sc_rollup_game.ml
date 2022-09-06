@@ -306,6 +306,48 @@ let test_staker_injectivity () =
     res
     (( = ) (Sc_rollup_errors.Sc_rollup_staker_in_game (`Defender defender)))
 
+module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+
+(** Test that sending a invalid serialized inbox proof to
+    {Sc_rollup_proof_repr.valid} is rejected. *)
+let test_invalid_serialized_inbox_proof () =
+  let open Lwt_result_syntax in
+  let open Alpha_context in
+  let* ctxt = Test_sc_rollup_inbox.create_context () in
+  let*! inbox =
+    Sc_rollup.Inbox.empty ctxt Sc_rollup.Address.zero Raw_level.root
+  in
+  let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
+
+  let ctxt = Tezos_context_memory.make_empty_context () in
+  let*! state = Arith_pvm.initial_state ctxt in
+  (* We evaluate the boot sector, so the [input_requested] is a
+     [First_after]. *)
+  let*! state = Arith_pvm.eval state in
+  let*! proof = Arith_pvm.produce_proof ctxt None state in
+  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+  let wrapped_proof =
+    Sc_rollup.Arith_pvm_with_proof
+      (module struct
+        include Arith_pvm
+
+        let proof = proof
+      end)
+  in
+
+  (* We create an obviously invalid inbox *)
+  let inbox = Bytes.of_string "I am the big bad wolf" |> Obj.magic in
+  let proof = Sc_rollup.Proof.{pvm_step = wrapped_proof; inbox = Some inbox} in
+
+  let*! res =
+    T.lift
+    @@ Sc_rollup.Proof.valid snapshot Raw_level.root ~pvm_name:"arith" proof
+  in
+  Assert.proto_error
+    ~loc:__LOC__
+    res
+    (( = ) Sc_rollup_proof_repr.Sc_rollup_invalid_serialized_inbox_proof)
+
 let tests =
   [
     Tztest.tztest
@@ -320,4 +362,8 @@ let tests =
       "Staker can be in at most one game (injectivity)."
       `Quick
       test_staker_injectivity;
+    Tztest.tztest
+      "Invalid serialized inbox proof is rejected."
+      `Quick
+      test_invalid_serialized_inbox_proof;
   ]
