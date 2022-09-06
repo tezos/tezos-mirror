@@ -97,6 +97,12 @@ type instruction_name =
   | N_IConcat_bytes_pair
   | N_ISlice_bytes
   | N_IBytes_size
+  | N_IOr_bytes
+  | N_IAnd_bytes
+  | N_IXor_bytes
+  | N_INot_bytes
+  | N_ILsl_bytes
+  | N_ILsr_bytes
   (* timestamp operations *)
   | N_IAdd_seconds_to_timestamp
   | N_IAdd_timestamp_to_seconds
@@ -297,6 +303,12 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IConcat_bytes_pair -> "N_IConcat_bytes_pair"
   | N_ISlice_bytes -> "N_ISlice_bytes"
   | N_IBytes_size -> "N_IBytes_size"
+  | N_IOr_bytes -> "N_IOr_bytes"
+  | N_IAnd_bytes -> "N_IAnd_bytes"
+  | N_IXor_bytes -> "N_IXor_bytes"
+  | N_INot_bytes -> "N_INot_bytes"
+  | N_ILsl_bytes -> "N_ILsl_bytes"
+  | N_ILsr_bytes -> "N_ILsr_bytes"
   | N_IAdd_seconds_to_timestamp -> "N_IAdd_seconds_to_timestamp"
   | N_IAdd_timestamp_to_seconds -> "N_IAdd_timestamp_to_seconds"
   | N_ISub_timestamp_seconds -> "N_ISub_timestamp_seconds"
@@ -632,6 +644,12 @@ let all_instructions =
     N_ILog;
     N_IOpen_chest;
     N_IEmit;
+    N_ILsl_bytes;
+    N_ILsr_bytes;
+    N_IOr_bytes;
+    N_IAnd_bytes;
+    N_IXor_bytes;
+    N_INot_bytes;
   ]
 
 let all_continuations =
@@ -816,6 +834,23 @@ module Instructions = struct
   let slice_bytes bytes = ir_sized_step N_ISlice_bytes (unary "bytes" bytes)
 
   let bytes_size = ir_sized_step N_IBytes_size nullary
+
+  let lsl_bytes bytes shift =
+    ir_sized_step N_ILsl_bytes (binary "bytes" bytes "shift" shift)
+
+  let lsr_bytes bytes shift =
+    ir_sized_step N_ILsr_bytes (binary "bytes" bytes "shift" shift)
+
+  let or_bytes bytes1 bytes2 =
+    ir_sized_step N_IOr_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let and_bytes bytes1 bytes2 =
+    ir_sized_step N_IAnd_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let xor_bytes bytes1 bytes2 =
+    ir_sized_step N_IXor_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
+
+  let not_bytes bytes = ir_sized_step N_INot_bytes (unary "bytes" bytes)
 
   let add_seconds_to_timestamp seconds tstamp =
     ir_sized_step
@@ -1439,6 +1474,27 @@ let extract_ir_sized_step :
       Instructions.open_chest log_time plaintext_size
   | IMin_block_time _, _ -> Instructions.min_block_time
   | IEmit _, _ -> Instructions.emit
+  | ILsl_bytes (_, _), (x, (y, _)) ->
+      let y =
+        match Script_int.to_int y with
+        | Some y -> y
+        | None -> (* overflow *) assert false
+      in
+      Instructions.lsl_bytes (Size.bytes x) y
+  | ILsr_bytes (_, _), (x, (y, _)) ->
+      let y =
+        match Script_int.to_int y with
+        | Some y -> y
+        | None -> (* overflow *) assert false
+      in
+      Instructions.lsr_bytes (Size.bytes x) y
+  | IOr_bytes (_, _), (x, (y, _)) ->
+      Instructions.or_bytes (Size.bytes x) (Size.bytes y)
+  | IAnd_bytes (_, _), (x, (y, _)) ->
+      Instructions.and_bytes (Size.bytes x) (Size.bytes y)
+  | IXor_bytes (_, _), (x, (y, _)) ->
+      Instructions.xor_bytes (Size.bytes x) (Size.bytes y)
+  | INot_bytes (_, _), (x, _) -> Instructions.not_bytes (Size.bytes x)
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =

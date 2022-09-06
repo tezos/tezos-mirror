@@ -183,24 +183,44 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ILsl_nat _ ->
       let x = accu in
       Interp_costs.lsl_nat x
+  | ILsl_bytes _ ->
+      let x = accu in
+      let y, _ = stack in
+      Interp_costs.lsl_bytes x y
   | ILsr_nat _ ->
       let x = accu in
       Interp_costs.lsr_nat x
+  | ILsr_bytes _ ->
+      let x = accu in
+      let y, _ = stack in
+      Interp_costs.lsr_bytes x y
   | IOr_nat _ ->
       let x = accu and y, _ = stack in
       Interp_costs.or_nat x y
+  | IOr_bytes _ ->
+      let x = accu and y, _ = stack in
+      Interp_costs.or_bytes x y
   | IAnd_nat _ ->
       let x = accu and y, _ = stack in
       Interp_costs.and_nat x y
   | IAnd_int_nat _ ->
       let x = accu and y, _ = stack in
       Interp_costs.and_int_nat x y
+  | IAnd_bytes _ ->
+      let x = accu and y, _ = stack in
+      Interp_costs.and_bytes x y
   | IXor_nat _ ->
       let x = accu and y, _ = stack in
       Interp_costs.xor_nat x y
+  | IXor_bytes _ ->
+      let x = accu and y, _ = stack in
+      Interp_costs.xor_bytes x y
   | INot_int _ ->
       let x = accu in
       Interp_costs.not_int x
+  | INot_bytes _ ->
+      let x = accu in
+      Interp_costs.not_bytes x
   | ICompare (_, ty, _) ->
       let a = accu and b, _ = stack in
       Interp_costs.compare ty a b
@@ -957,6 +977,17 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
+  Script_int.n Script_int.num * 'b ->
+  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+
+type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_bytes_type =
+  logger option ->
+  outdated_context * step_constants ->
+  local_gas_counter ->
+  Script.location ->
+  (bytes, 'b, 'c, 'd) kinstr ->
+  ('c, 'd, 'e, 'f) continuation ->
+  bytes ->
   Script_int.n Script_int.num * 'b ->
   ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
 

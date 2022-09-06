@@ -852,6 +852,12 @@ let check_kinstr_size () =
       Kinstr ("IAnd_int_nat", IAnd_int_nat (loc, halt ()));
       Kinstr ("IXor_nat", IXor_nat (loc, halt ()));
       Kinstr ("INot_int", INot_int (loc, halt ()));
+      Kinstr ("IAnd_bytes", IAnd_bytes (loc, halt ()));
+      Kinstr ("IOr_bytes", IOr_bytes (loc, halt ()));
+      Kinstr ("IXor_bytes", IXor_bytes (loc, halt ()));
+      Kinstr ("INot_bytes", INot_bytes (loc, halt ()));
+      Kinstr ("ILsl_bytes", ILsl_bytes (loc, halt ()));
+      Kinstr ("ILsr_bytes", ILsr_bytes (loc, halt ()));
       Kinstr
         ( "IIf",
           IIf

@@ -3729,14 +3729,29 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> ILsl_nat (loc, k))} in
       typed ctxt loc instr stack
+  | Prim (loc, I_LSL, [], annot), Item_t (Bytes_t, Item_t (Nat_t, rest)) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> ILsl_bytes (loc, k))} in
+      let stack = Item_t (Bytes_t, rest) in
+      typed ctxt loc instr stack
   | Prim (loc, I_LSR, [], annot), Item_t (Nat_t, (Item_t (Nat_t, _) as stack))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> ILsr_nat (loc, k))} in
       typed ctxt loc instr stack
+  | Prim (loc, I_LSR, [], annot), Item_t (Bytes_t, Item_t (Nat_t, rest)) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> ILsr_bytes (loc, k))} in
+      let stack = Item_t (Bytes_t, rest) in
+      typed ctxt loc instr stack
   | Prim (loc, I_OR, [], annot), Item_t (Nat_t, (Item_t (Nat_t, _) as stack)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IOr_nat (loc, k))} in
+      typed ctxt loc instr stack
+  | Prim (loc, I_OR, [], annot), Item_t (Bytes_t, (Item_t (Bytes_t, _) as stack))
+    ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IOr_bytes (loc, k))} in
       typed ctxt loc instr stack
   | Prim (loc, I_AND, [], annot), Item_t (Nat_t, (Item_t (Nat_t, _) as stack))
     ->
@@ -3748,10 +3763,20 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IAnd_int_nat (loc, k))} in
       typed ctxt loc instr stack
+  | ( Prim (loc, I_AND, [], annot),
+      Item_t (Bytes_t, (Item_t (Bytes_t, _) as stack)) ) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IAnd_bytes (loc, k))} in
+      typed ctxt loc instr stack
   | Prim (loc, I_XOR, [], annot), Item_t (Nat_t, (Item_t (Nat_t, _) as stack))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IXor_nat (loc, k))} in
+      typed ctxt loc instr stack
+  | ( Prim (loc, I_XOR, [], annot),
+      Item_t (Bytes_t, (Item_t (Bytes_t, _) as stack)) ) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IXor_bytes (loc, k))} in
       typed ctxt loc instr stack
   | Prim (loc, I_NOT, [], annot), (Item_t (Int_t, _) as stack) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3761,6 +3786,10 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> INot_int (loc, k))} in
       let stack = Item_t (int_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_NOT, [], annot), (Item_t (Bytes_t, _) as stack) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> INot_bytes (loc, k))} in
       typed ctxt loc instr stack
   (* comparison *)
   | Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest)) ->

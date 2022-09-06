@@ -200,6 +200,7 @@
   Alpha_context
   Script_string
   Script_timestamp
+  Script_bytes
   Tx_rollup_l2_storage_sig
   Tx_rollup_l2_context_sig
   Tx_rollup_l2_context
@@ -477,6 +478,7 @@
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
   tx_rollup_l2_context.ml
@@ -734,6 +736,7 @@
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
   tx_rollup_l2_context.ml
@@ -996,6 +999,7 @@
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
   script_timestamp.ml script_timestamp.mli
+  script_bytes.ml script_bytes.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
   tx_rollup_l2_context.ml

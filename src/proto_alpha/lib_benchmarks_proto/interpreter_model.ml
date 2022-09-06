@@ -341,6 +341,34 @@ module Models = struct
     end in
     (module M : Model.Model_impl
       with type arg_type = int * (int * (int * (int * unit))))
+
+  let lsl_bytes_model name =
+    Model.bilinear_affine
+      ~intercept:(fv (sf "%s_const" name))
+      ~coeff1:(fv (sf "%s_bytes" name))
+      ~coeff2:(fv (sf "%s_shift" name))
+
+  let lsr_bytes_model name =
+    let const = fv (sf "%s_const" name) in
+    let coeff = fv (sf "%s_coeff" name) in
+    let module M = struct
+      type arg_type = int * (int * unit)
+
+      module Def (X : Costlang.S) = struct
+        open X
+
+        type model_type = size -> size -> size
+
+        let arity = Model.arity_2
+
+        let model =
+          lam ~name:"size1" @@ fun size1 ->
+          lam ~name:"size2" @@ fun size2 ->
+          let_ ~name:"q" (size1 - (size2 * float 0.125)) @@ fun q ->
+          free ~name:const + (free ~name:coeff * if_ (lt (int 0) q) q (int 0))
+      end
+    end in
+    (module M : Model.Model_impl with type arg_type = int * (int * unit))
 end
 
 let ir_model ?specialization instr_or_cont =
@@ -374,6 +402,12 @@ let ir_model ?specialization instr_or_cont =
       | N_IConcat_bytes_pair -> model_2 instr_or_cont (concat_pair_model name)
       | N_ISlice_bytes -> model_1 instr_or_cont (affine_model name)
       | N_IBytes_size -> model_0 instr_or_cont (const1_model name)
+      | N_IOr_bytes -> model_2 instr_or_cont (linear_max_model name)
+      | N_IAnd_bytes -> model_2 instr_or_cont (linear_min_model name)
+      | N_IXor_bytes -> model_2 instr_or_cont (linear_max_model name)
+      | N_INot_bytes -> model_1 instr_or_cont (affine_model name)
+      | N_ILsl_bytes -> model_2 instr_or_cont (lsl_bytes_model name)
+      | N_ILsr_bytes -> model_2 instr_or_cont (lsr_bytes_model name)
       | N_IAdd_seconds_to_timestamp | N_IAdd_timestamp_to_seconds
       | N_ISub_timestamp_seconds | N_IDiff_timestamps ->
           model_2 instr_or_cont (linear_max_model name)

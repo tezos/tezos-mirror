@@ -96,6 +96,13 @@ let cost_N_IAnd_nat size1 size2 =
   let v0 = S.safe_int (Compare.Int.min size1 size2) in
   S.safe_int 35 + (v0 lsr 1)
 
+(* model N_IAnd_bytes *)
+(* Allocates [min size1 size2] *)
+let cost_N_IAnd_bytes size1 size2 =
+  let open S_syntax in
+  let v0 = S.safe_int (Compare.Int.min size1 size2) in
+  S.safe_int 30 + (v0 lsr 1)
+
 (* model N_IBalance *)
 let cost_N_IBalance = S.safe_int 10
 
@@ -381,6 +388,24 @@ let cost_N_ILsr_nat size =
   let v0 = S.safe_int size in
   S.safe_int 45 + (v0 lsr 1)
 
+(* model N_ILsl_bytes *)
+(* Allocates [size + shift / 8] bytes *)
+let cost_N_ILsl_bytes size shift =
+  let open S_syntax in
+  let v1 = S.safe_int size in
+  let v0 = S.safe_int shift in
+  S.safe_int 70 + (v1 lsr 1) + (v0 lsr 4)
+
+(* model N_ILsr_bytes *)
+(* Allocates [max 0 (size - shift / 8)] bytes *)
+let cost_N_ILsr_bytes size shift =
+  let q = size - (shift lsr 3) in
+  let open S.Syntax in
+  if Compare.Int.(q < 0) then S.safe_int 70
+  else
+    let v0 = S.safe_int q in
+    S.safe_int 70 + (v0 lsr 1)
+
 (* model N_ILt *)
 let cost_N_ILt = S.safe_int 10
 
@@ -513,6 +538,13 @@ let cost_N_INot_int size =
   let v0 = S.safe_int size in
   S.safe_int 25 + (v0 lsr 1)
 
+(* model N_INot_bytes *)
+(* Allocates [size] bytes *)
+let cost_N_INot_bytes size =
+  let open S_syntax in
+  let v0 = S.safe_int size in
+  S.safe_int 30 + (v0 lsr 1)
+
 (* model N_INow *)
 let cost_N_INow = S.safe_int 10
 
@@ -533,6 +565,13 @@ let cost_N_IOr = S.safe_int 10
 (* model N_IOr_nat *)
 (* Approximating 0.075758 x term *)
 let cost_N_IOr_nat = cost_linear_op_int
+
+(* model N_IOr_bytes *)
+(* Allocates [max size1 size2] bytes *)
+let cost_N_IOr_bytes size1 size2 =
+  let open S_syntax in
+  let v0 = S.safe_int (Compare.Int.max size1 size2) in
+  S.safe_int 30 + (v0 lsr 1)
 
 (* model N_IPairing_check_bls12_381 *)
 (* when benchmarking, compile bls12-381 without ADX *)
@@ -658,6 +697,13 @@ let cost_N_IXor = S.safe_int 15
 (* model N_IXor_nat *)
 (* Approximating 0.075601 x term *)
 let cost_N_IXor_nat = cost_linear_op_int
+
+(* model N_IXor_bytes *)
+(* Allocates [max size1 size2] bytes *)
+let cost_N_IXor_bytes size1 size2 =
+  let open S_syntax in
+  let v0 = S.safe_int (Compare.Int.max size1 size2) in
+  S.safe_int 30 + (v0 lsr 1)
 
 (* model N_KCons *)
 let cost_N_KCons = S.safe_int 10

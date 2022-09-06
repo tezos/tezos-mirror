@@ -188,6 +188,7 @@
         "Alpha_context",
         "Script_string",
         "Script_timestamp",
+        "Script_bytes",
 
         "Tx_rollup_l2_storage_sig",
         "Tx_rollup_l2_context_sig",
