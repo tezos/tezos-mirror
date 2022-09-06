@@ -74,7 +74,7 @@ module Make (Interpreter : Interpreter.S) :
     | Alice, Bob -> Their_turn
     | Bob, Alice -> Their_turn
 
-  (** [inject_next_move node_ctxt source ~refuation ~opponent] submits an L1
+  (** [inject_next_move node_ctxt source ~refutation ~opponent] submits an L1
       operation (signed by [source]) to issue the next move in the refutation
       game. *)
   let inject_next_move (node_ctxt : Node_context.t) source ~refutation ~opponent
