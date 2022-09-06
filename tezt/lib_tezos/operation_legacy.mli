@@ -80,6 +80,10 @@ val mk_reveal :
   Client.t ->
   manager_operation_content Lwt.t
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3683
+   This is covered by {!Operation_core.call}, remove when not used anymore.
+*)
+
 (** [mk_call] allows to construct a manager operation representing a call
     to a smart contract [entrypoint] with a given parameter [arg] from an
     implicit account [source].
