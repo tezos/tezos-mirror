@@ -260,6 +260,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let current_level = (Raw_context.current_level ctxt).level in
   let game =
     Sc_rollup_game_repr.initial
+      ~start_level:current_level
       (Sc_rollup_inbox_repr.take_snapshot ~current_level inbox)
       ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info

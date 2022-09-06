@@ -205,7 +205,8 @@ module V1 : sig
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
-    level : Raw_level_repr.t;
+    start_level : Raw_level_repr.t;
+    inbox_level : Raw_level_repr.t;
     pvm_name : string;
     game_state : game_state;
   }
@@ -263,9 +264,9 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox parent child refuter defender] will construct an
-    initial game where [refuter] is next to play. The game has
-    [dissection] with three states:
+    [initial inbox ~start_level ~pvm_name ~parent ~child ~refuter ~defender
+    ~default_number_of_sections] will construct an initial game where [refuter]
+    is next to play. The game has [dissection] with three states:
 
       - firstly, the state (with tick zero) of [parent], the commitment
       that both stakers agree on.
@@ -284,6 +285,7 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.history_proof ->
+  start_level:Raw_level_repr.t ->
   pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->
   child:Sc_rollup_commitment_repr.t ->

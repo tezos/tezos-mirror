@@ -89,7 +89,7 @@ module Make (Interpreter : Interpreter.S) :
     let*! hash =
       Layer1.hash_of_level
         node_ctxt.Node_context.store
-        (Raw_level.to_int32 game.level)
+        (Raw_level.to_int32 game.inbox_level)
     in
     let* history = Inbox.history_of_hash node_ctxt hash in
     let* inbox = Inbox.inbox_of_hash node_ctxt hash in
@@ -126,14 +126,15 @@ module Make (Interpreter : Interpreter.S) :
     end in
     let* proof =
       trace
-        (Sc_rollup_node_errors.Cannot_produce_proof (inbox, history, game.level))
-      @@ (Sc_rollup.Proof.produce (module P) game.level
+        (Sc_rollup_node_errors.Cannot_produce_proof
+           (inbox, history, game.inbox_level))
+      @@ (Sc_rollup.Proof.produce (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
     let*! res =
       Sc_rollup.Proof.valid
         history_proof
-        game.level
+        game.inbox_level
         ~pvm_name:game.pvm_name
         proof
       >|= Environment.wrap_tzresult
@@ -175,7 +176,9 @@ module Make (Interpreter : Interpreter.S) :
             .Unreliable_tezos_node_returning_inconsistent_game
       | {state_hash = their_hash; tick} :: dissection -> (
           let open Lwt_result_syntax in
-          let* our = Interpreter.state_of_tick node_ctxt tick game.level in
+          let* our =
+            Interpreter.state_of_tick node_ctxt tick game.inbox_level
+          in
           match (their_hash, our) with
           | None, None ->
               (* This case is absurd since: [None] can only occur at the
@@ -193,7 +196,12 @@ module Make (Interpreter : Interpreter.S) :
         let* ok, ko = traverse (hash, tick) dissection in
         let choice = snd ok in
         let* dissection =
-          new_dissection ~default_number_of_sections node_ctxt game.level ok ko
+          new_dissection
+            ~default_number_of_sections
+            node_ctxt
+            game.inbox_level
+            ok
+            ko
         in
         let chosen_section_len = Sc_rollup.Tick.distance (snd ko) choice in
         return (choice, chosen_section_len, dissection)
@@ -211,7 +219,7 @@ module Make (Interpreter : Interpreter.S) :
     let open Lwt_result_syntax in
     let final_move start_tick =
       let* start_state =
-        Interpreter.state_of_tick node_ctxt start_tick game.level
+        Interpreter.state_of_tick node_ctxt start_tick game.inbox_level
       in
       match start_state with
       | None ->
