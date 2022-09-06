@@ -487,8 +487,9 @@ let int32 = make @@ Int32
 
 let ranged_int minimum maximum =
   let minimum = min minimum maximum and maximum = max minimum maximum in
-  if minimum < -(1 lsl 30) || (1 lsl 30) - 1 < maximum then
-    invalid_arg "Data_encoding.ranged_int" ;
+  if
+    minimum < Binary_size.min_int `Int31 || Binary_size.max_int `Int31 < maximum
+  then invalid_arg "Data_encoding.ranged_int" ;
   make @@ RangedInt {minimum; maximum}
 
 let ranged_float minimum maximum =
@@ -545,10 +546,12 @@ let with_decoding_guard guard encoding =
 let uint_like_n ?max_value () =
   let max_value =
     match max_value with
-    | None -> (1 lsl 30) - 1
+    | None -> Binary_size.max_int `Uint30
     | Some max_value ->
-        if max_value <= 0 || (1 lsl 30) - 1 < max_value then
-          invalid_arg "Data_encoding.uint_like_n" ;
+        if
+          max_value <= Binary_size.min_int `Uint30
+          || Binary_size.max_int `Uint30 < max_value
+        then invalid_arg "Data_encoding.uint_like_n" ;
         max_value
   in
   let max_size =
@@ -570,7 +573,8 @@ let uint_like_n ?max_value () =
        (fun z ->
          (if Z.compare z (Z.of_int max_value) > 0 then
           let i =
-            if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then (1 lsl 30) - 1
+            if Z.compare z (Z.of_int (Binary_size.max_int `Uint30)) > 0 then
+              Binary_size.max_int `Uint30
               (* we avoid overflow on 32 bit machines by just giving the max value *)
             else Z.to_int z
           in
@@ -586,17 +590,18 @@ let uint_like_n ?max_value () =
 let int_like_z ?min_value ?max_value () =
   let max_value =
     match max_value with
-    | None -> (1 lsl 30) - 1
+    | None -> Binary_size.max_int `Int31
     | Some max_value ->
-        if (1 lsl 30) - 1 < max_value then
+        if Binary_size.max_int `Int31 < max_value then
           invalid_arg "Data_encoding.int_like_z" ;
         max_value
   in
   let min_value =
     match min_value with
-    | None -> -(1 lsl 30)
+    | None -> Binary_size.min_int `Int31
     | Some min_value ->
-        if min_value < -(1 lsl 30) then invalid_arg "Data_encoding.int_like_z" ;
+        if min_value < Binary_size.min_int `Int31 then
+          invalid_arg "Data_encoding.int_like_z" ;
         min_value
   in
   if max_value < min_value then invalid_arg "Data_encoding.int_like_z" ;
@@ -620,7 +625,8 @@ let int_like_z ?min_value ?max_value () =
        (fun z ->
          (if Z.compare z (Z.of_int min_value) < 0 then
           let i =
-            if Z.compare z (Z.of_int (-(1 lsl 30))) < 0 then -(1 lsl 30)
+            if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
+              Binary_size.min_int `Int31
             else Z.to_int z
           in
           raise
@@ -628,7 +634,8 @@ let int_like_z ?min_value ?max_value () =
               Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
          (if Z.compare z (Z.of_int max_value) > 0 then
           let i =
-            if Z.compare z (Z.of_int ((1 lsl 30) - 1)) > 0 then (1 lsl 30) - 1
+            if Z.compare z (Z.of_int (Binary_size.max_int `Int31)) > 0 then
+              Binary_size.max_int `Int31
             else Z.to_int z
           in
           raise
