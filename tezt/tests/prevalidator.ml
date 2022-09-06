@@ -820,14 +820,27 @@ module Revamped = struct
              oph3)) ;
     unit
 
-  (** This test checks that if we inject an operation from the same source,
-      and with the same counter, injection will fail if ~force is false
-      because the operation will not be applied/prechecked. *)
-  let one_operation_per_manager_per_block_inject_not_applied =
+  (** Test the one-operation-per-manager-per-block restriction (1M)
+      during the injection of operations in an isolated node.
+
+      Check that:
+
+      - operations from distinct managers are [applied] without issue;
+
+      - a second operation from the same manager with the same fee
+        cannot be injected at all with [~force:false];
+
+      - another operation from the same manager with the same fee,
+        injected with [~force:true], gets classified as [branch_delayed];
+
+      - another operation from the same manager with twice the fee
+        gets [applied] and causes the old operation to be reclassified as
+        [outdated]. *)
+  let one_operation_per_manager_per_block_inject_isolated_node =
     Protocol.register_test
       ~__FILE__
-      ~title:"Manager_restriction_inject_1M"
-      ~tags:["mempool"; "manager_restriction"; "inject"]
+      ~title:"Manager_restriction_inject_isolated_node"
+      ~tags:["mempool"; "manager_restriction"; "inject"; "isolated_node"]
     @@ fun protocol ->
     log_step 1 "Initialize a node and a client." ;
     let* _node, client =
@@ -838,41 +851,89 @@ module Revamped = struct
         ()
     in
 
-    log_step 2 "Inject a transfer with a correct counter." ;
+    let source1 = Constant.bootstrap1 in
+    let source2 = Constant.bootstrap2 in
+    let fee = 1_000 in
+    log_step
+      2
+      "Inject transfers from [source1] and [source2] with fee [%d] and correct \
+       counters. Check that both are applied (i.e. the manager restriction \
+       does not prevent similar operations from distinct managers)."
+      fee ;
     let* (`OpHash oph1) =
-      Operation.Manager.(inject [make @@ transfer ()] client)
+      Operation.Manager.(
+        inject
+          [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap3 ()]
+          client)
     in
+    let* (`OpHash oph2) =
+      Operation.Manager.(
+        inject
+          [make ~source:source2 ~fee @@ transfer ~dest:Constant.bootstrap3 ()]
+          client)
+    in
+    let* () = check_mempool ~applied:[oph1; oph2] client in
+
     log_step
       3
-      "Attempt to inject a transfer with a correct counter but different \
-       destination (~force: %b)."
-      false ;
-
+      "Inject another transfer from [source1] with the same fee and a correct \
+       counter (but a different destination so that it is not the same \
+       operation). Check that it fails and the mempool is unchanged. Indeed, \
+       the [force] argument of [inject] defaults to [false] so the faulty \
+       injected operation is discarded." ;
     let error =
       rex
         ~opts:[`Dotall]
         "Fatal error:\n  Command failed: Error while applying operation.*:"
     in
-    let* _ =
-      RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
-    in
     (* By putting the wrong signature, we also ensure that the
        signature is checked only after the 1M restriction check. *)
-    let* _oph2 =
+    let* (`OpHash _) =
       Operation.Manager.(
         inject
           ~error
-          ~signer:Constant.bootstrap2
-          [make @@ transfer ~dest:Constant.bootstrap3 ()]
+          ~signer:Constant.bootstrap3
+          [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
           client)
+    in
+    let* () = check_mempool ~applied:[oph1; oph2] client in
+
+    log_step
+      4
+      "Inject yet another transfer from [source1] with the same fee and a \
+       correct counter, but this time with [~force:true]. Check that the new \
+       operation is included in the mempool as [branch_delayed]." ;
+    let* (`OpHash oph1bis) =
+      Operation.Manager.(
+        inject
+          ~force:true
+          ~signer:Constant.bootstrap3
+          [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap5 ()]
+          client)
+    in
+    let* () =
+      check_mempool ~applied:[oph1; oph2] ~branch_delayed:[oph1bis] client
     in
 
     log_step
       5
-      "Check that the mempool contains %s as applied and no op as \
-       branch_delayed."
-      oph1 ;
-    check_mempool ~applied:[oph1] client
+      "Inject a new transfer from [source2] with a much higher fee than the \
+       first one from the same source. Check that the new operation is \
+       [applied] while the old one has become [outdated]." ;
+    let* (`OpHash oph2bis) =
+      Operation.Manager.(
+        inject
+          [
+            make ~source:source2 ~fee:(2 * fee)
+            @@ transfer ~dest:Constant.bootstrap4 ();
+          ]
+          client)
+    in
+    check_mempool
+      ~applied:[oph1; oph2bis]
+      ~branch_delayed:[oph1bis]
+      ~outdated:[oph2]
+      client
 
   (** This test checks that an operation with a wrong signature that is
       initially branch_delayed (1 M) will be correctly
@@ -4111,7 +4172,7 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_flush protocols ;
   Revamped.one_operation_per_manager_per_block_ban protocols ;
   Revamped.one_operation_per_manager_per_block_flush_on_ban protocols ;
-  Revamped.one_operation_per_manager_per_block_inject_not_applied protocols ;
+  Revamped.one_operation_per_manager_per_block_inject_isolated_node protocols ;
   Revamped.max_refused_operations_branch_delayed protocols ;
   Revamped.max_refused_operations_branch_refused protocols ;
   Revamped.max_refused_operations_refused protocols ;

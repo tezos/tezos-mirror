@@ -27,7 +27,7 @@
     -------
     Component:    Shell (Plugin)
     Invocation:   dune exec src/proto_alpha/lib_plugin/test/test_filter_state.exe
-    Subject:      Unit tests the filter tests function of the plugin
+    Subject:      Unit tests the filter state functions of the plugin
 *)
 
 open Lib_test.Qcheck2_helpers
@@ -36,346 +36,157 @@ open Test_utils
 
 let count = 1000
 
-(** Test that [check_manager_restriction] returns [Fresh] when we use an unknown
-    [pkh] in the filter state. *)
-let test_check_manager_restriction_fresh =
-  let open QCheck2 in
-  Test.make
-    ~count
-    ~name:
-      "[check_manager_restriction empty (remove pkh filter) pkh] returns \
-       [Fresh]"
-    Generators.filter_state_with_operation_gen
-    (fun (filter_state, (_oph, pkh)) ->
-      let config = config None in
-      let filter_state =
-        {
-          filter_state with
-          op_prechecked_managers =
-            Signature.Public_key_hash.Map.remove
-              pkh
-              filter_state.op_prechecked_managers;
-        }
-      in
-      match
-        check_manager_restriction
-          config
-          filter_state
-          pkh
-          ~fee:Alpha_context.Tez.zero
-          ~gas_limit:Alpha_context.Gas.Arith.zero
-      with
-      | `Fresh -> true
-      | `Replace _ | `Fail (`Branch_delayed _) ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a should not be in the set of precheck managers:@,\
-             %a@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state)
+let check_filter_state_invariants filter_state =
+  qcheck_cond
+    ~pp:(fun fmt filter_state ->
+      Format.fprintf
+        fmt
+        "The following filter_state breaks invariants:@.%a"
+        pp_state
+        filter_state)
+    ~cond:(fun filter_state ->
+      filter_state.prechecked_manager_op_count
+      = Operation_hash.Map.cardinal filter_state.prechecked_manager_ops
+      && filter_state.prechecked_manager_op_count
+         = ManagerOpWeightSet.cardinal filter_state.prechecked_op_weights
+      && ManagerOpWeightSet.for_all
+           (fun {operation_hash; weight} ->
+             match
+               Operation_hash.Map.find
+                 operation_hash
+                 filter_state.prechecked_manager_ops
+             with
+             | None -> false
+             | Some info -> Q.equal weight info.weight)
+           filter_state.prechecked_op_weights
+      && eq_op_weight_opt
+           (ManagerOpWeightSet.min_elt filter_state.prechecked_op_weights)
+           filter_state.min_prechecked_op_weight)
+    filter_state
+    ()
 
-(** Test that [check_manager_restriction] returns [Fail (`Branch_delayed _)]
-    when we use a known [pkh] that is associated with an operation having higher
-    fees. *)
-let test_check_manager_restriction_fail =
+(** Test that [add_manager_op] adds the given operation to the filter
+    state, and removes the replaced operation if applicable. *)
+let test_add_manager_op =
   let open QCheck2 in
   Test.make
     ~count
-    ~name:
-      "[check_manager_restriction {pkh} pkh fee gas_limit] returns [`Fail \
-       `Branch_delayed _] if [fee] < [old_op_fee]"
-    Generators.filter_state_with_operation_gen
-    (fun (filter_state, (op_info, pkh)) ->
-      let config = config None in
-      let filter_state =
-        {
-          filter_state with
-          op_prechecked_managers =
-            Signature.Public_key_hash.Map.add
-              pkh
-              {op_info with fee = Alpha_context.Tez.one}
-              (* We force higher fee than below: [one > zero]. *)
-              filter_state.op_prechecked_managers;
-        }
+    ~name:"Add a manager operation"
+    (Gen.pair Generators.filter_state_with_two_operations_gen Gen.bool)
+    (fun ((filter_state, (oph, op_info), (oph_to_replace, _)), should_replace)
+    ->
+      (* Both [oph] and [oph_to_replace] have even odds of being
+         already present in [filter_state] or fresh. *)
+      let replacement =
+        if should_replace then (
+          assume (not (Operation_hash.equal oph_to_replace oph)) ;
+          `Replace (oph_to_replace, ()))
+        else `No_replace
       in
-      match
-        check_manager_restriction
-          config
-          filter_state
-          pkh
-          ~fee:Alpha_context.Tez.zero
-          ~gas_limit:Alpha_context.Gas.Arith.zero
-      with
-      | `Fail (`Branch_delayed _) -> true
-      | `Fresh ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a should be in the set of precheck managers:@,\
-             %a@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state
-      | `Replace old_oph ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a is in the set of precheck managers:@,\
-             %a@,\
-             but should not replace the old operation:%a@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state
-            Operation_hash.pp
-            old_oph)
+      let filter_state = add_manager_op filter_state oph op_info replacement in
+      check_filter_state_invariants filter_state
+      && qcheck_cond
+           ~pp:(fun fmt set ->
+             Format.fprintf
+               fmt
+               "%a was not found in prechecked_manager_ops: %a"
+               Operation_hash.pp
+               oph
+               pp_prechecked_manager_ops
+               set)
+           ~cond:(Operation_hash.Map.mem oph)
+           filter_state.prechecked_manager_ops
+           ()
+      &&
+      if should_replace then
+        qcheck_cond
+          ~pp:(fun fmt () ->
+            Format.fprintf
+              fmt
+              "%a should have been removed from prechecked_manager_ops."
+              Operation_hash.pp
+              oph_to_replace)
+          ~cond:(fun () ->
+            not
+              (Operation_hash.Map.mem
+                 oph_to_replace
+                 filter_state.prechecked_manager_ops))
+          ()
+          ()
+      else true)
 
-(** Test that [check_manager_restriction] returns [Replace] when we use a known
-    [pkh] already associated with an operation that has a lower fees. *)
-let test_check_manager_restriction_replace =
+(** Test that [remove] removes the operation from the filter state if
+    it was present, and that adding then removing is the same as doing
+    nothing but removing the replaced operation if there is one. *)
+let test_remove_present =
   let open QCheck2 in
   Test.make
     ~count
-    ~name:
-      "[check_manager_restriction {pkh} pkh fee gas_limit] returns [`Replace \
-       _] if [fee] >= [old_op_fee]"
-    Generators.filter_state_with_operation_gen
-    (fun (filter_state, (op_info, pkh)) ->
-      let config = config None in
-      let fee = Alpha_context.Tez.zero in
-      let filter_state =
-        {
-          filter_state with
-          op_prechecked_managers =
-            Signature.Public_key_hash.Map.add
-              pkh
-              op_info
-              filter_state.op_prechecked_managers;
-        }
-      in
-      match
-        check_manager_restriction
-          config
-          filter_state
-          pkh
-          ~fee
-          ~gas_limit:Alpha_context.Gas.Arith.zero
-      with
-      | `Replace _ -> true
-      | `Fresh ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a should be in the set of precheck managers:@,\
-             %a@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state
-      | `Fail (`Branch_delayed _) ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a is in the set of prechecked managers:@,\
-             %a but the old version should have been replaced because the new \
-             fees(%a) are higher@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state
-            Alpha_context.Tez.pp
-            fee)
-
-(** Test that [add_manager_restriction] adds the [pkh] in the filter state. *)
-let test_add_manager_restriction_set =
-  let open QCheck2 in
-  Test.make
-    ~count
-    ~name:"[mem pkh (add_manager_restriction _ _ _ pkh).op_prechecked_managers]"
+    ~name:"Remove an existing operation hash"
     (Gen.triple
        Generators.filter_state_with_operation_gen
-       Generators.operation_hash_gen
+       Generators.oph_and_info_gen
        Gen.bool)
-    (fun ((filter_state, (op_info, pkh)), oph_to_replace, replace) ->
-      let replace =
-        if replace then `Replace (oph_to_replace, ()) else `No_replace
+    (fun ((initial_state, (oph_to_replace, _)), (oph, op_info), should_replace)
+    ->
+      (* Add a fresh operation [oph] to the state. *)
+      assume
+        (not (Operation_hash.Map.mem oph initial_state.prechecked_manager_ops)) ;
+      let replacement =
+        if should_replace then `Replace (oph_to_replace, ()) else `No_replace
       in
-      let filter_state =
-        add_manager_restriction
-          filter_state
-          op_info.operation_hash
-          op_info
-          pkh
-          replace
+      let filter_state = add_manager_op initial_state oph op_info replacement in
+      (* Remove [oph] from the state, in which it was present. *)
+      let filter_state = remove ~filter_state oph in
+      let (_ : bool) =
+        (* Check that the state invariants are preserved and that
+           [oph] has been removed. *)
+        check_filter_state_invariants filter_state
+        && qcheck_cond
+             ~pp:(fun fmt () ->
+               Format.fprintf
+                 fmt
+                 "%a should have been removed from prechecked_manager_ops."
+                 Operation_hash.pp
+                 oph)
+             ~cond:(fun () ->
+               not
+                 (Operation_hash.Map.mem
+                    oph
+                    filter_state.prechecked_manager_ops))
+             ()
+             ()
       in
-      qcheck_cond
-        ~pp:(fun fmt set ->
-          Format.fprintf
-            fmt
-            "%a was not found in prechecked_managers : %a"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_prechecked_managers
-            set)
-        ~cond:(Signature.Public_key_hash.Map.mem pkh)
-        filter_state.op_prechecked_managers
-        ())
-
-(** Test that [add_manager_restriction (`Replace oph)] remove the [oph] from the
-    filter state. *)
-let test_add_manager_restriction_replace =
-  let open QCheck2 in
-  Test.make
-    ~count
-    ~name:
-      "[mem oph (add_manager_restriction _ _ _ (`Replace \
-       oph).op_prechecked_managers]"
-    Generators.filter_state_with_operation_gen
-    (fun (filter_state, (op_info, pkh)) ->
-      match
-        Operation_hash.Map.choose filter_state.operation_hash_to_manager
-      with
-      | None -> true
-      | Some (oph, _) when Operation_hash.equal oph op_info.operation_hash ->
-          true
-      | Some (oph_to_replace, _) ->
-          let filter_state =
-            add_manager_restriction
-              filter_state
-              op_info.operation_hash
-              op_info
-              pkh
-              (`Replace (oph_to_replace, ()))
-          in
-          qcheck_cond
-            ~pp:(fun fmt map ->
-              Format.fprintf
-                fmt
-                "%a was not found in prechecked_managers : %a"
-                Operation_hash.pp
-                oph_to_replace
-                pp_operation_hash_manager
-                map)
-            ~cond:(fun map -> not (Operation_hash.Map.mem oph_to_replace map))
-            filter_state.operation_hash_to_manager
-            ())
-
-(** Test that [check_manager_restriction pkh] returns [Fail | Replace] on a
-    filter state returned by [add_manager_restriction pkh]. *)
-let test_add_manager_restriction_check =
-  let open QCheck2 in
-  Test.make
-    ~count
-    ~name:
-      "[check_manager_restriction filter_state pkh] returns [`Fail \
-       (`Branch_delayed)_ | `Replace _]"
-    (Gen.triple
-       Generators.filter_state_with_operation_gen
-       Generators.operation_hash_gen
-       Gen.bool)
-    (fun ((filter_state, (op_info, pkh)), oph_to_replace, replace) ->
-      let config = config None in
-      let replace =
-        if replace then `Replace (oph_to_replace, ()) else `No_replace
-      in
-      let filter_state =
-        add_manager_restriction
-          filter_state
-          op_info.operation_hash
-          op_info
-          pkh
-          replace
-      in
-      match
-        check_manager_restriction
-          config
-          filter_state
-          pkh
-          ~fee:Alpha_context.Tez.zero
-          ~gas_limit:Alpha_context.Gas.Arith.zero
-      with
-      | `Fresh ->
-          QCheck2.Test.fail_reportf
-            "@[<v 2>Check manager restriction failed!@,\
-             %a should be in the set of precheck managers:@,\
-             %a@]"
-            Signature.Public_key_hash.pp
-            pkh
-            pp_state
-            filter_state
-      | `Fail (`Branch_delayed _) | `Replace _ -> true)
-
-(** Test that [remove pkh] removes the key from the filter state returned
-    by [add_manager_restriction pkh]. *)
-let test_remove =
-  let open QCheck2 in
-  Test.make
-    ~count
-    ~name:"[removing an existing operation hash works]"
-    (Gen.triple
-       Generators.filter_state_with_operation_gen
-       Generators.operation_hash_gen
-       Gen.bool)
-    (fun ((filter_state, (op_info, pkh)), oph_to_replace, replace) ->
-      let replace =
-        if replace then `Replace (oph_to_replace, ()) else `No_replace
-      in
-      let filter_state =
-        add_manager_restriction
-          filter_state
-          op_info.operation_hash
-          op_info
-          pkh
-          replace
-      in
-      let actual_state = remove ~filter_state op_info.operation_hash in
-      let expected_prechecked_managers =
-        Signature.Public_key_hash.Map.remove
-          pkh
-          filter_state.op_prechecked_managers
+      (* Check that adding a fresh operation then removing it is the
+         same as doing nothing except removing any replaced operation. *)
+      let initial_state_without_replaced_op =
+        if should_replace then remove ~filter_state:initial_state oph_to_replace
+        else initial_state
       in
       qcheck_eq
-        ~pp:pp_prechecked_managers
-        ~eq:eq_prechecked_managers
-        expected_prechecked_managers
-        actual_state.op_prechecked_managers)
+        ~pp:pp_state
+        ~eq:eq_state
+        initial_state_without_replaced_op
+        filter_state)
 
-(** Test that [remove pkh] leaves the filter state intact if [pkh] is unknown. *)
+(** Test that [remove] leaves the filter state intact if the operation
+    hash is unknown. *)
 let test_remove_unknown =
   let open QCheck2 in
   Test.make
     ~count
-    ~name:"[removing an unknown operation hash leaves the filter state intact"
-    Generators.filter_state_with_operation_gen
-    (fun (filter_state, (op_info, _pkh)) ->
-      let filter_state =
-        {
-          filter_state with
-          operation_hash_to_manager =
-            Operation_hash.Map.remove
-              op_info.operation_hash
-              filter_state.operation_hash_to_manager;
-        }
-      in
-      let actual_state = remove ~filter_state op_info.operation_hash in
-      qcheck_eq ~pp:pp_state ~eq:eq_state filter_state actual_state)
+    ~name:"Remove an unknown operation hash"
+    (Gen.pair Generators.filter_state_gen Generators.operation_hash_gen)
+    (fun (initial_state, oph) ->
+      assume
+        (not (Operation_hash.Map.mem oph initial_state.prechecked_manager_ops)) ;
+      let filter_state = remove ~filter_state:initial_state oph in
+      qcheck_eq ~pp:pp_state ~eq:eq_state initial_state filter_state)
 
 let () =
   Alcotest.run
     "Filter_state"
     [
-      ( "check_manager_restriction",
-        qcheck_wrap
-          [
-            test_check_manager_restriction_fresh;
-            test_check_manager_restriction_replace;
-            test_check_manager_restriction_fail;
-          ] );
-      ( "add_manager_restriction",
-        qcheck_wrap
-          [
-            test_add_manager_restriction_set;
-            test_add_manager_restriction_check;
-            test_add_manager_restriction_replace;
-          ] );
-      ("remove", qcheck_wrap [test_remove; test_remove_unknown]);
+      ("add_manager_op", qcheck_wrap [test_add_manager_op]);
+      ("remove", qcheck_wrap [test_remove_present; test_remove_unknown]);
     ]

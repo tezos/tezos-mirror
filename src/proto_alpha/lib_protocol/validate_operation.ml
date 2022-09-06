@@ -1889,6 +1889,54 @@ module Manager = struct
       maybe_update_remaining_block_gas vi vs batch_state
     in
     return {vs with manager_state = {managers_seen; remaining_block_gas}}
+
+  let rec sum_batch_gas_limit :
+      type kind.
+      Gas.Arith.integral ->
+      kind Kind.manager contents_list ->
+      Gas.Arith.integral =
+   fun acc contents_list ->
+    match contents_list with
+    | Single (Manager_operation {gas_limit; _}) -> Gas.Arith.add gas_limit acc
+    | Cons (Manager_operation {gas_limit; _}, tail) ->
+        sum_batch_gas_limit (Gas.Arith.add gas_limit acc) tail
+
+  let remove_manager_operation (type manager_kind) vi vs
+      (operation : manager_kind Kind.manager operation) =
+    let source =
+      match operation.protocol_data.contents with
+      | Single (Manager_operation {source; _})
+      | Cons (Manager_operation {source; _}, _) ->
+          source
+    in
+    match
+      Signature.Public_key_hash.Map.find_opt
+        source
+        vs.manager_state.managers_seen
+    with
+    | None -> (* Nothing to do *) vs
+    | Some _oph ->
+        let managers_seen =
+          Signature.Public_key_hash.Map.remove
+            source
+            vs.manager_state.managers_seen
+        in
+        let remaining_block_gas =
+          match vi.mode with
+          | Block ->
+              let gas_limit =
+                sum_batch_gas_limit
+                  Gas.Arith.zero
+                  operation.protocol_data.contents
+              in
+              Gas.Arith.(
+                sub vs.manager_state.remaining_block_gas (fp gas_limit))
+          | Mempool ->
+              (* The remaining block gas is never updated in [Mempool]
+                 mode anyway (see {!maybe_update_remaining_block_gas}). *)
+              vs.manager_state.remaining_block_gas
+        in
+        {vs with manager_state = {managers_seen; remaining_block_gas}}
 end
 
 let init_info_and_state ctxt mode chain_id all_expected_consensus_features =
@@ -2006,23 +2054,6 @@ let validate_operation (vi : validate_operation_info)
   in
   return (vs, Operation_validated_stamp)
 
-module TMP_for_plugin = struct
-  type 'a should_check_signature =
-    | Check_signature of 'a operation
-    | Skip_signature_check
-
-  let precheck_manager vi vs contents_list should_check_signature =
-    let open Lwt_result_syntax in
-    let open Manager in
-    let* batch_state, source_pk =
-      check_sanity_and_find_public_key vi vs contents_list
-    in
-    let* _batch_state = validate_contents_list vi batch_state contents_list in
-    let*? () =
-      match should_check_signature with
-      | Check_signature operation ->
-          Operation.check_signature source_pk vi.chain_id operation
-      | Skip_signature_check -> ok ()
-    in
-    return Operation_validated_stamp
-end
+(* This function will be replaced with a generic remove_operation in
+   the future. *)
+let remove_manager_operation = Manager.remove_manager_operation

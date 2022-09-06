@@ -453,10 +453,10 @@ module Make_s
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
         []
 
-  let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
-      (op : protocol_operation operation) =
+  let precheck ~disable_precheck ~filter_config ~filter_state
+      ~validation_state:prevalidation_t (op : protocol_operation operation) =
     let open Lwt_syntax in
-    let validation_state = Prevalidation_t.validation_state validation_state in
+    let validation_state = Prevalidation_t.validation_state prevalidation_t in
     if disable_precheck then Lwt.return `Undecided
     else
       let+ v =
@@ -469,11 +469,16 @@ module Make_s
           op.protocol
       in
       match v with
-      | `Passed_precheck (filter_state, replacement) ->
+      | `Passed_precheck (filter_state, validation_state, replacement) ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
+          let prevalidation_t =
+            Prevalidation_t.set_validation_state
+              prevalidation_t
+              validation_state
+          in
           let new_op = Prevalidation_t.increment_successful_precheck op in
-          `Passed_precheck (filter_state, new_op, replacement)
+          `Passed_precheck (filter_state, prevalidation_t, new_op, replacement)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -522,7 +527,8 @@ module Make_s
       | `Fail errs ->
           (* Precheck rejected the operation *)
           Lwt.return_error errs
-      | `Passed_precheck (filter_state, new_op, replacement) ->
+      | `Passed_precheck (filter_state, validation_state, new_op, replacement)
+        ->
           (* Precheck succeeded *)
           let to_handle =
             match replacement with

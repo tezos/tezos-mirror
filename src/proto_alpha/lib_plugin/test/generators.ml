@@ -40,76 +40,95 @@ let operation_hash_gen : Operation_hash.t QCheck2.Gen.t =
   let+ s = QCheck2.Gen.string_size (return 32) in
   Operation_hash.of_string_exn s
 
-let dummy_manager_op_info oph =
-  {
-    Plugin.Mempool.operation_hash = oph;
-    gas_limit = Alpha_context.Gas.Arith.zero;
-    fee = Alpha_context.Tez.zero;
-    weight = Q.zero;
-  }
+let dummy_manager_op_info =
+  let fee = Alpha_context.Tez.zero in
+  let gas_limit = Alpha_context.Gas.Arith.zero in
+  let manager_op =
+    let open Alpha_context in
+    let source = Signature.Public_key_hash.zero in
+    let counter = Z.zero in
+    let storage_limit = Z.zero in
+    let operation = Set_deposits_limit None in
+    let contents =
+      Manager_operation
+        {source; fee; counter; operation; gas_limit; storage_limit}
+    in
+    let contents = Single contents in
+    let protocol_data = {contents; signature = Some Signature.zero} in
+    let branch = Block_hash.zero in
+    Mempool.Manager_op {shell = {branch}; protocol_data}
+  in
+  Mempool.{manager_op; fee; gas_limit; weight = Q.zero}
 
-let dummy_manager_op_info_with_key_gen :
-    (Plugin.Mempool.manager_op_info * Signature.public_key_hash) QCheck2.Gen.t =
+let oph_and_info_gen =
   let open QCheck2.Gen in
-  let+ oph, (pkh, _, _) = pair operation_hash_gen public_key_hash_gen in
-  (dummy_manager_op_info oph, pkh)
+  let+ oph = operation_hash_gen in
+  (oph, dummy_manager_op_info)
 
 let filter_state_gen : Plugin.Mempool.state QCheck2.Gen.t =
   let open QCheck2.Gen in
   let open Plugin.Mempool in
-  let+ inputs = small_list (pair operation_hash_gen public_key_hash_gen) in
+  let+ ops = small_list oph_and_info_gen in
   List.fold_left
-    (fun state (oph, (pkh, _, _)) ->
-      match Operation_hash.Map.find oph state.operation_hash_to_manager with
-      | Some _ -> state
-      | None ->
-          let info = dummy_manager_op_info oph in
-          let prechecked_operations_count =
-            if Operation_hash.Map.mem oph state.operation_hash_to_manager then
-              state.prechecked_operations_count
-            else state.prechecked_operations_count + 1
-          in
-          let op_weight = op_weight_of_info info in
-          let min_prechecked_op_weight =
-            match state.min_prechecked_op_weight with
-            | Some mini when Q.(mini.weight < info.weight) -> Some mini
-            | Some _ | None -> Some op_weight
-          in
-          {
-            state with
-            op_prechecked_managers =
-              Signature.Public_key_hash.Map.add
-                pkh
-                info
-                state.op_prechecked_managers;
-            operation_hash_to_manager =
-              Operation_hash.Map.add oph pkh state.operation_hash_to_manager;
-            ops_prechecked =
-              ManagerOpWeightSet.add op_weight state.ops_prechecked;
-            prechecked_operations_count;
-            min_prechecked_op_weight;
-          })
+    (fun state (oph, info) ->
+      if Operation_hash.Map.mem oph state.prechecked_manager_ops then state
+      else
+        let prechecked_manager_op_count =
+          state.prechecked_manager_op_count + 1
+        in
+        let op_weight = mk_op_weight oph info in
+        let min_prechecked_op_weight =
+          match state.min_prechecked_op_weight with
+          | Some old_min
+            when Mempool.compare_manager_op_weight old_min op_weight <= 0 ->
+              Some old_min
+          | Some _ | None -> Some op_weight
+        in
+        {
+          state with
+          prechecked_manager_op_count;
+          prechecked_manager_ops =
+            Operation_hash.Map.add oph info state.prechecked_manager_ops;
+          prechecked_op_weights =
+            ManagerOpWeightSet.add op_weight state.prechecked_op_weights;
+          min_prechecked_op_weight;
+        })
     Plugin.Mempool.empty
-    inputs
+    ops
 
+(** Generate a pair of operation hash and manager_op_info, that has
+    even odds of belonging to the given filter_state or being fresh. *)
 let with_filter_state_operation_gen :
     Plugin.Mempool.state ->
-    (Plugin.Mempool.manager_op_info * Signature.public_key_hash) QCheck2.Gen.t =
+    (Operation_hash.t * Plugin.Mempool.manager_op_info) QCheck2.Gen.t =
  fun state ->
   let open QCheck2.Gen in
   let* use_fresh = bool in
-  let to_ops map =
-    Operation_hash.Map.bindings map
-    |> List.map (fun (oph, pkh) -> (dummy_manager_op_info oph, pkh))
-  in
-  if use_fresh || Operation_hash.Map.is_empty state.operation_hash_to_manager
-  then dummy_manager_op_info_with_key_gen
-  else oneofl (to_ops state.operation_hash_to_manager)
+  if use_fresh || Operation_hash.Map.is_empty state.prechecked_manager_ops then
+    oph_and_info_gen
+  else oneofl (Operation_hash.Map.bindings state.prechecked_manager_ops)
 
+(** Generate both a filter_state, and a pair of operation hash and
+    manager_op_info. The pair has even odds of belonging to the
+    filter_state or being fresh. *)
 let filter_state_with_operation_gen :
-    (Plugin.Mempool.state
-    * (Plugin.Mempool.manager_op_info * Signature.public_key_hash))
+    (Plugin.Mempool.state * (Operation_hash.t * Plugin.Mempool.manager_op_info))
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   filter_state_gen >>= fun state ->
   pair (return state) (with_filter_state_operation_gen state)
+
+(** Generate a filter_state, and two pairs of operation hash and
+    manager_op_info. The pairs have indepedent, even odds of belonging
+    to the filter_state or being fresh. *)
+let filter_state_with_two_operations_gen :
+    (Plugin.Mempool.state
+    * (Operation_hash.t * Plugin.Mempool.manager_op_info)
+    * (Operation_hash.t * Plugin.Mempool.manager_op_info))
+    QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* filter_state = filter_state_gen in
+  triple
+    (return filter_state)
+    (with_filter_state_operation_gen filter_state)
+    (with_filter_state_operation_gen filter_state)
