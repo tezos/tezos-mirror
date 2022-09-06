@@ -1,3 +1,8 @@
+v1.0
+
+* refactoring: Invert control over resto server
+* feature: client follow redirects
+
 v0.10:
 
 feature: Merge for dynamic and dynamic tails directories
