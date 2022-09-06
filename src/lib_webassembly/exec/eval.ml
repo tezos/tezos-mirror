@@ -924,16 +924,6 @@ let eval_const_step module_reg = function
       EC_Next c
   | EC_Stop _ -> assert false
 
-let eval_const module_reg (inst : module_key) (const : const) : value Lwt.t =
-  let rec go k =
-    match eval_const_completed k with
-    | Some v -> Lwt.return v
-    | None ->
-        let* k = eval_const_step module_reg k in
-        go k
-  in
-  go (eval_const_kont inst const)
-
 (* Modules *)
 
 let create_func module_reg (inst_ref : module_key) (f : func) : func_inst Lwt.t
@@ -986,22 +976,6 @@ let create_export (inst : module_inst) (ex : export) : export_inst Lwt.t =
         ExternGlobal glob
   in
   (name, ext)
-
-let create_elem module_reg (inst : module_key) (seg : elem_segment) :
-    elem_inst Lwt.t =
-  let {einit; _} = seg.it in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-     [einit] should be changed to a lazy structure. We want to avoid traversing
-     it whole. *)
-  let* einit = Lazy_vector.Int32Vector.to_list einit in
-  let+ init =
-    TzStdLib.List.map_s
-      (fun v ->
-        let+ r = eval_const module_reg inst v in
-        as_ref r)
-      einit
-  in
-  ref (Instance.Vector.of_list init)
 
 let create_data (seg : data_segment) : data_inst =
   let {dinit; _} = seg.it in
@@ -1117,13 +1091,6 @@ let map_i_step {origin; destination; offset} f =
   let open Lwt.Syntax in
   let+ x = Vector.get offset origin in
   let destination = Vector.set offset (f offset x) destination in
-  {origin; destination; offset = Int32.succ offset}
-
-let map_s_step {origin; destination; offset} f =
-  let open Lwt.Syntax in
-  let* x = Vector.get offset origin in
-  let+ y = f x in
-  let destination = Vector.set offset y destination in
   {origin; destination; offset = Int32.succ offset}
 
 let map_i_s_step {origin; destination; offset} f =
@@ -1289,6 +1256,26 @@ let map_concat_step f = function
           let+ tick = join_step tick in
           MC_Join tick)
 
+type create_elem_kont = (eval_const_kont, const, ref_) tick_map_kont
+
+let create_elem_kont seg = tick_map_kont seg.it.einit
+
+let create_elem_completed : create_elem_kont -> elem_inst option =
+ fun kont ->
+  if tick_map_completed kont then Some (ref kont.map.destination) else None
+
+let create_elem_step ~module_reg inst :
+    create_elem_kont -> create_elem_kont Lwt.t =
+ fun tick ->
+  tick_map_step
+    (eval_const_kont inst)
+    (fun x ->
+      match eval_const_completed x with
+      | Some x -> Some (as_ref x)
+      | None -> None)
+    (eval_const_step module_reg)
+    tick
+
 type init_kont =
   | IK_Start
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
@@ -1300,7 +1287,8 @@ type init_kont =
       module_inst * ('kont, 'a, 'b) init_section * 'b concat_kont
       -> init_kont
   | IK_Exports of module_inst * (export, extern NameMap.t) fold_left_kont
-  | IK_Elems of module_inst * (elem_segment, elem_inst) map_kont
+  | IK_Elems of
+      module_inst * (create_elem_kont, elem_segment, elem_inst) tick_map_kont
   | IK_Datas of module_inst * (data_segment, data_inst) map_kont
   | IK_Es_elems of module_inst * (elem_segment, admin_instr) map_concat_kont
   | IK_Es_datas of
@@ -1423,7 +1411,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
       IK_Aggregate_concat (inst0, sec, tick)
   | IK_Exports (inst0, tick) when fold_left_completed tick ->
       let inst0 = {inst0 with exports = tick.acc} in
-      Lwt.return (IK_Elems (inst0, map_kont m.it.elems))
+      Lwt.return (IK_Elems (inst0, tick_map_kont m.it.elems))
   | IK_Exports (inst0, tick) ->
       let+ tick =
         fold_left_s_step tick (fun map export ->
@@ -1432,11 +1420,17 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
             NameMap.set k v map)
       in
       IK_Exports (inst0, tick)
-  | IK_Elems (inst0, tick) when map_completed tick ->
-      let inst0 = {inst0 with elems = tick.destination} in
+  | IK_Elems (inst0, tick) when tick_map_completed tick ->
+      let inst0 = {inst0 with elems = tick.map.destination} in
       Lwt.return (IK_Datas (inst0, map_kont m.it.datas))
   | IK_Elems (inst0, tick) ->
-      let+ tick = map_s_step tick (create_elem module_reg self) in
+      let+ tick =
+        tick_map_step
+          create_elem_kont
+          create_elem_completed
+          (create_elem_step ~module_reg self)
+          tick
+      in
       IK_Elems (inst0, tick)
   | IK_Datas (inst0, tick) when map_completed tick ->
       let inst = {inst0 with datas = tick.destination} in

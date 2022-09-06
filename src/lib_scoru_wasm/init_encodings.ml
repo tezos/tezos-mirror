@@ -102,6 +102,12 @@ let create_global_kont_encoding ~host_funcs =
     (value ["global_type"] Interpreter_encodings.Types.global_type_encoding)
     (scope ["kont"] (eval_const_kont_encoding ~host_funcs))
 
+let create_elem_kont_encoding ~host_funcs =
+  tick_map_kont_encoding
+    (eval_const_kont_encoding ~host_funcs)
+    (lazy_vec_encoding (value [] Interpreter_encodings.Ast.const_encoding))
+    (lazy_vec_encoding Wasm_encoding.value_ref_encoding)
+
 type (_, _) eq = Eq : ('a, 'a) eq
 
 let init_section_eq :
@@ -285,7 +291,8 @@ let init_kont_encoding ~host_funcs =
            (scope ["module"] Wasm_encoding.module_instance_encoding)
            (scope
               ["kont"]
-              (map_kont_encoding
+              (tick_map_kont_encoding
+                 (create_elem_kont_encoding ~host_funcs)
                  (lazy_vec_encoding
                     Parser.(no_region_encoding Elem.elem_encoding))
                  (lazy_vec_encoding
