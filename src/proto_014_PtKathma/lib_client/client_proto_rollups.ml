@@ -24,18 +24,52 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
+
+type rollup_entity = {rollup : Tx_rollup.t; origination_level : int32 option}
 
 module TxRollupEntity = struct
-  include Alpha_context.Tx_rollup (* t, Compare, encoding *)
+  type t = rollup_entity
+
+  include Compare.Make (struct
+    type t = rollup_entity
+
+    let compare r1 r2 = Tx_rollup.compare r1.rollup r2.rollup
+  end)
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"rollup without origination level"
+          (Tag 0)
+          Tx_rollup.encoding
+          (function
+            | {rollup; origination_level = None} -> Some rollup | _ -> None)
+          (fun rollup -> {rollup; origination_level = None});
+        case
+          ~title:"rollup with origination level"
+          (Tag 1)
+          (obj2
+             (req "rollup" Tx_rollup.encoding)
+             (req "origination_level" int32))
+          (function
+            | {rollup; origination_level = Some level} -> Some (rollup, level)
+            | _ -> None)
+          (fun (rollup, level) -> {rollup; origination_level = Some level});
+      ]
 
   let of_source s =
-    Alpha_context.Tx_rollup.of_b58check s
-    |> Environment.wrap_tzresult
-    |> record_trace_eval (fun () ->
-           error_of_fmt "bad transaction rollup notation")
-    |> Lwt.return
+    let open Lwt_result_syntax in
+    let*? rollup =
+      Tx_rollup.of_b58check s |> Environment.wrap_tzresult
+      |> record_trace_eval (fun () ->
+             error_of_fmt "bad transaction rollup notation")
+    in
+    return {rollup; origination_level = None}
 
-  let to_source s = return (Alpha_context.Tx_rollup.to_b58check s)
+  let to_source {rollup; _} = return (Tx_rollup.to_b58check rollup)
 
   let name = "tx_rollup"
 end
