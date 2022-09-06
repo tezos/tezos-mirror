@@ -178,7 +178,9 @@ let write file identity =
   let open Lwt_result_syntax in
   if Sys.file_exists file then tzfail (Existent_identity_file file)
   else
-    let* () = Node_data_version.ensure_data_dir (Filename.dirname file) in
+    let* () =
+      Node_data_version.ensure_data_dir ~mode:Exists (Filename.dirname file)
+    in
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)

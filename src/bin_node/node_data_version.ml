@@ -366,7 +366,9 @@ let check_data_dir_version files data_dir =
       | Some f -> return_some f
       | None -> tzfail (Invalid_data_dir_version (current_version, version))
 
-let ensure_data_dir bare data_dir =
+type ensure_mode = Exists | Is_bare | Is_compatible
+
+let ensure_data_dir ~mode data_dir =
   let open Lwt_result_syntax in
   let write_version () =
     let* () = write_version_file data_dir in
@@ -388,12 +390,13 @@ let ensure_data_dir bare data_dir =
               && s <> default_peers_file_name)
             files
         in
-        match files with
-        | [] -> write_version ()
-        | files when bare ->
+        match (files, mode) with
+        | [], _ -> write_version ()
+        | files, Is_bare ->
             let msg = Some (clean_directory files) in
             tzfail (Invalid_data_dir {data_dir; msg})
-        | files -> check_data_dir_version files data_dir
+        | files, Is_compatible -> check_data_dir_version files data_dir
+        | _files, Exists -> return_none
       else
         let*! () = Lwt_utils_unix.create_dir ~perm:0o700 data_dir in
         write_version ())
@@ -403,7 +406,7 @@ let ensure_data_dir bare data_dir =
 
 let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
   let open Lwt_result_syntax in
-  let* o = ensure_data_dir false data_dir in
+  let* o = ensure_data_dir ~mode:Is_compatible data_dir in
   match o with
   | None ->
       let*! () = Events.(emit dir_is_up_to_date ()) in
@@ -420,9 +423,9 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
           let*! () = Events.(emit aborting_upgrade e) in
           Lwt.return (Error e))
 
-let ensure_data_dir ?(bare = false) data_dir =
+let ensure_data_dir ?(mode = Is_compatible) data_dir =
   let open Lwt_result_syntax in
-  let* o = ensure_data_dir bare data_dir in
+  let* o = ensure_data_dir ~mode data_dir in
   match o with
   | None ->
       return_unit

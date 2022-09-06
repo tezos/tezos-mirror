@@ -1374,7 +1374,9 @@ let read fp =
 
 let write fp cfg =
   let open Lwt_result_syntax in
-  let* () = Node_data_version.ensure_data_dir (Filename.dirname fp) in
+  let* () =
+    Node_data_version.ensure_data_dir ~mode:Exists (Filename.dirname fp)
+  in
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
@@ -1402,7 +1404,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       Event.(emit all_rpc_allowed allow_all_rpc)
     else Lwt.return_unit
   in
-  let* () = Node_data_version.ensure_data_dir data_dir in
+  let* () = Node_data_version.ensure_data_dir ~mode:Exists data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =

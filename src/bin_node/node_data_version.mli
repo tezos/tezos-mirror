@@ -29,7 +29,7 @@ type error += Invalid_data_dir of {data_dir : string; msg : string option}
 
 type error += Could_not_read_data_dir_version of string
 
-(** Default file names to store the informations about the node's network
+(** Default file names to store the information about the node's network
     identity, peers and configuration. *)
 
 val default_identity_file_name : string
@@ -38,21 +38,30 @@ val default_config_file_name : string
 
 val default_peers_file_name : string
 
-(** Ensure that a directory is a valid data directory with the current version.
+(** Defines the properties that must be satisfied by the call to
+   [ensure_data_dir].
 
-    If the directory does not exist, create it and write a version file.
+    Depending of the given mode, it will:
+    - Exists: ensures that the directory exists, if not, creates a
+      fresh directory by creating it and writing a version file.
+    - Is_bare: ensures that, if the directory exists, it contains no other
+      file than:
+            - the version file;
+            - the identity file;
+            - the configuration file;
+            - the peer list file;
+      Otherwise, creates an fresh directory.
+    - Is_compatible: similar to [Exists] but, additionally, will
+      check the version compatibility.
+*)
+type ensure_mode = Exists | Is_bare | Is_compatible
 
-    If the directory exists and contains no other file expect maybe:
-    - the version file;
-    - the identity file;
-    - the configuration file;
-    - the peer list file;
-    then write or overwrite the version file.
-
-    If the directory exists and contains other files than the ones listed above
-    and [bare] is [true], fail. If [bare] is [false] instead, check that
-    the version file exists and that its version is the expected one. *)
-val ensure_data_dir : ?bare:bool -> string -> unit tzresult Lwt.t
+(** [ensure_data_dir ~mode] ensures that a directory is a valid with
+    regards to the given [mode]. See [ensure_mode] for the mode's
+    properties.
+    By default, the mode is set to [Is_compatible].
+ *)
+val ensure_data_dir : ?mode:ensure_mode -> string -> unit tzresult Lwt.t
 
 (** Upgrade data directory from an older version.
 

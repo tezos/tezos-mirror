@@ -525,7 +525,9 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
-  let* () = Node_data_version.ensure_data_dir config.data_dir in
+  let* () =
+    Node_data_version.ensure_data_dir ~mode:Is_compatible config.data_dir
+  in
   (* Main loop *)
   let log_cfg =
     match verbosity with
