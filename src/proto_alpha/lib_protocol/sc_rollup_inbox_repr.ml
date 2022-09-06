@@ -455,14 +455,14 @@ module type Merkelized_operations = sig
     Raw_level_repr.t * Z.t ->
     history_proof ->
     proof ->
-    Sc_rollup_PVM_sem.input option tzresult Lwt.t
+    Sc_rollup_PVM_sig.input option tzresult Lwt.t
 
   val produce_proof :
     inbox_context ->
     History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
-    (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+    (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
 
   val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
 
@@ -970,7 +970,7 @@ struct
         | Some payload ->
             return
             @@ Some
-                 Sc_rollup_PVM_sem.
+                 Sc_rollup_PVM_sig.
                    {inbox_level = l; message_counter = n; payload})
     | Level_crossing p -> (
         let lower_level_hash = Skip_list.content p.lower in
@@ -1001,7 +1001,7 @@ struct
         | Some payload ->
             return
             @@ Some
-                 Sc_rollup_PVM_sem.
+                 Sc_rollup_PVM_sig.
                    {
                      inbox_level = p.upper_level;
                      message_counter = Z.zero;
@@ -1060,10 +1060,11 @@ struct
     in
     match payload_opt with
     | Some payload ->
-        let input_given =
-          Some Sc_rollup_PVM_sem.{inbox_level = l; message_counter = n; payload}
-        in
-        return (Single_level {level; inc; message_proof}, input_given)
+        return
+          ( Single_level {level; inc; message_proof},
+            Some
+              Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
+          )
     | None -> (
         if equal_history_proof inbox level then
           return (Single_level {level; inc; message_proof}, None)
@@ -1103,7 +1104,7 @@ struct
           | Some payload ->
               let input_given =
                 Some
-                  Sc_rollup_PVM_sem.
+                  Sc_rollup_PVM_sig.
                     {
                       inbox_level = upper_level;
                       message_counter = Z.zero;

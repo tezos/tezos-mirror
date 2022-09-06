@@ -81,7 +81,7 @@ let stop input proof =
    above [commit_level] the [input_given] in the PVM proof should be
    [None]. *)
 let cut_at_level level input =
-  let input_level = Sc_rollup_PVM_sem.(input.inbox_level) in
+  let input_level = Sc_rollup_PVM_sig.(input.inbox_level) in
   if Raw_level_repr.(level <= input_level) then None else Some input
 
 let proof_error reason =
@@ -107,7 +107,7 @@ let valid snapshot commit_level ~pvm_name proof =
   let open Lwt_tzresult_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
-  let (input_requested : Sc_rollup_PVM_sem.input_request) =
+  let (input_requested : Sc_rollup_PVM_sig.input_request) =
     P.proof_input_requested P.proof
   in
   let* input =
@@ -121,7 +121,7 @@ let valid snapshot commit_level ~pvm_name proof =
         proof_error
           (Format.asprintf
              "input_requested is %a, inbox proof is %a"
-             Sc_rollup_PVM_sem.pp_input_request
+             Sc_rollup_PVM_sig.pp_input_request
              input_requested
              (Format.pp_print_option pp_proof)
              proof.inbox)
@@ -154,7 +154,7 @@ let produce pvm_and_state commit_level =
   let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
-  let*! (request : Sc_rollup_PVM_sem.input_request) =
+  let*! (request : Sc_rollup_PVM_sig.input_request) =
     P.is_input_state P.state
   in
   let* proof, input =

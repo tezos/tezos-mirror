@@ -339,7 +339,7 @@ let next_input ps l n =
   match List.nth level (Z.to_int n) with
   | Some msg ->
       let payload = payload_string msg in
-      Some Sc_rollup_PVM_sem.{inbox_level = l; message_counter = n; payload}
+      Some Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
   | None ->
       let rec aux l =
         let* payloads = List.nth ps l in
@@ -347,7 +347,7 @@ let next_input ps l n =
         | Some msg ->
             let payload = payload_string msg in
             Some
-              Sc_rollup_PVM_sem.
+              Sc_rollup_PVM_sig.
                 {
                   inbox_level = level_of_int l;
                   message_counter = Z.zero;

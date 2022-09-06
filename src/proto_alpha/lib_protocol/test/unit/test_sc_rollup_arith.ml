@@ -125,7 +125,7 @@ let boot boot_sector f =
   pre_boot boot_sector @@ fun ctxt state -> eval state >>= f ctxt
 
 let test_boot () =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
   is_input_state state >>= function
   | Initial -> return ()
@@ -141,7 +141,7 @@ let make_external_inbox_message str =
     Sc_rollup_inbox_message_repr.(External str |> serialize)
 
 let test_input_message () =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
   let input =
     {
@@ -172,7 +172,7 @@ let go ~max_steps target_status state =
   aux 0 state
 
 let test_parsing_message ~valid (source, expected_code) =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
   let input =
     {
@@ -240,7 +240,7 @@ let test_parsing_messages () =
 
 let test_evaluation_message ~valid
     (boot_sector, source, expected_stack, expected_vars) =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot boot_sector @@ fun _ctxt state ->
   let input =
     {
@@ -315,7 +315,7 @@ let test_evaluation_messages () =
 
 let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun ctxt state ->
   let input =
     {
@@ -346,7 +346,7 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
                   (Format.asprintf
                      "A wrong output proof is valid: %s -> %a"
                      source
-                     Sc_rollup_PVM_sem.pp_output
+                     Sc_rollup_PVM_sig.pp_output
                      output)))
       | Error _ -> return ()
   in
@@ -364,7 +364,7 @@ let make_output ~outbox_level ~message_index n =
   let message_index = Z.of_int message_index in
   let outbox_level = Raw_level_repr.of_int32_exn (Int32.of_int outbox_level) in
   let message = Atomic_transaction_batch {transactions} in
-  Sc_rollup_PVM_sem.{outbox_level; message_index; message}
+  Sc_rollup_PVM_sig.{outbox_level; message_index; message}
 
 let test_valid_output_messages () =
   let test inbox_level =

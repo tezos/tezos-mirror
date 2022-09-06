@@ -34,7 +34,7 @@ module PVM = struct
 
     val pp_boot_sector : Format.formatter -> boot_sector -> unit
 
-    include Sc_rollup_PVM_sem.S
+    include Sc_rollup_PVM_sig.S
   end
 
   type t = (module S)

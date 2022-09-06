@@ -78,7 +78,7 @@
   Sc_rollup_tick_repr
   Sc_rollup_inbox_message_repr
   Sc_rollup_outbox_message_repr
-  Sc_rollup_PVM_sem
+  Sc_rollup_PVM_sig
   Sc_rollup_arith
   Sc_rollup_wasm
   Sc_rollups
@@ -336,7 +336,7 @@
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
@@ -576,7 +576,7 @@
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
@@ -821,7 +821,7 @@
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
