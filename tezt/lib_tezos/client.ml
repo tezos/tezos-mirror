@@ -2008,8 +2008,9 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key ?consensus owner client =
+let spawn_register_key ?hooks ?consensus owner client =
   spawn_command
+    ?hooks
     client
     (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
     @
@@ -2017,8 +2018,9 @@ let spawn_register_key ?consensus owner client =
     | None -> []
     | Some pk -> ["with"; "consensus"; "key"; pk])
 
-let register_key ?consensus owner client =
-  spawn_register_key ?consensus owner client |> Process.check
+let register_key ?hooks ?expect_failure ?consensus owner client =
+  spawn_register_key ?hooks ?consensus owner client
+  |> Process.check ?expect_failure
 
 let contract_storage ?unparsing_mode address client =
   spawn_command
