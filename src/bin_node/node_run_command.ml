@@ -525,9 +525,6 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
-  let* () =
-    Node_data_version.ensure_data_dir ~mode:Is_compatible config.data_dir
-  in
   (* Main loop *)
   let log_cfg =
     match verbosity with
@@ -542,6 +539,9 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   in
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
+  in
+  let* () =
+    Node_data_version.ensure_data_dir ~mode:Is_compatible config.data_dir
   in
   let* () = Node_config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
