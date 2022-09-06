@@ -200,7 +200,7 @@ module Encoding : sig
 
       The optional parameters [?min_value] and [?max_value] can be used to
       further restrict the
-      range of values. If [min_value is set and less than [-(1 lsl 30)] or if
+      range of values. If [min_value] is set and less than [-(1 lsl 30)] or if
       [max_value] is set and is greater than [(1 lsl 30) - 1] then the function
       raises [Invalid_argument].
 
@@ -214,7 +214,7 @@ module Encoding : sig
 
       @raise [Invalid_argument] if [max_value > (1 lsl 30) - 1]
 
-      @raise [Invalid_argument] if [min_value < -(1 lsl 30)] *)
+      @raise [Invalid_argument] if [min_value] < -(1 lsl 30)] *)
   val int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
 
   (** Encoding of floating point number

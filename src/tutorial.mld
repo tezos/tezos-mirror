@@ -1627,8 +1627,8 @@ dynamic_size ~kind:`Uint16 (Variable.list …)
 
 You can also be weary of integer sizes. Prefer smaller integer sizes where
 possible. And even if an integer-like type is not guaranteed to always fit
-within a smaller integer representation, you can use [uint_as_n] and [int_as_z]
-which occupy less bytes on small values but more space on bigger values.
+within a smaller integer representation, you can use [uint_like_n] and
+[int_like_z] which occupy less bytes on small values but more space on bigger values.
 
 If you need to find exact cut-off points for various integer ranges for various
 encodings, you can check the code in [misc/eval_numsizes.ml].
