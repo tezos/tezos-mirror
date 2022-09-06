@@ -839,7 +839,8 @@ module Scripts = struct
       Return the unchanged operation protocol data, and the operation
       receipt ie. metadata containing balance updates, consumed gas,
       application success or failure, etc. *)
-  let run_operation_service ctxt () (packed_operation, chain_id) =
+  let run_operation_service rpc_ctxt () (packed_operation, chain_id) =
+    let {Services_registration.context; block_header; _} = rpc_ctxt in
     (match packed_operation.protocol_data with
     | Operation_data {contents = Single (Preendorsement _); _}
     | Operation_data {contents = Single (Endorsement _); _}
@@ -848,34 +849,30 @@ module Scripts = struct
     | _ -> ok ())
     >>?= fun () ->
     let oph = Operation.hash_packed packed_operation in
-    let validity_state = Validate.begin_no_predecessor_info ctxt chain_id in
+    let validity_state = Validate.begin_no_predecessor_info context chain_id in
     Validate.validate_operation
       validity_state
       ~should_check_signature:false
       oph
       packed_operation
     >>=? fun _validate_operation_state ->
-    let predecessor_level = Level.(current ctxt).level in
-    Alpha_context.Fitness.create
-      ~level:predecessor_level
-      ~locked_round:None
-      ~predecessor_round:Round.zero
-      ~round:Round.zero
-    >>?= fun dummy_fitness ->
-    let dummy_application_mode =
+    Raw_level.of_int32 block_header.level >>?= fun predecessor_level ->
+    Alpha_context.Fitness.round_from_raw block_header.fitness
+    >>?= fun predecessor_round ->
+    let application_mode =
       Apply.Partial_construction
         {
           predecessor_level;
-          predecessor_round = Round.zero;
-          predecessor_fitness = Fitness.to_raw dummy_fitness;
+          predecessor_round;
+          predecessor_fitness = block_header.fitness;
         }
     in
     let application_state =
       Apply.
         {
-          ctxt;
+          ctxt = context;
           chain_id;
-          mode = dummy_application_mode;
+          mode = application_mode;
           op_count = 0;
           migration_balance_updates = [];
           liquidity_baking_toggle_ema = Liquidity_baking.Toggle_EMA.zero;
@@ -901,14 +898,16 @@ module Scripts = struct
        time of the operation.
 
     *)
-  let simulate_operation_service ctxt
+  let simulate_operation_service rpc_ctxt
       (_simulate_query : < successor_level : bool >)
       (blocks_before_activation, op, chain_id, time_in_blocks) =
+    let {Services_registration.context; _} = rpc_ctxt in
     Cache.Admin.future_cache_expectation
-      ctxt
+      context
       ~time_in_blocks
       ?blocks_before_activation
-    >>=? fun ctxt -> run_operation_service ctxt () (op, chain_id)
+    >>=? fun context ->
+    run_operation_service {rpc_ctxt with context} () (op, chain_id)
 
   let default_from_context ctxt get = function
     | None -> get ctxt
@@ -1477,8 +1476,11 @@ module Scripts = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3364
 
        Should [run_operation] be registered at successor level? *)
-    Registration.register0 ~chunked:true S.run_operation run_operation_service ;
-    Registration.register0_successor_level
+    Registration.register0_fullctxt
+      ~chunked:true
+      S.run_operation
+      run_operation_service ;
+    Registration.register0_fullctxt_successor_level
       ~chunked:true
       S.simulate_operation
       simulate_operation_service ;
