@@ -44,8 +44,8 @@ type t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)
-  fee_parameter : Injection.fee_parameter;
-      (** Fee parameter to use when injecting operations in layer 1. *)
+  fee_parameters : Configuration.fee_parameters;
+      (** Fee parameters to use when injecting operations in layer 1. *)
   protocol_constants : Constants.t;
       (** Protocol constants retrieved from the Tezos node. *)
   loser_mode : Loser_mode.t;
@@ -61,6 +61,13 @@ type t = {
 val get_operator :
   t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
+(** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
+    operation for a given [purpose]. If no specific fee parameters were
+    configured for this purpose, returns the default fee parameter for this
+    purpose.
+*)
+val get_fee_parameter : t -> Configuration.purpose -> Injection.fee_parameter
+
 (** [init cctxt dal_cctxt l1_ctxt sc_rollup genesis_info kind operators fees
     ~loser_mode store context] initialises the rollup representation. The rollup
     origination level and kind are fetched via an RPC call to the layer1 node
@@ -73,7 +80,7 @@ val init :
   Sc_rollup.t ->
   Protocol.Alpha_context.Sc_rollup.Kind.t ->
   Configuration.operators ->
-  Injection.fee_parameter ->
+  Configuration.fee_parameters ->
   loser_mode:Loser_mode.t ->
   Store.t ->
   Context.index ->
