@@ -1,0 +1,35 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/not_bytes.tz]
+
+Well typed
+Gas remaining: 1039981.341 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { DROP
+         /* [] */ ;
+         PUSH bytes 0x05
+         /* [ bytes ] */ ;
+         NOT
+         /* [ bytes ] */ ;
+         PUSH bytes 0xfa
+         /* [ bytes : bytes ] */ ;
+         ASSERT_CMPEQ ;
+         PUSH bytes 0x0005
+         /* [ bytes ] */ ;
+         NOT
+         /* [ bytes ] */ ;
+         PUSH bytes 0xfffa
+         /* [ bytes : bytes ] */ ;
+         ASSERT_CMPEQ ;
+         PUSH bytes 0xff05
+         /* [ bytes ] */ ;
+         NOT
+         /* [ bytes ] */ ;
+         PUSH bytes 0x00fa
+         /* [ bytes : bytes ] */ ;
+         ASSERT_CMPEQ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL @noop operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

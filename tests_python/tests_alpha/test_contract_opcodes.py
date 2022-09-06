@@ -450,6 +450,29 @@ class TestContractOpcodes:
         with assert_run_failure(r'unexpected arithmetic overflow'):
             client.run_script(contract, param, storage, trace_stack=True)
 
+    @pytest.mark.parametrize(
+        "contract,param,storage",
+        [  # FORMAT: assert_output contract_file storage input
+            # Bytes and, or, xor, not, lsl, lsr
+            ('and_bytes.tz', 'Unit', 'Unit'),
+            ('or_bytes.tz', 'Unit', 'Unit'),
+            ('xor_bytes.tz', 'Unit', 'Unit'),
+            ('not_bytes.tz', 'Unit', 'Unit'),
+            ('lsl_bytes.tz', 'Unit', 'Unit'),
+            ('lsr_bytes.tz', 'Unit', 'Unit'),
+        ],
+    )
+    def test_bytes_bitwise(
+        self,
+        client_regtest: ClientRegression,
+        contract: str,
+        param: str,
+        storage: str,
+    ):
+        client = client_regtest
+        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        client.run_script(contract, param, storage, trace_stack=True)
+
     @pytest.mark.skip(reason="Bug in annotation system")
     def test_fails_annotated_set_car_cdr(
         self, client_regtest: ClientRegression
