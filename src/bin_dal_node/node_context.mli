@@ -27,10 +27,25 @@ type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
   plugin : (module Dal_constants_plugin.T);
+  slot_header_store : Slot_headers_store.t;
 }
 
 type status = Ready of ready_ctxt | Starting
 
-type t = {mutable status : status; config : Configuration.t}
+type t
 
-val make : Configuration.t -> t
+val init : Configuration.t -> t
+
+val set_ready :
+  t ->
+  Slot_headers_store.t ->
+  (module Dal_constants_plugin.T) ->
+  Cryptobox.t ->
+  Cryptobox.parameters ->
+  unit
+
+val get_ready : t -> ready_ctxt tzresult
+
+val get_config : t -> Configuration.t
+
+val get_status : t -> status

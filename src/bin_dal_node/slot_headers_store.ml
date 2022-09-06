@@ -23,14 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
 include Store_utils
 
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`
    to `Dal.Slot.t`. The encoding function converts this
    list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slots = Make_nested_map (struct
+include Make_nested_map (struct
   let path = ["dal"; "slot_headers"]
 
   (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
@@ -41,17 +40,17 @@ module Dal_slots = Make_nested_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type secondary_key = Dal.Slot_index.t
+  type secondary_key = int
 
-  let compare_secondary_keys = Dal.Slot_index.compare
+  let compare_secondary_keys = Int.compare
 
-  type value = Dal.Slot.t
+  type value = Cryptobox.commitment
 
-  let secondary_key_encoding = Dal.Slot_index.encoding
+  let secondary_key_encoding = Data_encoding.int31
 
   let secondary_key_name = "slot_index"
 
-  let value_encoding = Dal.Slot.encoding
+  let value_encoding = Cryptobox.Commitment.encoding
 
   let value_name = "slots_metadata"
 end)

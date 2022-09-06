@@ -42,7 +42,7 @@ module Plugin = struct
     let open Lwt_result_syntax in
     let open Protocol.Alpha_context in
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
-    let+ block =
+    let* block =
       Protocol_client_context.Alpha_block_services.info
         cpctxt
         ~block
@@ -51,16 +51,13 @@ module Plugin = struct
     in
     let apply_internal acc ~source:_ _op _res = acc in
     let apply (type kind) acc ~source:_ (op : kind manager_operation) _res =
-      match op with
-      | Dal_publish_slot_header {slot = {index; header; _}} ->
-          (Dal.Slot_index.to_int index, header) :: acc
-      | _ -> acc
+      match op with Dal_publish_slot_header {slot} -> slot :: acc | _ -> acc
     in
-    let slot_headers =
-      Layer1_services.(
-        process_manager_operations [] block.operations {apply; apply_internal})
-    in
-    slot_headers
+    Layer1_services.(
+      process_manager_operations [] block.operations {apply; apply_internal})
+    |> List.map_es (fun slot ->
+           return
+             (Dal.Slot_index.to_int slot.Dal.Slot.id.index, slot.Dal.Slot.header))
 end
 
 let () = Dal_constants_plugin.register (module Plugin)
