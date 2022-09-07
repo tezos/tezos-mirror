@@ -123,6 +123,10 @@ let tz4_account : Account.aggregate_key =
 (** WASM PVM boot sector that provides a zeroed chunk of kernel, and a
     public key.
 
+    This is enough to get the PVM past the Gather_floppies stage. Since
+    an all-zero kernel is not a valid WebAssembly module, a PVM using
+    this boot sector is expected to get stuck in the parsing stage.
+
     This constant was computed with the following OCaml script.
     $ dune utop src/lib_scoru_wasm
     utop # open Tezos_scoru_wasm.Gather_floppies ;;
