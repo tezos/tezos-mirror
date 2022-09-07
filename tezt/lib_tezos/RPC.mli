@@ -534,6 +534,22 @@ val get_chain_block_context_constants :
 val get_chain_block_context_constants_errors :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/storage/used_space]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_storage_used_space :
+  ?chain:string -> ?block:string -> string -> int t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/storage/paid_space]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_storage_paid_space :
+  ?chain:string -> ?block:string -> string -> int t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_rights]
 
     [chain] defaults to ["main"].
