@@ -56,8 +56,8 @@ let rec length : type x. x Encoding.t -> x -> int =
       Binary_size.integer_to_size @@ Binary_size.range_to_size ~minimum ~maximum
   | Float -> Binary_size.float
   | RangedFloat _ -> Binary_size.float
-  | Bytes (`Fixed n) -> n
-  | String (`Fixed n) -> n
+  | Bytes (`Fixed n, _) -> n
+  | String (`Fixed n, _) -> n
   | Padded (e, n) -> length e value + n
   | String_enum (_, arr) ->
       Binary_size.integer_to_size @@ Binary_size.enum_size arr
@@ -76,8 +76,8 @@ let rec length : type x. x Encoding.t -> x -> int =
       match value with None -> 1 | Some value -> 1 + length e value)
   (* Variable *)
   | Ignore -> 0
-  | Bytes `Variable -> Bytes.length value
-  | String `Variable -> String.length value
+  | Bytes (`Variable, _) -> Bytes.length value
+  | String (`Variable, _) -> String.length value
   | Array {length_limit; elts} -> (
       (match length_limit with
       | No_limit -> ()
@@ -158,8 +158,8 @@ let rec maximum_length : type a. a Encoding.t -> int option =
         @@ Binary_size.range_to_size ~minimum ~maximum)
   | Float -> Some Binary_size.float
   | RangedFloat _ -> Some Binary_size.float
-  | Bytes (`Fixed n) -> Some n
-  | String (`Fixed n) -> Some n
+  | Bytes (`Fixed n, _) -> Some n
+  | String (`Fixed n, _) -> Some n
   | Padded (e, n) -> maximum_length e >|? fun s -> s + n
   | String_enum (_, arr) ->
       Some (Binary_size.integer_to_size @@ Binary_size.enum_size arr)
@@ -171,8 +171,8 @@ let rec maximum_length : type a. a Encoding.t -> int option =
       maximum_length e >|? fun s -> s + Binary_size.uint8
   (* Variable *)
   | Ignore -> Some 0
-  | Bytes `Variable -> None
-  | String `Variable -> None
+  | Bytes (`Variable, _) -> None
+  | String (`Variable, _) -> None
   | Array {length_limit; elts = e} -> (
       match length_limit with
       | No_limit -> None

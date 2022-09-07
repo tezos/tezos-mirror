@@ -89,6 +89,8 @@ let is_tag = Uint_option.is_some
 
 let get_tag = Uint_option.get
 
+type string_json_repr = Hex | Plain
+
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -107,8 +109,8 @@ type 'a desc =
   | RangedInt : {minimum : int; maximum : int} -> int desc
   | RangedFloat : {minimum : float; maximum : float} -> float desc
   | Float : float desc
-  | Bytes : Kind.length -> Bytes.t desc
-  | String : Kind.length -> string desc
+  | Bytes : Kind.length * string_json_repr -> Bytes.t desc
+  | String : Kind.length * string_json_repr -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
@@ -231,8 +233,8 @@ and classify_desc : type a. a desc -> Kind.t =
   | Float -> `Fixed Binary_size.float
   | RangedFloat _ -> `Fixed Binary_size.float
   (* Tagged *)
-  | Bytes kind -> (kind :> Kind.t)
-  | String kind -> (kind :> Kind.t)
+  | Bytes (kind, _repr) -> (kind :> Kind.t)
+  | String (kind, _repr) -> (kind :> Kind.t)
   | Padded ({encoding; _}, n) -> (
       match classify_desc encoding with
       | `Fixed m -> `Fixed (n + m)
@@ -388,17 +390,21 @@ let check_not_zeroable name e =
 let make ?json_encoding encoding = {encoding; json_encoding}
 
 module Fixed = struct
-  let string n =
+  let string' json_repr n =
     if n <= 0 then
       invalid_arg
         "Cannot create a string encoding of negative or null fixed length." ;
-    make @@ String (`Fixed n)
+    make @@ String (`Fixed n, json_repr)
 
-  let bytes n =
+  let string n = string' Plain n
+
+  let bytes' json_repr n =
     if n <= 0 then
       invalid_arg
         "Cannot create a byte encoding of negative or null fixed length." ;
-    make @@ Bytes (`Fixed n)
+    make @@ Bytes (`Fixed n, json_repr)
+
+  let bytes n = bytes' Hex n
 
   let add_padding e n =
     if n <= 0 then
@@ -425,9 +431,13 @@ module Fixed = struct
 end
 
 module Variable = struct
-  let string = make @@ String `Variable
+  let string' json_repr = make @@ String (`Variable, json_repr)
 
-  let bytes = make @@ Bytes `Variable
+  let string = string' Plain
+
+  let bytes' json_repr = make @@ Bytes (`Variable, json_repr)
+
+  let bytes = bytes' Hex
 
   let array ?max_length e =
     check_not_variable "an array" e ;
@@ -510,9 +520,13 @@ let z = make @@ Z
 
 let float = make @@ Float
 
-let string = dynamic_size Variable.string
+let string' json_repr = dynamic_size (Variable.string' json_repr)
 
-let bytes = dynamic_size Variable.bytes
+let string = string' Plain
+
+let bytes' json_repr = dynamic_size (Variable.bytes' json_repr)
+
+let bytes = bytes' Hex
 
 let array ?max_length e = dynamic_size (Variable.array ?max_length e)
 

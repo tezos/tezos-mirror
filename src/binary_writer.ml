@@ -232,12 +232,12 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | N -> Atom.n state value
   | Z -> Atom.z state value
   | Float -> Atom.float state value
-  | Bytes (`Fixed n) -> Atom.fixed_kind_bytes n state value
-  | Bytes `Variable ->
+  | Bytes (`Fixed n, _) -> Atom.fixed_kind_bytes n state value
+  | Bytes (`Variable, _) ->
       let length = Bytes.length value in
       Atom.fixed_kind_bytes length state value
-  | String (`Fixed n) -> Atom.fixed_kind_string n state value
-  | String `Variable ->
+  | String (`Fixed n, _) -> Atom.fixed_kind_string n state value
+  | String (`Variable, _) ->
       let length = String.length value in
       Atom.fixed_kind_string length state value
   | Padded (e, n) ->

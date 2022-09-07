@@ -93,10 +93,14 @@ type _ ty =
   | Float : float ty
   | RangedFloat : float * float -> float ty
   | Bool : bool ty
-  | String : string ty
-  | FixedString : int -> string ty
-  | Bytes : bytes ty
-  | FixedBytes : int -> bytes ty
+  | StringPlain : string ty
+  | FixedStringPlain : int -> string ty
+  | BytesPlain : bytes ty
+  | FixedBytesPlain : int -> bytes ty
+  | StringHex : string ty
+  | FixedStringHex : int -> string ty
+  | BytesHex : bytes ty
+  | FixedBytesHex : int -> bytes ty
   | Option : 'a ty -> 'a option ty
   | Result : 'a ty * 'b ty -> ('a, 'b) result ty
   | List : 'a ty -> 'a list ty
@@ -180,10 +184,14 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Float -> Crowbar.pp ppf "float"
   | RangedFloat (low, high) -> Crowbar.pp ppf "rangedfloat:[%g;%g]" low high
   | Bool -> Crowbar.pp ppf "bool"
-  | String -> Crowbar.pp ppf "string"
-  | Bytes -> Crowbar.pp ppf "bytes"
-  | FixedString n -> Crowbar.pp ppf "fixedstring(%d)" n
-  | FixedBytes n -> Crowbar.pp ppf "fixedbytes(%d)" n
+  | StringPlain -> Crowbar.pp ppf "string"
+  | BytesPlain -> Crowbar.pp ppf "bytes"
+  | FixedStringPlain n -> Crowbar.pp ppf "fixedstring(%d)" n
+  | FixedBytesPlain n -> Crowbar.pp ppf "fixedbytes(%d)" n
+  | StringHex -> Crowbar.pp ppf "stringhex"
+  | BytesHex -> Crowbar.pp ppf "byteshex"
+  | FixedStringHex n -> Crowbar.pp ppf "fixedstringhex(%d)" n
+  | FixedBytesHex n -> Crowbar.pp ppf "fixedbyteshex(%d)" n
   | Option ty -> Crowbar.pp ppf "option(%a)" pp_ty ty
   | Result (tya, tyb) -> Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
   | List ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
@@ -325,10 +333,14 @@ let any_ty_ground_gen =
             let high = max a b in
             AnyTy (RangedFloat (low, high)));
         const @@ AnyTy Bool;
-        const @@ AnyTy String;
-        const @@ AnyTy Bytes;
-        map [range ~min:1 10] (fun i -> AnyTy (FixedString i));
-        map [range ~min:1 10] (fun i -> AnyTy (FixedBytes i));
+        const @@ AnyTy StringPlain;
+        const @@ AnyTy BytesPlain;
+        const @@ AnyTy StringHex;
+        const @@ AnyTy BytesHex;
+        map [range ~min:1 10] (fun i -> AnyTy (FixedStringPlain i));
+        map [range ~min:1 10] (fun i -> AnyTy (FixedBytesPlain i));
+        map [range ~min:1 10] (fun i -> AnyTy (FixedStringHex i));
+        map [range ~min:1 10] (fun i -> AnyTy (FixedBytesHex i));
         const @@ AnyTy StringEnum;
       ]
   in
@@ -635,13 +647,23 @@ let make_string ty gen encoding : string full =
     let encoding = encoding
   end)
 
-let full_string : string full = make_string String string Data_encoding.string
+let full_string_plain : string full =
+  make_string StringPlain string (Data_encoding.string' Plain)
 
-let full_fixed_string n : string full =
+let full_string_hex : string full =
+  make_string StringHex string (Data_encoding.string' Hex)
+
+let full_fixed_string_plain n : string full =
   make_string
-    (FixedString n)
+    (FixedStringPlain n)
     (Crowbar.bytes_fixed n)
-    (Data_encoding.Fixed.string n)
+    (Data_encoding.Fixed.string' Plain n)
+
+let full_fixed_string_hex n : string full =
+  make_string
+    (FixedStringHex n)
+    (Crowbar.bytes_fixed n)
+    (Data_encoding.Fixed.string' Hex n)
 
 let make_bytes ty gen encoding : bytes full =
   (module struct
@@ -658,13 +680,23 @@ let make_bytes ty gen encoding : bytes full =
     let encoding = encoding
   end)
 
-let full_bytes : bytes full = make_bytes Bytes bytes Data_encoding.bytes
+let full_bytes_hex : bytes full =
+  make_bytes BytesHex bytes (Data_encoding.bytes' Hex)
 
-let full_fixed_bytes n : bytes full =
+let full_bytes_plain : bytes full =
+  make_bytes BytesPlain bytes (Data_encoding.bytes' Plain)
+
+let full_fixed_bytes_hex n : bytes full =
   make_bytes
-    (FixedBytes n)
+    (FixedBytesHex n)
     Crowbar.(map [bytes_fixed n] Bytes.unsafe_of_string)
-    (Data_encoding.Fixed.bytes n)
+    (Data_encoding.Fixed.bytes' Hex n)
+
+let full_fixed_bytes_plain n : bytes full =
+  make_bytes
+    (FixedBytesPlain n)
+    Crowbar.(map [bytes_fixed n] Bytes.unsafe_of_string)
+    (Data_encoding.Fixed.bytes' Plain n)
 
 let full_option : type a. a full -> a option full =
  fun full ->
@@ -1994,10 +2026,14 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Float -> full_float
   | RangedFloat (low, high) -> full_rangedfloat low high
   | Bool -> full_bool
-  | String -> full_string
-  | Bytes -> full_bytes
-  | FixedString n -> full_fixed_string n
-  | FixedBytes n -> full_fixed_bytes n
+  | StringPlain -> full_string_plain
+  | BytesPlain -> full_bytes_plain
+  | FixedStringPlain n -> full_fixed_string_plain n
+  | FixedBytesPlain n -> full_fixed_bytes_plain n
+  | StringHex -> full_string_hex
+  | BytesHex -> full_bytes_hex
+  | FixedStringHex n -> full_fixed_string_hex n
+  | FixedBytesHex n -> full_fixed_bytes_hex n
   | Option ty -> full_option (full_of_ty ty)
   | Result (tya, tyb) -> full_result (full_of_ty tya) (full_of_ty tyb)
   | List ty -> full_list (full_of_ty ty)

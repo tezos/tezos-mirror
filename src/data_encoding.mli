@@ -88,6 +88,8 @@ module Encoding : sig
 
   type 'a encoding = 'a t
 
+  type string_json_repr = Hex | Plain
+
   (** {3 Ground descriptors} *)
 
   (** {4 voids} *)
@@ -231,13 +233,19 @@ module Encoding : sig
   val bool : bool encoding
 
   (** Encoding of a string
-      - encoded as a byte sequence in binary prefixed by the length
+      - In binary, encoded as a byte sequence prefixed by the length
         of the string
-      - encoded as a string in JSON. *)
+      - in JSON when [string_json_repr = Plain], encoded as a string
+      - in JSON when [string_json_repr = Hex],  encoded via hex. *)
+  val string' : string_json_repr -> string encoding
+
+  (** Encoding of arbitrary bytes. See [string'] *)
+  val bytes' : string_json_repr -> Bytes.t encoding
+
+  (** same as [string' Plain] *)
   val string : string encoding
 
-  (** Encoding of arbitrary bytes
-      (encoded via hex in JSON and directly as a sequence byte in binary). *)
+  (** same as [bytes' Hex] *)
   val bytes : Bytes.t encoding
 
   (** {3 Descriptor combinators} *)
@@ -734,7 +742,13 @@ let encoding_t =
     val string : int -> string encoding
 
     (** @raise Invalid_argument if the argument is less or equal to zero. *)
+    val string' : string_json_repr -> int -> string encoding
+
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
     val bytes : int -> Bytes.t encoding
+
+    (** @raise Invalid_argument if the argument is less or equal to zero. *)
+    val bytes' : string_json_repr -> int -> Bytes.t encoding
 
     (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
         there are [n] null bytes ([\000]) added after the value encoded by [e].
@@ -816,7 +830,11 @@ let expr_encoding =
   module Variable : sig
     val string : string encoding
 
+    val string' : string_json_repr -> string encoding
+
     val bytes : Bytes.t encoding
+
+    val bytes' : string_json_repr -> Bytes.t encoding
 
     (** @raise Invalid_argument if the encoding argument is variable length
         or may lead to zero-width representation in binary. *)
@@ -835,9 +853,15 @@ let expr_encoding =
 
         Attempting to construct a string with a length that is too long causes
         an [Invalid_argument] exception. *)
+    val string' : string_json_repr -> int -> string encoding
+
+    (** Same as [string' Plain] *)
     val string : int -> string encoding
 
-    (** See {!string} above. *)
+    (** See {!string'} above. *)
+    val bytes' : string_json_repr -> int -> Bytes.t encoding
+
+    (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
   end
 
