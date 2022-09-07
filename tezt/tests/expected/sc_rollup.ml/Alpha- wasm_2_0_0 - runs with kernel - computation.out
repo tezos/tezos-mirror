@@ -73,7 +73,7 @@ Aj!A  kAq!
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs128tdeU7N4cArSUrxeLe3YYiyZFHCaPgJKf6dNTxMWNmFsGjXjq"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "0"
@@ -118,13 +118,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12CDiRBTLYe9rfTuHEmpAaCb6NTFmBpsuq6MBDAZJJ7GQRY8hBN"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11484"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12CDiRBTLYe9rfTuHEmpAaCb6NTFmBpsuq6MBDAZJJ7GQRY8hBN"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11484"
@@ -170,13 +170,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12UYj1PyXok3YMZwSYZKHH47Y4PhHmsrJ4f3bd4Fox8F1WJqfH6"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11607"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12UYj1PyXok3YMZwSYZKHH47Y4PhHmsrJ4f3bd4Fox8F1WJqfH6"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11607"
@@ -222,13 +222,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12JAMJcT1E3ZHZZi4FCbyMh99ymS4VFUfFkHaVmLPiJUNVUpMDP"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11730"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12JAMJcT1E3ZHZZi4FCbyMh99ymS4VFUfFkHaVmLPiJUNVUpMDP"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11730"
@@ -275,13 +275,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs138kKYYy4ffK76tuaeyT9vzSrmNWvo5JBqqp6HN8s7PavZz1ozD"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11853"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs138kKYYy4ffK76tuaeyT9vzSrmNWvo5JBqqp6HN8s7PavZz1ozD"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11853"
@@ -328,13 +328,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12k61MnN6NaBtZawvpE8xEBEE8nkQKK97Gqnzz84ndFuLfcuf8X"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11976"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12k61MnN6NaBtZawvpE8xEBEE8nkQKK97Gqnzz84ndFuLfcuf8X"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "11976"
@@ -381,13 +381,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12FgKfZD5PhKAtYLHZR7vcbJuAouuRawhJwhferAXPPRHJkq3i9"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12099"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12FgKfZD5PhKAtYLHZR7vcbJuAouuRawhJwhferAXPPRHJkq3i9"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12099"
@@ -434,13 +434,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Q9BuPEor48kGmeWfgFbhzZKdxXv2gMich7enTQ14aEd3Lgj4Q"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12222"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Q9BuPEor48kGmeWfgFbhzZKdxXv2gMich7enTQ14aEd3Lgj4Q"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12222"
@@ -488,13 +488,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Uc99dhMCp47TugSModvYeNenaBv4ozwXKkWs153QBnsdGmg2M"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12345"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12Uc99dhMCp47TugSModvYeNenaBv4ozwXKkWs153QBnsdGmg2M"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12345"
@@ -542,13 +542,13 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12R51ZNSdyaZhC915uCVnuERgsmmTypiiFeUuDPpa7hDonv2taE"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12468"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs12R51ZNSdyaZhC915uCVnuERgsmmTypiiFeUuDPpa7hDonv2taE"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12468"
@@ -596,7 +596,7 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /global/state_hash
-"scs13NCv3Qs39T1qEMA9T6Z9Tf5heouRWbM3yisgfihyKjgBuBNrJf"
+"[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
 "12591"

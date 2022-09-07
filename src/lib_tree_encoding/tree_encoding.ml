@@ -210,7 +210,7 @@ struct
            (fun vector ->
              (loaded_bindings vector, num_elements vector, first_key vector))
            (E.tup3
-              (E.lazy_mapping to_key value.encode)
+              (E.scope ["contents"] (E.lazy_mapping to_key value.encode))
               (E.scope ["length"] with_key.encode)
               (E.scope ["head"] with_key.encode))
     in
@@ -220,7 +220,7 @@ struct
           create ~produce_value ~first_key:head ?origin len)
         (let open D.Syntax in
         let+ origin = D.subtree
-        and+ x = D.lazy_mapping to_key value.decode
+        and+ x = D.scope ["contents"] (D.lazy_mapping to_key value.decode)
         and+ y = D.scope ["length"] with_key.decode
         and+ z = D.scope ["head"] with_key.decode in
         (origin, x, y, z))
@@ -253,7 +253,7 @@ let chunked_byte_vector =
     @@ E.contramap
          (fun vector -> (loaded_chunks vector, length vector))
          (E.tup2
-            (E.lazy_mapping to_key chunk.encode)
+            (E.scope ["contents"] @@ E.lazy_mapping to_key chunk.encode)
             (E.value ["length"] Data_encoding.int64))
   in
   let decode =
@@ -261,7 +261,7 @@ let chunked_byte_vector =
       (fun (origin, get_chunk, len) -> create ?origin ~get_chunk len)
       (let open D.Syntax in
       let+ origin = D.subtree
-      and+ x = D.lazy_mapping to_key chunk.decode
+      and+ x = D.scope ["contents"] @@ D.lazy_mapping to_key chunk.decode
       and+ y = D.value ["length"] Data_encoding.int64 in
       (origin, x, y))
   in

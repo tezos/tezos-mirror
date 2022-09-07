@@ -31,5 +31,7 @@
 *)
 
 let () =
-  Alcotest_lwt.run "test lib tree encoding" [("Encodings", Test_encoding.tests)]
+  Alcotest_lwt.run
+    "test lib tree encoding"
+    [("Encodings", Test_encoding.tests); ("Proofs", Test_proofs.tests)]
   |> Lwt_main.run

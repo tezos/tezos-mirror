@@ -39,6 +39,9 @@ let replace_variables string =
       ("txM\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]");
       ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
       ("scr1\\w{33}\\b", "[SC_ROLLUP_HASH]");
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/3752
+         Remove this regexp as soon as the WASM PVM stabilizes. *)
+      ("scs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
       ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
       ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
       ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
