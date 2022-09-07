@@ -72,7 +72,7 @@ module Make (PVM : Pvm.S) = struct
   let process_included_l1_operation (type kind) (node_ctxt : Node_context.t)
       head ~source:_ (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     match (operation, result) with
     | ( Sc_rollup_publish {commitment; _},
         Sc_rollup_publish_result {published_at_level; _} ) ->
@@ -80,17 +80,39 @@ module Make (PVM : Pvm.S) = struct
         let commitment_hash =
           Sc_rollup.Commitment.hash_uncarbonated commitment
         in
-        Store.Commitments_published_at_level.add
-          node_ctxt.store
-          commitment_hash
-          published_at_level
+        let*! () =
+          Store.Commitments_published_at_level.add
+            node_ctxt.store
+            commitment_hash
+            published_at_level
+        in
+        return_unit
     | Sc_rollup_cement {commitment; _}, Sc_rollup_cement_result {inbox_level; _}
       ->
         (* Cemented commitment ---------------------------------------------- *)
-        let* () =
+        let*! () =
           Store.Last_cemented_commitment_level.set node_ctxt.store inbox_level
         in
-        Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
+        let*! () =
+          Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
+        in
+        return_unit
+    | ( Sc_rollup_refute _,
+        Sc_rollup_refute_result
+          {game_status = Ended (reason, loser); balance_updates; _} )
+      when Node_context.is_operator node_ctxt loser ->
+        let*? slashed_amount =
+          List.fold_left_e
+            (fun slashed -> function
+              | ( Receipt.Sc_rollup_refutation_punishments,
+                  Receipt.Credited amount,
+                  _ ) ->
+                  Environment.wrap_tzresult Tez.(slashed +? amount)
+              | _ -> Ok slashed)
+            Tez.zero
+            balance_updates
+        in
+        tzfail (Sc_rollup_node_errors.Lost_game (loser, reason, slashed_amount))
     | Dal_publish_slot_header {slot}, Dal_publish_slot_header_result _ ->
         let {Dal.Slot.index; _} = slot in
         (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3510
@@ -99,11 +121,14 @@ module Make (PVM : Pvm.S) = struct
            headers of slots to which the rollup node is subscribed to.
            We do not have the information about DAL slots subscribed to
            at this time. *)
-        Store.Dal_slots.add
-          node_ctxt.store
-          ~primary_key:head
-          ~secondary_key:index
-          slot
+        let*! () =
+          Store.Dal_slots.add
+            node_ctxt.store
+            ~primary_key:head
+            ~secondary_key:index
+            slot
+        in
+        return_unit
     | _, _ ->
         (* Other manager operations *)
         return_unit
@@ -113,12 +138,12 @@ module Make (PVM : Pvm.S) = struct
   let process_finalized_l1_operation (type kind) _node_ctxt _head ~source:_
       (_operation : kind manager_operation)
       (_result : kind successful_manager_operation_result) =
-    Lwt.return_unit
+    return_unit
 
   let process_l1_operation (type kind) ~finalized node_ctxt head ~source
       (operation : kind manager_operation)
       (result : kind Apply_results.manager_operation_result) =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     let is_for_my_rollup : type kind. kind manager_operation -> bool = function
       | Sc_rollup_add_messages {rollup; _}
       | Sc_rollup_cement {rollup; _}
@@ -142,7 +167,7 @@ module Make (PVM : Pvm.S) = struct
     if not (is_for_my_rollup operation) then return_unit
     else
       (* Only look at operations that are for the node's rollup *)
-      let* () = Daemon_event.included_operation ~finalized operation result in
+      let*! () = Daemon_event.included_operation ~finalized operation result in
       match result with
       | Applied success_result ->
           let process =
@@ -159,7 +184,7 @@ module Make (PVM : Pvm.S) = struct
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
         result =
-      let open Lwt_syntax in
+      let open Lwt_result_syntax in
       let* () = accu in
       process_l1_operation ~finalized node_ctxt hash ~source operation result
     in
@@ -168,9 +193,9 @@ module Make (PVM : Pvm.S) = struct
         (_result : kind Apply_internal_results.internal_operation_result) =
       accu
     in
-    let*! () =
+    let* () =
       Layer1_services.process_manager_operations
-        Lwt.return_unit
+        return_unit
         block.operations
         {apply; apply_internal}
     in

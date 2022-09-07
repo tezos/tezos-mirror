@@ -45,6 +45,11 @@ type t = {
 let get_operator node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.operators
 
+let is_operator node_ctxt pkh =
+  Configuration.Operator_purpose_map.exists
+    (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
+    node_ctxt.operators
+
 let get_fee_parameter node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
   |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())

@@ -25,6 +25,8 @@
 
 open Protocol.Alpha_context
 
+let tez_sym = "\xEA\x9C\xA9"
+
 type error +=
   | Cannot_produce_proof of
       Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
@@ -40,6 +42,10 @@ type error +=
 type error += Missing_PVM_state of Block_hash.t * Raw_level.t
 
 type error += Cannot_checkout_context of Block_hash.t * string option
+
+type error +=
+  | Lost_game of
+      public_key_hash * Protocol.Alpha_context.Sc_rollup.Game.reason * Tez.t
 
 let () =
   register_error_kind
@@ -204,4 +210,31 @@ let () =
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
       | _ -> None)
-    (fun (block, context) -> Cannot_checkout_context (block, context))
+    (fun (block, context) -> Cannot_checkout_context (block, context)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.lost_game"
+    ~title:"Lost refutation game"
+    ~description:"The rollup node lost a refutation game."
+    ~pp:(fun ppf (loser, reason, slashed) ->
+      Format.fprintf
+        ppf
+        "The rollup node lost the refutation game for operator %a and was \
+         slashed %s%a, for reason: %a."
+        Signature.Public_key_hash.pp
+        loser
+        tez_sym
+        Tez.pp
+        slashed
+        Protocol.Alpha_context.Sc_rollup.Game.pp_reason
+        reason)
+    Data_encoding.(
+      obj3
+        (req "loser" Signature.Public_key_hash.encoding)
+        (req "reason" Protocol.Alpha_context.Sc_rollup.Game.reason_encoding)
+        (req "slashed" Tez.encoding))
+    (function
+      | Lost_game (loser, reason, slashed) -> Some (loser, reason, slashed)
+      | _ -> None)
+    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed))
