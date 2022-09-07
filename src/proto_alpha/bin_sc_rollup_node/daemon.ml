@@ -383,8 +383,6 @@ module Make (PVM : Pvm.S) = struct
     let message = l1_ctxt.cctxt#message in
     let* () = message "Stopping L1 monitor@." in
     l1_ctxt.stopper () ;
-    let* () = message "Closing L1 events stream@." in
-    let* () = Lwt_stream.closed l1_ctxt.events in
     let* () = message "Shutting down L1@." in
     let* () = Layer1.shutdown store in
     let* () = message "Shutting down RPC server@." in
