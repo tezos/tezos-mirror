@@ -88,7 +88,6 @@
     The difference between [tezt] and [tezt.js] is that [tezt.js] does not provide:
     - the [Process] module;
     - the [Temp] module;
-    - the [Regression] module;
     - the [Runner] module.
     So the JavaScript backend is not well suited for integration tests and regression tests.
     But it does support unit tests.

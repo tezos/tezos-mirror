@@ -29,7 +29,6 @@
     Contrary to {!Tezt}, it does not provide:
     - the [Process] module;
     - the [Temp] module;
-    - the [Regression] module;
     - the [Runner] module. *)
 
 module Background = Background
@@ -40,6 +39,7 @@ module Diff = Diff
 module JSON = JSON
 module Log = Log
 module Process_hooks = Process_hooks
+module Regression = Regression
 
 module Test = struct
   include Test
