@@ -239,7 +239,7 @@ let check_origination_proof kind boot_sector origination_proof =
       (not is_valid)
       (Sc_rollup_proof_repr.Sc_rollup_proof_check "invalid origination proof")
   in
-  match PVM.(proof_stop_state None proof) with
+  match PVM.(proof_stop_state None No_input_required proof) with
   | Some genesis_hash -> return genesis_hash
   | None ->
       fail

@@ -82,9 +82,9 @@ let start proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   P.proof_start_state P.proof
 
-let stop input proof =
+let stop input input_request proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  P.proof_stop_state input P.proof
+  P.proof_stop_state input input_request P.proof
 
 (* This takes an [input] and checks if it is at or above the given level.
    It returns [None] if this is the case.
@@ -125,7 +125,7 @@ let valid snapshot commit_level ~pvm_name proof =
         Option.bind input (cut_at_level commit_level)
   in
   let* input_requested = P.verify_proof input P.proof in
-  let*! res =
+  let* () =
     match (proof.inbox, input_requested) with
     | None, No_input_required -> return_unit
     | Some {level; message_counter; proof = _}, Initial ->
@@ -140,7 +140,7 @@ let valid snapshot commit_level ~pvm_name proof =
     | Some _, No_input_required | None, Initial | None, First_after _ ->
         proof_error "Inbox proof and input request are dissociated."
   in
-  return (Result.is_ok res, input)
+  return (input, input_requested)
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S

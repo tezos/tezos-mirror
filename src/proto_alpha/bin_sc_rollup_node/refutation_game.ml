@@ -117,18 +117,21 @@ module Make (Interpreter : Interpreter.S) :
         let inbox = history_proof
       end
     end in
-    let* r =
+    let* proof =
       trace
         (Sc_rollup_node_errors.Cannot_produce_proof (inbox, history, game.level))
       @@ (Sc_rollup.Proof.produce (module P) game.level
          >|= Environment.wrap_tzresult)
     in
-    let+ check, _ =
-      Sc_rollup.Proof.valid history_proof game.level ~pvm_name:game.pvm_name r
+    let*! res =
+      Sc_rollup.Proof.valid
+        history_proof
+        game.level
+        ~pvm_name:game.pvm_name
+        proof
       >|= Environment.wrap_tzresult
     in
-    assert check ;
-    r
+    if Result.is_ok res then return proof else assert false
 
   let new_dissection node_ctxt last_level ok our_view =
     let state_hash_from_tick tick =

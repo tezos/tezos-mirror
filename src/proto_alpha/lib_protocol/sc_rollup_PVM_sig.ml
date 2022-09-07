@@ -272,11 +272,10 @@ module type S = sig
       execution step. *)
   val proof_start_state : proof -> hash
 
-  (** [proof_stop_state input_given proof] returns the final state hash of
-      the [proof] execution step.
-      Returns [None] if the [input_requested] do not match the [input_given].
-  *)
-  val proof_stop_state : input option -> proof -> hash option
+  (** [proof_stop_state input_given input_request proof] returns the final state
+      hash of the [proof] execution step. Returns [None] if the [input_request]
+      do not match the [input_given].  *)
+  val proof_stop_state : input option -> input_request -> proof -> hash option
 
   (** [proof_input_requested proof] returns the [input_request] status of the
       start state of the proof, as given by [is_input_state]. This must match

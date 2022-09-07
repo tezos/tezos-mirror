@@ -183,8 +183,8 @@ module Make (Context : P) :
 
   let proof_start_state p = Context.proof_before p.tree_proof
 
-  let proof_stop_state input_given p =
-    match (input_given, p.requested) with
+  let proof_stop_state input_given input_request p =
+    match (input_given, input_request) with
     | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
     | None, _ -> None
     | _ -> Some (Context.proof_after p.tree_proof)

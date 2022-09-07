@@ -3188,7 +3188,8 @@ module Sc_rollup : sig
 
       val proof_start_state : proof -> hash
 
-      val proof_stop_state : input option -> proof -> hash option
+      val proof_stop_state :
+        input option -> input_request -> proof -> hash option
 
       val proof_input_requested : proof -> input_request
 
@@ -3471,7 +3472,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       pvm_name:string ->
       t ->
-      (bool * input option) tzresult Lwt.t
+      (input option * input_request) tzresult Lwt.t
 
     val produce :
       (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t
