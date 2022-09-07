@@ -92,6 +92,40 @@ type slot = t
 
 val equal : t -> t -> bool
 
+type slot_index = Index.t
+
+(** A DAL slot is decomposed to a successive list of pages with fixed content
+   size. The size is chosen so that it's possible to inject a page in a Tezos
+   L1 operation if needed during the proof phase of a refutation game.
+*)
+module Page : sig
+  type content = Bytes.t
+
+  module Index : sig
+    type t = int
+
+    val zero : int
+
+    val encoding : int Data_encoding.t
+
+    val pp : Format.formatter -> int -> unit
+
+    val compare : int -> int -> int
+
+    val equal : int -> int -> bool
+  end
+
+  (** A page is identified by its slots index and by its own index in the list
+     of pages of the slot. *)
+  type t = {slot_index : slot_index; page_index : Index.t}
+
+  val equal : t -> t -> bool
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 (** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t
 
@@ -128,3 +162,4 @@ module Slot_market : sig
   (** [candidates t] returns a list of slot candidates. *)
   val candidates : t -> slot list
 end
+

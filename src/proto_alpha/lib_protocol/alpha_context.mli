@@ -2772,6 +2772,30 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  module Page : sig
+    type content = bytes
+
+    module Index : sig
+      type t = int
+
+      val encoding : int Data_encoding.t
+
+      val pp : Format.formatter -> int -> unit
+
+      val compare : int -> int -> int
+
+      val equal : int -> int -> bool
+    end
+
+    type t = {slot_index : Slot_index.t; page_index : Index.t}
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+  end
+
   (** This module re-exports definitions from {!Dal_slot_repr},
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
