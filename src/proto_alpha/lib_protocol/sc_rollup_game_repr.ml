@@ -802,42 +802,31 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
   in
   traverse dissection
 
-(** We check firstly that the interval in question is a single tick.
+(** Check that the chosen interval is a single tick. *)
+let check_proof_distance_is_one ~start_tick ~stop_tick =
+  let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
+  check Z.(equal dist one) (Proof_unexpected_section_size dist)
 
-    Then we check the proof begins with the correct state and ends
-    with a different state to the one in the current dissection.
-
-    Note: this does not check the proof itself is valid, just that it
-    makes the expected claims about start and stop states. The function
-    {!play} below has to call {!Sc_rollup_proof_repr.valid} separately
-    to ensure the proof is actually valid. *)
-let check_proof_start_stop ~start_chunk ~stop_chunk input_given input_request
-    proof =
-  let open Lwt_result_syntax in
-  let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
-  let* () = check Z.(equal dist one) (Proof_unexpected_section_size dist) in
+(** Check the proof begins with the correct state. *)
+let check_proof_start_state ~start_state proof =
   let start_proof = Sc_rollup_proof_repr.start proof in
+  check
+    (Option.equal State_hash.equal start_state (Some start_proof))
+    (Proof_start_state_hash_mismatch
+       {start_state_hash = start_state; start_proof})
+
+(** Check the proof stops with a different state than refuted one. *)
+let check_proof_stop_state ~stop_state input_given
+    (input_request : Sc_rollup_PVM_sig.input_request) proof =
   let stop_proof =
     match (input_given, input_request) with
-    | None, Sc_rollup_PVM_sig.No_input_required
-    | Some _, Sc_rollup_PVM_sig.Initial
-    | Some _, Sc_rollup_PVM_sig.First_after _ ->
+    | None, No_input_required | Some _, Initial | Some _, First_after _ ->
         Some (Sc_rollup_proof_repr.stop proof)
-    | Some _, Sc_rollup_PVM_sig.No_input_required
-    | None, Sc_rollup_PVM_sig.Initial
-    | None, Sc_rollup_PVM_sig.First_after _ ->
-        None
-  in
-  let* () =
-    check
-      (Option.equal State_hash.equal start_chunk.state_hash (Some start_proof))
-      (Proof_start_state_hash_mismatch
-         {start_state_hash = start_chunk.state_hash; start_proof})
+    | Some _, No_input_required | None, Initial | None, First_after _ -> None
   in
   check
-    (not (Option.equal State_hash.equal stop_chunk.state_hash stop_proof))
-    (Proof_stop_state_hash_mismatch
-       {stop_state_hash = stop_chunk.state_hash; stop_proof})
+    (not (Option.equal State_hash.equal stop_state stop_proof))
+    (Proof_stop_state_hash_mismatch {stop_state_hash = stop_state; stop_proof})
 
 let play game refutation =
   let open Lwt_result_syntax in
@@ -870,9 +859,18 @@ let play game refutation =
         let* () =
           match valid with
           | Ok (input, input_request) ->
-              check_proof_start_stop
-                ~start_chunk
-                ~stop_chunk
+              let* () =
+                check_proof_distance_is_one
+                  ~start_tick:start_chunk.tick
+                  ~stop_tick:stop_chunk.tick
+              in
+              let* () =
+                check_proof_start_state
+                  ~start_state:start_chunk.state_hash
+                  proof
+              in
+              check_proof_stop_state
+                ~stop_state:stop_chunk.state_hash
                 input
                 input_request
                 proof
