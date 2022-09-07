@@ -30,8 +30,8 @@ let resolve_plugin cctxt =
   in
   return
   @@ Option.either
-       (Dal_constants_plugin.get protocols.current_protocol)
-       (Dal_constants_plugin.get protocols.next_protocol)
+       (Dal_plugin.get protocols.current_protocol)
+       (Dal_plugin.get protocols.next_protocol)
 
 type error += Cryptobox_initialisation_failed of string
 
@@ -50,7 +50,7 @@ let () =
     (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
     (fun str -> Cryptobox_initialisation_failed str)
 
-let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_constants_plugin.T) =
+let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
   let open Cryptobox in
   let open Lwt_result_syntax in
   let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
@@ -108,7 +108,7 @@ let run ~data_dir cctxt =
         let* plugin = resolve_plugin cctxt in
         match plugin with
         | Some plugin ->
-            let (module Plugin : Dal_constants_plugin.T) = plugin in
+            let (module Plugin : Dal_plugin.T) = plugin in
             let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
             let* dal_constants, dal_parameters =
               init_cryptobox config.use_unsafe_srs cctxt plugin

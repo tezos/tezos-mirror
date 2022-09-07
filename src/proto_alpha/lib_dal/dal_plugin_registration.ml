@@ -60,4 +60,4 @@ module Plugin = struct
              (Dal.Slot_index.to_int slot.Dal.Slot.id.index, slot.Dal.Slot.header))
 end
 
-let () = Dal_constants_plugin.register (module Plugin)
+let () = Dal_plugin.register (module Plugin)

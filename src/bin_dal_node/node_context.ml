@@ -28,7 +28,7 @@ exception Status_already_ready
 type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
-  plugin : (module Dal_constants_plugin.T);
+  plugin : (module Dal_plugin.T);
   slot_header_store : Slot_headers_store.t;
 }
 
