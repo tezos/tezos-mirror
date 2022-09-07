@@ -567,6 +567,9 @@ let int_like_n_or_z ~min_value ~max_value name sizer like =
        (fun z ->
          (if Z.compare z z_min_value < 0 then
           let i =
+            (* here and in the next check, we want to make sure that the error
+               message is consistent across any platform. To that end, we only
+               convert [z] to [int] if it would fit on a 32 bit machine. *)
             if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
               Binary_size.min_int `Int31
             else Z.to_int z
@@ -586,10 +589,10 @@ let int_like_n_or_z ~min_value ~max_value name sizer like =
          Z.to_int z)
        like)
 
-let uint_like_n ~max_value () =
+let uint_like_n ~max_value =
   int_like_n_or_z ~min_value:0 ~max_value "Data_encoding.uint_like_n" n_length n
 
-let int_like_z ~min_value ~max_value () =
+let int_like_z ~min_value ~max_value =
   int_like_n_or_z ~min_value ~max_value "Data_encoding.int_like_z" z_length z
 
 let def id ?title ?description encoding =

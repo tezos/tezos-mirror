@@ -39,7 +39,7 @@ module Encoding = struct
             invalid_arg "Data_encoding.uint_like_n" ;
           max_value
     in
-    let binary = uint_like_n ~max_value () in
+    let binary = uint_like_n ~max_value in
     let json = ranged_int 0 max_value in
     splitted ~json ~binary
 
@@ -60,7 +60,7 @@ module Encoding = struct
             invalid_arg "Data_encoding.int_like_z" ;
           min_value
     in
-    let binary = int_like_z ~min_value ~max_value () in
+    let binary = int_like_z ~min_value ~max_value in
     let json = ranged_int min_value max_value in
     splitted ~json ~binary
 
