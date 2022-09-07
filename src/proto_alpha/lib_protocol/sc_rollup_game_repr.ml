@@ -376,7 +376,11 @@ type invalid_move =
       start_state_hash : State_hash.t option;
       start_proof : State_hash.t;
     }
-  | Proof_stop_state_hash_mismatch of {
+  | Proof_stop_state_hash_failed_to_refute of {
+      stop_state_hash : State_hash.t option;
+      stop_proof : State_hash.t option;
+    }
+  | Proof_stop_state_hash_failed_to_validate of {
       stop_state_hash : State_hash.t option;
       stop_proof : State_hash.t option;
     }
@@ -465,10 +469,18 @@ let pp_invalid_move fmt =
         start_state_hash
         State_hash.pp
         start_proof
-  | Proof_stop_state_hash_mismatch {stop_state_hash; stop_proof} ->
+  | Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof} ->
       Format.fprintf
         fmt
-        "stop(%a) should not be equal to stop_proof(%a)"
+        "Trying to refute %a, the stop_proof must not be equal to %a"
+        pp_hash_opt
+        stop_state_hash
+        pp_hash_opt
+        stop_proof
+  | Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof} ->
+      Format.fprintf
+        fmt
+        "Trying to validate %a, the stop_proof must be equal to %a"
         pp_hash_opt
         stop_state_hash
         pp_hash_opt
@@ -606,21 +618,34 @@ let invalid_move_encoding =
         (fun ((), start_state_hash, start_proof) ->
           Proof_start_state_hash_mismatch {start_state_hash; start_proof});
       case
-        ~title:"sc_rollup_proof_stop_state_hash_mismatch"
+        ~title:"sc_rollup_proof_stop_state_hash_failed_to_refute"
         (Tag 11)
         (obj3
-           (req "kind" (constant "proof_stop_state_hash_mismatch"))
+           (req "kind" (constant "proof_stop_state_hash_failed_to_refute"))
            (req "stop_state_hash" (option State_hash.encoding))
            (req "stop_proof" (option State_hash.encoding)))
         (function
-          | Proof_stop_state_hash_mismatch e ->
+          | Proof_stop_state_hash_failed_to_refute e ->
               Some ((), e.stop_state_hash, e.stop_proof)
           | _ -> None)
         (fun ((), stop_state_hash, stop_proof) ->
-          Proof_stop_state_hash_mismatch {stop_state_hash; stop_proof});
+          Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof});
+      case
+        ~title:"sc_rollup_proof_stop_state_hash_failed_to_validate"
+        (Tag 12)
+        (obj3
+           (req "kind" (constant "proof_stop_state_hash_failed_to_validate"))
+           (req "stop_state_hash" (option State_hash.encoding))
+           (req "stop_proof" (option State_hash.encoding)))
+        (function
+          | Proof_stop_state_hash_failed_to_validate e ->
+              Some ((), e.stop_state_hash, e.stop_proof)
+          | _ -> None)
+        (fun ((), stop_state_hash, stop_proof) ->
+          Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof});
       case
         ~title:"sc_rollup_proof_invalid"
-        (Tag 12)
+        (Tag 13)
         (obj2 (req "kind" (constant "proof_invalid")) (req "message" string))
         (function Proof_invalid s -> Some ((), s) | _ -> None)
         (fun ((), s) -> Proof_invalid s);
@@ -810,7 +835,7 @@ let check_proof_start_state ~start_state proof =
 
 (** Check the proof stops with a different state than refuted one. *)
 let check_proof_stop_state ~stop_state input_given
-    (input_request : Sc_rollup_PVM_sig.input_request) proof =
+    (input_request : Sc_rollup_PVM_sig.input_request) proof validate =
   let stop_proof =
     match (input_given, input_request) with
     | None, No_input_required | Some _, Initial | Some _, First_after _ ->
@@ -818,8 +843,22 @@ let check_proof_stop_state ~stop_state input_given
     | Some _, No_input_required | None, Initial | None, First_after _ -> None
   in
   check
-    (not (Option.equal State_hash.equal stop_state stop_proof))
-    (Proof_stop_state_hash_mismatch {stop_state_hash = stop_state; stop_proof})
+    (let b = Option.equal State_hash.equal stop_state stop_proof in
+     if validate then b else not b)
+    (if validate then
+     Proof_stop_state_hash_failed_to_validate
+       {stop_state_hash = stop_state; stop_proof}
+    else
+      Proof_stop_state_hash_failed_to_refute
+        {stop_state_hash = stop_state; stop_proof})
+
+(** Check the proof validates the stop state. *)
+let check_proof_validate_stop_state ~stop_state input input_request proof =
+  check_proof_stop_state ~stop_state input input_request proof true
+
+(** Check the proof refutes the stop state. *)
+let check_proof_refute_stop_state ~stop_state input input_request proof =
+  check_proof_stop_state ~stop_state input input_request proof false
 
 let play game refutation =
   let open Lwt_result_syntax in
@@ -862,7 +901,7 @@ let play game refutation =
                   ~start_state:start_chunk.state_hash
                   proof
               in
-              check_proof_stop_state
+              check_proof_refute_stop_state
                 ~stop_state:stop_chunk.state_hash
                 input
                 input_request

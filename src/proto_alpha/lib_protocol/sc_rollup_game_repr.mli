@@ -325,11 +325,17 @@ type invalid_move =
       start_state_hash : State_hash.t option;
       start_proof : State_hash.t;
     }  (** The given proof's starting state doesn't match the expected one. *)
-  | Proof_stop_state_hash_mismatch of {
+  | Proof_stop_state_hash_failed_to_refute of {
       stop_state_hash : State_hash.t option;
       stop_proof : State_hash.t option;
     }
       (** The given proof's ending state should not match the state being
+          refuted. *)
+  | Proof_stop_state_hash_failed_to_validate of {
+      stop_state_hash : State_hash.t option;
+      stop_proof : State_hash.t option;
+    }
+      (** The given proof's ending state should match the state being
           refuted. *)
   | Proof_invalid of string  (** The given proof is not valid. *)
 

@@ -3542,7 +3542,11 @@ module Sc_rollup : sig
           start_state_hash : State_hash.t option;
           start_proof : State_hash.t;
         }
-      | Proof_stop_state_hash_mismatch of {
+      | Proof_stop_state_hash_failed_to_refute of {
+          stop_state_hash : State_hash.t option;
+          stop_proof : State_hash.t option;
+        }
+      | Proof_stop_state_hash_failed_to_validate of {
           stop_state_hash : State_hash.t option;
           stop_proof : State_hash.t option;
         }
