@@ -111,36 +111,35 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
-let pp_proof fmt {proof; _} =
-  match Sc_rollup_inbox_repr.of_serialized_proof proof with
-  | None -> Format.pp_print_string fmt "<invalid-proof-serialization>"
-  | Some proof -> Sc_rollup_inbox_repr.pp_proof fmt proof
-
 let valid snapshot commit_level ~pvm_name proof =
   let open Lwt_tzresult_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
-  let (input_requested : Sc_rollup_PVM_sig.input_request) =
-    P.proof_input_requested P.proof
-  in
   let* input =
-    match (input_requested, proof.inbox) with
-    | No_input_required, None -> return None
-    | Initial, Some {proof = inbox_proof; _} ->
-        check_inbox_proof snapshot inbox_proof (Raw_level_repr.root, Z.zero)
-    | First_after (level, counter), Some {proof = inbox_proof; _} ->
-        check_inbox_proof snapshot inbox_proof (level, Z.succ counter)
-    | No_input_required, Some _ | Initial, None | First_after _, None ->
-        proof_error
-          (Format.asprintf
-             "input_requested is %a, inbox proof is %a"
-             Sc_rollup_PVM_sig.pp_input_request
-             input_requested
-             (Format.pp_print_option pp_proof)
-             proof.inbox)
+    match proof.inbox with
+    | None -> return None
+    | Some {level; message_counter; proof} ->
+        let+ input =
+          check_inbox_proof snapshot proof (level, Z.succ message_counter)
+        in
+        Option.bind input (cut_at_level commit_level)
   in
-  let input = Option.bind input (cut_at_level commit_level) in
-  let*! res = P.verify_proof input P.proof in
+  let* input_requested = P.verify_proof input P.proof in
+  let*! res =
+    match (proof.inbox, input_requested) with
+    | None, No_input_required -> return_unit
+    | Some {level; message_counter; proof = _}, Initial ->
+        check
+          (Raw_level_repr.(level = root) && Z.(equal message_counter zero))
+          "Inbox proof is not about the initial input request."
+    | Some {level; message_counter; proof = _}, First_after (l, n) ->
+        check
+          (Raw_level_repr.(level = l) && Z.(equal message_counter n))
+          "Level and index of inbox proof are not equal to the one expected in \
+           input request."
+    | Some _, No_input_required | None, Initial | None, First_after _ ->
+        proof_error "Inbox proof and input request are dissociated."
+  in
   return (Result.is_ok res, input)
 
 module type PVM_with_context_and_state = sig
@@ -170,27 +169,27 @@ let produce pvm_and_state commit_level =
   let*! (request : Sc_rollup_PVM_sig.input_request) =
     P.is_input_state P.state
   in
-  let* proof, input =
+  let* inbox_proof, input_given =
     match request with
     | No_input_required -> return (None, None)
     | Initial ->
         let level = Raw_level_repr.root in
         let message_counter = Z.zero in
-        let* proof, input =
+        let* inbox_proof, input =
           Inbox_with_history.(
             produce_proof context history inbox (level, message_counter))
         in
-        let proof = Inbox_with_history.to_serialized_proof proof in
+        let proof = Inbox_with_history.to_serialized_proof inbox_proof in
         return (Some {level; message_counter; proof}, input)
     | First_after (level, message_counter) ->
-        let* proof, input =
+        let* inbox_proof, input =
           Inbox_with_history.(
             produce_proof context history inbox (level, Z.succ message_counter))
         in
-        let proof = Inbox_with_history.to_serialized_proof proof in
+        let proof = Inbox_with_history.to_serialized_proof inbox_proof in
         return (Some {level; message_counter; proof}, input)
   in
-  let input_given = Option.bind input (cut_at_level commit_level) in
+  let input_given = Option.bind input_given (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
   let module P_with_proof = struct
     include P
@@ -198,5 +197,5 @@ let produce pvm_and_state commit_level =
     let proof = pvm_step_proof
   end in
   match Sc_rollups.wrap_proof (module P_with_proof) with
-  | Some pvm_step -> return {pvm_step; inbox = proof}
+  | Some pvm_step -> return {pvm_step; inbox = inbox_proof}
   | None -> proof_error "Could not wrap proof"
