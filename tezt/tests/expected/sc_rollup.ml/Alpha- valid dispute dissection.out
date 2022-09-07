@@ -22,7 +22,7 @@ This sequence of operations was run:
     Smart contract rollup origination:
       Kind: arith
       Parameter type: unit
-      Boot sector: ''
+      Boot sector Blake2B hash: '0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8'
       This smart contract rollup origination was successfully applied
       Consumed gas: 3110.449
       Storage size: 6655 bytes
