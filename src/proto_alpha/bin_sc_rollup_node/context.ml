@@ -175,6 +175,7 @@ end
 
 module Inbox = struct
   include Sc_rollup.Inbox
+  module Message = Sc_rollup.Inbox_message
 
   include Sc_rollup.Inbox.Make_hashing_scheme (struct
     include

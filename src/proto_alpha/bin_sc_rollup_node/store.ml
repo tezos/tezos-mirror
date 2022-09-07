@@ -293,10 +293,10 @@ module Messages = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Sc_rollup.Inbox.Message.t list
+  type value = Sc_rollup.Inbox_message.t list
 
   let value_encoding =
-    Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox.Message.encoding)
+    Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
 end)
 
 (** Inbox state for each block *)

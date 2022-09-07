@@ -40,14 +40,14 @@ let check_encode_decode_inbox_message message =
   let open Lwt_result_syntax in
   let open Sc_rollup_management_protocol in
   let*? bytes =
-    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.serialize message
+    Environment.wrap_tzresult @@ Sc_rollup.Inbox_message.serialize message
   in
   let*? message' =
     Environment.wrap_tzresult
     @@ Internal_for_tests.deserialize_inbox_message bytes
   in
   let*? bytes' =
-    Environment.wrap_tzresult @@ Sc_rollup.Inbox.Message.serialize message'
+    Environment.wrap_tzresult @@ Sc_rollup.Inbox_message.serialize message'
   in
   Assert.equal_string ~loc:__LOC__ (bytes :> string) (bytes' :> string)
 
@@ -144,10 +144,10 @@ let test_encode_decode_internal_inbox_message () =
 let test_encode_decode_external_inbox_message () =
   let open Lwt_result_syntax in
   let assert_prefix message =
-    let inbox_message = Sc_rollup.Inbox.Message.External message in
+    let inbox_message = Sc_rollup.Inbox_message.External message in
     let*? real_encoding =
       Environment.wrap_tzresult
-      @@ Sc_rollup.Inbox.Message.serialize inbox_message
+      @@ Sc_rollup.Inbox_message.serialize inbox_message
     in
     let real_encoding = (real_encoding :> string) in
     (* The prefix consists of a tag (0 for internal, 1 for external). *)
@@ -167,7 +167,7 @@ let test_encode_decode_external_inbox_message () =
   let* () = assert_prefix "0123456789" in
   let* () = assert_prefix (String.init 256 (Fun.const 'A')) in
   let assert_encoding_failure message =
-    let inbox_message = Sc_rollup.Inbox.Message.External message in
+    let inbox_message = Sc_rollup.Inbox_message.External message in
     let*! res = check_encode_decode_inbox_message inbox_message in
     assert_encoding_failure ~loc:__LOC__ res
   in

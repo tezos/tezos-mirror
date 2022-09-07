@@ -69,7 +69,7 @@ val make_internal_inbox_message :
   payload:'a ->
   sender:Contract_hash.t ->
   source:public_key_hash ->
-  (Sc_rollup.Inbox.Message.t * context) tzresult Lwt.t
+  (Sc_rollup.Inbox_message.t * context) tzresult Lwt.t
 
 (** [outbox_message_of_outbox_message_repr ctxt msg] returns a typed version of
     of the given outbox message [msg].
@@ -108,5 +108,5 @@ module Internal_for_tests : sig
   (** [deserialize_inbox_message bs] decodes an inbox message from the given data
       [bs]. *)
   val deserialize_inbox_message :
-    Sc_rollup.Inbox.Message.serialized -> Sc_rollup.Inbox.Message.t tzresult
+    Sc_rollup.Inbox_message.serialized -> Sc_rollup.Inbox_message.t tzresult
 end

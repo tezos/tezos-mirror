@@ -59,11 +59,11 @@ module Sc_rollup = struct
   include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
+  module Inbox_message = Sc_rollup_inbox_message_repr
 
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
-    module Message = Sc_rollup_inbox_message_repr
 
     module Internal_for_tests = struct
       include Sc_rollup_inbox_repr.Internal_for_tests

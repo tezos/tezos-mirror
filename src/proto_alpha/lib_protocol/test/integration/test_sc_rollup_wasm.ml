@@ -237,7 +237,7 @@ let should_boot_complete_boot_sector boot_sector () =
   return_unit
 
 let arbitrary_input i payload =
-  match Sc_rollup.Inbox.Message.serialize (External payload) with
+  match Sc_rollup.Inbox_message.serialize (External payload) with
   | Ok payload ->
       Sc_rollup.
         {
