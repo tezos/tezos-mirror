@@ -12,3 +12,6 @@ unified_coverage:
   script:
     # On the project default branch, we fetch coverage from the last merged MR
     - COVERAGE_START_COMMIT=$CI_COMMIT_SHA poetry run python3 scripts/ci/coverage.py
+  # This job will fail if coverage is not found, but that is not
+  # reason to stop the pipeline.
+  allow_failure: true
