@@ -56,7 +56,7 @@ let get_first_2_accounts_contracts (a1, a2) =
 
    - active stake = the amount of tez with which a delegate participates in
       consensus; it must be greater than [minimal_stake] and less or equal the staking
-      balance; it is computed in [Delegate_storage.select_distribution_for_cycle]
+      balance; it is computed in [Delegate_sampler.select_distribution_for_cycle]
 
    - frozen deposits = represents frozen_deposits_percentage of the maximum stake during
       preserved_cycles + max_slashing_period cycles; obtained with
@@ -534,7 +534,7 @@ let test_frozen_deposits_with_overdelegation () =
   Context.Delegate.full_balance (B b) account1
   >>=? fun expected_new_frozen_deposits ->
   (* the equality follows from the definition of active stake in
-     [Delegate.select_distribution_for_cycle]. *)
+     [Delegate_sampler.select_distribution_for_cycle]. *)
   assert (initial_frozen_deposits = expected_new_frozen_deposits) ;
   Context.Delegate.current_frozen_deposits (B b) account1
   >>=? fun new_frozen_deposits ->

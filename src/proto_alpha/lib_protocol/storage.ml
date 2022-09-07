@@ -1065,6 +1065,7 @@ module Stake = struct
       end)
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
+  module Total_active_stake = Cycle.Total_active_stake
 
   (* This is an index that is set to 0 by calls to
      {!val:Stake_storage.selected_new_distribution_at_cycle_end} and
@@ -1092,7 +1093,6 @@ module Stake = struct
       (Encoding.UInt16)
 end
 
-module Total_active_stake = Cycle.Total_active_stake
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
 
 (** Votes *)

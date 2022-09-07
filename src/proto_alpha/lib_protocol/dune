@@ -155,6 +155,10 @@
   Contract_storage
   Token
   Delegate_storage
+  Delegate_sampler
+  Delegate_missed_endorsements_storage
+  Delegate_slashed_deposits_storage
+  Delegate_cycles
   Bootstrap_storage
   Vote_storage
   Fees_storage
@@ -409,6 +413,11 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
   fees_storage.ml fees_storage.mli
@@ -643,6 +652,11 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
   fees_storage.ml fees_storage.mli
@@ -882,6 +896,11 @@
   contract_storage.ml contract_storage.mli
   token.ml token.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
   fees_storage.ml fees_storage.mli

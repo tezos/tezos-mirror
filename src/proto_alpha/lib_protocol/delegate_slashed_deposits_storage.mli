@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 G.B. Fefe, <gb.fefe@protonmail.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +25,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module deals with delegates' activity. Typically, the provided
-   functions can be used to deactivate a delegate that has not shown activity
-   for a certain number of cycles, and to reactivate it when appropriate.
+(** This module maintains the storage related to slashing of delegates for
+   double signing. In particular, it is responsible for maintaining the
+   {!Storage.Slashed_deposits} table.  *)
 
-    This module is responsible for maintaining the following tables:
-    - {!Storage.Contract.Inactive_delegate}
-    - {!Storage.Contract.Delegate_last_cycle_before_deactivation} *)
-
-val is_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
-(** [last_cycle_before_deactivation ctxt delegate] is the cycle at which
-    the delegate is scheduled to become inactive. *)
-val last_cycle_before_deactivation :
-  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
-
-(** [set_inactive context delegate] adds [delegate] to the set of inactive
- * contracts. *)
-val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
-
-(** [set_active ctxt delegate] returns a pair [(new_ctxt, is_inactive)] where:
-    - [new_ctxt] is a new context, updated from [ctxt], where the [delegate]'s
-    last active cycle has been updated
-    - [is_inactive] represents the state of [delegate], prior to the update.
-  *)
-val set_active :
+(** Returns true if the given delegate has already been slashed
+    for double baking for the given level. *)
+val already_slashed_for_double_baking :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
-  (Raw_context.t * bool) tzresult Lwt.t
+  Level_repr.t ->
+  bool tzresult Lwt.t
+
+(** Returns true if the given delegate has already been slashed
+    for double preendorsing or double endorsing for the given level. *)
+val already_slashed_for_double_endorsing :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
+  bool tzresult Lwt.t
+
+(** Burn some frozen deposit for a delegate at a given level and
+    record in the context that the given delegate has now been slashed
+    for double endorsing for the given level.
+
+    Returns the burned amount.
+
+    Fails with [Unrequired_denunciation] if the given delegate has
+    already been slashed for double endorsing for the given level.  *)
+val punish_double_endorsing :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
+  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+(** Burn some frozen deposit for a delegate at a given level and
+    record in the context that the given delegate has now been slashed
+    for double baking for the given level.
+
+    Returns the burned amount.
+
+    Fails with [Unrequired_denunciation] if the given delegate has
+    already been slashed for double baking for the given level.  *)
+val punish_double_baking :
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Level_repr.t ->
+  (Raw_context.t * Tez_repr.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+val clear_outdated_slashed_deposits :
+  Raw_context.t -> new_cycle:Cycle_repr.t -> Raw_context.t Lwt.t

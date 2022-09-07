@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 G.B. Fefe, <gb.fefe@protonmail.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +25,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module deals with delegates' activity. Typically, the provided
-   functions can be used to deactivate a delegate that has not shown activity
-   for a certain number of cycles, and to reactivate it when appropriate.
+(** Per-cycle management of delegates. *)
 
-    This module is responsible for maintaining the following tables:
-    - {!Storage.Contract.Inactive_delegate}
-    - {!Storage.Contract.Delegate_last_cycle_before_deactivation} *)
-
-val is_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
-(** [last_cycle_before_deactivation ctxt delegate] is the cycle at which
-    the delegate is scheduled to become inactive. *)
-val last_cycle_before_deactivation :
-  Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
-
-(** [set_inactive context delegate] adds [delegate] to the set of inactive
- * contracts. *)
-val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
-
-(** [set_active ctxt delegate] returns a pair [(new_ctxt, is_inactive)] where:
-    - [new_ctxt] is a new context, updated from [ctxt], where the [delegate]'s
-    last active cycle has been updated
-    - [is_inactive] represents the state of [delegate], prior to the update.
-  *)
-val set_active :
+(** Trigger the context maintenance at the end of cycle 'n', i.e.:
+    unfreeze the endorsing rewards, potentially deactivate delegates.
+    Return the corresponding balances updates and the list of
+    deactivated delegates. *)
+val cycle_end :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  (Raw_context.t * bool) tzresult Lwt.t
+  Cycle_repr.t ->
+  Storage.Seed.unrevealed_nonce list ->
+  (Raw_context.t
+  * Receipt_repr.balance_updates
+  * Signature.Public_key_hash.t list)
+  tzresult
+  Lwt.t
+
+(** [init_first_cycles ctxt ~origin] computes and records the distribution of
+    the total active stake among active delegates. This concerns the total
+    active stake involved in the calculation of baking rights for all cycles
+    in the range [0, preserved_cycles]. It also freezes the deposits for all
+    the active delegates. *)
+val init_first_cycles :
+  Raw_context.t ->
+  origin:Receipt_repr.update_origin ->
+  (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t

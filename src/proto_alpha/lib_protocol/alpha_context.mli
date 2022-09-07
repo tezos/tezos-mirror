@@ -2514,7 +2514,9 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
-(** This module re-exports definitions from {!Delegate_storage}. *)
+(** This module re-exports definitions from {!Delegate_storage},
+   {!Delegate_missed_endorsements_storage},
+   {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
 module Delegate : sig
   val init :
     context ->
@@ -2543,8 +2545,6 @@ module Delegate : sig
 
   val list : context -> public_key_hash list Lwt.t
 
-  val check_delegate : context -> public_key_hash -> unit tzresult Lwt.t
-
   type participation_info = {
     expected_cycle_activity : int;
     minimal_cycle_activity : int;
@@ -2554,7 +2554,7 @@ module Delegate : sig
     expected_endorsing_rewards : Tez.t;
   }
 
-  val delegate_participation_info :
+  val participation_info :
     context -> public_key_hash -> participation_info tzresult Lwt.t
 
   val cycle_end :
@@ -4510,13 +4510,6 @@ module Stake_distribution : sig
     Level.t ->
     Slot.t ->
     (context * (public_key * public_key_hash)) tzresult Lwt.t
-
-  (** See {!Delegate.pubkey}. *)
-  val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
-
-  (** See {!Delegate.staking_balance}. *)
-  val get_staking_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,

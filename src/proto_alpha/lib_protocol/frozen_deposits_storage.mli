@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Simple abstraction from low-level storage to handle frozen deposits *)
+(** Simple abstraction from low-level storage to handle frozen deposits.
+
+    This module is responsible for maintaining the
+    {!Storage.Contract.Frozen_deposits} table. *)
 
 (** [init ctxt delegate] returns a new context from [ctxt] where the frozen
    deposits of the implicit contract represented by [delegate] have been initialized to

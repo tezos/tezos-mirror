@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module deals with the delegates of a contract. It is
+   responsible for maintaining the tables {!Storage.Contract.Delegate}
+   and {!Storage.Contract.Delegated}. *)
+
 (** [find ctxt contract] returns the delegate associated to [contract], or [None]
     if [contract] has no delegate. *)
 val find :

@@ -384,15 +384,15 @@ module Stake : sig
       with type key = Cycle_repr.t
        and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
        and type t := Raw_context.t
-end
 
-(** Sum of the active stakes of all the delegates with
-   {!Constants_parametric_repr.minimal_stake} *)
-module Total_active_stake :
-  Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = Tez_repr.t
-     and type t := Raw_context.t
+  (** Sum of the active stakes of all the delegates with
+      {!Constants_parametric_repr.minimal_stake} *)
+  module Total_active_stake :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
+       and type t := Raw_context.t
+end
 
 (** State of the sampler used to select delegates. Managed synchronously
     with [Stake.Selected_distribution_for_cycle]. *)

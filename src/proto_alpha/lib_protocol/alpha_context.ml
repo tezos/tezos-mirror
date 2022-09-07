@@ -466,6 +466,9 @@ module Receipt = Receipt_repr
 
 module Delegate = struct
   include Delegate_storage
+  include Delegate_missed_endorsements_storage
+  include Delegate_slashed_deposits_storage
+  include Delegate_cycles
 
   type deposits = Storage.deposits = {
     initial_amount : Tez.t;
@@ -487,15 +490,11 @@ end
 module Stake_distribution = struct
   let snapshot = Stake_storage.snapshot
 
-  let compute_snapshot_index = Delegate_storage.compute_snapshot_index
+  let compute_snapshot_index = Delegate_sampler.compute_snapshot_index
 
-  let baking_rights_owner = Delegate.baking_rights_owner
+  let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
-  let slot_owner = Delegate.slot_owner
-
-  let delegate_pubkey = Delegate.pubkey
-
-  let get_staking_balance = Delegate.staking_balance
+  let slot_owner = Delegate_sampler.slot_owner
 end
 
 module Nonce = Nonce_storage

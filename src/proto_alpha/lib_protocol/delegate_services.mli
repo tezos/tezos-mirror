@@ -31,6 +31,8 @@
 
 open Alpha_context
 
+type error += (* `Temporary *) Not_registered of Signature.Public_key_hash.t
+
 val list :
   'a #RPC_context.simple ->
   'a ->

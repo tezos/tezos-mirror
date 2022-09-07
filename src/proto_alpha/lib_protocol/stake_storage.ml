@@ -129,14 +129,14 @@ let max_snapshot_index = Storage.Stake.Last_snapshot.get
 let set_selected_distribution_for_cycle ctxt cycle stakes total_stake =
   let stakes = List.sort (fun (_, x) (_, y) -> Tez_repr.compare y x) stakes in
   Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
-  Storage.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
+  Storage.Stake.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   (* cleanup snapshots *)
   Storage.Stake.Staking_balance.Snapshot.clear ctxt >>= fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.Snapshot.clear ctxt
   >>= fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
 let clear_cycle ctxt cycle =
-  Storage.Total_active_stake.remove_existing ctxt cycle >>=? fun ctxt ->
+  Storage.Stake.Total_active_stake.remove_existing ctxt cycle >>=? fun ctxt ->
   Selected_distribution_for_cycle.remove_existing ctxt cycle
 
 let fold ctxt ~f ~order init =
@@ -193,7 +193,7 @@ let prepare_stake_distribution ctxt =
        ctxt
        stake_distribution)
 
-let get_total_active_stake = Storage.Total_active_stake.get
+let get_total_active_stake = Storage.Stake.Total_active_stake.get
 
 let remove_contract_stake ctxt contract amount =
   Contract_delegate_storage.find ctxt contract >>=? function
