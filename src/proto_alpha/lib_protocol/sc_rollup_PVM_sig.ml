@@ -313,9 +313,13 @@ module type S = sig
       execution of an atomic step of the rollup at state [s0]. *)
   val eval : state -> state Lwt.t
 
-  (** [verify_proof p] checks the proof [p]. See the doc-string for the [proof]
-      type. *)
-  val verify_proof : input option -> proof -> bool Lwt.t
+  (** [verify_proof input p] checks the proof [p] with input [input] and returns
+      the [input_request] before the evaluation of the proof. See the doc-string
+      for the [proof] type.
+
+      [verify_proof input p] fails when the proof is invalid in regards to the
+      given input. *)
+  val verify_proof : input option -> proof -> input_request tzresult Lwt.t
 
   (** [produce_proof ctxt input_given state] should return a [proof] for
       the PVM step starting from [state], if possible. This may fail for

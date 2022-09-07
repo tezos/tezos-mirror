@@ -1165,15 +1165,16 @@ module Make (Context : P) :
     in
     return (state, request)
 
+  type error += Arith_proof_verification_failed
+
   let verify_proof input_given proof =
-    let open Lwt_syntax in
-    let* result =
+    let open Lwt_tzresult_syntax in
+    let*! result =
       Context.verify_proof proof.tree_proof (step_transition input_given)
     in
     match result with
-    | None -> return false
-    | Some (_, request) ->
-        return (PS.input_request_equal request proof.requested)
+    | None -> fail Arith_proof_verification_failed
+    | Some (_, request) -> return request
 
   let produce_proof context input_given state =
     let open Lwt_tzresult_syntax in

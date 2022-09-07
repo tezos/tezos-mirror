@@ -140,8 +140,8 @@ let valid snapshot commit_level ~pvm_name proof =
              proof.inbox)
   in
   let input = Option.bind input (cut_at_level commit_level) in
-  let*! valid = P.verify_proof input P.proof in
-  return (valid, input)
+  let*! res = P.verify_proof input P.proof in
+  return (Result.is_ok res, input)
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S

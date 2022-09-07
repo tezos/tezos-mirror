@@ -316,15 +316,16 @@ module V2_0_0 = struct
       in
       return (state, request)
 
+    type error += WASM_proof_verification_failed
+
     let verify_proof input_given proof =
-      let open Lwt_syntax in
-      let* result =
+      let open Lwt_tzresult_syntax in
+      let*! result =
         Context.verify_proof proof.tree_proof (step_transition input_given)
       in
       match result with
-      | None -> return false
-      | Some (_, request) ->
-          return (PS.input_request_equal request proof.requested)
+      | None -> fail WASM_proof_verification_failed
+      | Some (_state, request) -> return request
 
     type error += WASM_proof_production_failed
 

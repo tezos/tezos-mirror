@@ -3204,7 +3204,7 @@ module Sc_rollup : sig
 
       val eval : state -> state Lwt.t
 
-      val verify_proof : input option -> proof -> bool Lwt.t
+      val verify_proof : input option -> proof -> input_request tzresult Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t
