@@ -345,7 +345,6 @@ variables:
   retry: 2
   script:
     - opam remote add dev-repo ./_opam-repo-for-release
-    - opam depext --yes ${package}.dev
     - opam install --yes ${package}.dev
     - opam reinstall --yes --with-test ${package}.dev
   needs: [opam:prepare]
