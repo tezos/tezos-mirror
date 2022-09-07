@@ -171,14 +171,7 @@ module V1 = struct
   let pp_dissection ppf d =
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";\n")
-      (fun ppf {state_hash; tick} ->
-        Format.fprintf
-          ppf
-          "%a: %a"
-          Sc_rollup_tick_repr.pp
-          tick
-          pp_state_hash
-          state_hash)
+      pp_dissection_chunk
       ppf
       d
 
