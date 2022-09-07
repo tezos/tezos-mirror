@@ -88,6 +88,7 @@ type options = {
   mutable files_to_run : string list;
   mutable tests_to_run : string list;
   mutable tests_not_to_run : string list;
+  mutable patterns_to_run : rex list;
   mutable tags_to_run : string list;
   mutable tags_not_to_run : string list;
   mutable list : [`Ascii_art | `Tsv] option;
