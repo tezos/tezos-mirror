@@ -236,6 +236,8 @@ let slot_availability ~signer availability client =
   List.iter (fun i -> endorsement.(i) <- true) availability ;
   Operation.Consensus.(inject ~signer (slot_availability ~endorsement) client)
 
+let header_of_slot_metadata {Sc_rollup_client.header; _} = header
+
 type status = Applied | Failed of {error_id : string}
 
 let pp fmt = function
@@ -509,6 +511,69 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
+let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
+    client =
+  (* Check that the rollup node stores the slots published in a block, along with slot headers:
+
+     1. Run rollup node for an originated rollup
+     2. Execute a client command to publish a slot header, bake one level
+     3. Repeat step two for a second slot header
+     4. Get the list of slot headers for the rollup node
+     5. Determine that the list contains the two slot headers published.
+  *)
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let cryptobox = Rollup.Dal.make parameters in
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+  Check.(level = init_level)
+    Check.int
+    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  let* _ =
+    publish_slot
+      ~source:Constant.bootstrap1
+      ~fee:1_200
+      ~index:0
+      ~message:"CAFEBABE"
+      parameters
+      cryptobox
+      node
+      client
+  in
+  let* _ =
+    publish_slot
+      ~source:Constant.bootstrap2
+      ~fee:1_200
+      ~index:1
+      ~message:"CAFEDEAD"
+      parameters
+      cryptobox
+      node
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* _level = Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1) in
+  let* slots_metadata =
+    Sc_rollup_client.dal_slots_metadata ~hooks sc_rollup_client
+  in
+  let slot_headers = slots_metadata |> List.map header_of_slot_metadata in
+  let expected_slot_headers =
+    List.map
+      (fun msg ->
+        Tezos_crypto_dal.Cryptobox.Commitment.to_b58check
+        @@ Rollup.Dal.Commitment.dummy_commitment parameters cryptobox msg)
+      ["CAFEBABE"; "CAFEDEAD"]
+  in
+  Check.(slot_headers = expected_slot_headers)
+    (Check.list Check.string)
+    ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
+  return ()
+
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
   test_dal_scenario
@@ -518,4 +583,9 @@ let register ~protocols =
     protocols ;
   test_slot_management_logic protocols ;
   test_dal_node_slot_management protocols ;
-  test_dal_node_startup protocols
+  test_dal_node_startup protocols ;
+  test_dal_scenario
+    ~dal_enable:true
+    "rollup_node_dal_headers_storage"
+    rollup_node_stores_dal_slots
+    protocols

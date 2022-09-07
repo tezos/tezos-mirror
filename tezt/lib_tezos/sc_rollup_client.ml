@@ -38,6 +38,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type slot_metadata = {level : int; header : string; index : int}
+
 let commitment_from_json json =
   if JSON.is_null json then None
   else
@@ -145,8 +147,22 @@ let last_published_commitment ?hooks sc_client =
 
 let dal_slot_subscriptions ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slots"] in
+  let+ json =
+    rpc_get ?hooks sc_client ["global"; "dal"; "slot_subscriptions"]
+  in
   JSON.as_list json |> List.map JSON.as_int
+
+let dal_slots_metadata ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slots"] in
+  JSON.(
+    as_list json
+    |> List.map (fun obj ->
+           {
+             level = obj |> get "level" |> as_int;
+             header = obj |> get "header" |> as_string;
+             index = obj |> get "index" |> as_int;
+           }))
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

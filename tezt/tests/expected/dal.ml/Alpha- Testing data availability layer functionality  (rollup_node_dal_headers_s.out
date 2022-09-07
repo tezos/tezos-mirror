@@ -37,11 +37,10 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /global/dal/slot_subscriptions
-[]
-
-./tezos-sc-rollup-client-alpha rpc get /global/dal/slot_subscriptions
-[ 0 ]
-
-./tezos-sc-rollup-client-alpha rpc get /global/dal/slot_subscriptions
-[ 0, 1 ]
+./tezos-sc-rollup-client-alpha rpc get /global/dal/slots
+[ { "level": 2, "index": 0,
+    "header":
+      "sh1xjHVBc36jYtzCoktBUq1RCin8bFEwXTZxpFoS1RA5MqqBsX5Z5A2CqU7QZZQUuqdKfSsvab" },
+  { "level": 2, "index": 1,
+    "header":
+      "sh27onybk3L4eVH8khVVk8oKZvMkjGi1YszeTLneRe5ps9LL4oqXxR12DKzTMS8tJa27w5imfP" } ]

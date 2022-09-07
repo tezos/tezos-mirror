@@ -26,6 +26,10 @@
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3471
    Use indexed file for append-only instead of Irmin. *)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3739
+   Refactor the store file to have functors in their own
+   separate module, and return errors within the Error monad. *)
+
 open Protocol
 open Alpha_context
 module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
@@ -63,8 +67,6 @@ module type Mutable_value = sig
 
   val path_key : path
 
-  val decode_value : bytes -> value Lwt.t
-
   val set : t -> value -> unit Lwt.t
 
   val get : t -> value Lwt.t
@@ -97,15 +99,17 @@ module Make_map (P : KeyValue) = struct
   let mem store key = IStore.mem store (make_key key)
 
   let decode_value encoded_value =
-    Lwt.return
-    @@ Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
+    Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
 
-  let get store key = IStore.get store (make_key key) >>= decode_value
+  let get store key =
+    let open Lwt_syntax in
+    let+ e = IStore.get store (make_key key) in
+    decode_value e
 
   let find store key =
-    let open Lwt_syntax in
-    let* value = IStore.find store (make_key key) in
-    Option.map_s decode_value value
+    let open Lwt_option_syntax in
+    let+ value = IStore.find store (make_key key) in
+    decode_value value
 
   let find_with_default store key ~on_default =
     let open Lwt_syntax in
@@ -163,8 +167,7 @@ struct
   let path_key = P.path
 
   let decode_value encoded_value =
-    Lwt.return
-    @@ Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
+    Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
 
   let set store value =
     let encoded_value =
@@ -173,12 +176,15 @@ struct
     let info () = info (String.concat "/" P.path) in
     IStore.set_exn ~info store path_key encoded_value
 
-  let get store = IStore.get store path_key >>= decode_value
+  let get store =
+    let open Lwt_syntax in
+    let+ value = IStore.get store path_key in
+    decode_value value
 
   let find store =
-    let open Lwt_syntax in
-    let* value = IStore.find store path_key in
-    Option.map_s decode_value value
+    let open Lwt_option_syntax in
+    let+ value = IStore.find store path_key in
+    decode_value value
 end
 
 (** Aggregated collection of messages from the L1 inbox *)
@@ -387,6 +393,9 @@ module Commitments_published_at_level = Make_updatable_map (struct
   let value_encoding = Raw_level.encoding
 end)
 
+(* Slot subscriptions per block hash, saved as a list of
+   `Dal.Slot_index.t`, which is a bounded integer between `0` and `255`
+   included. *)
 module Dal_slot_subscriptions = Make_append_only_map (struct
   let path = ["dal"; "slot_subscriptions"]
 
@@ -414,3 +423,85 @@ module Contexts = Make_append_only_map (struct
 
   let value_encoding = Context.hash_encoding
 end)
+
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+module Dal_slots = struct
+  module Dal_slots_map = Map.Make (struct
+    type t = Dal.Slot_index.t
+
+    let compare = Dal.Slot_index.compare
+  end)
+
+  include Make_updatable_map (struct
+    let keep_last_n_entries_in_memory = 10
+
+    let path = ["dal"; "slot_headers"]
+
+    type key = Block_hash.t
+
+    let string_of_key = Block_hash.to_b58check
+
+    type value = Dal.Slot.t Dal_slots_map.t
+
+    (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3732
+       Use data encodings for maps once they are available in the
+       `Data_encoding` library.
+    *)
+    let value_encoding =
+      Data_encoding.conv
+        (fun dal_slots_map -> Dal_slots_map.bindings dal_slots_map)
+        (fun dal_slots_bindings ->
+          Dal_slots_map.of_seq @@ List.to_seq dal_slots_bindings)
+        Data_encoding.(
+          list
+          @@ obj2
+               (req "slot_index" Dal.Slot_index.encoding)
+               (req "slot_metadata" Dal.Slot.encoding))
+  end)
+
+  let list_secondary_keys_with_values store ~primary_key =
+    let open Lwt_syntax in
+    let+ slots_map = find store primary_key in
+    Option.fold ~none:[] ~some:Dal_slots_map.bindings slots_map
+
+  let list_secondary_keys store ~primary_key =
+    let open Lwt_syntax in
+    let+ secondary_keys_with_values =
+      list_secondary_keys_with_values store ~primary_key
+    in
+    secondary_keys_with_values |> List.map fst
+
+  let list_values store ~primary_key =
+    let open Lwt_syntax in
+    let+ secondary_keys_with_values =
+      list_secondary_keys_with_values store ~primary_key
+    in
+    secondary_keys_with_values |> List.map snd
+
+  let add store ~primary_key ~secondary_key value =
+    let open Lwt_syntax in
+    let* slots_map = find store primary_key in
+    let slots_map = Option.value ~default:Dal_slots_map.empty slots_map in
+    let value_can_be_added =
+      match Dal_slots_map.find secondary_key slots_map with
+      | None -> true
+      | Some old_value ->
+          Data_encoding.Binary.(
+            Bytes.equal
+              (to_bytes_exn Dal.Slot.encoding old_value)
+              (to_bytes_exn Dal.Slot.encoding value))
+    in
+    if value_can_be_added then
+      let new_slots_map = Dal_slots_map.add secondary_key value slots_map in
+      add store primary_key new_slots_map
+    else
+      Stdlib.failwith
+        (Printf.sprintf
+           "A binding for slot index %d under block_hash %s already exists \
+            with a different value"
+           (Dal.Slot_index.to_int secondary_key)
+           (Block_hash.to_b58check primary_key))
+end

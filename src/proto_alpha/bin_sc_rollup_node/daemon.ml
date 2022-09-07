@@ -70,7 +70,7 @@ module Make (PVM : Pvm.S) = struct
       for the first time. {b Note}: this function does not process inboxes for
       the rollup, which is done instead by {!Inbox.process_head}. *)
   let process_included_l1_operation (type kind) (node_ctxt : Node_context.t)
-      ~source:_ (operation : kind manager_operation)
+      head ~source:_ (operation : kind manager_operation)
       (result : kind successful_manager_operation_result) =
     let open Lwt_syntax in
     match (operation, result) with
@@ -91,18 +91,31 @@ module Make (PVM : Pvm.S) = struct
           Store.Last_cemented_commitment_level.set node_ctxt.store inbox_level
         in
         Store.Last_cemented_commitment_hash.set node_ctxt.store commitment
+    | Dal_publish_slot_header {slot}, Dal_publish_slot_header_result _ ->
+        let {Dal.Slot.index; _} = slot in
+        (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3510
+           We store slot headers for all slots. In practice,
+           it would be convenient to store only information about
+           headers of slots to which the rollup node is subscribed to.
+           We do not have the information about DAL slots subscribed to
+           at this time. *)
+        Store.Dal_slots.add
+          node_ctxt.store
+          ~primary_key:head
+          ~secondary_key:index
+          slot
     | _, _ ->
         (* Other manager operations *)
         return_unit
 
   (** Process an L1 SCORU operation (for the node's rollup) which is finalized
       for the first time. *)
-  let process_finalized_l1_operation (type kind) _node_ctxt ~source:_
+  let process_finalized_l1_operation (type kind) _node_ctxt _head ~source:_
       (_operation : kind manager_operation)
       (_result : kind successful_manager_operation_result) =
     Lwt.return_unit
 
-  let process_l1_operation (type kind) ~finalized node_ctxt ~source
+  let process_l1_operation (type kind) ~finalized node_ctxt head ~source
       (operation : kind manager_operation)
       (result : kind Apply_results.manager_operation_result) =
     let open Lwt_syntax in
@@ -116,14 +129,14 @@ module Make (PVM : Pvm.S) = struct
       | Sc_rollup_recover_bond {sc_rollup = rollup}
       | Sc_rollup_dal_slot_subscribe {rollup; _} ->
           Sc_rollup.Address.(rollup = node_ctxt.Node_context.rollup_address)
+      | Dal_publish_slot_header _ -> true
       | Reveal _ | Transaction _ | Origination _ | Delegation _
       | Register_global_constant _ | Set_deposits_limit _
       | Increase_paid_storage _ | Tx_rollup_origination
       | Tx_rollup_submit_batch _ | Tx_rollup_commit _ | Tx_rollup_return_bond _
       | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
       | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
-      | Dal_publish_slot_header _ | Sc_rollup_originate _
-      | Zk_rollup_origination _ ->
+      | Sc_rollup_originate _ | Zk_rollup_origination _ ->
           false
     in
     if not (is_for_my_rollup operation) then return_unit
@@ -136,7 +149,7 @@ module Make (PVM : Pvm.S) = struct
             if finalized then process_finalized_l1_operation
             else process_included_l1_operation
           in
-          process node_ctxt ~source operation success_result
+          process node_ctxt head ~source operation success_result
       | _ ->
           (* No action for non successful operations  *)
           return_unit
@@ -148,7 +161,7 @@ module Make (PVM : Pvm.S) = struct
         result =
       let open Lwt_syntax in
       let* () = accu in
-      process_l1_operation ~finalized node_ctxt ~source operation result
+      process_l1_operation ~finalized node_ctxt hash ~source operation result
     in
     let apply_internal (type kind) accu ~source:_
         (_operation : kind Apply_internal_results.internal_operation)
