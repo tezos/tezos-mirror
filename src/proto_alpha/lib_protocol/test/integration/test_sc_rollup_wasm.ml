@@ -113,9 +113,18 @@ module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2198
    SCORU system should expose a constant upper bound for proof size.
-   One suggestion for this constant is 16KB - so is used here.
+   One suggestion for this constant is 16KB. Unfortunately, the proof
+   that are generated in “realistic” scenarios are still too big.
+
+   If #2198 is addressed, and a constant is added to the protocol to
+   limit the maximum size of a valid SCORU proof, then the value here
+   should reflect that.
+
+   The size set here is the minimum size that makes the current tests
+   pass. It should be updated to [16 * 1024] once the small ticks
+   milestone is completed.
 *)
-let proof_size_limit = 1024 * 1024 * 16
+let proof_size_limit = 28_116
 
 let check_proof_size ~loc context input_opt s =
   let open Lwt_result_syntax in
