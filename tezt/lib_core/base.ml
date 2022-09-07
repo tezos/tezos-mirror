@@ -29,7 +29,6 @@
    do not need a human-readable version. *)
 let () =
   Printexc.register_printer @@ function
-  | Unix.Unix_error (error, _, _) -> Some (Unix.error_message error)
   | Failure error -> Some error
   | Sys_error error -> Some error
   | _ -> None

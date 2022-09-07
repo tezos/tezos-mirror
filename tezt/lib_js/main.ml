@@ -41,7 +41,14 @@ module Scheduler : Test.SCHEDULER = struct
     | Some test ->
         let clean_up () = unit in
         let* test_result =
-          Test.run_one ~sleep:Js_of_ocaml_lwt.Lwt_js.sleep ~clean_up test
+          Test.run_one
+            ~sleep:Js_of_ocaml_lwt.Lwt_js.sleep
+            ~clean_up
+            ~temp_start:(fun () ->
+              "(temporary files are not implemented for JS)")
+            ~temp_stop:(fun () -> ())
+            ~temp_clean_up:(fun () -> ())
+            test
         in
         return (Test_result test_result)
 

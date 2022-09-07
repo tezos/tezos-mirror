@@ -147,7 +147,7 @@ type test = {
 
 type t = test
 
-let really_run ~sleep ~clean_up test =
+let really_run ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   test.result <- None ;
@@ -180,7 +180,7 @@ let really_run ~sleep ~clean_up test =
   in
   Background.start handle_background_exception ;
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
-  let main_temporary_directory = Temp.start () in
+  let main_temporary_directory = temp_start () in
   let* () =
     let run_test () =
       let* () = test.body () in
@@ -242,17 +242,17 @@ let really_run ~sleep ~clean_up test =
     try
       match Cli.options.temporary_file_mode with
       | Delete ->
-          Temp.clean_up () ;
+          temp_clean_up () ;
           false
       | Delete_if_successful ->
           if test.result = Some Successful then (
-            Temp.clean_up () ;
+            temp_clean_up () ;
             false)
           else (
-            Temp.stop () ;
+            temp_stop () ;
             true)
       | Keep ->
-          Temp.stop () ;
+          temp_stop () ;
           true
     with exn ->
       Log.warn "Failed to clean up: %s" (Printexc.to_string exn) ;
@@ -275,8 +275,11 @@ let really_run ~sleep ~clean_up test =
   in
   return test_result
 
-let rec really_run_with_retry ~sleep ~clean_up remaining_retry_count test =
-  let* test_result = really_run ~sleep ~clean_up test in
+let rec really_run_with_retry ~sleep ~clean_up ~temp_start ~temp_stop
+    ~temp_clean_up remaining_retry_count test =
+  let* test_result =
+    really_run ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test
+  in
   match test_result with
   | Failed _ when remaining_retry_count > 0 ->
       Log.warn
@@ -284,11 +287,25 @@ let rec really_run_with_retry ~sleep ~clean_up remaining_retry_count test =
         remaining_retry_count
         test.title ;
       test.session_retries <- test.session_retries + 1 ;
-      really_run_with_retry ~sleep ~clean_up (remaining_retry_count - 1) test
+      really_run_with_retry
+        ~sleep
+        ~clean_up
+        ~temp_start
+        ~temp_stop
+        ~temp_clean_up
+        (remaining_retry_count - 1)
+        test
   | x -> return x
 
-let run_one ~sleep ~clean_up test =
-  really_run_with_retry ~sleep ~clean_up Cli.options.retry test
+let run_one ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test =
+  really_run_with_retry
+    ~sleep
+    ~clean_up
+    ~temp_start
+    ~temp_stop
+    ~temp_clean_up
+    Cli.options.retry
+    test
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run

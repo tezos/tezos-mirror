@@ -26,7 +26,11 @@
 (** Tezt (for JavaScript). *)
 
 (** This library is the same as {!Tezt} but for JavaScript.
-    Contrary to {!Tezt}, it does not provide the [Process] module. *)
+    Contrary to {!Tezt}, it does not provide:
+    - the [Process] module;
+    - the [Temp] module;
+    - the [Regression] module;
+    - the [Runner] module. *)
 
 module Background = Background
 module Base = Base
@@ -36,9 +40,6 @@ module Diff = Diff
 module JSON = JSON
 module Log = Log
 module Process_hooks = Process_hooks
-module Regression = Regression
-module Runner = Runner
-module Temp = Temp
 
 module Test = struct
   include Test

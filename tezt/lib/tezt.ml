@@ -85,9 +85,13 @@
     In other words, to actually run the tests you have to decide whether
     to use the JavaScript backend or not.
 
-    The only difference between [tezt] and [tezt.js] is that [tezt.js] does
-    not provide the [Process] module. So the JavaScript backend is not well
-    suited for integration tests. But it does support unit tests and regression tests.
+    The difference between [tezt] and [tezt.js] is that [tezt.js] does not provide:
+    - the [Process] module;
+    - the [Temp] module;
+    - the [Regression] module;
+    - the [Runner] module.
+    So the JavaScript backend is not well suited for integration tests and regression tests.
+    But it does support unit tests.
 
     If you want to run your tests on multiple backends you have to write
     two executables: one linked with [tezt] and one linked with [tezt.js].

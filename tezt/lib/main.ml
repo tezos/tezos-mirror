@@ -25,6 +25,13 @@
 
 open Base
 
+(* [Unix.error_message] is not available in JS, so we register the printer here
+   instead of in [Base]. *)
+let () =
+  Printexc.register_printer @@ function
+  | Unix.Unix_error (error, _, _) -> Some (Unix.error_message error)
+  | _ -> None
+
 module Scheduler : Test.SCHEDULER = struct
   type request = Run_test of {test_title : string}
 
@@ -82,7 +89,14 @@ module Scheduler : Test.SCHEDULER = struct
           unit
         in
         let test_result =
-          Lwt_main.run @@ Test.run_one ~sleep:Lwt_unix.sleep ~clean_up test
+          Lwt_main.run
+          @@ Test.run_one
+               ~sleep:Lwt_unix.sleep
+               ~clean_up
+               ~temp_start:Temp.start
+               ~temp_stop:Temp.stop
+               ~temp_clean_up:Temp.clean_up
+               test
         in
         Test_result test_result
 

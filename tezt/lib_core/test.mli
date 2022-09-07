@@ -152,5 +152,8 @@ val get_test_by_title : string -> t option
 val run_one :
   sleep:(float -> unit Lwt.t) ->
   clean_up:(unit -> unit Lwt.t) ->
+  temp_start:(unit -> string) ->
+  temp_stop:(unit -> unit) ->
+  temp_clean_up:(unit -> unit) ->
   t ->
   Log.test_result Lwt.t
