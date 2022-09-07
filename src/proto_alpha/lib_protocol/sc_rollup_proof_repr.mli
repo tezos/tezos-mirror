@@ -45,6 +45,12 @@
 
 open Sc_rollup_repr
 
+type inbox_proof = {
+  level : Raw_level_repr.t;
+  message_counter : Z.t;
+  proof : Sc_rollup_inbox_repr.serialized_proof;
+}
+
 (** A PVM proof [pvm_step] is combined with an [inbox] proof to provide
     the proof necessary to validate a single step in the refutation
     game.
@@ -57,10 +63,7 @@ open Sc_rollup_repr
     In the case that input is involved, [inbox] is a proof of the next
     message available from the inbox after a given location; this must
     match up with [pvm_step] to give a valid refutation proof. *)
-type t = {
-  pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.serialized_proof option;
-}
+type t = {pvm_step : Sc_rollups.wrapped_proof; inbox : inbox_proof option}
 
 type error += Sc_rollup_proof_check of string
 

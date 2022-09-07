@@ -3438,7 +3438,13 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type t = {pvm_step : wrapped_proof; inbox : Inbox.serialized_proof option}
+    type inbox_proof = {
+      level : Raw_level.t;
+      message_counter : Z.t;
+      proof : Inbox.serialized_proof;
+    }
+
+    type t = {pvm_step : wrapped_proof; inbox : inbox_proof option}
 
     module type PVM_with_context_and_state = sig
       include PVM.S

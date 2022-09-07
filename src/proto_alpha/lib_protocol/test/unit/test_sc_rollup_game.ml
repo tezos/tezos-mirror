@@ -145,9 +145,9 @@ let two_stakers_in_conflict () =
   return (ctxt, rollup, refuter, defender)
 
 (** A dissection is 'poorly distributed' if its tick counts are not
-    very evenly spread through the total tick-duration. Formally, the
-    maximum tick-distance between two consecutive states in a dissection
-    may not be more than half of the total tick-duration. *)
+very evenly spread through the total tick-duration. Formally, the
+maximum tick-distance between two consecutive states in a dissection
+may not be more than half of the total tick-duration. *)
 let test_poorly_distributed_dissection () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in
   let start_hash = hash_string "foo" in
@@ -309,7 +309,7 @@ let test_staker_injectivity () =
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 (** Test that sending a invalid serialized inbox proof to
-    {Sc_rollup_proof_repr.valid} is rejected. *)
+{Sc_rollup_proof_repr.valid} is rejected. *)
 let test_invalid_serialized_inbox_proof () =
   let open Lwt_result_syntax in
   let open Alpha_context in
@@ -336,7 +336,11 @@ let test_invalid_serialized_inbox_proof () =
   in
 
   (* We create an obviously invalid inbox *)
-  let inbox = Bytes.of_string "I am the big bad wolf" |> Obj.magic in
+  let inbox_proof = Bytes.of_string "I am the big bad wolf" |> Obj.magic in
+  let inbox =
+    Sc_rollup.Proof.
+      {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
+  in
   let proof = Sc_rollup.Proof.{pvm_step = wrapped_proof; inbox = Some inbox} in
 
   let*! res =

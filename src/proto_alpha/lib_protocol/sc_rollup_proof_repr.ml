@@ -49,10 +49,23 @@ let () =
     (function Sc_rollup_invalid_serialized_inbox_proof -> Some () | _ -> None)
     (fun () -> Sc_rollup_invalid_serialized_inbox_proof)
 
-type t = {
-  pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.serialized_proof option;
+type inbox_proof = {
+  level : Raw_level_repr.t;
+  message_counter : Z.t;
+  proof : Sc_rollup_inbox_repr.serialized_proof;
 }
+
+let inbox_proof_encoding =
+  let open Data_encoding in
+  conv
+    (fun {level; message_counter; proof} -> (level, message_counter, proof))
+    (fun (level, message_counter, proof) -> {level; message_counter; proof})
+    (obj3
+       (req "level" Raw_level_repr.encoding)
+       (req "message_counter" Data_encoding.n)
+       (req "proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
+
+type t = {pvm_step : Sc_rollups.wrapped_proof; inbox : inbox_proof option}
 
 let encoding =
   let open Data_encoding in
@@ -61,7 +74,7 @@ let encoding =
     (fun (pvm_step, inbox) -> {pvm_step; inbox})
     (obj2
        (req "pvm_step" Sc_rollups.wrapped_proof_encoding)
-       (opt "inbox" Sc_rollup_inbox_repr.serialized_proof_encoding))
+       (opt "inbox" inbox_proof_encoding))
 
 let pp ppf _ = Format.fprintf ppf "Refutation game proof"
 
@@ -98,8 +111,8 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
-let pp_proof fmt serialized_inbox_proof =
-  match Sc_rollup_inbox_repr.of_serialized_proof serialized_inbox_proof with
+let pp_proof fmt {proof; _} =
+  match Sc_rollup_inbox_repr.of_serialized_proof proof with
   | None -> Format.pp_print_string fmt "<invalid-proof-serialization>"
   | Some proof -> Sc_rollup_inbox_repr.pp_proof fmt proof
 
@@ -113,9 +126,9 @@ let valid snapshot commit_level ~pvm_name proof =
   let* input =
     match (input_requested, proof.inbox) with
     | No_input_required, None -> return None
-    | Initial, Some inbox_proof ->
+    | Initial, Some {proof = inbox_proof; _} ->
         check_inbox_proof snapshot inbox_proof (Raw_level_repr.root, Z.zero)
-    | First_after (level, counter), Some inbox_proof ->
+    | First_after (level, counter), Some {proof = inbox_proof; _} ->
         check_inbox_proof snapshot inbox_proof (level, Z.succ counter)
     | No_input_required, Some _ | Initial, None | First_after _, None ->
         proof_error
@@ -161,16 +174,21 @@ let produce pvm_and_state commit_level =
     match request with
     | No_input_required -> return (None, None)
     | Initial ->
+        let level = Raw_level_repr.root in
+        let message_counter = Z.zero in
         let* proof, input =
           Inbox_with_history.(
-            produce_proof context history inbox (Raw_level_repr.root, Z.zero))
+            produce_proof context history inbox (level, message_counter))
         in
-        return (Some proof, input)
-    | First_after (l, n) ->
+        let proof = Inbox_with_history.to_serialized_proof proof in
+        return (Some {level; message_counter; proof}, input)
+    | First_after (level, message_counter) ->
         let* proof, input =
-          Inbox_with_history.(produce_proof context history inbox (l, Z.succ n))
+          Inbox_with_history.(
+            produce_proof context history inbox (level, Z.succ message_counter))
         in
-        return (Some proof, input)
+        let proof = Inbox_with_history.to_serialized_proof proof in
+        return (Some {level; message_counter; proof}, input)
   in
   let input_given = Option.bind input (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
@@ -179,7 +197,6 @@ let produce pvm_and_state commit_level =
 
     let proof = pvm_step_proof
   end in
-  let inbox = Option.map Inbox_with_history.to_serialized_proof proof in
   match Sc_rollups.wrap_proof (module P_with_proof) with
-  | Some pvm_step -> return {pvm_step; inbox}
+  | Some pvm_step -> return {pvm_step; inbox = proof}
   | None -> proof_error "Could not wrap proof"
