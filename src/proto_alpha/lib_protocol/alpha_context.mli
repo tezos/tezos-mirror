@@ -3017,7 +3017,7 @@ module Sc_rollup : sig
         (tree * t) tzresult Lwt.t
 
       val get_message_payload :
-        tree -> Z.t -> Sc_rollup_inbox_message_repr.serialized option Lwt.t
+        tree -> Z.t -> Inbox_message.serialized option Lwt.t
 
       val form_history_proof :
         inbox_context ->
