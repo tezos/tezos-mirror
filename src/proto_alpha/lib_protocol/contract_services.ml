@@ -401,7 +401,7 @@ let register () =
           | false -> return_some None
           | true ->
               Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key))) ;
-  register_opt_field ~chunked:false S.delegate Delegate.find ;
+  register_opt_field ~chunked:false S.delegate Contract.Delegate.find ;
   opt_register1 ~chunked:false S.counter (fun ctxt contract () () ->
       match contract with
       | Originated _ -> return_none
@@ -555,7 +555,7 @@ let register () =
     S.info
     (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
-      Delegate.find ctxt contract >>=? fun delegate ->
+      Contract.Delegate.find ctxt contract >>=? fun delegate ->
       match contract with
       | Implicit manager ->
           Contract.get_counter ctxt manager >|=? fun counter ->

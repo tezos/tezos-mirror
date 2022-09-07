@@ -516,13 +516,13 @@ let build_test_cases () =
   (* Configure baker1, and baker2 as delegates by self-delegation, for which
      revealing their manager key is a prerequisite. *)
   wrap (Contract.reveal_manager_key ctxt baker1 baker1_pk) >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.Implicit baker1) (Some baker1))
+  wrap (Contract.Delegate.set ctxt (Contract.Implicit baker1) (Some baker1))
   >>=? fun ctxt ->
   wrap (Contract.reveal_manager_key ctxt baker2 baker2_pk) >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.Implicit baker2) (Some baker2))
+  wrap (Contract.Delegate.set ctxt (Contract.Implicit baker2) (Some baker2))
   (* Let user1 delegate to baker2. *)
   >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.Implicit user1) (Some baker2))
+  wrap (Contract.Delegate.set ctxt (Contract.Implicit user1) (Some baker2))
   >>=? fun ctxt ->
   let tx_rollup1 = mk_rollup () in
   let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in

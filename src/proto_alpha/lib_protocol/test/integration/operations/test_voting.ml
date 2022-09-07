@@ -335,6 +335,16 @@ let wrong_voting_period_kind loc = function
   | [Environment.Ecoproto_error (Wrong_voting_period_kind _)] -> return_unit
   | err -> wrong_error "Wrong_voting_period_kind" err loc
 
+let proposals_from_unregistered_delegate loc = function
+  | [Environment.Ecoproto_error (Proposals_from_unregistered_delegate _)] ->
+      return_unit
+  | err -> wrong_error "Proposals_from_unregistered_delegate" err loc
+
+let ballot_from_unregistered_delegate loc = function
+  | [Environment.Ecoproto_error (Ballot_from_unregistered_delegate _)] ->
+      return_unit
+  | err -> wrong_error "Ballot_from_unregistered_delegate" err loc
+
 let source_not_in_vote_listings loc = function
   | [Environment.Ecoproto_error Source_not_in_vote_listings] -> return_unit
   | err -> wrong_error "Source_not_in_vote_listings" err loc
@@ -1330,6 +1340,13 @@ let test_proposals_source_not_in_vote_listings () =
   let* block, funder = context_init1 ~blocks_per_cycle:10l () in
   let fresh_account = Account.new_account () in
   let proposer = Contract.Implicit fresh_account.pkh in
+  let assert_fails_with_unregistered_delegate block =
+    assert_validate_proposals_fails
+      ~expected_error:proposals_from_unregistered_delegate
+      ~proposer
+      ~proposals:[Protocol_hash.zero]
+      block
+  in
   let assert_fails_with_source_not_in_vote_listings block =
     assert_validate_proposals_fails
       ~expected_error:source_not_in_vote_listings
@@ -1338,15 +1355,15 @@ let test_proposals_source_not_in_vote_listings () =
       block
   in
   (* Fail when the source has no contract in the storage. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.transaction (B block) funder proposer Tez.one in
   let* block = Block.bake block ~operation in
   (* Fail when the contract's public key is unreavealed. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.revelation (B block) fresh_account.pk in
   let* block = Block.bake block ~operation in
   (* Fail when the source is not a delegate. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.delegation (B block) proposer (Some fresh_account.pkh) in
   let* block = Block.bake block ~operation in
   (* Fail when the source is a delegate, but not yet in the vote listings. *)
@@ -1790,16 +1807,24 @@ let test_ballot_source_not_in_vote_listings () =
       ~ballot:Vote.Yay
       block
   in
+  let assert_fails_with_unregistered_delegate block =
+    assert_validate_ballot_fails
+      ~expected_error:ballot_from_unregistered_delegate
+      ~voter
+      ~proposal
+      ~ballot:Vote.Yay
+      block
+  in
   (* Fail when the source has no contract in the storage. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.transaction (B block) funder voter Tez.one in
   let* block = Block.bake block ~operation in
   (* Fail when the contract's public key is unreavealed. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.revelation (B block) fresh_account.pk in
   let* block = Block.bake block ~operation in
   (* Fail when the source is not a delegate. *)
-  let* () = assert_fails_with_source_not_in_vote_listings block __LOC__ in
+  let* () = assert_fails_with_unregistered_delegate block __LOC__ in
   let* operation = Op.delegation (B block) voter (Some fresh_account.pkh) in
   let* block = Block.bake block ~operation in
   (* Fail when the source is a delegate, but not yet in the vote listings. *)

@@ -273,7 +273,7 @@ let update_script_storage_and_ticket_balances ctxt ~self storage
   Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
 
 let apply_delegation ~ctxt ~source ~delegate ~before_operation =
-  Delegate.set ctxt source delegate >|=? fun ctxt ->
+  Contract.Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Gas.consumed ~since:before_operation ~until:ctxt, [])
 
 type 'loc execution_arg =
@@ -522,7 +522,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   let contract = Contract.Originated contract_hash in
   (match delegate with
   | None -> return ctxt
-  | Some delegate -> Delegate.init ctxt contract delegate)
+  | Some delegate -> Contract.Delegate.init ctxt contract delegate)
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
@@ -1011,7 +1011,7 @@ let apply_manager_operation :
             Tez.(limit > max_limit)
             (Set_deposits_limit_too_high {limit; max_limit}))
       >>?= fun () ->
-      Delegate.registered ctxt source >>=? fun is_registered ->
+      Delegate.registered ctxt source >>= fun is_registered ->
       error_unless
         is_registered
         (Set_deposits_limit_on_unregistered_delegate source)
@@ -2175,8 +2175,7 @@ let may_start_new_cycle ctxt =
   match Level.dawn_of_a_new_cycle ctxt with
   | None -> return (ctxt, [], [])
   | Some last_cycle ->
-      Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
-      Delegate.cycle_end ctxt last_cycle unrevealed
+      Delegate.cycle_end ctxt last_cycle
       >>=? fun (ctxt, balance_updates, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle >|=? fun ctxt ->
       (ctxt, balance_updates, deactivated)

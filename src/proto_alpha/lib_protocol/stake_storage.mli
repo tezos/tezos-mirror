@@ -46,10 +46,10 @@ val add_stake :
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-val deactivate_only_call_from_delegate_storage :
+val set_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
-val activate_only_call_from_delegate_storage :
+val set_active :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
 val get_staking_balance :

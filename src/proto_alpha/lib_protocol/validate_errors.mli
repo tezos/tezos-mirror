@@ -113,6 +113,7 @@ module Voting : sig
     | Conflicting_dictator_proposals of Operation_hash.t
     | Testnet_dictator_multiple_proposals
     | Testnet_dictator_conflicting_operation
+    | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
         current : Protocol_hash.t;
@@ -120,6 +121,7 @@ module Voting : sig
       }
     | Already_submitted_a_ballot
     | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
+    | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
 end
 
 (** Errors that may arise while validating an anonymous operation. *)

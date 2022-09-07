@@ -306,6 +306,12 @@ module Contract = struct
 
   let get_manager_key = Contract_manager_storage.get_manager_key
 
+  module Delegate = struct
+    let find = Contract_delegate_storage.find
+
+    include Delegate_storage.Contract
+  end
+
   module Internal_for_tests = struct
     include Contract_repr
     include Contract_storage
@@ -480,11 +486,9 @@ module Delegate = struct
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
-  let registered = Contract_delegate_storage.registered
-
-  let find = Contract_delegate_storage.find
-
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
+
+  let deactivated = Delegate_activation_storage.is_inactive
 end
 
 module Stake_distribution = struct
