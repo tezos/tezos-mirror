@@ -927,6 +927,30 @@ messages and such). There is additional nuance because the Tezos project
 actually started by rolling out its own bytes-like type, but that's as much
 detail as this tutorial will mention.
 
+[string' : string_json_repr -> string encoding] (dynamic) is a combinator for
+the [string] type. In binary it is represented like a [string]. In JSON, it's
+representation depends on the [string_json_repr] parameter: with [Plain] it is
+represented as a String literal (like [string] above), with [Hex] it is
+represented as an hex-encoded String literal (like [bytes] above). Use [Plain]
+for strings which are intended to be human-readable, use [Hex] for strings which
+are intended to be blobs.
+
+Note that for backwards compatibility reason, the original [string] and [bytes]
+encoding have not been modified and this encoding has an apostrophe in the name:
+[string'].
+
+[bytes' : string_json_repr -> bytes encoding] (dynamic) is a combinator for
+the [bytes] type. In binary it is represented like a [bytes]. In JSON, it's
+representation depends on the [string_json_repr] parameter: with [Plain] it is
+represented as a String literal (like [string] above), with [Hex] it is
+represented as an hex-encoded String literal (like [bytes] above). Use [Plain]
+for bytes which are intended to be human-readable, use [Hex] for bytes which
+are intended to be blobs.
+
+Note that for backwards compatibility reason, the original [string] and [bytes]
+encoding have not been modified and this encoding has an apostrophe in the name:
+[bytes'].
+
 {2 Simple combinators}
 
 [option : 'a encoding -> 'a option encoding] (?, nullable) is a combinator for
