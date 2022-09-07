@@ -134,8 +134,7 @@ module ScRollup = struct
        and type state = In_memory_context.tree
        and type proof =
         Tezos_context_memory.Context.Proof.tree
-        Tezos_context_memory.Context.Proof.t
-        Sc_rollup.ArithPVM.proof =
+        Tezos_context_memory.Context.Proof.t =
     Sc_rollup.ArithPVM.Make (In_memory_context)
 
   module Wasm_pvm :
@@ -144,8 +143,7 @@ module ScRollup = struct
        and type state = In_memory_context.tree
        and type proof =
         Tezos_context_memory.Context.Proof.tree
-        Tezos_context_memory.Context.Proof.t
-        Sc_rollup.Wasm_2_0_0PVM.proof =
+        Tezos_context_memory.Context.Proof.t =
     Sc_rollup.Wasm_2_0_0PVM.Make (In_memory_context)
 
   let origination_proof_exn ~boot_sector kind =

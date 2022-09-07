@@ -277,11 +277,6 @@ module type S = sig
       do not match the [input_given].  *)
   val proof_stop_state : input option -> input_request -> proof -> hash option
 
-  (** [proof_input_requested proof] returns the [input_request] status of the
-      start state of the proof, as given by [is_input_state]. This must match
-      with the inbox proof to complete a valid refutation game proof. *)
-  val proof_input_requested : proof -> input_request
-
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 

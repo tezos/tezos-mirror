@@ -3191,8 +3191,6 @@ module Sc_rollup : sig
       val proof_stop_state :
         input option -> input_request -> proof -> hash option
 
-      val proof_input_requested : proof -> input_request
-
       val state_hash : state -> hash Lwt.t
 
       val initial_state : context -> state Lwt.t
@@ -3282,14 +3280,12 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {tree_proof : 'a; requested : input_request}
-
     module Make (C : P) : sig
       include
         PVM.S
           with type context = C.Tree.t
            and type state = C.tree
-           and type proof = C.proof proof
+           and type proof = C.proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -3306,7 +3302,7 @@ module Sc_rollup : sig
       PVM.S
         with type context = Context.t
          and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t proof
+         and type proof = Context.Proof.tree Context.Proof.t
   end
 
   module Wasm_2_0_0PVM : sig
@@ -3334,14 +3330,12 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {tree_proof : 'a; requested : input_request}
-
     module Make (C : P) : sig
       include
         PVM.S
           with type context = C.Tree.t
            and type state = C.tree
-           and type proof = C.proof proof
+           and type proof = C.proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -3359,7 +3353,7 @@ module Sc_rollup : sig
       PVM.S
         with type context = Context.t
          and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t proof
+         and type proof = Context.Proof.tree Context.Proof.t
 
     val reference_initial_state_hash : State_hash.t
   end

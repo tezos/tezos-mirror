@@ -154,42 +154,28 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sig.input_request}
-
-let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
- fun encoding ->
-  let open Data_encoding in
-  conv
-    (fun {tree_proof; requested} -> (tree_proof, requested))
-    (fun (tree_proof, requested) -> {tree_proof; requested})
-    (obj2
-       (req "tree_proof" encoding)
-       (req "requested" PS.input_request_encoding))
-
 module Make (Context : P) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
-     and type proof = Context.proof proof = struct
+     and type proof = Context.proof = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
 
   type hash = State_hash.t
 
-  type nonrec proof = Context.proof proof
+  type proof = Context.proof
 
-  let proof_encoding = proof_encoding Context.proof_encoding
+  let proof_encoding = Context.proof_encoding
 
-  let proof_start_state p = Context.proof_before p.tree_proof
+  let proof_start_state proof = Context.proof_before proof
 
-  let proof_stop_state input_given input_request p =
+  let proof_stop_state input_given input_request proof =
     match (input_given, input_request) with
-    | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
+    | None, PS.No_input_required -> Some (Context.proof_after proof)
     | None, _ -> None
-    | _ -> Some (Context.proof_after p.tree_proof)
-
-  let proof_input_requested p = p.requested
+    | _ -> Some (Context.proof_after proof)
 
   let name = "arith"
 
@@ -1169,12 +1155,10 @@ module Make (Context : P) :
 
   let verify_proof input_given proof =
     let open Lwt_tzresult_syntax in
-    let*! result =
-      Context.verify_proof proof.tree_proof (step_transition input_given)
-    in
+    let*! result = Context.verify_proof proof (step_transition input_given) in
     match result with
     | None -> fail Arith_proof_verification_failed
-    | Some (_, request) -> return request
+    | Some (_state, request) -> return request
 
   let produce_proof context input_given state =
     let open Lwt_tzresult_syntax in
@@ -1182,16 +1166,16 @@ module Make (Context : P) :
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
-    | Some (tree_proof, requested) -> return {tree_proof; requested}
+    | Some (tree_proof, _requested) -> return tree_proof
     | None -> fail Arith_proof_production_failed
 
   let verify_origination_proof proof boot_sector =
     let open Lwt_syntax in
-    let before = Context.proof_before proof.tree_proof in
+    let before = Context.proof_before proof in
     if State_hash.(before <> reference_initial_state_hash) then return false
     else
       let* result =
-        Context.verify_proof proof.tree_proof (fun state ->
+        Context.verify_proof proof (fun state ->
             let* state = install_boot_sector state boot_sector in
             return (state, ()))
       in
@@ -1207,8 +1191,7 @@ module Make (Context : P) :
           return (state, ()))
     in
     match result with
-    | Some (tree_proof, ()) ->
-        return {tree_proof; requested = No_input_required}
+    | Some (proof, ()) -> return proof
     | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)
