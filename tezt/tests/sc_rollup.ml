@@ -2543,10 +2543,15 @@ let inputs_for n =
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
+  let commitment_period = 10 in
   [
     ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
     ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
     ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
+    ("inbox_proof_with_new_content", ("5 0 0", inputs_for 30, 80, [], []));
+    (* In "inbox_proof_with_new_content" we add messages after the commitment
+       period so the current inbox is not equal to the inbox snapshot-ted at the
+       game creation. *)
     ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
     ( "inbox_proof_many_empty_levels",
       ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
@@ -2560,6 +2565,7 @@ let test_refutation protocols ~kind =
          test_refutation_scenario
            ~kind
            ~challenge_window
+           ~commitment_period
            variant
            inputs
            protocols)
