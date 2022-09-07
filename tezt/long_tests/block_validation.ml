@@ -249,7 +249,7 @@ module Validation = struct
     let node = Node.create datadir in
     Lwt_seq.iter_s
       (fun range ->
-        Node.replay_and_wait_for_termination ~strict:true [range] node)
+        Node.replay_and_wait_for_termination ~strict:true range node)
       (Lwt_seq.of_seq blocks)
 end
 
@@ -417,19 +417,17 @@ module Semantic = struct
   (** [stitching_blocks] contains the block levels blocks in which stitching
       between two protocols happen. *)
   let stitching_blocks =
-    String.concat
-      " "
-      [
-        "2244608";
-        "1916928";
-        "1589247";
-        "1466367";
-        "1343488";
-        "1212416";
-        "851968";
-        "655360";
-        "458752";
-      ]
+    [
+      "2244608";
+      "1916928";
+      "1589247";
+      "1466367";
+      "1343488";
+      "1212416";
+      "851968";
+      "655360";
+      "458752";
+    ]
 
   let replay ~seed ~chunk_size ~runtime () =
     if chunk_size < 0 then invalid_arg "replay: chunk_size must be >= 0" ;
@@ -456,7 +454,7 @@ module Semantic = struct
             let ends = starts + chunk_size - 1 in
             let range = string_of_int starts ^ ".." ^ string_of_int ends in
             Log.debug "Blockrange: %s" range ;
-            Some (range, ()))
+            Some ([range], ()))
         ()
     in
     let blocks () =
