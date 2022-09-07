@@ -170,6 +170,53 @@ module Encoding : sig
   (** Positive big number, see [z]. *)
   val n : Z.t encoding
 
+  (** [uint_like_n ()] is an encoding for [int] which uses the same representation
+      as {!n}.
+
+      For compatibility with 32-bit machines, this encoding supports the same
+      range of encodings as [int31], but only the positive ones. I.e., it
+      supports the inclusive range [0] to [(1 lsl 30) - 1].
+
+      The optional parameter [?max_value] can be used to further restrict the
+      range of values. If [max_value] is set and is greater than
+      [(1 lsl 30) - 1] then the function raises [Invalid_argument].
+
+      The encoding is partial: attempting to de/serialise values which are
+      outside of the supported range will fail. In addition, in binary, a
+      maximum size for the serialised representation is computed based on the
+      maximum value in the range, and the de/serialisation process fails before
+      attempting any conversion if the size is exceeded.
+
+      @raise [Invalid_argument] if [max_value < 0] or
+      [max_value > (1 lsl 30) - 1] *)
+  val uint_like_n : ?max_value:int -> unit -> int encoding
+
+  (** [int_like_z ()] is an encoding for [int] which uses the same representation
+      as {!z}.
+
+      For compatibility with 32-bit machines, this encoding supports the same
+      range of encodings as [int31]. I.e., it supports the inclusive range
+      [-(1 lsl 30)] to [(1 lsl 30) - 1].
+
+      The optional parameters [?min_value] and [?max_value] can be used to
+      further restrict the
+      range of values. If [min_value] is set and less than [-(1 lsl 30)] or if
+      [max_value] is set and is greater than [(1 lsl 30) - 1] then the function
+      raises [Invalid_argument].
+
+      The encoding is partial: attempting to de/serialise values which are
+      outside of the supported range will fail. In addition, in binary, a
+      maximum size for the serialised representation is computed based on the
+      encoding's range, and the de/serialisation process fails before attempting
+      any conversion if the size is exceeded.
+
+      @raise [Invalid_argument] if [max_value < min_value]
+
+      @raise [Invalid_argument] if [max_value > (1 lsl 30) - 1]
+
+      @raise [Invalid_argument] if [min_value] < -(1 lsl 30)] *)
+  val int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
+
   (** Encoding of floating point number
       (encoded as a floating point number in JSON and a double in binary). *)
   val float : float encoding

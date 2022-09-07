@@ -220,6 +220,10 @@ val n : Z.t encoding
 
 val z : Z.t encoding
 
+val uint_like_n : max_value:int -> int encoding
+
+val int_like_z : min_value:int -> max_value:int -> int encoding
+
 val ranged_int : int -> int -> int encoding
 
 val ranged_float : float -> float -> float encoding
@@ -518,3 +522,7 @@ val raw_splitted :
 val is_nullable : 'a encoding -> bool
 
 val is_zeroable : 'a encoding -> bool
+
+val z_length : Z.t -> int
+
+val n_length : Z.t -> int

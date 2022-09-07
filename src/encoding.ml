@@ -280,6 +280,12 @@ let check_not_variable name e =
         name
   | `Dynamic | `Fixed _ -> ()
 
+let n_length value =
+  let bits = Z.numbits value in
+  if bits = 0 then 1 else (bits + 6) / 7
+
+let z_length value = (Z.numbits value + 1 + 6) / 7
+
 (* [Mu_visited] is intended for internal use only. It is used to record visit
    to recursion nodes ([Mu]) to avoid infinite recursion. See [is_zeroable] for
    an example of use. *)
@@ -487,8 +493,9 @@ let int32 = make @@ Int32
 
 let ranged_int minimum maximum =
   let minimum = min minimum maximum and maximum = max minimum maximum in
-  if minimum < -(1 lsl 30) || (1 lsl 30) - 1 < maximum then
-    invalid_arg "Data_encoding.ranged_int" ;
+  if
+    minimum < Binary_size.min_int `Int31 || Binary_size.max_int `Int31 < maximum
+  then invalid_arg "Data_encoding.ranged_int" ;
   make @@ RangedInt {minimum; maximum}
 
 let ranged_float minimum maximum =
@@ -541,6 +548,52 @@ let with_decoding_guard guard encoding =
       | Ok () -> y
       | Error s -> raise (Binary_error_types.Invariant_guard s))
     encoding
+
+let int_like_n_or_z ~min_value ~max_value name sizer like =
+  if max_value < min_value then invalid_arg name ;
+  let z_max_value = Z.of_int max_value in
+  let z_min_value = Z.of_int min_value in
+  let max_size = max (sizer z_min_value) (sizer z_max_value) in
+  check_size
+    max_size
+    (conv
+       (fun i ->
+         if i < min_value || i > max_value then
+           raise
+             Binary_error_types.(
+               Write_error
+                 (Invalid_int {min = min_value; v = i; max = max_value})) ;
+         Z.of_int i)
+       (fun z ->
+         (if Z.compare z z_min_value < 0 then
+          let i =
+            (* here and in the next check, we want to make sure that the error
+               message is consistent across any platform. To that end, we only
+               convert [z] to [int] if it would fit on a 32 bit machine. *)
+            if Z.compare z (Z.of_int (Binary_size.min_int `Int31)) < 0 then
+              Binary_size.min_int `Int31
+            else Z.to_int z
+          in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         (if Z.compare z z_max_value > 0 then
+          let i =
+            if Z.compare z (Z.of_int (Binary_size.max_int `Int31)) > 0 then
+              Binary_size.max_int `Int31
+            else Z.to_int z
+          in
+          raise
+            Binary_error_types.(
+              Read_error (Invalid_int {min = min_value; v = i; max = max_value}))) ;
+         Z.to_int z)
+       like)
+
+let uint_like_n ~max_value =
+  int_like_n_or_z ~min_value:0 ~max_value "Data_encoding.uint_like_n" n_length n
+
+let int_like_z ~min_value ~max_value =
+  int_like_n_or_z ~min_value ~max_value "Data_encoding.int_like_z" z_length z
 
 let def id ?title ?description encoding =
   make @@ Describe {id; title; description; encoding}
