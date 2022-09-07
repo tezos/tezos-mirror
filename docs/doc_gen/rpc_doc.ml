@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -76,25 +75,35 @@ module Index = struct
     | Empty -> Format.fprintf ppf "Empty"
     | Static {services; subdirs = None} -> pp_services prefix ppf services
     | Static {services; subdirs = Some (Suffixes map)} ->
-        pp_services prefix ppf services ;
-        pp_suffixes prefix ppf (Resto.StringMap.bindings map)
-    | Static {services; subdirs = Some (Arg (arg, dir))} ->
-        pp_services prefix ppf services ;
-        let name = Format.asprintf "<%s>" arg.name in
-        pp_suffixes prefix ppf [(name, dir)]
-    | Dynamic _ ->
-        Format.fprintf ppf "@[<h>* %a (<dynamic>)@]@\n" pp_name prefix
-
-  and pp_suffixes prefix ppf l =
-    List.iter (fun (name, dir) -> pp (prefix @ [name]) ppf dir) l
-
-  and pp_services prefix ppf service =
-    match Resto.MethMap.bindings service with
-    | [] -> ()
-    | services ->
         Format.fprintf
           ppf
-          "@[<h>* %a (%a)@]@\n"
+          "@[<v 2>%a@ @ %a@]"
+          (pp_services prefix)
+          services
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ @ ")
+             (pp_suffixes prefix))
+          (Resto.StringMap.bindings map)
+    | Static {services; subdirs = Some (Arg (arg, dir))} ->
+        let name = Format.asprintf "<%s>" arg.name in
+        Format.fprintf
+          ppf
+          "@[<v 2>%a@ @ %a@]"
+          (pp_services prefix)
+          services
+          (pp_suffixes prefix)
+          (name, dir)
+    | Dynamic _ -> Format.fprintf ppf "* %a (<dyn>)" pp_name prefix
+
+  and pp_suffixes prefix ppf (name, dir) = pp (prefix @ [name]) ppf dir
+
+  and pp_services prefix ppf services =
+    match Resto.MethMap.bindings services with
+    | [] -> Format.fprintf ppf "* %a" pp_name prefix
+    | _ :: _ as services ->
+        Format.fprintf
+          ppf
+          "* %a (@[<h>%a@])"
           pp_name
           prefix
           (Format.pp_print_list
@@ -111,10 +120,6 @@ module Index = struct
 end
 
 module Description = struct
-  let pp_h ppf n content = Format.fprintf ppf "<h%d>%s</h%d>" n content n
-
-  let pp_p ppf content = Format.fprintf ppf "<p>%s</p>" content
-
   module Query = struct
     let pp_arg fmt =
       let open RPC_arg in
@@ -128,7 +133,7 @@ module Description = struct
           | Single arg | Optional arg ->
               Format.fprintf ppf "[%s=%a]" name pp_arg arg
           | Flag -> Format.fprintf ppf "[%s]" name
-          | Multi arg -> Format.fprintf ppf "(%s=%a)*" name pp_arg arg)
+          | Multi arg -> Format.fprintf ppf "(%s=%a)\\*" name pp_arg arg)
 
     let pp_title ppf query =
       Format.fprintf
@@ -165,10 +170,9 @@ module Description = struct
       match query with
       | [] -> ()
       | _ :: _ as query ->
-          pp_h ppf 6 "Optional query arguments:" ;
           Format.fprintf
             ppf
-            "<ul><li>%a</li></ul>"
+            "</p> <p>Optional query arguments :<ul><li>%a</li></ul>"
             (Format.pp_print_list
                ~pp_sep:(fun ppf () -> Format.fprintf ppf "</li><li>")
                pp_item)
@@ -176,74 +180,136 @@ module Description = struct
   end
 
   module Tabs = struct
-    let pp_div ?id ?classes ppf f =
+    let pp_tab_div ppf f =
       Format.fprintf
         ppf
-        "<div%a%a>%a</div>"
-        (fun fmt -> function
-          | None -> ()
-          | Some c -> Format.fprintf fmt " id=\"%s\"" c)
-        id
-        (fun fmt -> function
-          | None -> ()
-          | Some cl -> Format.fprintf fmt " class=\"%s\"" (String.concat " " cl))
-        classes
+        "@[<v 2><div class=\"tab\">%a</div>@]"
         (fun ppf () -> f ppf)
         ()
 
-    let pp_main_description ppf content =
-      pp_h ppf 6 "Description" ;
-      let content = html_encode content in
-      let contents_l = Stdlib.String.trim content |> String.split '\n' in
-      List.iter (pp_p ppf) (List.map (Format.sprintf "%s") contents_l)
+    let pp_tabcontent_div ~id ~class_ ppf f =
+      Format.fprintf
+        ppf
+        "@[<v 2><div id=\"%s\" class=\"%s tabcontent\">@ %a@ @]</div>@ "
+        id
+        class_
+        (fun ppf () -> f ppf)
+        ()
+
+    let pp_button ppf ?(default = false) ~shortlabel ~content target_ref =
+      Format.fprintf
+        ppf
+        "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', \
+         '%s')\">%s</button>@ "
+        (if default then " defaultOpen" else "")
+        (target_ref ^ shortlabel)
+        target_ref
+        content
+
+    let pp_content ppf ~tag ~shortlabel target_ref pp_content content =
+      pp_tabcontent_div
+        ~id:(target_ref ^ shortlabel)
+        ~class_:target_ref
+        ppf
+        (fun ppf ->
+          Format.fprintf ppf "<%s>@ %a</%s>" tag pp_content content tag)
 
     let pp_description ppf (service : _ RPC_description.service) =
-      pp_div ~classes:["tabcontent"] ppf (fun ppf ->
-          (* let open RPC_description in *)
-          (* TODO collect and display arg description (in path and in query) *)
-          Format.fprintf
-            ppf
-            "@[<v 2>%a%a@]"
-            Format.(pp_print_option pp_main_description)
-            service.description
-            Query.pp
-            service.query)
-
-    let pp_dynamic_tail fmt service =
-      List.last_opt service.Resto.Description.path
-      |> Option.iter (function
-             | Resto.Description.PDynamicTail {name; _} ->
-                 Format.fprintf fmt "(/<%s>)*" name
-             | _ -> ())
-
-    let pp_service_title ppf prefix service =
-      Format.kasprintf
-        html_encode
-        "%a%a%a"
-        pp_name
-        prefix
-        pp_dynamic_tail
-        service
-        Query.pp_title
+      let open RPC_description in
+      (* TODO collect and display arg description (in path and in query) *)
+      Format.fprintf
+        ppf
+        "@[<h>%a@]%a"
+        Format.(pp_print_option pp_print_text)
+        (Option.map html_encode service.description)
+        Query.pp
         service.query
-      |> Format.fprintf ppf "%s"
 
-    let class_of_method meth =
-      String.lowercase_ascii (Resto.string_of_meth meth) ^ "-meth"
-
-    let pp ppf prefix (meth, service) =
+    let pp ppf prefix service =
+      let open RPC_description in
+      let target_ref = ref_of_service (prefix, service.meth) in
       Rst.pp_html ppf (fun ppf ->
-          pp_div ppf (fun ppf ->
-              pp_div ~classes:["tab"] ppf (fun ppf ->
-                  pp_div
-                    ~classes:["meth"; class_of_method meth]
+          pp_tab_div ppf (fun ppf ->
+              pp_button
+                ppf
+                ~default:true
+                ~shortlabel:"descr"
+                ~content:"Description"
+                target_ref ;
+              Option.iter
+                (fun _ ->
+                  pp_button
                     ppf
-                    (fun ppf ->
-                      Format.pp_print_string ppf (Resto.string_of_meth meth)) ;
-                  pp_div ~classes:["rpc-path"] ppf (fun ppf ->
-                      pp_service_title ppf prefix service)) ;
-              pp_description ppf service))
+                    ~default:false
+                    ~shortlabel:"input.json"
+                    ~content:"Json input"
+                    target_ref ;
+                  pp_button
+                    ppf
+                    ~default:false
+                    ~shortlabel:"input.bin"
+                    ~content:"Binary input"
+                    target_ref)
+                service.input ;
+              pp_button
+                ppf
+                ~default:false
+                ~shortlabel:"output.json"
+                ~content:"Json output"
+                target_ref ;
+              pp_button
+                ppf
+                ~default:false
+                ~shortlabel:"output.bin"
+                ~content:"Binary output"
+                target_ref) ;
+          pp_content
+            ppf
+            ~tag:"p"
+            ~shortlabel:"descr"
+            target_ref
+            pp_description
+            service ;
+          Option.iter
+            (fun input ->
+              let schema, bin_schema = Lazy.force input in
+              pp_content
+                ppf
+                ~tag:"pre"
+                ~shortlabel:"input.json"
+                target_ref
+                Json_schema.pp
+                schema ;
+              pp_content
+                ppf
+                ~tag:"pre"
+                ~shortlabel:"input.bin"
+                target_ref
+                Data_encoding.Binary_schema.pp
+                bin_schema)
+            service.input ;
+          pp_content
+            ppf
+            ~tag:"pre"
+            ~shortlabel:"output.json"
+            target_ref
+            Json_schema.pp
+            (fst (Lazy.force service.output)) ;
+          pp_content
+            ppf
+            ~tag:"pre"
+            ~shortlabel:"output.bin"
+            target_ref
+            Data_encoding.Binary_schema.pp
+            (snd (Lazy.force service.output)))
   end
+
+  let pp_dynamic_tail fmt service =
+    List.last_opt service.Resto.Description.path
+    |> Option.iter (function
+           | Resto.Description.PDynamicTail {name; _} ->
+               Format.fprintf fmt "(/<%s>)*" name
+           | _ -> ())
 
   let rec pp prefix ppf dir =
     let open Resto.Description in
@@ -269,13 +335,24 @@ module Description = struct
 
   and pp_service prefix ppf (meth, service) =
     Rst.pp_ref ppf (ref_of_service (prefix, meth)) ;
-    Format.fprintf ppf "------------@\n@\n" ;
-    Tabs.pp ppf prefix (meth, service)
+    Format.fprintf
+      ppf
+      "**%s %a%a%a**@\n@\n"
+      (Resto.string_of_meth meth)
+      pp_name
+      prefix
+      pp_dynamic_tail
+      service
+      Query.pp_title
+      service.query ;
+    Tabs.pp ppf prefix service
 end
 
 let pp_document ppf descriptions version =
   (* Style : hack *)
-  Format.fprintf ppf "%a@\n" Rst.pp_raw_html Rst.style ;
+  Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.style ;
+  (* Script : hack *)
+  Format.fprintf ppf "%a@." Rst.pp_raw_html Rst.script ;
   (* Index *)
   Format.pp_set_margin ppf 10000 ;
   Format.pp_set_max_indent ppf 9000 ;
@@ -287,7 +364,7 @@ let pp_document ppf descriptions version =
       (* If provided, insert the introductory include *)
       Option.iter (Format.fprintf ppf ".. include:: %s@\n@\n") intro ;
       Rst.pp_h3 ppf name ;
-      Format.fprintf ppf "%a@\n" (Index.pp prefix) rpc_dir)
+      Format.fprintf ppf "%a@\n@\n" (Index.pp prefix) rpc_dir)
     descriptions ;
   (* Full description *)
   Rst.pp_h2 ppf "RPCs - Full description" ;
@@ -302,48 +379,46 @@ let pp_document ppf descriptions version =
 
 let make_index node required_version =
   let open Lwt_syntax in
-  let dir =
-    if required_version = "shell" then
-      let shell_dir = Node.build_rpc_directory node in
-      ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
-    else
-      let make_protocol_index (version, name, intro, hash) =
+  let shell_dir = Node.build_rpc_directory node in
+  let protocol_dirs =
+    List.map
+      (fun (version, name, intro, hash) ->
         let hash = Protocol_hash.of_b58check_exn hash in
         let (module Proto) =
           match Registered_protocol.get hash with
-          | Some proto -> proto
           | None ->
               (* This is probably an indication that a line for the
                  requested protocol is missing in the dune file of
                  this repository *)
-              Format.kasprintf
-                Stdlib.failwith
-                "Hash not found: %a"
-                Protocol_hash.pp
-                hash
-        in
-        let open RPC_directory in
-        let proto_rpc_directory =
-          Block_directory.build_raw_rpc_directory (module Proto) (module Proto)
-          |> map (fun () -> assert false)
+              Format.eprintf "Hash not found: %a" Protocol_hash.pp hash ;
+              assert false
+          | Some proto -> proto
         in
         ( version,
           "Protocol " ^ name,
           intro,
           [".."; "<block_id>"],
-          proto_rpc_directory )
-      in
-      WithExceptions.Option.get ~loc:__LOC__
-      @@ List.find
-           (fun (version, _name, _intro, _hash) -> version = required_version)
-           protocols
-      |> make_protocol_index
+          RPC_directory.map (fun () -> assert false)
+          @@ Block_directory.build_raw_rpc_directory
+               (module Proto)
+               (module Proto) ))
+      protocols
   in
-  let _version, name, intro, path, dir = dir in
+  let dirs =
+    ("shell", "Shell", Some "/shell/rpc_introduction.rst.inc", [""], shell_dir)
+    :: protocol_dirs
+  in
+  let _version, name, intro, path, dir =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.find
+         (fun (version, _name, _intro, _path, _dir) ->
+           version = required_version)
+         dirs
+  in
   let* dir = RPC_directory.describe_directory ~recurse:true ~arg:() dir in
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
-  return_ok_unit
+  return_ok ()
 
 let make_default_acl _node =
   let addr_of_string addr = P2p_point.Id.{addr; port = None; peer_id = None} in
