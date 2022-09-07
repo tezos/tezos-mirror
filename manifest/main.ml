@@ -240,6 +240,8 @@ let plonk = external_lib "tezos-plonk" V.(at_least "0.1.2")
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
+let ppx_import = external_lib "ppx_import" V.True
+
 let ppx_deriving = external_lib "ppx_deriving" V.True
 
 let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
@@ -3075,6 +3077,7 @@ let _octez_scoru_wasm_tests =
         alcotest_lwt;
         tezt_lib;
       ]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
 (* PROTOCOL PACKAGES *)
 

@@ -138,7 +138,7 @@ let test_output_buffer_tree =
 (** Test serialize/deserialize values and compare trees. *)
 let test_values_tree =
   test_generic_tree
-    ~pp:(Format.pp_print_list Ast_printer.pp_value)
+    ~pp:(Format.pp_print_list Ast_printer.Values.pp_value)
     ~gen:(fun ~host_funcs:_ ~module_reg:_ ->
       QCheck2.Gen.list Ast_generators.value_gen)
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.values_encoding)

@@ -16,7 +16,7 @@ module NameMap = Lazy_map.Make (struct
   let to_string = Utf8.encode_list
 end)
 
-type module_key = Module_key of string
+type module_key = Module_key of string [@@deriving show]
 
 type module_inst = {
   types : func_type Vector.t;
