@@ -3062,7 +3062,6 @@ module Sc_rollup : sig
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
 
-      (*xx*)
       module Internal_for_tests : sig
         val eq_tree : tree -> tree -> bool
 
