@@ -144,6 +144,13 @@ module Global = struct
       ~query:RPC_query.empty
       ~output:(Data_encoding.list Dal.Slot.encoding)
       (prefix / "dal" / "slots")
+
+  let dal_confirmed_slots () =
+    RPC_service.get_service
+      ~description:"Data availability confirmed slots for a given block hash"
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list Dal.Slot.encoding)
+      (prefix / "dal" / "confirmed_slots")
 end
 
 module Local = struct

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,27 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node keeps the list of dal slots to which the rollup is
-    subscribed to for each block it needs to process. This is to determine
-    whether the inbox for a given block will need to be retrieved from the
-    block operations, or from the data availability layer after lag levels
-    have passed and the slot for the block has been declared available.
+open Protocol
+open Alpha_context
 
-    The state of subscribed slots per block is persistent.
-*)
+module Simple = struct
+  include Internal_event.Simple
 
-type error += Cannot_read_block_metadata of Block_hash.t
+  let section = ["sc_rollup_node"; "dal_slots_tracker"]
 
-(** [process_head node_ctxt head] performs the following operations:
-    {ul
-      {li it fetches the slot indices to which the rollup is subscribed to,
-       and stores them in [Store.Dal_slot_subbscriptions] }
-      {li it reads the endorsements for headers published endorsement_lag
-      levels preceding [head] from the block metadata, determines which
-      ones the rollup node will download, and stores the results in
-      [Store.Dal_confirmed_slots].}
-    }  *)
-val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+  let slot_has_been_confirmed =
+    declare_3
+      ~section
+      ~name:"dal_confirmed_slot"
+      ~msg:
+        "Slot header for index {slot_index} was published at block \
+         {published_hash}. The rollup was subscribed to the slot index and the \
+         slot header has been confirmed at {confirmed_hash}. The slot contents \
+         will be downloaded."
+      ~level:Notice
+      ("slot_index", Dal.Slot_index.encoding)
+      ("published_hash", Block_hash.encoding)
+      ("confirmed_hash", Block_hash.encoding)
+end
 
-(** [start ()] initializes the Dal_slot_tracker to track the dal slot subscriptions. *)
-val start : unit -> unit Lwt.t
+let slot_has_been_confirmed slot published_hash confirmed_hash =
+  Simple.(emit slot_has_been_confirmed (slot, published_hash, confirmed_hash))

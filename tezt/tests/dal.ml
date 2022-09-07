@@ -513,13 +513,19 @@ let test_dal_node_startup =
 
 let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
     client =
-  (* Check that the rollup node stores the slots published in a block, along with slot headers:
+  (* Check that the rollup node stores the slots published in a block,
+     along with slot headers:
 
      1. Run rollup node for an originated rollup
-     2. Execute a client command to publish a slot header, bake one level
-     3. Repeat step two for a second slot header
-     4. Get the list of slot headers for the rollup node
-     5. Determine that the list contains the two slot headers published.
+     2. Subscribe rollup node to slot 0, bake one level
+     3. Subscribe rollup node to slot 1, bake one level
+     4. Execute a client command to publish a slot header for slot 0,
+        bake one level
+     5. Execute a client command to publish a slot header for slot 1,
+        bake one level
+     4. Get the list of slot headers subscribed and confirmed for the
+        rollup node
+     5. Determine that the list contains only the header for slot 1.
   *)
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make parameters in
@@ -534,6 +540,18 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+  let* (`OpHash _) =
+    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
+  in
+  let* first_subscription_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
+  in
+  let* (`OpHash _) =
+    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:1
+  in
+  let* second_subscription_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
+  in
   let* _ =
     publish_slot
       ~source:Constant.bootstrap1
@@ -556,8 +574,21 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
       node
       client
   in
+  let* _ =
+    publish_slot
+      ~source:Constant.bootstrap3
+      ~fee:1_200
+      ~index:2
+      ~message:"C0FFEE"
+      parameters
+      cryptobox
+      node
+      client
+  in
   let* () = Client.bake_for_and_wait client in
-  let* _level = Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1) in
+  let* slots_published_level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (second_subscription_level + 1)
+  in
   let* slots_metadata =
     Sc_rollup_client.dal_slots_metadata ~hooks sc_rollup_client
   in
@@ -567,9 +598,37 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
       (fun msg ->
         Tezos_crypto_dal.Cryptobox.Commitment.to_b58check
         @@ Rollup.Dal.Commitment.dummy_commitment parameters cryptobox msg)
-      ["CAFEBABE"; "CAFEDEAD"]
+      ["CAFEBABE"; "CAFEDEAD"; "C0FFEE"]
   in
   Check.(slot_headers = expected_slot_headers)
+    (Check.list Check.string)
+    ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
+  (* Endorse only slots 1 and 2. *)
+  let* _ = slot_availability ~signer:Constant.bootstrap1 [2; 1; 0] client in
+  let* _ = slot_availability ~signer:Constant.bootstrap2 [2; 1; 0] client in
+  let* _ = slot_availability ~signer:Constant.bootstrap3 [2; 1] client in
+  let* _ = slot_availability ~signer:Constant.bootstrap4 [2; 1] client in
+  let* _ = slot_availability ~signer:Constant.bootstrap5 [2; 1] client in
+  let* () = Client.bake_for_and_wait client in
+  let* level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)
+  in
+  Check.(level = slots_published_level + 1)
+    Check.int
+    ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
+  let* confirmed_slots_metadata =
+    Sc_rollup_client.dal_confirmed_slots_metadata ~hooks sc_rollup_client
+  in
+  let confirmed_slot_headers =
+    confirmed_slots_metadata |> List.map header_of_slot_metadata
+  in
+  (* Slot 0 was subscribed to, but not confirmed.
+     Slot 1 was subscribed to and confirmed.
+     Slot 2 was confirmed, but not subscribed to.
+     Only the slot header for slot 1 will appear in the list
+     of confirmed slots for the rollup. *)
+  let expected_confirmed_slot_headers = [List.nth expected_slot_headers 1] in
+  Check.(confirmed_slot_headers = expected_confirmed_slot_headers)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
   return ()

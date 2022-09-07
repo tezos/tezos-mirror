@@ -38,9 +38,17 @@ This sequence of operations was run:
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./tezos-sc-rollup-client-alpha rpc get /global/dal/slots
-[ { "level": 2, "index": 0,
+[ { "level": 4, "index": 0,
     "header":
       "sh1xjHVBc36jYtzCoktBUq1RCin8bFEwXTZxpFoS1RA5MqqBsX5Z5A2CqU7QZZQUuqdKfSsvab" },
-  { "level": 2, "index": 1,
+  { "level": 4, "index": 1,
+    "header":
+      "sh27onybk3L4eVH8khVVk8oKZvMkjGi1YszeTLneRe5ps9LL4oqXxR12DKzTMS8tJa27w5imfP" },
+  { "level": 4, "index": 2,
+    "header":
+      "sh23zGWS1EKMFiCGDYWCbGf15j3mqFuQnpoHQZwytuS3c5kKwU3ktsDS4Cz12r6443BCr4Fhpa" } ]
+
+./tezos-sc-rollup-client-alpha rpc get /global/dal/confirmed_slots
+[ { "level": 4, "index": 1,
     "header":
       "sh27onybk3L4eVH8khVVk8oKZvMkjGi1YszeTLneRe5ps9LL4oqXxR12DKzTMS8tJa27w5imfP" } ]
