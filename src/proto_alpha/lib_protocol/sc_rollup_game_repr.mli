@@ -139,6 +139,8 @@ module V1 : sig
 
   val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
 
+  val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+
   (** A game state is characterized by:
 
     - [turn], the player that must provide the next move.

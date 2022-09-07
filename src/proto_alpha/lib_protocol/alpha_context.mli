@@ -3484,6 +3484,8 @@ module Sc_rollup : sig
 
     val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
 
+    val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+
     type t = {
       turn : player;
       inbox_snapshot : Inbox.history_proof;

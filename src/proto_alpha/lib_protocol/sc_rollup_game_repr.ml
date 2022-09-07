@@ -116,15 +116,18 @@ module V1 = struct
 
   let opponent = function Alice -> Bob | Bob -> Alice
 
+  let dissection_chunk_encoding =
+    let open Data_encoding in
+    conv
+      (fun {state_hash; tick} -> (state_hash, tick))
+      (fun (state_hash, tick) -> {state_hash; tick})
+      (obj2
+         (opt "state" State_hash.encoding)
+         (req "tick" Sc_rollup_tick_repr.encoding))
+
   let dissection_encoding =
     let open Data_encoding in
-    list
-      (conv
-         (fun {state_hash; tick} -> (state_hash, tick))
-         (fun (state_hash, tick) -> {state_hash; tick})
-         (obj2
-            (opt "state" State_hash.encoding)
-            (req "tick" Sc_rollup_tick_repr.encoding)))
+    list dissection_chunk_encoding
 
   let encoding =
     let open Data_encoding in
