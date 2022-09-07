@@ -79,7 +79,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
-        "scs11gWNbWVVpTVdWMiTbzTVWBa99eLzqWBFXtYNznDfQDdbEC3Vzf",
+        "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_ticks": "0" },
@@ -88,7 +88,7 @@ This sequence of operations was run:
 ./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
-        "scs11gWNbWVVpTVdWMiTbzTVWBa99eLzqWBFXtYNznDfQDdbEC3Vzf",
+        "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
       "number_of_ticks": "0" },

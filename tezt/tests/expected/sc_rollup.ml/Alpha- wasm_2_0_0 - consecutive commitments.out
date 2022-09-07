@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ2.67275
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 32 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 32 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
 Estimated gas: 5781.719 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -56,7 +56,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 32
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
@@ -69,7 +69,7 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 62 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 62 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
 Estimated gas: 4245.547 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -92,7 +92,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 62
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1

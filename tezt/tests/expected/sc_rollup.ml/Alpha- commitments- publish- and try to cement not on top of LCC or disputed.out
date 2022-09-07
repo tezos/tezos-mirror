@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.66375
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 5 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 5 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 1
 Node is bootstrapped.
 Estimated gas: 5781.719 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -56,7 +56,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 5
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 1
@@ -69,7 +69,7 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 8 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 2
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 8 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 2
 Node is bootstrapped.
 Estimated gas: 4245.547 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -92,7 +92,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 8
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 2
@@ -102,7 +102,7 @@ This sequence of operations was run:
       Commitment published at level: 9
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 11 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 31
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 11 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 31
 Node is bootstrapped.
 Estimated gas: 4245.547 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -125,7 +125,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 11
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 31
@@ -135,7 +135,7 @@ This sequence of operations was run:
       Commitment published at level: 12
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 11 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 32
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 11 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 32
 Node is bootstrapped.
 Estimated gas: 8082.075 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -158,7 +158,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 11
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 32
@@ -171,7 +171,7 @@ This sequence of operations was run:
         Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... +ꜩ10000
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 14 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 311
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 14 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 311
 Node is bootstrapped.
 Estimated gas: 4245.547 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -194,7 +194,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 14
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 311
@@ -204,7 +204,7 @@ This sequence of operations was run:
       Commitment published at level: 15
 
 
-./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf at inbox level 14 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 321
+./tezos-client --wait none publish commitment from '[PUBLIC_KEY_HASH]' for sc rollup '[SC_ROLLUP_HASH]' with compressed state '[SC_ROLLUP_PVM_STATE_HASH]' at inbox level 14 and predecessor '[SC_ROLLUP_COMMITMENT_HASH]' and number of ticks 321
 Node is bootstrapped.
 Estimated gas: 4245.547 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -227,7 +227,7 @@ This sequence of operations was run:
     Smart contract rollup commitment publishing:
       Address: [SC_ROLLUP_HASH]
       Commitment:
-        compressed_state: scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf
+        compressed_state: [SC_ROLLUP_PVM_STATE_HASH]
         inbox_level: 14
         predecessor: [SC_ROLLUP_COMMITMENT_HASH]
         number_of_ticks: 321
