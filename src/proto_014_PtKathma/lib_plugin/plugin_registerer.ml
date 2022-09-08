@@ -23,9 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
+module Filter = struct
   module Proto = Registerer.Registered
-  include Plugin
+  module Mempool = Plugin.Mempool
+end
+
+module RPC = struct
+  module Proto = Registerer.Registered
+  include RPC
 end
 
 module MetricsPlugin = struct
@@ -34,6 +39,8 @@ module MetricsPlugin = struct
   let hash = Registerer.Registered.hash
 end
 
-let () = Prevalidator_filters.register (module Plugin)
+let () = Shell_plugin.register_filter (module Filter)
+
+let () = Shell_plugin.register_rpc (module RPC)
 
 let () = Shell_metrics.Proto_plugin.register_plugin (module MetricsPlugin)

@@ -689,8 +689,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
          Lwt.return (chain_store, hash, header))
        (build_raw_header_rpc_directory (module Proto))) ;
   let proto_services =
-    match Prevalidator_filters.find Next_proto.hash with
-    | Some (module Filters) -> Filters.RPC.rpc_services
+    match Shell_plugin.find_rpc Next_proto.hash with
+    | Some (module RPC) -> RPC.rpc_services
     | None -> Next_proto.rpc_services
   in
   merge

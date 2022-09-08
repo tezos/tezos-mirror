@@ -77,7 +77,7 @@ val default_limits : limits
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->
-  (module Prevalidator_filters.FILTER) ->
+  (module Shell_plugin.FILTER) ->
   Distributed_db.chain_db ->
   t tzresult Lwt.t
 
@@ -169,7 +169,7 @@ module Internal_for_tests : sig
     ('protocol_data, 'prevalidation_t) types_state_shell
 
   module Make
-      (Filter : Prevalidator_filters.FILTER)
+      (Filter : Shell_plugin.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state

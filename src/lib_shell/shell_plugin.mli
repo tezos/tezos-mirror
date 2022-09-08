@@ -135,19 +135,28 @@ module type FILTER = sig
       Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
+end
 
-  module RPC : sig
-    val rpc_services :
-      Tezos_protocol_environment.rpc_context RPC_directory.directory
-  end
+(** Type of a protocol-specific RPC plug-in. *)
+module type RPC = sig
+  module Proto : Registered_protocol.T
+
+  val rpc_services :
+    Tezos_protocol_environment.rpc_context RPC_directory.directory
 end
 
 (** Dummy filter that does nothing *)
 module No_filter (Proto : Registered_protocol.T) :
   FILTER with module Proto = Proto
 
-(** Registers a mempool plug-in for a specific protocol (according to its [Proto.hash]). *)
-val register : (module FILTER) -> unit
+(** Registers a mempool filters plug-in for a specific protocol (according to its [Proto.hash]). *)
+val register_filter : (module FILTER) -> unit
 
-(** Looks for a mempool plug-in for a specific protocol. *)
-val find : Protocol_hash.t -> (module FILTER) option
+(** Registers a RPC plug-in for a specific protocol *)
+val register_rpc : (module RPC) -> unit
+
+(** Looks for a mempool filter plug-in for a specific protocol. *)
+val find_filter : Protocol_hash.t -> (module FILTER) option
+
+(** Looks for an rpc plug-in for a specific protocol. *)
+val find_rpc : Protocol_hash.t -> (module RPC) option

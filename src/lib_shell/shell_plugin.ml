@@ -87,11 +87,13 @@ module type FILTER = sig
       Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
+end
 
-  module RPC : sig
-    val rpc_services :
-      Tezos_protocol_environment.rpc_context RPC_directory.directory
-  end
+module type RPC = sig
+  module Proto : Registered_protocol.T
+
+  val rpc_services :
+    Tezos_protocol_environment.rpc_context RPC_directory.directory
 end
 
 module No_filter (Proto : Registered_protocol.T) = struct
@@ -125,16 +127,22 @@ module No_filter (Proto : Registered_protocol.T) = struct
         ~validation_state_after:_ _ =
       Lwt.return (`Passed_postfilter filter_state)
   end
-
-  module RPC = struct
-    let rpc_services = Proto.rpc_services
-  end
 end
 
-let table : (module FILTER) Protocol_hash.Table.t = Protocol_hash.Table.create 5
+let filter_table : (module FILTER) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
 
-let register (module Filter : FILTER) =
-  assert (not (Protocol_hash.Table.mem table Filter.Proto.hash)) ;
-  Protocol_hash.Table.add table Filter.Proto.hash (module Filter)
+let rpc_table : (module RPC) Protocol_hash.Table.t =
+  Protocol_hash.Table.create 5
 
-let find = Protocol_hash.Table.find table
+let register_filter (module Filter : FILTER) =
+  assert (not (Protocol_hash.Table.mem filter_table Filter.Proto.hash)) ;
+  Protocol_hash.Table.add filter_table Filter.Proto.hash (module Filter)
+
+let register_rpc (module Rpc : RPC) =
+  assert (not (Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
+  Protocol_hash.Table.add rpc_table Rpc.Proto.hash (module Rpc)
+
+let find_filter = Protocol_hash.Table.find filter_table
+
+let find_rpc = Protocol_hash.Table.find rpc_table
