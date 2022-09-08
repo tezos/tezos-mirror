@@ -157,8 +157,10 @@ let liquidity_baking_toggle_vote_parameter =
 let liquidity_baking_toggle_vote_arg =
   Clic.arg
     ~doc:
-      "Vote to continue (option \"on\") or end (option \"off\") the liquidity \
-       baking subsidy. Or choose to pass (option \"pass\")."
+      "Vote to continue or end the liquidity baking subsidy. The possible \
+       values for this option are: \"off\" to request ending the subsidy, \
+       \"on\" to request continuing or restarting the subsidy, and \"pass\" to \
+       abstain. Note that this \"option\" is mandatory!"
     ~long:"liquidity-baking-toggle-vote"
     ~placeholder:"vote"
     liquidity_baking_toggle_vote_parameter
