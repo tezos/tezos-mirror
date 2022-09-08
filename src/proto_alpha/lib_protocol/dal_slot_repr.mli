@@ -163,3 +163,21 @@ module Slot_market : sig
   val candidates : t -> slot list
 end
 
+module Slots_history : sig
+  (** Abstract representation of a skip list specialized for
+       confirmed slot headers. *)
+  type t
+
+  (** Encoding of the datatype. *)
+  val encoding : t Data_encoding.t
+
+  (** First cell of this skip list. *)
+  val genesis : t
+
+  (** [add_confirmed_slots cell slots] updates the given structure
+     [cell] with the list of [slots]. *)
+  val add_confirmed_slots : t -> slot list -> t
+
+  (** [equal a b] returns true iff a is equal to b. *)
+  val equal : t -> t -> bool
+end

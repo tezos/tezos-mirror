@@ -177,3 +177,96 @@ module Slot_market = struct
   let candidates t =
     t.slots |> Slot_index_map.to_seq |> Seq.map snd |> List.of_seq
 end
+
+module Slots_history = struct
+  (* History is represented via a skip list. The content of the cell
+     is the hash of a merkle proof. *)
+
+  (* A leaf of the merkle tree is a slot. *)
+  module Leaf = struct
+    type t = slot
+
+    let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
+  end
+
+  module Content_prefix = struct
+    let _prefix = "dash1"
+
+    (* 32 *)
+    let b58check_prefix = "\002\224\072\094\219" (* dash1(55) *)
+
+    let size = Some 32
+
+    let name = "dal_skip_list_content"
+
+    let title = "A hash to represent the content of a cell in the skip list"
+  end
+
+  module Content_hash = Blake2B.Make (Base58) (Content_prefix)
+  module Merkle_list = Merkle_list.Make (Leaf) (Content_hash)
+
+  (* Pointers of the skip lists are used to encode the content and the
+     backpointers. *)
+  module Pointer_prefix = struct
+    let _prefix = "dask1"
+
+    (* 32 *)
+    let b58check_prefix = "\002\224\072\115\035" (* dask1(55) *)
+
+    let size = Some 32
+
+    let name = "dal_skip_list_pointer"
+
+    let title = "A hash that represents the skip list pointers"
+  end
+
+  module Pointer_hash = Blake2B.Make (Base58) (Pointer_prefix)
+
+  module Skip_list_parameters = struct
+    let basis = 2
+  end
+
+  module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
+
+  module V1 = struct
+    (* The content of a cell is the hash of all the slot headers
+       represented as a merkle list. *)
+    (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3765
+       Decide how to store attested slots in the skip list's content. *)
+    type content = slot
+
+    (* A pointer to a cell is the hash of its content and all the back
+       pointers. *)
+    type ptr = Pointer_hash.t
+
+    type t = (content, ptr) Skip_list.cell option
+
+    let slot_encoding = encoding
+
+    let encoding =
+      Skip_list.encoding Pointer_hash.encoding encoding |> Data_encoding.option
+
+    let genesis : t = None
+
+    let hash_skip_list_cell cell =
+      let current_slot = Skip_list.content cell in
+      let back_pointers_hashes = Skip_list.back_pointers cell in
+      Data_encoding.Binary.to_bytes_exn slot_encoding current_slot
+      :: List.map Pointer_hash.to_bytes back_pointers_hashes
+      |> Pointer_hash.hash_bytes
+
+    let add_confirmed_slot t slot =
+      match t with
+      | None -> Some (Skip_list.genesis slot)
+      | Some t ->
+          let content = slot in
+          let prev_cell_ptr = hash_skip_list_cell t in
+          Skip_list.next ~prev_cell:t ~prev_cell_ptr content |> Option.some
+
+    let add_confirmed_slots t slots = List.fold_left add_confirmed_slot t slots
+
+    let equal = Option.equal @@ Skip_list.equal Pointer_hash.equal equal
+  end
+
+  include V1
+end

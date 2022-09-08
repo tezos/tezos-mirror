@@ -2820,6 +2820,16 @@ module Dal : sig
     val finalize_pending_slots :
       context -> (context * Endorsement.t) tzresult Lwt.t
   end
+
+  module Slots_history : sig
+    type t
+
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
+       Do we need to export this? *)
+    val genesis : t
+
+    val equal : t -> t -> bool
+  end
 end
 
 (** This module re-exports definitions from {!Dal_errors_repr}. *)
