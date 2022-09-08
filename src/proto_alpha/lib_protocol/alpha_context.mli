@@ -3486,13 +3486,26 @@ module Sc_rollup : sig
 
     val dissection_chunk_encoding : dissection_chunk Data_encoding.t
 
+    type game_state =
+      | Dissecting of {
+          dissection : dissection_chunk list;
+          default_number_of_sections : int;
+        }
+      | Final_move of {
+          agreed_start_chunk : dissection_chunk;
+          refuted_stop_chunk : dissection_chunk;
+        }
+
+    val game_state_encoding : game_state Data_encoding.t
+
+    val game_state_equal : game_state -> game_state -> bool
+
     type t = {
       turn : player;
-      inbox_snapshot : Inbox.history_proof;
+      inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
       level : Raw_level.t;
       pvm_name : string;
-      dissection : dissection_chunk list;
-      default_number_of_sections : int;
+      game_state : game_state;
     }
 
     val pp_dissection : Format.formatter -> dissection_chunk list -> unit
@@ -3560,17 +3573,25 @@ module Sc_rollup : sig
 
     val reason_encoding : reason Data_encoding.t
 
-    type status = Ongoing | Ended of (reason * Staker.t)
+    type game_result = Loser of (reason * Staker.t) | Draw
+
+    val pp_game_result : Format.formatter -> game_result -> unit
+
+    val game_result_encoding : game_result Data_encoding.t
+
+    type status = Ongoing | Ended of game_result
 
     val pp_status : Format.formatter -> status -> unit
 
     val status_encoding : status Data_encoding.t
 
-    type outcome = {loser : player; reason : reason}
+    type outcome = {loser : player option; reason : reason}
 
     val pp_outcome : Format.formatter -> outcome -> unit
 
     val outcome_encoding : outcome Data_encoding.t
+
+    val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
     val initial :
       Inbox.history_proof ->

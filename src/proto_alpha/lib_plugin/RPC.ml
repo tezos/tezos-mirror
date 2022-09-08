@@ -2183,7 +2183,10 @@ module Sc_rollup = struct
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
         match res with
-        | Ok (outcome, _context) -> return_some outcome.loser
+        | Ok (outcome, _context) ->
+            (* If a timeout operation succeeds, there must be a loser. *)
+            let loser = WithExceptions.Option.get ~loc:__LOC__ outcome.loser in
+            return_some loser
         | Error _ -> return_none)
 
   let register_can_be_cemented () =

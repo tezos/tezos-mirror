@@ -321,7 +321,7 @@ let timeout ctxt rollup stakers =
          ( level_of_timeout,
            match game.turn with Alice -> stakers.alice | Bob -> stakers.bob ))
   in
-  return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
+  return (Sc_rollup_game_repr.{loser = Some game.turn; reason = Timeout}, ctxt)
 
 let reward ctxt winner =
   let open Lwt_tzresult_syntax in
@@ -336,23 +336,32 @@ let reward ctxt winner =
 
 let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
   let open Lwt_tzresult_syntax in
-  let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
-  let winning_staker =
-    let loser_opponent = Sc_rollup_game_repr.opponent outcome.loser in
-    Sc_rollup_game_repr.Index.staker stakers loser_opponent
+  let game_result =
+    Sc_rollup_game_repr.game_result_from_outcome ~stakers outcome
   in
-  let* ctxt, balance_updates_winner = reward ctxt winning_staker in
-  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
-  let* ctxt, balance_updates_loser =
-    Stake_storage.remove_staker ctxt rollup losing_staker
+  let status = Sc_rollup_game_repr.Ended game_result in
+
+  let* ctxt, balances_updates =
+    match outcome.loser with
+    | Some loser ->
+        let losing_staker = Sc_rollup_game_repr.Index.staker stakers loser in
+        let winning_staker =
+          let loser_opponent = Sc_rollup_game_repr.opponent loser in
+          Sc_rollup_game_repr.Index.staker stakers loser_opponent
+        in
+        let* ctxt, balance_updates_winner = reward ctxt winning_staker in
+        let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+        let* ctxt, balance_updates_loser =
+          Stake_storage.remove_staker ctxt rollup losing_staker
+        in
+        let balances_updates = balance_updates_loser @ balance_updates_winner in
+        return (ctxt, balances_updates)
+    | None -> return (ctxt, [])
   in
   let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.bob in
-  return
-    ( Sc_rollup_game_repr.Ended (outcome.reason, losing_staker),
-      ctxt,
-      balance_updates_loser @ balance_updates_winner )
+  return (status, ctxt, balances_updates)
 
 module Internal_for_tests = struct
   let get_conflict_point = get_conflict_point

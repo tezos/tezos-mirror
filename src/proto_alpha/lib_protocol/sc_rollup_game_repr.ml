@@ -48,13 +48,22 @@ module V1 = struct
       Sc_rollup_tick_repr.pp
       tick
 
+  type game_state =
+    | Dissecting of {
+        dissection : dissection_chunk list;
+        default_number_of_sections : int;
+      }
+    | Final_move of {
+        agreed_start_chunk : dissection_chunk;
+        refuted_stop_chunk : dissection_chunk;
+      }
+
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
     level : Raw_level_repr.t;
     pvm_name : string;
-    dissection : dissection_chunk list;
-    default_number_of_sections : int;
+    game_state : game_state;
   }
 
   let player_encoding =
@@ -86,29 +95,57 @@ module V1 = struct
     Option.equal State_hash.equal state_hash chunk2.state_hash
     && Sc_rollup_tick_repr.equal tick chunk2.tick
 
+  let game_state_equal gs1 gs2 =
+    match (gs1, gs2) with
+    | ( Dissecting
+          {
+            dissection = dissection1;
+            default_number_of_sections = default_number_of_sections1;
+          },
+        Dissecting
+          {
+            dissection = dissection2;
+            default_number_of_sections = default_number_of_sections2;
+          } ) ->
+        Compare.Int.equal
+          default_number_of_sections1
+          default_number_of_sections2
+        && List.equal dissection_chunk_equal dissection1 dissection2
+    | Dissecting _, _ -> false
+    | ( Final_move
+          {
+            agreed_start_chunk = agreed_start_chunk1;
+            refuted_stop_chunk = refuted_stop_chunk1;
+          },
+        Final_move
+          {
+            agreed_start_chunk = agreed_start_chunk2;
+            refuted_stop_chunk = refuted_stop_chunk2;
+          } ) ->
+        dissection_chunk_equal agreed_start_chunk1 agreed_start_chunk2
+        && dissection_chunk_equal refuted_stop_chunk1 refuted_stop_chunk2
+    | Final_move _, _ -> false
+
   let equal
       {
         turn = turn1;
         inbox_snapshot = inbox_snapshot1;
         level = level1;
         pvm_name = pvm_name1;
-        dissection = dissection1;
-        default_number_of_sections = default_number_of_sections1;
+        game_state = game_state1;
       }
       {
         turn = turn2;
         inbox_snapshot = inbox_snapshot2;
         level = level2;
         pvm_name = pvm_name2;
-        dissection = dissection2;
-        default_number_of_sections = default_number_of_sections2;
+        game_state = game_state2;
       } =
     player_equal turn1 turn2
-    && Compare.Int.equal default_number_of_sections1 default_number_of_sections2
     && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
     && Raw_level_repr.equal level1 level2
     && String.equal pvm_name1 pvm_name2
-    && List.equal dissection_chunk_equal dissection1 dissection2
+    && game_state_equal game_state1 game_state2
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
@@ -129,44 +166,52 @@ module V1 = struct
     let open Data_encoding in
     list dissection_chunk_encoding
 
+  let game_state_encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Dissecting"
+          (Tag 0)
+          (obj3
+             (req "kind" (constant "Dissecting"))
+             (req "dissection" dissection_encoding)
+             (req "default_number_of_sections" uint8))
+          (function
+            | Dissecting {dissection; default_number_of_sections} ->
+                Some ((), dissection, default_number_of_sections)
+            | _ -> None)
+          (fun ((), dissection, default_number_of_sections) ->
+            Dissecting {dissection; default_number_of_sections});
+        case
+          ~title:"Final_move"
+          (Tag 1)
+          (obj3
+             (req "kind" (constant "Final_move"))
+             (req "agreed_start_chunk" dissection_chunk_encoding)
+             (req "refuted_stop_chunk" dissection_chunk_encoding))
+          (function
+            | Final_move {agreed_start_chunk; refuted_stop_chunk} ->
+                Some ((), agreed_start_chunk, refuted_stop_chunk)
+            | _ -> None)
+          (fun ((), agreed_start_chunk, refuted_stop_chunk) ->
+            Final_move {agreed_start_chunk; refuted_stop_chunk});
+      ]
+
   let encoding =
     let open Data_encoding in
     conv
-      (fun {
-             turn;
-             inbox_snapshot;
-             level;
-             pvm_name;
-             dissection;
-             default_number_of_sections;
-           } ->
-        ( turn,
-          inbox_snapshot,
-          level,
-          pvm_name,
-          dissection,
-          default_number_of_sections ))
-      (fun ( turn,
-             inbox_snapshot,
-             level,
-             pvm_name,
-             dissection,
-             default_number_of_sections ) ->
-        {
-          turn;
-          inbox_snapshot;
-          level;
-          pvm_name;
-          dissection;
-          default_number_of_sections;
-        })
-      (obj6
+      (fun {turn; inbox_snapshot; level; pvm_name; game_state} ->
+        (turn, inbox_snapshot, level, pvm_name, game_state))
+      (fun (turn, inbox_snapshot, level, pvm_name, game_state) ->
+        {turn; inbox_snapshot; level; pvm_name; game_state})
+      (obj5
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
          (req "level" Raw_level_repr.encoding)
          (req "pvm_name" string)
-         (req "dissection" dissection_encoding)
-         (req "default_number_of_sections" uint8))
+         (req "game_state" game_state_encoding))
 
   let pp_dissection ppf d =
     Format.pp_print_list
@@ -175,12 +220,30 @@ module V1 = struct
       ppf
       d
 
+  let pp_game_state ppf game_state =
+    let open Format in
+    match game_state with
+    | Dissecting {dissection; default_number_of_sections} ->
+        fprintf
+          ppf
+          "Dissecting %a using %d number of sections"
+          pp_dissection
+          dissection
+          default_number_of_sections
+    | Final_move {agreed_start_chunk; refuted_stop_chunk} ->
+        fprintf
+          ppf
+          "Final move to refute %a from %a, opponent failed to refute"
+          pp_dissection_chunk
+          agreed_start_chunk
+          pp_dissection_chunk
+          refuted_stop_chunk
+
   let pp ppf game =
     Format.fprintf
       ppf
-      "[%a] %a playing; inbox snapshot = %a; level = %a; pvm_name = %s;"
-      pp_dissection
-      game.dissection
+      "%a playing; inbox snapshot = %a; level = %a; pvm_name = %s; game_state \
+       = %a"
       pp_player
       game.turn
       Sc_rollup_inbox_repr.pp_history_proof
@@ -188,6 +251,8 @@ module V1 = struct
       Raw_level_repr.pp
       game.level
       game.pvm_name
+      pp_game_state
+      game.game_state
 end
 
 type versioned = V1 of V1.t
@@ -272,24 +337,31 @@ let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
   let alice_to_play = Staker.equal alice refuter in
   let open Sc_rollup_tick_repr in
   let tick = of_number_of_ticks child.number_of_ticks in
+  let game_state =
+    Dissecting
+      {
+        dissection =
+          (if equal tick initial then
+           [
+             make_chunk (Some child.compressed_state) initial;
+             make_chunk None (next initial);
+           ]
+          else
+            [
+              make_chunk (Some parent.compressed_state) initial;
+              make_chunk (Some child.compressed_state) tick;
+              make_chunk None (next tick);
+            ]);
+        default_number_of_sections;
+      }
+  in
+
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
     level = child.inbox_level;
     pvm_name;
-    dissection =
-      (if equal tick initial then
-       [
-         make_chunk (Some child.compressed_state) initial;
-         make_chunk None (next initial);
-       ]
-      else
-        [
-          make_chunk (Some parent.compressed_state) initial;
-          make_chunk (Some child.compressed_state) tick;
-          make_chunk None (next tick);
-        ]);
-    default_number_of_sections;
+    game_state;
   }
 
 type step =
@@ -684,19 +756,45 @@ let reason_encoding =
         (fun () -> Timeout);
     ]
 
-type status = Ongoing | Ended of (reason * Staker.t)
+type game_result = Loser of (reason * Staker.t) | Draw
+
+let pp_game_result ppf r =
+  let open Format in
+  match r with
+  | Loser (reason, player) ->
+      fprintf ppf "%a lost because: %a" Staker.pp player pp_reason reason
+  | Draw -> fprintf ppf "Draw"
+
+let game_result_encoding =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"Loser"
+        (Tag 0)
+        (obj3
+           (req "kind" (constant "loser"))
+           (req "reason" reason_encoding)
+           (req "player" Staker.encoding))
+        (function
+          | Loser (reason, player) -> Some ((), reason, player) | _ -> None)
+        (fun ((), reason, player) -> Loser (reason, player));
+      case
+        ~title:"Draw"
+        (Tag 1)
+        (obj1 (req "kind" (constant "draw")))
+        (function Draw -> Some () | _ -> None)
+        (fun () -> Draw);
+    ]
+
+type status = Ongoing | Ended of game_result
 
 let pp_status ppf status =
   match status with
   | Ongoing -> Format.fprintf ppf "Game ongoing"
-  | Ended (reason, staker) ->
-      Format.fprintf
-        ppf
-        "Game ended due to %a, %a loses their stake"
-        pp_reason
-        reason
-        Staker.pp
-        staker
+  | Ended game_result ->
+      Format.fprintf ppf "Game ended: %a" pp_game_result game_result
 
 let status_encoding =
   let open Data_encoding in
@@ -712,34 +810,44 @@ let status_encoding =
       case
         ~title:"Ended"
         (Tag 1)
-        (obj2 (req "reason" reason_encoding) (req "staker" Staker.encoding))
-        (function Ended (r, s) -> Some (r, s) | _ -> None)
-        (fun (r, s) -> Ended (r, s));
+        (obj1 (req "result" game_result_encoding))
+        (function Ended r -> Some r | _ -> None)
+        (fun r -> Ended r);
     ]
 
-type outcome = {loser : player; reason : reason}
+type outcome = {loser : player option; reason : reason}
 
 let pp_outcome ppf outcome =
-  Format.fprintf
-    ppf
-    "Game outcome: %a - %a has lost.\n"
-    pp_reason
-    outcome.reason
-    pp_player
-    outcome.loser
+  match outcome.loser with
+  | None -> Format.fprintf ppf "Game outcome, no one lost\n"
+  | Some loser ->
+      Format.fprintf
+        ppf
+        "Game outcome: %a - %a has lost.\n"
+        pp_reason
+        outcome.reason
+        pp_player
+        loser
 
 let outcome_encoding =
   let open Data_encoding in
   conv
     (fun {loser; reason} -> (loser, reason))
     (fun (loser, reason) -> {loser; reason})
-    (obj2 (req "loser" player_encoding) (req "reason" reason_encoding))
+    (obj2 (req "loser" (option player_encoding)) (req "reason" reason_encoding))
+
+let game_result_from_outcome ~stakers {loser; reason} =
+  match loser with
+  | Some loser ->
+      let loser = Index.staker stakers loser in
+      Loser (reason, loser)
+  | None -> Draw
 
 let invalid_move reason =
   let open Lwt_result_syntax in
   fail (Invalid_move reason)
 
-let find_choice game tick =
+let find_choice dissection tick =
   let open Lwt_result_syntax in
   let rec traverse states =
     match states with
@@ -748,7 +856,7 @@ let find_choice game tick =
         else traverse (next :: others)
     | _ -> invalid_move (Dissection_choice_not_found tick)
   in
-  traverse game.dissection
+  traverse dissection
 
 let check pred reason =
   let open Lwt_result_syntax in
@@ -860,18 +968,96 @@ let check_proof_validate_stop_state ~stop_state input input_request proof =
 let check_proof_refute_stop_state ~stop_state input input_request proof =
   check_proof_stop_state ~stop_state input input_request proof false
 
-let play game refutation =
+let validity_final_move ~first_move ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
-  let*! result =
-    let* start_chunk, stop_chunk = find_choice game refutation.choice in
-    match refutation.step with
-    | Dissection states ->
+  let*! res =
+    let {inbox_snapshot; level; pvm_name; _} = game in
+    let*! valid =
+      Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
+    in
+    let* () =
+      if first_move then
+        check_proof_distance_is_one
+          ~start_tick:start_chunk.tick
+          ~stop_tick:stop_chunk.tick
+      else return_unit
+    in
+    let* () =
+      check_proof_start_state ~start_state:start_chunk.state_hash proof
+    in
+    match valid with
+    | Ok (input, input_request) ->
+        let* () =
+          if first_move then
+            check_proof_refute_stop_state
+              ~stop_state:stop_chunk.state_hash
+              input
+              input_request
+              proof
+          else
+            check_proof_validate_stop_state
+              ~stop_state:stop_chunk.state_hash
+              input
+              input_request
+              proof
+        in
+        return_true
+    | _ -> return_false
+  in
+  Lwt.return @@ Result.value ~default:false res
+
+(** Returns the validity of the first final move on top of a dissection.
+
+    It is valid if and only:
+    - The distance of the refuted dissection is [1].
+    - The proof start on the agreed start state.
+    - The proof stop on the state different than the refuted one.
+    - The proof is correctly verified.
+*)
+let validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk =
+  validity_final_move ~first_move:true ~proof ~game ~start_chunk ~stop_chunk
+
+(** Returns the validity of the second final move.
+
+    It is valid if and only:
+    - The proof start on the agreed start state.
+    - The proof stop on the state validates the refuted one.
+    - The proof is correctly verified.
+*)
+let validity_second_final_move ~agreed_start_chunk ~refuted_stop_chunk ~game
+    ~proof =
+  validity_final_move
+    ~first_move:false
+    ~proof
+    ~game
+    ~start_chunk:agreed_start_chunk
+    ~stop_chunk:refuted_stop_chunk
+
+let loser_of_results ~alice_result ~bob_result =
+  match (alice_result, bob_result) with
+  | true, true -> None
+  | false, false -> None
+  | false, true -> Some Alice
+  | true, false -> Some Bob
+
+let play game refutation =
+  let open Lwt_syntax in
+  let* result =
+    let open Lwt_result_syntax in
+    match (refutation.step, game.game_state) with
+    | Dissection states, Dissecting {dissection; default_number_of_sections} ->
+        let* start_chunk, stop_chunk =
+          find_choice dissection refutation.choice
+        in
         let* () =
           check_dissection
-            ~default_number_of_sections:game.default_number_of_sections
+            ~default_number_of_sections
             ~start_chunk
             ~stop_chunk
             states
+        in
+        let new_game_state =
+          Dissecting {dissection = states; default_number_of_sections}
         in
         return
           (Either.Right
@@ -880,41 +1066,55 @@ let play game refutation =
                inbox_snapshot = game.inbox_snapshot;
                level = game.level;
                pvm_name = game.pvm_name;
-               dissection = states;
-               default_number_of_sections = game.default_number_of_sections;
+               game_state = new_game_state;
              })
-    | Proof proof ->
-        let {inbox_snapshot; level; pvm_name; _} = game in
-        let*! valid =
-          Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
+    | Dissection _, Final_move _ ->
+        invalid_move
+          (Proof_invalid "Final move has started, unexpected dissection")
+    | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
+        let* start_chunk, stop_chunk =
+          find_choice dissection refutation.choice
         in
-        let* () =
-          match valid with
-          | Ok (input, input_request) ->
-              let* () =
-                check_proof_distance_is_one
-                  ~start_tick:start_chunk.tick
-                  ~stop_tick:stop_chunk.tick
-              in
-              let* () =
-                check_proof_start_state
-                  ~start_state:start_chunk.state_hash
-                  proof
-              in
-              check_proof_refute_stop_state
-                ~stop_state:stop_chunk.state_hash
-                input
-                input_request
-                proof
-          | Error e ->
-              invalid_move (Proof_invalid (Format.asprintf "%a" pp_trace e))
+        let*! player_result =
+          validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk
         in
-        return
-          (Either.Left {loser = opponent game.turn; reason = Conflict_resolved})
+        if player_result then
+          let loser = Some (opponent game.turn) in
+          return (Either.Left {loser; reason = Conflict_resolved})
+        else
+          let new_game_state =
+            let agreed_start_chunk = start_chunk in
+            let refuted_stop_chunk = stop_chunk in
+            Final_move {agreed_start_chunk; refuted_stop_chunk}
+          in
+          return
+            (Either.Right
+               {
+                 turn = opponent game.turn;
+                 inbox_snapshot = game.inbox_snapshot;
+                 level = game.level;
+                 pvm_name = game.pvm_name;
+                 game_state = new_game_state;
+               })
+    | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
+        let*! player_result =
+          validity_second_final_move
+            ~agreed_start_chunk
+            ~refuted_stop_chunk
+            ~game
+            ~proof
+        in
+        if player_result then
+          (* If we play when the final move started, the opponent provided
+             a invalid proof. So if the defender manages to provide a valid
+             proof, he wins. *)
+          let loser = Some (opponent game.turn) in
+          return (Either.Left {loser; reason = Conflict_resolved})
+        else return (Either.Left {loser = None; reason = Conflict_resolved})
   in
   match result with
-  | Ok x -> Lwt.return x
-  | Error reason -> Lwt.return @@ Either.Left {loser = game.turn; reason}
+  | Ok x -> return x
+  | Error reason -> return @@ Either.Left {loser = Some game.turn; reason}
 
 module Internal_for_tests = struct
   let find_choice = find_choice
