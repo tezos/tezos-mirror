@@ -95,12 +95,9 @@ type validation_state = {
   application_state : Apply.application_state;
 }
 
-let prepare_context ctxt ~level ~predecessor_timestamp ~timestamp =
-  Alpha_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
-
 let init_allowed_consensus_operations ctxt ~endorsement_level
     ~preendorsement_level =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let open Alpha_context in
   let* ctxt = Delegate.prepare_stake_distribution ctxt in
   let* ctxt, allowed_endorsements, allowed_preendorsements =
@@ -127,247 +124,316 @@ let init_allowed_consensus_operations ctxt ~endorsement_level
   in
   return ctxt
 
-let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
-    ~(predecessor_fitness : Fitness.t)
-    (block_header : Alpha_context.Block_header.t) =
+(** Circumstances and relevant information for [begin_validation] and
+    [begin_application] below. *)
+type mode =
+  | Application of {block_header : block_header}
+  | Partial_application of {block_header : block_header}
+  | Construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+      block_header_data : block_header_data;
+    }
+  | Partial_construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+    }
+
+let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Lwt_tzresult_syntax in
   let open Alpha_context in
+  let level, timestamp =
+    match mode with
+    | Application {block_header} | Partial_application {block_header} ->
+        (block_header.shell.level, block_header.shell.timestamp)
+    | Construction {timestamp; _} | Partial_construction {timestamp; _} ->
+        (Int32.succ predecessor.level, timestamp)
+  in
   let* ctxt, migration_balance_updates, migration_operation_results =
-    prepare_context
-      predecessor_context
-      ~level:block_header.shell.level
-      ~predecessor_timestamp
-      ~timestamp:block_header.shell.timestamp
+    prepare ctxt ~level ~predecessor_timestamp:predecessor.timestamp ~timestamp
   in
-  let*? predecessor_level =
-    Alpha_context.Raw_level.of_int32 (Int32.pred block_header.shell.level)
+  let*? predecessor_raw_level = Raw_level.of_int32 predecessor.level in
+  let predecessor_level = Level.from_raw ctxt predecessor_raw_level in
+  (* During block (full or partial) application or full construction,
+     endorsements must be for [predecessor_level] and preendorsements,
+     if any, for the block's level. In the mempool (partial
+     construction), only consensus operations for [predecessor_level]
+     (that is, head's level) are allowed (except for grandparent
+     endorsements, which are handled differently). *)
+  let preendorsement_level =
+    match mode with
+    | Application _ | Partial_application _ | Construction _ ->
+        Level.current ctxt
+    | Partial_construction _ -> predecessor_level
   in
-  let predecessor_level = Alpha_context.Level.from_raw ctxt predecessor_level in
-  let current_level = Level.current ctxt in
   let* ctxt =
     init_allowed_consensus_operations
       ctxt
       ~endorsement_level:predecessor_level
-      ~preendorsement_level:current_level
+      ~preendorsement_level
   in
-  let*? fitness = Alpha_context.Fitness.from_raw block_header.shell.fitness in
-  let* validity_state =
-    Validate.begin_application
-      ctxt
-      chain_id
-      ~predecessor_level
+  return
+    ( ctxt,
+      migration_balance_updates,
+      migration_operation_results,
+      predecessor_level,
+      predecessor_raw_level )
+
+let begin_validation ctxt chain_id mode ~predecessor =
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
+  let* ( ctxt,
+         _migration_balance_updates,
+         _migration_operation_results,
+         predecessor_level,
+         _predecessor_raw_level ) =
+    prepare_ctxt ctxt ~predecessor mode
+  in
+  let predecessor_timestamp = predecessor.timestamp in
+  let predecessor_fitness = predecessor.fitness in
+  match mode with
+  | Application {block_header} ->
+      let*? fitness = Fitness.from_raw block_header.shell.fitness in
+      Validate.begin_application
+        ctxt
+        chain_id
+        ~predecessor_level
+        ~predecessor_timestamp
+        block_header
+        fitness
+  | Partial_application {block_header} ->
+      let*? fitness = Fitness.from_raw block_header.shell.fitness in
+      Validate.begin_partial_application
+        ctxt
+        chain_id
+        ~predecessor_level
+        ~predecessor_timestamp
+        block_header
+        fitness
+  | Construction {predecessor_hash; timestamp; block_header_data} ->
+      let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+      let*? round =
+        Round.round_of_timestamp
+          (Constants.round_durations ctxt)
+          ~predecessor_timestamp
+          ~predecessor_round
+          ~timestamp
+      in
+      Validate.begin_full_construction
+        ctxt
+        chain_id
+        ~predecessor_level
+        ~predecessor_round
+        ~predecessor_timestamp
+        ~predecessor_hash
+        round
+        block_header_data.contents
+  | Partial_construction _ ->
+      let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+      let*? grandparent_round =
+        Fitness.predecessor_round_from_raw predecessor_fitness
+      in
+      return
+        (Validate.begin_partial_construction
+           ctxt
+           chain_id
+           ~predecessor_level
+           ~predecessor_round
+           ~grandparent_round)
+
+let validate_operation = Validate.validate_operation
+
+let finalize_validation = Validate.finalize_block
+
+let new_begin_application ctxt chain_id mode ~predecessor =
+  let open Lwt_tzresult_syntax in
+  let open Alpha_context in
+  let* ( ctxt,
+         migration_balance_updates,
+         migration_operation_results,
+         predecessor_level,
+         predecessor_raw_level ) =
+    prepare_ctxt ctxt ~predecessor mode
+  in
+  let predecessor_timestamp = predecessor.timestamp in
+  let predecessor_fitness = predecessor.fitness in
+  match mode with
+  | Application {block_header} ->
+      Apply.begin_application
+        ctxt
+        chain_id
+        ~migration_balance_updates
+        ~migration_operation_results
+        ~predecessor_fitness
+        block_header
+  | Partial_application {block_header} ->
+      Apply.begin_partial_application
+        chain_id
+        ~ancestor_context:ctxt
+        ~migration_balance_updates
+        ~migration_operation_results
+        ~predecessor_fitness
+        block_header
+  | Construction {predecessor_hash; timestamp; block_header_data; _} ->
+      let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
+      Apply.begin_full_construction
+        ctxt
+        chain_id
+        ~migration_balance_updates
+        ~migration_operation_results
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_round
+        ~predecessor:predecessor_hash
+        ~timestamp
+        block_header_data.contents
+  | Partial_construction _ ->
+      Apply.begin_partial_construction
+        ctxt
+        chain_id
+        ~migration_balance_updates
+        ~migration_operation_results
+        ~predecessor_level:predecessor_raw_level
+        ~predecessor_fitness
+
+let new_apply_operation = Apply.apply_operation
+
+let finalize_application = Apply.finalize_block
+
+(* Dummy block header for the predecessor, setting only the fields
+   which will actually be accessed by the validation or application of
+   blocks and operations (that is, the ones taken as arguments).
+
+   This is a temporary function used by the updater-compliant
+   functions below; it will go away in the next commit. *)
+let dummy_predecessor ~predecessor_timestamp ~predecessor_fitness
+    ~predecessor_level =
+  {
+    Block_header.level = predecessor_level;
+    proto_level = 0;
+    predecessor = Block_hash.zero;
+    timestamp = predecessor_timestamp;
+    validation_passes = 0;
+    operations_hash = Operation_list_list_hash.zero;
+    fitness = predecessor_fitness;
+    context = Context_hash.zero;
+  }
+
+(* Updater's signature compliant functions, that will be removed in
+   the next commit. *)
+
+let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
+    ~predecessor_fitness (block_header : block_header) =
+  let open Lwt_tzresult_syntax in
+  let predecessor =
+    dummy_predecessor
       ~predecessor_timestamp
-      block_header
-      fitness
+      ~predecessor_fitness
+      ~predecessor_level:(Int32.pred block_header.shell.level)
+  in
+  let* validity_state =
+    begin_validation
+      predecessor_context
+      chain_id
+      ~predecessor
+      (Application {block_header})
   in
   let* application_state =
-    Apply.begin_application
-      ctxt
+    new_begin_application
+      predecessor_context
       chain_id
-      ~migration_balance_updates
-      ~migration_operation_results
-      ~predecessor_fitness
-      (block_header : Alpha_context.Block_header.t)
+      ~predecessor
+      (Application {block_header})
   in
   return {validity_state; application_state}
 
 let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
-    ~(predecessor_fitness : Fitness.t)
-    (block_header : Alpha_context.Block_header.t) =
+    ~predecessor_fitness (block_header : block_header) =
   let open Lwt_tzresult_syntax in
-  let open Alpha_context in
-  let* ancestor_context, migration_balance_updates, migration_operation_results
-      =
-    prepare_context
-      ancestor_context
-      ~level:block_header.shell.level
+  let predecessor =
+    dummy_predecessor
       ~predecessor_timestamp
-      ~timestamp:block_header.shell.timestamp
-  in
-  let*? predecessor_level =
-    Raw_level.of_int32 (Int32.pred block_header.shell.level)
-  in
-  let predecessor_level = Level.from_raw ancestor_context predecessor_level in
-  let current_level = Level.current ancestor_context in
-  let* ancestor_context =
-    init_allowed_consensus_operations
-      ancestor_context
-      ~endorsement_level:predecessor_level
-      ~preendorsement_level:current_level
-  in
-  let*? fitness = Fitness.from_raw block_header.shell.fitness in
-  let* validity_state =
-    Validate.begin_partial_application
-      ancestor_context
-      chain_id
-      ~predecessor_level
-      ~predecessor_timestamp
-      block_header
-      fitness
-  in
-  let* application_state =
-    Apply.begin_partial_application
-      chain_id
-      ~ancestor_context
-      ~migration_balance_updates
-      ~migration_operation_results
       ~predecessor_fitness
-      block_header
-  in
-  return {validity_state; application_state}
-
-let begin_full_construction ~chain_id ~predecessor_context
-    ~predecessor_timestamp ~predecessor_level ~(predecessor_fitness : Fitness.t)
-    ~predecessor ~timestamp
-    (block_header_contents : Alpha_context.Block_header.contents) =
-  let open Lwt_tzresult_syntax in
-  let open Alpha_context in
-  let level = Int32.succ predecessor_level in
-  let* ctxt, migration_balance_updates, migration_operation_results =
-    prepare_context ~level ~predecessor_timestamp ~timestamp predecessor_context
-  in
-  let*? predecessor_level = Raw_level.of_int32 predecessor_level in
-  let predecessor_level = Level.from_raw ctxt predecessor_level in
-  let current_level = Level.current ctxt in
-  let* ctxt =
-    init_allowed_consensus_operations
-      ctxt
-      ~endorsement_level:predecessor_level
-      ~preendorsement_level:current_level
-  in
-  let round_durations = Constants.round_durations ctxt in
-  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-  let*? round =
-    Round.round_of_timestamp
-      round_durations
-      ~predecessor_timestamp
-      ~predecessor_round
-      ~timestamp
+      ~predecessor_level:(Int32.pred block_header.shell.level)
   in
   let* validity_state =
-    Validate.begin_full_construction
-      ctxt
+    begin_validation
+      ancestor_context
       chain_id
-      ~predecessor_level
-      ~predecessor_round
-      ~predecessor_timestamp
-      ~predecessor_hash:predecessor
-      round
-      block_header_contents
-  in
-  let* application_state =
-    Apply.begin_full_construction
-      ctxt
-      chain_id
-      ~migration_balance_updates
-      ~migration_operation_results
-      ~predecessor_timestamp
-      ~predecessor_level
-      ~predecessor_round
       ~predecessor
-      ~timestamp
-      block_header_contents
-  in
-  return {validity_state; application_state}
-
-let begin_partial_construction ~chain_id ~predecessor_context
-    ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
-    ~predecessor:_ ~timestamp =
-  let open Lwt_tzresult_syntax in
-  let open Alpha_context in
-  let level = Int32.succ predecessor_level in
-  let* ctxt, migration_balance_updates, migration_operation_results =
-    prepare ~level ~predecessor_timestamp ~timestamp predecessor_context
-  in
-  let*? predecessor_raw_level = Raw_level.of_int32 predecessor_level in
-  let predecessor_level = Level.from_raw ctxt predecessor_raw_level in
-  (* In the mempool, only consensus operations for [predecessor_level]
-     (that is, head's level) are allowed, contrary to block validation
-     where endorsements are for the previous level and
-     preendorsements, if any, for the block's level. *)
-  let* ctxt =
-    init_allowed_consensus_operations
-      ctxt
-      ~endorsement_level:predecessor_level
-      ~preendorsement_level:predecessor_level
-  in
-  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-  let*? grandparent_round =
-    Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
-  in
-  let validity_state =
-    Validate.begin_partial_construction
-      ctxt
-      chain_id
-      ~predecessor_level
-      ~predecessor_round
-      ~grandparent_round
+      (Partial_application {block_header})
   in
   let* application_state =
-    Apply.begin_partial_construction
-      ctxt
+    new_begin_application
+      ancestor_context
       chain_id
-      ~migration_balance_updates
-      ~migration_operation_results
-      ~predecessor_level:predecessor_raw_level
-      ~predecessor_fitness
+      ~predecessor
+      (Partial_application {block_header})
   in
   return {validity_state; application_state}
 
-(* Updater's signature compliant function *)
 let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
-    ~predecessor_level ~(predecessor_fitness : Fitness.t) ~predecessor
+    ~predecessor_level ~predecessor_fitness ~predecessor:predecessor_hash
     ~timestamp ?(protocol_data : block_header_data option) () =
+  let open Lwt_tzresult_syntax in
+  let predecessor =
+    dummy_predecessor
+      ~predecessor_timestamp
+      ~predecessor_fitness
+      ~predecessor_level
+  in
   match protocol_data with
   | None ->
-      begin_partial_construction
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-  | Some protocol_data ->
-      begin_full_construction
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-        protocol_data.contents
-
-let validate_operation validity_state
-    (packed_operation : Alpha_context.packed_operation) =
-  let {shell; protocol_data = Operation_data protocol_data} =
-    packed_operation
-  in
-  let operation : _ Alpha_context.operation = {shell; protocol_data} in
-  let oph = Alpha_context.Operation.hash operation in
-  Validate.validate_operation validity_state oph packed_operation
+      let partial_construction =
+        Partial_construction {predecessor_hash; timestamp}
+      in
+      let* validity_state =
+        begin_validation
+          predecessor_context
+          chain_id
+          ~predecessor
+          partial_construction
+      in
+      let* application_state =
+        new_begin_application
+          predecessor_context
+          chain_id
+          ~predecessor
+          partial_construction
+      in
+      return {validity_state; application_state}
+  | Some block_header_data ->
+      let construction =
+        Construction {predecessor_hash; timestamp; block_header_data}
+      in
+      let* validity_state =
+        begin_validation predecessor_context chain_id ~predecessor construction
+      in
+      let* application_state =
+        new_begin_application
+          predecessor_context
+          chain_id
+          ~predecessor
+          construction
+      in
+      return {validity_state; application_state}
 
 let apply_operation (state : validation_state)
     (packed_operation : Alpha_context.packed_operation) =
   let open Lwt_result_syntax in
-  let* validation_state =
-    validate_operation state.validity_state packed_operation
-  in
   let operation_hash = Alpha_context.Operation.hash_packed packed_operation in
-  let* application_state, operation_receipt =
-    Apply.apply_operation
-      state.application_state
-      operation_hash
-      packed_operation
+  let* validity_state =
+    validate_operation state.validity_state operation_hash packed_operation
   in
-  return
-    ({validity_state = validation_state; application_state}, operation_receipt)
+  let* application_state, operation_receipt =
+    new_apply_operation state.application_state operation_hash packed_operation
+  in
+  return ({validity_state; application_state}, operation_receipt)
 
 let finalize_block state shell_header =
   let open Lwt_result_syntax in
-  let* () = Validate.finalize_block state.validity_state in
-  Apply.finalize_block state.application_state shell_header
+  let* () = finalize_validation state.validity_state in
+  finalize_application state.application_state shell_header
 
 let compare_operations (oph1, op1) (oph2, op2) =
   Alpha_context.Operation.compare (oph1, op1) (oph2, op2)
@@ -450,21 +516,16 @@ module Mempool = struct
       ~current_timestamp =
     let open Lwt_tzresult_syntax in
     let open Alpha_context in
-    let level = Int32.succ head_header.level in
-    let* ctxt, _migration_balance_updates, _migration_operation_results =
-      prepare
-        ~level
-        ~predecessor_timestamp:head_header.timestamp
-        ~timestamp:current_timestamp
+    let* ( ctxt,
+           _migration_balance_updates,
+           _migration_operation_results,
+           head_level,
+           _head_raw_level ) =
+      prepare_ctxt
         ctxt
-    in
-    let*? raw_pred_level = Raw_level.of_int32 head_header.level in
-    let head_level = Level.from_raw ctxt raw_pred_level in
-    let* ctxt =
-      init_allowed_consensus_operations
-        ctxt
-        ~endorsement_level:head_level
-        ~preendorsement_level:head_level
+        (Partial_construction
+           {predecessor_hash = head_hash; timestamp = current_timestamp})
+        ~predecessor:head_header
     in
     let*? fitness = Fitness.from_raw head_header.fitness in
     let predecessor_round = Fitness.round fitness in
