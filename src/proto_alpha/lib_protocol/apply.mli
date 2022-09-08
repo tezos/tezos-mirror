@@ -71,7 +71,6 @@ type mode =
     }
   | Partial_construction of {
       predecessor_level : Raw_level.t;
-      predecessor_round : Round.t;
       predecessor_fitness : Fitness.raw;
     }  (** This mode is mainly intended to be used by a mempool. *)
 

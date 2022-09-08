@@ -1977,7 +1977,6 @@ type mode =
     }
   | Partial_construction of {
       predecessor_level : Raw_level.t;
-      predecessor_round : Round.t;
       predecessor_fitness : Fitness.raw;
     }
 
@@ -2684,15 +2683,11 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_level
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
-  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
   let toggle_vote = Liquidity_baking.LB_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let mode =
-    Partial_construction
-      {predecessor_level; predecessor_round; predecessor_fitness}
-  in
+  let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
     {
       mode;
