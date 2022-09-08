@@ -48,6 +48,12 @@ let rec meta_clique connect = function
       List.iter (connect head) tail ;
       meta_clique connect tail
 
+let rec meta_clique_lwt connect = function
+  | [] -> unit
+  | head :: tail ->
+      let* () = Lwt_list.iter_s (connect head) tail in
+      meta_clique_lwt connect tail
+
 let meta_ring connect nodes =
   match nodes with
   | [] -> ()

@@ -362,18 +362,10 @@ let test_storage_snapshot =
     ]
   in
 
-  let connect_clique ns =
-    Lwt_list.iteri_s
-      (fun index peer ->
-        Lwt_list.iter_s
-          (fun peer' ->
-            Log.debug "Connecting %s to %s" (Node.name peer) (Node.name peer') ;
-            Client.Admin.connect_address
-              ~endpoint:(Node peer)
-              ~peer:peer'
-              client)
-          (drop (index + 1) ns))
-      ns
+  let connect_clique =
+    Cluster.meta_clique_lwt @@ fun peer peer' ->
+    Log.debug "Connecting %s to %s" (Node.name peer) (Node.name peer') ;
+    Client.Admin.connect_address ~endpoint:(Node peer) ~peer:peer' client
   in
 
   Log.info "Group 2: Connect nodes %s in clique" (show_node_group nodes_group2) ;
