@@ -69,3 +69,6 @@ val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t
 
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
+
+(** [delete durable key] deletes the value at and/or subtrees of [key]. *)
+val delete : t -> key -> t Lwt.t

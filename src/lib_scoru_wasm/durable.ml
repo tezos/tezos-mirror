@@ -102,3 +102,5 @@ let count_subtrees tree key =
   let* opt = T.find_tree tree @@ to_value_key key in
   let+ len = T.length tree key in
   if Option.is_none opt then len else len - 1
+
+let delete tree key = T.remove tree key
