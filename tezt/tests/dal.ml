@@ -381,11 +381,20 @@ let test_slot_management_logic =
       bool
       ~error_msg:"Expected slot 1 to be available") ;
   let* bytes = RPC_legacy.raw_bytes client in
-  if not JSON.(bytes |-> "dal" |> is_null) then
-    Test.fail
-      "Expected the context to contain no more information about the DAL \
-       anymore." ;
-  unit
+  let dal_keys = ["slots_history"] in
+  match JSON.(bytes |-> "dal" |> as_object_opt) with
+  | None ->
+      Test.fail
+        "Expected the context to contain information about the DAL (%a)."
+        Format.(pp_print_list (fun fmt -> fprintf fmt "%s"))
+        dal_keys
+  | Some l ->
+      List.iter
+        (fun (k, _) ->
+          if not @@ List.mem k dal_keys then
+            Test.fail "Unexpected entry %s in context/DAL" k)
+        l ;
+      unit
 
 (* Tests for integration between Dal and Scoru *)
 let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node

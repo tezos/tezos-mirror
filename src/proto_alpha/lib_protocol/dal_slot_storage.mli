@@ -63,3 +63,8 @@ val finalize_current_slots : Raw_context.t -> Raw_context.t Lwt.t
    [current_level - lag] level are removed from the context. *)
 val finalize_pending_slots :
   Raw_context.t -> (Raw_context.t * Dal_endorsement_repr.t) tzresult Lwt.t
+
+(** [get_slots_history ctxt] returns the current value of slots_history stored
+   in [ctxt], or Slots_history.genesis if no value is stored yet. *)
+val get_slots_history :
+  Raw_context.t -> Dal_slot_repr.Slots_history.t tzresult Lwt.t

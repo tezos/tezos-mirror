@@ -2772,12 +2772,40 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  module Page : sig
+    type content = bytes
+
+    module Index : sig
+      type t = int
+
+      val encoding : int Data_encoding.t
+
+      val pp : Format.formatter -> int -> unit
+
+      val compare : int -> int -> int
+
+      val equal : int -> int -> bool
+    end
+
+    type t = {slot_index : Slot_index.t; page_index : Index.t}
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+  end
+
   (** This module re-exports definitions from {!Dal_slot_repr},
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
     type header = Dal.commitment
 
-    type t = {level : Raw_level.t; index : Slot_index.t; header : header}
+    type t = {
+      published_level : Raw_level.t;
+      index : Slot_index.t;
+      header : header;
+    }
 
     val zero : header
 
@@ -2795,6 +2823,16 @@ module Dal : sig
 
     val finalize_pending_slots :
       context -> (context * Endorsement.t) tzresult Lwt.t
+  end
+
+  module Slots_history : sig
+    type t
+
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3766
+       Do we need to export this? *)
+    val genesis : t
+
+    val equal : t -> t -> bool
   end
 end
 

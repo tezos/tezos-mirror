@@ -86,11 +86,48 @@ end
 
 type header = Header.t
 
-type t = {level : Raw_level_repr.t; index : Index.t; header : header}
+(** For Layer-1, a slot is described by the level at which it is published,
+    the slot's index (in the list of slots), and the slot's header
+    (KATE commitment hash). *)
+type t = {published_level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 
 val equal : t -> t -> bool
+
+type slot_index = Index.t
+
+(** A DAL slot is decomposed to a successive list of pages with fixed content
+   size. The size is chosen so that it's possible to inject a page in a Tezos
+   L1 operation if needed during the proof phase of a refutation game.
+*)
+module Page : sig
+  type content = Bytes.t
+
+  module Index : sig
+    type t = int
+
+    val zero : int
+
+    val encoding : int Data_encoding.t
+
+    val pp : Format.formatter -> int -> unit
+
+    val compare : int -> int -> int
+
+    val equal : int -> int -> bool
+  end
+
+  (** A page is identified by its slots index and by its own index in the list
+     of pages of the slot. *)
+  type t = {slot_index : slot_index; page_index : Index.t}
+
+  val equal : t -> t -> bool
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
 
 (** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t
@@ -127,4 +164,23 @@ module Slot_market : sig
 
   (** [candidates t] returns a list of slot candidates. *)
   val candidates : t -> slot list
+end
+
+module Slots_history : sig
+  (** Abstract representation of a skip list specialized for
+       confirmed slot headers. *)
+  type t
+
+  (** Encoding of the datatype. *)
+  val encoding : t Data_encoding.t
+
+  (** First cell of this skip list. *)
+  val genesis : t
+
+  (** [add_confirmed_slots cell slots] updates the given structure
+     [cell] with the list of [slots]. *)
+  val add_confirmed_slots : t -> slot list -> t
+
+  (** [equal a b] returns true iff a is equal to b. *)
+  val equal : t -> t -> bool
 end

@@ -105,11 +105,17 @@ module Dal = struct
     include Raw_context.Dal
   end
 
+  module Page = struct
+    include Dal_slot_repr.Page
+  end
+
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
     include Raw_context.Dal
   end
+
+  module Slots_history = Dal_slot_repr.Slots_history
 end
 
 module Dal_errors = Dal_errors_repr
