@@ -284,6 +284,75 @@ let rec pp_admin_instr' out instr =
         index
         (pp_vector Values.pp_value)
         values
+  | Table_init_meta (idx, value, d, s, n, x, y) ->
+      Format.fprintf
+        out
+        "@[<v 2>Table_init_meta (%ld, %a, %ld, %ld, %ld, %a, %a)@]"
+        idx
+        Values.pp_ref_
+        value
+        d
+        s
+        n
+        Ast.pp_var
+        x
+        Ast.pp_var
+        y
+  | Table_fill_meta (idx, i, n, r, x) ->
+      Format.fprintf
+        out
+        "@[<v 2>Table_fill_meta (%ld, %ld, %ld, %a, %a)@]"
+        idx
+        i
+        n
+        Values.pp_ref_
+        r
+        Ast.pp_var
+        x
+  | Table_copy_meta (idx, d, s, n, x, y, case) ->
+      Format.fprintf
+        out
+        "@[<v 2>Table_copy_meta (%ld, %ld, %ld, %ld, %a, %a, %a)@]"
+        idx
+        d
+        s
+        n
+        Ast.pp_var
+        x
+        Ast.pp_var
+        y
+        Format.pp_print_bool
+        case
+  | Memory_init_meta (idx, d, b, n, s, x) ->
+      Format.fprintf
+        out
+        "@[<v 2>Memory_init_meta (%ld, %ld, %ld, %ld, %ld, %a)@]"
+        idx
+        d
+        b
+        n
+        s
+        Ast.pp_var
+        x
+  | Memory_fill_meta (idx, i, k, n) ->
+      Format.fprintf
+        out
+        "@[<v 2>Memory_fill_meta (%ld, %ld, %a, %ld)@]"
+        idx
+        i
+        Values.pp_num
+        k
+        n
+  | Memory_copy_meta (idx, d, s, n, case) ->
+      Format.fprintf
+        out
+        "@[<v 2>Memory_copy_meta (%ld, %ld, %ld, %ld, %a)@]"
+        idx
+        d
+        s
+        n
+        Format.pp_print_bool
+        case
 
 and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
 

@@ -48,6 +48,12 @@ and admin_instr' =
   | Trapping of string
   | Returning of value Vector.t
   | Breaking of int32 * value Vector.t
+  | Table_init_meta of int32 * ref_ * int32 * int32 * int32 * Ast.var * Ast.var
+  | Table_fill_meta of int32 * int32 * int32 * ref_ * Ast.var
+  | Table_copy_meta of int32 * int32 * int32 * int32 * Ast.var * Ast.var * bool
+  | Memory_init_meta of int32 * int32 * int32 * int32 * int32 * Ast.var
+  | Memory_fill_meta of int32 * int32 * Values.num * int32
+  | Memory_copy_meta of int32 * int32 * int32 * int32 * bool
 
 type code = value Vector.t * admin_instr Vector.t
 

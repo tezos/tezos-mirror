@@ -552,6 +552,58 @@ let rec admin_instr'_gen ~module_reg =
     let+ values = small_vector_gen value_gen in
     Breaking (index, values)
   in
+  let table_init_meta_gen =
+    let* idx = int32 in
+    let* value = ref_gen in
+    let* d = int32 in
+    let* s = int32 in
+    let* n = int32 in
+    let* x = var_gen in
+    let+ y = var_gen in
+    Table_init_meta (idx, value, d, s, n, x, y)
+  in
+  let table_fill_meta_gen =
+    let* idx = int32 in
+    let* i = int32 in
+    let* n = int32 in
+    let* r = ref_gen in
+    let+ x = var_gen in
+    Table_fill_meta (idx, i, n, r, x)
+  in
+  let table_copy_meta_gen =
+    let* idx = int32 in
+    let* d = int32 in
+    let* s = int32 in
+    let* n = int32 in
+    let* x = var_gen in
+    let* y = var_gen in
+    let+ case = bool in
+    Table_copy_meta (idx, d, s, n, x, y, case)
+  in
+  let memory_init_meta_gen =
+    let* idx = int32 in
+    let* d = int32 in
+    let* b = int32 in
+    let* n = int32 in
+    let* s = int32 in
+    let+ x = var_gen in
+    Memory_init_meta (idx, d, b, n, s, x)
+  in
+  let memory_fill_meta_gen =
+    let* idx = int32 in
+    let* i = int32 in
+    let* k = num_gen in
+    let+ n = int32 in
+    Memory_fill_meta (idx, i, k.it, n)
+  in
+  let memory_copy_meta_instr =
+    let* idx = int32 in
+    let* d = int32 in
+    let* s = int32 in
+    let* n = int32 in
+    let+ case = bool in
+    Memory_copy_meta (idx, d, s, n, case)
+  in
   oneof
     [
       from_block_gen;
@@ -561,6 +613,12 @@ let rec admin_instr'_gen ~module_reg =
       trapping_gen;
       returning_gen;
       breaking_gen;
+      table_init_meta_gen;
+      table_fill_meta_gen;
+      table_copy_meta_gen;
+      memory_init_meta_gen;
+      memory_fill_meta_gen;
+      memory_copy_meta_instr;
     ]
 
 and admin_instr_gen ~module_reg =

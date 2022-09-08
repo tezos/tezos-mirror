@@ -778,6 +778,91 @@ let rec admin_instr'_encoding () =
         (function
           | Breaking (index, values) -> Some (index, values) | _ -> None)
         (fun (index, values) -> Breaking (index, values));
+      case
+        "Table_init_meta"
+        (tup7
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           value_ref_encoding
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Interpreter_encodings.Ast.var_encoding)
+           (value [] Interpreter_encodings.Ast.var_encoding))
+        (function
+          | Table_init_meta (idx, value, d, s, n, x, y) ->
+              Some (idx, value, d, s, n, x, y)
+          | _ -> None)
+        (fun (idx, value, d, s, n, x, y) ->
+          Table_init_meta (idx, value, d, s, n, x, y));
+      case
+        "Table_fill_meta"
+        (tup5
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           value_ref_encoding
+           (value [] Interpreter_encodings.Ast.var_encoding))
+        (function
+          | Table_fill_meta (idx, i, n, r, x) -> Some (idx, i, n, r, x)
+          | _ -> None)
+        (fun (idx, i, n, r, x) -> Table_fill_meta (idx, i, n, r, x));
+      case
+        "Table_copy_meta"
+        (tup7
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Interpreter_encodings.Ast.var_encoding)
+           (value [] Interpreter_encodings.Ast.var_encoding)
+           (value [] Data_encoding.bool))
+        (function
+          | Table_copy_meta (idx, d, s, n, x, y, case) ->
+              Some (idx, d, s, n, x, y, case)
+          | _ -> None)
+        (fun (idx, d, s, n, x, y, case) ->
+          Table_copy_meta (idx, d, s, n, x, y, case));
+      case
+        "Memory_init_meta"
+        (tup6
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Interpreter_encodings.Ast.var_encoding))
+        (function
+          | Memory_init_meta (idx, d, b, n, s, x) -> Some (idx, d, b, n, s, x)
+          | _ -> None)
+        (fun (idx, d, b, n, s, x) -> Memory_init_meta (idx, d, b, n, s, x));
+      case
+        "Memory_fill_meta"
+        (tup4
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Interpreter_encodings.Values.num_encoding)
+           (value [] Data_encoding.int32))
+        (function
+          | Memory_fill_meta (idx, i, k, n) -> Some (idx, i, k, n) | _ -> None)
+        (fun (idx, i, k, n) -> Memory_fill_meta (idx, i, k, n));
+      case
+        "Memory_copy_meta"
+        (tup5
+           ~flatten:false
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.int32)
+           (value [] Data_encoding.bool))
+        (function
+          | Memory_copy_meta (idx, d, s, n, case) -> Some (idx, d, s, n, case)
+          | _ -> None)
+        (fun (idx, d, s, n, case) -> Memory_copy_meta (idx, d, s, n, case));
     ]
 
 and admin_instr_encoding () =

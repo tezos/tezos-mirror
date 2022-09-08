@@ -146,6 +146,156 @@ and admin_instr' =
   | Trapping of string
   | Returning of value Vector.t
   | Breaking of int32 * value Vector.t
+  | Table_init_meta of int32 * ref_ * int32 * int32 * int32 * var * var
+  | Table_fill_meta of int32 * int32 * int32 * ref_ * var
+  | Table_copy_meta of int32 * int32 * int32 * int32 * var * var * bool
+  | Memory_init_meta of int32 * int32 * int32 * int32 * int32 * var
+  | Memory_fill_meta of int32 * int32 * Values.num * int32
+  | Memory_copy_meta of int32 * int32 * int32 * int32 * bool
+
+let table_init_meta_instr idx value d s n x y at =
+  let instrs =
+    [
+      Plain (Const (I32 d @@ at));
+      Refer value;
+      Plain (TableSet x);
+      Plain (Const (I32 (I32.add d 1l) @@ at));
+      Plain (Const (I32 (I32.add s 1l) @@ at));
+      Plain (Const (I32 (I32.sub n 1l) @@ at));
+      Plain (TableInit (x, y));
+    ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Table_init_meta (Int32.succ idx, value, d, s, n, x, y) @@ at)
+      )
+  | None -> raise (Invalid_argument "table_fill_meta_instr")
+
+let table_fill_meta_instr idx i n r x at =
+  let instrs =
+    [
+      Plain (Const (I32 i @@ at));
+      Refer r;
+      Plain (TableSet x);
+      Plain (Const (I32 (I32.add i 1l) @@ at));
+      Refer r;
+      Plain (Const (I32 (I32.sub n 1l) @@ at));
+      Plain (TableFill x);
+    ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Table_fill_meta (Int32.succ idx, i, n, r, x) @@ at) )
+  | None -> raise (Invalid_argument "table_fill_meta_instr")
+
+let table_copy_meta_instr idx d s n x y case at =
+  let instrs =
+    if case then
+      [
+        Plain (Const (I32 d @@ at));
+        Plain (Const (I32 s @@ at));
+        Plain (TableGet y);
+        Plain (TableSet x);
+        Plain (Const (I32 (I32.add d 1l) @@ at));
+        Plain (Const (I32 (I32.add s 1l) @@ at));
+        Plain (Const (I32 (I32.sub n 1l) @@ at));
+        Plain (TableCopy (x, y));
+      ]
+    else
+      [
+        Plain (Const (I32 (I32.add d 1l) @@ at));
+        Plain (Const (I32 (I32.add s 1l) @@ at));
+        Plain (Const (I32 (I32.sub n 1l) @@ at));
+        Plain (TableCopy (x, y));
+        Plain (Const (I32 d @@ at));
+        Plain (Const (I32 s @@ at));
+        Plain (TableGet y);
+        Plain (TableSet x);
+      ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Table_copy_meta (Int32.succ idx, d, s, n, x, y, case) @@ at)
+      )
+  | None -> raise (Invalid_argument "table_copy_meta_instr")
+
+let memory_init_meta_instr idx d b n s x at =
+  let instrs =
+    [
+      Plain (Const (I32 d @@ at));
+      Plain (Const (I32 b @@ at));
+      Plain (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
+      Plain (Const (I32 (I32.add d 1l) @@ at));
+      Plain (Const (I32 (I32.add s 1l) @@ at));
+      Plain (Const (I32 (I32.sub n 1l) @@ at));
+      Plain (MemoryInit x);
+    ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Memory_init_meta (Int32.succ idx, d, b, n, s, x) @@ at) )
+  | None -> raise (Invalid_argument "memory_init_meta_instr")
+
+let memory_fill_meta_instr idx i k n at =
+  let instrs =
+    [
+      Plain (Const (I32 i @@ at));
+      Plain (Const (k @@ at));
+      Plain (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
+      Plain (Const (I32 (I32.add i 1l) @@ at));
+      Plain (Const (k @@ at));
+      Plain (Const (I32 (I32.sub n 1l) @@ at));
+      Plain MemoryFill;
+    ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Memory_fill_meta (Int32.succ idx, i, k, n) @@ at) )
+  | None -> raise (Invalid_argument "memory_init_meta_instr")
+
+let memory_copy_meta_instr idx d s n case at =
+  let instrs =
+    if case then
+      [
+        Plain (Const (I32 d @@ at));
+        Plain (Const (I32 s @@ at));
+        Plain
+          (Load {ty = I32Type; align = 0; offset = 0l; pack = Some (Pack8, ZX)});
+        Plain (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
+        Plain (Const (I32 (I32.add d 1l) @@ at));
+        Plain (Const (I32 (I32.add s 1l) @@ at));
+        Plain (Const (I32 (I32.sub n 1l) @@ at));
+        Plain MemoryCopy;
+      ]
+    else
+      [
+        Plain (Const (I32 (I32.add d 1l) @@ at));
+        Plain (Const (I32 (I32.add s 1l) @@ at));
+        Plain (Const (I32 (I32.sub n 1l) @@ at));
+        Plain MemoryCopy;
+        Plain (Const (I32 d @@ at));
+        Plain (Const (I32 s @@ at));
+        Plain
+          (Load {ty = I32Type; align = 0; offset = 0l; pack = Some (Pack8, ZX)});
+        Plain (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
+      ]
+  in
+  match List.nth_opt instrs (Int32.to_int idx) with
+  | Some instr ->
+      ( instr @@ at,
+        if List.length instrs <= Int32.to_int idx + 1 then None
+        else Some (Memory_copy_meta (Int32.succ idx, d, s, n, case) @@ at) )
+  | None -> raise (Invalid_argument "memory_copy_meta_instr")
 
 type code = value Vector.t * admin_instr Vector.t
 
@@ -692,19 +842,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
       else if n = 0l then label_kont_with_code vs' []
       else
         let _ = assert (I32.lt_u i 0xffff_ffffl) in
-        label_kont_with_code
-          vs'
-          (List.map
-             (Source.at at)
-             [
-               Plain (Const (I32 i @@ at));
-               Refer r;
-               Plain (TableSet x);
-               Plain (Const (I32 (I32.add i 1l) @@ at));
-               Refer r;
-               Plain (Const (I32 (I32.sub n 1l) @@ at));
-               Plain (TableFill x);
-             ])
+        label_kont_with_code vs' [Table_fill_meta (0l, i, n, r, x) @@ at]
   | TableCopy (x, y) ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -717,32 +855,9 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         (if oob_d || oob_s then [Trapping (table_error at Table.Bounds) @@ at]
         else if n = 0l then []
         else if I32.le_u d s then
-          List.map
-            (Source.at at)
-            [
-              Plain (Const (I32 d @@ at));
-              Plain (Const (I32 s @@ at));
-              Plain (TableGet y);
-              Plain (TableSet x);
-              Plain (Const (I32 (I32.add d 1l) @@ at));
-              Plain (Const (I32 (I32.add s 1l) @@ at));
-              Plain (Const (I32 (I32.sub n 1l) @@ at));
-              Plain (TableCopy (x, y));
-            ]
-        else
-          (* d > s *)
-          List.map
-            (Source.at at)
-            [
-              Plain (Const (I32 (I32.add d 1l) @@ at));
-              Plain (Const (I32 (I32.add s 1l) @@ at));
-              Plain (Const (I32 (I32.sub n 1l) @@ at));
-              Plain (TableCopy (x, y));
-              Plain (Const (I32 d @@ at));
-              Plain (Const (I32 s @@ at));
-              Plain (TableGet y);
-              Plain (TableSet x);
-            ])
+          [Table_copy_meta (0l, d, s, n, x, y, true) @@ at]
+        else (* d > s *)
+          [Table_copy_meta (0l, d, s, n, x, y, false) @@ at])
   | TableInit (x, y) ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -761,21 +876,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         let+ value = Instance.Vector.get s !seg in
         label_kont_with_code
           vs'
-          (List.map
-             (Source.at at)
-             [
-               Plain (Const (I32 d @@ at));
-               (* Note, the [Instance.Vector.get] is logarithmic in the number of
-                  contained elements in [seg]. However, in a scenario where the PVM
-                  runs, only the element that will be looked up is in the map
-                  making the look up cheap. *)
-               Refer value;
-               Plain (TableSet x);
-               Plain (Const (I32 (I32.add d 1l) @@ at));
-               Plain (Const (I32 (I32.add s 1l) @@ at));
-               Plain (Const (I32 (I32.sub n 1l) @@ at));
-               Plain (TableInit (x, y));
-             ])
+          [Table_init_meta (0l, value, d, s, n, x, y) @@ at]
   | ElemDrop x ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ seg = elem inst x in
@@ -937,19 +1038,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         vs'
         (if oob then [Trapping (memory_error at Memory.Bounds) @@ at]
         else if n = 0l then []
-        else
-          List.map
-            (Source.at at)
-            [
-              Plain (Const (I32 i @@ at));
-              Plain (Const (k @@ at));
-              Plain
-                (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-              Plain (Const (I32 (I32.add i 1l) @@ at));
-              Plain (Const (k @@ at));
-              Plain (Const (I32 (I32.sub n 1l) @@ at));
-              Plain MemoryFill;
-            ])
+        else [Memory_fill_meta (0l, i, k, n) @@ at])
   | MemoryCopy ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -961,49 +1050,9 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         vs'
         (if oob_s || oob_d then [Trapping (memory_error at Memory.Bounds) @@ at]
         else if n = 0l then []
-        else if I32.le_u d s then
-          List.map
-            (Source.at at)
-            [
-              Plain (Const (I32 d @@ at));
-              Plain (Const (I32 s @@ at));
-              Plain
-                (Load
-                   {
-                     ty = I32Type;
-                     align = 0;
-                     offset = 0l;
-                     pack = Some (Pack8, ZX);
-                   });
-              Plain
-                (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-              Plain (Const (I32 (I32.add d 1l) @@ at));
-              Plain (Const (I32 (I32.add s 1l) @@ at));
-              Plain (Const (I32 (I32.sub n 1l) @@ at));
-              Plain MemoryCopy;
-            ]
-        else
-          (* d > s *)
-          List.map
-            (Source.at at)
-            [
-              Plain (Const (I32 (I32.add d 1l) @@ at));
-              Plain (Const (I32 (I32.add s 1l) @@ at));
-              Plain (Const (I32 (I32.sub n 1l) @@ at));
-              Plain MemoryCopy;
-              Plain (Const (I32 d @@ at));
-              Plain (Const (I32 s @@ at));
-              Plain
-                (Load
-                   {
-                     ty = I32Type;
-                     align = 0;
-                     offset = 0l;
-                     pack = Some (Pack8, ZX);
-                   });
-              Plain
-                (Store {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-            ])
+        else if I32.le_u d s then [Memory_copy_meta (0l, d, s, n, true) @@ at]
+        else (* d > s *)
+          [Memory_copy_meta (0l, d, s, n, false) @@ at])
   | MemoryInit x ->
       (* Num (I32 n) :: Num (I32 s) :: Num (I32 d) :: vs' *)
       let* n, vs = vector_pop_map vs num_i32 at in
@@ -1022,21 +1071,7 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         let* seg = Ast.get_data !seg inst.allocations.datas in
         let+ b = Chunked_byte_vector.load_byte seg (Int64.of_int32 s) in
         let b = Int32.of_int b in
-        label_kont_with_code
-          vs'
-          (List.map
-             (Source.at at)
-             [
-               Plain (Const (I32 d @@ at));
-               Plain (Const (I32 b @@ at));
-               Plain
-                 (Store
-                    {ty = I32Type; align = 0; offset = 0l; pack = Some Pack8});
-               Plain (Const (I32 (I32.add d 1l) @@ at));
-               Plain (Const (I32 (I32.add s 1l) @@ at));
-               Plain (Const (I32 (I32.sub n 1l) @@ at));
-               Plain (MemoryInit x);
-             ])
+        label_kont_with_code vs' [Memory_init_meta (0l, d, b, n, s, x) @@ at]
   | DataDrop x ->
       let* inst = resolve_module_ref module_reg frame.inst in
       let+ seg = data inst x in
@@ -1237,6 +1272,18 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
       with exn ->
         label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
 
+(* This function is used to implement the logic of the “meta”
+   instruction for memory and memory manipulation. *)
+let push_admin_instr label es vs instr next stack =
+  LS_Modify_top
+    (Label_stack
+       ( {
+           label with
+           label_code =
+             (vs, Vector.prepend_list (instr :: Option.to_list next) es);
+         },
+         stack ))
+
 let label_step :
     Durable_storage.t ->
     module_reg ->
@@ -1327,6 +1374,26 @@ let label_step :
                 (LS_Craft_frame
                    ( Label_stack (label, stack),
                      Inv_start {func; code = (vs, es)} ))
+          | Table_init_meta (idx, value, d, s, n, x, y) ->
+              let instr, next =
+                table_init_meta_instr idx value d s n x y e.at
+              in
+              Lwt.return (push_admin_instr label es vs instr next stack)
+          | Table_fill_meta (idx, i, n, r, x) ->
+              let instr, next = table_fill_meta_instr idx i n r x e.at in
+              Lwt.return (push_admin_instr label es vs instr next stack)
+          | Table_copy_meta (idx, d, s, n, y, x, case) ->
+              let instr, next = table_copy_meta_instr idx d s n y x case e.at in
+              Lwt.return (push_admin_instr label es vs instr next stack)
+          | Memory_init_meta (idx, d, b, n, s, x) ->
+              let instr, next = memory_init_meta_instr idx d b n s x e.at in
+              Lwt.return (push_admin_instr label es vs instr next stack)
+          | Memory_fill_meta (idx, i, k, n) ->
+              let instr, next = memory_fill_meta_instr idx i k n e.at in
+              Lwt.return (push_admin_instr label es vs instr next stack)
+          | Memory_copy_meta (idx, d, s, n, case) ->
+              let instr, next = memory_copy_meta_instr idx d s n case e.at in
+              Lwt.return (push_admin_instr label es vs instr next stack)
         in
         (durable, kont)
       else if Vector.num_elements stack = 0l then
