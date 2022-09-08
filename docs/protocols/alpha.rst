@@ -33,7 +33,136 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 - Introduce an Q module, making a subset of Zarith.Q available to the
   protocol (MR :gl:`!6042`)
 
+Consensus key
+-------------
 
+The "consensus key" feature allows bakers to use a different key,
+called the *consensus key* for consensus, that is, for baking and for
+signing consensus operations (i.e. preendorsements and
+endorsements). It also allows them to update this key. The update
+becomes active after ``PRESERVED_CYCLES + 1`` cycles. We therefore
+distinguish the *active* consensus key and the *pending* consensus
+keys. (There can be multiple pending updates.) The active consensus
+key is by default the baker's regular key, called its *manager key*,
+which cannot change.
+
+Two new operations have been added:
+
+  ``Update_consensus_key (<public_key>)``
+      This is a manager operation that must be signed by the manager
+      key of a baker.  This operation updates the consensus key of the
+      baker to ``public_key`` starting from the current cycle plus
+      ``PRESERVED_CYCLES + 1``.  A consensus key can only be used by a
+      single baker, the operation fails otherwise.
+
+  ``Drain_delegate (<baker_pkh, consensus_pkh, destination_pkh>)``
+     This is an operation that must be signed by the active consensus
+     key ``consensus_pkh`` of the baker ``baker_pkh``.  This operation
+     immediately transfers all the spendable balance of the
+     ``baker_pkh``'s implicit account into the ``destination_pkh``
+     implicit account. It has no effect on the frozen balance.  This
+     operation is included in pass 2 (anonymous operations). So drain
+     operations don't compete with regular manager operations for gas
+     and block size quota; the :doc:`1M restriction<014_kathmandu>`
+     (one-operation-per-manager-per-block) applies to drain operations
+     as well, meaning that a drain for a baker and a transfer
+     operation from the same baker are in conflict. As an incentive
+     for bakers to include drain operations, a fixed fraction of the
+     drained baker's spendable balance is transferred as fees to the
+     baker that includes the operation, i.e. the maximum between 1tz
+     or 1% of the spendable balance.
+
+(Breaking changes) Some existing RPCs have been updated:
+
+- ``/chains/main/blocks/head/metadata``
+
+  The block metadata is extended with the active consensus key of the
+  baker and the proposer. The fields ``proposer`` and ``baker`` still
+  hold the respective public key hashes of the manager keys of the
+  proposer and the baker.
+
+::
+ 
+  "proposer_consensus_key": "[PUBLIC_KEY_HASH]",
+  "baker_consensus_key": "[PUBLIC_KEY_HASH]",
+
+- ``/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]``
+
+  The delegate data is extended with the active and pending consensus keys.
+
+::
+
+ {"full_balance": "4000000000000",
+  "current_frozen_deposits": "200000000000",
+  "frozen_deposits": "200000000000",
+  "staking_balance": "4000000000000",
+  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
+  "delegated_balance": "0",
+  "deactivated": false,
+  "grace_period": 5,
+  "voting_power": "4000000000000",
+  "active_consensus_key": "[PUBLIC_KEY_HASH]",
+  "pending_consensus_keys": [
+      { "cycle": 7, "pkh": "[PUBLIC_KEY_HASH]},
+      { "cycle": 9, "pkh": "[PUBLIC_KEY_HASH]}
+    ]}}
+
+
+- ``/chains/main/blocks/head/helpers/baking_rights``
+
+  The baking rights RPC now returns both the manager key, required to
+  identify the rewarded delegate, and the active consensus key
+  required to sign a block. The RPC also accepts a new parameter
+  ``consensus_key=<pkh>`` to filter the result by the active consensus
+  key.
+
+::
+
+ [{ "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 0, "estimated_time": "[TIMESTAMP]",
+    "consensus_key": "[PUBLIC_KEY_HASH]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 1, "estimated_time": "[TIMESTAMP]",
+    "consensus_key": "[PUBLIC_KEY_HASH]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 2, "estimated_time": "[TIMESTAMP]",
+    "consensus_key": "[PUBLIC_KEY_HASH]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 3, "estimated_time": "[TIMESTAMP]",
+    "consensus_key": "[PUBLIC_KEY_HASH]" },
+  { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
+    "round": 10, "estimated_time": "[TIMESTAMP]",
+    "consensus_key": "[PUBLIC_KEY_HASH]" }]
+
+- ``/chains/main/blocks/head/helpers/endorsing_rights``
+
+  The endorsing rights RPC now returns both the manager key, required
+  to identify the rewarded delegate, and the active consensus key
+  required to sign a block. The RPC also accepts a new parameter
+  ``consensus_key=<pkh>`` to filter the result by the active consensus
+  key.
+
+::
+
+ [ { "level": 1,
+     "delegates":
+      [ { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 11, "endorsing_power": 50,
+          "consensus_key": "[PUBLIC_KEY_HASH]" },
+        { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 4, "endorsing_power": 47,
+          "consensus_key": "[PUBLIC_KEY_HASH]" },
+        { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 2, "endorsing_power": 46,
+          "consensus_key": "[PUBLIC_KEY_HASH]" },
+        { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 1, "endorsing_power": 55,
+          "consensus_key": "[PUBLIC_KEY_HASH]" },
+        { "delegate": "[PUBLIC_KEY_HASH]",
+          "first_slot": 0, "endorsing_power": 58,
+          "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
+
+MRs: :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
