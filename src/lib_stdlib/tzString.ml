@@ -58,6 +58,38 @@ let split_no_empty delim ?(limit = max_int) path =
   in
   if limit > 0 then do_slashes [] limit 0 else [path]
 
+let chunk_bytes_strict error_on_partial_chunk n b =
+  let l = Bytes.length b in
+  if l mod n <> 0 then Error error_on_partial_chunk
+  else
+    let rec split seq offset =
+      if offset = l then List.rev seq
+      else
+        let s = Bytes.sub_string b offset n in
+        split (s :: seq) (offset + n)
+    in
+    Ok (split [] 0)
+
+let chunk_bytes_loose n b =
+  let l = Bytes.length b in
+  let rec split seq offset =
+    if offset = l then List.rev seq
+    else if offset + n > l then
+      List.rev (Bytes.sub_string b offset (l - offset) :: seq)
+    else
+      let s = Bytes.sub_string b offset n in
+      split (s :: seq) (offset + n)
+  in
+  split [] 0
+
+let chunk_bytes ?error_on_partial_chunk n b =
+  if n <= 0 then raise @@ Invalid_argument "chunk_bytes"
+  else
+    match error_on_partial_chunk with
+    | Some error_on_partial_chunk ->
+        chunk_bytes_strict error_on_partial_chunk n b
+    | None -> Ok (chunk_bytes_loose n b)
+
 let has_prefix ~prefix s =
   let x = String.length prefix in
   let n = String.length s in
