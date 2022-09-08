@@ -80,6 +80,8 @@ module Index : sig
   val to_int : t -> int
 
   val compare : t -> t -> int
+
+  val equal : t -> t -> bool
 end
 
 type header = Header.t
@@ -87,6 +89,8 @@ type header = Header.t
 type t = {level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
+
+val equal : t -> t -> bool
 
 (** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t

@@ -196,6 +196,8 @@ module Inner = struct
 
     let zero = Bls12_381.G1.zero
 
+    let equal = Bls12_381.G1.eq
+
     let commitment_to_bytes = Bls12_381.G1.to_compressed_bytes
 
     let commitment_of_bytes_opt = Bls12_381.G1.of_compressed_bytes_opt

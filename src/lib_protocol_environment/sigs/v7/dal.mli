@@ -56,6 +56,8 @@ module Commitment : sig
 
   val zero : commitment
 
+  val equal : commitment -> commitment -> bool
+
   val pp : Format.formatter -> commitment -> unit
 end
 
