@@ -796,4 +796,4 @@ let config_gen ~host_funcs ~module_reg =
   let* output = output_buffer_gen in
   let* stack_size_limit = small_int in
   let+ step_kont = step_kont_gen ~module_reg in
-  Eval.{input; output; step_kont; host_funcs; stack_size_limit; durable = None}
+  Eval.{input; output; step_kont; host_funcs; stack_size_limit}

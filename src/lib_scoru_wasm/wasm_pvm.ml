@@ -172,11 +172,11 @@ struct
           let self = Wasm.Instance.Module_key wasm_main_module_name in
           (* The module instance is registered in [self] that contains the
              module registry, why we can ignore the result here. *)
-          Lwt.return (Init {self; ast_module; init_kont = IK_Start})
+          Lwt.return (durable, Init {self; ast_module; init_kont = IK_Start})
       | Decode m ->
           let* kernel = Durable.find_value_exn durable kernel_key in
           let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
-          Decode m
+          (durable, Decode m)
       | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
@@ -204,14 +204,15 @@ struct
                   (Lazy_containers.Lazy_vector.Int32Vector.singleton
                      admin_instr)
               in
-              Lwt.return (Eval eval_config)
+              Lwt.return (durable, Eval eval_config)
           | _ ->
               (* We require a function with the name [main] to be exported
                  rather than any other structure. *)
               Lwt.return
-                (Stuck
-                   (Invalid_state "Invalid_module: no `main` function exported"))
-          )
+                ( durable,
+                  Stuck
+                    (Invalid_state "Invalid_module: no `main` function exported")
+                ))
       | Init {self; ast_module; init_kont} ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3786
              Tickify linking, which implies taking care of Utf8 decoding *)
@@ -247,14 +248,15 @@ struct
               externs
               init_kont
           in
-          Lwt.return (Init {self; ast_module; init_kont})
+          Lwt.return (durable, Init {self; ast_module; init_kont})
       | Eval eval_config ->
-          let eval_config =
-            {eval_config with durable = Some (Durable.to_tree durable)}
+          let store = Durable.to_storage durable in
+          let+ store', eval_config =
+            Wasm.Eval.step ~durable:store module_reg eval_config
           in
-          let+ eval_config = Wasm.Eval.step module_reg eval_config in
-          Eval eval_config
-      | Stuck e -> Lwt.return (Stuck e)
+          let durable' = Durable.of_storage ~default:durable store' in
+          (durable', Eval eval_config)
+      | Stuck e -> Lwt.return (durable, Stuck e)
 
     let next_tick_state pvm_state =
       let to_stuck exn =
@@ -269,7 +271,7 @@ struct
               | Stuck _ -> Unknown_error error.raw_exception)
           | `Unknown raw_exception -> Unknown_error raw_exception
         in
-        Lwt.return (Stuck wasm_error)
+        Lwt.return (pvm_state.durable, Stuck wasm_error)
       in
       Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
@@ -277,7 +279,7 @@ struct
       let open Lwt_syntax in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Calculate the next tick state. *)
-      let* tick_state = next_tick_state pvm_state in
+      let* durable, tick_state = next_tick_state pvm_state in
       let input_request, tick_state =
         match tick_state with
         | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
@@ -294,11 +296,6 @@ struct
                    }) )
         | Stuck _ -> (Wasm_pvm_sig.Input_required, tick_state)
         | _ -> (Wasm_pvm_sig.No_input_required, tick_state)
-      in
-      let durable =
-        match pvm_state.tick_state with
-        | Eval {durable = Some tree; _} -> Durable.of_tree tree
-        | _ -> pvm_state.durable
       in
       (* Update the tick state, input-request, durable and increment the
          current tick *)

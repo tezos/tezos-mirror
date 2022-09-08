@@ -545,9 +545,7 @@ let pp_output_buffer out (output : Output_buffer.t) =
     (Output_buffer.Level_Vector.snapshot output)
 
 let pp_config out
-    Eval.
-      {input; output; step_kont; host_funcs = _; stack_size_limit; durable = _}
-    =
+    Eval.{input; output; step_kont; host_funcs = _; stack_size_limit} =
   Format.fprintf
     out
     "@[<v 2>{input = %a;@;output = %a;@;frame_kont = %a;@;budget = %i;@;}@]"

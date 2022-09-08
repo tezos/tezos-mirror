@@ -176,7 +176,7 @@ let test_host_fun () =
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
 
-  let* result =
+  let* _, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key

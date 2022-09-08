@@ -2,10 +2,10 @@ type host_func =
   | Host_func of
       (Input_buffer.t ->
       Output_buffer.t ->
-      Lazy_map.tree option ->
+      Durable_storage.t ->
       Instance.memory_inst Instance.Vector.t ->
       Values.value list ->
-      Values.value list Lwt.t)
+      (Durable_storage.t * Values.value list) Lwt.t)
 [@@ocaml.unboxed]
 
 module Registry = Map.Make (String)

@@ -130,7 +130,6 @@ type config = {
   input : input_inst;
   output : output_inst;
   step_kont : step_kont;
-  durable : Lazy_map.tree option;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
 }
@@ -236,18 +235,21 @@ val invoke :
   caller:module_key ->
   ?input:Input_buffer.t ->
   ?output:Output_buffer.t ->
-  ?durable:Lazy_map.tree ->
+  ?durable:Durable_storage.t ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
-  value list Lwt.t (* raises Trap *)
+  (Durable_storage.t * value list) Lwt.t (* raises Trap *)
 
-val step : module_reg -> config -> config Lwt.t
+val step :
+  ?durable:Durable_storage.t ->
+  module_reg ->
+  config ->
+  (Durable_storage.t * config) Lwt.t
 
 val config :
   ?input:input_inst ->
   ?output:output_inst ->
-  ?durable:Lazy_map.tree ->
   Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->

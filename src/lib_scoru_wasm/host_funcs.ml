@@ -97,7 +97,7 @@ let read_input_name = "tezos_read_input"
 
 let read_input =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer _durable memories inputs ->
+    (fun input_buffer output_buffer durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [
@@ -119,7 +119,7 @@ let read_input =
               ~dst
               ~max_bytes
           in
-          Lwt.return [Values.(Num (I32 (I32.of_int_s x)))]
+          Lwt.return (durable, [Values.(Num (I32 (I32.of_int_s x)))])
       | _ -> raise Bad_input)
 
 let write_output_name = "tezos_write_output"
@@ -133,7 +133,7 @@ let write_output_type =
 
 let write_output =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer _durable memories inputs ->
+    (fun input_buffer output_buffer durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
@@ -146,7 +146,7 @@ let write_output =
               ~src
               ~num_bytes
           in
-          Lwt.return [Values.(Num (I32 x))]
+          Lwt.return (durable, [Values.(Num (I32 x))])
       | _ -> raise Bad_input)
 
 let lookup name =

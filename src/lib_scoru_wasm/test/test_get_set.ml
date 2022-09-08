@@ -227,7 +227,6 @@ let test_set_input () =
       {
         input = Input_buffer.alloc ();
         output = Output_buffer.alloc ();
-        durable = None;
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
@@ -280,7 +279,6 @@ let test_get_output () =
       {
         input = Input_buffer.alloc ();
         output;
-        durable = None;
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
