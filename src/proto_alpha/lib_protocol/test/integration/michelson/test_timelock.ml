@@ -32,6 +32,7 @@
 *)
 
 open Protocol
+open Lwt_result_syntax
 
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
@@ -54,7 +55,30 @@ let simple_test () =
   assert (result = expected_result) ;
   return_unit
 
-let contract_test () =
+let deprecated_chest_open () =
+  (* Verify contract fails origination legacy *)
+  let* block, baker, source_contract, _src2 = Contract_helpers.init () in
+  let storage = "0xdeadbeef" in
+  let script = Contract_helpers.read_file "./contracts/timelock.tz" in
+  Contract_helpers.originate_contract_from_string_hash
+    ~script
+    ~storage
+    ~source_contract
+    ~baker
+    block
+  >>= function
+  | Ok _ -> Alcotest.fail "script originated successfully, expected an error"
+  | Error lst
+    when List.mem
+           ~equal:( = )
+           (Environment.Ecoproto_error
+              (Script_tc_errors.Deprecated_instruction I_OPEN_CHEST))
+           lst ->
+      return ()
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
+
+let disabled_contract_test () =
   (* Parse a Michelson contract from string. *)
   let originate_contract file storage src b =
     let load_file f =
@@ -163,5 +187,6 @@ let contract_test () =
 let tests =
   [
     Tztest.tztest "simple test" `Quick simple_test;
-    Tztest.tztest "contract test" `Quick contract_test;
+    Tztest.tztest "deprecated chest_open" `Quick deprecated_chest_open
+    (* Tztest.tztest "contract test" `Quick disabled_contract_test; *);
   ]
