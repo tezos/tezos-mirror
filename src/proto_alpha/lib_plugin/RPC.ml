@@ -2025,10 +2025,10 @@ module Sc_rollup = struct
                Format.asprintf "%a" Sc_rollup.Staker.pp x)
         |> seal
       in
-      let output = Data_encoding.option Sc_rollup.Game.player_encoding in
+      let output = Data_encoding.option Sc_rollup.Game.outcome_encoding in
       RPC_service.get_service
         ~description:
-          "Returns whether the timeout is reached for the current player."
+          "Returns whether the timeout creates an outcome for the game."
         ~query
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout_reached")
@@ -2183,10 +2183,7 @@ module Sc_rollup = struct
         let index = Sc_rollup.Game.Index.make staker1 staker2 in
         let*! res = Sc_rollup.Refutation_storage.timeout context rollup index in
         match res with
-        | Ok (outcome, _context) ->
-            (* If a timeout operation succeeds, there must be a loser. *)
-            let loser = WithExceptions.Option.get ~loc:__LOC__ outcome.loser in
-            return_some loser
+        | Ok (outcome, _context) -> return_some outcome
         | Error _ -> return_none)
 
   let register_can_be_cemented () =

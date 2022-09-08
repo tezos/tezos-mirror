@@ -321,7 +321,17 @@ let timeout ctxt rollup stakers =
          ( level_of_timeout,
            match game.turn with Alice -> stakers.alice | Bob -> stakers.bob ))
   in
-  return (Sc_rollup_game_repr.{loser = Some game.turn; reason = Timeout}, ctxt)
+  let outcome =
+    match game.game_state with
+    | Dissecting _ ->
+        (* Timeout during the dissecting results in a loss. *)
+        Sc_rollup_game_repr.{loser = Some game.turn; reason = Timeout}
+    | Final_move {agreed_start_chunk = _; refuted_stop_chunk = _} ->
+        (* Timeout-ed because the opponent played an invalid move and
+           the current player is not playing. Both are invalid moves. *)
+        Sc_rollup_game_repr.{loser = None; reason = Conflict_resolved}
+  in
+  return (outcome, ctxt)
 
 let reward ctxt winner =
   let open Lwt_tzresult_syntax in
