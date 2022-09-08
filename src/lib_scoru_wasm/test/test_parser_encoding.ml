@@ -1082,8 +1082,12 @@ module Module = struct
       let* func_types = Vec.gen Ast_generators.var_gen in
       let* func_bodies = Field.code_field_gen in
       let* func_kont = LazyVec.gen Code.func_gen in
+      let* iterators =
+        option (LazyVec.gen (LazyVec.gen Ast_generators.instr_gen))
+      in
       let+ datas_in_func = bool in
-      Decode.MKElaborateFunc (func_types, func_bodies, func_kont, datas_in_func)
+      Decode.MKElaborateFunc
+        (func_types, func_bodies, func_kont, iterators, datas_in_func)
     in
     let build =
       let* funcs = opt (Vec.gen Code.func_gen) in
@@ -1240,6 +1244,14 @@ module Module = struct
 
   let check_without_region check x y = check x.Source.it y.Source.it
 
+  let check_option f x y =
+    match (x, y) with
+    | Some x, Some y -> f x y
+    | None, None -> Lwt_result.return true
+    | _, _ -> Lwt_result.return false
+
+  let eq_instr i i' = Lwt_result.return (i = i')
+
   let check mk mk' =
     let open Lwt_result_syntax in
     match (mk, mk') with
@@ -1258,17 +1270,23 @@ module Module = struct
         in
         let+ eq_size = Size.check size size' in
         eq_kont && eq_size && Field.check_field_type ft ft'
-    | ( MKElaborateFunc (fts, fbs, kont, datas),
-        MKElaborateFunc (fts', fbs', kont', datas') ) ->
+    | ( MKElaborateFunc (fts, fbs, kont, iterators, datas),
+        MKElaborateFunc (fts', fbs', kont', iterators', datas') ) ->
         let eq_vars v v' = return (v = v') in
         let* eq_fts = Vec.check eq_vars fts fts' in
         let* eq_fbs =
           Vec.check (check_without_region Code.check_func) fbs fbs'
         in
+        let* eq_its =
+          check_option
+            (LazyVec.check (LazyVec.check eq_instr))
+            iterators
+            iterators'
+        in
         let+ eq_kont =
           LazyVec.check (check_without_region Code.check_func) kont kont'
         in
-        eq_fts && eq_fbs && eq_kont && datas = datas'
+        eq_fts && eq_fbs && eq_kont && eq_its && datas = datas'
     | MKBuild (Some funcs, datas), MKBuild (Some funcs', datas') ->
         let+ eq_funcs =
           Vec.check (check_without_region Code.check_func) funcs funcs'

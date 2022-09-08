@@ -1,6 +1,21 @@
 open Values
 open Instance
 
+(* Kontinuation *)
+
+type ('a, 'b) map_kont = {
+  origin : 'a Vector.t;
+  destination : 'b Vector.t;
+  offset : int32;
+}
+
+type 'a concat_kont = {
+  lv : 'a Vector.t;
+  rv : 'a Vector.t;
+  res : 'a Vector.t;
+  offset : int32;
+}
+
 exception Link of Source.region * string
 
 exception Trap of Source.region * string
@@ -21,11 +36,9 @@ type init_state =
     initialization. *)
 exception Init_step_error of init_state
 
-type frame = {inst : module_key; locals : value ref list}
+type frame = {inst : module_key; locals : value ref Vector.t}
 
-type code = value list * admin_instr list
-
-and admin_instr = admin_instr' Source.phrase
+type admin_instr = admin_instr' Source.phrase
 
 and admin_instr' =
   | From_block of Ast.block_label * int32
@@ -33,37 +46,98 @@ and admin_instr' =
   | Refer of ref_
   | Invoke of func_inst
   | Trapping of string
-  | Returning of value list
-  | Breaking of int32 * value list
-  | Label of int32 * Ast.instr list * code
-  | Frame of int32 * frame * code
+  | Returning of value Vector.t
+  | Breaking of int32 * value Vector.t
+
+type code = value Vector.t * admin_instr Vector.t
+
+type label = {
+  label_arity : int32 option;
+  label_frame_specs : frame;
+  label_break : Ast.instr option;
+  label_code : code;
+}
+
+type ongoing = Ongoing_kind
+
+type finished = Finished_kind
+
+type _ label_kont =
+  | Label_stack : label * label Vector.t -> ongoing label_kont
+  | Label_result : value Vector.t -> finished label_kont
+  | Label_trapped : string Source.phrase -> finished label_kont
+
+type 'a frame_stack = {
+  frame_arity : int32 option;
+  frame_specs : frame;
+  frame_label_kont : 'a label_kont;
+}
+
+type invoke_step_kont =
+  | Inv_start of {func : func_inst; code : code}
+  | Inv_prepare_locals of {
+      arity : int32;
+      args : value Vector.t;
+      vs : value Vector.t;
+      instructions : admin_instr Vector.t;
+      inst : module_key;
+      func : Ast.func;
+      locals_kont : (Types.value_type, value ref) map_kont;
+    }
+  | Inv_prepare_args of {
+      arity : int32;
+      vs : value Vector.t;
+      instructions : admin_instr Vector.t;
+      inst : module_key;
+      func : Ast.func;
+      locals : value ref Vector.t;
+      args_kont : (value, value ref) map_kont;
+    }
+  | Inv_concat of {
+      arity : int32;
+      vs : value Vector.t;
+      instructions : admin_instr Vector.t;
+      inst : module_key;
+      func : Ast.func;
+      concat_kont : value ref concat_kont;
+    }
+  | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+
+type label_step_kont =
+  | LS_Start : ongoing label_kont -> label_step_kont
+  | LS_Craft_frame of ongoing label_kont * invoke_step_kont
+  | LS_Push_frame of ongoing label_kont * ongoing frame_stack
+  | LS_Consolidate_top of
+      label * value concat_kont * admin_instr Vector.t * label Vector.t
+  | LS_Modify_top : 'a label_kont -> label_step_kont
+
+type step_kont =
+  | SK_Start : 'a frame_stack * ongoing frame_stack Vector.t -> step_kont
+  | SK_Next :
+      'a frame_stack * ongoing frame_stack Vector.t * label_step_kont
+      -> step_kont
+  | SK_Consolidate_label_result of
+      ongoing frame_stack
+      * ongoing frame_stack Vector.t
+      * label
+      * value concat_kont
+      * admin_instr Vector.t
+      * label Vector.t
+  | SK_Result of value Vector.t
+  | SK_Trapped of string Source.phrase
 
 type config = {
-  frame : frame;
   input : input_inst;
   output : output_inst;
-  code : code;
+  step_kont : step_kont;
   host_funcs : Host_funcs.registry;
-  budget : int; (* to model stack overflow *)
+  stack_size_limit : int;
 }
 
 type ('a, 'b, 'acc) fold_right2_kont = {
   acc : 'acc;
   lv : 'a Vector.t;
   rv : 'b Vector.t;
-  offset : int32;
-}
-
-type ('a, 'b) map_kont = {
-  origin : 'a Vector.t;
-  destination : 'b Vector.t;
-  offset : int32;
-}
-
-type 'a concat_kont = {
-  lv : 'a Vector.t;
-  rv : 'a Vector.t;
-  res : 'a Vector.t;
   offset : int32;
 }
 
@@ -163,7 +237,8 @@ val config :
   ?input:input_inst ->
   ?output:output_inst ->
   Host_funcs.registry ->
+  ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
-  value list ->
-  admin_instr list ->
+  value Vector.t ->
+  admin_instr Vector.t ->
   config

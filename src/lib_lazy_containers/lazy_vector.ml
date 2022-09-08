@@ -84,9 +84,13 @@ module type S = sig
 
   val cons : 'a -> 'a t -> 'a t
 
+  val split : 'a t -> key -> 'a t * 'a t
+
   val grow : ?default:(unit -> 'a) -> key -> 'a t -> 'a t
 
   val pop : 'a t -> ('a * 'a t) Lwt.t
+
+  val prepend_list : 'a list -> 'a t -> 'a t
 
   val append : 'a -> 'a t -> 'a t * key
 
@@ -176,6 +180,20 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     let num_elements = Key.succ map.num_elements in
     {first; values; num_elements}
 
+  let split vec at =
+    if
+      Key.(
+        unsigned_compare at zero < 0
+        || unsigned_compare (num_elements vec) at < 0)
+    then raise Bounds
+    else
+      ( {first = vec.first; num_elements = at; values = Map.dup vec.values},
+        {
+          first = Key.(add vec.first at);
+          num_elements = Key.(sub vec.num_elements at);
+          values = Map.dup vec.values;
+        } )
+
   let append_opt elt map =
     let num_elements = map.num_elements in
     let map = {map with num_elements = Key.succ num_elements} in
@@ -197,6 +215,11 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     else raise Bounds
 
   let append elt map = append_opt (Some elt) map
+
+  let prepend_list es es0 =
+    let es = List.rev es in
+    let rec aux v = function x :: rst -> aux (cons x v) rst | [] -> v in
+    aux es0 es
 
   let rec grow ?default delta map =
     if Key.(delta <= zero) then map

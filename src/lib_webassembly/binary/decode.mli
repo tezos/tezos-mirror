@@ -223,7 +223,11 @@ type module_kont =
   | MKField : ('a, vec_repr) field_type * size * 'a lazy_vec_kont -> module_kont
       (** Section currently parsed, accumulating each element from the underlying vector. *)
   | MKElaborateFunc :
-      Ast.var Vector.t * Ast.func Vector.t * Ast.func lazy_vec_kont * bool
+      Ast.var Vector.t
+      * Ast.func Vector.t
+      * Ast.func lazy_vec_kont
+      * Ast.instr lazy_vec_kont lazy_vec_kont option
+      * bool
       -> module_kont
       (** Elaboration of functions from the code section with their declared type in
       the func section, and accumulating invariants conditions associated to

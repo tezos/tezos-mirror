@@ -25,6 +25,7 @@
 
 open Tezos_webassembly_interpreter
 open Lazy_containers
+open Kont_encodings
 
 exception Uninitialized_current_module
 
@@ -38,18 +39,27 @@ module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 (** Utility function*)
 let string_tag = value [] Data_encoding.string
 
-let list_encoding item_enc =
-  let vector = int32_lazy_vector (value [] Data_encoding.int32) item_enc in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3076
-     This should return a [Instance.Vector.t] instead of a list. Once the AST
-     has been sufficiently adapted to lazy vectors and maps, this change can
-     go forward. *)
-  conv_lwt V.to_list (fun list -> Lwt.return (V.of_list list)) vector
-
 let lazy_vector_encoding field_name tree_encoding =
   scope
     [field_name]
     (int32_lazy_vector (value [] Data_encoding.int32) tree_encoding)
+
+let lazy_vector_encoding' tree_encoding =
+  int32_lazy_vector (value [] Data_encoding.int32) tree_encoding
+
+let func_encoding =
+  let ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
+  let locals =
+    lazy_vector_encoding
+      "locals"
+      (value [] Interpreter_encodings.Types.value_type_encoding)
+  in
+  let body = value ["body"] Interpreter_encodings.Ast.block_label_encoding in
+  conv
+    (fun (ftype, locals, body) ->
+      Source.(Ast.{ftype; locals; body} @@ no_region))
+    (fun {it = {ftype; locals; body}; _} -> (ftype, locals, body))
+    (tup3 ~flatten:true ftype locals body)
 
 let function_type_encoding =
   conv
@@ -65,7 +75,7 @@ let function_type_encoding =
           (value [] Interpreter_encodings.Types.value_type_encoding)))
 
 let var_list_encoding =
-  list_encoding (value [] Interpreter_encodings.Ast.var_encoding)
+  value [] (Data_encoding.list Interpreter_encodings.Ast.var_encoding)
 
 let block_label_encoding =
   value [] Interpreter_encodings.Ast.block_label_encoding
@@ -533,7 +543,7 @@ let value_encoding =
         (fun r -> Values.Ref r);
     ]
 
-let values_encoding = list_encoding value_encoding
+let values_encoding = lazy_vector_encoding' value_encoding
 
 let name_encoding key = lazy_vector_encoding key (value [] Data_encoding.int31)
 
@@ -710,14 +720,13 @@ let module_instances_encoding =
     (scope ["modules"] (ModuleMap.lazy_map module_instance_encoding))
 
 let frame_encoding =
-  let locals_encoding = list_encoding @@ conv ref ( ! ) @@ value_encoding in
   conv
     (fun (inst, locals) -> Eval.{inst; locals})
     (fun Eval.{inst; locals} -> (inst, locals))
     (tup2
        ~flatten:true
        (scope ["module"] module_key_encoding)
-       (scope ["locals"] locals_encoding))
+       (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding)))
 
 let rec admin_instr'_encoding () =
   let open Eval in
@@ -764,34 +773,6 @@ let rec admin_instr'_encoding () =
         (function
           | Breaking (index, values) -> Some (index, values) | _ -> None)
         (fun (index, values) -> Breaking (index, values));
-      case
-        "Label"
-        (tup4
-           ~flatten:false
-           (value [] Data_encoding.int32)
-           (list_encoding instruction_encoding)
-           values_encoding
-           (list_encoding (admin_instr_encoding ())))
-        (function
-          | Label (index, final_instrs, (values, instrs)) ->
-              Some (index, final_instrs, values, instrs)
-          | _ -> None)
-        (fun (index, final_instrs, values, instrs) ->
-          Label (index, final_instrs, (values, instrs)));
-      case
-        "Frame"
-        (tup4
-           ~flatten:false
-           (value [] Data_encoding.int32)
-           frame_encoding
-           values_encoding
-           (list_encoding (admin_instr_encoding ())))
-        (function
-          | Frame (index, frame, (values, instrs)) ->
-              Some (index, frame, values, instrs)
-          | _ -> None)
-        (fun (index, frame, values, instrs) ->
-          Frame (index, frame, (values, instrs)));
     ]
 
 and admin_instr_encoding () =
@@ -838,6 +819,287 @@ let input_buffer_encoding =
              input_buffer_message_encoding))
        (value ["num-messages"] Data_encoding.z))
 
+let label_encoding =
+  conv
+    (fun (label_arity, label_frame_specs, label_break, vs, es) ->
+      Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)})
+    (fun {label_arity; label_frame_specs; label_break; label_code = vs, es} ->
+      (label_arity, label_frame_specs, label_break, vs, es))
+    (tup5
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_break"] (option instruction_encoding))
+       (scope ["values"] values_encoding)
+       (lazy_vector_encoding "instructions" admin_instr_encoding))
+
+let ongoing_label_kont_encoding : Eval.ongoing Eval.label_kont t =
+  tagged_union
+    string_tag
+    [
+      case
+        "Label_stack"
+        (tup2
+           ~flatten:true
+           (scope ["top"] label_encoding)
+           (lazy_vector_encoding "rst" label_encoding))
+        (function Eval.Label_stack (label, stack) -> Some (label, stack))
+        (fun (label, stack) -> Label_stack (label, stack));
+    ]
+
+type packed_label_kont = Packed : 'a Eval.label_kont -> packed_label_kont
+
+let packed_label_kont_encoding : packed_label_kont t =
+  tagged_union
+    string_tag
+    [
+      case
+        "Label_stack"
+        (tup2
+           ~flatten:true
+           (scope ["top"] label_encoding)
+           (lazy_vector_encoding "rst" label_encoding))
+        (function
+          | Packed (Label_stack (label, stack)) -> Some (label, stack)
+          | _ -> None)
+        (fun (label, stack) -> Packed (Label_stack (label, stack)));
+      case
+        "Label_result"
+        values_encoding
+        (function Packed (Label_result vs0) -> Some vs0 | _ -> None)
+        (fun vs0 -> Packed (Label_result vs0));
+      case
+        "Label_trapped"
+        (value [] Data_encoding.string)
+        (function Packed (Label_trapped msg) -> Some msg.it | _ -> None)
+        (fun msg -> Packed (Label_trapped Source.(msg @@ no_region)));
+    ]
+
+let ongoing_frame_stack_encoding =
+  conv
+    (fun (frame_arity, frame_specs, frame_label_kont) ->
+      Eval.{frame_arity; frame_specs; frame_label_kont})
+    (fun {frame_arity; frame_specs; frame_label_kont} ->
+      (frame_arity, frame_specs, frame_label_kont))
+    (tup3
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_kont"] ongoing_label_kont_encoding))
+
+type packed_frame_stack =
+  | Packed_fs : 'a Eval.frame_stack -> packed_frame_stack
+
+let packed_frame_stack_encoding =
+  conv
+    (fun (frame_arity, frame_specs, Packed frame_label_kont) ->
+      Packed_fs Eval.{frame_arity; frame_specs; frame_label_kont})
+    (function
+      | Packed_fs Eval.{frame_arity; frame_specs; frame_label_kont} ->
+          (frame_arity, frame_specs, Packed frame_label_kont))
+    (tup3
+       ~flatten:true
+       (value_option ["arity"] Data_encoding.int32)
+       (scope ["frame"] frame_encoding)
+       (scope ["label_kont"] packed_label_kont_encoding))
+
+let invoke_step_kont_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "Inv_start"
+        (tup3
+           ~flatten:true
+           (scope ["func"] function_encoding)
+           (scope ["values"] values_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding))
+        (function
+          | Eval.Inv_start {func; code = vs, es} -> Some (func, vs, es)
+          | _ -> None)
+        (fun (func, vs, es) -> Inv_start {func; code = (vs, es)});
+      case
+        "Inv_prepare_locals"
+        (tup7
+           ~flatten:true
+           (value ["arity"] Data_encoding.int32)
+           (lazy_vector_encoding "args" value_encoding)
+           (lazy_vector_encoding "values" value_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (scope ["inst"] module_key_encoding)
+           (scope ["func"] func_encoding)
+           (scope
+              ["kont"]
+              (map_kont_encoding
+                 (lazy_vector_encoding
+                    "x"
+                    (value [] Interpreter_encodings.Types.value_type_encoding))
+                 (lazy_vector_encoding "y" (conv ref ( ! ) @@ value_encoding)))))
+        (function
+          | Eval.Inv_prepare_locals
+              {arity; args; vs; instructions; inst; func; locals_kont} ->
+              Some (arity, args, vs, instructions, inst, func, locals_kont)
+          | _ -> None)
+        (fun (arity, args, vs, instructions, inst, func, locals_kont) ->
+          Inv_prepare_locals
+            {arity; args; vs; instructions; inst; func; locals_kont});
+      case
+        "Inv_prepare_args"
+        (tup7
+           ~flatten:true
+           (value ["arity"] Data_encoding.int32)
+           (lazy_vector_encoding "values" value_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (scope ["inst"] module_key_encoding)
+           (scope ["func"] func_encoding)
+           (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding))
+           (scope
+              ["kont"]
+              (map_kont_encoding
+                 (lazy_vector_encoding "1" value_encoding)
+                 (lazy_vector_encoding "2" (conv ref ( ! ) @@ value_encoding)))))
+        (function
+          | Eval.Inv_prepare_args
+              {arity; vs; instructions; inst; func; locals; args_kont} ->
+              Some (arity, vs, instructions, inst, func, locals, args_kont)
+          | _ -> None)
+        (fun (arity, vs, instructions, inst, func, locals, args_kont) ->
+          Inv_prepare_args
+            {arity; vs; instructions; inst; func; locals; args_kont});
+      case
+        "Inv_concat"
+        (tup6
+           ~flatten:true
+           (value ["arity"] Data_encoding.int32)
+           (lazy_vector_encoding "values" value_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (scope ["inst"] module_key_encoding)
+           (scope ["func"] func_encoding)
+           (scope
+              ["kont"]
+              (concat_kont_encoding
+                 (lazy_vector_encoding "2" (conv ref ( ! ) @@ value_encoding)))))
+        (function
+          | Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
+            ->
+              Some (arity, vs, instructions, inst, func, concat_kont)
+          | _ -> None)
+        (fun (arity, vs, instructions, inst, func, concat_kont) ->
+          Inv_concat {arity; vs; instructions; inst; func; concat_kont});
+      case
+        "Inv_stop"
+        (tup3
+           ~flatten:true
+           (scope ["values"] values_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (scope ["fresh_frame"] (option ongoing_frame_stack_encoding)))
+        (function
+          | Eval.Inv_stop {code = vs, es; fresh_frame} ->
+              Some (vs, es, fresh_frame)
+          | _ -> None)
+        (fun (vs, es, fresh_frame) -> Inv_stop {code = (vs, es); fresh_frame});
+    ]
+
+let label_step_kont_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "LS_Start"
+        ongoing_label_kont_encoding
+        (function Eval.LS_Start label -> Some label | _ -> None)
+        (fun label -> LS_Start label);
+      case
+        "LS_Craft_frame"
+        (tup2
+           ~flatten:true
+           (scope ["label_kont"] ongoing_label_kont_encoding)
+           (scope ["invoke_kont"] invoke_step_kont_encoding))
+        (function Eval.LS_Craft_frame (l, i) -> Some (l, i) | _ -> None)
+        (fun (l, i) -> LS_Craft_frame (l, i));
+      case
+        "LS_Push_frame"
+        (tup2
+           ~flatten:true
+           (scope ["label_kont"] ongoing_label_kont_encoding)
+           (scope ["fresh_frame"] ongoing_frame_stack_encoding))
+        (function Eval.LS_Push_frame (l, i) -> Some (l, i) | _ -> None)
+        (fun (l, i) -> LS_Push_frame (l, i));
+      case
+        "LS_Consolidate_top"
+        (tup4
+           ~flatten:true
+           (scope ["label"] label_encoding)
+           (scope
+              ["kont"]
+              (concat_kont_encoding (lazy_vector_encoding' value_encoding)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (lazy_vector_encoding "labels-stack" label_encoding))
+        (function
+          | Eval.LS_Consolidate_top (l, k, es, s) -> Some (l, k, es, s)
+          | _ -> None)
+        (fun (l, k, es, s) -> LS_Consolidate_top (l, k, es, s));
+      case
+        "LS_Modify_top"
+        packed_label_kont_encoding
+        (function Eval.LS_Modify_top l -> Some (Packed l) | _ -> None)
+        (fun (Packed l) -> LS_Modify_top l);
+    ]
+
+let step_kont_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "SK_Start"
+        (tup2
+           ~flatten:true
+           (scope ["top"] packed_frame_stack_encoding)
+           (lazy_vector_encoding "rst" ongoing_frame_stack_encoding))
+        (function
+          | Eval.SK_Start (f, rst) -> Some (Packed_fs f, rst) | _ -> None)
+        (fun (Packed_fs f, rst) -> SK_Start (f, rst));
+      case
+        "SK_Next"
+        (tup3
+           ~flatten:true
+           (scope ["top"] packed_frame_stack_encoding)
+           (lazy_vector_encoding "rst" ongoing_frame_stack_encoding)
+           (scope ["kont"] label_step_kont_encoding))
+        (function
+          | Eval.SK_Next (f, r, k) -> Some (Packed_fs f, r, k) | _ -> None)
+        (fun (Packed_fs f, r, k) -> SK_Next (f, r, k));
+      case
+        "SK_Consolidate_label_result"
+        (tup6
+           ~flatten:true
+           (scope ["top-frame"] ongoing_frame_stack_encoding)
+           (lazy_vector_encoding "frames-stack" ongoing_frame_stack_encoding)
+           (scope ["top-label"] label_encoding)
+           (scope
+              ["kont"]
+              (concat_kont_encoding (lazy_vector_encoding' value_encoding)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding)
+           (lazy_vector_encoding "labels-stack" label_encoding))
+        (function
+          | Eval.SK_Consolidate_label_result
+              (frame', stack, label, vs, es, lstack) ->
+              Some (frame', stack, label, vs, es, lstack)
+          | _ -> None)
+        (fun (frame', stack, label, vs, es, lstack) ->
+          SK_Consolidate_label_result (frame', stack, label, vs, es, lstack));
+      case
+        "SK_Result"
+        values_encoding
+        (function Eval.SK_Result vs -> Some vs | _ -> None)
+        (fun vs -> SK_Result vs);
+      case
+        "SK_Trapped"
+        (value [] Data_encoding.string)
+        (function Eval.SK_Trapped msg -> Some msg.it | _ -> None)
+        (fun msg -> SK_Trapped Source.(msg @@ no_region));
+    ]
+
 let index_vector_encoding =
   conv
     (fun index -> Output_buffer.Index_Vector.of_immutable index)
@@ -852,15 +1114,13 @@ let output_buffer_encoding =
 
 let config_encoding ~host_funcs =
   conv
-    (fun (frame, input, output, instrs, values, budget) ->
-      Eval.{frame; input; output; code = (values, instrs); host_funcs; budget})
-    (fun Eval.{frame; input; output; code = values, instrs; budget; _} ->
-      (frame, input, output, instrs, values, budget))
-    (tup6
+    (fun (input, output, step_kont, stack_size_limit) ->
+      Eval.{input; output; step_kont; host_funcs; stack_size_limit})
+    (fun Eval.{input; output; step_kont; stack_size_limit; _} ->
+      (input, output, step_kont, stack_size_limit))
+    (tup4
        ~flatten:true
-       (scope ["frame"] frame_encoding)
        (scope ["input"] input_buffer_encoding)
        (scope ["output"] output_buffer_encoding)
-       (scope ["instructions"] (list_encoding admin_instr_encoding))
-       (scope ["values"] values_encoding)
-       (value ["budget"] Data_encoding.int31))
+       (scope ["step_kont"] step_kont_encoding)
+       (value ["stack_size_limit"] Data_encoding.int31))

@@ -240,12 +240,15 @@ let pp_module out
 let pp_frame out frame =
   let open Eval in
   let (Module_key key) = frame.inst in
+  let locals =
+    Lwt_main.run (Lazy_containers.Lazy_vector.Int32Vector.to_list frame.locals)
+  in
   Format.fprintf
     out
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"
     key
-    (Format.pp_print_list Values.pp_value)
-    (List.map ( ! ) frame.locals)
+    (pp_vector Values.pp_value)
+    (Lazy_containers.Lazy_vector.Int32Vector.of_list (List.map ( ! ) locals))
 
 let rec pp_admin_instr' out instr =
   let open Eval in
@@ -267,39 +270,256 @@ let rec pp_admin_instr' out instr =
       Format.fprintf
         out
         "Returning @[<hv 2>%a@]"
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         values
   | Breaking (index, values) ->
       Format.fprintf
         out
         "Breaking @[<hv 2>(%li,@; %a)@]"
         index
-        (Format.pp_print_list Values.pp_value)
+        (pp_vector Values.pp_value)
         values
-  | Label (index, final_instrs, (values, instrs)) ->
-      Format.fprintf
-        out
-        "Label @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
-        index
-        (Format.pp_print_list Ast.pp_instr)
-        final_instrs
-        (Format.pp_print_list Values.pp_value)
-        values
-        (Format.pp_print_list pp_admin_instr)
-        instrs
-  | Frame (index, frame, (values, instrs)) ->
-      Format.fprintf
-        out
-        "Frame @[<hv 2>(%li,@; %a,@; %a,@; %a)@]"
-        index
-        pp_frame
-        frame
-        (Format.pp_print_list Values.pp_value)
-        values
-        (Format.pp_print_list pp_admin_instr)
-        instrs
 
 and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
+
+let pp_label out
+    Eval.{label_arity; label_frame_specs; label_break; label_code = vs, es} =
+  Format.fprintf
+    out
+    "@[<v 2>{label_arity = %a;@;\
+     label_frame_specs = %a;@;\
+     label_break = %a;@;\
+     instructions = %a; values = %a}@]"
+    (pp_opt (fun out x -> Format.fprintf out "%ld" x))
+    label_arity
+    pp_frame
+    label_frame_specs
+    (pp_opt Ast.pp_instr)
+    label_break
+    (pp_vector pp_admin_instr)
+    es
+    (pp_vector Values.pp_value)
+    vs
+
+let pp_label_kont : type a. Format.formatter -> a Eval.label_kont -> unit =
+ fun out -> function
+  | Label_stack (label, stack) ->
+      Format.fprintf
+        out
+        "@[<v 2>Label_stack (@;%a,@;%a@;)@]"
+        pp_label
+        label
+        (pp_vector pp_label)
+        stack
+  | Label_result res ->
+      Format.fprintf
+        out
+        "@[<v 2>Label_result %a@]"
+        (pp_vector Values.pp_value)
+        res
+  | Label_trapped msg -> Format.fprintf out "@[<v 2>Label_trapped %s@]" msg.it
+
+let pp_frame_stack out Eval.{frame_arity; frame_specs; frame_label_kont} =
+  Format.fprintf
+    out
+    "@[<v 2>{frame_arity = %a;@;frame_specs = %a;@;frame_label_kont = %a}@]"
+    (pp_opt (fun out x -> Format.fprintf out "%ld" x))
+    frame_arity
+    pp_frame
+    frame_specs
+    pp_label_kont
+    frame_label_kont
+
+let pp_map_kont pp_origin pp_destination out Eval.{origin; destination; offset}
+    =
+  Format.fprintf
+    out
+    "@[<v 2>{origin = %a;@;destination = %a;@;offset = %ld}@]"
+    (pp_vector pp_origin)
+    origin
+    (pp_vector pp_destination)
+    destination
+    offset
+
+let pp_concat_kont pp out Eval.{lv; rv; res; offset} =
+  Format.fprintf
+    out
+    "@[<v 2>{lv = %a;@;rv = %a;@;res = %a;@;offset = %ld;@;}@]"
+    (pp_vector pp)
+    lv
+    (pp_vector pp)
+    rv
+    (pp_vector pp)
+    res
+    offset
+
+let pp_invoke_step_kont out = function
+  | Eval.Inv_start {func; code = vs, es} ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_start {func = %a;@;instructions = %a;@;values = %a}@]"
+        Instance.pp_func_inst
+        func
+        (pp_vector pp_admin_instr)
+        es
+        (pp_vector Values.pp_value)
+        vs
+  | Inv_prepare_locals
+      {arity; args; vs; instructions; inst = Module_key inst; func; locals_kont}
+    ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         args = %a;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         locals_kont = %a;@;\
+         }"
+        arity
+        (pp_vector Values.pp_value)
+        args
+        (pp_vector Values.pp_value)
+        vs
+        (pp_vector pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_map_kont Types.pp_value_type (fun out x -> Values.pp_value out !x))
+        locals_kont
+  | Inv_prepare_args
+      {arity; vs; instructions; inst = Module_key inst; func; locals; args_kont}
+    ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         locals = %a;@;\
+         args_kont = %a;@;\
+         }"
+        arity
+        (pp_vector Values.pp_value)
+        vs
+        (pp_vector pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_vector (fun out x -> Values.pp_value out !x))
+        locals
+        (pp_map_kont Values.pp_value (fun out x -> Values.pp_value out !x))
+        args_kont
+  | Inv_concat
+      {arity; vs; instructions; inst = Module_key inst; func; concat_kont} ->
+      Format.fprintf
+        out
+        "@[<v 2>Inv_prepare_locals {arity = %ld;@;\
+         values = %a;@;\
+         instructions = %a;@;\
+         inst = %s;@;\
+         func = %a;@;\
+         concat_kont = %a;@;\
+         }"
+        arity
+        (pp_vector Values.pp_value)
+        vs
+        (pp_vector pp_admin_instr)
+        instructions
+        inst
+        Ast.pp_func
+        func
+        (pp_concat_kont (fun out x -> Values.pp_value out !x))
+        concat_kont
+  | Inv_stop {code = vs, es; fresh_frame} ->
+      Format.fprintf
+        out
+        "%@[<v 2>Inv_stop {values = %a;@;\
+         instructions = %a;@;\
+         fresh_frame = %a}@]"
+        (pp_vector Values.pp_value)
+        vs
+        (pp_vector pp_admin_instr)
+        es
+        (pp_opt pp_frame_stack)
+        fresh_frame
+
+let pp_label_step_kont out = function
+  | Eval.LS_Start label_kont ->
+      Format.fprintf out "@[<v 2>LS_Start %a@]" pp_label_kont label_kont
+  | LS_Craft_frame (label_kont, kont) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Craft_frame (%a, %a)@]"
+        pp_label_kont
+        label_kont
+        pp_invoke_step_kont
+        kont
+  | LS_Push_frame (label_kont, frame) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Push_frame (%a, %a)@]"
+        pp_label_kont
+        label_kont
+        pp_frame_stack
+        frame
+  | LS_Consolidate_top (label, kont, es, labels) ->
+      Format.fprintf
+        out
+        "@[<v 2>LS_Consolidate_top (%a, %a, %a, %a)@]"
+        pp_label
+        label
+        (pp_concat_kont Values.pp_value)
+        kont
+        (pp_vector pp_admin_instr)
+        es
+        (pp_vector pp_label)
+        labels
+  | LS_Modify_top label_kont ->
+      Format.fprintf out "@[<v 2>LS_Modify_top %a@]" pp_label_kont label_kont
+
+let pp_step_kont out = function
+  | Eval.SK_Start (frame, stack) ->
+      Format.fprintf
+        out
+        "@[<v 2>SK_Start (%a; %a)@]"
+        pp_frame_stack
+        frame
+        (pp_vector pp_frame_stack)
+        stack
+  | SK_Next (frame_stack, stack, kont) ->
+      Format.fprintf
+        out
+        "@[<v 2>SK_Next (%a, %a, %a)@]"
+        pp_frame_stack
+        frame_stack
+        (pp_vector pp_frame_stack)
+        stack
+        pp_label_step_kont
+        kont
+  | SK_Consolidate_label_result (frame, stack, label, kont, es, labels) ->
+      Format.fprintf
+        out
+        "@[<v 2>SK_Consolidate_label_result (%a, %a, %a, %a, %a, %a)@]"
+        pp_frame_stack
+        frame
+        (pp_vector pp_frame_stack)
+        stack
+        pp_label
+        label
+        (pp_concat_kont Values.pp_value)
+        kont
+        (pp_vector pp_admin_instr)
+        es
+        (pp_vector pp_label)
+        labels
+  | SK_Result vs ->
+      Format.fprintf out "@[<v 2>SK_Result %a@]" (pp_vector Values.pp_value) vs
+  | SK_Trapped msg -> Format.fprintf out "@[<v 2>SK_Trapped %s@]" msg.it
 
 let pp_input_buffer out input =
   let open Input_buffer in
@@ -325,24 +545,14 @@ let pp_output_buffer out (output : Output_buffer.t) =
     (Output_buffer.Level_Vector.snapshot output)
 
 let pp_config out
-    Eval.{frame; input; output; code = values, instrs; host_funcs = _; budget} =
+    Eval.{input; output; step_kont; host_funcs = _; stack_size_limit} =
   Format.fprintf
     out
-    "@[<v 2>{frame = %a;@;\
-     input = %a;@;\
-     output = %a;@;\
-     instructions = %a;@;\
-     values = %a;@;\
-     budget = %i;@;\
-     }@]"
-    pp_frame
-    frame
+    "@[<v 2>{input = %a;@;output = %a;@;frame_kont = %a;@;budget = %i;@;}@]"
     pp_input_buffer
     input
     pp_output_buffer
     output
-    (Format.pp_print_list pp_admin_instr)
-    instrs
-    (Format.pp_print_list Values.pp_value)
-    values
-    budget
+    pp_step_kont
+    step_kont
+    stack_size_limit

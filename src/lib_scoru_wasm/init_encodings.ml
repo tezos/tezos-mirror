@@ -26,57 +26,9 @@
 open Tezos_webassembly_interpreter.Eval
 module Parser = Binary_parser_encodings
 open Tree_encoding
+open Kont_encodings
 
 let tag_encoding = value [] Data_encoding.string
-
-let fold_right2_kont_encoding enc_a enc_b enc_acc =
-  conv
-    (fun (acc, lv, rv, offset) -> {acc; lv; rv; offset})
-    (fun {acc; lv; rv; offset} -> (acc, lv, rv, offset))
-  @@ tup4
-       ~flatten:true
-       (scope ["acc"] enc_acc)
-       (scope ["left_vector"] enc_a)
-       (scope ["right_vector"] enc_b)
-       (value ["offset"] @@ Data_encoding.int32)
-
-let map_kont_encoding enc_a enc_b =
-  conv
-    (fun (origin, destination, offset) -> {origin; destination; offset})
-    (fun {origin; destination; offset} -> (origin, destination, offset))
-  @@ tup3
-       ~flatten:true
-       (scope ["origin"] enc_a)
-       (scope ["destination"] enc_b)
-       (value ["offset"] Data_encoding.int32)
-
-let tick_map_kont_encoding enc_kont enc_a enc_b =
-  conv (fun (tick, map) -> {tick; map}) (fun {tick; map} -> (tick, map))
-  @@ tup2
-       ~flatten:true
-       (option (scope ["inner_kont"] enc_kont))
-       (scope ["map_kont"] (map_kont_encoding enc_a enc_b))
-
-let concat_kont_encoding enc_a =
-  conv
-    (fun (lv, rv, res, offset) -> {lv; rv; res; offset})
-    (fun {lv; rv; res; offset} -> (lv, rv, res, offset))
-  @@ tup4
-       ~flatten:true
-       (scope ["lv"] enc_a)
-       (scope ["rv"] enc_a)
-       (scope ["res"] enc_a)
-       (value ["offset"] Data_encoding.int32)
-
-let fold_left_kont_encoding enc_a enc_acc =
-  conv
-    (fun (origin, acc, offset) -> {origin; acc; offset})
-    (fun {origin; acc; offset} -> (origin, acc, offset))
-  @@ tup3
-       ~flatten:true
-       (scope ["origin"] enc_a)
-       (scope ["acc"] enc_acc)
-       (value ["offset"] Data_encoding.int32)
 
 let lazy_vec_encoding enc = int32_lazy_vector (value [] Data_encoding.int32) enc
 

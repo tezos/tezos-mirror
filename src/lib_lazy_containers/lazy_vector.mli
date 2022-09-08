@@ -137,6 +137,14 @@ module type S = sig
       one. That value can then be accessed using the [zero] key. *)
   val cons : 'a -> 'a t -> 'a t
 
+  (** [split vec at] splits [vec] into two sub vectors at element
+      [at]. The first vector has [at] elements, the second [length vec
+      - at] elements.
+
+      @raise Bounds when [at < 0]
+      @raise Bounds when [at > num_elements vec] *)
+  val split : 'a t -> key -> 'a t * 'a t
+
   (** [grow delta ?default vector] creates a new lazy vector that has
       [delta] more items than [vector]. This also retains all values that have
       previously been created. New values will be created with [default]
@@ -151,6 +159,12 @@ module type S = sig
 
       @raise Bounds when applied on an empty vector. *)
   val pop : 'a t -> ('a * 'a t) Lwt.t
+
+  (** [prepend_list l vec] adds the elements of [l] at the front of [vec].
+
+      {b Note:} This function may be dangerous to use in a tick, if
+      [List.length l] is significant. *)
+  val prepend_list : 'a list -> 'a t -> 'a t
 
   (** [append elt vector] creates a new lazy vector that has one
       more item than [vector] whose value is [elt]. This is a shortcut

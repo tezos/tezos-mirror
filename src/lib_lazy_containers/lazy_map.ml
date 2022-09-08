@@ -59,6 +59,8 @@ module type S = sig
 
   val set : key -> 'a -> 'a t -> 'a t
 
+  val dup : 'a t -> 'a t
+
   val loaded_bindings : 'a t -> (key * 'a) list
 end
 
@@ -120,6 +122,8 @@ module Make (Key : KeyS) : S with type key = Key.t = struct
     | Some value -> Lwt.return value
 
   let set key value map = {map with values = Map.add key value map.values}
+
+  let dup {origin; produce_value; values} = {origin; produce_value; values}
 
   let loaded_bindings m = Map.bindings m.values
 end
