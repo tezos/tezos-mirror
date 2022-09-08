@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 1
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -46,13 +46,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 2
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -80,13 +80,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 3
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -114,13 +114,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 4
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -148,13 +148,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 5
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -182,13 +182,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 6
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -216,13 +216,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 7
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -250,13 +250,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 8
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -284,13 +284,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 9
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
@@ -318,13 +318,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.004714
+    Fee to the baker: ꜩ0.004713
     Expected counter: 10
     Gas limit: 3227
     Storage limit: 10711 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.004714
-      payload fees(the block proposer) ....... +ꜩ0.004714
+      [PUBLIC_KEY_HASH] ... -ꜩ0.004713
+      payload fees(the block proposer) ....... +ꜩ0.004713
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
