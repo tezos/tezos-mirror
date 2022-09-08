@@ -2801,7 +2801,11 @@ module Dal : sig
   module Slot : sig
     type header = Dal.commitment
 
-    type t = {level : Raw_level.t; index : Slot_index.t; header : header}
+    type t = {
+      published_level : Raw_level.t;
+      index : Slot_index.t;
+      header : header;
+    }
 
     val zero : header
 

@@ -86,7 +86,10 @@ end
 
 type header = Header.t
 
-type t = {level : Raw_level_repr.t; index : Index.t; header : header}
+(** For Layer-1, a slot is described by the level at which it is published,
+    the slot's index (in the list of slots), and the slot's header
+    (KATE commitment hash). *)
+type t = {published_level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 

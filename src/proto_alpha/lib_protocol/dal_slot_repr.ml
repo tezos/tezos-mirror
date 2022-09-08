@@ -65,14 +65,14 @@ type header = Header.t
 
 let zero = Dal.Commitment.zero
 
-type t = {level : Raw_level_repr.t; index : Index.t; header : header}
+type t = {published_level : Raw_level_repr.t; index : Index.t; header : header}
 
 type slot = t
 
 type slot_index = Index.t
 
-let equal ({level; index; header} : t) s2 =
-  Raw_level_repr.equal level s2.level
+let equal ({published_level; index; header} : t) s2 =
+  Raw_level_repr.equal published_level s2.published_level
   && Index.equal index s2.index
   && Header.equal header s2.header
 
@@ -123,19 +123,19 @@ end
 let encoding =
   let open Data_encoding in
   conv
-    (fun {level; index; header} -> (level, index, header))
-    (fun (level, index, header) -> {level; index; header})
+    (fun {published_level; index; header} -> (published_level, index, header))
+    (fun (published_level, index, header) -> {published_level; index; header})
     (obj3
        (req "level" Raw_level_repr.encoding)
        (req "index" Data_encoding.uint8)
        (req "header" Header.encoding))
 
-let pp fmt {level; index; header} =
+let pp fmt {published_level; index; header} =
   Format.fprintf
     fmt
-    "level: %a index: %a header: %a"
+    "published_level: %a index: %a header: %a"
     Raw_level_repr.pp
-    level
+    published_level
     Format.pp_print_int
     index
     Header.pp
