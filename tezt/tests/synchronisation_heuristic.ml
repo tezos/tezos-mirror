@@ -52,10 +52,10 @@ let wait_for_sync node =
      whether the node is (already) synchronized via an RPC. *)
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
-    let* sync_state =
+    let* is_bootstrapped =
       RPC.Client.call client @@ RPC.get_chain_is_bootstrapped ()
     in
-    if String.equal sync_state "synced" then Lwt.return_unit
+    if is_bootstrapped.sync_state = Synced then Lwt.return_unit
     else fst @@ Lwt.task ()
   in
   Lwt.pick [event; is_synchronised]
@@ -193,6 +193,388 @@ let check_prevalidator_start =
   let* () = check_is_prevalidator_closed (Node node3) in
   unit
 
+let sync_state_typ =
+  let open RPC in
+  Check.(
+    convert
+      (function
+        | Synced -> "synced" | Unsynced -> "unsynced" | Stuck -> "stuck")
+      string)
+
+let check_sync_state ?__LOC__ ?endpoint client expected_state =
+  let* sync_state =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+  in
+  Check.(sync_state.sync_state = expected_state)
+    sync_state_typ
+    ~error_msg:"Expected node to be %L, was %R" ;
+  unit
+
+(* Threshold 0, peer always bootstrapped. *)
+let test_threshold_zero =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: test threshold zero"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  Log.info "Setup network" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 0; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+
+  Log.info "Check that the node is bootstrapped" ;
+  let* () = check_sync_state client Synced in
+  unit
+
+let check_is_bootstrapped ?__LOC__ ?endpoint client =
+  let* sync_state =
+    RPC.Client.call ?endpoint client @@ RPC.get_chain_is_bootstrapped ()
+  in
+  if not sync_state.bootstrapped then
+    Test.fail "Expected node to be bootstrapped" ;
+  unit
+
+let connect_clique client =
+  Cluster.meta_clique_lwt @@ fun peer peer' ->
+  Log.debug "Connecting %s to %s" (Node.name peer) (Node.name peer') ;
+  Client.Admin.connect_address ~endpoint:(Node peer) ~peer:peer' client
+
+(* First peer has threshold zero, second peer has threshold one *)
+let test_threshold_one =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: test threshold one"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  Log.info "Add a first peer with threshold zero" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 1; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+
+  Log.info "Check synchronisation state of first peer" ;
+  let* () = check_sync_state client Synced in
+
+  Log.info "Add a second peer with threshold one, and connect to the first" ;
+  let* node1, client1 =
+    Client.init_with_node
+      ~nodes_args:[Connections 1; Synchronisation_threshold 1; Sync_latency 3]
+      `Client
+      ()
+  in
+  let* () = Client.Admin.connect_address client ~peer:node1 in
+
+  Log.info "Check bootstrapped state of second peer" ;
+  let* () = Client.bootstrapped client1 in
+
+  unit
+
+(* First peer has threshold zero, second peer has threshold one *)
+let test_threshold_two =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: test threshold two"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  Log.info "Add a first peer with threshold zero" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 3; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+
+  Log.info "Add nodes and connect in clique" ;
+
+  let* node1, client1 =
+    Client.init_with_node
+      ~nodes_args:[Connections 3; Synchronisation_threshold 2; Sync_latency 3]
+      `Client
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Connections 3; Synchronisation_threshold 2; Sync_latency 3]
+      `Client
+      ()
+  in
+  let* node3, client3 =
+    Client.init_with_node
+      ~nodes_args:[Connections 3; Synchronisation_threshold 1; Sync_latency 3]
+      `Client
+      ()
+  in
+  let nodes = [node; node1; node2; node3] in
+
+  let* () = connect_clique client nodes in
+
+  Log.info "Check bootstrapped state of second peer" ;
+  (* - if we assume that all nodes are connected, and that
+     [Sync_Latency] has not elapsed, then all node should be synced
+     and hence bootstrapped.
+
+     - if [Sync_latency] has elapsed, then all nodes will be [Stuck],
+     and hence bootstrapped.
+  *)
+  let* () =
+    let level = Node.get_level node in
+    Lwt_list.iter_p
+      (fun n ->
+        let* (_ : int) = Node.wait_for_level n (level + 1) in
+        unit)
+      [node; node1; node2; node3]
+  in
+
+  let* () = Client.bootstrapped client in
+  let* () = Client.bootstrapped client1 in
+  let* () = Client.bootstrapped client2 in
+  let* () = Client.bootstrapped client3 in
+
+  unit
+
+let test_threshold_stuck =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: test threshold stuck"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  let sync_latency = 3 in
+
+  Log.info "Add a first peer with threshold zero" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.
+          [
+            Connections 3; Synchronisation_threshold 0; Sync_latency sync_latency;
+          ]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* baker = Baker.init ~protocol node client in
+
+  Log.info "Bake a few blocks and kill baker" ;
+  let* (_ : int) = Node.wait_for_level node (Node.get_level node + 3) in
+  let* () = Baker.terminate baker in
+
+  Log.info "Add two additional peers" ;
+  let* node1, client1 =
+    Client.init_with_node
+      ~nodes_args:
+        [Connections 3; Synchronisation_threshold 2; Sync_latency sync_latency]
+      `Client
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:
+        [Connections 3; Synchronisation_threshold 2; Sync_latency sync_latency]
+      `Client
+      ()
+  in
+
+  let* () = connect_clique client [node; node1; node2] in
+
+  Log.info "Delay until until sync_latency has expired" ;
+  let* () = Lwt_unix.sleep (float_of_int (2 * sync_latency)) in
+
+  Log.info "Check that additional peers are bootstrapped and stuck" ;
+  let* () = check_sync_state client1 Stuck in
+  let* () = check_sync_state client2 Stuck in
+  let* () = Client.bootstrapped client1 in
+  let* () = Client.bootstrapped client2 in
+
+  unit
+
+let test_threshold_split_view =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: test threshold split view"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  Log.info
+    "Add two peers with threshold zero, and one with threshold 2 and a high \
+     latency" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 3; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* node1, client1 =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 3; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.[Connections 3; Synchronisation_threshold 2; Sync_latency 15]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* () = connect_clique client [node; node1; node2] in
+
+  Log.info "Test that all nodes bootstrap" ;
+  let* () = check_sync_state client Synced in
+  let* () = check_sync_state client1 Synced in
+  let* () = Client.bootstrapped client2 in
+
+  Log.info "Disconnect node1 from baker" ;
+  let* () =
+    let* node1_id = Node.wait_for_identity node1 in
+    Client.Admin.ban_peer client ~peer:node1_id
+  in
+  let* () =
+    let* node_id = Node.wait_for_identity node in
+    Client.Admin.ban_peer client1 ~peer:node_id
+  in
+
+  Log.info "Delay for a few blocks" ;
+  let* (_ : int) = Node.wait_for_level node (3 + Node.get_level node) in
+
+  Log.info "Check that additional peers are bootstrapped and synced" ;
+  let* () = check_sync_state client Synced in
+  let* () = check_sync_state client1 Synced in
+  let* () = check_sync_state client2 Synced in
+
+  unit
+
+(* Run many nodes, bake for a while, add a node and check it's bootstrapped
+   when it should be. *)
+let test_many_nodes_bootstrap =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bootstrap: many nodes bootstrap"
+    ~tags:["bootstrap"; "threshold"]
+  @@ fun protocol ->
+  let num_nodes = 8 in
+  let running_time = 10.0 in
+
+  Log.info "Add two peers" ;
+  let* node, client =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.
+          [Connections num_nodes; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* _ = Baker.init ~protocol ~delegates:["bootstrap5"] node client in
+  let* node1, client1 =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.
+          [Connections num_nodes; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.
+          [Connections num_nodes; Synchronisation_threshold 0; Sync_latency 3]
+      `Client
+      ~protocol
+      ~timestamp:Now
+      ()
+  in
+  let* () = connect_clique client [node; node1; node2] in
+
+  Log.info "Let the two peers bootstrap" ;
+  let* () = Client.bootstrapped client in
+  let* () = Client.bootstrapped client1 in
+
+  Log.info "Add nodes" ;
+  let* nodes =
+    Lwt_list.map_s
+      (fun _i ->
+        Node.init
+          Node.
+            [Connections num_nodes; Synchronisation_threshold 0; Sync_latency 3])
+      (Base.range 2 (num_nodes - 1))
+  in
+  let* () = connect_clique client nodes in
+  let* () =
+    Lwt_list.iter_s
+      (fun peer -> Client.Admin.connect_address client ~peer)
+      nodes
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun peer -> Client.Admin.connect_address client1 ~peer)
+      nodes
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun peer -> Client.Admin.connect_address client2 ~peer)
+      nodes
+  in
+
+  Log.info "Delay a bit" ;
+  let* () = Lwt_unix.sleep running_time in
+
+  Log.info "Add another node, connect it and check that it bootstraps" ;
+  let* _node_last, client_last =
+    Client.init_with_node
+      ~nodes_args:
+        Node.
+          [
+            Connections num_nodes;
+            Synchronisation_threshold num_nodes;
+            Sync_latency 3;
+          ]
+      `Client
+      ()
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun peer -> Client.Admin.connect_address client_last ~peer)
+      ([node; node1; node2] @ nodes)
+  in
+  let* () = Client.bootstrapped client_last in
+
+  unit
+
 let register ~protocols =
   check_node_synchronization_state protocols ;
+  test_threshold_zero protocols ;
+  test_threshold_one protocols ;
+  test_threshold_two protocols ;
+  test_threshold_stuck protocols ;
+  test_threshold_split_view protocols ;
+  test_many_nodes_bootstrap protocols ;
   check_prevalidator_start protocols

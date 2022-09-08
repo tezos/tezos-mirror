@@ -41,6 +41,7 @@ type argument =
   | Singleprocess
   | Bootstrap_threshold of int
   | Synchronisation_threshold of int
+  | Sync_latency of int
   | Connections of int
   | Private_mode
   | Peer of string
@@ -64,6 +65,7 @@ let make_argument = function
   | Bootstrap_threshold x -> ["--bootstrap-threshold"; string_of_int x]
   | Synchronisation_threshold x ->
       ["--synchronisation-threshold"; string_of_int x]
+  | Sync_latency x -> ["--sync-latency"; string_of_int x]
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]

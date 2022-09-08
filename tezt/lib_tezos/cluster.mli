@@ -137,6 +137,9 @@ val meta_connect : ('a -> 'a -> unit) -> 'a list -> 'a list -> unit
     on [a] and [b]. *)
 val meta_clique : ('a -> 'a -> unit) -> 'a list -> unit
 
+(** Lwt-version of {!meta_clique}. *)
+val meta_clique_lwt : ('a -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
 (** Meta-version of {!ring}.
 
     For a list [x1; x2; ...; xN], this calls the connection function

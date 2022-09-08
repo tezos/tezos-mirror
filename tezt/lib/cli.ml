@@ -45,6 +45,7 @@ type options = {
   mutable files_to_run : string list;
   mutable tests_to_run : string list;
   mutable tests_not_to_run : string list;
+  mutable patterns_to_run : rex list;
   mutable tags_to_run : string list;
   mutable tags_not_to_run : string list;
   mutable list : [`Ascii_art | `Tsv] option;
@@ -79,6 +80,7 @@ let options =
     files_to_run = [];
     tests_to_run = [];
     tests_not_to_run = [];
+    patterns_to_run = [];
     tags_to_run = [];
     tags_not_to_run = [];
     list = None;
@@ -283,6 +285,19 @@ let init ?args () =
           Arg.String
             (fun file -> options.files_to_run <- file :: options.files_to_run),
           "<FILE> Same as --file." );
+        ( "--match",
+          Arg.String
+            (fun pattern ->
+              options.patterns_to_run <-
+                Base.rex pattern :: options.patterns_to_run),
+          "<PERL_REGEXP> Only run tests matching PERL_REGEXP (see SELECTING \
+           TESTS)." );
+        ( "-m",
+          Arg.String
+            (fun pattern ->
+              options.patterns_to_run <-
+                Base.rex pattern :: options.patterns_to_run),
+          "<PERL_REGEXP> Same as --match." );
         ( "--title",
           Arg.String
             (fun title -> options.tests_to_run <- title :: options.tests_to_run),
@@ -431,18 +446,21 @@ let init ?args () =
     "Usage: " ^ Sys.argv.(0)
     ^ " [OPTION..] [TAG..]\n\n\
        SELECTING TESTS\n\n\
-      \  You can specify multiple tags, negated tags, titles and filenames on \
-       the command line. Only tests which match all the following conditions \
-       will be run:\n\
+      \  You can specify multiple tags, negated tags, titles, title patterns \
+       and filenames on the command line. Only tests which match all the \
+       following conditions will be run:\n\
       \  - the test must have all tags and none of the negated tags;\n\
       \  - the test must have one of the specified titles;\n\
+      \  - the test must have a title matching one of the specified patterns;\n\
       \  - the test must be implemented in one of the specified files.\n\n\
       \  The tags of a test are given by the ~tags argument of Test.run. To \
        negate a tag, prefix it with a slash: /\n\n\
       \  The title of a test is given by the ~title argument of Test.run. It \
        is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
        reports. Use --title (respectively --not-title) to select (respectively \
-       unselect) a test by its title on the command-line.\n\n\
+       unselect) a test by its title on the command-line. You can also select \
+       tests whose title matches one or several Perl regular expressions using \
+       --match.\n\n\
       \  The file in which a test is implemented is specified by the ~__FILE__ \
        argument of Test.run. In other words, it is the name of the file in \
        which the test is defined, without directories. Use --file to select a \

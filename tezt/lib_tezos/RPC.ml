@@ -256,9 +256,26 @@ let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
     ~data:(`O [("bootstrapped", `Bool bootstrapped)])
     ignore
 
+type sync_state = Synced | Unsynced | Stuck
+
+type is_bootstrapped = {bootstrapped : bool; sync_state : sync_state}
+
 let get_chain_is_bootstrapped ?(chain = "main") () =
   make GET ["chains"; chain; "is_bootstrapped"] @@ fun json ->
-  JSON.(json |-> "sync_state" |> as_string)
+  JSON.
+    {
+      sync_state =
+        (json |-> "sync_state" |> as_string |> function
+         | "synced" -> Synced
+         | "unsynced" -> Unsynced
+         | "stuck" -> Stuck
+         | state ->
+             Test.fail
+               "/chains/%s/is_bootstrapped returned unexpected sync_state: %s"
+               chain
+               state);
+      bootstrapped = json |-> "bootstrapped" |> as_bool;
+    }
 
 type block_descriptor = {block_hash : string; level : int}
 
