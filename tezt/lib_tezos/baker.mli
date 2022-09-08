@@ -54,6 +54,25 @@ val on_event : t -> (event -> unit) -> unit
     continues running in the background.*)
 val run : t -> unit Lwt.t
 
+(** Liquidity baking vote values. *)
+type liquidity_baking_vote = Off | On | Pass
+
+(** Returns the [liquidity_baking_vote] corresponding to a string, or None if the
+    string is not a valid liquidity baking vote. *)
+val liquidity_baking_vote_of_string_opt : string -> liquidity_baking_vote option
+
+(** Returns the string representation of a [liquidity_baking_vote]. *)
+val liquidity_baking_vote_to_string : liquidity_baking_vote -> string
+
+(** Writes a liquidity baking votefile, as read by the bakers [--votefile]
+    argument.
+
+    If [path] is set, the vote file is written there. Otherwise, it is written
+    to a temporary file.
+
+    Returns the path to the file that was written. *)
+val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
+
 (** Create a baker.
 
     This function just creates a value of type [t], it does not call {!val:run}.
@@ -78,9 +97,15 @@ val run : t -> unit Lwt.t
 
     [delegates] is a list of account aliases (see {!val:Account.key.alias}), e.g.,
     bootstrap accounts (see {!val:Constant.bootstrap_keys}), delegated to this
-    baker. This defaults to the empy list, which is a shortcut for "every known
+    baker. This defaults to the empty list, which is a shortcut for "every known
     account".
-   *)
+
+    [votefile] and [liquidity_baking_toggle_vote] are passed to the baker daemon
+    through the flags [--votefile] and [--liquidity-baking-toggle-vote]. If
+    [--liquidity-baking-toggle-vote] is [None], then
+    [--liquidity-baking-toggle-vote]
+    is not passed. If it is [Some x] then [--liquidity-baking-toggle-vote x] is
+    passed. The default value is [Some Pass]. *)
 val create :
   protocol:Protocol.t ->
   ?name:string ->
@@ -88,6 +113,8 @@ val create :
   ?event_pipe:string ->
   ?runner:Runner.t ->
   ?delegates:string list ->
+  ?votefile:string ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   Node.t ->
   Client.t ->
   t
@@ -119,9 +146,11 @@ val create :
 
     [delegates] is a list of account aliases (see {!val:Account.key.alias}), e.g.,
     bootstrap accounts (see {!val:Constant.bootstrap_keys}), delegated to this
-    baker. This defaults to the empy list, which is a shortcut for "every known
+    baker. This defaults to the empty list, which is a shortcut for "every known
     account".
- *)
+
+    [votefile] and [liquidity_baking_toggle_vote] are passed to the baker daemon
+    through the flags [--votefile] and [--liquidity-baking-toggle-vote]. *)
 val init :
   protocol:Protocol.t ->
   ?name:string ->
@@ -129,6 +158,8 @@ val init :
   ?event_pipe:string ->
   ?runner:Runner.t ->
   ?delegates:string list ->
+  ?votefile:string ->
+  ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
   Node.t ->
   Client.t ->
   t Lwt.t

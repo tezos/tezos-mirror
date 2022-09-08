@@ -103,6 +103,7 @@ let register_protocol_agnostic_tests () =
   Hash_data.register ~protocols:[Alpha] ;
   Large_metadata.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
+  Liquidity_baking_per_block_votes.register ~protocols ;
   Manager_operations.register ~protocols ;
   Mockup.register ~protocols ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
