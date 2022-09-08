@@ -1036,7 +1036,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
 
     let* level =
-      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node init_level
     in
     Check.(level = init_level)
       Check.int
@@ -3090,21 +3090,23 @@ let register ~protocols =
   test_rollup_arith_origination_boot_sector protocols ;
   test_rollup_node_uses_arith_boot_sector protocols ;
   (* Specific Wasm PVM tezts *)
-  test_rollup_node_run_with_kernel
-    protocols
-    ~kind:"wasm_2_0_0"
-    ~kernel_name:"computation"
-    ~internal:false ;
-  test_rollup_node_run_with_kernel
-    protocols
-    ~kind:"wasm_2_0_0"
-    ~kernel_name:"no_parse_random"
-    ~internal:false ;
-  test_rollup_node_run_with_kernel
-    protocols
-    ~kind:"wasm_2_0_0"
-    ~kernel_name:"no_parse_bad_fingerprint"
-    ~internal:false ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3772
+     test_rollup_node_run_with_kernel
+        protocols
+        ~kind:"wasm_2_0_0"
+        ~kernel_name:"computation"
+        ~internal:false ;
+     test_rollup_node_run_with_kernel
+       protocols
+       ~kind:"wasm_2_0_0"
+       ~kernel_name:"no_parse_random"
+       ~internal:false ;
+     test_rollup_node_run_with_kernel
+       protocols
+       ~kind:"wasm_2_0_0"
+       ~kernel_name:"no_parse_bad_fingerprint"
+       ~internal:false ;
+  *)
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
