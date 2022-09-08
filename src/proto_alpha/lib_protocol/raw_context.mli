@@ -215,14 +215,18 @@ val map_temporary_lazy_storage_ids_s :
   (Lazy_storage_kind.Temp_ids.t -> (t * Lazy_storage_kind.Temp_ids.t) Lwt.t) ->
   t Lwt.t
 
-module Cache :
-  Context.CACHE
-    with type t := t
-     and type size := int
-     and type index := int
-     and type identifier := string
-     and type key = Context.Cache.key
-     and type value = Context.Cache.value
+module Cache : sig
+  include
+    Context.CACHE
+      with type t := t
+       and type size := int
+       and type index := int
+       and type identifier := string
+       and type key = Context.Cache.key
+       and type value = Context.Cache.value
+
+  val sync : t -> bytes -> t Lwt.t
+end
 
 (* Hashes of non-consensus operations are stored so that, when
    finalizing the block, we can compute the block's payload hash. *)

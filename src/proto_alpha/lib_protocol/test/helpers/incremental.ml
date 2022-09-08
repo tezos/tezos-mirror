@@ -50,7 +50,7 @@ let level st = st.header.shell.level
 
 let rpc_context st =
   let fitness = (header st).shell.fitness in
-  let result = Alpha_context.finalize st.state.ctxt fitness in
+  let result = Alpha_context.finalize st.state.application_state.ctxt fitness in
   {
     Environment.Updater.block_hash = Block_hash.zero;
     block_header = {st.header.shell with fitness = result.fitness};
@@ -62,9 +62,14 @@ let rpc_ctxt =
     rpc_context
     Plugin.RPC.rpc_services
 
-let alpha_ctxt st = st.state.ctxt
+let alpha_ctxt st = st.state.application_state.ctxt
 
-let set_alpha_ctxt st ctxt = {st with state = {st.state with ctxt}}
+let set_alpha_ctxt st ctxt =
+  {
+    st with
+    state =
+      {st.state with application_state = {st.state.application_state with ctxt}};
+  }
 
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ?(policy = Block.By_round 0) (predecessor : Block.t) =

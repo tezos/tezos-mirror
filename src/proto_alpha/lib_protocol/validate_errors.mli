@@ -184,3 +184,12 @@ module Manager : sig
 end
 
 type error += Failing_noop_error
+
+module Block : sig
+  type error +=
+    | Not_enough_endorsements of {required : int; provided : int}
+    | Inconsistent_validation_passes_in_block of {
+        expected : int;
+        provided : int;
+      }
+end

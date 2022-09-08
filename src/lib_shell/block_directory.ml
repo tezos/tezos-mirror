@@ -666,7 +666,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           ~cache:`Lazy
           ()
       in
-      let* state, acc =
+      let* _state, acc =
         List.fold_left_es
           (fun (state, acc) op ->
             let* state, result = Next_proto.apply_operation state op in
@@ -674,9 +674,6 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           (state, [])
           ops
       in
-      (* A pre application must not commit into the protocol caches.
-         Hence, we set [cache_nonce] to None. *)
-      let* _ = Next_proto.finalize_block state None in
       return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       let* ctxt = Store.Block.context chain_store block in

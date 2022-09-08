@@ -425,7 +425,7 @@ module Voting = struct
     (* Shared voting errors *)
     register_error_kind
       `Temporary
-      ~id:"validate_operation.wrong_voting_period_index"
+      ~id:"validate.operation.wrong_voting_period_index"
       ~title:"Wrong voting period index"
       ~description:
         "The voting operation contains a voting period index different from \
@@ -447,7 +447,7 @@ module Voting = struct
         Wrong_voting_period_index {expected; provided}) ;
     register_error_kind
       `Temporary
-      ~id:"validate_operation.wrong_voting_period_kind"
+      ~id:"validate.operation.wrong_voting_period_kind"
       ~title:"Wrong voting period kind"
       ~description:
         "The voting operation is incompatible the current voting period kind."
@@ -474,7 +474,7 @@ module Voting = struct
     let description = "The delegate is not in the vote listings." in
     register_error_kind
       `Temporary
-      ~id:"validate_operation.source_not_in_vote_listings"
+      ~id:"validate.operation.source_not_in_vote_listings"
       ~title:"Source not in vote listings"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -486,7 +486,7 @@ module Voting = struct
     let description = "Proposal list cannot be empty." in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.empty_proposals"
+      ~id:"validate.operation.empty_proposals"
       ~title:"Empty proposals"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -495,7 +495,7 @@ module Voting = struct
       (fun () -> Empty_proposals) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.proposals_contain_duplicate"
+      ~id:"validate.operation.proposals_contain_duplicate"
       ~title:"Proposals contain duplicate"
       ~description:"The list of proposals contains a duplicate element."
       ~pp:(fun ppf proposal ->
@@ -514,7 +514,7 @@ module Voting = struct
     in
     register_error_kind
       `Branch
-      ~id:"validate_operation.too_many_proposals"
+      ~id:"validate.operation.too_many_proposals"
       ~title:"Too many proposals"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -523,7 +523,7 @@ module Voting = struct
       (fun () -> Too_many_proposals) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.already_proposed"
+      ~id:"validate.operation.already_proposed"
       ~title:"Already proposed"
       ~description:
         "The delegate has already submitted one of the operation's proposals."
@@ -538,7 +538,7 @@ module Voting = struct
       (fun proposal -> Already_proposed {proposal}) ;
     register_error_kind
       `Temporary
-      ~id:"validate_operation.conflict_too_many_proposals"
+      ~id:"validate.operation.conflict_too_many_proposals"
       ~title:"Conflict too many proposals"
       ~description:
         "The delegate exceeded the maximum number of allowed proposals due to, \
@@ -601,7 +601,7 @@ module Voting = struct
           }) ;
     register_error_kind
       `Temporary
-      ~id:"validate_operation.conflict_already_proposed"
+      ~id:"validate.operation.conflict_already_proposed"
       ~title:"Conflict already proposed"
       ~description:
         "The delegate has already submitted one of the operation's proposals \
@@ -627,7 +627,7 @@ module Voting = struct
         Conflict_already_proposed {proposal; conflicting_operation}) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.conflicting_dictator_proposals"
+      ~id:"validate.operation.conflicting_dictator_proposals"
       ~title:"Conflicting dictator proposals"
       ~description:
         "The current block/mempool already contains a testnest dictator \
@@ -648,7 +648,7 @@ module Voting = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.testnet_dictator_multiple_proposals"
+      ~id:"validate.operation.testnet_dictator_multiple_proposals"
       ~title:"Testnet dictator multiple proposals"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -661,7 +661,7 @@ module Voting = struct
     in
     register_error_kind
       `Branch
-      ~id:"validate_operation.testnet_dictator_conflicting_operation"
+      ~id:"validate.operation.testnet_dictator_conflicting_operation"
       ~title:"Testnet dictator conflicting operation"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -687,7 +687,7 @@ module Voting = struct
     (* Ballot errors *)
     register_error_kind
       `Branch
-      ~id:"validate_operation.ballot_for_wrong_proposal"
+      ~id:"validate.operation.ballot_for_wrong_proposal"
       ~title:"Ballot for wrong proposal"
       ~description:"Ballot provided for a proposal that is not the current one."
       ~pp:(fun ppf (current, submitted) ->
@@ -714,7 +714,7 @@ module Voting = struct
     in
     register_error_kind
       `Branch
-      ~id:"validate_operation.already_submitted_a_ballot"
+      ~id:"validate.operation.already_submitted_a_ballot"
       ~title:"Already submitted a ballot"
       ~description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
@@ -723,7 +723,7 @@ module Voting = struct
       (fun () -> Already_submitted_a_ballot) ;
     register_error_kind
       `Temporary
-      ~id:"validate_operation.conflicting_ballot"
+      ~id:"validate.operation.conflicting_ballot"
       ~title:"Conflicting ballot"
       ~description:
         "The delegate has already submitted a ballot in a previously validated \
@@ -765,7 +765,7 @@ module Anonymous = struct
   let () =
     register_error_kind
       `Permanent
-      ~id:"validate_operation.invalid_activation"
+      ~id:"validate.operation.invalid_activation"
       ~title:"Invalid activation"
       ~description:
         "The given key and secret do not correspond to any existing \
@@ -782,7 +782,7 @@ module Anonymous = struct
       (fun pkh -> Invalid_activation {pkh}) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.conflicting_activation"
+      ~id:"validate.operation.conflicting_activation"
       ~title:"Account already activated in current validation_state"
       ~description:
         "The account has already been activated by a previous operation in the \
@@ -895,7 +895,7 @@ module Anonymous = struct
           {hash1; level1; round1; hash2; level2; round2}) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.block.invalid_denunciation"
+      ~id:"validate.operation.block.invalid_denunciation"
       ~title:"Invalid denunciation"
       ~description:"A denunciation is malformed"
       ~pp:(fun ppf kind ->
@@ -909,7 +909,7 @@ module Anonymous = struct
       (fun kind -> Invalid_denunciation kind) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.block.inconsistent_denunciation"
+      ~id:"validate.operation.block.inconsistent_denunciation"
       ~title:"Inconsistent denunciation"
       ~description:
         "A denunciation operation is inconsistent (two distinct delegates)"
@@ -936,7 +936,7 @@ module Anonymous = struct
         Inconsistent_denunciation {kind; delegate1; delegate2}) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.already_denounced"
+      ~id:"validate.operation.already_denounced"
       ~title:"Already denounced"
       ~description:"The same denunciation has already been validated."
       ~pp:(fun ppf (kind, delegate, level) ->
@@ -961,7 +961,7 @@ module Anonymous = struct
       (fun (kind, delegate, level) -> Already_denounced {kind; delegate; level}) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.conflicting_denunciation"
+      ~id:"validate.operation.conflicting_denunciation"
       ~title:"Conflicting denunciation in current validation state"
       ~description:
         "The same denunciation has already been validated in the current \
@@ -993,7 +993,7 @@ module Anonymous = struct
         Conflicting_denunciation {kind; delegate; level; hash}) ;
     register_error_kind
       `Temporary
-      ~id:"validate_operation.block.too_early_denunciation"
+      ~id:"validate.operation.block.too_early_denunciation"
       ~title:"Too early denunciation"
       ~description:"A denunciation is too far in the future"
       ~pp:(fun ppf (kind, level, current) ->
@@ -1020,7 +1020,7 @@ module Anonymous = struct
         Too_early_denunciation {kind; level; current}) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.block.outdated_denunciation"
+      ~id:"validate.operation.block.outdated_denunciation"
       ~title:"Outdated denunciation"
       ~description:"A denunciation is outdated."
       ~pp:(fun ppf (kind, level, last_cycle) ->
@@ -1051,7 +1051,7 @@ module Anonymous = struct
   let () =
     register_error_kind
       `Branch
-      ~id:"validate_operation.conflicting_nonce_revelation"
+      ~id:"validate.operation.conflicting_nonce_revelation"
       ~title:"Conflicting nonce revelation in the current validation state)."
       ~description:
         "A revelation for the same nonce has already been validated for the \
@@ -1080,7 +1080,7 @@ module Manager = struct
   let () =
     register_error_kind
       `Temporary
-      ~id:"validate_operation.manager_restriction"
+      ~id:"validate.operation.manager_restriction"
       ~title:"Manager restriction"
       ~description:
         "An operation with the same manager has already been validated in the \
@@ -1106,7 +1106,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.inconsistent_sources"
+      ~id:"validate.operation.inconsistent_sources"
       ~title:"Inconsistent sources in operation batch"
       ~description:inconsistent_sources_description
       ~pp:(fun ppf () ->
@@ -1120,7 +1120,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.inconsistent_counters"
+      ~id:"validate.operation.inconsistent_counters"
       ~title:"Inconsistent counters in operation"
       ~description:inconsistent_counters_description
       ~pp:(fun ppf () ->
@@ -1134,7 +1134,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.incorrect_reveal_position"
+      ~id:"validate.operation.incorrect_reveal_position"
       ~title:"Incorrect reveal position"
       ~description:incorrect_reveal_description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" incorrect_reveal_description)
@@ -1143,7 +1143,7 @@ module Manager = struct
       (fun () -> Incorrect_reveal_position) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.insufficient_gas_for_manager"
+      ~id:"validate.operation.insufficient_gas_for_manager"
       ~title:"Not enough gas for initial manager cost"
       ~description:
         (Format.asprintf
@@ -1161,7 +1161,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.gas_quota_exceeded_init_deserialize"
+      ~id:"validate.operation.gas_quota_exceeded_init_deserialize"
       ~title:"Not enough gas for initial deserialization of script expressions"
       ~description:gas_deserialize_description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" gas_deserialize_description)
@@ -1170,7 +1170,7 @@ module Manager = struct
       (fun () -> Gas_quota_exceeded_init_deserialize) ;
     register_error_kind
       `Permanent
-      ~id:"validate_operation.tx_rollup_is_disabled"
+      ~id:"validate.operation.tx_rollup_is_disabled"
       ~title:"Tx rollup is disabled"
       ~description:"Cannot originate a tx rollup as it is disabled."
       ~pp:(fun ppf () ->
@@ -1186,7 +1186,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.sc_rollup_disabled"
+      ~id:"validate.operation.sc_rollup_disabled"
       ~title:"Smart contract rollups are disabled"
       ~description:scoru_disabled_description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" scoru_disabled_description)
@@ -1213,10 +1213,62 @@ let () =
   let description = "A failing_noop operation can never be validated." in
   register_error_kind
     `Permanent
-    ~id:"validate_operation.failing_noop_error"
+    ~id:"validate.operation.failing_noop_error"
     ~title:"Failing_noop error"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.empty
     (function Failing_noop_error -> Some () | _ -> None)
     (fun () -> Failing_noop_error)
+
+module Block = struct
+  type error +=
+    | Not_enough_endorsements of {required : int; provided : int}
+    | Inconsistent_validation_passes_in_block of {
+        expected : int;
+        provided : int;
+      }
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.not_enough_endorsements"
+      ~title:"Not enough endorsements"
+      ~description:
+        "The block being validated does not include the required minimum \
+         number of endorsements."
+      ~pp:(fun ppf (required, provided) ->
+        Format.fprintf
+          ppf
+          "Wrong number of endorsements (%i), at least %i are expected"
+          provided
+          required)
+      Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
+      (function
+        | Not_enough_endorsements {required; provided} ->
+            Some (required, provided)
+        | _ -> None)
+      (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
+    register_error_kind
+      `Permanent
+      ~id:"validate.block.inconsistent_validation_passes_in_block"
+      ~title:"Inconsistent validation passes in block"
+      ~description:
+        "Validation of operation should be ordered by their validation passes \
+         in a block."
+      ~pp:(fun ppf (expected, provided) ->
+        Format.fprintf
+          ppf
+          "Validation of operation should be ordered by their validation \
+           passes in a block. Got an operation with validation pass: %d while \
+           the last validated operation had the validation pass %d."
+          provided
+          expected)
+      Data_encoding.(obj2 (req "expected" int31) (req "provided" int31))
+      (function
+        | Inconsistent_validation_passes_in_block {expected; provided} ->
+            Some (expected, provided)
+        | _ -> None)
+      (fun (expected, provided) ->
+        Inconsistent_validation_passes_in_block {expected; provided})
+end

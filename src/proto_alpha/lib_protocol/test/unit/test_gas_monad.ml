@@ -41,7 +41,7 @@ let new_context ~limit =
   Context.init1 () >>=? fun (b, _contract) ->
   Incremental.begin_construction b >|=? fun inc ->
   let state = Incremental.validation_state inc in
-  Gas.set_limit state.ctxt limit
+  Gas.set_limit state.application_state.ctxt limit
 
 let assert_gas_exhaustion ~loc ctxt gas_monad =
   match GM.run ctxt gas_monad with

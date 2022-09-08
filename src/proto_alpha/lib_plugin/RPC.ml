@@ -839,37 +839,49 @@ module Scripts = struct
       Return the unchanged operation protocol data, and the operation
       receipt ie. metadata containing balance updates, consumed gas,
       application success or failure, etc. *)
-  let run_operation_service ctxt ()
-      ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
-    (match protocol_data.contents with
-    | Single (Preendorsement _)
-    | Single (Endorsement _)
-    | Single (Dal_slot_availability _) ->
+  let run_operation_service rpc_ctxt () (packed_operation, chain_id) =
+    let {Services_registration.context; block_header; _} = rpc_ctxt in
+    (match packed_operation.protocol_data with
+    | Operation_data {contents = Single (Preendorsement _); _}
+    | Operation_data {contents = Single (Endorsement _); _}
+    | Operation_data {contents = Single (Dal_slot_availability _); _} ->
         error Run_operation_does_not_support_consensus_operations
     | _ -> ok ())
     >>?= fun () ->
-    let operation : _ operation = {shell; protocol_data} in
-    let oph = Operation.hash operation in
-    let validate_operation_info, validate_operation_state =
-      Validate_operation.begin_no_predecessor_info ctxt chain_id
-    in
-    Validate_operation.validate_operation
-      validate_operation_info
-      validate_operation_state
+    let oph = Operation.hash_packed packed_operation in
+    let validity_state = Validate.begin_no_predecessor_info context chain_id in
+    Validate.validate_operation
+      validity_state
       ~should_check_signature:false
       oph
-      operation
-    >>=? fun (_validate_operation_state, op_validated_stamp) ->
-    Apply.apply_operation
-      ctxt
-      chain_id
-      (Apply.Partial_construction {predecessor_level = None})
-      ~payload_producer:Signature.Public_key_hash.zero
-      op_validated_stamp
-      oph
-      operation
+      packed_operation
+    >>=? fun _validate_operation_state ->
+    Raw_level.of_int32 block_header.level >>?= fun predecessor_level ->
+    Alpha_context.Fitness.round_from_raw block_header.fitness
+    >>?= fun predecessor_round ->
+    let application_mode =
+      Apply.Partial_construction
+        {
+          predecessor_level;
+          predecessor_round;
+          predecessor_fitness = block_header.fitness;
+        }
+    in
+    let application_state =
+      Apply.
+        {
+          ctxt = context;
+          chain_id;
+          mode = application_mode;
+          op_count = 0;
+          migration_balance_updates = [];
+          liquidity_baking_toggle_ema = Liquidity_baking.Toggle_EMA.zero;
+          implicit_operations_results = [];
+        }
+    in
+    Apply.apply_operation application_state oph packed_operation
     >|=? fun (_ctxt, op_metadata) ->
-    (Operation_data protocol_data, Apply_results.Operation_metadata op_metadata)
+    (packed_operation.protocol_data, op_metadata)
 
   (*
 
@@ -886,14 +898,16 @@ module Scripts = struct
        time of the operation.
 
     *)
-  let simulate_operation_service ctxt
+  let simulate_operation_service rpc_ctxt
       (_simulate_query : < successor_level : bool >)
       (blocks_before_activation, op, chain_id, time_in_blocks) =
+    let {Services_registration.context; _} = rpc_ctxt in
     Cache.Admin.future_cache_expectation
-      ctxt
+      context
       ~time_in_blocks
       ?blocks_before_activation
-    >>=? fun ctxt -> run_operation_service ctxt () (op, chain_id)
+    >>=? fun context ->
+    run_operation_service {rpc_ctxt with context} () (op, chain_id)
 
   let default_from_context ctxt get = function
     | None -> get ctxt
@@ -1462,8 +1476,11 @@ module Scripts = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3364
 
        Should [run_operation] be registered at successor level? *)
-    Registration.register0 ~chunked:true S.run_operation run_operation_service ;
-    Registration.register0_successor_level
+    Registration.register0_fullctxt
+      ~chunked:true
+      S.run_operation
+      run_operation_service ;
+    Registration.register0_fullctxt_successor_level
       ~chunked:true
       S.simulate_operation
       simulate_operation_service ;

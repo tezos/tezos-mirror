@@ -180,7 +180,7 @@ type manager_op = Manager_op : 'kind Kind.manager operation -> manager_op
 type manager_op_info = {
   manager_op : manager_op;
       (** Used when we want to remove the operation with
-          {!Validate_operation.remove_manager_operation}. *)
+          {!Validate.remove_manager_operation}. *)
   fee : Tez.t;
   gas_limit : Fixed_point_repr.integral_tag Gas.Arith.t;
       (** Both [fee] and [gas_limit] are used to determine whether a new
@@ -243,7 +243,7 @@ let init config ?(validation_state : validation_state option) ~predecessor () =
   ignore config ;
   (match validation_state with
   | None -> return empty
-  | Some {ctxt; _} ->
+  | Some {application_state = {ctxt; _}; _} ->
       let {
         Tezos_base.Block_header.fitness = predecessor_fitness;
         timestamp = predecessor_timestamp;
@@ -448,7 +448,7 @@ let size_of_operation op =
 let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas op
     =
   let hard_gas_limit_per_block =
-    Constants.hard_gas_limit_per_block validation_state.ctxt
+    Constants.hard_gas_limit_per_block validation_state.application_state.ctxt
   in
   let max_size = managers_quota.max_size in
   let size = match size with None -> size_of_operation op | Some s -> s in
@@ -768,8 +768,8 @@ let pre_filter_far_future_consensus_ops config
   | ( Some grandparent_level_start,
       Some validation_state_before,
       Some round_zero_duration ) -> (
-      let ctxt : t = validation_state_before.ctxt in
-      match validation_state_before.mode with
+      let ctxt : t = validation_state_before.application_state.ctxt in
+      match validation_state_before.application_state.mode with
       | Application _ | Partial_application _ | Full_construction _ ->
           assert false
       (* Prefilter is always applied in mempool mode aka Partial_construction *)
@@ -859,7 +859,7 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
   | Single (Manager_operation _) as op -> prefilter_manager_op op
   | Cons (Manager_operation _, _) as op -> prefilter_manager_op op
 
-(** Call the protocol's {!Validate_operation.validate_operation} and
+(** Call the protocol's {!Validate.validate_operation} and
     return either:
 
     - the updated {!validation_state} when the validation is
@@ -871,20 +871,20 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
     The signature check is skipped when the operation has previously
     been validated successfully, ie. [nb_successful_prechecks > 0]. *)
 let proto_validate_operation validation_state oph ~nb_successful_prechecks
-    (operation : 'kind operation) :
+    (operation : packed_operation) :
     (validation_state, error trace * error_classification) result Lwt.t =
   let open Lwt_result_syntax in
   let*! res =
-    Validate_operation.validate_operation
-      validation_state.validate_operation_info
-      validation_state.validate_operation_state
+    Validate.validate_operation
+      validation_state.validity_state
       ~should_check_signature:(nb_successful_prechecks <= 0)
       oph
       operation
   in
   match res with
-  | Ok (validate_operation_state, (_ : Validate_operation.stamp)) ->
-      return {validation_state with validate_operation_state}
+  | Ok state ->
+      let validity_state = {validation_state.validity_state with state} in
+      return {validation_state with validity_state}
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -896,7 +896,7 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
       in
       fail (err, error_classification)
 
-(** Call the protocol's {!Validate_operation.validate_operation} on a
+(** Call the protocol's {!Validate.validate_operation} on a
     manager operation and return:
 
     - [`Success] containing the updated [validation_state] when the
@@ -926,7 +926,7 @@ let proto_validate_manager_operation validation_state oph
       validation_state
       oph
       ~nb_successful_prechecks
-      operation
+      (Operation.pack operation)
   in
   match res with
   | Ok validation_state -> return (`Success validation_state)
@@ -941,13 +941,11 @@ let proto_validate_manager_operation validation_state oph
 
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
-  let validate_operation_state =
-    Validate_operation.remove_manager_operation
-      validation_state.validate_operation_info
-      validation_state.validate_operation_state
-      op
+  let state =
+    Validate.remove_manager_operation validation_state.validity_state op
   in
-  {validation_state with validate_operation_state}
+  let validity_state = {validation_state.validity_state with state} in
+  {validation_state with validity_state}
 
 (** Call the protocol validation on a manager operation and handle
     potential conflicts: if either the 1M restriction is triggered or
@@ -1215,7 +1213,7 @@ let precheck_manager config filter_state validation_state oph
       err) ->
       Lwt.return err
 
-(** Call the protocol's {!Validate_operation.validate_operation}. If
+(** Call the protocol's {!Validate.validate_operation}. If
     successful, return the updated [validation_state], the unchanged
     [filter_state], and no operation replacement. Otherwise, return the
     classification associated with the protocol error. Note that when
@@ -1239,13 +1237,13 @@ let precheck_non_manager filter_state validation_state oph
         error_classification) ) ->
       Lwt.return error_classification
 
-(* Now that [precheck] uses {!Validate_operation.validate_operation}
+(* Now that [precheck] uses {!Validate.validate_operation}
    for every kind of operation, it must never return
    [`Undecided]. Indeed, this would cause the prevalidator to call
    {!Apply.apply_operation}, which relies on updates to the alpha
    context to detect incompatible operations, whereas
    [validate_operation] only updates the
-   {!Validate_operation.validate_operation_state}. Therefore, it would
+   {!Validate.validate_operation_state}. Therefore, it would
    be possible for the mempool to accept conflicting operations. *)
 let precheck :
     config ->
@@ -1265,8 +1263,9 @@ let precheck :
      ~filter_state
      ~validation_state
      oph
-     {shell = shell_header; protocol_data = Operation_data protocol_data}
+     operation
      ~nb_successful_prechecks ->
+  let {protocol_data = Operation_data protocol_data; _} = operation in
   let call_precheck_manager (protocol_data : _ Kind.manager protocol_data) =
     precheck_manager
       config
@@ -1274,7 +1273,7 @@ let precheck :
       validation_state
       oph
       ~nb_successful_prechecks
-      {shell = shell_header; protocol_data}
+      {shell = operation.shell; protocol_data}
   in
   match protocol_data.contents with
   | Single (Manager_operation _) -> call_precheck_manager protocol_data
@@ -1285,7 +1284,7 @@ let precheck :
         validation_state
         oph
         ~nb_successful_prechecks
-        {shell = shell_header; protocol_data}
+        operation
 
 open Apply_results
 
@@ -1359,7 +1358,8 @@ let rec post_filter_manager :
       | `Refused _ as errs -> errs)
 
 let post_filter config ~(filter_state : state) ~validation_state_before:_
-    ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
+    ~validation_state_after:
+      ({application_state = {ctxt; _}; _} : validation_state) (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata {contents} -> (
