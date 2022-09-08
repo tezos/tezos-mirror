@@ -1060,12 +1060,11 @@ struct
     in
     match payload_opt with
     | Some payload ->
-        return
-          ( Single_level {level; inc; message_proof},
-            Some
-              Sc_rollup_PVM_sem.{inbox_level = l; message_counter = n; payload}
-          )
-    | None ->
+        let input_given =
+          Some Sc_rollup_PVM_sem.{inbox_level = l; message_counter = n; payload}
+        in
+        return (Single_level {level; inc; message_proof}, input_given)
+    | None -> (
         if equal_history_proof inbox level then
           return (Single_level {level; inc; message_proof}, None)
         else
@@ -1098,25 +1097,30 @@ struct
               "upper_level_tree was misformed---could not find level"
               (Lwt.return upper_level_opt)
           in
-          return
-            ( Level_crossing
-                {
-                  lower = level;
-                  upper;
-                  inc;
-                  lower_message_proof = message_proof;
-                  upper_message_proof;
-                  upper_level;
-                },
-              Option.map
-                (fun payload ->
+          match payload_opt with
+          | None ->
+              proof_error "if upper_level_tree exists, the payload must exist"
+          | Some payload ->
+              let input_given =
+                Some
                   Sc_rollup_PVM_sem.
                     {
                       inbox_level = upper_level;
                       message_counter = Z.zero;
                       payload;
-                    })
-                payload_opt )
+                    }
+              in
+              return
+                ( Level_crossing
+                    {
+                      lower = level;
+                      upper;
+                      inc;
+                      lower_message_proof = message_proof;
+                      upper_message_proof;
+                      upper_level;
+                    },
+                  input_given ))
 
   let empty context rollup level =
     let open Lwt_syntax in

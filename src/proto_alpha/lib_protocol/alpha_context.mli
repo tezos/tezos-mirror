@@ -3167,11 +3167,9 @@ module Sc_rollup : sig
 
       val proof_start_state : proof -> hash
 
-      val proof_stop_state : proof -> hash option
+      val proof_stop_state : input option -> proof -> hash option
 
       val proof_input_requested : proof -> input_request
-
-      val proof_input_given : proof -> input option
 
       val state_hash : state -> hash Lwt.t
 
@@ -3185,7 +3183,7 @@ module Sc_rollup : sig
 
       val eval : state -> state Lwt.t
 
-      val verify_proof : proof -> bool Lwt.t
+      val verify_proof : input option -> proof -> bool Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t
@@ -3262,11 +3260,7 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {
-      tree_proof : 'a;
-      given : input option;
-      requested : input_request;
-    }
+    type 'a proof = {tree_proof : 'a; requested : input_request}
 
     module Make (C : P) : sig
       include
@@ -3316,11 +3310,7 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {
-      tree_proof : 'a;
-      given : input option;
-      requested : input_request;
-    }
+    type 'a proof = {tree_proof : 'a; requested : input_request}
 
     module Make (C : P) : sig
       include
@@ -3450,7 +3440,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       pvm_name:string ->
       t ->
-      bool tzresult Lwt.t
+      (bool * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
 
     val produce :
       (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t

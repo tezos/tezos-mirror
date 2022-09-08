@@ -156,11 +156,9 @@ module type S = sig
 
   val proof_start_state : proof -> hash
 
-  val proof_stop_state : proof -> hash option
+  val proof_stop_state : input option -> proof -> hash option
 
   val proof_input_requested : proof -> input_request
-
-  val proof_input_given : proof -> input option
 
   val state_hash : state -> hash Lwt.t
 
@@ -174,7 +172,7 @@ module type S = sig
 
   val eval : state -> state Lwt.t
 
-  val verify_proof : proof -> bool Lwt.t
+  val verify_proof : input option -> proof -> bool Lwt.t
 
   val produce_proof : context -> input option -> state -> proof tzresult Lwt.t
 

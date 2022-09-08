@@ -101,21 +101,14 @@ module V2_0_0 = struct
      Get rid of the duplication by writing the projection functions and
      removing the [given] and [requested] fields.
   *)
-  type 'a proof = {
-    tree_proof : 'a;
-    given : PS.input option;
-    requested : PS.input_request;
-  }
+  type 'a proof = {tree_proof : 'a; requested : PS.input_request}
 
   let proof_encoding e =
     let open Data_encoding in
     conv
-      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-      (obj3
-         (req "tree_proof" e)
-         (opt "given" PS.input_encoding)
-         (req "requested" PS.input_request_encoding))
+      (fun {tree_proof; requested} -> (tree_proof, requested))
+      (fun (tree_proof, requested) -> {tree_proof; requested})
+      (obj2 (req "tree_proof" e) (req "requested" PS.input_request_encoding))
 
   module Make (Context : P) :
     S
@@ -130,16 +123,14 @@ module V2_0_0 = struct
 
     type nonrec proof = Context.proof proof
 
-    let proof_input_given p = p.given
-
     let proof_input_requested p = p.requested
 
     let proof_encoding = proof_encoding Context.proof_encoding
 
     let proof_start_state p = Context.proof_before p.tree_proof
 
-    let proof_stop_state p =
-      match (p.given, p.requested) with
+    let proof_stop_state input_given p =
+      match (input_given, p.requested) with
       | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
       | None, _ -> None
       | _ -> Some (Context.proof_after p.tree_proof)
@@ -318,10 +309,10 @@ module V2_0_0 = struct
       in
       return (state, request)
 
-    let verify_proof proof =
+    let verify_proof input_given proof =
       let open Lwt_syntax in
       let* result =
-        Context.verify_proof proof.tree_proof (step_transition proof.given)
+        Context.verify_proof proof.tree_proof (step_transition input_given)
       in
       match result with
       | None -> return false
@@ -336,8 +327,7 @@ module V2_0_0 = struct
         Context.produce_proof context state (step_transition input_given)
       in
       match result with
-      | Some (tree_proof, requested) ->
-          return {tree_proof; given = input_given; requested}
+      | Some (tree_proof, requested) -> return {tree_proof; requested}
       | None -> fail WASM_proof_production_failed
 
     let verify_origination_proof proof boot_sector =
@@ -363,7 +353,7 @@ module V2_0_0 = struct
       in
       match result with
       | Some (tree_proof, ()) ->
-          return {tree_proof; given = None; requested = No_input_required}
+          return {tree_proof; requested = No_input_required}
       | None -> fail WASM_proof_production_failed
 
     type output_proof = {

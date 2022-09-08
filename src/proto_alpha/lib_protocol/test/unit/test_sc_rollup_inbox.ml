@@ -367,10 +367,7 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
     Node.form_history_proof ctxt history inbox (Some current_level_tree)
     >|= Environment.wrap_tzresult
   in
-  let*! result =
-    Node.produce_proof ctxt history history_proof (l, n)
-    >|= Environment.wrap_tzresult
-  in
+  let*! result = Node.produce_proof ctxt history history_proof (l, n) in
   match result with
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox built from the same messages
@@ -379,9 +376,7 @@ let test_inbox_proof_production (list_of_payloads, l, n) =
       @@ fun _ctxt _current_level_tree _history inbox _inboxes ->
       let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
-      let*! verification =
-        verify_proof (l, n) snapshot proof >|= Environment.wrap_tzresult
-      in
+      let*! verification = verify_proof (l, n) snapshot proof in
       match verification with
       | Ok v_input ->
           fail_unless
@@ -411,9 +406,7 @@ let test_inbox_proof_verification (list_of_payloads, l, n) =
       | Some inbox -> (
           let snapshot = take_snapshot inbox in
           let proof = node_proof_to_protocol_proof proof in
-          let*! verification =
-            verify_proof (l, n) snapshot proof >|= Environment.wrap_tzresult
-          in
+          let*! verification = verify_proof (l, n) snapshot proof in
           match verification with
           | Ok _ -> fail [err "Proof should not be valid"]
           | Error _ -> return (ok ()))
@@ -432,7 +425,6 @@ let test_empty_inbox_proof (level, n) =
   in
   let*! result =
     Node.produce_proof ctxt history history_proof (Raw_level_repr.root, n)
-    >|= Environment.wrap_tzresult
   in
   match result with
   | Ok (proof, input) -> (
@@ -444,7 +436,6 @@ let test_empty_inbox_proof (level, n) =
       let proof = node_proof_to_protocol_proof proof in
       let*! verification =
         verify_proof (Raw_level_repr.root, n) snapshot proof
-        >|= Environment.wrap_tzresult
       in
       match verification with
       | Ok v_input ->

@@ -149,7 +149,7 @@ let genesis_commitment ~boot_sector ~origination_level = function
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       let genesis_state_hash =
         WithExceptions.Option.get ~loc:__LOC__
-        @@ Arith_pvm.proof_stop_state proof
+        @@ Arith_pvm.proof_stop_state None proof
       in
       return
         Sc_rollup.Commitment.(
@@ -161,7 +161,7 @@ let genesis_commitment ~boot_sector ~origination_level = function
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
       let genesis_state_hash =
         WithExceptions.Option.get ~loc:__LOC__
-        @@ Wasm_pvm.proof_stop_state proof
+        @@ Wasm_pvm.proof_stop_state None proof
       in
       return
         Sc_rollup.Commitment.(

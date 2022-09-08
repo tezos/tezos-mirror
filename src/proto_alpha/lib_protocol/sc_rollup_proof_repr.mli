@@ -78,7 +78,7 @@ val start : t -> State_hash.t
 (** The state hash of the machine after the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val stop : t -> State_hash.t option
+val stop : Sc_rollup_PVM_sem.input option -> t -> State_hash.t option
 
 (** Check the validity of a proof.
 
@@ -92,13 +92,16 @@ val stop : t -> State_hash.t option
       PVM proof ;
 
       - the [pvm_name], used to check that the proof given has the right
-      PVM kind. *)
+      PVM kind.
+
+    It also returns the optional input executed during the proof.
+*)
 val valid :
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  bool tzresult Lwt.t
+  (bool * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S
