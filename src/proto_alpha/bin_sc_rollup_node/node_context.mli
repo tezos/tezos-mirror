@@ -61,6 +61,10 @@ type t = {
 val get_operator :
   t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
+(** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
+    operator for the node (for any purpose). *)
+val is_operator : t -> Signature.Public_key_hash.t -> bool
+
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
     configured for this purpose, returns the default fee parameter for this
