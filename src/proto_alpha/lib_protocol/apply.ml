@@ -35,6 +35,7 @@ type error +=
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Error_while_taking_fees
+  | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
@@ -130,6 +131,21 @@ let () =
     (function Error_while_taking_fees -> Some () | _ -> None)
     (fun () -> Error_while_taking_fees) ;
 
+  register_error_kind
+    `Temporary
+    ~id:"operation.update_consensus_key_on_unregistered_delegate"
+    ~title:"Update consensus key on an unregistered delegate"
+    ~description:"Cannot update consensus key an unregistered delegate."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Cannot update the consensus key on the unregistered delegate %a."
+        Signature.Public_key_hash.pp
+        c)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function
+      | Update_consensus_key_on_unregistered_delegate c -> Some c | _ -> None)
+    (fun c -> Update_consensus_key_on_unregistered_delegate c) ;
   register_error_kind
     `Branch
     ~id:"contract.empty_transaction"
@@ -1037,6 +1053,18 @@ let apply_manager_operation :
           }
       in
       (ctxt, result, [])
+  | Update_consensus_key pk ->
+      Delegate.registered ctxt source >>= fun is_registered ->
+      error_unless
+        is_registered
+        (Update_consensus_key_on_unregistered_delegate source)
+      >>?= fun () ->
+      Delegate.Consensus_key.register_update ctxt source pk >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Update_consensus_key_result
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
+          [] )
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
@@ -1542,7 +1570,8 @@ let burn_manager_storage_fees :
             size_of_constant = payload.size_of_constant;
             global_address = payload.global_address;
           } )
-  | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Set_deposits_limit_result _ | Update_consensus_key_result _ ->
+      return (ctxt, storage_limit, smopr)
   | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Tx_rollup_origination_result payload ->
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
@@ -1733,7 +1762,7 @@ type _ fees_updated_contents_list =
 
 let rec mark_skipped :
     type kind.
-    payload_producer:Signature.Public_key_hash.t ->
+    payload_producer:Consensus_key.t ->
     Level.t ->
     kind Kind.manager fees_updated_contents_list ->
     kind Kind.manager contents_result_list =
@@ -1809,7 +1838,7 @@ let take_fees ctxt contents_list =
 let rec apply_manager_contents_list_rec :
     type kind.
     context ->
-    payload_producer:public_key_hash ->
+    payload_producer:Consensus_key.t ->
     Chain_id.t ->
     kind Kind.manager fees_updated_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
@@ -1893,23 +1922,23 @@ type mode =
   | Application of {
       block_header : Block_header.t;
       fitness : Fitness.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
   | Partial_application of {
       block_header : Block_header.t;
       fitness : Fitness.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
   | Full_construction of {
       predecessor : Block_hash.t;
-      payload_producer : public_key_hash;
-      block_producer : public_key_hash;
+      payload_producer : Consensus_key.t;
+      block_producer : Consensus_key.t;
       block_data_contents : Block_header.contents;
       round : Round.t;
       predecessor_level : Level.t;
@@ -1942,7 +1971,7 @@ let record_operation (type kind) ctxt hash (operation : kind operation) :
       ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
       | Vdf_revelation _ | Double_endorsement_evidence _
       | Double_preendorsement_evidence _ | Double_baking_evidence _
-      | Activate_account _ | Manager_operation _ )
+      | Activate_account _ | Drain_delegate _ | Manager_operation _ )
   | Cons (Manager_operation _, _) ->
       record_non_consensus_operation_hash ctxt hash
 
@@ -1961,7 +1990,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
   | None ->
       (* This should not happen: operation validation should have failed. *)
       error Faulty_validation_wrong_slot
-  | Some (_delegate_pk, delegate, preendorsement_power) ->
+  | Some ({delegate; consensus_pkh; _}, preendorsement_power) ->
       let* ctxt =
         Consensus.record_preendorsement
           ctxt
@@ -1973,7 +2002,12 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
         ( ctxt,
           Single_result
             (Preendorsement_result
-               {balance_updates = []; delegate; preendorsement_power}) )
+               {
+                 balance_updates = [];
+                 delegate;
+                 consensus_key = consensus_pkh;
+                 preendorsement_power;
+               }) )
 
 let is_grandparent_endorsement mode content =
   match mode with
@@ -1984,27 +2018,35 @@ let is_grandparent_endorsement mode content =
 let record_endorsement ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.endorsement contents_result_list) tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
-  let mk_endorsement_result delegate endorsement_power =
+  let mk_endorsement_result {Consensus_key.delegate; consensus_pkh}
+      endorsement_power =
     Single_result
-      (Endorsement_result {balance_updates = []; delegate; endorsement_power})
+      (Endorsement_result
+         {
+           balance_updates = [];
+           delegate;
+           consensus_key = consensus_pkh;
+           endorsement_power;
+         })
   in
   if is_grandparent_endorsement mode content then
     let level = Level.from_raw ctxt content.level in
-    let* ctxt, (_delegate_pk, delegate) =
+    let* ctxt, ({delegate; _} as consensus_key) =
       Stake_distribution.slot_owner ctxt level content.slot
     in
     let*? ctxt = Consensus.record_grand_parent_endorsement ctxt delegate in
-    return (ctxt, mk_endorsement_result delegate 0)
+    return (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) 0)
   else
     match Slot.Map.find content.slot (Consensus.allowed_endorsements ctxt) with
     | None ->
         (* This should not happen: operation validation should have failed. *)
         fail Faulty_validation_wrong_slot
-    | Some (_delegate_pk, delegate, power) ->
+    | Some (consensus_key, power) ->
         let*? ctxt =
           Consensus.record_endorsement ctxt ~initial_slot:content.slot ~power
         in
-        return (ctxt, mk_endorsement_result delegate power)
+        return
+          (ctxt, mk_endorsement_result (Consensus_key.pkh consensus_key) power)
 
 let apply_manager_contents_list ctxt ~payload_producer chain_id
     fees_updated_contents_list =
@@ -2045,7 +2087,7 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
       Token.transfer
         ctxt
         `Double_signing_evidence_rewards
-        (`Contract (Contract.Implicit payload_producer))
+        (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
         reward
   | Error _ -> (* reward is Tez.zero *) return (ctxt, []))
   >|=? fun (ctxt, reward_balance_updates) ->
@@ -2070,10 +2112,10 @@ let punish_double_endorsement_or_preendorsement (type kind) ctxt
   | Single (Preendorsement e1) | Single (Endorsement e1) ->
       let level = Level.from_raw ctxt e1.level in
       Stake_distribution.slot_owner ctxt level e1.slot
-      >>=? fun (ctxt, (_delegate_pk, delegate)) ->
+      >>=? fun (ctxt, consensus_pk1) ->
       punish_delegate
         ctxt
-        delegate
+        consensus_pk1.delegate
         level
         `Double_endorsing
         mk_result
@@ -2087,10 +2129,10 @@ let punish_double_baking ctxt (bh1 : Block_header.t) ~payload_producer =
   let committee_size = Constants.consensus_committee_size ctxt in
   Round.to_slot round1 ~committee_size >>?= fun slot1 ->
   Stake_distribution.slot_owner ctxt level slot1
-  >>=? fun (ctxt, (_delegate_pk, delegate)) ->
+  >>=? fun (ctxt, consensus_pk1) ->
   punish_delegate
     ctxt
-    delegate
+    consensus_pk1.delegate
     level
     `Double_baking
     ~payload_producer
@@ -2129,14 +2171,18 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       let level = Level.from_raw ctxt level in
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       let tip = Constants.seed_nonce_revelation_tip ctxt in
-      let contract = Contract.Implicit payload_producer in
+      let contract =
+        Contract.Implicit payload_producer.Consensus_key.delegate
+      in
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
   | Single (Vdf_revelation {solution}) ->
       Seed.update_seed ctxt solution >>=? fun ctxt ->
       let tip = Constants.seed_nonce_revelation_tip ctxt in
-      let contract = Contract.Implicit payload_producer in
+      let contract =
+        Contract.Implicit payload_producer.Consensus_key.delegate
+      in
       Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
       >|=? fun (ctxt, balance_updates) ->
       (ctxt, Single_result (Vdf_revelation_result balance_updates))
@@ -2159,6 +2205,24 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single (Proposals _ as contents) ->
       Amendment.apply_proposals ctxt chain_id contents
   | Single (Ballot _ as contents) -> Amendment.apply_ballot ctxt contents
+  | Single (Drain_delegate {delegate; destination; consensus_key = _}) ->
+      Delegate.drain ctxt ~delegate ~destination
+      >>=? fun ( ctxt,
+                 allocated_destination_contract,
+                 fees,
+                 drain_balance_updates ) ->
+      Token.transfer
+        ctxt
+        (`Contract (Contract.Implicit delegate))
+        (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
+        fees
+      >>=? fun (ctxt, fees_balance_updates) ->
+      let balance_updates = drain_balance_updates @ fees_balance_updates in
+      return
+        ( ctxt,
+          Single_result
+            (Drain_delegate_result
+               {balance_updates; allocated_destination_contract}) )
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
          rejected by {!Validate_operation.validate_operation}. *)
@@ -2227,7 +2291,7 @@ let apply_operation application_state operation_hash operation =
       apply_operation
         application_state
         operation
-        ~payload_producer:Signature.Public_key_hash.zero
+        ~payload_producer:Consensus_key.zero
 
 let may_start_new_cycle ctxt =
   match Level.dawn_of_a_new_cycle ctxt with
@@ -2409,7 +2473,7 @@ let are_endorsements_required ctxt ~level =
 let record_endorsing_participation ctxt =
   let validators = Consensus.allowed_endorsements ctxt in
   Slot.Map.fold_es
-    (fun initial_slot (_delegate_pk, delegate, power) ctxt ->
+    (fun initial_slot ((consensus_pk : Consensus_key.pk), power) ctxt ->
       let participation =
         if Slot.Set.mem initial_slot (Consensus.endorsements_seen ctxt) then
           Delegate.Participated
@@ -2417,7 +2481,7 @@ let record_endorsing_participation ctxt =
       in
       Delegate.record_endorsing_participation
         ctxt
-        ~delegate
+        ~delegate:consensus_pk.delegate
         ~participation
         ~endorsing_power:power)
     validators
@@ -2434,10 +2498,10 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let predecessor_level = Level.from_raw ctxt predecessor_level in
   let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
-  let* ctxt, _slot, (payload_producer, _payload_producer) =
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2457,8 +2521,8 @@ let begin_application ctxt chain_id ~migration_balance_updates
         fitness;
         predecessor_round;
         predecessor_level;
-        payload_producer = Signature.Public_key.hash payload_producer;
-        block_producer;
+        payload_producer = Consensus_key.pkh payload_producer;
+        block_producer = Consensus_key.pkh block_producer;
       }
   in
   return
@@ -2487,10 +2551,10 @@ let begin_partial_application ~ancestor_context chain_id
   (* Note: we don't have access to the predecessor context. *)
   let round = Fitness.round fitness in
   let current_level = Level.current ancestor_context in
-  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ancestor_context current_level ~round
   in
-  let* ctxt, _slot, (payload_producer_pk, _payload_producer) =
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2510,8 +2574,8 @@ let begin_partial_application ~ancestor_context chain_id
         fitness;
         predecessor_level;
         predecessor_round;
-        payload_producer = Signature.Public_key.hash payload_producer_pk;
-        block_producer;
+        payload_producer = Consensus_key.pkh payload_producer;
+        block_producer = Consensus_key.pkh block_producer;
       }
   in
   return
@@ -2544,10 +2608,10 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   (* The endorsement/preendorsement validation rules for construction are the
      same as for application. *)
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
-  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2561,8 +2625,8 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
     Full_construction
       {
         predecessor;
-        payload_producer;
-        block_producer;
+        payload_producer = Consensus_key.pkh payload_producer;
+        block_producer = Consensus_key.pkh block_producer;
         round;
         block_data_contents;
         predecessor_round;
@@ -2612,7 +2676,8 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
 
 let finalize_application ctxt block_data_contents ~round ~predecessor
     ~liquidity_baking_toggle_ema ~implicit_operations_results
-    ~migration_balance_updates ~block_producer ~payload_producer =
+    ~migration_balance_updates ~(block_producer : Consensus_key.t)
+    ~(payload_producer : Consensus_key.t) =
   let open Lwt_result_syntax in
   let level = Level.current ctxt in
   let endorsing_power = Consensus.current_endorsement_power ctxt in
@@ -2647,7 +2712,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor
     match block_data_contents.Block_header.seed_nonce_hash with
     | None -> return ctxt
     | Some nonce_hash ->
-        Nonce.record_hash ctxt {nonce_hash; delegate = block_producer}
+        Nonce.record_hash ctxt {nonce_hash; delegate = block_producer.delegate}
   in
   let* ctxt, reward_bonus =
     if required_endorsements then
@@ -2660,8 +2725,8 @@ let finalize_application ctxt block_data_contents ~round ~predecessor
   let* ctxt, baking_receipts =
     Delegate.record_baking_activity_and_pay_rewards_and_fees
       ctxt
-      ~payload_producer
-      ~block_producer
+      ~payload_producer:payload_producer.delegate
+      ~block_producer:block_producer.delegate
       ~baking_reward
       ~reward_bonus
   in
@@ -2815,8 +2880,8 @@ let finalize_block (application_state : application_state) shell_header_opt =
         ( result,
           Apply_results.
             {
-              proposer = Signature.Public_key_hash.zero;
-              baker = Signature.Public_key_hash.zero;
+              proposer = Consensus_key.zero;
+              baker = Consensus_key.zero;
               level_info;
               voting_period_info;
               nonce_hash = None;
@@ -2855,7 +2920,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
         finalize_with_commit_message ctxt ~cache_nonce fitness round op_count
       in
       return (result, receipt)
-  | Partial_application {block_producer; fitness; _} ->
+  | Partial_application {payload_producer; block_producer; fitness; _} ->
       let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
       let level_info = Level.current ctxt in
       let ctxt = finalize ctxt (Fitness.to_raw fitness) in
@@ -2863,10 +2928,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
         ( ctxt,
           Apply_results.
             {
-              proposer = Signature.Public_key_hash.zero;
-              (* We cannot retrieve the proposer as it requires the
-                 frozen deposit that might not be available depending on
-                 the context given to the partial application. *)
+              proposer = payload_producer;
               baker = block_producer;
               level_info;
               voting_period_info;

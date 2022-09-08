@@ -103,11 +103,11 @@ module Contract = struct
       Stake_storage.set_active c delegate
     else
       let contract = Contract_repr.Implicit delegate in
-      let* () =
-        let* is_pk_revealed =
-          Contract_manager_storage.is_manager_key_revealed c delegate
-        in
-        fail_unless is_pk_revealed (Unregistered_delegate delegate)
+      let* pk =
+        Contract_manager_storage.get_manager_key
+          c
+          ~error:(Unregistered_delegate delegate)
+          delegate
       in
       let* () =
         let*! is_allocated = Contract_storage.allocated c contract in
@@ -122,6 +122,7 @@ module Contract = struct
       let* c = Contract_delegate_storage.set c contract delegate in
       let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
       let*! c = Storage.Delegates.add c delegate in
+      let* c = Delegate_consensus_key.init c delegate pk in
       let* c = Stake_storage.set_active c delegate in
       return c
 
@@ -247,8 +248,33 @@ let delegated_balance ctxt delegate =
   full_balance ctxt delegate >>=? fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
 
-let pubkey ctxt delegate =
-  Contract_manager_storage.get_manager_key
-    ctxt
-    delegate
-    ~error:(Unregistered_delegate delegate)
+let drain ctxt ~delegate ~destination =
+  let open Lwt_tzresult_syntax in
+  let*! is_destination_allocated =
+    Contract_storage.allocated ctxt (Contract_repr.Implicit destination)
+  in
+  let delegate_contract = Contract_repr.Implicit delegate in
+  let* ctxt, _, balance_updates1 =
+    if not is_destination_allocated then
+      Fees_storage.burn_origination_fees
+        ctxt
+        ~storage_limit:(Z.of_int (Constants_storage.origination_size ctxt))
+        ~payer:(`Contract delegate_contract)
+    else return (ctxt, Z.zero, [])
+  in
+  let* manager_balance = spendable_balance ctxt delegate in
+  let*? one_percent = Tez_repr.(manager_balance /? 100L) in
+  let fees = Tez_repr.(max one one_percent) in
+  let*? transfered = Tez_repr.(manager_balance -? fees) in
+  let* ctxt, balance_updates2 =
+    Token.transfer
+      ctxt
+      (`Contract delegate_contract)
+      (`Contract (Contract_repr.Implicit destination))
+      transfered
+  in
+  return
+    ( ctxt,
+      not is_destination_allocated,
+      fees,
+      balance_updates1 @ balance_updates2 )

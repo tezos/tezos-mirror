@@ -2440,6 +2440,25 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
+module Consensus_key : sig
+  type pk = {
+    delegate : Signature.Public_key_hash.t;
+    consensus_pk : Signature.Public_key.t;
+    consensus_pkh : Signature.Public_key_hash.t;
+  }
+
+  type t = {
+    delegate : Signature.Public_key_hash.t;
+    consensus_pkh : Signature.Public_key_hash.t;
+  }
+
+  val zero : t
+
+  val pp : Format.formatter -> t -> unit
+
+  val pkh : pk -> t
+end
+
 (** This module re-exports definitions from {!Delegate_storage},
    {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
@@ -2458,6 +2477,12 @@ module Delegate : sig
     'a Lwt.t
 
   val list : context -> public_key_hash list Lwt.t
+
+  val drain :
+    context ->
+    delegate:public_key_hash ->
+    destination:public_key_hash ->
+    (context * bool * Tez.t * Receipt.balance_updates) tzresult Lwt.t
 
   type participation_info = {
     expected_cycle_activity : int;
@@ -2532,7 +2557,18 @@ module Delegate : sig
   val last_cycle_before_deactivation :
     context -> public_key_hash -> Cycle.t tzresult Lwt.t
 
-  val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+  module Consensus_key : sig
+    val active_pubkey :
+      context -> public_key_hash -> Consensus_key.pk tzresult Lwt.t
+
+    val pending_updates :
+      context ->
+      public_key_hash ->
+      (Cycle.t * public_key_hash) list tzresult Lwt.t
+
+    val register_update :
+      context -> public_key_hash -> public_key -> context tzresult Lwt.t
+  end
 
   (** See {!Stake_storage.prepare_stake_distribution}. *)
   val prepare_stake_distribution : context -> context tzresult Lwt.t
@@ -3862,6 +3898,10 @@ module Kind : sig
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
+  type drain_delegate = Drain_delegate_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -3916,6 +3956,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -4030,6 +4071,12 @@ and _ contents =
       ballot : Vote.ballot;
     }
       -> Kind.ballot contents
+  | Drain_delegate : {
+      consensus_key : Signature.Public_key_hash.t;
+      delegate : Signature.Public_key_hash.t;
+      destination : Signature.Public_key_hash.t;
+    }
+      -> Kind.drain_delegate contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : public_key_hash;
@@ -4069,6 +4116,9 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup.t;
@@ -4309,6 +4359,8 @@ module Operation : sig
 
     val ballot_case : Kind.ballot case
 
+    val drain_delegate_case : Kind.drain_delegate case
+
     val failing_noop_case : Kind.failing_noop case
 
     val reveal_case : Kind.reveal Kind.manager case
@@ -4318,6 +4370,8 @@ module Operation : sig
     val origination_case : Kind.origination Kind.manager case
 
     val delegation_case : Kind.delegation Kind.manager case
+
+    val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
     val tx_rollup_origination_case :
       Kind.tx_rollup_origination Kind.manager case
@@ -4399,6 +4453,10 @@ module Operation : sig
 
       val delegation_case : Kind.delegation case
 
+      val update_consensus_key_tag : int
+
+      val update_consensus_key_case : Kind.update_consensus_key case
+
       val register_global_constant_case : Kind.register_global_constant case
 
       val set_deposits_limit_case : Kind.set_deposits_limit case
@@ -4468,13 +4526,10 @@ module Stake_distribution : sig
     context ->
     Level.t ->
     round:Round.t ->
-    (context * Slot.t * (public_key * public_key_hash)) tzresult Lwt.t
+    (context * Slot.t * Consensus_key.pk) tzresult Lwt.t
 
   val slot_owner :
-    context ->
-    Level.t ->
-    Slot.t ->
-    (context * (public_key * public_key_hash)) tzresult Lwt.t
+    context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,
@@ -4561,6 +4616,7 @@ module Parameters : sig
     public_key : public_key option;
     amount : Tez.t;
     delegate_to : public_key_hash option;
+    consensus_key : public_key option;
   }
 
   type bootstrap_contract = {
@@ -4577,6 +4633,8 @@ module Parameters : sig
     security_deposit_ramp_up_cycles : int option;
     no_reward_cycles : int option;
   }
+
+  val bootstrap_account_encoding : bootstrap_account Data_encoding.t
 
   val encoding : t Data_encoding.t
 end
@@ -4650,6 +4708,7 @@ module Consensus : sig
        and type 'a slot_map := 'a Slot.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
+       and type consensus_pk := Consensus_key.pk
 
   (** [store_endorsement_branch context branch] sets the "endorsement branch"
       (see {!Storage.Tenderbake.Endorsement_branch} to [branch] in both the disk

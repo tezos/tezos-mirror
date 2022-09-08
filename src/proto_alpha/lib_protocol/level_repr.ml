@@ -342,4 +342,13 @@ module Internal_for_tests = struct
     let raw_level = level.level in
     let new_raw_level = Raw_level_repr.add raw_level n in
     {level with level = new_raw_level}
+
+  let add_cycles ~blocks_per_cycle level n =
+    {
+      level with
+      cycle = Cycle_repr.add level.cycle n;
+      level = Raw_level_repr.add level.level (n * blocks_per_cycle);
+      level_position =
+        Int32.add level.level_position (Int32.of_int (n * blocks_per_cycle));
+    }
 end

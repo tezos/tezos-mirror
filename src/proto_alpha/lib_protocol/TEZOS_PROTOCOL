@@ -133,6 +133,8 @@
         "Stake_storage",
         "Contract_storage",
         "Token",
+        "Fees_storage",
+        "Delegate_consensus_key",
         "Delegate_storage",
         "Delegate_sampler",
         "Delegate_missed_endorsements_storage",
@@ -141,7 +143,6 @@
         "Bootstrap_storage",
 
         "Vote_storage",
-        "Fees_storage",
         "Ticket_storage",
         "Liquidity_baking_storage",
         "Liquidity_baking_cpmm",

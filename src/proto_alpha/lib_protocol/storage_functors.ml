@@ -885,7 +885,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
         Data_encoding.bool
   end
 
-  module Make_map (N : NAME) (V : VALUE) :
+  module Make_map (R : REGISTER) (N : NAME) (V : VALUE) :
     Indexed_data_storage with type t = t and type key = key and type value = V.t =
   struct
     type t = C.t
@@ -969,15 +969,19 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description =
+        if R.ghost then Storage_description.create ()
+        else Raw_context.description
+      in
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
           find c k)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         V.encoding
   end
 
-  module Make_carbonated_map (N : NAME) (V : VALUE) :
+  module Make_carbonated_map (R : REGISTER) (N : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage
       with type t = t
        and type key = key
@@ -1096,11 +1100,15 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description =
+        if R.ghost then Storage_description.create ()
+        else Raw_context.description
+      in
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
           find c k >|=? fun (_, v) -> v)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         V.encoding
   end
 end

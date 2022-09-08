@@ -190,6 +190,7 @@ module Contract = struct
 
   module Spendable_balance =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["balance"]
       end)
@@ -197,6 +198,7 @@ module Contract = struct
 
   module Missed_endorsements =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["missed_endorsements"]
       end)
@@ -204,13 +206,32 @@ module Contract = struct
 
   module Manager =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["manager"]
       end)
       (Manager_repr)
 
+  module Consensus_key =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["consensus_key"; "active"]
+      end)
+      (Signature.Public_key)
+
+  module Pending_consensus_keys =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["consensus_key"; "pendings"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Signature.Public_key)
+
   module Delegate =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["delegate"]
       end)
@@ -225,6 +246,7 @@ module Contract = struct
 
   module Delegate_last_cycle_before_deactivation =
     Indexed_context.Make_map
+      (Registered)
       (struct
         (* FIXME? Change the key name to reflect the functor's name *)
         let name = ["delegate_desactivation"]
@@ -241,6 +263,7 @@ module Contract = struct
 
   module Counter =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["counter"]
       end)
@@ -254,8 +277,7 @@ module Contract = struct
        and type value = Script_repr.lazy_expr
        and type t := Raw_context.t = struct
     module I =
-      Indexed_context.Make_carbonated_map
-        (N)
+      Indexed_context.Make_carbonated_map (Registered) (N)
         (struct
           type t = Script_repr.lazy_expr
 
@@ -326,6 +348,7 @@ module Contract = struct
 
   module Paid_storage_space =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["paid_bytes"]
       end)
@@ -333,6 +356,7 @@ module Contract = struct
 
   module Used_storage_space =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["used_bytes"]
       end)
@@ -340,6 +364,7 @@ module Contract = struct
 
   module Frozen_deposits =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["frozen_deposits"]
       end)
@@ -347,6 +372,7 @@ module Contract = struct
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["frozen_deposits_limit"]
       end)
@@ -362,6 +388,7 @@ module Contract = struct
 
   module Frozen_bonds =
     Bond_id_index.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["frozen_bonds"]
       end)
@@ -371,6 +398,7 @@ module Contract = struct
 
   module Total_frozen_bonds =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_frozen_bonds"]
       end)
@@ -455,6 +483,7 @@ module Big_map = struct
 
   module Total_bytes =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_bytes"]
       end)
@@ -462,6 +491,7 @@ module Big_map = struct
 
   module Key_type =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["key_type"]
       end)
@@ -473,6 +503,7 @@ module Big_map = struct
 
   module Value_type =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["value_type"]
       end)
@@ -582,6 +613,7 @@ module Sapling = struct
 
   module Total_bytes =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_bytes"]
       end)
@@ -905,6 +937,14 @@ module Delegates =
        end))
        (Public_key_hash_index)
 
+module Consensus_keys =
+  Make_data_set_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["consensus_keys"]
+       end))
+       (Public_key_hash_index)
+
 (** Per cycle storage *)
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
@@ -942,6 +982,7 @@ module Cycle = struct
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["selected_stake_distribution"]
       end)
@@ -958,27 +999,43 @@ module Cycle = struct
 
   module Total_active_stake =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_active_stake"]
       end)
       (Tez_repr)
 
-  let public_key_with_ghost_hash_encoding =
-    Data_encoding.conv
-      fst
-      (fun x -> (x, Signature.Public_key.hash x))
-      Signature.Public_key.encoding
+  module Migration_from_Kathmandu = struct
+    let public_key_with_ghost_hash_encoding =
+      Data_encoding.conv
+        fst
+        (fun x -> (x, Signature.Public_key.hash x))
+        Signature.Public_key.encoding
+
+    module Delegate_sampler_state =
+      Indexed_context.Make_map
+        (Ghost)
+        (struct
+          let name = ["delegate_sampler_state"]
+        end)
+        (struct
+          type t =
+            (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+
+          let encoding = Sampler.encoding public_key_with_ghost_hash_encoding
+        end)
+  end
 
   module Delegate_sampler_state =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["delegate_sampler_state"]
       end)
       (struct
-        type t =
-          (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+        type t = Raw_context.consensus_pk Sampler.t
 
-        let encoding = Sampler.encoding public_key_with_ghost_hash_encoding
+        let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
   type unrevealed_nonce = {
@@ -1025,6 +1082,7 @@ module Cycle = struct
 
   module Seed =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["random_seed"]
       end)
@@ -1468,6 +1526,7 @@ module Tx_rollup = struct
 
   module State =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["state"]
       end)
@@ -1483,6 +1542,7 @@ module Tx_rollup = struct
 
   module Inbox =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["inbox"]
       end)
@@ -1494,6 +1554,7 @@ module Tx_rollup = struct
 
   module Revealed_withdrawals =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["withdrawals"]
       end)
@@ -1501,6 +1562,7 @@ module Tx_rollup = struct
 
   module Commitment =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["commitment"]
       end)
@@ -1516,6 +1578,7 @@ module Tx_rollup = struct
 
   module Commitment_bond =
     Bond_indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["commitment"]
       end)
@@ -1597,6 +1660,7 @@ module Sc_rollup = struct
 
   module PVM_kind =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["kind"]
       end)
@@ -1608,6 +1672,7 @@ module Sc_rollup = struct
 
   module Boot_sector =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["boot_sector"]
       end)
@@ -1619,6 +1684,7 @@ module Sc_rollup = struct
 
   module Parameters_type =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["parameters_type"]
       end)
@@ -1630,6 +1696,7 @@ module Sc_rollup = struct
 
   module Genesis_info =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["genesis_info"]
       end)
@@ -1641,6 +1708,7 @@ module Sc_rollup = struct
 
   module Inbox_versioned =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["inbox"]
       end)
@@ -1657,6 +1725,7 @@ module Sc_rollup = struct
 
   module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["last_cemented_commitment"]
       end)
@@ -1684,6 +1753,7 @@ module Sc_rollup = struct
 
   module Staker_count =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["staker_count"]
       end)
@@ -1837,6 +1907,7 @@ module Sc_rollup = struct
 
   module Applied_outbox_messages =
     Level_index_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["applied_outbox_messages"]
       end)
@@ -1857,6 +1928,7 @@ module Sc_rollup = struct
 
   module Slot_subscriptions =
     Dal_level_index.Make_map
+      (Registered)
       (struct
         let name = ["slot_subscriptions"]
       end)
@@ -1888,6 +1960,7 @@ module Dal = struct
      to index each header directly. *)
   module Slot_headers =
     Level_context.Make_map
+      (Registered)
       (struct
         let name = ["slots"]
       end)
@@ -1913,6 +1986,7 @@ module Zk_rollup = struct
        and type key = Zk_rollup_repr.t
        and type value = Zk_rollup_account_repr.t =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["account"]
       end)
@@ -1920,6 +1994,7 @@ module Zk_rollup = struct
 
   module Pending_list =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["pending_list"]
       end)
@@ -1982,4 +2057,9 @@ module Zk_rollup = struct
               Zk_rollup_operation_repr.encoding
               (option Ticket_hash_repr.encoding))
       end)
+end
+
+module Migration_from_Kathmandu = struct
+  module Delegate_sampler_state =
+    Cycle.Migration_from_Kathmandu.Delegate_sampler_state
 end

@@ -37,19 +37,19 @@ val bake :
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
-  Baking_state.delegate list ->
+  Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
 val preendorse :
   Protocol_client_context.full ->
   ?force:bool ->
-  Baking_state.delegate list ->
+  Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
 val endorse :
   Protocol_client_context.full ->
   ?force:bool ->
-  Baking_state.delegate list ->
+  Baking_state.consensus_key list ->
   unit tzresult Lwt.t
 
 val propose :
@@ -61,5 +61,5 @@ val propose :
   ?minimal_timestamp:bool ->
   ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
-  Baking_state.delegate list ->
+  Baking_state.consensus_key list ->
   unit tzresult Lwt.t

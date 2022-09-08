@@ -34,7 +34,11 @@ type error +=
       consensus_threshold : int;
     }
 
-type ordered_slots = private Slot.t list
+type ordered_slots = private {
+  delegate : Signature.public_key_hash;
+  consensus_key : Signature.public_key_hash;
+  slots : Slot.t list;
+}
 
 (** For a given level computes who has the right to include an endorsement in
    the next block.
@@ -48,14 +52,14 @@ val endorsing_rights :
   Level.t ->
   (context * ordered_slots Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
-(** Computes endorsing rights for a given level. 
+(** Computes endorsing rights for a given level.
 
    @return  map from allocated first slots to their owner's public key, public key
    hash, and endorsing power. *)
 val endorsing_rights_by_first_slot :
   context ->
   Level.t ->
-  (context * (public_key * public_key_hash * int) Slot.Map.t) tzresult Lwt.t
+  (context * (Consensus_key.pk * int) Slot.Map.t) tzresult Lwt.t
 
 (** Computes the bonus baking reward depending on the endorsing power. *)
 val bonus_baking_reward : context -> endorsing_power:int -> Tez.t tzresult
@@ -63,4 +67,4 @@ val bonus_baking_reward : context -> endorsing_power:int -> Tez.t tzresult
 (** [baking_rights ctxt level] is the lazy list of contract's
     public key hashes that are allowed to propose for [level]
     at each round. *)
-val baking_rights : context -> Level.t -> public_key lazy_list
+val baking_rights : context -> Level.t -> Consensus_key.t lazy_list

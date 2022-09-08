@@ -42,7 +42,7 @@ let () =
     (fun pkh -> Unrevealed_public_key pkh)
 
 let init_account (ctxt, balance_updates)
-    ({public_key_hash; public_key; amount; delegate_to} :
+    ({public_key_hash; public_key; amount; delegate_to; consensus_key} :
       Parameters_repr.bootstrap_account) =
   let contract = Contract_repr.Implicit public_key_hash in
   Token.transfer
@@ -63,6 +63,12 @@ let init_account (ctxt, balance_updates)
         ctxt
         contract
         (Some (Option.value ~default:public_key_hash delegate_to))
+      >>=? fun ctxt ->
+      (match consensus_key with
+      | None -> return ctxt
+      | Some consensus_key ->
+          Delegate_consensus_key.init ctxt public_key_hash consensus_key)
+      >>=? fun ctxt -> return ctxt
   | None ->
       fail_when
         (Option.is_some delegate_to)

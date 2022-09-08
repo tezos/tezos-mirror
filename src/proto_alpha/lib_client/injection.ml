@@ -316,6 +316,7 @@ let estimated_gas_single (type kind)
         | Delegation_result {consumed_gas}
         | Register_global_constant_result {consumed_gas; _}
         | Set_deposits_limit_result {consumed_gas}
+        | Update_consensus_key_result {consumed_gas; _}
         | Increase_paid_storage_result {consumed_gas; _}
         | Tx_rollup_origination_result {consumed_gas; _}
         | Tx_rollup_submit_batch_result {consumed_gas; _}
@@ -386,6 +387,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
             Ok (Z.add paid_storage_size_diff origination_size)
         | Register_global_constant_result {size_of_constant; _} ->
             Ok size_of_constant
+        | Update_consensus_key_result _ -> Ok Z.zero
         | Tx_rollup_origination_result _ -> Ok tx_rollup_origination_size
         | Tx_rollup_submit_batch_result {paid_storage_size_diff; _}
         | Sc_rollup_execute_outbox_message_result {paid_storage_size_diff; _}
@@ -493,9 +495,9 @@ let originated_contracts_single (type kind)
             | Transaction_to_sc_rollup_result _ )
         | Register_global_constant_result _ | Reveal_result _
         | Delegation_result _ | Set_deposits_limit_result _
-        | Increase_paid_storage_result _ | Tx_rollup_origination_result _
-        | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
-        | Tx_rollup_return_bond_result _
+        | Update_consensus_key_result _ | Increase_paid_storage_result _
+        | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
+        | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
         | Tx_rollup_finalize_commitment_result _
         | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
         | Tx_rollup_dispatch_tickets_result _ | Transfer_ticket_result _

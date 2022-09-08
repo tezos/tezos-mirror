@@ -65,6 +65,7 @@ let ensure_kind infos kind =
       | Delegation _, K_Self_delegation
       | Register_global_constant _, K_Register_global_constant
       | Set_deposits_limit _, K_Set_deposits_limit
+      | Update_consensus_key _, K_Update_consensus_key
       | Increase_paid_storage _, K_Increase_paid_storage
       | Tx_rollup_origination, K_Tx_rollup_origination
       | Tx_rollup_submit_batch _, K_Tx_rollup_submit_batch
@@ -87,16 +88,17 @@ let ensure_kind infos kind =
       | Zk_rollup_origination _, K_Zk_rollup_origination ->
           return_unit
       | ( ( Transaction _ | Origination _ | Register_global_constant _
-          | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _
-          | Reveal _ | Tx_rollup_origination | Tx_rollup_submit_batch _
-          | Tx_rollup_commit _ | Tx_rollup_return_bond _
-          | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
-          | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
-          | Tx_rollup_rejection _ | Sc_rollup_originate _ | Sc_rollup_publish _
-          | Sc_rollup_cement _ | Sc_rollup_add_messages _ | Sc_rollup_refute _
-          | Sc_rollup_timeout _ | Sc_rollup_execute_outbox_message _
-          | Sc_rollup_recover_bond _ | Dal_publish_slot_header _
-          | Sc_rollup_dal_slot_subscribe _ | Zk_rollup_origination _ ),
+          | Delegation _ | Set_deposits_limit _ | Update_consensus_key _
+          | Increase_paid_storage _ | Reveal _ | Tx_rollup_origination
+          | Tx_rollup_submit_batch _ | Tx_rollup_commit _
+          | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
+          | Tx_rollup_remove_commitment _ | Tx_rollup_dispatch_tickets _
+          | Transfer_ticket _ | Tx_rollup_rejection _ | Sc_rollup_originate _
+          | Sc_rollup_publish _ | Sc_rollup_cement _ | Sc_rollup_add_messages _
+          | Sc_rollup_refute _ | Sc_rollup_timeout _
+          | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
+          | Dal_publish_slot_header _ | Sc_rollup_dal_slot_subscribe _
+          | Zk_rollup_origination _ ),
           _ ) ->
           assert false)
   | Single _ -> assert false

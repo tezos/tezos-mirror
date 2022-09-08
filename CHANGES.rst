@@ -75,12 +75,43 @@ Client
   ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/used_space``
   and ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/paid_space``.
 
+- Added commands related to the "consensus key" feature:
+
+	Update the consensus key of a baker:
+
+```shell
+tezos-client set consensus key for <mgr> to <key>
+```
+
+  It is also possible to register as a delegate and immediately set the consensus key:
+
+```shell
+tezos-client register key <mgr> as delegate with consensus key <key>
+```
+
+  (The current registration command still works.)
+
+
+  Drain a baker's account:
+
+```shell
+tezos-client drain delegate <mgr> to <key>
+```
+
+  or, if the destination account is different from the consensus key
+
+```shell
+tezos-client drain delegate <mgr> to <dest_key> with <consensus_key>
+```
+	
 Baker
 -----
 
 - External operations pool specified by the ``--operations-pool`` option are
   guaranteed to be included in the order they are received from the operations
   source.
+
+- The logs now display both the delegate and its consensus key.
 
 Accuser
 -------

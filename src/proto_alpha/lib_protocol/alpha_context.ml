@@ -469,6 +469,7 @@ module Bond_id = struct
 end
 
 module Receipt = Receipt_repr
+module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
   include Delegate_storage
@@ -489,6 +490,8 @@ module Delegate = struct
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
 
   let deactivated = Delegate_activation_storage.is_inactive
+
+  module Consensus_key = Delegate_consensus_key
 end
 
 module Stake_distribution = struct

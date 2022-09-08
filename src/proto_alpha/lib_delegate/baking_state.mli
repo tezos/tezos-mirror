@@ -26,16 +26,24 @@
 open Protocol
 open Alpha_context
 
-type delegate = {
+type consensus_key = {
   alias : string option;
   public_key : Signature.public_key;
   public_key_hash : Signature.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
-val delegate_encoding : delegate Data_encoding.t
+val consensus_key_encoding : consensus_key Data_encoding.t
 
-val pp_delegate : Format.formatter -> delegate -> unit
+val pp_consensus_key : Format.formatter -> consensus_key -> unit
+
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
+
+val consensus_key_and_delegate_encoding :
+  consensus_key_and_delegate Data_encoding.t
+
+val pp_consensus_key_and_delegate :
+  Format.formatter -> consensus_key_and_delegate -> unit
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
@@ -65,7 +73,7 @@ type block_info = {
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
   round_timestamps :
-    (Timestamp.time * Round.t * delegate)
+    (Timestamp.time * Round.t * consensus_key_and_delegate)
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
@@ -77,7 +85,7 @@ type global_state = {
   round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
   validation_mode : validation_mode;
-  delegates : delegate list;
+  delegates : consensus_key list;
   cache : cache;
 }
 
@@ -87,14 +95,10 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 
 module SlotMap : Map.S with type key = Slot.t
 
-type endorsing_slot = {
-  delegate : Signature.public_key_hash;
-  slots : Slot.t trace;
-  endorsing_power : int;
-}
+type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
 
 type delegate_slots = {
-  own_delegate_slots : (delegate * endorsing_slot) SlotMap.t;
+  own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
   all_delegate_slots : endorsing_slot SlotMap.t;
   all_slots_by_round : Slot.t array;
 }
@@ -189,7 +193,7 @@ val compute_delegate_slots :
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
-  delegate list ->
+  consensus_key list ->
   delegate_slots tzresult Lwt.t
 
 val create_cache : unit -> cache
@@ -211,7 +215,8 @@ val pp_endorsable_payload : Format.formatter -> endorsable_payload -> unit
 
 val pp_elected_block : Format.formatter -> elected_block -> unit
 
-val pp_endorsing_slot : Format.formatter -> delegate * endorsing_slot -> unit
+val pp_endorsing_slot :
+  Format.formatter -> consensus_key_and_delegate * endorsing_slot -> unit
 
 val pp_delegate_slots : Format.formatter -> delegate_slots -> unit
 

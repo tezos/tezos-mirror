@@ -177,6 +177,8 @@ module Delegate : sig
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
@@ -197,6 +199,11 @@ module Delegate : sig
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 
   val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
+
+  val consensus_key :
+    t ->
+    public_key_hash ->
+    (public_key_hash * (Cycle.t * public_key_hash) list) tzresult Lwt.t
 
   val participation :
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t

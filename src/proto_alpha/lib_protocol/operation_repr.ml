@@ -76,6 +76,10 @@ module Kind = struct
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
+  type drain_delegate = Drain_delegate_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -130,6 +134,7 @@ module Kind = struct
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -312,6 +317,12 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  | Drain_delegate : {
+      consensus_key : Signature.Public_key_hash.t;
+      delegate : Signature.Public_key_hash.t;
+      destination : Signature.Public_key_hash.t;
+    }
+      -> Kind.drain_delegate contents
   | Failing_noop : string -> Kind.failing_noop contents
   | Manager_operation : {
       source : Signature.public_key_hash;
@@ -353,6 +364,9 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
@@ -479,6 +493,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
+  | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
   | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
   | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
@@ -754,6 +769,21 @@ module Encoding = struct
           inj =
             (fun (amount_in_bytes, destination) ->
               Increase_paid_storage {amount_in_bytes; destination});
+        }
+
+    let update_consensus_key_tag = 6
+
+    let update_consensus_key_case =
+      MCase
+        {
+          tag = update_consensus_key_tag;
+          name = "update_consensus_key";
+          encoding = obj1 (req "pk" Signature.Public_key.encoding);
+          select =
+            (function
+            | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
+          proj = (function Update_consensus_key consensus_pk -> consensus_pk);
+          inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
         }
 
     let tx_rollup_origination_case =
@@ -1511,6 +1541,27 @@ module Encoding = struct
             Ballot {source; period; proposal; ballot});
       }
 
+  let drain_delegate_case =
+    Case
+      {
+        tag = 9;
+        name = "drain_delegate";
+        encoding =
+          obj3
+            (req "consensus_key" Signature.Public_key_hash.encoding)
+            (req "delegate" Signature.Public_key_hash.encoding)
+            (req "destination" Signature.Public_key_hash.encoding);
+        select =
+          (function Contents (Drain_delegate _ as op) -> Some op | _ -> None);
+        proj =
+          (function
+          | Drain_delegate {consensus_key; delegate; destination} ->
+              (consensus_key, delegate, destination));
+        inj =
+          (fun (consensus_key, delegate, destination) ->
+            Drain_delegate {consensus_key; delegate; destination});
+      }
+
   let failing_noop_case =
     Case
       {
@@ -1579,6 +1630,9 @@ module Encoding = struct
 
   let increase_paid_storage_case =
     make_manager_case 113 Manager_operations.increase_paid_storage_case
+
+  let update_consensus_key_case =
+    make_manager_case 114 Manager_operations.update_consensus_key_case
 
   let tx_rollup_origination_case =
     make_manager_case
@@ -1709,6 +1763,8 @@ module Encoding = struct
            make delegation_case;
            make set_deposits_limit_case;
            make increase_paid_storage_case;
+           make update_consensus_key_case;
+           make drain_delegate_case;
            make failing_noop_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
@@ -1812,6 +1868,7 @@ let acceptable_pass (op : packed_operation) =
   | Single (Double_preendorsement_evidence _) -> Some anonymous_pass
   | Single (Double_baking_evidence _) -> Some anonymous_pass
   | Single (Activate_account _) -> Some anonymous_pass
+  | Single (Drain_delegate _) -> Some anonymous_pass
   | Single (Manager_operation _) -> Some manager_pass
   | Cons (Manager_operation _, _ops) -> Some manager_pass
 
@@ -1901,7 +1958,7 @@ let check_signature (type kind) key chain_id
           ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
           | Vdf_revelation _ | Double_endorsement_evidence _
           | Double_preendorsement_evidence _ | Double_baking_evidence _
-          | Activate_account _ | Manager_operation _ ) ->
+          | Activate_account _ | Drain_delegate _ | Manager_operation _ ) ->
           check
             ~watermark:Generic_operation
             (Contents_list protocol_data.contents)
@@ -1948,6 +2005,8 @@ let equal_manager_operation_kind :
   | Set_deposits_limit _, _ -> None
   | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
   | Increase_paid_storage _, _ -> None
+  | Update_consensus_key _, Update_consensus_key _ -> Some Eq
+  | Update_consensus_key _, _ -> None
   | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
   | Tx_rollup_origination, _ -> None
   | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq
@@ -2017,6 +2076,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
   | Proposals _, _ -> None
   | Ballot _, Ballot _ -> Some Eq
   | Ballot _, _ -> None
+  | Drain_delegate _, Drain_delegate _ -> Some Eq
+  | Drain_delegate _, _ -> None
   | Failing_noop _, Failing_noop _ -> Some Eq
   | Failing_noop _, _ -> None
   | Manager_operation op1, Manager_operation op2 -> (
@@ -2190,6 +2251,9 @@ let consensus_infos_and_hash_from_block_header (bh : Block_header_repr.t) =
     The [weight] of an {!Activate_account} depends on its public key
    hash.
 
+    The [weight] of an {!Drain_delegate} depends on the public key
+   hash of the delegate.
+
     The [weight] of {!Manager_operation} depends on its [fee] and
    [gas_limit] ratio expressed in {!Q.t}. *)
 type _ weight =
@@ -2211,6 +2275,9 @@ type _ weight =
   | Weight_double_baking : double_baking_infos -> anonymous_pass_type weight
   | Weight_activate_account :
       Ed25519.Public_key_hash.t
+      -> anonymous_pass_type weight
+  | Weight_drain_delegate :
+      Signature.Public_key_hash.t
       -> anonymous_pass_type weight
   | Weight_manager : Q.t * Signature.public_key_hash -> manager_pass_type weight
   | Weight_noop : noop_pass_type weight
@@ -2328,6 +2395,8 @@ let weight_of : packed_operation -> operation_weight =
       W (Anonymous, Weight_double_baking double_baking_infos)
   | Single (Activate_account {id; _}) ->
       W (Anonymous, Weight_activate_account id)
+  | Single (Drain_delegate {delegate; _}) ->
+      W (Anonymous, Weight_drain_delegate delegate)
   | Single (Manager_operation _) as ops ->
       let manweight, src = weight_manager ops in
       W (Manager, Weight_manager (manweight, src))
@@ -2525,37 +2594,49 @@ let compare_anonymous_weight w1 w2 =
   | Weight_double_endorsement infos1, Weight_double_endorsement infos2 ->
       compare_round_infos infos1 infos2
   | ( ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _ ),
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ),
       (Weight_double_preendorsement _ | Weight_double_endorsement _) ) ->
       -1
   | ( (Weight_double_preendorsement _ | Weight_double_endorsement _),
       ( Weight_double_baking _ | Weight_seed_nonce_revelation _
-      | Weight_vdf_revelation _ | Weight_activate_account _ ) ) ->
+      | Weight_vdf_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ) ) ->
       1
   | Weight_double_baking infos1, Weight_double_baking infos2 ->
       compare_baking_infos infos1 infos2
   | ( ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
-      | Weight_activate_account _ ),
+      | Weight_activate_account _ | Weight_drain_delegate _ ),
       Weight_double_baking _ ) ->
       -1
   | ( Weight_double_baking _,
       ( Weight_seed_nonce_revelation _ | Weight_vdf_revelation _
-      | Weight_activate_account _ ) ) ->
+      | Weight_activate_account _ | Weight_drain_delegate _ ) ) ->
       1
   | Weight_vdf_revelation solution1, Weight_vdf_revelation solution2 ->
       Seed_repr.compare_vdf_solution solution1 solution2
-  | ( (Weight_seed_nonce_revelation _ | Weight_activate_account _),
+  | ( ( Weight_seed_nonce_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ),
       Weight_vdf_revelation _ ) ->
       -1
   | ( Weight_vdf_revelation _,
-      (Weight_seed_nonce_revelation _ | Weight_activate_account _) ) ->
+      ( Weight_seed_nonce_revelation _ | Weight_activate_account _
+      | Weight_drain_delegate _ ) ) ->
       1
   | Weight_seed_nonce_revelation l1, Weight_seed_nonce_revelation l2 ->
       Compare.Int32.compare l1 l2
-  | Weight_activate_account _, Weight_seed_nonce_revelation _ -> -1
-  | Weight_seed_nonce_revelation _, Weight_activate_account _ -> 1
+  | ( (Weight_activate_account _ | Weight_drain_delegate _),
+      Weight_seed_nonce_revelation _ ) ->
+      -1
+  | ( Weight_seed_nonce_revelation _,
+      (Weight_activate_account _ | Weight_drain_delegate _) ) ->
+      1
   | Weight_activate_account pkh1, Weight_activate_account pkh2 ->
       Ed25519.Public_key_hash.compare pkh1 pkh2
+  | Weight_drain_delegate _, Weight_activate_account _ -> -1
+  | Weight_activate_account _, Weight_drain_delegate _ -> 1
+  | Weight_drain_delegate pkh1, Weight_drain_delegate pkh2 ->
+      Signature.Public_key_hash.compare pkh1 pkh2
 
 (** {5 Comparison of valid {!Manager_operation}} *)
 

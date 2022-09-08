@@ -33,6 +33,7 @@ type bootstrap_account = {
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
   delegate_to : Signature.Public_key_hash.t option;
+  consensus_key : Signature.Public_key.t option;
 }
 
 (** An originated contract initially existing on a chain since genesis. *)
@@ -52,6 +53,8 @@ type t = {
   security_deposit_ramp_up_cycles : int option;
   no_reward_cycles : int option;
 }
+
+val bootstrap_account_encoding : bootstrap_account Data_encoding.t
 
 val encoding : t Data_encoding.t
 

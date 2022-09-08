@@ -143,7 +143,7 @@ module Parameters :
         *)
         return_true
     | Reveal _ | Transaction _ | Origination _ | Delegation _
-    | Register_global_constant _ | Set_deposits_limit _
+    | Update_consensus_key _ | Register_global_constant _ | Set_deposits_limit _
     | Increase_paid_storage _ | Tx_rollup_origination | Tx_rollup_submit_batch _
     | Tx_rollup_commit _ | Tx_rollup_return_bond _
     | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _

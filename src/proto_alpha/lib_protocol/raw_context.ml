@@ -73,6 +73,29 @@ module Sc_rollup_address_map_builder =
 
  *)
 
+type consensus_pk = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pk : Signature.Public_key.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+let consensus_pk_encoding =
+  let open Data_encoding in
+  conv
+    (fun {delegate; consensus_pk; consensus_pkh} ->
+      if Signature.Public_key_hash.equal consensus_pkh delegate then
+        (consensus_pk, None)
+      else (consensus_pk, Some delegate))
+    (fun (consensus_pk, delegate) ->
+      let consensus_pkh = Signature.Public_key.hash consensus_pk in
+      let delegate =
+        match delegate with None -> consensus_pkh | Some del -> del
+      in
+      {delegate; consensus_pk; consensus_pkh})
+    (obj2
+       (req "consensus_pk" Signature.Public_key.encoding)
+       (opt "delegate" Signature.Public_key_hash.encoding))
+
 module Raw_consensus = struct
   (** Consensus operations are indexed by their [initial slots]. Given
       a delegate, the [initial slot] is the lowest slot assigned to
@@ -81,16 +104,12 @@ module Raw_consensus = struct
   type t = {
     current_endorsement_power : int;
         (** Number of endorsement slots recorded for the current block. *)
-    allowed_endorsements :
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int)
-      Slot_repr.Map.t;
+    allowed_endorsements : (consensus_pk * int) Slot_repr.Map.t;
         (** Endorsements rights for the current block. Only an endorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
             slot with its power. *)
-    allowed_preendorsements :
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int)
-      Slot_repr.Map.t;
+    allowed_preendorsements : (consensus_pk * int) Slot_repr.Map.t;
         (** Preendorsements rights for the current block. Only a preendorsement
             for the lowest slot in the block can be recorded. The map
             associates to each initial slot the [pkh] associated to this
@@ -238,10 +257,7 @@ type back = {
   unlimited_operation_gas : bool;
   consensus : Raw_consensus.t;
   non_consensus_operations_rev : Operation_hash.t list;
-  sampler_state :
-    (Seed_repr.seed
-    * (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t)
-    Cycle_repr.Map.t;
+  sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
@@ -1286,6 +1302,12 @@ let record_non_consensus_operation_hash ctxt operation_hash =
 
 let non_consensus_operations ctxt = List.rev (non_consensus_operations_rev ctxt)
 
+module Migration_from_Kathmandu = struct
+  let reset_samplers ctxt =
+    let ctxt = update_sampler_state ctxt Cycle_repr.Map.empty in
+    ok ctxt
+end
+
 let init_sampler_for_cycle ctxt cycle seed state =
   let map = sampler_state ctxt in
   if Cycle_repr.Map.mem cycle map then error (Sampler_already_set cycle)
@@ -1324,6 +1346,17 @@ module Internal_for_tests = struct
     let new_level = Level_repr.Internal_for_tests.add_level ctxt.back.level l in
     let new_back = {ctxt.back with level = new_level} in
     {ctxt with back = new_back}
+
+  let add_cycles ctxt l =
+    let blocks_per_cycle = Int32.to_int (constants ctxt).blocks_per_cycle in
+    let new_level =
+      Level_repr.Internal_for_tests.add_cycles
+        ~blocks_per_cycle
+        ctxt.back.level
+        l
+    in
+    let new_back = {ctxt.back with level = new_level} in
+    {ctxt with back = new_back}
 end
 
 module type CONSENSUS = sig
@@ -1337,20 +1370,18 @@ module type CONSENSUS = sig
 
   type round
 
-  val allowed_endorsements :
-    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+  type consensus_pk
 
-  val allowed_preendorsements :
-    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
 
   val current_endorsement_power : t -> int
 
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
-    allowed_preendorsements:
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map ->
+    allowed_preendorsements:(consensus_pk * int) slot_map ->
     t
 
   val record_grand_parent_endorsement :
@@ -1384,7 +1415,8 @@ module Consensus :
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type slot_set := Slot_repr.Set.t
-     and type round := Round_repr.t = struct
+     and type round := Round_repr.t
+     and type consensus_pk := consensus_pk = struct
   let[@inline] allowed_endorsements ctxt =
     ctxt.back.consensus.allowed_endorsements
 
@@ -1573,11 +1605,13 @@ module Dal = struct
   let rec compute_shards ?(index = 0) ctxt ~endorser =
     let max_shards = ctxt.back.constants.dal.number_of_shards in
     Slot_repr.Map.fold_e
-      (fun _ (_, public_key_hash, power) (index, shards) ->
+      (fun _ (consensus_key, power) (index, shards) ->
         let limit = Compare.Int.min (index + power) max_shards in
         (* Early fail when we have reached the desired number of shards *)
         if Compare.Int.(index >= max_shards) then Error shards
-        else if Signature.Public_key_hash.(public_key_hash = endorser) then
+        else if
+          Signature.Public_key_hash.(consensus_key.consensus_pkh = endorser)
+        then
           let shards = Misc.(index --> (limit - 1)) in
           Ok (index + power, shards)
         else Ok (index + power, shards))

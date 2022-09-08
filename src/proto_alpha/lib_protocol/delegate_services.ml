@@ -83,6 +83,8 @@ type info = {
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
+  active_consensus_key : Signature.Public_key_hash.t;
+  pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
 }
 
 let info_encoding =
@@ -99,6 +101,8 @@ let info_encoding =
            deactivated;
            grace_period;
            voting_info;
+           active_consensus_key;
+           pending_consensus_keys;
          } ->
       ( ( full_balance,
           current_frozen_deposits,
@@ -109,7 +113,7 @@ let info_encoding =
           delegated_balance,
           deactivated,
           grace_period ),
-        voting_info ))
+        (voting_info, (active_consensus_key, pending_consensus_keys)) ))
     (fun ( ( full_balance,
              current_frozen_deposits,
              frozen_deposits,
@@ -119,7 +123,7 @@ let info_encoding =
              delegated_balance,
              deactivated,
              grace_period ),
-           voting_info ) ->
+           (voting_info, (active_consensus_key, pending_consensus_keys)) ) ->
       {
         full_balance;
         current_frozen_deposits;
@@ -131,6 +135,8 @@ let info_encoding =
         deactivated;
         grace_period;
         voting_info;
+        active_consensus_key;
+        pending_consensus_keys;
       })
     (merge_objs
        (obj9
@@ -143,7 +149,17 @@ let info_encoding =
           (req "delegated_balance" Tez.encoding)
           (req "deactivated" bool)
           (req "grace_period" Cycle.encoding))
-       Vote.delegate_info_encoding)
+       (merge_objs
+          Vote.delegate_info_encoding
+          (obj2
+             (req "active_consensus_key" Signature.Public_key_hash.encoding)
+             (dft
+                "pending_consensus_keys"
+                (list
+                   (obj2
+                      (req "cycle" Cycle.encoding)
+                      (req "pkh" Signature.Public_key_hash.encoding)))
+                []))))
 
 let participation_info_encoding =
   let open Data_encoding in
@@ -331,6 +347,25 @@ module S = struct
       ~output:Vote.delegate_info_encoding
       RPC_path.(path / "voting_info")
 
+  let consensus_key =
+    RPC_service.get_service
+      ~description:
+        "The active consensus key for a given delegate and the pending \
+         consensus keys."
+      ~query:RPC_query.empty
+      ~output:
+        Data_encoding.(
+          obj2
+            (req "active" Signature.Public_key_hash.encoding)
+            (dft
+               "pendings"
+               (list
+                  (obj2
+                     (req "cycle" Cycle.encoding)
+                     (req "pkh" Signature.Public_key_hash.encoding)))
+               []))
+      RPC_path.(path / "consensus_key")
+
   let participation =
     RPC_service.get_service
       ~description:
@@ -403,7 +438,9 @@ let register () =
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
       Delegate.last_cycle_before_deactivation ctxt pkh >>=? fun grace_period ->
-      Vote.get_delegate_info ctxt pkh >|=? fun voting_info ->
+      Vote.get_delegate_info ctxt pkh >>=? fun voting_info ->
+      Delegate.Consensus_key.active_pubkey ctxt pkh >>=? fun consensus_key ->
+      Delegate.Consensus_key.pending_updates ctxt pkh >|=? fun pendings ->
       {
         full_balance;
         current_frozen_deposits = frozen_deposits.current_amount;
@@ -415,6 +452,8 @@ let register () =
         deactivated;
         grace_period;
         voting_info;
+        active_consensus_key = consensus_key.consensus_pkh;
+        pending_consensus_keys = pendings;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (check_delegate_registered ctxt pkh)
@@ -451,6 +490,10 @@ let register () =
   register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Vote.get_delegate_info ctxt pkh) ;
+  register1 ~chunked:false S.consensus_key (fun ctxt pkh () () ->
+      Delegate.Consensus_key.active_pubkey ctxt pkh >>=? fun pk ->
+      Delegate.Consensus_key.pending_updates ctxt pkh >>=? fun pendings ->
+      return (pk.consensus_pkh, pendings)) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       check_delegate_registered ctxt pkh >>=? fun () ->
       Delegate.participation_info ctxt pkh)
@@ -498,6 +541,9 @@ let voting_power ctxt block pkh =
 
 let voting_info ctxt block pkh =
   RPC_context.make_call1 S.voting_info ctxt block pkh () ()
+
+let consensus_key ctxt block pkh =
+  RPC_context.make_call1 S.consensus_key ctxt block pkh () ()
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()

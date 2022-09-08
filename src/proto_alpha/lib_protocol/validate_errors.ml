@@ -1063,6 +1063,145 @@ module Anonymous = struct
       Data_encoding.unit
       (function Conflicting_nonce_revelation -> Some () | _ -> None)
       (fun () -> Conflicting_nonce_revelation)
+
+  type error +=
+    | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_inactive_key of {
+        delegate : Signature.Public_key_hash.t;
+        consensus_key : Signature.Public_key_hash.t;
+        active_consensus_key : Signature.Public_key_hash.t;
+      }
+    | Invalid_drain_delegate_no_consensus_key of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_noop of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees of {
+        delegate : Signature.Public_key_hash.t;
+        destination : Signature.Public_key_hash.t;
+        min_amount : Tez.t;
+      }
+    | Conflicting_drain of {delegate : Signature.Public_key_hash.t}
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"operation.drain_delegate_key_on_unregistered_delegate"
+      ~title:"Drain delegate key on an unregistered delegate"
+      ~description:"Cannot drain an unregistered delegate."
+      ~pp:(fun ppf c ->
+        Format.fprintf
+          ppf
+          "Cannot drain an unregistered delegate %a."
+          Signature.Public_key_hash.pp
+          c)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function
+        | Drain_delegate_on_unregistered_delegate c -> Some c | _ -> None)
+      (fun c -> Drain_delegate_on_unregistered_delegate c) ;
+    register_error_kind
+      `Temporary
+      ~id:"operation.invalid_drain.inactive_key"
+      ~title:"Drain delegate with an inactive consensus key"
+      ~description:"Cannot drain with an inactive consensus key."
+      ~pp:(fun ppf (delegate, consensus_key, active_consensus_key) ->
+        Format.fprintf
+          ppf
+          "Consensus key %a is not the active consensus key for delegate %a. \
+           The active consensus key is %a."
+          Signature.Public_key_hash.pp
+          consensus_key
+          Signature.Public_key_hash.pp
+          delegate
+          Signature.Public_key_hash.pp
+          active_consensus_key)
+      Data_encoding.(
+        obj3
+          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "consensus_key" Signature.Public_key_hash.encoding)
+          (req "active_consensus_key" Signature.Public_key_hash.encoding))
+      (function
+        | Invalid_drain_delegate_inactive_key
+            {delegate; consensus_key; active_consensus_key} ->
+            Some (delegate, consensus_key, active_consensus_key)
+        | _ -> None)
+      (fun (delegate, consensus_key, active_consensus_key) ->
+        Invalid_drain_delegate_inactive_key
+          {delegate; consensus_key; active_consensus_key}) ;
+    register_error_kind
+      `Temporary
+      ~id:"operation.invalid_drain.no_consensus_key"
+      ~title:"Drain a delegate without consensus key"
+      ~description:"Cannot drain a delegate without consensus key."
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "There is no active consensus key for delegate %a."
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function
+        | Invalid_drain_delegate_no_consensus_key c -> Some c | _ -> None)
+      (fun c -> Invalid_drain_delegate_no_consensus_key c) ;
+    register_error_kind
+      `Temporary
+      ~id:"operation.invalid_drain.noop"
+      ~title:"Invalid drain delegate: noop"
+      ~description:"Cannot drain a delegate to itself."
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "The destination of a drain operation cannot be the delegate itself \
+           (%a)."
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Invalid_drain_delegate_noop c -> Some c | _ -> None)
+      (fun c -> Invalid_drain_delegate_noop c) ;
+    register_error_kind
+      `Temporary
+      ~id:"operation.invalid_drain.insufficient_funds_for_burn_or_fees"
+      ~title:
+        "Drain delegate without enough balance for allocation burn or drain \
+         fees"
+      ~description:"Cannot drain without enough allocation burn and drain fees."
+      ~pp:(fun ppf (delegate, destination, min_amount) ->
+        Format.fprintf
+          ppf
+          "Cannot drain delegate from %a to %a: not enough funds for the drain \
+           fees in the delegate account (minimum balance required: %a)."
+          Signature.Public_key_hash.pp
+          delegate
+          Signature.Public_key_hash.pp
+          destination
+          Tez.pp
+          min_amount)
+      Data_encoding.(
+        obj3
+          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "destination" Signature.Public_key_hash.encoding)
+          (req "min_amount" Tez.encoding))
+      (function
+        | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
+            {delegate; destination; min_amount} ->
+            Some (delegate, destination, min_amount)
+        | _ -> None)
+      (fun (delegate, destination, min_amount) ->
+        Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
+          {delegate; destination; min_amount}) ;
+    register_error_kind
+      `Branch
+      ~id:"validate_operation.conflicting_drain"
+      ~title:"Conflicting drain in the current validation state)."
+      ~description:
+        "A manager operation or another drain operation is in conflict."
+      ~pp:(fun ppf delegate ->
+        Format.fprintf
+          ppf
+          "This drain operation is conflicting with another drain operation or \
+           a manager operation for delegate %a"
+          Signature.Public_key_hash.pp
+          delegate)
+      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+      (function Conflicting_drain {delegate} -> Some delegate | _ -> None)
+      (fun delegate -> Conflicting_drain {delegate})
 end
 
 module Manager = struct

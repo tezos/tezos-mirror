@@ -209,6 +209,12 @@ let pp_manager_operation_content (type kind) source ppf
         source
         Contract_hash.pp
         destination
+  | Update_consensus_key pk ->
+      Format.fprintf
+        ppf
+        "Update_consensus_key:@,Public key hash: %a"
+        Signature.Public_key_hash.pp
+        (Signature.Public_key.hash pk)
   | Tx_rollup_origination ->
       Format.fprintf
         ppf
@@ -807,6 +813,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Delegation_result _ -> "delegation"
     | Register_global_constant_result _ -> "global constant registration"
     | Set_deposits_limit_result _ -> "deposits limit modification"
+    | Update_consensus_key_result _ -> "consensus key update"
     | Increase_paid_storage_result _ -> "paid storage increase"
     | Tx_rollup_origination_result _ -> "transaction rollup origination"
     | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
@@ -843,6 +850,8 @@ let pp_manager_operation_contents_result ppf op_result =
     | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
     | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
     | Set_deposits_limit_result {consumed_gas} ->
+        pp_consumed_gas ppf consumed_gas
+    | Update_consensus_key_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx
     | Origination_result op_res -> pp_origination_result ppf op_res
@@ -984,8 +993,8 @@ let pp_contents_and_result :
         pp_balance_updates
         bus
   | ( Preendorsement {level; _},
-      Preendorsement_result {balance_updates; delegate; preendorsement_power} )
-    ->
+      Preendorsement_result
+        {balance_updates; delegate; consensus_key; preendorsement_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Preendorsement:@,\
@@ -997,11 +1006,12 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
-        delegate
+        Consensus_key.pp
+        {delegate; consensus_pkh = consensus_key}
         preendorsement_power
   | ( Endorsement {level; _},
-      Endorsement_result {balance_updates; delegate; endorsement_power} ) ->
+      Endorsement_result
+        {balance_updates; delegate; consensus_key; endorsement_power} ) ->
       Format.fprintf
         ppf
         "@[<v 2>Endorsement:@,\
@@ -1013,8 +1023,8 @@ let pp_contents_and_result :
         level
         pp_balance_updates
         balance_updates
-        Signature.Public_key_hash.pp
-        delegate
+        Consensus_key.pp
+        {delegate; consensus_pkh = consensus_key}
         endorsement_power
   | Dal_slot_availability _, Dal_slot_availability_result {delegate} ->
       Format.fprintf
@@ -1083,6 +1093,24 @@ let pp_contents_and_result :
         proposal
         Data_encoding.Json.pp
         (Data_encoding.Json.construct Vote.ballot_encoding ballot)
+  | ( Drain_delegate {consensus_key; delegate; destination},
+      Drain_delegate_result {balance_updates; allocated_destination_contract} )
+    ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Drain delegate:@,\
+         Consensus key hash: %a@,\
+         Delegate: %a@,\
+         Destination: %a%s%a@]"
+        Signature.Public_key_hash.pp
+        consensus_key
+        Signature.Public_key_hash.pp
+        delegate
+        Signature.Public_key_hash.pp
+        destination
+        (if allocated_destination_contract then " (allocated)" else "")
+        pp_balance_updates
+        balance_updates
   | Failing_noop _arbitrary, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       .

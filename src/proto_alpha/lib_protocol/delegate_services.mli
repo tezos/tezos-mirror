@@ -54,6 +54,8 @@ type info = {
   deactivated : bool;
   grace_period : Cycle.t;
   voting_info : Vote.delegate_info;
+  active_consensus_key : Signature.Public_key_hash.t;
+  pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
 }
 
 val info_encoding : info Data_encoding.t
@@ -126,6 +128,14 @@ val voting_info :
   'a ->
   public_key_hash ->
   Vote.delegate_info shell_tzresult Lwt.t
+
+val consensus_key :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  (Signature.Public_key_hash.t * (Cycle.t * Signature.Public_key_hash.t) list)
+  shell_tzresult
+  Lwt.t
 
 val participation :
   'a #RPC_context.simple ->

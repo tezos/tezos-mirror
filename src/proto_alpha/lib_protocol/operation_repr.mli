@@ -106,6 +106,10 @@ module Kind : sig
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
+  type drain_delegate = Drain_delegate_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -160,6 +164,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -325,6 +330,15 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  (* [Drain_delegate { consensus_key ; delegate ; destination }]
+     transfers the spendable balance of the [delegate] to [destination]
+     when [consensus_key] is the active consensus key of [delegate].. *)
+  | Drain_delegate : {
+      consensus_key : Signature.Public_key_hash.t;
+      delegate : Signature.Public_key_hash.t;
+      destination : Signature.Public_key_hash.t;
+    }
+      -> Kind.drain_delegate contents
   (* Failing_noop: An operation never considered by the state machine
      and which will always fail at [apply]. This allows end-users to
      sign arbitrary messages which have no computational semantics. *)
@@ -393,6 +407,11 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  (* [Update_consensus_key pk] updates the consensus key of
+     the signing delegate to [pk]. *)
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
@@ -652,19 +671,19 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
    {!Double_endorsement_evidence} > {!Double_baking_evidence} >
    {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
-   > {!Manager_operation}.
+   > {!Drain_delegate} > {!Manager_operation}.
 
    {!Endorsement} and {!Preendorsement} are compared by the pair of
    their [level] and [round] such as the farther to the current state
-   [level] and [round] is greater;e.g. the greater pair in
+   [level] and [round] is greater; e.g. the greater pair in
    lexicographic order being the better. When equal and both
    operations being of the same kind, we compare their [slot]: the
-   The smaller begin the better; assuming that the more an endorser has
-   slots, the smaller is its smaller [slot]. When the pair is equal
+   The smaller being the better, assuming that the more slots an endorser
+   has, the smaller is its smallest [slot]. When the pair is equal
    and comparing an {!Endorsement] to a {!Preendorsement}, the
    {!Endorsement} is better.
 
-   Two {!Dal_slot_availability} are compared in the lexicographic
+   Two {!Dal_slot_availability} ops are compared in the lexicographic
    order of the pair of their number of endorsed slots as available
    and their endorsers.
 
@@ -677,13 +696,15 @@ val compare_by_passes : packed_operation -> packed_operation -> int
    in the case of equality, they are compared by the hashes of their first
    denounced block_header.
 
-   Two {!Vdf_revelation} are compared as their [solution].
+   Two {!Vdf_revelation} ops are compared by their [solution].
 
-   Two {!Seed_nonce_relevation} are compared as their [level].
+   Two {!Seed_nonce_relevation} ops are compared by their [level].
 
-   Two {!Activate_account} are compared as their [id].
+   Two {!Activate_account} ops are compared by their [id].
 
-   Two {!Manager_operation} are compared in the lexicographic order of
+   Two {!Drain_delegate} ops are compared by their [delegate].
+
+   Two {!Manager_operation}s are compared in the lexicographic order of
    the pair of their [fee]/[gas_limit] ratios and [source]. *)
 val compare :
   Operation_hash.t * packed_operation ->
@@ -736,6 +757,8 @@ module Encoding : sig
 
   val ballot_case : Kind.ballot case
 
+  val drain_delegate_case : Kind.drain_delegate case
+
   val failing_noop_case : Kind.failing_noop case
 
   val reveal_case : Kind.reveal Kind.manager case
@@ -745,6 +768,8 @@ module Encoding : sig
   val origination_case : Kind.origination Kind.manager case
 
   val delegation_case : Kind.delegation Kind.manager case
+
+  val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
@@ -821,6 +846,10 @@ module Encoding : sig
     val origination_case : Kind.origination case
 
     val delegation_case : Kind.delegation case
+
+    val update_consensus_key_tag : int
+
+    val update_consensus_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
 

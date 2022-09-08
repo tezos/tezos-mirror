@@ -154,6 +154,8 @@
   Stake_storage
   Contract_storage
   Token
+  Fees_storage
+  Delegate_consensus_key
   Delegate_storage
   Delegate_sampler
   Delegate_missed_endorsements_storage
@@ -161,7 +163,6 @@
   Delegate_cycles
   Bootstrap_storage
   Vote_storage
-  Fees_storage
   Ticket_storage
   Liquidity_baking_storage
   Liquidity_baking_cpmm
@@ -412,6 +413,8 @@
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_missed_endorsements_storage.ml
@@ -420,7 +423,6 @@
   delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml
@@ -651,6 +653,8 @@
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_missed_endorsements_storage.ml
@@ -659,7 +663,6 @@
   delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml
@@ -895,6 +898,8 @@
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_missed_endorsements_storage.ml
@@ -903,7 +908,6 @@
   delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml

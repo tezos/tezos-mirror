@@ -79,8 +79,8 @@ let make_consensus_list state proposal =
   let round = proposal.block.round in
   let block_payload_hash = proposal.block.payload_hash in
   SlotMap.fold
-    (fun _slot (delegate, slots) acc ->
-      ( delegate,
+    (fun _slot (consensus_key_and_delegate, slots) acc ->
+      ( consensus_key_and_delegate,
         {slot = Stdlib.List.hd slots.slots; level; round; block_payload_hash} )
       :: acc)
     state.level_state.delegate_slots.own_delegate_slots
@@ -96,7 +96,7 @@ let make_preendorse_action state proposal =
     in
     {state with round_state}
   in
-  let preendorsements : (delegate * consensus_content) list =
+  let preendorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
   Inject_preendorsements {preendorsements; updated_state}
@@ -598,7 +598,7 @@ let make_endorse_action state proposal =
       proposal.block.round
       proposal.block.payload_hash
   in
-  let endorsements : (delegate * consensus_content) list =
+  let endorsements : (consensus_key_and_delegate * consensus_content) list =
     make_consensus_list state proposal
   in
   Inject_endorsements {endorsements; updated_state}

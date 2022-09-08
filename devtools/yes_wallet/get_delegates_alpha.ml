@@ -42,7 +42,9 @@ module Get_delegates = struct
 
     let fold ctxt ~order ~init ~f = fold ctxt ~order ~init ~f
 
-    let pubkey ctxt pkh = pubkey ctxt pkh |> Lwt.map Environment.wrap_tzresult
+    let pubkey ctxt pkh =
+      Alpha_context.Contract.get_manager_key ctxt pkh
+      |> Lwt.map Environment.wrap_tzresult
 
     let staking_balance ctxt pkh =
       staking_balance ctxt pkh |> Lwt.map Environment.wrap_tzresult

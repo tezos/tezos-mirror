@@ -95,10 +95,8 @@ type all_expected_consensus_features = {
 
 type consensus_info = {
   all_expected_features : all_expected_consensus_features;
-  preendorsement_slot_map :
-    (Signature.public_key * Signature.public_key_hash * int) Slot.Map.t;
-  endorsement_slot_map :
-    (Signature.public_key * Signature.public_key_hash * int) Slot.Map.t;
+  preendorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
+  endorsement_slot_map : (Consensus_key.pk * int) Slot.Map.t;
 }
 
 let init_consensus_info ctxt all_expected_features =
@@ -246,8 +244,8 @@ let init_manager_state ctxt =
 (** Mode-dependent information needed in final checks. *)
 type application_info = {
   fitness : Fitness.t;
-  block_producer : public_key_hash;
-  payload_producer : public_key_hash;
+  block_producer : Consensus_key.pk;
+  payload_producer : Consensus_key.pk;
   predecessor_hash : Block_hash.t;
   block_data_contents : Block_header.contents;
 }
@@ -278,8 +276,8 @@ type mode =
       predecessor_hash : Block_hash.t;
       round : Round.t;
       block_data_contents : Block_header.contents;
-      block_producer : public_key_hash;
-      payload_producer : public_key_hash;
+      block_producer : Consensus_key.pk;
+      payload_producer : Consensus_key.pk;
     }
   | Mempool
 
@@ -599,16 +597,21 @@ module Consensus = struct
         consensus_content
         operation
     in
-    let*? delegate_pk, delegate_pkh, voting_power =
+    let*? consensus_key, voting_power =
       get_delegate_details
         vi.consensus_info.preendorsement_slot_map
         kind
         consensus_content
     in
-    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let* () =
+      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
+    in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
     return
@@ -646,19 +649,25 @@ module Consensus = struct
     let open Lwt_result_syntax in
     let kind = Grandparent_endorsement in
     let level = Level.from_raw vi.ctxt consensus_content.level in
-    let* _ctxt, (delegate_pk, delegate_pkh) =
+    let* _ctxt, consensus_key =
       Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
     in
-    let*? () = ensure_conflict_free_grandparent_endorsement vs delegate_pkh in
+    let*? () =
+      ensure_conflict_free_grandparent_endorsement vs consensus_key.delegate
+    in
     let*? () =
       check_consensus_features vs kind expected consensus_content operation
     in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
-    return (update_validity_state_grandparent_endorsement vs delegate_pkh)
+    return
+      (update_validity_state_grandparent_endorsement vs consensus_key.delegate)
 
   let ensure_conflict_free_endorsement vs slot =
     error_unless
@@ -713,16 +722,21 @@ module Consensus = struct
         consensus_content
         operation
     in
-    let*? delegate_pk, delegate_pkh, voting_power =
+    let*? consensus_key, voting_power =
       get_delegate_details
         vi.consensus_info.endorsement_slot_map
         kind
         consensus_content
     in
-    let* () = check_frozen_deposits_are_positive vi.ctxt delegate_pkh in
+    let* () =
+      check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
+    in
     let*? () =
       if should_check_signature then
-        Operation.check_signature delegate_pk vi.chain_id operation
+        Operation.check_signature
+          consensus_key.consensus_pk
+          vi.chain_id
+          operation
       else ok ()
     in
     return
@@ -1307,11 +1321,14 @@ module Anonymous = struct
         (* Disambiguate: levels are equal *)
         let level = Level.from_raw vi.ctxt e1.level in
         let*? () = check_denunciation_age vi denunciation_kind level.level in
-        let* ctxt, (delegate1_pk, delegate1) =
+        let* ctxt, consensus_key1 =
           Stake_distribution.slot_owner vi.ctxt level e1.slot
         in
-        let* ctxt, (_delegate2_pk, delegate2) =
+        let* ctxt, consensus_key2 =
           Stake_distribution.slot_owner ctxt level e2.slot
+        in
+        let delegate1, delegate2 =
+          (consensus_key1.delegate, consensus_key2.delegate)
         in
         let*? () =
           error_unless
@@ -1319,7 +1336,7 @@ module Anonymous = struct
             (Inconsistent_denunciation
                {kind = denunciation_kind; delegate1; delegate2})
         in
-        let delegate_pk, delegate = (delegate1_pk, delegate1) in
+        let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
         let*? () =
           match
             Double_evidence.find
@@ -1394,19 +1411,22 @@ module Anonymous = struct
     let level = Level.from_raw vi.ctxt level1 in
     let committee_size = Constants.consensus_committee_size vi.ctxt in
     let*? slot1 = Round.to_slot round1 ~committee_size in
-    let* ctxt, (delegate1_pk, delegate1) =
+    let* ctxt, consensus_key1 =
       Stake_distribution.slot_owner vi.ctxt level slot1
     in
     let*? slot2 = Round.to_slot round2 ~committee_size in
-    let* ctxt, (_delegate2_pk, delegate2) =
+    let* ctxt, consensus_key2 =
       Stake_distribution.slot_owner ctxt level slot2
+    in
+    let delegate1, delegate2 =
+      (consensus_key1.delegate, consensus_key2.delegate)
     in
     let*? () =
       error_unless
         Signature.Public_key_hash.(delegate1 = delegate2)
         (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
     in
-    let delegate_pk, delegate = (delegate1_pk, delegate1) in
+    let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
     let*? () =
       match
         Double_evidence.find
@@ -1440,6 +1460,83 @@ module Anonymous = struct
         vs with
         anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
       }
+
+  let validate_drain_delegate vi vs ~should_check_signature oph
+      (operation : Kind.drain_delegate Operation.t) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Drain_delegate {delegate; destination; consensus_key})) =
+      operation.protocol_data.contents
+    in
+    let*! is_registered = Delegate.registered vi.ctxt delegate in
+    let* () =
+      fail_unless
+        is_registered
+        (Drain_delegate_on_unregistered_delegate delegate)
+    in
+    let* active_pk = Delegate.Consensus_key.active_pubkey vi.ctxt delegate in
+    let* () =
+      if
+        not
+          (Signature.Public_key_hash.equal
+             active_pk.consensus_pkh
+             consensus_key)
+      then
+        fail
+          (Invalid_drain_delegate_inactive_key
+             {
+               delegate;
+               consensus_key;
+               active_consensus_key = active_pk.consensus_pkh;
+             })
+      else if Signature.Public_key_hash.equal active_pk.consensus_pkh delegate
+      then fail (Invalid_drain_delegate_no_consensus_key delegate)
+      else if Signature.Public_key_hash.equal destination delegate then
+        fail (Invalid_drain_delegate_noop delegate)
+      else return_unit
+    in
+    let*! is_destination_allocated =
+      Contract.allocated vi.ctxt (Contract.Implicit destination)
+    in
+    let* balance = Contract.get_balance vi.ctxt (Contract.Implicit delegate) in
+    let*? origination_burn =
+      if is_destination_allocated then ok Tez.zero
+      else
+        let cost_per_byte = Constants.cost_per_byte vi.ctxt in
+        let origination_size = Constants.origination_size vi.ctxt in
+        Tez.(cost_per_byte *? Int64.of_int origination_size)
+    in
+    let* drain_fees =
+      let*? one_percent = Tez.(balance /? 100L) in
+      return Tez.(max one one_percent)
+    in
+    let*? min_amount = Tez.(origination_burn +? drain_fees) in
+    let* () =
+      fail_when
+        Tez.(balance < min_amount)
+        (Invalid_drain_delegate_insufficient_funds_for_burn_or_fees
+           {delegate; destination; min_amount})
+    in
+    let*? () =
+      if should_check_signature then
+        Operation.check_signature active_pk.consensus_pk vi.chain_id operation
+      else ok ()
+    in
+    let*? () =
+      match
+        Signature.Public_key_hash.Map.find
+          delegate
+          vs.manager_state.managers_seen
+      with
+      | None -> ok ()
+      | Some _ -> error (Conflicting_drain {delegate})
+    in
+    let managers_seen =
+      Signature.Public_key_hash.Map.add
+        delegate
+        oph
+        vs.manager_state.managers_seen
+    in
+    return {vs with manager_state = {vs.manager_state with managers_seen}}
 
   let validate_seed_nonce_revelation vi vs
       (Seed_nonce_revelation {level = commitment_raw_level; nonce}) =
@@ -1810,7 +1907,8 @@ module Manager = struct
           consume_decoding_gas remaining_gas script.storage
       | Register_global_constant {value} ->
           consume_decoding_gas remaining_gas value
-      | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _ ->
+      | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _
+      | Update_consensus_key _ ->
           return remaining_gas
       | Tx_rollup_origination ->
           let* () = assert_tx_rollup_feature_enabled vi in
@@ -2010,7 +2108,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
   let*? () =
@@ -2021,13 +2119,15 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
       ~predecessor_round
       ~fitness
       ~timestamp:block_header.shell.timestamp
-      ~delegate_pk:block_producer_pk
+      ~delegate_pk:block_producer.consensus_pk
       ~round_durations:(Constants.round_durations ctxt)
       ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
       ~expected_commitment:current_level.expected_commitment
   in
-  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
-  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+  let* () =
+    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+  in
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2097,11 +2197,13 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
   in
   let current_level = Level.current ctxt in
-  let* ctxt, _slot, (_block_producer_pk, block_producer) =
+  let* ctxt, _slot, block_producer =
     Stake_distribution.baking_rights_owner ctxt current_level ~round
   in
-  let* () = Consensus.check_frozen_deposits_are_positive ctxt block_producer in
-  let* ctxt, _slot, (_payload_producer_pk, payload_producer) =
+  let* () =
+    Consensus.check_frozen_deposits_are_positive ctxt block_producer.delegate
+  in
+  let* ctxt, _slot, payload_producer =
     Stake_distribution.baking_rights_owner
       ctxt
       current_level
@@ -2264,6 +2366,13 @@ let validate_operation {info; state} ?(should_check_signature = true) oph
               contents
         | Single (Double_baking_evidence _ as contents) ->
             Anonymous.validate_double_baking_evidence info state oph contents
+        | Single (Drain_delegate _) ->
+            Anonymous.validate_drain_delegate
+              info
+              state
+              ~should_check_signature
+              oph
+              operation
         | Single (Seed_nonce_revelation _ as contents) ->
             Anonymous.validate_seed_nonce_revelation info state contents
         | Single (Vdf_revelation _ as contents) ->

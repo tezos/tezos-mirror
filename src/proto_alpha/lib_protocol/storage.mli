@@ -104,6 +104,20 @@ module Contract : sig
        and type value = Manager_repr.t
        and type t := Raw_context.t
 
+  (** The active consensus key of a delegate *)
+  module Consensus_key :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t
+
+  (** The pending consensus key of a delegate *)
+  module Pending_consensus_keys :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t * Contract_repr.t
+
   (** The delegate of a contract, if any. *)
   module Delegate :
     Indexed_data_storage
@@ -345,6 +359,12 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
+(** Set of all active consensus keys in cycle `current + preserved_cycles + 1` *)
+module Consensus_keys :
+  Data_set_storage
+    with type t := Raw_context.t
+     and type elt = Signature.Public_key_hash.t
+
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
 
 (** Set used to avoid slashing multiple times the same event *)
@@ -399,8 +419,7 @@ end
 module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value =
-      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+     and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
 (** Votes *)
@@ -904,4 +923,13 @@ module Zk_rollup : sig
       with type t := Raw_context.t * Zk_rollup_repr.t
        and type key = int64
        and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+end
+
+module Migration_from_Kathmandu : sig
+  module Delegate_sampler_state :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value =
+        (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+       and type t := Raw_context.t
 end

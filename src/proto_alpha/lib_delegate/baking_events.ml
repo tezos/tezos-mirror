@@ -87,8 +87,8 @@ module State_transitions = struct
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
       ("next_round", Round.encoding)
-      ~pp4:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp4:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let new_head_while_waiting_for_qc =
     declare_0
@@ -241,8 +241,8 @@ module State_transitions = struct
       ~name:"proposing_fresh_block"
       ~level:Info
       ~msg:"proposing fresh block for {delegate} at round {round}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Round.pp
       ("round", Round.encoding)
 
@@ -384,8 +384,8 @@ module Scheduling = struct
       ("round", Round.encoding)
       ~pp3:Timestamp.pp
       ("timestamp", Timestamp.encoding)
-      ~pp4:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp4:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let waiting_end_of_round =
     declare_3
@@ -499,8 +499,8 @@ module Actions = struct
       ~name:"skipping_preendorsement"
       ~level:Error
       ~msg:"skipping preendorsement for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -510,8 +510,8 @@ module Actions = struct
       ~name:"skipping_endorsement"
       ~level:Error
       ~msg:"skipping endorsement for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -521,8 +521,8 @@ module Actions = struct
       ~name:"failed_to_inject_preendorsement"
       ~level:Error
       ~msg:"failed to inject preendorsement for {delegate} -- {trace}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -545,8 +545,8 @@ module Actions = struct
       ~msg:"injected preendorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let endorsement_injected =
     declare_2
@@ -556,8 +556,8 @@ module Actions = struct
       ~msg:"injected endorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
-      ~pp2:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp2:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let synchronizing_round =
     declare_1
@@ -573,29 +573,26 @@ module Actions = struct
       ~section
       ~name:"forging_block"
       ~level:Info
-      ~msg:
-        "forging block at level {level}, round {round} for delegate {delegate}"
+      ~msg:"forging block at level {level}, round {round} for {delegate}"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Baking_state.pp_delegate
+      ~pp3:Baking_state.pp_consensus_key_and_delegate
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.delegate_encoding)
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let injecting_block =
     declare_3
       ~section
       ~name:"injecting_block"
       ~level:Debug
-      ~msg:
-        "injecting block at level {level}, round {round} for delegate \
-         {delegate}"
+      ~msg:"injecting block at level {level}, round {round} for {delegate}"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Baking_state.pp_delegate
+      ~pp3:Baking_state.pp_consensus_key_and_delegate
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.delegate_encoding)
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let block_injected =
     declare_4
@@ -603,16 +600,15 @@ module Actions = struct
       ~name:"block_injected"
       ~level:Notice
       ~msg:
-        "block {block} at level {level}, round {round} injected for delegate \
-         {delegate}"
+        "block {block} at level {level}, round {round} injected for {delegate}"
       ~pp1:Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
-      ~pp4:Baking_state.pp_delegate
+      ~pp4:Baking_state.pp_consensus_key_and_delegate
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.delegate_encoding)
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let signing_preendorsement =
     declare_1
@@ -620,8 +616,8 @@ module Actions = struct
       ~name:"signing_preendorsement"
       ~level:Info
       ~msg:"signing preendorsement for {delegate}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let signing_endorsement =
     declare_1
@@ -629,8 +625,8 @@ module Actions = struct
       ~name:"signing_endorsement"
       ~level:Info
       ~msg:"signing endorsement for {delegate}"
-      ~pp1:Baking_state.pp_delegate
-      ("delegate", Baking_state.delegate_encoding)
+      ~pp1:Baking_state.pp_consensus_key_and_delegate
+      ("delegate", Baking_state.consensus_key_and_delegate_encoding)
 
   let invalid_json_file =
     declare_1

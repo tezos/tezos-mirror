@@ -340,6 +340,8 @@ module Delegate = struct
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Alpha_context.Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
@@ -361,6 +363,8 @@ module Delegate = struct
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
 
   let voting_info ctxt d = Alpha_services.Delegate.voting_info rpc_ctxt ctxt d
+
+  let consensus_key ctxt pkh = Delegate_services.consensus_key rpc_ctxt ctxt pkh
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
@@ -521,7 +525,7 @@ let init_with_constants_gen tup constants =
     List.map
       (fun (acc, tez, delegate_to) ->
         Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
+          (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
       accounts
   in
   let parameters =
@@ -544,7 +548,8 @@ let default_raw_context () =
   let bootstrap_accounts =
     List.map
       (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
+        Default_parameters.make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
       initial_accounts
   in
   Block.prepare_initial_context_params initial_accounts

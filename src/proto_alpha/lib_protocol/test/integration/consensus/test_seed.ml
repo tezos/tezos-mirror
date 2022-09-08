@@ -134,7 +134,7 @@ let test_revelation_early_wrong_right_twice () =
     csts.parametric.baking_reward_fixed_portion
   in
   (* get the pkh of a baker *)
-  let* pkh, _, _ = Block.get_next_baker b in
+  let* pkh, _, _, _ = Block.get_next_baker b in
   let id = Alpha_context.Contract.Implicit pkh in
   let policy = Block.Excluding [pkh] in
   (* bake until commitment - 2, excluding id *)
@@ -190,7 +190,7 @@ let test_revelation_early_wrong_right_twice () =
       level_commitment
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   in
-  let* baker_pkh, _, _ = Block.get_next_baker ~policy b in
+  let* baker_pkh, _, _, _ = Block.get_next_baker ~policy b in
   let baker = Alpha_context.Contract.Implicit baker_pkh in
   let* baker_bal = Context.Contract.balance (B b) baker in
   (* test that revealing twice in a block produces an error *)
@@ -243,7 +243,7 @@ let test_revelation_missing_and_late () =
   (* bake until commitment *)
   let* b = Block.bake_n (blocks_per_commitment - 2) b in
   (* the next baker [id] will include a seed_nonce commitment *)
-  let* pkh, _, _ = Block.get_next_baker b in
+  let* pkh, _, _, _ = Block.get_next_baker b in
   let* b = Block.bake b in
   let*? level_commitment = Context.get_level (B b) in
   let* committed_hash = Context.get_seed_nonce_hash (B b) in
@@ -381,7 +381,7 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let seed_nonce_revelation_tip = csts.parametric.seed_nonce_revelation_tip in
   let vdf_nonce_revelation_tip = csts.parametric.seed_nonce_revelation_tip in
   (* get the pkh of a baker *)
-  let* pkh, _, _ = Block.get_next_baker b in
+  let* pkh, _, _, _ = Block.get_next_baker b in
   let id = Alpha_context.Contract.Implicit pkh in
   let policy = Block.Excluding [pkh] in
   (* bake until commitment - 2, excluding id *)
@@ -409,7 +409,7 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       level_commitment
       (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   in
-  let* baker_pkh, _, _ = Block.get_next_baker ~policy b in
+  let* baker_pkh, _, _, _ = Block.get_next_baker ~policy b in
   let baker = Alpha_context.Contract.Implicit baker_pkh in
   let* baker_bal = Context.Contract.balance (B b) baker in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in

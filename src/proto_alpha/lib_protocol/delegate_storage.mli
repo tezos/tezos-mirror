@@ -144,9 +144,9 @@ val full_balance :
 val delegated_balance :
   Raw_context.t -> Signature.Public_key_hash.t -> Tez_repr.t tzresult Lwt.t
 
-(** Returns the public key of a registered delegate. Returns the error
-   {!Contract.Unregistered_delegate} if the delegate is not registered.  *)
-val pubkey :
+val drain :
   Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t
+  delegate:Signature.Public_key_hash.t ->
+  destination:Signature.Public_key_hash.t ->
+  (Raw_context.t * bool * Tez_repr.t * Receipt_repr.balance_updates) tzresult
+  Lwt.t

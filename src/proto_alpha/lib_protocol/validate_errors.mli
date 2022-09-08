@@ -167,6 +167,20 @@ module Anonymous : sig
         last_cycle : Cycle.t;
       }
     | Conflicting_nonce_revelation
+    | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_inactive_key of {
+        delegate : Signature.Public_key_hash.t;
+        consensus_key : Signature.Public_key_hash.t;
+        active_consensus_key : Signature.Public_key_hash.t;
+      }
+    | Invalid_drain_delegate_no_consensus_key of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_noop of Signature.Public_key_hash.t
+    | Invalid_drain_delegate_insufficient_funds_for_burn_or_fees of {
+        delegate : Signature.Public_key_hash.t;
+        destination : Signature.Public_key_hash.t;
+        min_amount : Tez.t;
+      }
+    | Conflicting_drain of {delegate : Signature.Public_key_hash.t}
 end
 
 (** Errors that may arise while validating a manager operation. *)

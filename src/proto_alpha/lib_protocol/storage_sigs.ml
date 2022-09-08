@@ -418,10 +418,10 @@ module type Indexed_raw_context = sig
   module Make_set (_ : REGISTER) (_ : NAME) :
     Data_set_storage with type t = t and type elt = key
 
-  module Make_map (_ : NAME) (V : VALUE) :
+  module Make_map (_ : REGISTER) (_ : NAME) (V : VALUE) :
     Indexed_data_storage with type t = t and type key = key and type value = V.t
 
-  module Make_carbonated_map (_ : NAME) (V : VALUE) :
+  module Make_carbonated_map (_ : REGISTER) (_ : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage
       with type t = t
        and type key = key

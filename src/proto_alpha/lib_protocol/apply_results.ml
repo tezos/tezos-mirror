@@ -66,6 +66,10 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.increase_paid_storage successful_manager_operation_result
+  | Update_consensus_key_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.update_consensus_key successful_manager_operation_result
   | Tx_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -505,6 +509,26 @@ module Manager_result = struct
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function Delegation_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> Delegation_result {consumed_gas})
+
+  let update_consensus_key_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.update_consensus_key_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Update_consensus_key_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Update_consensus_key_manager_kind
+      ~proj:(function
+        | Update_consensus_key_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Update_consensus_key_result {consumed_gas = consumed_milligas})
 
   let set_deposits_limit_case =
     make
@@ -1006,6 +1030,7 @@ let successful_manager_operation_result_encoding :
          make Manager_result.transaction_case;
          make Manager_result.origination_case;
          make Manager_result.delegation_case;
+         make Manager_result.update_consensus_key_case;
          make Manager_result.set_deposits_limit_case;
          make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
@@ -1014,13 +1039,15 @@ let successful_manager_operation_result_encoding :
 type 'kind contents_result =
   | Preendorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       preendorsement_power : int;
     }
       -> Kind.preendorsement contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
-      delegate : Signature.Public_key_hash.t;
+      delegate : Signature.public_key_hash;
+      consensus_key : Signature.public_key_hash;
       endorsement_power : int;
     }
       -> Kind.endorsement contents_result
@@ -1048,6 +1075,11 @@ type 'kind contents_result =
       -> Kind.activate_account contents_result
   | Proposals_result : Kind.proposals contents_result
   | Ballot_result : Kind.ballot contents_result
+  | Drain_delegate_result : {
+      balance_updates : Receipt.balance_updates;
+      allocated_destination_contract : bool;
+    }
+      -> Kind.drain_delegate contents_result
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
@@ -1077,6 +1109,10 @@ let equal_manager_kind :
   | Kind.Origination_manager_kind, _ -> None
   | Kind.Delegation_manager_kind, Kind.Delegation_manager_kind -> Some Eq
   | Kind.Delegation_manager_kind, _ -> None
+  | ( Kind.Update_consensus_key_manager_kind,
+      Kind.Update_consensus_key_manager_kind ) ->
+      Some Eq
+  | Kind.Update_consensus_key_manager_kind, _ -> None
   | ( Kind.Register_global_constant_manager_kind,
       Kind.Register_global_constant_manager_kind ) ->
       Some Eq
@@ -1194,10 +1230,11 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.preendorsement_case;
         encoding =
-          obj3
+          obj4
             (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "preendorsement_power" int31);
+            (req "preendorsement_power" int31)
+            (req "consensus_key" Signature.Public_key_hash.encoding);
         select =
           (function
           | Contents_result (Preendorsement_result _ as op) -> Some op
@@ -1209,12 +1246,13 @@ module Encoding = struct
         proj =
           (function
           | Preendorsement_result
-              {balance_updates; delegate; preendorsement_power} ->
-              (balance_updates, delegate, preendorsement_power));
+              {balance_updates; delegate; consensus_key; preendorsement_power}
+            ->
+              (balance_updates, delegate, preendorsement_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, preendorsement_power) ->
+          (fun (balance_updates, delegate, preendorsement_power, consensus_key) ->
             Preendorsement_result
-              {balance_updates; delegate; preendorsement_power});
+              {balance_updates; delegate; consensus_key; preendorsement_power});
       }
 
   let endorsement_case =
@@ -1222,10 +1260,11 @@ module Encoding = struct
       {
         op_case = Operation.Encoding.endorsement_case;
         encoding =
-          obj3
+          obj4
             (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
-            (req "endorsement_power" int31);
+            (req "endorsement_power" int31)
+            (req "consensus_key" Signature.Public_key_hash.encoding);
         select =
           (function
           | Contents_result (Endorsement_result _ as op) -> Some op | _ -> None);
@@ -1235,11 +1274,13 @@ module Encoding = struct
           | _ -> None);
         proj =
           (function
-          | Endorsement_result {balance_updates; delegate; endorsement_power} ->
-              (balance_updates, delegate, endorsement_power));
+          | Endorsement_result
+              {balance_updates; delegate; consensus_key; endorsement_power} ->
+              (balance_updates, delegate, endorsement_power, consensus_key));
         inj =
-          (fun (balance_updates, delegate, endorsement_power) ->
-            Endorsement_result {balance_updates; delegate; endorsement_power});
+          (fun (balance_updates, delegate, endorsement_power, consensus_key) ->
+            Endorsement_result
+              {balance_updates; delegate; consensus_key; endorsement_power});
       }
 
   let dal_slot_availability_case =
@@ -1408,6 +1449,34 @@ module Encoding = struct
         inj = (fun () -> Ballot_result);
       }
 
+  let drain_delegate_case =
+    Case
+      {
+        op_case = Operation.Encoding.drain_delegate_case;
+        encoding =
+          Data_encoding.(
+            obj2
+              (dft "balance_updates" Receipt.balance_updates_encoding [])
+              (dft "allocated_destination_contract" bool false));
+        select =
+          (function
+          | Contents_result (Drain_delegate_result _ as op) -> Some op
+          | _ -> None);
+        mselect =
+          (function
+          | Contents_and_result ((Drain_delegate _ as op), res) -> Some (op, res)
+          | _ -> None);
+        proj =
+          (function
+          | Drain_delegate_result
+              {balance_updates; allocated_destination_contract} ->
+              (balance_updates, allocated_destination_contract));
+        inj =
+          (fun (balance_updates, allocated_destination_contract) ->
+            Drain_delegate_result
+              {balance_updates; allocated_destination_contract});
+      }
+
   let make_manager_case (type kind)
       (Operation.Encoding.Case op_case :
         kind Kind.manager Operation.Encoding.case)
@@ -1471,6 +1540,7 @@ module Encoding = struct
           | Contents_result (Double_preendorsement_evidence_result _) -> None
           | Contents_result (Double_baking_evidence_result _) -> None
           | Contents_result (Activate_account_result _) -> None
+          | Contents_result (Drain_delegate_result _) -> None
           | Contents_result Proposals_result -> None);
         mselect;
         proj =
@@ -1528,6 +1598,17 @@ module Encoding = struct
       (function
         | Contents_and_result
             ((Manager_operation {operation = Delegation _; _} as op), res) ->
+            Some (op, res)
+        | _ -> None)
+
+  let update_consensus_key_case =
+    make_manager_case
+      Operation.Encoding.update_consensus_key_case
+      Manager_result.update_consensus_key_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Update_consensus_key _; _} as op),
+              res ) ->
             Some (op, res)
         | _ -> None)
 
@@ -1822,6 +1903,7 @@ let contents_result_encoding =
          make activate_account_case;
          make proposals_case;
          make ballot_case;
+         make drain_delegate_case;
          make reveal_case;
          make transaction_case;
          make origination_case;
@@ -1829,6 +1911,7 @@ let contents_result_encoding =
          make register_global_constant_case;
          make set_deposits_limit_case;
          make increase_paid_storage_case;
+         make update_consensus_key_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -1893,6 +1976,8 @@ let contents_and_result_encoding =
          make register_global_constant_case;
          make set_deposits_limit_case;
          make increase_paid_storage_case;
+         make update_consensus_key_case;
+         make drain_delegate_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -2043,6 +2128,8 @@ let kind_equal :
   | Proposals _, _ -> None
   | Ballot _, Ballot_result -> Some Eq
   | Ballot _, _ -> None
+  | Drain_delegate _, Drain_delegate_result _ -> Some Eq
+  | Drain_delegate _, _ -> None
   | Failing_noop _, _ ->
       (* the Failing_noop operation always fails and can't have result *)
       None
@@ -2139,6 +2226,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Delegation _; _}, _ -> None
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {operation_result = Applied (Update_consensus_key_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Update_consensus_key_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Update_consensus_key_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Update_consensus_key_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Update_consensus_key _; _}, _ -> None
   | ( Manager_operation {operation = Register_global_constant _; _},
       Manager_operation_result
         {operation_result = Applied (Register_global_constant_result _); _} ) ->
@@ -2870,8 +2983,8 @@ let operation_data_and_metadata_encoding =
        ]
 
 type block_metadata = {
-  proposer : Signature.Public_key_hash.t;
-  baker : Signature.Public_key_hash.t;
+  proposer : Consensus_key.t;
+  baker : Consensus_key.t;
   level_info : Level.t;
   voting_period_info : Voting_period.info;
   nonce_hash : Nonce_hash.t option;
@@ -2888,8 +3001,9 @@ let block_metadata_encoding =
   def "block_header.alpha.metadata"
   @@ conv
        (fun {
-              proposer;
-              baker;
+              proposer =
+                {delegate = proposer; consensus_pkh = proposer_active_key};
+              baker = {delegate = baker; consensus_pkh = baker_active_key};
               level_info;
               voting_period_info;
               nonce_hash;
@@ -2909,7 +3023,10 @@ let block_metadata_encoding =
              balance_updates,
              liquidity_baking_toggle_ema,
              implicit_operations_results ),
-           (consumed_gas, dal_slot_availability) ))
+           ( proposer_active_key,
+             baker_active_key,
+             consumed_gas,
+             dal_slot_availability ) ))
        (fun ( ( proposer,
                 baker,
                 level_info,
@@ -2919,10 +3036,13 @@ let block_metadata_encoding =
                 balance_updates,
                 liquidity_baking_toggle_ema,
                 implicit_operations_results ),
-              (consumed_gas, dal_slot_availability) ) ->
+              ( proposer_active_key,
+                baker_active_key,
+                consumed_gas,
+                dal_slot_availability ) ) ->
          {
-           proposer;
-           baker;
+           proposer = {delegate = proposer; consensus_pkh = proposer_active_key};
+           baker = {delegate = baker; consensus_pkh = baker_active_key};
            level_info;
            voting_period_info;
            nonce_hash;
@@ -2948,10 +3068,11 @@ let block_metadata_encoding =
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))
-          (obj2
+          (obj4
+             (req "proposer_consensus_key" Signature.Public_key_hash.encoding)
+             (req "baker_consensus_key" Signature.Public_key_hash.encoding)
              (req "consumed_milligas" Gas.Arith.n_fp_encoding)
              (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3119
-
                 This varopt is here while the DAL is behind a feature
                 flag. This should be replaced by a required field once
                 the feature flag will be activated. *)

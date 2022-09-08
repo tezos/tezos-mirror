@@ -2777,7 +2777,8 @@ let requested_levels ~default_level ctxt cycles levels =
 module Baking_rights = struct
   type t = {
     level : Raw_level.t;
-    delegate : Signature.Public_key_hash.t;
+    delegate : public_key_hash;
+    consensus_key : public_key_hash;
     round : int;
     timestamp : Timestamp.t option;
   }
@@ -2785,15 +2786,16 @@ module Baking_rights = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; round; timestamp} ->
-        (level, delegate, round, timestamp))
-      (fun (level, delegate, round, timestamp) ->
-        {level; delegate; round; timestamp})
-      (obj4
+      (fun {level; delegate; consensus_key; round; timestamp} ->
+        (level, delegate, round, timestamp, consensus_key))
+      (fun (level, delegate, round, timestamp, consensus_key) ->
+        {level; delegate; consensus_key; round; timestamp})
+      (obj5
          (req "level" Raw_level.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "round" uint16)
-         (opt "estimated_time" Timestamp.encoding))
+         (opt "estimated_time" Timestamp.encoding)
+         (req "consensus_key" Signature.Public_key_hash.encoding))
 
   let default_max_round = 64
 
@@ -2806,18 +2808,21 @@ module Baking_rights = struct
       levels : Raw_level.t list;
       cycle : Cycle.t option;
       delegates : Signature.Public_key_hash.t list;
+      consensus_keys : Signature.Public_key_hash.t list;
       max_round : int option;
       all : bool;
     }
 
     let baking_rights_query =
       let open RPC_query in
-      query (fun levels cycle delegates max_round all ->
-          {levels; cycle; delegates; max_round; all})
+      query (fun levels cycle delegates consensus_keys max_round all ->
+          {levels; cycle; delegates; consensus_keys; max_round; all})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
       |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
       |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
              t.delegates)
+      |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
+             t.consensus_keys)
       |+ opt_field "max_round" RPC_arg.uint (fun t -> t.max_round)
       |+ flag "all" (fun t -> t.all)
       |> seal
@@ -2834,9 +2839,10 @@ module Baking_rights = struct
               (valid) level(s) in the past or future at which the baking \
               rights have to be returned.\n\
               Parameter `delegate` can be used to restrict the results to the \
-              given delegates. If parameter `all` is set, all the baking \
-              opportunities for each baker at each level are returned, instead \
-              of just the first one.\n\
+              given delegates. Parameter `consensus_key` can be used to \
+              restrict the results to the given consensus_keys. If parameter \
+              `all` is set, all the baking opportunities for each baker at \
+              each level are returned, instead of just the first one.\n\
               Returns the list of baking opportunities up to round %d. Also \
               returns the minimal timestamps that correspond to these \
               opportunities. The timestamps are omitted for levels in the \
@@ -2859,8 +2865,7 @@ module Baking_rights = struct
     let rec loop l acc round =
       if Compare.Int.(round > max_round) then return (List.rev acc)
       else
-        let (Misc.LCons (pk, next)) = l in
-        let delegate = Signature.Public_key.hash pk in
+        let (Misc.LCons ({Consensus_key.consensus_pkh; delegate}, next)) = l in
         estimated_time
           round_durations
           ~current_level
@@ -2869,7 +2874,16 @@ module Baking_rights = struct
           ~level
           ~round
         >>?= fun timestamp ->
-        let acc = {level = level.level; delegate; round; timestamp} :: acc in
+        let acc =
+          {
+            level = level.level;
+            delegate;
+            consensus_key = consensus_pkh;
+            round;
+            timestamp;
+          }
+          :: acc
+        in
         next () >>=? fun l -> loop l acc (round + 1)
     in
     loop delegates [] 0
@@ -2911,27 +2925,44 @@ module Baking_rights = struct
           if q.all then List.concat rights
           else List.concat_map remove_duplicated_delegates rights
         in
-        match q.delegates with
-        | [] -> rights
-        | _ :: _ as delegates ->
-            let is_requested p =
-              List.exists (Signature.Public_key_hash.equal p.delegate) delegates
-            in
-            List.filter is_requested rights)
+        let rights =
+          match q.delegates with
+          | [] -> rights
+          | _ :: _ as delegates ->
+              let is_requested p =
+                List.exists
+                  (Signature.Public_key_hash.equal p.delegate)
+                  delegates
+              in
+              List.filter is_requested rights
+        in
+        let rights =
+          match q.consensus_keys with
+          | [] -> rights
+          | _ :: _ as delegates ->
+              let is_requested p =
+                List.exists
+                  (Signature.Public_key_hash.equal p.consensus_key)
+                  delegates
+              in
+              List.filter is_requested rights
+        in
+        rights)
 
-  let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(all = false) ?max_round
-      block =
+  let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
+      ?(all = false) ?max_round block =
     RPC_context.make_call0
       S.baking_rights
       ctxt
       block
-      {levels; cycle; delegates; max_round; all}
+      {levels; cycle; delegates; consensus_keys; max_round; all}
       ()
 end
 
 module Endorsing_rights = struct
   type delegate_rights = {
     delegate : Signature.Public_key_hash.t;
+    consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
     endorsing_power : int;
   }
@@ -2945,14 +2976,15 @@ module Endorsing_rights = struct
   let delegate_rights_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; first_slot; endorsing_power} ->
-        (delegate, first_slot, endorsing_power))
-      (fun (delegate, first_slot, endorsing_power) ->
-        {delegate; first_slot; endorsing_power})
-      (obj3
+      (fun {delegate; consensus_key; first_slot; endorsing_power} ->
+        (delegate, first_slot, endorsing_power, consensus_key))
+      (fun (delegate, first_slot, endorsing_power, consensus_key) ->
+        {delegate; first_slot; endorsing_power; consensus_key})
+      (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req "endorsing_power" uint16))
+         (req "endorsing_power" uint16)
+         (req "consensus_key" Signature.Public_key_hash.encoding))
 
   let encoding =
     let open Data_encoding in
@@ -2975,15 +3007,19 @@ module Endorsing_rights = struct
       levels : Raw_level.t list;
       cycle : Cycle.t option;
       delegates : Signature.Public_key_hash.t list;
+      consensus_keys : Signature.Public_key_hash.t list;
     }
 
     let endorsing_rights_query =
       let open RPC_query in
-      query (fun levels cycle delegates -> {levels; cycle; delegates})
+      query (fun levels cycle delegates consensus_keys ->
+          {levels; cycle; delegates; consensus_keys})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
       |+ opt_field "cycle" Cycle.rpc_arg (fun t -> t.cycle)
       |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
              t.delegates)
+      |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
+             t.consensus_keys)
       |> seal
 
     let endorsing_rights =
@@ -2996,6 +3032,8 @@ module Endorsing_rights = struct
            level(s) in the past or future at which the endorsing rights have \
            to be returned. Parameter `delegate` can be used to restrict the \
            results to the given delegates.\n\
+           Parameter `consensus_key` can be used to restrict the results to \
+           the given consensus_keys. \n\
            Returns the smallest endorsing slots and the endorsing power. Also \
            returns the minimal timestamp that corresponds to endorsing at the \
            given level. The timestamps are omitted for levels in the past, and \
@@ -3023,8 +3061,15 @@ module Endorsing_rights = struct
     >>?= fun estimated_time ->
     let rights =
       Slot.Map.fold
-        (fun first_slot (_pk, delegate, endorsing_power) acc ->
-          {delegate; first_slot; endorsing_power} :: acc)
+        (fun first_slot
+             ( {
+                 Consensus_key.delegate;
+                 consensus_pk = _;
+                 consensus_pkh = consensus_key;
+               },
+               endorsing_power )
+             acc ->
+          {delegate; consensus_key; first_slot; endorsing_power} :: acc)
         rights
         []
     in
@@ -3042,30 +3087,34 @@ module Endorsing_rights = struct
         in
         List.map_es (endorsing_rights_at_level ctxt) levels
         >|=? fun rights_per_level ->
-        match q.delegates with
-        | [] -> rights_per_level
-        | _ :: _ as delegates ->
-            List.filter_map
-              (fun rights_at_level ->
-                let is_requested p =
-                  List.exists
-                    (Signature.Public_key_hash.equal p.delegate)
-                    delegates
-                in
-                match
-                  List.filter is_requested rights_at_level.delegates_rights
-                with
-                | [] -> None
-                | delegates_rights ->
-                    Some {rights_at_level with delegates_rights})
-              rights_per_level)
+        let rights_per_level =
+          match q.consensus_keys with
+          | [] -> rights_per_level
+          | _ :: _ as consensus_keys ->
+              List.filter_map
+                (fun rights_at_level ->
+                  let is_requested p =
+                    List.exists
+                      (Signature.Public_key_hash.equal p.consensus_key)
+                      consensus_keys
+                  in
+                  match
+                    List.filter is_requested rights_at_level.delegates_rights
+                  with
+                  | [] -> None
+                  | delegates_rights ->
+                      Some {rights_at_level with delegates_rights})
+                rights_per_level
+        in
+        rights_per_level)
 
-  let get ctxt ?(levels = []) ?cycle ?(delegates = []) block =
+  let get ctxt ?(levels = []) ?cycle ?(delegates = []) ?(consensus_keys = [])
+      block =
     RPC_context.make_call0
       S.endorsing_rights
       ctxt
       block
-      {levels; cycle; delegates}
+      {levels; cycle; delegates; consensus_keys}
       ()
 end
 
@@ -3073,18 +3122,22 @@ module Validators = struct
   type t = {
     level : Raw_level.t;
     delegate : Signature.Public_key_hash.t;
+    consensus_key : Signature.public_key_hash;
     slots : Slot.t list;
   }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; slots} -> (level, delegate, slots))
-      (fun (level, delegate, slots) -> {level; delegate; slots})
-      (obj3
+      (fun {level; delegate; consensus_key; slots} ->
+        (level, delegate, slots, consensus_key))
+      (fun (level, delegate, slots, consensus_key) ->
+        {level; delegate; consensus_key; slots})
+      (obj4
          (req "level" Raw_level.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "slots" (list Slot.encoding)))
+         (req "slots" (list Slot.encoding))
+         (req "consensus_key" Signature.Public_key_hash.encoding))
 
   module S = struct
     open Data_encoding
@@ -3094,14 +3147,18 @@ module Validators = struct
     type validators_query = {
       levels : Raw_level.t list;
       delegates : Signature.Public_key_hash.t list;
+      consensus_keys : Signature.Public_key_hash.t list;
     }
 
     let validators_query =
       let open RPC_query in
-      query (fun levels delegates -> {levels; delegates})
+      query (fun levels delegates consensus_keys ->
+          {levels; delegates; consensus_keys})
       |+ multi_field "level" Raw_level.rpc_arg (fun t -> t.levels)
       |+ multi_field "delegate" Signature.Public_key_hash.rpc_arg (fun t ->
              t.delegates)
+      |+ multi_field "consensus_key" Signature.Public_key_hash.rpc_arg (fun t ->
+             t.consensus_keys)
       |> seal
 
     let validators =
@@ -3113,7 +3170,8 @@ module Validators = struct
            Parameter `level` can be used to specify the (valid) level(s) in \
            the past or future at which the endorsement rights have to be \
            returned. Parameter `delegate` can be used to restrict the results \
-           to the given delegates.\n"
+           results to the given delegates. Parameter `consensus_key` can be \
+           used to restrict the results to the given consensus_keys.\n"
         ~query:validators_query
         ~output:(list encoding)
         path
@@ -3122,8 +3180,9 @@ module Validators = struct
   let endorsing_slots_at_level ctxt level =
     Baking.endorsing_rights ctxt level >|=? fun (_, rights) ->
     Signature.Public_key_hash.Map.fold
-      (fun delegate slots acc -> {level = level.level; delegate; slots} :: acc)
-      (rights :> Slot.t list Signature.Public_key_hash.Map.t)
+      (fun _pkh {Baking.delegate; consensus_key; slots} acc ->
+        {level = level.level; delegate; consensus_key; slots} :: acc)
+      rights
       []
 
   let register () =
@@ -3133,16 +3192,37 @@ module Validators = struct
         in
         List.concat_map_es (endorsing_slots_at_level ctxt) levels
         >|=? fun rights ->
-        match q.delegates with
-        | [] -> rights
-        | _ :: _ as delegates ->
-            let is_requested p =
-              List.exists (Signature.Public_key_hash.equal p.delegate) delegates
-            in
-            List.filter is_requested rights)
+        let rights =
+          match q.delegates with
+          | [] -> rights
+          | _ :: _ as delegates ->
+              let is_requested p =
+                List.exists
+                  (Signature.Public_key_hash.equal p.delegate)
+                  delegates
+              in
+              List.filter is_requested rights
+        in
+        let rights =
+          match q.consensus_keys with
+          | [] -> rights
+          | _ :: _ as delegates ->
+              let is_requested p =
+                List.exists
+                  (Signature.Public_key_hash.equal p.consensus_key)
+                  delegates
+              in
+              List.filter is_requested rights
+        in
+        rights)
 
-  let get ctxt ?(levels = []) ?(delegates = []) block =
-    RPC_context.make_call0 S.validators ctxt block {levels; delegates} ()
+  let get ctxt ?(levels = []) ?(delegates = []) ?(consensus_keys = []) block =
+    RPC_context.make_call0
+      S.validators
+      ctxt
+      block
+      {levels; delegates; consensus_keys}
+      ()
 end
 
 module S = struct

@@ -114,6 +114,8 @@ val last_of_cycle : cycle_eras:cycle_eras -> level -> bool
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t
+
+  val add_cycles : blocks_per_cycle:int -> t -> int -> t
 end
 
 (**/**)

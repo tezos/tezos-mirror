@@ -72,12 +72,17 @@ let bonus_baking_reward ctxt ~endorsing_power =
 let baking_rights c level =
   let rec f c round =
     Stake_distribution.baking_rights_owner c level ~round
-    >>=? fun (c, _slot, (delegate, _)) ->
-    return (LCons (delegate, fun () -> f c (Round.succ round)))
+    >>=? fun (c, _slot, consensus_pk) ->
+    return
+      (LCons (Consensus_key.pkh consensus_pk, fun () -> f c (Round.succ round)))
   in
   f c Round.zero
 
-type ordered_slots = Slot.t list
+type ordered_slots = {
+  delegate : Signature.public_key_hash;
+  consensus_key : Signature.public_key_hash;
+  slots : Slot.t list;
+}
 
 (* Slots returned by this function are assumed by consumers to be in increasing
    order, hence the use of [Slot.Range.rev_fold_es]. *)
@@ -86,11 +91,20 @@ let endorsing_rights (ctxt : t) level =
   Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
   Slot.Range.rev_fold_es
     (fun (ctxt, map) slot ->
-      Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
+      Stake_distribution.slot_owner ctxt level slot
+      >>=? fun (ctxt, consensus_pk) ->
       let map =
         Signature.Public_key_hash.Map.update
-          pkh
-          (function None -> Some [slot] | Some slots -> Some (slot :: slots))
+          consensus_pk.delegate
+          (function
+            | None ->
+                Some
+                  {
+                    delegate = consensus_pk.delegate;
+                    consensus_key = consensus_pk.consensus_pkh;
+                    slots = [slot];
+                  }
+            | Some slots -> Some {slots with slots = slot :: slots.slots})
           map
       in
       return (ctxt, map))
@@ -103,11 +117,17 @@ let endorsing_rights_by_first_slot ctxt level =
   Slot.Range.fold_es
     (fun (ctxt, (delegates_map, slots_map)) slot ->
       Stake_distribution.slot_owner ctxt level slot
-      >|=? fun (ctxt, (pk, pkh)) ->
+      >|=? fun (ctxt, consensus_pk) ->
       let initial_slot, delegates_map =
-        match Signature.Public_key_hash.Map.find pkh delegates_map with
+        match
+          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
+        with
         | None ->
-            (slot, Signature.Public_key_hash.Map.add pkh slot delegates_map)
+            ( slot,
+              Signature.Public_key_hash.Map.add
+                consensus_pk.delegate
+                slot
+                delegates_map )
         | Some initial_slot -> (initial_slot, delegates_map)
       in
       (* [slots_map]'keys are the minimal slots of delegates because
@@ -116,8 +136,8 @@ let endorsing_rights_by_first_slot ctxt level =
         Slot.Map.update
           initial_slot
           (function
-            | None -> Some (pk, pkh, 1)
-            | Some (pk, pkh, count) -> Some (pk, pkh, count + 1))
+            | None -> Some (consensus_pk, 1)
+            | Some (consensus_pk, count) -> Some (consensus_pk, count + 1))
           slots_map
       in
       (ctxt, (delegates_map, slots_map)))
