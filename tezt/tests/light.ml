@@ -58,8 +58,7 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let* level_json = RPC.Client.call ~endpoint client @@ get_current_level () in
-  let level = JSON.(level_json |-> "level" |> as_int) in
+  let* {level; _} = RPC.Client.call ~endpoint client @@ get_current_level () in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in

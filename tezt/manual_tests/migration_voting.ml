@@ -247,11 +247,10 @@ let prepare_migration ?yes_node_path ?yes_wallet context protocol
   in
   let endpoint = Client.(Node node) in
   let* client = Client.init ~endpoint () in
-  let* json =
+  let* {level; _} =
     RPC.Client.call ~endpoint client
     @@ RPC.get_chain_block_helper_current_level ()
   in
-  let level = JSON.(json |-> "level" |> as_int) in
   Log.info "The node is at level %d" level ;
   let* () = Node.terminate node in
   let migration_level = level + levels_till_migration in

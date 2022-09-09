@@ -534,6 +534,14 @@ val get_chain_block_context_constants_errors :
 val get_chain_block_helper_baking_rights :
   ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
+type level = {
+  level : int;
+  level_position : int;
+  cycle : int;
+  cycle_position : int;
+  expected_commitment : bool;
+}
+
 (** RPC: [GET /chains/[chain]/blocks/[block]/helpers/current_level]
 
     [chain] defaults to ["main"].
@@ -541,7 +549,7 @@ val get_chain_block_helper_baking_rights :
     [offset] defaults to [0].
 *)
 val get_chain_block_helper_current_level :
-  ?chain:string -> ?block:string -> ?offset:int -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> ?offset:int -> unit -> level t
 
 (** RPC: [GET /chains/[chain]/blocks/[block]/helpers/endorsing_rights]
 

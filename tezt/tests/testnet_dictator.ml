@@ -32,10 +32,9 @@
 *)
 
 let bake node client =
-  let* level_json =
+  let* {level; _} =
     RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
   in
-  let level = JSON.(level_json |-> "level" |> as_int) in
   let* () =
     Client.bake_for
       ~keys:
