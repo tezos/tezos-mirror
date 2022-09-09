@@ -353,7 +353,7 @@ Docker Images
   since version 13.0. It is recommended to write your own docker-compose file instead.
   ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
 
-- ``tezos-codec`` is now included in Docker images.
+- ``octez-codec`` is now included in Docker images.
 
 Rollups
 -------
@@ -2097,7 +2097,7 @@ Client
    command line arguments.
 
 -  Fixed an issue which caused ``octez-client rpc get /errors`` as well
-   as ``tezos-codec dump encodings`` to fail because of duplicate
+   as ``octez-codec dump encodings`` to fail because of duplicate
    encodings. As a result, some protocol encodings whose name was not
    prefixed by the protocol name are now prefixed by it. If you have
    tools which rely on encoding names you may have to update them.
@@ -2195,7 +2195,7 @@ Protocol Compiler And Environment
 Codec
 -----
 
--  Fixed ``tezos-codec dump encodings`` which failed due to two
+-  Fixed ``octez-codec dump encodings`` which failed due to two
    encodings having the same name.
 
 Version 7.5

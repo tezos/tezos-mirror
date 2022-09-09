@@ -47,7 +47,7 @@ Codec manual
 ============
 
 .. raw:: html
-         :file: ../api/tezos-codec.html
+         :file: ../api/octez-codec.html
 
 
 .. _node_manual:

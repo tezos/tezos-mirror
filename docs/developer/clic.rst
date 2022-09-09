@@ -17,7 +17,7 @@ like this, thanks to ``tezos-clic``:
 
 
 ``clic`` is used for most of the binaries distributed with Octez, such
-as ``octez-client`` and ``tezos-codec``. A notable exception is
+as ``octez-client`` and ``octez-codec``. A notable exception is
 ``octez-node`` which uses ``cmdliner``.
 
 In this tutorial, we will give a gentle introduction to ``clic`` by

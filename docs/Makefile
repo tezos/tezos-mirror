@@ -55,8 +55,8 @@ manuals: \
 	# generic
 	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
-	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
-	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
+	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
+	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
