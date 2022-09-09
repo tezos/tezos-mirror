@@ -499,8 +499,8 @@ module Make (Rollup : PARAMETERS) = struct
     in
     return (op, Apply_results.Contents_result_list result)
 
-  let inject_on_node state {shell; protocol_data = Operation_data {contents; _}}
-      =
+  let inject_on_node state ~nb
+      {shell; protocol_data = Operation_data {contents; _}} =
     let open Lwt_result_syntax in
     let unsigned_op = (shell, Contents_list contents) in
     let unsigned_op_bytes =
@@ -524,7 +524,7 @@ module Make (Rollup : PARAMETERS) = struct
       ~chain:state.cctxt#chain
       op_bytes
     >>=? fun oph ->
-    let*! () = Event.(emit1 injected) state oph in
+    let*! () = Event.(emit2 injected) state nb oph in
     return oph
 
   (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
@@ -586,7 +586,8 @@ module Make (Rollup : PARAMETERS) = struct
     else
       (* Inject on node for real *)
       let+ oph =
-        trace (Step_failed "injection") @@ inject_on_node state packed_op
+        trace (Step_failed "injection")
+        @@ inject_on_node ~nb:(List.length operations) state packed_op
       in
       (oph, operations)
 
