@@ -21,7 +21,7 @@ After a successful compilation, you should have the following binaries:
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
   note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
-- ``tezos-signer``: a client to remotely sign operations or blocks
+- ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 - ``tezos-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)

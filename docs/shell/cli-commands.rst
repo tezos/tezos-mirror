@@ -29,7 +29,7 @@ Signer manual
 =============
 
 .. raw:: html
-         :file: ../api/tezos-signer.html
+         :file: ../api/octez-signer.html
 
 
 .. _benchmark_tool_manual:

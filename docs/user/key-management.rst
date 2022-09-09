@@ -85,13 +85,13 @@ Among the signing scheme supported by the client, that we can list
 with ``octez-client list signing schemes``, there are ``unix``,
 ``tcp``, ``http`` and ``https``.
 These schemes send signing requests over their respective
-communication channel towards the ``tezos-signer``, which can run on a
+communication channel towards the ``octez-signer``, which can run on a
 different machine that stores the secret key.
 
 Signer requests
 ~~~~~~~~~~~~~~~
 
-The ``tezos-signer`` handles signing requests with the following format::
+The ``octez-signer`` handles signing requests with the following format::
 
     <magic_byte><data>
 
@@ -139,10 +139,10 @@ of the signer.
 
 ::
 
-   home~$ tezos-signer gen keys alice
+   home~$ octez-signer gen keys alice
    home~$ cat ~/.tezos-signer/public_key_hashs
    [ { "name": "alice", "value": "tz1abc..." } ]
-   home~$ tezos-signer launch socket signer -a home
+   home~$ octez-signer launch socket signer -a home
 
    vps~$ octez-client import secret key alice tcp://home:7732/tz1abc...
    vps~$ octez-client sign bytes 0x03 for alice
@@ -167,7 +167,7 @@ Alternatively, the address of the signer can be recorded in environment variable
 
 All the above methods can be retargeted to the other signing schemes, for instance, ``http``::
 
-   home~$ tezos-signer launch http signer -a home
+   home~$ octez-signer launch http signer -a home
 
    vps~$ octez-client import secret key alice http://home:7732/tz1abc...
    vps~$ octez-client sign bytes 0x03 for alice
@@ -218,8 +218,8 @@ signer and it is not used as a Tezos account.
        "value":
           "unencrypted:edpk123456789" } ]
 
-   home~$ tezos-signer add authorized key edpk123456789 --name vps
-   home~$ tezos-signer --require-authentication launch socket signer -a home-ip
+   home~$ octez-signer add authorized key edpk123456789 --name vps
+   home~$ octez-signer --require-authentication launch socket signer -a home-ip
 
 All request are now signed with the *vps* key thus you are
 guaranteed authenticity and integrity.
