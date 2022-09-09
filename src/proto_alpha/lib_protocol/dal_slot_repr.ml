@@ -71,7 +71,7 @@ type slot = t
 
 type slot_index = Index.t
 
-let equal ({published_level; index; header} : t) s2 =
+let slot_equal ({published_level; index; header} : t) s2 =
   Raw_level_repr.equal published_level s2.published_level
   && Index.equal index s2.index
   && Header.equal header s2.header
@@ -120,7 +120,7 @@ module Page = struct
       page_index
 end
 
-let encoding =
+let slot_encoding =
   let open Data_encoding in
   conv
     (fun {published_level; index; header} -> (published_level, index, header))
@@ -130,7 +130,7 @@ let encoding =
        (req "index" Data_encoding.uint8)
        (req "header" Header.encoding))
 
-let pp fmt {published_level; index; header} =
+let pp_slot fmt {published_level; index; header} =
   Format.fprintf
     fmt
     "published_level: %a index: %a header: %a"
@@ -186,7 +186,7 @@ module Slots_history = struct
   module Leaf = struct
     type t = slot
 
-    let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
+    let to_bytes = Data_encoding.Binary.to_bytes_exn slot_encoding
   end
 
   module Content_prefix = struct
@@ -239,12 +239,19 @@ module Slots_history = struct
        pointers. *)
     type ptr = Pointer_hash.t
 
-    type t = (content, ptr) Skip_list.cell option
+    type history = (content, ptr) Skip_list.cell
 
-    let slot_encoding = encoding
+    type t = history option
 
-    let encoding =
-      Skip_list.encoding Pointer_hash.encoding encoding |> Data_encoding.option
+    let history_encoding =
+      Skip_list.encoding Pointer_hash.encoding slot_encoding
+
+    let equal_history : history -> history -> bool =
+      Skip_list.equal Pointer_hash.equal slot_equal
+
+    let encoding = Data_encoding.option history_encoding
+
+    let equal : t -> t -> bool = Option.equal equal_history
 
     let genesis : t = None
 
@@ -255,18 +262,58 @@ module Slots_history = struct
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
-    let add_confirmed_slot t slot =
+    let pp_history fmt (history : history) =
+      let history_hash = hash_skip_list_cell history in
+      Format.fprintf
+        fmt
+        "@[hash : %a@;%a@]"
+        Pointer_hash.pp
+        history_hash
+        (Skip_list.pp ~pp_content:pp_slot ~pp_ptr:Pointer_hash.pp)
+        history
+
+    module History_cache =
+      Bounded_history_repr.Make
+        (struct
+          let name = "dal_slots_cache"
+        end)
+        (Pointer_hash)
+        (struct
+          type t = history
+
+          let encoding = history_encoding
+
+          let pp = pp_history
+
+          let equal = equal_history
+        end)
+
+    let add_confirmed_slot (t, cache) slot =
+      let open Tzresult_syntax in
       match t with
-      | None -> Some (Skip_list.genesis slot)
+      | None -> return (Some (Skip_list.genesis slot), cache)
       | Some t ->
           let content = slot in
           let prev_cell_ptr = hash_skip_list_cell t in
-          Skip_list.next ~prev_cell:t ~prev_cell_ptr content |> Option.some
+          let* cache = History_cache.remember prev_cell_ptr t cache in
+          return
+            ( Skip_list.next ~prev_cell:t ~prev_cell_ptr content |> Option.some,
+              cache )
 
-    let add_confirmed_slots t slots = List.fold_left add_confirmed_slot t slots
+    let add_confirmed_slots t cache slots =
+      List.fold_left_e add_confirmed_slot (t, cache) slots
 
-    let equal = Option.equal @@ Skip_list.equal Pointer_hash.equal equal
+    let add_confirmed_slots_no_cache =
+      let no_cache = History_cache.empty ~capacity:0L in
+      fun t slots ->
+        List.fold_left_e add_confirmed_slot (t, no_cache) slots >|? fst
   end
 
   include V1
 end
+
+let encoding = slot_encoding
+
+let pp = pp_slot
+
+let equal = slot_equal

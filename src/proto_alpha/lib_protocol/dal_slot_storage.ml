@@ -51,9 +51,12 @@ let get_slots_history ctxt =
 
 let update_skip_list ctxt ~confirmed_slots =
   get_slots_history ctxt >>=? fun slots_history ->
-  Dal_slot_repr.Slots_history.add_confirmed_slots slots_history confirmed_slots
-  |> Storage.Dal.Slots_history.add ctxt
-  >>= fun ctxt -> return ctxt
+  Lwt.return
+  @@ Dal_slot_repr.Slots_history.add_confirmed_slots_no_cache
+       slots_history
+       confirmed_slots
+  >>=? fun slots_history ->
+  Storage.Dal.Slots_history.add ctxt slots_history >|= ok
 
 let finalize_pending_slots ctxt =
   let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
