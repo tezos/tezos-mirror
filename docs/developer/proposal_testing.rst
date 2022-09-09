@@ -37,7 +37,7 @@ latest code and run unit tests::
 We can run a node and a client in sandboxed mode by invoking::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 By default, the sandbox starts from the `genesis` block at level 0, and the
 sandbox's active protocol is the `Genesis protocol`. Once the sandbox is
@@ -493,10 +493,10 @@ node as usual. In our example we can run the following::
 
 We can also start the client::
 
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Instead of command ``tezos-activate-alpha``, the sandboxed client script
-``src/bin_client/tezos-init-sandboxed-client.sh`` now accepts a command
+``src/bin_client/octez-init-sandboxed-client.sh`` now accepts a command
 ``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
 version number ``XXX`` and short hash ``<short_hash>``. In our example, the
 predecessor protocol is ``011`` with short hash ``PtHangz2``. (Check the folder
@@ -645,7 +645,7 @@ the following fur commands)::
 Run sandboxed node and client::
 
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol and move chain one level forward::
 
@@ -664,7 +664,7 @@ To test again, restart the sandboxed node and client::
   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
   ^C
   $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol::
 

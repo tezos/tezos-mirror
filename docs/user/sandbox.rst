@@ -5,7 +5,7 @@ To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
 -  ``./src/bin_node/octez-sandboxed-node.sh``
--  ``./src/bin_client/tezos-init-sandboxed-client.sh``
+-  ``./src/bin_client/octez-init-sandboxed-client.sh``
 
 For the moment these scripts are expected to be run on the ``master``
 branch (see :ref:`Build from sources<build_from_sources>`; in
@@ -48,7 +48,7 @@ Once your node is running, open a new terminal and initialize the
 
 ::
 
-    eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+    eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 It will also define in the current shell session an alias ``octez-client``
 preconfigured for communicating with the same-numbered node.

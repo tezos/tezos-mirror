@@ -72,7 +72,7 @@ environment for using a proxy server:
 
 ::
 
-    $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+    $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Then upgrade the node to protocol alpha:
 
