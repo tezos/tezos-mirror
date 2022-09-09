@@ -34,7 +34,7 @@ open Tezos_micheline_rewriting
 open Tezos_protocol_alpha.Protocol
 
 module Michelson_signature :
-  Signature.S with type t = Michelson_v1_primitives.prim = struct
+  Algebraic_signature.S with type t = Michelson_v1_primitives.prim = struct
   type t = Michelson_v1_primitives.prim
 
   let compare (x : t) (y : t) = Stdlib.compare x y

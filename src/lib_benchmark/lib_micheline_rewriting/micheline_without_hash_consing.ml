@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Make
-    (X : Signature.S) (Label : sig
+    (X : Algebraic_signature.S) (Label : sig
       type t
 
       val default : t
