@@ -71,3 +71,17 @@ let () =
     Data_encoding.(obj1 (req "operation" L1_operation.encoding))
     (function No_worker_for_operation op -> Some op | _ -> None)
     (fun op -> No_worker_for_operation op)
+
+type error += Step_failed of string
+
+let () =
+  register_error_kind
+    ~id:"rollups.injector.step_failed"
+    ~title:"A step failed in the injector"
+    ~description:"A step failed in the injector."
+    ~pp:(fun ppf step ->
+      Format.fprintf ppf "%s failed in injector" (String.capitalize_ascii step))
+    `Temporary
+    Data_encoding.(obj1 (req "step" string))
+    (function Step_failed s -> Some s | _ -> None)
+    (fun s -> Step_failed s)

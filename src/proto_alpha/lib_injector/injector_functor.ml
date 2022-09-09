@@ -539,7 +539,8 @@ module Make (Rollup : PARAMETERS) = struct
       (operations : L1_operation.t list) =
     let open Lwt_result_syntax in
     let* packed_op, result =
-      simulate_operations ~must_succeed state operations
+      trace (Step_failed "simulation")
+      @@ simulate_operations ~must_succeed state operations
     in
     let results = Apply_results.to_list result in
     let failure = ref false in
@@ -584,7 +585,9 @@ module Make (Rollup : PARAMETERS) = struct
       inject_operations ~must_succeed state operations
     else
       (* Inject on node for real *)
-      let+ oph = inject_on_node state packed_op in
+      let+ oph =
+        trace (Step_failed "injection") @@ inject_on_node state packed_op
+      in
       (oph, operations)
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
@@ -878,7 +881,8 @@ module Make (Rollup : PARAMETERS) = struct
 
     let on_launch _w signer
         Types.{cctxt; data_dir; rollup_node_state; strategy; tags} =
-      init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags
+      trace (Step_failed "initialization")
+      @@ init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags
 
     let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
