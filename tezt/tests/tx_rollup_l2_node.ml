@@ -1372,10 +1372,10 @@ let test_batcher ~test_persistence =
         bls_pkh_1
         bls_pkh_2 ;
       let* txh1 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
           ~qty:1L
-          ~signer:bls_key_1
+          ~source:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
@@ -1385,10 +1385,10 @@ let test_batcher ~test_persistence =
         bls_pkh_2
         bls_pkh_1 ;
       let* txh2 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
           ~qty:5L
-          ~signer:bls_key_2
+          ~source:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
       in
@@ -1473,28 +1473,27 @@ let test_batcher ~test_persistence =
       in
 
       let inject_tx ?(amount = 1L) ~counter ~from ~dest () =
-        craft_tx_and_inject
-          tx_client
-          ~qty:amount
+        inject_transfer
           ~counter
-          ~signer:from
+          tx_client
+          ~source:from.Account.aggregate_alias
+          ~qty:amount
           ~dest
           ~ticket:ticket_id
       in
 
       let nbtxs1 = 70 in
+      let nbtxs2 = 30 in
       let batch_success_promise = wait_for_batch_success_event tx_node in
-      Log.info "Injecting %d transactions to queue" nbtxs1 ;
       let* () =
+        Log.info "Injecting %d transactions to queue" nbtxs1 ;
         Lwt_list.iter_s
           (fun counter ->
             let* _ = inject_tx ~counter ~from:bls_key_1 ~dest:bls_pkh_2 () in
             unit)
           (List.init nbtxs1 (fun i -> Int64.of_int (i + 2)))
-      in
-      let nbtxs2 = 30 in
-      Log.info "Injecting %d transactions to queue" nbtxs2 ;
-      let* () =
+      and* () =
+        Log.info "Injecting %d transactions to queue" nbtxs2 ;
         Lwt_list.iter_s
           (fun counter ->
             let* _ = inject_tx ~counter ~from:bls_key_2 ~dest:bls_pkh_1 () in
@@ -2037,11 +2036,11 @@ let test_committer =
       let* inbox = Tx_rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox) in
       let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
           ~qty:amount
           ?counter
-          ~signer:from
+          ~source:from.Account.aggregate_alias
           ~dest
           ~ticket:ticket_id
       in
@@ -2190,17 +2189,17 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       Log.info "Submitting transactions to queue" ;
       let* _txh1 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
-          ~signer:bls_key_1
+          ~source:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
       in
       let* _txh2 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
-          ~signer:bls_key_2
+          ~source:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
@@ -2294,17 +2293,17 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       Log.info "Submitting transactions to queue" ;
       let* _txh1 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
-          ~signer:bls_key_1
+          ~source:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
       in
       let* _txh2 =
-        craft_tx_and_inject
+        inject_transfer
           tx_client
-          ~signer:bls_key_2
+          ~source:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
@@ -2784,11 +2783,11 @@ let test_catch_up =
   let* block = Tx_rollup_node.Client.get_block ~tx_node ~block:"head" in
   check_l2_level block 0 ;
   let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
-    craft_tx_and_inject
+    inject_transfer
       tx_client
       ~qty:amount
       ?counter
-      ~signer:from
+      ~source:from.Account.aggregate_alias
       ~dest
       ~ticket:ticket_id
   in
