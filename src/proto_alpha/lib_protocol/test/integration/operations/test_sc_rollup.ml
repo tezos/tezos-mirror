@@ -1488,6 +1488,15 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
   let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
   return_unit
 
+let add_op block op =
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr op in
+  Incremental.finalize_block incr
+
+let add_publish ~rollup block account commitment =
+  let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
+  add_op block publish
+
 (** [test_timeout] test multiple cases of the timeout logic.
     - Test to timeout a player before it's allowed and fails.
     - Test that the timeout left by player decreases as expected.
@@ -1522,17 +1531,9 @@ let test_timeout () =
           (Context_hash.hash_string ["second"]);
     }
   in
-  let add_op block op =
-    let* incr = Incremental.begin_construction block in
-    let* incr = Incremental.add_operation incr op in
-    Incremental.finalize_block incr
-  in
-  let add_publish block account commitment =
-    let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
-    add_op block publish
-  in
-  let* block = add_publish block account1 commitment1 in
-  let* block = add_publish block account2 commitment2 in
+
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
   let* start_game_op =
     Op.sc_rollup_refute (B block) account1 rollup pkh2 None
   in
