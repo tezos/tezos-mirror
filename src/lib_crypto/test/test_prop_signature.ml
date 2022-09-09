@@ -76,7 +76,10 @@ struct
     let is_valid_aggregated_sign =
       X.aggregate_signature_opt [signed1; signed2; signed3] |> function
       | None -> false
-      | Some s -> X.aggregate_check [(pk1, msg1); (pk2, msg2); (pk3, msg3)] s
+      | Some s ->
+          X.aggregate_check
+            [(pk1, None, msg1); (pk2, None, msg2); (pk3, None, msg3)]
+            s
     in
     X.check pk1 signed1 msg1 && X.check pk2 signed2 msg2
     && X.check pk3 signed3 msg3 && is_valid_aggregated_sign
