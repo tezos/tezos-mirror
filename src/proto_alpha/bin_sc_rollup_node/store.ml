@@ -352,7 +352,7 @@ module Dal_confirmed_slots_histories = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Dal.Slots_history.Cache.t
+  type value = Dal.Slots_history.History_cache.t
 
-  let value_encoding = Dal.Slots_history.Cache.encoding
+  let value_encoding = Dal.Slots_history.History_cache.encoding
 end)

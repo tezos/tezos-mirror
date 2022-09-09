@@ -85,7 +85,7 @@ let common_slot_indexes (l : Dal.Slot_index.t list) (r : Dal.Slot_index.t list)
   let r_set = Slot_set.of_list r in
   Slot_set.elements @@ Slot_set.inter l_set r_set
 
-(* [confirmed_slots node_ctxt head] reads the slot indexes that have been
+(** [confirmed_slots node_ctxt head] reads the slot indexes that have been
     declared available from [head]'s block receipt, and returns the list of
     confirmed slots to which the rollup is subscribed to, with the corresponding
     slot header. *)
@@ -166,25 +166,133 @@ let confirmed_slots node_ctxt (Layer1.Head {hash; _} as head) =
 
       return confirmed_slot_indexes_with_header
 
-let compute_and_save_confirmed_slot_headers node_ctxt
-    (Layer1.Head {hash; _} as head) =
-  let open Lwt_result_syntax in
-  let* slots_to_save = confirmed_slots node_ctxt head in
-  let*! () =
-    List.iter_s
-      (fun ({Dal.Slot.index; _} as slot) ->
-        Store.Dal_confirmed_slots.add
-          node_ctxt.store
-          ~primary_key:hash
-          ~secondary_key:index
-          slot)
-      slots_to_save
-  in
-  return_unit
+let save_confirmed_slot_headers node_ctxt hash slots_to_save =
+  List.iter_s
+    (fun ({Dal.Slot.index; _} as slot) ->
+      Store.Dal_confirmed_slots.add
+        node_ctxt.Node_context.store
+        ~primary_key:hash
+        ~secondary_key:index
+        slot)
+    slots_to_save
+  >|= ok
 
-let process_head node_ctxt head =
+module Confirmed_slots_history = struct
+  let read_slots_history_from_l1 {Node_context.l1_ctxt = {cctxt; _}; _} block =
+    let open Lwt_result_syntax in
+    (* We return the empty Slots_history if DAL is not enabled. *)
+    let* slots_list_opt =
+      RPC.Dal.dal_confirmed_slots_history cctxt (cctxt#chain, `Hash (block, 0))
+    in
+    return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
+
+  let slots_history_of_hash node_ctxt block_hash =
+    let open Lwt_result_syntax in
+    let open Node_context in
+    let*! confirmed_slots_history_opt =
+      Store.Dal_confirmed_slots_history.find node_ctxt.store block_hash
+    in
+    match confirmed_slots_history_opt with
+    | Some confirmed_dal_slots -> return confirmed_dal_slots
+    | None ->
+        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          (* We won't find "dal slots history" for blocks before the
+             rollup origination level in the node's store. In this case, we get
+             the value of the skip list form L1 in case DAL is enabled, or the
+             genesis DAL skip list otherwise. *)
+          read_slots_history_from_l1 node_ctxt block_hash
+        else
+          (* We won't find "dal slots history" for blocks after the rollup
+             origination level. This should not happen in normal circumstances. *)
+          failwith
+            "The confirmed DAL slots history for block hash %a (level = %a) is \
+             missing."
+            Block_hash.pp
+            block_hash
+            Raw_level.pp
+            block_level
+
+  let slots_history_cache_of_hash node_ctxt block_hash =
+    let open Lwt_result_syntax in
+    let open Node_context in
+    let*! confirmed_slots_history_cache_opt =
+      Store.Dal_confirmed_slots_histories.find node_ctxt.store block_hash
+    in
+    match confirmed_slots_history_cache_opt with
+    | Some cache -> return cache
+    | None ->
+        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
+        let block_level = Raw_level.of_int32_exn block_level in
+        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+          (* We won't find "dal slots history cache" for blocks before the
+             rollup origination level. In this case, we initialize with the
+             empty cache. *)
+          let num_slots =
+            node_ctxt.Node_context.protocol_constants.parametric.dal
+              .number_of_slots
+          in
+          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
+             Put an accurate value for capacity. The value
+                    `num_slots * 60000` below is chosen based on:
+                 - The number of remembered L1 inboxes in their corresponding
+                   cache (60000),
+                 - The (max) number of slots (num_slots) that could be attested
+                   per L1 block,
+                 - The way the Slots_history.t skip list is implemented (one slot
+                   per cell). *)
+          return
+          @@ Dal.Slots_history.History_cache.empty
+               ~capacity:(Int64.of_int @@ (num_slots * 60000))
+        else
+          (* We won't find "dal slots history cache" for blocks after the rollup
+             origination level. This should not happen in normal circumstances. *)
+          failwith
+            "The confirmed DAL slots history cache for block hash %a (level = \
+             %a) is missing."
+            Block_hash.pp
+            block_hash
+            Raw_level.pp
+            block_level
+
+  let update (Node_context.{store; _} as node_ctxt)
+      Layer1.(Head {hash = head_hash; _} as head) slots_to_save =
+    let open Lwt_result_syntax in
+    let slots_to_save =
+      let open Dal in
+      List.fast_sort
+        (fun {Slot.index = a; _} {Slot.index = b; _} -> Slot_index.compare a b)
+        slots_to_save
+    in
+    let*! pred = Layer1.predecessor store head in
+    let* slots_history = slots_history_of_hash node_ctxt pred in
+    let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
+    let*? slots_history, slots_cache =
+      Dal.Slots_history.add_confirmed_slots
+        slots_history
+        slots_cache
+        slots_to_save
+      |> Environment.wrap_tzresult
+    in
+    (* The value of [slots_history] computed here is supposed to be equal to the
+       one computed stored for block [head_hash] on L1, we basically re-do the
+       computation here because we need to build/maintain the [slots_cache]
+       bounded cache in case we need it for refutation game. *)
+    (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3856
+       Attempt to improve this process. *)
+    let*! () =
+      Store.Dal_confirmed_slots_history.add store head_hash slots_history
+    in
+    let*! () =
+      Store.Dal_confirmed_slots_histories.add store head_hash slots_cache
+    in
+    return ()
+end
+
+let process_head node_ctxt (Layer1.Head {hash = head_hash; _} as head) =
   let open Lwt_result_syntax in
   let* () = fetch_and_save_subscribed_slot_headers node_ctxt head in
-  compute_and_save_confirmed_slot_headers node_ctxt head
-
-let get_slots_history_of_hash = X.State.slots_history_of_hash
+  let* slots_to_save = confirmed_slots node_ctxt head in
+  let* () = save_confirmed_slot_headers node_ctxt head_hash slots_to_save in
+  Confirmed_slots_history.update node_ctxt head slots_to_save
