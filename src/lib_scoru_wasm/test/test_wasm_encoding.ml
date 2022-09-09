@@ -121,19 +121,12 @@ let test_frame_tree =
     ~gen:(fun ~host_funcs:_ -> Ast_generators.frame_gen)
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.frame_encoding)
 
-(** Test serialize/deserialize input buffers and compare trees. *)
-let test_input_buffer_tree =
+(** Test serialize/deserialize input and output buffers and compare trees. *)
+let test_buffers_tree =
   test_generic_tree
-    ~pp:Ast_printer.pp_input_buffer
-    ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.input_buffer_gen)
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.input_buffer_encoding)
-
-(** Test serialize/deserialize output buffers and compare trees. *)
-let test_output_buffer_tree =
-  test_generic_tree
-    ~pp:Ast_printer.pp_output_buffer
-    ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.output_buffer_gen)
-    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.output_buffer_encoding)
+    ~pp:Ast_printer.pp_buffers
+    ~gen:(fun ~host_funcs:_ ~module_reg:_ -> Ast_generators.buffers_gen)
+    ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.buffers_encoding)
 
 (** Test serialize/deserialize values and compare trees. *)
 let test_values_tree =
@@ -167,8 +160,7 @@ let tests =
     tztest "Module trees" `Quick test_module_tree;
     tztest "Values trees" `Quick test_values_tree;
     tztest "Admin_instr trees" `Quick test_admin_instr_tree;
-    tztest "Input_buffer trees" `Quick test_input_buffer_tree;
-    tztest "Output_buffer trees" `Quick test_output_buffer_tree;
+    tztest "Input and output buffers trees" `Quick test_buffers_tree;
     tztest "Frame trees" `Quick test_frame_tree;
     tztest "Config trees" `Quick test_config_tree;
   ]

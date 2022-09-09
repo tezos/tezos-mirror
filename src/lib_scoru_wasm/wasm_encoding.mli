@@ -98,3 +98,5 @@ val frame_encoding : Eval.frame Tree_encoding.t
 
 val config_encoding :
   host_funcs:Host_funcs.registry -> Eval.config Tree_encoding.t
+
+val buffers_encoding : Eval.buffers Tree_encoding.t

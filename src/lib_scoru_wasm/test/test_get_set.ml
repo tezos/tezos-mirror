@@ -87,6 +87,10 @@ let floppy_encoding =
 
 let inp_encoding = Tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
+(* Replicates the encoding of buffers from [Wasm_pvm] as part of the pvm_state. *)
+let buffers_encoding =
+  Tree_encoding.scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding
+
 let zero =
   WithExceptions.Option.get
     ~loc:__LOC__
@@ -124,7 +128,10 @@ let initialise_tree () =
       Wasm_pvm_sig.Input_required
       tree
   in
-  Lwt.return tree
+  Tree_encoding_runner.encode
+    buffers_encoding
+    (Tezos_webassembly_interpreter.Eval.buffers ())
+    tree
 
 let make_inbox_info ~inbox_level ~message_counter =
   Wasm_pvm_sig.
@@ -225,8 +232,6 @@ let test_set_input () =
   let tick_state =
     Eval.
       {
-        input = Input_buffer.alloc ();
-        output = Output_buffer.alloc ();
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
@@ -274,17 +279,8 @@ let test_get_output () =
   let output = Output_buffer.alloc () in
   Output_buffer.set_level output 0l ;
   let* () = Output_buffer.set_value output @@ Bytes.of_string "hello" in
-  let tick_state =
-    Eval.
-      {
-        input = Input_buffer.alloc ();
-        output;
-        host_funcs;
-        step_kont = SK_Result (Vector.empty ());
-        stack_size_limit = 1000;
-      }
-  in
-  let* tree = encode_tick_state ~host_funcs tick_state tree in
+  let buffers = Eval.{input = Input_buffer.alloc (); output} in
+  let* tree = Tree_encoding_runner.encode buffers_encoding buffers tree in
   let output_info = make_output_info ~outbox_level:0 ~message_index:0 in
   let* payload = Wasm.get_output output_info tree in
   assert (payload = "hello") ;

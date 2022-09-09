@@ -787,13 +787,16 @@ let step_kont_gen ~module_reg =
       sk_trapped_gen;
     ]
 
-let config_gen ~host_funcs ~module_reg =
+let buffers_gen =
   let* input = input_buffer_gen in
   let _input_list =
     Lwt_main.run @@ Lazy_vector.ZVector.to_list
     @@ Lazy_vector.Mutable.ZVector.snapshot input.content
   in
-  let* output = output_buffer_gen in
+  let+ output = output_buffer_gen in
+  Eval.{input; output}
+
+let config_gen ~host_funcs ~module_reg =
   let* stack_size_limit = small_int in
   let+ step_kont = step_kont_gen ~module_reg in
-  Eval.{input; output; step_kont; host_funcs; stack_size_limit}
+  Eval.{step_kont; host_funcs; stack_size_limit}

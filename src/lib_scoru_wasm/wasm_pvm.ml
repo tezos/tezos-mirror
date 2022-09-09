@@ -50,6 +50,8 @@ type pvm_state = {
   durable : Durable.t;  (** The durable storage of the PVM. *)
   module_reg : Wasm.Instance.module_reg;
       (** Module registry of the loaded kernel. *)
+  buffers : Wasm.Eval.buffers;
+      (** Input and outut buffers used by the PVM host functions. *)
   tick_state : tick_state;  (** The current tick state. *)
   input_request : Wasm_pvm_sig.input_request;
       (** Signals whether or not the PVM needs input. *)
@@ -123,6 +125,9 @@ struct
           | Wasm_pvm_sig.No_input_required -> false)
         (Tree_encoding.value ~default:false [] Data_encoding.bool)
 
+    let durable_buffers_encoding =
+      Tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
+
     let pvm_state_encoding =
       let open Tree_encoding in
       conv
@@ -130,6 +135,7 @@ struct
                current_tick,
                durable,
                module_reg,
+               buffers,
                tick_state,
                input_request ) ->
           {
@@ -137,6 +143,12 @@ struct
             current_tick;
             durable;
             module_reg;
+            buffers =
+              (*`Gather_floppies` uses `get_info`, that decodes the state of the
+                PVM, which at the start of the rollup doesn't exist. *)
+              Option.value_f
+                ~default:Tezos_webassembly_interpreter.Eval.buffers
+                buffers;
             tick_state;
             input_request;
           })
@@ -145,6 +157,7 @@ struct
                current_tick;
                durable;
                module_reg;
+               buffers;
                tick_state;
                input_request;
              } ->
@@ -152,20 +165,22 @@ struct
             current_tick,
             durable,
             module_reg,
+            Some buffers,
             tick_state,
             input_request ))
-        (tup6
+        (tup7
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
            (scope ["durable"] Durable.encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding)
+           (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
            (scope ["input"; "consuming"] input_request_encoding))
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 
-    let unsafe_next_tick_state {module_reg; durable; tick_state; _} =
+    let unsafe_next_tick_state {module_reg; buffers; durable; tick_state; _} =
       let open Lwt_syntax in
       match tick_state with
       | Decode {module_kont = MKStop ast_module; _} ->
@@ -243,6 +258,7 @@ struct
               ~check_module_exports:Exports_memory_0
               ~module_reg
               ~self
+              buffers
               host_funcs
               ast_module
               externs
@@ -252,7 +268,7 @@ struct
       | Eval eval_config ->
           let store = Durable.to_storage durable in
           let+ store', eval_config =
-            Wasm.Eval.step ~durable:store module_reg eval_config
+            Wasm.Eval.step ~durable:store module_reg eval_config buffers
           in
           let durable' = Durable.of_storage ~default:durable store' in
           (durable', Eval eval_config)
@@ -355,20 +371,15 @@ struct
 
     let compute_step tree = compute_step_many ~max_steps:1L tree
 
-    let out_encoding =
-      Tree_encoding.scope
-        ["wasm"; "value"; "output"]
-        Wasm_encoding.output_buffer_encoding
-
     let get_output output_info tree =
       let open Lwt_syntax in
       let open Wasm_pvm_sig in
       let {outbox_level; message_index} = output_info in
       let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
-      let* output_buffer = Tree_encoding_runner.decode out_encoding tree in
-      let+ payload =
-        Wasm.Output_buffer.get output_buffer outbox_level message_index
+      let* {output; _} =
+        Tree_encoding_runner.decode durable_buffers_encoding tree
       in
+      let+ payload = Wasm.Output_buffer.get output outbox_level message_index in
       Bytes.to_string payload
 
     let get_info tree =
@@ -390,11 +401,11 @@ struct
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* tick_state =
         match pvm_state.tick_state with
-        | Eval {input; _} ->
+        | Eval _ ->
             let+ () =
               Wasm.Input_buffer.(
                 enqueue
-                  input
+                  pvm_state.buffers.input
                   {
                     (* This is to distinguish (0) Inbox inputs from (1)
                        DAL/Slot_header inputs. *)
