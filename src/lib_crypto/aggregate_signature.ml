@@ -364,6 +364,8 @@ type signature = Bls12_381 of Bls.t | Unknown of Bytes.t
 
 type t = signature
 
+type watermark = Bytes.t
+
 let name = "Aggregate signature"
 
 let title = "A Bls12_381 signature"
@@ -456,16 +458,19 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let sign (Secret_key.Bls12_381 sk) bytes = Bls12_381 (Bls.sign sk bytes)
+let zero = Bls12_381 Bls.zero
 
-let check pk signature message =
+let sign ?watermark (Secret_key.Bls12_381 sk) bytes =
+  Bls12_381 (Bls.sign ?watermark sk bytes)
+
+let check ?watermark pk signature message =
   match (pk, signature) with
   | Public_key.Bls12_381 pk, Unknown signature ->
       Bls.of_bytes_opt signature
-      |> Option.map (fun signature -> Bls.check pk signature message)
+      |> Option.map (fun signature -> Bls.check ?watermark pk signature message)
       |> Option.value ~default:false
   | Public_key.Bls12_381 pk, Bls12_381 signature ->
-      Bls.check pk signature message
+      Bls.check ?watermark pk signature message
 
 let generate_key ?seed () =
   let pkh, pk, sk = Bls.generate_key ?seed () in
@@ -473,9 +478,18 @@ let generate_key ?seed () =
     Public_key.Bls12_381 pk,
     Secret_key.Bls12_381 sk )
 
+let deterministic_nonce (Secret_key.Bls12_381 sk) msg =
+  Bls.deterministic_nonce sk msg
+
+let deterministic_nonce_hash (Secret_key.Bls12_381 sk) msg =
+  Bls.deterministic_nonce_hash sk msg
+
 let aggregate_check pks signature =
   let pks =
-    List.map (fun (Public_key.Bls12_381 pk, bytes) -> (pk, bytes)) pks
+    List.map
+      (fun (Public_key.Bls12_381 pk, watermark, bytes) ->
+        (pk, watermark, bytes))
+      pks
   in
   match signature with
   | Bls12_381 signature -> Bls.aggregate_check pks signature

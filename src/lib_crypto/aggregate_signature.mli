@@ -36,5 +36,6 @@ include
      and type Public_key.t = public_key
      and type Secret_key.t = secret_key
      and type t = signature
+     and type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t
