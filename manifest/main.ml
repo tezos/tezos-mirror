@@ -4485,6 +4485,9 @@ module Protocol = Protocol
             main |> open_;
             client |> if_some |> open_;
             octez_rpc |> open_;
+            irmin_pack;
+            irmin_pack_unix;
+            irmin;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true

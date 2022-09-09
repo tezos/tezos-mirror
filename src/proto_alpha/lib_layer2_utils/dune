@@ -9,7 +9,10 @@
   tezos-base
   tezos-protocol-alpha
   tezos-client-alpha
-  tezos-rpc)
+  tezos-rpc
+  irmin-pack
+  irmin-pack.unix
+  irmin)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
