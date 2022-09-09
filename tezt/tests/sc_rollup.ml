@@ -642,7 +642,13 @@ module Sc_rollup_inbox = struct
         P.Raw_level_repr.encoding
         (P.Raw_level_repr.of_int32_exn level)
     in
+    let number_of_messages_bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Data_encoding.n
+        (Z.of_int (List.length current_messages))
+    in
     let* tree = add (empty ()) ["level"] level_bytes in
+    let* tree = add tree ["number_of_messages"] number_of_messages_bytes in
     let* tree = build_current_messages_tree Z.zero tree current_messages in
     let context_hash = hash tree in
     let test =

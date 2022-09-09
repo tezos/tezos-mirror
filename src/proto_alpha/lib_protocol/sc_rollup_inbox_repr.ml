@@ -390,6 +390,8 @@ let key_of_message ix =
 
 let level_key = ["level"]
 
+let number_of_messages_key = ["number_of_messages"]
+
 type serialized_proof = bytes
 
 let serialized_proof_encoding = Data_encoding.bytes
@@ -525,11 +527,19 @@ struct
       level_bytes
       (Data_encoding.Binary.of_bytes_opt Raw_level_repr.encoding)
 
+  let set_number_of_messages tree number_of_messages =
+    let number_of_messages_bytes =
+      Data_encoding.Binary.to_bytes_exn Data_encoding.n number_of_messages
+    in
+    Tree.add tree number_of_messages_key number_of_messages_bytes
+
   (** Initialise the merkle tree for a new level in the inbox. We have
       to include the [level] in this structure so that it cannot be
       forged by a malicious rollup node. *)
   let new_level_tree ctxt level =
+    let open Lwt_syntax in
     let tree = Tree.empty ctxt in
+    let* tree = set_number_of_messages tree Z.zero in
     set_level tree level
 
   let add_message inbox payload level_tree =
@@ -543,6 +553,7 @@ struct
         (Bytes.of_string
            (payload : Sc_rollup_inbox_message_repr.serialized :> string))
     in
+    let*! level_tree = set_number_of_messages level_tree message_counter in
     let nb_messages_in_commitment_period =
       Int64.succ inbox.nb_messages_in_commitment_period
     in
@@ -587,6 +598,10 @@ struct
     in
     Bytes.to_string level_bytes
 
+  let commit_tree ctxt tree inbox_level =
+    let key = [key_of_level inbox_level] in
+    P.commit_tree ctxt key tree
+
   let form_history_proof ctxt history inbox level_tree =
     let open Lwt_tzresult_syntax in
     let*! () =
@@ -595,7 +610,7 @@ struct
         | Some tree -> Lwt.return tree
         | None -> new_level_tree ctxt inbox.level
       in
-      P.commit_tree ctxt [key_of_level inbox.level] tree
+      commit_tree ctxt tree inbox.level
     in
     let prev_cell = inbox.old_levels_messages in
     let prev_cell_ptr = hash_skip_list_cell prev_cell in
@@ -1127,9 +1142,7 @@ struct
     let open Lwt_syntax in
     let pre_genesis_level = Raw_level_repr.root in
     let* initial_level = new_level_tree context pre_genesis_level in
-    let* () =
-      P.commit_tree context [key_of_level pre_genesis_level] initial_level
-    in
+    let* () = commit_tree context initial_level pre_genesis_level in
     let initial_hash = hash_level_tree initial_level in
     return
       {
