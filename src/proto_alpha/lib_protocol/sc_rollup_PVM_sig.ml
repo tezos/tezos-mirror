@@ -49,7 +49,14 @@
 
     According the rollup management protocol, the payload must be obtained
     through {!Sc_rollup_inbox_message_repr.serialize} which follows a documented
-    format. *)
+    format.
+
+    FIXME: https://gitlab.com/tezos/tezos/-/issues/3649
+
+    This type cannot be extended in a retro-compatible way. It should
+    be put into a variant.
+*)
+
 type input = {
   inbox_level : Raw_level_repr.t;
   message_counter : Z.t;
@@ -57,10 +64,26 @@ type input = {
 }
 
 (** [input_encoding] encoding value for {!input}. *)
-val input_encoding : input Data_encoding.t
+let input_encoding =
+  let open Data_encoding in
+  conv
+    (fun {inbox_level; message_counter; payload} ->
+      (inbox_level, message_counter, (payload :> string)))
+    (fun (inbox_level, message_counter, payload) ->
+      let payload = Sc_rollup_inbox_message_repr.unsafe_of_string payload in
+      {inbox_level; message_counter; payload})
+    (obj3
+       (req "inbox_level" Raw_level_repr.encoding)
+       (req "message_counter" n)
+       (req "payload" string))
 
 (** [input_equal i1 i2] return whether [i1] and [i2] are equal. *)
-val input_equal : input -> input -> bool
+let input_equal (a : input) (b : input) : bool =
+  let {inbox_level; message_counter; payload} = a in
+  (* To be robust to the addition of fields in [input] *)
+  Raw_level_repr.equal inbox_level b.inbox_level
+  && Z.equal message_counter b.message_counter
+  && String.equal (payload :> string) (b.payload :> string)
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
@@ -75,15 +98,62 @@ type input_request =
   | Initial
   | First_after of Raw_level_repr.t * Z.t
 
-(** [input_request_encoding] encoding value for {!input_requests}. *)
-val input_request_encoding : input_request Data_encoding.t
+(** [input_request_encoding] encoding value for {!input_request}. *)
+let input_request_encoding =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"No_input_required"
+        (Tag 0)
+        (obj1 (req "kind" (constant "no_input_required")))
+        (function No_input_required -> Some () | _ -> None)
+        (fun () -> No_input_required);
+      case
+        ~title:"Initial"
+        (Tag 1)
+        (obj1 (req "kind" (constant "initial")))
+        (function Initial -> Some () | _ -> None)
+        (fun () -> Initial);
+      case
+        ~title:"First_after"
+        (Tag 2)
+        (obj3
+           (req "kind" (constant "first_after"))
+           (req "level" Raw_level_repr.encoding)
+           (req "counter" n))
+        (function
+          | First_after (level, counter) -> Some ((), level, counter)
+          | _ -> None)
+        (fun ((), level, counter) -> First_after (level, counter));
+    ]
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
-val pp_input_request : Format.formatter -> input_request -> unit
+let pp_input_request fmt request =
+  match request with
+  | No_input_required -> Format.fprintf fmt "No_input_required"
+  | Initial -> Format.fprintf fmt "Initial"
+  | First_after (l, n) ->
+      Format.fprintf
+        fmt
+        "First_after (level = %a, counter = %a)"
+        Raw_level_repr.pp
+        l
+        Z.pp_print
+        n
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
-val input_request_equal : input_request -> input_request -> bool
+let input_request_equal a b =
+  match (a, b) with
+  | No_input_required, No_input_required -> true
+  | No_input_required, _ -> false
+  | Initial, Initial -> true
+  | Initial, _ -> false
+  | First_after (l, n), First_after (m, o) ->
+      Raw_level_repr.equal l m && Z.equal n o
+  | First_after _, _ -> false
 
 (** Type that describes output values. *)
 type output = {
@@ -95,11 +165,30 @@ type output = {
 }
 
 (** [output_encoding] encoding value for {!output}. *)
-val output_encoding : output Data_encoding.t
+let output_encoding =
+  let open Data_encoding in
+  conv
+    (fun {outbox_level; message_index; message} ->
+      (outbox_level, message_index, message))
+    (fun (outbox_level, message_index, message) ->
+      {outbox_level; message_index; message})
+    (obj3
+       (req "outbox_level" Raw_level_repr.encoding)
+       (req "message_index" n)
+       (req "message" Sc_rollup_outbox_message_repr.encoding))
 
 (** [pp_output fmt o] pretty prints the given output [o] to the formatter
     [fmt]. *)
-val pp_output : Format.formatter -> output -> unit
+let pp_output fmt {outbox_level; message_index; message} =
+  Format.fprintf
+    fmt
+    "@[%a@;%a@;%a@;@]"
+    Raw_level_repr.pp
+    outbox_level
+    Z.pp_print
+    message_index
+    Sc_rollup_outbox_message_repr.pp
+    message
 
 module type S = sig
   (** The state of the PVM denotes a state of the rollup.

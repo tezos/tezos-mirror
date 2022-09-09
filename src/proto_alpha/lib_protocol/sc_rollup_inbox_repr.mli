@@ -35,7 +35,7 @@
    rollup, there are only two possibilities: either these two claims
    correspond to two distinct interpretations of the same inbox ; or,
    these two claims differ on their views about the contents of the
-   inbox itself. {!Sc_rollup_PVM_sem} is meant to arbitrate the first
+   inbox itself. {!Sc_rollup_PVM_sig} is meant to arbitrate the first
    kind of conflicts while {!Sc_rollup_inbox} focuses on the second
    kind of conflicts.
 
@@ -62,7 +62,7 @@
 
    {1 Merkelization of the inbox}
 
-   As for the state of the {!Sc_rollup_PVM_sem}, the layer 1 does not
+   As for the state of the {!Sc_rollup_PVM_sig}, the layer 1 does not
    have to store the entire inbox but only a compressed form
    (typically a low number of hashes) that witnesses its contents, so
    that the protocol can check the validity of a proof about its contents.
@@ -345,7 +345,7 @@ module type Merkelized_operations = sig
       - the [starting_point], of type [Raw_level_repr.t * Z.t], specifying
         a location in the inbox ;
 
-      - the [message], of type [Sc_rollup_PVM_sem.input option] ;
+      - the [message], of type [Sc_rollup_PVM_sig.input option] ;
 
       - and a reference [snapshot] inbox.
 
@@ -375,7 +375,7 @@ module type Merkelized_operations = sig
     Raw_level_repr.t * Z.t ->
     history_proof ->
     proof ->
-    Sc_rollup_PVM_sem.input option tzresult Lwt.t
+    Sc_rollup_PVM_sig.input option tzresult Lwt.t
 
   (** [produce_proof ctxt history inbox (level, counter)] creates an
       inbox proof proving the first message after the index [counter] at
@@ -387,7 +387,7 @@ module type Merkelized_operations = sig
     History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
-    (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+    (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
 
   (** [empty ctxt level] is an inbox started at some given [level] with no
       message at all. *)

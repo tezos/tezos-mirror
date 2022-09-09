@@ -52,7 +52,7 @@
    The machine has a boot sector which is a mere string used a prefix
    for each message.
 
-   The module implements the {!Sc_rollup_PVM_sem.S}Î interface to be
+   The module implements the {!Sc_rollup_PVM_sig.S}Î interface to be
    used in the smart contract rollup infrastructure.
 
    The machine exposes extra operations to be used in the rollup node.
@@ -60,7 +60,7 @@
 *)
 
 module type S = sig
-  include Sc_rollup_PVM_sem.S
+  include Sc_rollup_PVM_sig.S
 
   (** [name] is "arith". *)
   val name : string
@@ -126,7 +126,7 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sem.input_request}
+type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sig.input_request}
 
 module Protocol_implementation :
   S

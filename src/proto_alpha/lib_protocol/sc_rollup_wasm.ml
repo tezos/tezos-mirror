@@ -53,7 +53,7 @@ module V2_0_0 = struct
       "scs11pDQTn37TBnWgQAiCPdMAcQPiXARjg9ZZVmLx26sZwxeSxovE5"
 
   open Sc_rollup_repr
-  module PS = Sc_rollup_PVM_sem
+  module PS = Sc_rollup_PVM_sig
 
   module type P = sig
     module Tree :
@@ -77,7 +77,7 @@ module V2_0_0 = struct
   end
 
   module type S = sig
-    include Sc_rollup_PVM_sem.S
+    include Sc_rollup_PVM_sig.S
 
     val name : string
 

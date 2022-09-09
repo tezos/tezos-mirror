@@ -3023,14 +3023,14 @@ module Sc_rollup : sig
         Raw_level.t * Z.t ->
         history_proof ->
         proof ->
-        Sc_rollup_PVM_sem.input option tzresult Lwt.t
+        Sc_rollup_PVM_sig.input option tzresult Lwt.t
 
       val produce_proof :
         inbox_context ->
         History.t ->
         history_proof ->
         Raw_level.t * Z.t ->
-        (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+        (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
 
@@ -3448,7 +3448,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       pvm_name:string ->
       t ->
-      (bool * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+      (bool * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
 
     val produce :
       (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t

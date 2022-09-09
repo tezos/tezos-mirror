@@ -49,7 +49,7 @@
         "Sc_rollup_tick_repr",
         "Sc_rollup_inbox_message_repr",
         "Sc_rollup_outbox_message_repr",
-        "Sc_rollup_PVM_sem",
+        "Sc_rollup_PVM_sig",
         "Sc_rollup_arith",
         "Sc_rollup_wasm",
         "Sc_rollups",

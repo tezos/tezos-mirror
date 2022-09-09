@@ -29,7 +29,7 @@ module V2_0_0 : sig
     WebAssembly (version 2.0.0). *)
 
   module type S = sig
-    include Sc_rollup_PVM_sem.S
+    include Sc_rollup_PVM_sig.S
 
     (** [name] is "wasm_2_0_0".
 
@@ -80,7 +80,7 @@ module V2_0_0 : sig
       Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
   end
 
-  type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sem.input_request}
+  type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sig.input_request}
 
   val proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t
 

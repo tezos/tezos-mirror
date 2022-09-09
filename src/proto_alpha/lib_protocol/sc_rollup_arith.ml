@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Sc_rollup_repr
-module PS = Sc_rollup_PVM_sem
+module PS = Sc_rollup_PVM_sig
 
 (*
   This is the state hash of reference that both the prover of the node
@@ -114,7 +114,7 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sem.input_request}
+type 'a proof = {tree_proof : 'a; requested : Sc_rollup_PVM_sig.input_request}
 
 let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
  fun encoding ->
@@ -680,13 +680,13 @@ module Make (Context : P) :
     end)
 
     module Output = Make_dict (struct
-      type t = Sc_rollup_PVM_sem.output
+      type t = Sc_rollup_PVM_sig.output
 
       let name = "output"
 
-      let encoding = Sc_rollup_PVM_sem.output_encoding
+      let encoding = Sc_rollup_PVM_sig.output_encoding
 
-      let pp = Sc_rollup_PVM_sem.pp_output
+      let pp = Sc_rollup_PVM_sig.pp_output
     end)
 
     let pp =
@@ -1019,7 +1019,7 @@ module Make (Context : P) :
     let message = Atomic_transaction_batch {transactions = [transaction]} in
     let* outbox_level = Current_level.get in
     let output =
-      Sc_rollup_PVM_sem.{outbox_level; message_index = counter; message}
+      Sc_rollup_PVM_sig.{outbox_level; message_index = counter; message}
     in
     Output.set (Z.to_string counter) output
 
