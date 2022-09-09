@@ -1477,7 +1477,7 @@ Baker / Endorser / Accuser
 Proxy server
 ------------
 
--  Added a new binary: ``tezos-proxy-server``, a read-only frontend to a node.
+-  Added a new binary: ``octez-proxy-server``, a read-only frontend to a node.
    It is designed to lower the load of nodes, by being capable
    of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
    An instance of a proxy server is protocol-specific: it automatically picks

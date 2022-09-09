@@ -23,7 +23,7 @@ After a successful compilation, you should have the following binaries:
 - ``octez-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
-- ``tezos-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
+- ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)

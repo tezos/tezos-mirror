@@ -95,7 +95,7 @@ is doing (see the :doc:`proxy mode<proxy>` page for more details).
 ::
 
     $ export TEZOS_LOG="proxy_rpc_ctxt->debug; alpha.proxy_rpc->debug; proxy_server_run->debug; proxy_getter->debug; proxy_services->debug"
-    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732
+    $ ./octez-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
 
@@ -194,7 +194,7 @@ and restart it as follows:
 
 ::
 
-    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/octez-node.Uzq5aGAN
+    $ ./octez-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/octez-node.Uzq5aGAN
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
 
@@ -227,7 +227,7 @@ Additional arguments
 ~~~~~~~~~~~~~~~~~~~~
 
 We describe the entire list of arguments of the proxy server. This
-documentation is also available with ``./tezos-proxy-server --help``.
+documentation is also available with ``./octez-proxy-server --help``.
 Here is the list of possible arguments:
 
 * ``-c`` and ``--config`` specify the JSON file to use an input
