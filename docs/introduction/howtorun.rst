@@ -30,7 +30,7 @@ achieved by the following command:
 
 ::
 
-   tezos-client set delegate for <implicit_account> to <delegate>
+   octez-client set delegate for <implicit_account> to <delegate>
 
 where ``<implicit_account>`` is the address or alias of the implicit
 account to delegate and ``<delegate>`` is the address or alias of the
@@ -40,7 +40,7 @@ To stop a delegation, the following command can be used:
 
 ::
 
-   tezos-client withdraw delegate from <implicit_account>
+   octez-client withdraw delegate from <implicit_account>
 
 
 
@@ -50,7 +50,7 @@ origination using the ``--delegate`` option:
 
 ::
 
-    tezos-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script> --delegate <delegate> --burn-cap <cap>
+    octez-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script> --delegate <delegate> --burn-cap <cap>
 
 
 Once the contract is originated, the only way to stop or modify its
@@ -101,7 +101,7 @@ frozen deposits with the following command:
 
 ::
 
-   tezos-client set deposits limit for <delegate> to <limit>
+   octez-client set deposits limit for <delegate> to <limit>
 
 
 On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
@@ -119,7 +119,7 @@ Register and check your rights
 To run a delegate, you first need to register as one using
 your implicit account::
 
-   tezos-client register key bob as delegate
+   octez-client register key bob as delegate
 
 Once registered, you need to wait ``preserved_cycles + 2 = 7`` cycles
 for your rights to be considered.
@@ -129,7 +129,7 @@ cycle, up to 5 cycles in the future.
 
 ::
 
-   tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_round=2
+   octez-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_round=2
 
 Sometimes there is no consensus at a round, so it is worth considering also
 baking rights at higher rounds, like 2 in the example above.

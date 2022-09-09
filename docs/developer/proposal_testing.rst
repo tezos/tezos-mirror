@@ -51,7 +51,7 @@ because the sandbox contains accounts ``bootstrap1`` to ``bootstrap5`` with
 implicit credentials that allow them to bake blocks by using the usual RPCs in
 the shell (see :doc:`../user/sandbox`)::
 
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -418,7 +418,7 @@ stake of at least 75 percent can be kept with::
 
 By restricting the accumulated stake to 75% as in the command above,
 the wallet is both "lighter" (it may contain around 30-40 keys and
-therefore some commands like ``tezos-client bake for`` will execute
+therefore some commands like ``octez-client bake for`` will execute
 faster) and its keys will represent more than the 2/3rds of the
 endorsing power for any given level.
 
@@ -515,15 +515,15 @@ which migration will be triggered, which in our example is ``3``. Since
 activating the predecessor protocol increases the level by one, we need to bake
 two more blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) the command above
    requires a specific account to bake for. Any of ``bootstrap[0-9]`` accounts
    can be used to do it:
 
-   ``$ tezos-client bake for bootstrap1 --minimal-timestamp``
+   ``$ octez-client bake for bootstrap1 --minimal-timestamp``
 
 At this moment migration will be triggered and the protocol
 ``proto_012_<short_hash>`` will become active, and we will see the log message
@@ -565,14 +565,14 @@ with the yes-wallet created in step 5 above, and with any of the accounts
 ``foundation1`` to ``foundation8``. In our example, we can bake one block by
 running the following command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
    a specific account to bake for. Any of ``foundation[1-8]`` accounts can be
    used to do it.
 
-   ``$ tezos-client bake for foundation1 --minimal-timestamp``
+   ``$ octez-client bake for foundation1 --minimal-timestamp``
 
    If the chosen account ``foundation1`` ceases to have the priority to bake, we
    can switch to any of the remaining accounts ``foundation2`` to
@@ -602,7 +602,7 @@ Now we run the node in the test folder by invoking::
 And finally, we bake the numbers of blocks specified by the user-activated
 upgrade, with the command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 
 Wrap up the Manual Migration Procedure
@@ -653,8 +653,8 @@ Activate predecessor of the Alpha protocol and move chain one level forward::
 
 Bake two more blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message!
 
@@ -672,8 +672,8 @@ Activate predecessor of the Alpha protocol::
 
 Bake two blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -727,9 +727,9 @@ Run the node`::
 
 Bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
@@ -757,9 +757,9 @@ Run the node::
 
 And bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -867,7 +867,7 @@ Once the node is up, it is possible to inspect the storage by using the Tezos
 client and/or the RPCs. New blocks can be baked with any of the accounts
 ``foundation1`` to ``foundation8`` by using the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 If the developer wishes not to start the node that results after the migration,
 the parameter ``--keep-temp`` can be omitted and the Tezt's temp folder will be
@@ -917,7 +917,7 @@ Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
 Use the client, to manually inspect the storage, or for example to bake new
 blocks with the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 To test again, kill the node::
 

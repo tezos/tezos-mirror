@@ -16,7 +16,7 @@ The Binaries
 After a successful compilation, you should have the following binaries:
 
 - ``octez-node``: the tezos daemon itself (see `Node`_);
-- ``tezos-client``: a command-line client and basic wallet (see `Client`_);
+- ``octez-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
   note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
@@ -44,15 +44,15 @@ All the Tezos binaries provide the ``--help`` option to display information abou
 Additionally, most of the above binaries (i.e., all but the node, the validator, and the compiler) provide a textual manual that can be obtained with the command ``man``,
 whose verbosity can be increased with ``-v``, for example::
 
-    tezos-client man -v 3
+    octez-client man -v 3
 
 It is also possible to get information on a specific command in the manual with ``man <command>``::
 
-   tezos-client man set
+   octez-client man set
 
 To see the usage of one specific command, you may also type the command without arguments, which display its possible completions and options::
 
-   tezos-client transfer
+   octez-client transfer
 
 .. warning::
 
@@ -76,11 +76,11 @@ To see the usage of one specific command, you may also type the command without 
 
 To get the manual of a client command for a protocol other than that used by the node (or even when not connected to a node), use the option ``--protocol``, e.g.::
 
-    tezos-client --protocol ProtoALphaALph man transfer
+    octez-client --protocol ProtoALphaALph man transfer
 
 Note that you can get the list of protocols known to the client with::
 
-    tezos-client list understood protocols
+    octez-client list understood protocols
 
 The full command line documentation of the Tezos binaries supporting the ``man`` command is also available
 online: :doc:`../shell/cli-commands`.
@@ -109,7 +109,7 @@ disseminating this information to build a consensus across the
 network.
 
 Other than passively observing the network, your node can also inject
-its own new operations when instructed by the ``tezos-client`` and even
+its own new operations when instructed by the ``octez-client`` and even
 send new blocks when guided by the ``octez-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
@@ -247,7 +247,7 @@ status or ask the node to perform some actions.
 For example, after starting your node you can check if it has finished
 synchronizing (see :doc:`../shell/sync`) using::
 
-   tezos-client bootstrapped
+   octez-client bootstrapped
 
 This call will hang and return only when the node is synchronized
 (recall that this is much faster when starting a node from a snapshot).
@@ -255,7 +255,7 @@ Once the above command returns,
 we can check what is the current timestamp of the head of the
 chain (time is in UTC so it may differ from your local time)::
 
-   tezos-client get timestamp
+   octez-client get timestamp
 
 You can also use the above command before the node is bootstrapped, from another terminal.
 However, recall that the commands available on the client depend on the specific
@@ -269,11 +269,11 @@ A Simple Wallet
 The client is also a basic wallet. We can, for example, generate a new pair of keys, which can be used locally
 with the alias *alice*::
 
-      $ tezos-client gen keys alice
+      $ octez-client gen keys alice
 
 To check the account (also called a contract) for Alice has been created::
 
-      $ tezos-client list known contracts
+      $ octez-client list known contracts
 
 You will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
 3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
@@ -289,7 +289,7 @@ contracts, which have the form *KT1…*.
 Notice that by default, the keys were stored unencrypted, which is fine in our test example.
 In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
 
-      $ tezos-client gen keys bob --encrypted
+      $ octez-client gen keys bob --encrypted
 
 Tezos support three different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
 one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
@@ -327,7 +327,7 @@ the network, so that we can inspect its receipt.
 
 Let's try::
 
-  tezos-client transfer 1 from alice to bob --dry-run
+  octez-client transfer 1 from alice to bob --dry-run
 
   Fatal error:
     The operation will burn ꜩ0.257 which is higher than the configured burn cap (ꜩ0).
@@ -345,7 +345,7 @@ Because storing an address requires burning ꜩ0.257 and the client has
 a default of 0, we need to explicitly set a cap on the amount that we
 allow to burn::
 
-  tezos-client transfer 1 from alice to bob --dry-run --burn-cap 0.257
+  octez-client transfer 1 from alice to bob --dry-run --burn-cap 0.257
 
 This should do it and you should see a rather long receipt being
 produced, here's an excerpt::
@@ -448,7 +448,7 @@ In Tezos there are two kinds of accounts: *implicit accounts* and *smart contrac
 
 Let's originate our first contract and call it *id*::
 
-    tezos-client originate contract id transferring 1 from alice \
+    octez-client originate contract id transferring 1 from alice \
                  running ./tests_python/contracts_alpha/attic/id.tz \
                  --init '"hello"' --burn-cap 0.4
 
@@ -498,7 +498,7 @@ abuse and encourage lean programs.
 Let's see what calling a program with a new argument would look like
 with the ``--dry-run`` option::
 
-   tezos-client transfer 0 from alice to id --arg '"world"' --dry-run
+   octez-client transfer 0 from alice to id --arg '"world"' --dry-run
 
 The transaction would successfully update the storage but this time it
 wouldn't cost us anything more than the fee, the reason is that the
@@ -524,7 +524,7 @@ Note that the storage limit sets an upper bound to the storage size *difference*
 
 ::
 
-   tezos-client transfer 0 from alice to id --arg '"world"' \
+   octez-client transfer 0 from alice to id --arg '"world"' \
                                             --gas-limit 11375 \
                                             --storage-limit 0
 
@@ -579,7 +579,7 @@ make sure that the node is listening on the right ports and that the ports are
 open.
 For example the ``get timestamp`` command above is a shortcut for::
 
-   tezos-client rpc get /chains/main/blocks/head/header/shell
+   octez-client rpc get /chains/main/blocks/head/header/shell
 
 The client tries to simplify common tasks as much as possible, however
 if you want to query the node for more specific information you'll
@@ -591,7 +591,7 @@ For example to check the value of important
 :ref:`constants <protocol_constants>` in Tezos, which may differ between Mainnet and other
 :ref:`test networks<test-networks>`, you can use::
 
-   tezos-client rpc get /chains/main/blocks/head/context/constants | jq
+   octez-client rpc get /chains/main/blocks/head/context/constants | jq
    {
      "proof_of_work_nonce_size": 8,
      "nonce_length": 32,
@@ -601,11 +601,11 @@ For example to check the value of important
 Another interesting use of RPCs is to inspect the receipts of the
 operations of a block::
 
-  tezos-client rpc get /chains/main/blocks/head/operations
+  octez-client rpc get /chains/main/blocks/head/operations
 
 It is also possible to review the receipt of the whole block::
 
-  tezos-client rpc get /chains/main/blocks/head/metadata
+  octez-client rpc get /chains/main/blocks/head/metadata
 
 An interesting block receipt is the one produced at the end of a
 cycle as many delegates receive back part of their unfrozen accounts.

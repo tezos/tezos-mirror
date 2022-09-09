@@ -128,7 +128,7 @@ that you will not automatically get updates to the list of bootstrap peers and
 user-activated upgrades (see `Alias Versus Explicit Configuration`_).
 
 - ``genesis`` is the description of the genesis block, i.e. the first block of the chain.
-  Inspect the genesis block using ``tezos-client rpc get /chains/main/blocks/0``
+  Inspect the genesis block using ``octez-client rpc get /chains/main/blocks/0``
   to find these values.
 
 - ``chain_name`` is the name of the network (nodes only talk to other nodes which use

@@ -50,7 +50,7 @@ Once your node is running, open a new terminal and initialize the
 
     eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
-It will also define in the current shell session an alias ``tezos-client``
+It will also define in the current shell session an alias ``octez-client``
 preconfigured for communicating with the same-numbered node.
 
 When you bootstrap a new network, the network is initialized with a
@@ -62,11 +62,11 @@ For instance:
 
 ::
 
-    $ tezos-client rpc get /chains/main/blocks/head/metadata
+    $ octez-client rpc get /chains/main/blocks/head/metadata
       "next_protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
     $ tezos-activate-alpha
       Injected BMV9KnSPE1yw
-    $ tezos-client rpc get /chains/main/blocks/head/metadata
+    $ octez-client rpc get /chains/main/blocks/head/metadata
       "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
 
 We now have the possibility to send transactions to the sandboxed network.
@@ -77,7 +77,7 @@ preconfigured accounts which can be listed with:
 
 ::
 
-   $ tezos-client list known addresses
+   $ octez-client list known addresses
 
      activator: tz1TGu6TN5GSez2ndXXeDX6LgUDvLzPLqgYV (unencrypted sk known)
      bootstrap5: tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv (unencrypted sk known)
@@ -91,7 +91,7 @@ another:
 
 ::
 
-   $ tezos-client transfer 42 from bootstrap1 to bootstrap2 &
+   $ octez-client transfer 42 from bootstrap1 to bootstrap2 &
    ...
    Waiting for the operation to be included...
 
@@ -103,7 +103,7 @@ we can do so with the following command:
 
 ::
 
-   $ tezos-client bake for bootstrap1
+   $ octez-client bake for bootstrap1
 
 If the previous transaction is valid, the operation is included in the
 chain and the transfer terminates returning the usual receipt.

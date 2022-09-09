@@ -2258,7 +2258,7 @@ types:
       code. Instead, they must be created using ``EMPTY_BIG_MAP`` and
       manipulated using ``GET``, ``UPDATE`` and ``MEM``. However,
       literal ``big_map``\ s are used when originating and calling
-      contracts using ``tezos-client``.
+      contracts using ``octez-client``.
 
       Values of the ``big_map`` type cannot be serialized using ``PACK``.
     examples:

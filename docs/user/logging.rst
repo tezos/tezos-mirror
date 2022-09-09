@@ -274,13 +274,13 @@ events) this call adds a sink to suddenly start pretty-printing all
 
 ::
 
-   tezos-client rpc put /config/logging with \
+   octez-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
 Client and Baking Daemons
 -------------------------
 
-For now, ``tezos-client``, ``octez-{baker,accuser}-*``, etc.
+For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.
 
 There is one common option ``--log-requests`` which can be used to trace

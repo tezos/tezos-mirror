@@ -79,7 +79,7 @@ Then upgrade the node to protocol alpha:
 ::
 
     $ tezos-activate-alpha
-    $ tezos-client bake for bootstrap1
+    $ octez-client bake for bootstrap1
 
 To avoid warnings being printed in upcoming commands (optional):
 
@@ -104,7 +104,7 @@ Now, start a fourth terminal, and make a client request data from the proxy serv
 ::
 
     $ export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=y
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       [ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
@@ -145,13 +145,13 @@ Now, in the fourth terminal, retrieve the contracts again, but twice in a row:
 
 ::
 
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       [ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
         "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv" ]
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       # ... same output ...
 
 In the meantime, in the proxy server's terminal, you should see:
@@ -207,7 +207,7 @@ to retrieve contracts:
 
 ::
 
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       # ... same output as above ...
 
 Now the output in the proxy server terminal should be:
@@ -285,7 +285,7 @@ Because computations done by the proxy server are protocol dependent, the proxy 
 does not support all protocols. However, it is expected that, at any
 given time, the proxy server supports ``Alpha``, the current protocol
 of Mainnet and the current protocol proposal on Mainnet at the time of release.
-In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
+In doubt, execute ``octez-client list proxy protocols`` to see the supported protocols.
 
 .. _unsupported_rpcs:
 

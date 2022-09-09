@@ -41,15 +41,15 @@ full: odoc
 	${MAKE} html
 
 # Build the manuals for a given protocol
-%/tezos-client.html:
-	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-client.html:
+	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-baker.html:
 	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 %/octez-accuser.html:
 	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
-	 $(PROTOCOLS:%=%/tezos-client.html) \
+	 $(PROTOCOLS:%=%/octez-client.html) \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
 	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic

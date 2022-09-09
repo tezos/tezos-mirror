@@ -174,7 +174,7 @@ Python testing and execution framework
 
 The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
 framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
-``octez-node`` and ``tezos-client``, to perform integration testing
+``octez-node`` and ``octez-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
 
@@ -185,7 +185,7 @@ enables regression testing.
 
 
 Typical use cases:
- - Testing the commands of ``tezos-client``. This allows to test the
+ - Testing the commands of ``octez-client``. This allows to test the
    full chain: from client, to node RPC to the implementation of the
    economic protocol.
  - Test networks of nodes, with daemons.
@@ -264,7 +264,7 @@ detect performance regressions. See :doc:`long-tezts`.
    The `Michelson unit test proposal
    <https://gitlab.com/tezos/tezos/-/merge_requests/1487>`__ defines a
    format for unit tests for Michelson snippets. If the proposal is eventually accepted, then these
-   tests will be executable through ``tezos-client``.
+   tests will be executable through ``octez-client``.
 
    Example use cases:
     - Verifying the functional (input--output) behavior of snippets of
@@ -434,7 +434,7 @@ guidelines:
 
 For system test frameworks
    System test frameworks, as :doc:`tezt` and :doc:`python_testing_framework`,
-   run binaries e.g. ``tezos-client`` and
+   run binaries e.g. ``octez-client`` and
    ``octez-node``. Typically, they do so with calls to ``exec`` so the
    resulting process does not inherit the signal handlers from the
    parent process (the test framework). When writing tests in these

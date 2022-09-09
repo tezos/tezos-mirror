@@ -330,7 +330,7 @@ Client
 - Client now allows to simulate failing operations with ``--simulation
   --force``, and report errors without specifying limits.
 
-- Added ``--ignore-case`` option to the ``tezos-client gen vanity keys`` command
+- Added ``--ignore-case`` option to the ``octez-client gen vanity keys`` command
   to allow case-insensitive search for the given pattern.
 
 Proxy Server
@@ -661,7 +661,7 @@ Node
 - Fixed missing removal of replaced operation in the plugin when another better
   one takes its place (when the mempool is full).
 
-- The output of ``tezos-client get ledger high watermark for <ledger>``
+- The output of ``octez-client get ledger high watermark for <ledger>``
   now also displays the high-water mark for the round, if available.
   Rounds are introduced in Tenderbake.
 
@@ -867,7 +867,7 @@ Node
 - The prevalidator (which handles operations which have been received but not
   yet included in a block) was made more restrictive: it now accepts a single
   manager operation from a given manager for a given block. This limitation
-  was already present implicitly if you were using the ``tezos-client`` commands.
+  was already present implicitly if you were using the ``octez-client`` commands.
   Batches of operations can be used to get around this restriction, see the
   ``multiple transfers`` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
@@ -1146,9 +1146,9 @@ Node
 Client
 ------
 
--  Disabled indentation checking by default in the ``tezos-client
-   convert script`` and ``tezos-client hash script`` commands. In
-   particular, ``tezos-client convert script <script> from Michelson
+-  Disabled indentation checking by default in the ``octez-client
+   convert script`` and ``octez-client hash script`` commands. In
+   particular, ``octez-client convert script <script> from Michelson
    to Michelson`` can now be used as a Michelson script formatter. To
    force the indentation check, the new ``--enforce-indentation``
    command line switch can be used.
@@ -1446,7 +1446,7 @@ Client
    it uses Merkle proofs to make the light mode super safe.
 
 -  Added commands to display the hash of Michelson script from files
-   (``tezos-client hash script``) and from addresses (``tezos-client
+   (``octez-client hash script``) and from addresses (``octez-client
    get contract script hash``).
 
 -  Added support for a new generic version of the multisig contract.
@@ -2093,10 +2093,10 @@ Node
 Client
 ------
 
--  The ``tezos-client config show`` command now takes into account the
+-  The ``octez-client config show`` command now takes into account the
    command line arguments.
 
--  Fixed an issue which caused ``tezos-client rpc get /errors`` as well
+-  Fixed an issue which caused ``octez-client rpc get /errors`` as well
    as ``tezos-codec dump encodings`` to fail because of duplicate
    encodings. As a result, some protocol encodings whose name was not
    prefixed by the protocol name are now prefixed by it. If you have
@@ -2116,8 +2116,8 @@ Client
    understand an error from the node.
 
 -  Added client commands
-   ``tezos-client convert script <script> from <input> to <output>`` and
-   ``tezos-client convert data <data> from <input> to <output>`` to
+   ``octez-client convert script <script> from <input> to <output>`` and
+   ``octez-client convert data <data> from <input> to <output>`` to
    convert to and from michelson, JSON, binary and OCaml with
    type-checking.
 

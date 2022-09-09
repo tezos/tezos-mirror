@@ -11,27 +11,27 @@ network and just want to explore the RPC, you would run:
 
     ./octez-node run --rpc-addr localhost
 
-The RPC interface is self-documented and the ``tezos-client`` executable
+The RPC interface is self-documented and the ``octez-client`` executable
 is able to pretty-print the RPC API. For instance, to see the API
 provided by the Tezos Shell:
 
 ::
 
-    ./tezos-client rpc list
+    ./octez-client rpc list
 
 To get API attached to the “genesis” block, including the remote
 procedures provided by the associated economic protocol version:
 
 ::
 
-    ./tezos-client rpc list /chains/main/blocks/genesis
+    ./octez-client rpc list /chains/main/blocks/genesis
 
 You might also want the JSON schema describing the expected input and
 output of a RPC. For instance:
 
 ::
 
-    ./tezos-client rpc schema get /chains/main/blocks/genesis/hash
+    ./octez-client rpc schema get /chains/main/blocks/genesis/hash
 
 Note: you can get the same information, but as a raw JSON object, with a
 simple HTTP request:

@@ -20,7 +20,7 @@ It is a command-line tool allowing users and developers to:
 You may refer to the ``tezos-codec`` :ref:`online manual <codec_manual>` for more details.
 The rest of this page gives a gentle introduction to this tool by showing on some examples how to perform the two tasks above.
 
-Note that for the particular case of Micheline expressions, the ``tezos-client`` tool can also be used to convert between several data representations, covering not only the binary and JSON representations, but also OCaml and Michelson notations (see :ref:`client_convert`).
+Note that for the particular case of Micheline expressions, the ``octez-client`` tool can also be used to convert between several data representations, covering not only the binary and JSON representations, but also OCaml and Michelson notations (see :ref:`client_convert`).
 
 .. _codec_describe:
 
@@ -383,18 +383,18 @@ As usual, ``tezos-codec`` can be used the other way around, to encode the same t
 
 .. _client_convert:
 
-How to convert Micheline with ``tezos-client``
+How to convert Micheline with ``octez-client``
 ----------------------------------------------
 
-The ``tezos-client`` can be used to convert Micheline expressions between the following forms: binary, JSON, Michelson, and OCaml.
+The ``octez-client`` can be used to convert Micheline expressions between the following forms: binary, JSON, Michelson, and OCaml.
 
 Note that the client has to be run in conjunction to a running node for the following commands to work (unless option ``--protocol`` is specified)::
 
-  $ tezos-client convert data '(Pair 1 2)' from michelson to binary
+  $ octez-client convert data '(Pair 1 2)' from michelson to binary
   0x070700010002
-  $ tezos-client convert data 0x070700010002 from binary to michelson
+  $ octez-client convert data 0x070700010002 from binary to michelson
   (Pair 1 2)
-  $ tezos-client convert data 0x070700010002 from binary to json
+  $ octez-client convert data 0x070700010002 from binary to json
   { "prim": "Pair", "args": [ { "int": "1" }, { "int": "2" } ] }
-  $ tezos-client convert data 0x070700010002 from binary to ocaml
+  $ octez-client convert data 0x070700010002 from binary to ocaml
   Prim (0, D_Pair, [Int (1, Z.one); Int (2, Z.of_int 2)], [])

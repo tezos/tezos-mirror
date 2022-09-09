@@ -162,7 +162,7 @@ by command-line argument ``--rpc-addr`` when starting the node.
 
 Additionally either the ``whitelist`` **or** the ``blacklist`` field must be specified
 (but not both), containing a list of paths which should be black-listed or
-white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``tezos-client rpc``
+white-listed. Each element in the list is an API-endpoint (that can be passed to e.g. the ``octez-client rpc``
 command). It may be preceded by a capitalized HTTP method name. In the absence of
 the method, the rule applies to all methods. The path can include an ``*``
 character, which stands for any whole path segment (i.e. it's not allowed to mix ``*``

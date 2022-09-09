@@ -343,7 +343,7 @@ octez-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 
-   Note that ``opam install tezos-client`` and ``opam install
+   Note that ``opam install octez-client`` and ``opam install
    tezos-signer`` are "minimal" and do not install the support for
    Ledger Nano devices. To enable it, run ``opam install
    ledgerwallet-tezos`` in addition to installing the binaries. (The

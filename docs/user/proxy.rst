@@ -1,7 +1,7 @@
 Proxy mode
 ----------
 
-The ``tezos-client`` described
+The ``octez-client`` described
 :ref:`here <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *proxy* mode, a mode where the client
 performs protocol RPCs locally. For the computations to be correct,
@@ -18,19 +18,19 @@ Executing commands in proxy mode
 
 The CLI interface of the client in proxy mode (the *proxy client* in short)
 is the same as the default client. To turn proxy mode ON,
-pass ``--mode proxy`` to ``tezos-client``.
+pass ``--mode proxy`` to ``octez-client``.
 
 Because computations done locally are protocol dependent, the proxy mode does not support all protocols.
 It is expected that, at any given time, the proxy mode supports ``Alpha``,
 the current protocol of Mainnet and the current protocol proposal on Mainnet
 at the time of release.
-In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
+In doubt, execute ``octez-client list proxy protocols`` to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the proxy client, it
 tries to match the node's protocol. On the one hand, this is handy when
 testing. On the other hand, in a production environment, it is recommended
 to specify ``--protocol`` if the protocol is known, to avoid an extra
-RPC at **every** call ``tezos-client --mode proxy ...``
+RPC at **every** call ``octez-client --mode proxy ...``
 
 Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -57,7 +57,7 @@ Then upgrade the node to protocol alpha:
 ::
 
     $ tezos-activate-alpha
-    $ tezos-client bake for bootstrap1
+    $ octez-client bake for bootstrap1
 
 To avoid warnings being printed in upcoming commands (optional):
 
@@ -69,7 +69,7 @@ You're now ready to use the proxy client. For example, request baking rights:
 
 ::
 
-    $ tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
+    $ octez-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
     protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     [ { "level": 3, "delegate": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
         "priority": 0, "estimated_time": "2020-07-01T08:47:21Z" },
@@ -103,7 +103,7 @@ keystrokes and the ``protocol of proxy unspecified`` warning:
 
 ::
 
-    $ alias proxy-client="tezos-client --mode proxy --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+    $ alias proxy-client="octez-client --mode proxy --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
 Now configure ``proxy_rpc_ctxt`` to have more information:
 

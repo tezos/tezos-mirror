@@ -76,7 +76,7 @@ operation from the message that is being signed or checked.
 
 ::
 
-   tezos-client sign message "hello world" for <account>
+   octez-client sign message "hello world" for <account>
 
-   tezos-client check that message "hello world" was signed by <account> to
+   octez-client check that message "hello world" was signed by <account> to
    produce <signature>

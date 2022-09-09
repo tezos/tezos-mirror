@@ -186,8 +186,8 @@ not the other way around.):
 - ``spendable balance`` is obtained with ``../context/contracts/<pkh>/balance``
 
 Delegates can set an upper limit to their frozen deposits with the
-command ``tezos-client set deposits limit for <delegate> to
-<deposit_limit>``, and unset this limit with the command ``tezos-client
+command ``octez-client set deposits limit for <delegate> to
+<deposit_limit>``, and unset this limit with the command ``octez-client
 unset deposits limit for <delegate>``. These commands are implemented
 using a new manager operation ``Set_deposits_limit``. When emitting such a
 command in cycle ``c``, it affects the active stake for cycles starting

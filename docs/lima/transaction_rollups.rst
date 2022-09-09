@@ -532,12 +532,12 @@ Getting Started
 Originating a Transaction Rollup
 ********************************
 
-The ``tezos-client`` has a dedicated command that any implicit account holder
+The ``octez-client`` has a dedicated command that any implicit account holder
 can use to originate a transaction rollup.
 
 .. code:: sh
 
-    tezos-client originate tx rollup ${tx_rollup_allias} from ${implicit_account_alias}
+    octez-client originate tx rollup ${tx_rollup_allias} from ${implicit_account_alias}
 
 where ``tx`` is an abbreviation for transaction.
 
@@ -552,7 +552,7 @@ prefixed by ``txr1``. For instance,::
 
 is a valid transaction rollup address.
 
-When using the ``tezos-client`` to originate a transaction rollup, it outputs
+When using the ``octez-client`` to originate a transaction rollup, it outputs
 the newly created address.
 
 Starting a Rollup Node
@@ -748,7 +748,7 @@ the deposit.
 
 .. code:: sh
 
-    tezos-client originate contract ${contract_alias} \
+    octez-client originate contract ${contract_alias} \
                  transferring 0 \
                  from ${alias} \
                  running ${path_to_contract} \
@@ -757,23 +757,23 @@ the deposit.
 Once the contract is originated, it becomes possible to deposit
 arbitrary tickets to the layer-2.
 
-Note that the ``tezos-client`` comes with facilities to generate and
+Note that the ``octez-client`` comes with facilities to generate and
 manipulate BLS keys (that are used to authenticate users on the
 layer-2, and to generate layer-2 addresses).
 
 .. code:: sh
 
     # generate a pair of public and secret keys
-    tezos-client bls gen keys ${alias}
+    octez-client bls gen keys ${alias}
     # display the keys (including the ``tz4`` hash)
-    tezos-client bls show address ${alias}
+    octez-client bls show address ${alias}
 
 So, to mint and deposit a ``ticket string`` whose contents is
 ``foobar``, one can make the following contract call.
 
 .. code:: sh
 
-    tezos-client transfer 0 from user to deposit_contract \
+    octez-client transfer 0 from user to deposit_contract \
              --arg '(Pair "foobar" ${qty} "${tz4_address}" "${tx_rollup_address}")' \
              --burn-cap 0.068
 
@@ -845,7 +845,7 @@ The ``--endpoint`` argument can be omitted if the rollup node is using
 the default RPC server address, that is ``localhost:9999``.
 
 Here, the source has to be an alias identifying a BLS pair of keys
-generated with ``tezos-client bls gen key``, while the destination can
+generated with ``octez-client bls gen key``, while the destination can
 either be an alias, or a ``tz4`` address directly.
 
 Similarly to Tezos, a transaction rollup also has a notion of L2
@@ -873,7 +873,7 @@ implicit account address directly.
 If a rollup node is run using the mode ``operator``, then once the
 commitment related to a withdraw order is finalized, the rollup node
 will “dispatch” the ticket to the ``l1_dst`` address. Once this is
-done, the owner of ``l1_dst`` can use a dedicated ``tezos-client``
+done, the owner of ``l1_dst`` can use a dedicated ``octez-client``
 command to transfer their tickets to a smart contract.
 
 To do so, it is necessary to provide the layer-1 with the actual
@@ -881,7 +881,7 @@ contents of the ticket, not just the ticket hash.
 
 .. code:: sh
 
-    tezos-client transfer ${qty} tickets \
+    octez-client transfer ${qty} tickets \
           from ${src} to ${sc_dst} \
           with entrypoint ${ep} \
           and contents ${micheline_contents} \

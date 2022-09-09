@@ -121,7 +121,7 @@ You can then verify that your history mode is set to full by using the checkpoin
 
 .. code-block:: console
 
-   tezos-client rpc get /chains/main/checkpoint
+   octez-client rpc get /chains/main/checkpoint
 
 .. code-block:: json
 
