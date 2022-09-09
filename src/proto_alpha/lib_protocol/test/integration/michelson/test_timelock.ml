@@ -81,7 +81,7 @@ let deprecated_chest_open () =
 (* Test to verify open_chest correctness
    DISABLED as open_chest is deprecated, but is expected to return.
 *)
-let disabled_contract_test () =
+let contract_test () =
   let* block, baker, source_contract, _src2 = Contract_helpers.init () in
   let storage = "0xdeadbeef" in
   let script = Contract_helpers.read_file "./contracts/timelock.tz" in
@@ -182,12 +182,29 @@ let disabled_contract_test () =
   check_storage chest_correct chest_key_incorrect "01" >>=? fun () ->
   return_unit
 
+(**
+   Expect fail wrapper for tests that you expect to return Error or throw an exception.
+   Useful to keep tests enabled even if they fail, but still run them.
+   @param test_f test function that is expected to fail.
+   *)
+let expect_fail_result_lwt test_f () =
+  let open Lwt_syntax in
+  try
+    let* res = test_f () in
+    match res with
+    | Ok _ -> Alcotest.fail "Expect failure"
+    | Error _ -> return_ok_unit
+  with _ -> return_ok_unit
+
 let tests =
   [
     Tztest.tztest "simple test" `Quick simple_test;
     Tztest.tztest
       "verify chest_open fails origination"
       `Quick
-      deprecated_chest_open
-    (* Tztest.tztest "contract test" `Quick disabled_contract_test; *);
+      deprecated_chest_open;
+    Tztest.tztest
+      "contract test with chest_open (OK when it fails)"
+      `Quick
+      (expect_fail_result_lwt contract_test);
   ]
