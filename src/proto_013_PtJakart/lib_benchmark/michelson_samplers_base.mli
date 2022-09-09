@@ -47,7 +47,7 @@ module type S = sig
 
   val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
 
-  val signature : Tezos_crypto.Signature.t sampler
+  val signature : Signature.t sampler
 
   val string : Alpha_context.Script_string.t sampler
 
