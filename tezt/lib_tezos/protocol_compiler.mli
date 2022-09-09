@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let spawn_command ?(path = Constant.tezos_codec) ?hooks arguments =
-  Process.spawn path ?hooks arguments
+(** Run tezos-protocol-compiler commands. *)
 
-let spawn_encode ?path ?hooks ~name json =
-  spawn_command ?path ?hooks ["encode"; name; "from"; JSON.encode_u json]
+(** In all functions below, [path] can be used to override the path
+    to [tezos-protocol-compiler], which is [Constant.tezos_protocol_compiler]
+    by default. *)
 
-let encode ?path ?hooks ~name json =
-  let open Lwt.Infix in
-  spawn_encode ?path ?hooks ~name json
-  |> Process.check_and_read_stdout >|= String.trim
+(** Run [tezos-protocol-compiler <protocol_dir>] and return the hash
+    of the compiled protocol.
 
-let spawn_decode ?path ?hooks ~name binary =
-  spawn_command ?path ?hooks ["decode"; name; "from"; binary]
+    If [hash_only] is set, then pass [-hash-only] to the protocol
+    compiler. *)
+val compile :
+  ?path:string ->
+  ?hooks:Tezt.Process.hooks ->
+  ?hash_only:bool ->
+  string ->
+  string Lwt.t
 
-let decode ?path ?hooks ~name binary =
-  let* json =
-    String.trim binary
-    |> spawn_decode ?path ?hooks ~name
-    |> Process.check_and_read_stdout
-  in
-  return (JSON.parse ~origin:("tezos-codec encode " ^ name) json)
-
-let spawn_dump_encodings ?path () = spawn_command ?path ["dump"; "encodings"]
-
-let dump_encodings ?path () =
-  let* json = spawn_dump_encodings ?path () |> Process.check_and_read_stdout in
-  return (JSON.parse ~origin:"tezos-codec dump encodings" json)
+(** Same as [compile], but do not wait for the process to exit. *)
+val spawn_compile :
+  ?path:string ->
+  ?hooks:Tezt.Process.hooks ->
+  ?hash_only:bool ->
+  string ->
+  Tezt.Process.t

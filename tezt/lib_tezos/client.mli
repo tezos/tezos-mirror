@@ -166,6 +166,9 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     Run [rpc meth path?query_string with data].
     Fail the test if the RPC call failed.
 
+    The [protocol_hash] argument allows to run the RPC command for a specific
+    protocol hash.
+
     See the documentation of {!Process.spawn} for information about
     [log_*], [hooks] and [env] arguments.
 
@@ -183,6 +186,7 @@ val rpc :
   ?data:JSON.u ->
   ?filename:string ->
   ?query_string:query_string ->
+  ?protocol_hash:string ->
   meth ->
   path ->
   t ->
@@ -200,6 +204,7 @@ val spawn_rpc :
   ?data:JSON.u ->
   ?filename:string ->
   ?query_string:query_string ->
+  ?protocol_hash:string ->
   meth ->
   path ->
   t ->
@@ -219,6 +224,7 @@ module Spawn : sig
     ?data:JSON.u ->
     ?filename:string ->
     ?query_string:query_string ->
+    ?protocol_hash:string ->
     meth ->
     path ->
     t ->
@@ -301,6 +307,15 @@ module Admin : sig
 
   (** Same as [list_protocols], but do not wait for the process to exit. *)
   val spawn_list_protocols : ?endpoint:endpoint -> t -> Process.t
+
+  (** Run [tezos-admin-client protocol environment] on a protocol hash.
+
+      Return its environment version as a string such as ["V1"]. *)
+  val protocol_environment : ?endpoint:endpoint -> t -> string -> string Lwt.t
+
+  (** Same as [protocol_environment], but do not wait for the process to exit. *)
+  val spawn_protocol_environment :
+    ?endpoint:endpoint -> t -> string -> Process.t
 end
 
 (** {2 Regular Client Commands} *)
@@ -335,13 +350,18 @@ val spawn_import_secret_key :
     present (at which point one would have to wait between each block
     so that peers do not reject them for being in the future).
 
+    You must either provide [protocol] (in which case [parameter_file] defaults
+    to [Protocol.parameter_file protocol]), or provide both [protocol_hash]
+    and [parameter_file].
+
     If you want to wait until the node switches its head to the block
     activating the given protocol, consider using
     {!activate_protocol_and_wait} below.
 *)
 val activate_protocol :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
@@ -359,7 +379,8 @@ val activate_protocol :
     found. *)
 val activate_protocol_and_wait :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
@@ -371,7 +392,8 @@ val activate_protocol_and_wait :
 (** Same as [activate_protocol], but do not wait for the process to exit. *)
 val spawn_activate_protocol :
   ?endpoint:endpoint ->
-  protocol:Protocol.t ->
+  ?protocol:Protocol.t ->
+  ?protocol_hash:string ->
   ?fitness:int ->
   ?key:string ->
   ?timestamp:timestamp ->
@@ -1485,6 +1507,7 @@ val spawn_command :
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?admin:bool ->
+  ?protocol_hash:string ->
   t ->
   string list ->
   Process.t

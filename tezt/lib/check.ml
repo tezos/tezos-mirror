@@ -377,6 +377,15 @@ let raises ?__LOC__ expected_exn f ~error_msg =
       fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option (Some exn)
   | _ -> fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option None
 
+let file_exists ?__LOC__ path =
+  if not (Sys.file_exists path) then
+    Test.fail ?__LOC__ "expected that file %s exists" path
+
+let is_true ?__LOC__ b ~error_msg =
+  if not b then Test.fail ?__LOC__ "%s" error_msg
+
+let is_false ?__LOC__ b ~error_msg = is_true ?__LOC__ (not b) ~error_msg
+
 (* We define infix operators at the end to avoid using them accidentally. *)
 
 let ( = ) = eq

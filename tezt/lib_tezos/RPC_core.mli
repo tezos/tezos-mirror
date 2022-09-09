@@ -153,6 +153,7 @@ module Client : sig
       - [endpoint];
       - [hooks];
       - [env];
+      - [protocol_hash];
       are passed to [Client.rpc]. *)
   val call :
     ?log_command:bool ->
@@ -162,6 +163,7 @@ module Client : sig
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
+    ?protocol_hash:string ->
     Client.t ->
     'result t ->
     'result Lwt.t
@@ -175,6 +177,7 @@ module Client : sig
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
+    ?protocol_hash:string ->
     Client.t ->
     'result t ->
     string Lwt.t
@@ -188,6 +191,7 @@ module Client : sig
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
+    ?protocol_hash:string ->
     Client.t ->
     'result t ->
     JSON.t Lwt.t
@@ -204,6 +208,7 @@ module Client : sig
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
+    ?protocol_hash:string ->
     Client.t ->
     'result t ->
     JSON.t Runnable.process

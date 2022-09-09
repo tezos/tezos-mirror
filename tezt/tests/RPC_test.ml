@@ -578,7 +578,7 @@ let test_delegates _test_mode_tag _protocol ?endpoint client =
 (* Test the votes RPC. *)
 let test_votes _test_mode_tag _protocol ?endpoint client =
   (* initialize data *)
-  let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
+  let proto_hash = Protocol.demo_noops_hash in
   let* () = Client.submit_proposals ~proto_hash client in
   let* () = Client.bake_for_and_wait client in
   (* RPC calls *)

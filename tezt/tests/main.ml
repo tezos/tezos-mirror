@@ -46,6 +46,7 @@ let register_protocol_independent_tests () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Injection.register_protocol_independent () ;
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;

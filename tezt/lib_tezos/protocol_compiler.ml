@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let spawn_command ?(path = Constant.tezos_codec) ?hooks arguments =
+let spawn_command ?(path = Constant.tezos_protocol_compiler) ?hooks arguments =
   Process.spawn path ?hooks arguments
 
-let spawn_encode ?path ?hooks ~name json =
-  spawn_command ?path ?hooks ["encode"; name; "from"; JSON.encode_u json]
+let spawn_compile ?path ?hooks ?(hash_only = false) proto_dir =
+  spawn_command
+    ?path
+    ?hooks
+    ((if hash_only then ["-hash-only"] else []) @ [proto_dir])
 
-let encode ?path ?hooks ~name json =
-  let open Lwt.Infix in
-  spawn_encode ?path ?hooks ~name json
-  |> Process.check_and_read_stdout >|= String.trim
-
-let spawn_decode ?path ?hooks ~name binary =
-  spawn_command ?path ?hooks ["decode"; name; "from"; binary]
-
-let decode ?path ?hooks ~name binary =
-  let* json =
-    String.trim binary
-    |> spawn_decode ?path ?hooks ~name
+let compile ?path ?hooks ?(hash_only = false) proto_dir =
+  let* output =
+    spawn_compile ?path ?hooks ~hash_only proto_dir
     |> Process.check_and_read_stdout
   in
-  return (JSON.parse ~origin:("tezos-codec encode " ^ name) json)
-
-let spawn_dump_encodings ?path () = spawn_command ?path ["dump"; "encodings"]
-
-let dump_encodings ?path () =
-  let* json = spawn_dump_encodings ?path () |> Process.check_and_read_stdout in
-  return (JSON.parse ~origin:"tezos-codec dump encodings" json)
+  if hash_only then return (String.trim output)
+  else
+    match output =~* rex "Success: ([a-zA-Z0-9]+)" with
+    | Some hash -> return hash
+    | None ->
+        Test.fail "Couldn't parse output from compiling %s: %s" proto_dir output

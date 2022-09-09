@@ -159,7 +159,8 @@ let mode_arg client =
   | Proxy _ -> ["--mode"; "proxy"]
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
-    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) client command =
+    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
+    client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -167,6 +168,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
       (fun o -> Option.value ~default:"Y" o |> Option.some)
       env
   in
+  let protocol_arg = Cli_arg.optional_arg "protocol" Fun.id protocol_hash in
   Process.spawn
     ~name:client.name
     ~color:client.color
@@ -177,7 +179,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
-  @ media_type_arg client.mode @ mode_arg client @ base_dir_arg client @ command
+  @ protocol_arg @ media_type_arg client.mode @ mode_arg client
+  @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -221,8 +224,8 @@ let rpc_path_query_to_string ?(query_string = []) path =
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client :
-      JSON.t Runnable.process =
+      ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth
+      path client : JSON.t Runnable.process =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
@@ -243,6 +246,7 @@ module Spawn = struct
         ?endpoint
         ?hooks
         ?env
+        ?protocol_hash
         client
         (better_error
         @ ["rpc"; string_of_meth meth; full_path]
@@ -256,7 +260,8 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path
+    client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -269,6 +274,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
@@ -276,7 +282,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -289,6 +295,7 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
@@ -384,9 +391,10 @@ module Admin = struct
     spawn_command ?endpoint client ["inject"; "protocol"; protocol_path]
 
   let inject_protocol ?endpoint ~protocol_path client =
-    let process = spawn_inject_protocol ?endpoint ~protocol_path client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_inject_protocol ?endpoint ~protocol_path client
+      |> Process.check_and_read_stdout
+    in
     match output =~* rex "Injected protocol ([^ ]+) successfully" with
     | None ->
         Test.fail
@@ -398,10 +406,25 @@ module Admin = struct
     spawn_command ?endpoint client ["list"; "protocols"]
 
   let list_protocols ?endpoint client =
-    let process = spawn_list_protocols ?endpoint client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_list_protocols ?endpoint client |> Process.check_and_read_stdout
+    in
     return (parse_list_protocols_output output)
+
+  let spawn_protocol_environment ?endpoint client protocol =
+    spawn_command ?endpoint client ["protocol"; "environment"; protocol]
+
+  let protocol_environment ?endpoint client protocol =
+    let* output =
+      spawn_protocol_environment ?endpoint client protocol
+      |> Process.check_and_read_stdout
+    in
+    match output =~* rex "Protocol [^ ]+ uses environment (V\\d+)" with
+    | None ->
+        Test.fail
+          "tezos-admin-client protocol environment did not answer \"Protocol \
+           ... uses environment V...\""
+    | Some version -> return version
 end
 
 let spawn_version client = spawn_command client ["--version"]
@@ -446,17 +469,32 @@ let time_of_timestamp timestamp =
       | Some tm -> tm)
   | At tm -> tm
 
-let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
+let spawn_activate_protocol ?endpoint ?protocol ?protocol_hash ?(fitness = 1)
     ?(key = Constant.activator.alias) ?(timestamp = Ago default_delay)
     ?parameter_file client =
   let timestamp = time_of_timestamp timestamp in
+  let protocol_hash, parameter_file =
+    match (protocol, protocol_hash, parameter_file) with
+    | Some protocol, None, _ ->
+        ( Protocol.hash protocol,
+          Option.value
+            parameter_file
+            ~default:(Protocol.parameter_file protocol) )
+    | None, Some protocol_hash, Some parameter_file ->
+        (protocol_hash, parameter_file)
+    | _, _, _ ->
+        Test.fail
+          ~__LOC__
+          "Must pass either protocol or both protocol_file and parameter_file \
+           to spawn_activate_protocol"
+  in
   spawn_command
     ?endpoint
     client
     [
       "activate";
       "protocol";
-      Protocol.hash protocol;
+      protocol_hash;
       "with";
       "fitness";
       string_of_int fitness;
@@ -465,16 +503,17 @@ let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
       key;
       "and";
       "parameters";
-      Option.value parameter_file ~default:(Protocol.parameter_file protocol);
+      parameter_file;
       "--timestamp";
       Time.to_notation timestamp;
     ]
 
-let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?parameter_file client =
+let activate_protocol ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file client =
   spawn_activate_protocol
     ?endpoint
-    ~protocol
+    ?protocol
+    ?protocol_hash
     ?fitness
     ?key
     ?timestamp
@@ -491,8 +530,8 @@ let node_of_client_mode = function
   | Client (None, _) -> None
   | Mockup -> None
 
-let activate_protocol_and_wait ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?parameter_file ?node client =
+let activate_protocol_and_wait ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file ?node client =
   let node =
     match node with
     | Some n -> n
@@ -505,7 +544,8 @@ let activate_protocol_and_wait ?endpoint ~protocol ?fitness ?key ?timestamp
   let* () =
     activate_protocol
       ?endpoint
-      ~protocol
+      ?protocol
+      ?protocol_hash
       ?fitness
       ?key
       ?timestamp
@@ -872,9 +912,10 @@ let spawn_get_balance_for ?endpoint ~account client =
   spawn_command ?endpoint client ["get"; "balance"; "for"; account]
 
 let get_balance_for ?endpoint ~account client =
-  let process = spawn_get_balance_for ?endpoint ~account client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_get_balance_for ?endpoint ~account client
+    |> Process.check_and_read_stdout
+  in
   return @@ Tez.parse_floating output
 
 let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
@@ -1388,9 +1429,9 @@ let spawn_list_protocols mode client =
   spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
 
 let list_protocols mode client =
-  let process = spawn_list_protocols mode client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_list_protocols mode client |> Process.check_and_read_stdout
+  in
   return (parse_list_protocols_output output)
 
 let spawn_migrate_mockup ~next_protocol client =
@@ -1645,9 +1686,9 @@ let spawn_show_voting_period ?endpoint client =
   spawn_command ?endpoint client (mode_arg client @ ["show"; "voting"; "period"])
 
 let show_voting_period ?endpoint client =
-  let process = spawn_show_voting_period ?endpoint client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_show_voting_period ?endpoint client |> Process.check_and_read_stdout
+  in
   match output =~* rex "Current period: \"([a-z]+)\"" with
   | None ->
       Test.fail

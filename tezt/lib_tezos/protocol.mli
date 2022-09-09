@@ -59,6 +59,9 @@ val hash : t -> string
 (** Hash of protocol genesis *)
 val genesis_hash : string
 
+(** Hash of protocol demo_noops *)
+val demo_noops_hash : string
+
 (** Hash of protocol demo_counter *)
 val demo_counter_hash : string
 
