@@ -28,4 +28,5 @@
 
 (** A Resto middleware that rewrites any queries that the proxy server cannot
     handle and forwards them to the full node at the given [Uri.t]. *)
-val query_forwarder : Uri.t -> Resto_cohttp_server.Server.middleware
+val proxy_server_query_forwarder :
+  Uri.t -> Resto_cohttp_server.Server.middleware

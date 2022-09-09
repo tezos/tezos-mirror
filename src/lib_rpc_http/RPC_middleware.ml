@@ -38,9 +38,16 @@ let make_transform_callback forwarding_endpoint callback conn req body =
     let response =
       Cohttp.Response.make ~status:`Moved_permanently ~headers ()
     in
-    Lwt.return (`Response (response, Cohttp_lwt.Body.empty))
+    Lwt.return
+      (`Response
+        ( response,
+          Cohttp_lwt.Body.of_string
+            (Format.asprintf
+               "tezos-proxy-server: request unsupported for proxy server, \
+                redirecting to node endpoint at %s"
+               overriding) ))
   else Lwt.return answer
 
-let query_forwarder forwarding_endpoint =
+let proxy_server_query_forwarder forwarding_endpoint =
   Resto_cohttp_server.Server.
     {transform_callback = make_transform_callback forwarding_endpoint}
