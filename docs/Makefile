@@ -120,7 +120,7 @@ docexes:
 	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
 developer/metrics.csv:
-	../tezos-node dump-metrics > developer/metrics.csv
+	../octez-node dump-metrics > developer/metrics.csv
 
 $(ERRDOCEXE): docexes
 $(RPCDOCEXE): docexes

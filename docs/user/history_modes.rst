@@ -105,7 +105,7 @@ To run a ``full`` node you can either use the command line arguments:
 
 .. code-block:: console
 
-   tezos-node run --history-mode full
+   octez-node run --history-mode full
 
 or use your configuration file as described in :doc:`here <node-configuration>`:
 
@@ -141,7 +141,7 @@ To run a ``rolling`` node you can either use the command line arguments:
 
 .. code-block:: console
 
-   tezos-node run --history-mode experimental-rolling
+   octez-node run --history-mode experimental-rolling
 
 or use your configuration file as described in :doc:`here <node-configuration>`:
 
@@ -165,7 +165,7 @@ Setting up a node in archive mode
 ---------------------------------
 
 To run an ``archive`` node you can use the command line arguments:
-``$ tezos-node run --history-mode archive``
+``$ octez-node run --history-mode archive``
 
 Or the configuration file:
 ``{ "shell": {"history_mode": "archive"} }``
@@ -255,6 +255,6 @@ there are some restrictions when switching from one mode to another.
 +---------+---------+------+---------+
 
 (*) Switching from a ``full`` node to an ``archive`` one is possible
-using the ``reconstruct`` feature. To do so, run ``tezos-node
+using the ``reconstruct`` feature. To do so, run ``octez-node
 reconstruct`` on your node. Note that the storage reconstruction is a
 long process that, on the main network, may requires days to complete.

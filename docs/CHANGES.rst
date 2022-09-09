@@ -275,7 +275,7 @@ Node
 
 - Added a store metric to expose the number of blocks considered as invalid.
 
-- Fixed the ``tezos-node config reset`` command which did not actually reset
+- Fixed the ``octez-node config reset`` command which did not actually reset
   the configuration file to its default values.
 
 - Added metrics to observe the bootstrapped and synchronisation status.
@@ -310,7 +310,7 @@ Node
   upgraded. To this end, a new storage version was introduced: 1.0
   (previously 0.8). Backward compatibility is preserved: upgrading
   from 0.6, 0.7 (Octez 12.x) or 0.8 (Octez 13.0) is done through the
-  ``tezos-node upgrade storage`` command. This upgrade is
+  ``octez-node upgrade storage`` command. This upgrade is
   instantaneous. However, be careful that there is no forward
   compatibility: previous versions of Octez will refuse to run on an
   upgraded data directory.
@@ -416,10 +416,10 @@ Node
   must be used for RPC requests to the node. The value can be ``json``,
   ``binary`` or ``any``. By default, the value is set to ``any``.
 
-- Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``tezos-node`` to
+- Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``octez-node`` to
   expose some metrics using the Prometheus format.
 
-- Added command ``tezos-node storage head-commmit`` which prints the commit hash
+- Added command ``octez-node storage head-commmit`` which prints the commit hash
   of the current context head.
 
 - Added a history mode check when importing a snapshot to ensure the consistency between the
@@ -461,7 +461,7 @@ Node
   limit, and therefore not stored. The re-computed metadata are not
   stored on disk after this call, but rather just returned by the RPC call.
 
-- Added ``--progress-display-mode`` option to the ``tezos-node`` commands
+- Added ``--progress-display-mode`` option to the ``octez-node`` commands
   that display progress animation. This option allows to redirect progress
   animation to non-TTY file descriptors.
 
@@ -654,7 +654,7 @@ Version 12.0
 Node
 ----
 
-- The tezos-node configuration file parameter
+- The octez-node configuration file parameter
   ``shell.prevalidator.limits.max_refused_operations`` is now
   deprecated and may be removed starting from version 13.0.
 
@@ -873,7 +873,7 @@ Node
   rejected because of this limitation are solely delayed to a future block.
 
 - Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
-  It is no longer possible to run ``tezos-node upgrade storage`` to upgrade
+  It is no longer possible to run ``octez-node upgrade storage`` to upgrade
   from those older versions. It is also no longer possible to import
   snapshots that were exported using this version.
 
@@ -1166,7 +1166,7 @@ Client
 -  Fix gas simulation for operation batches for Granada, Hangzhou and Alpha
 
 -  Added timestamp display of the snapshot's block target when running
-   the ``tezos-node snapshot info`` command.
+   the ``octez-node snapshot info`` command.
 
 Baker / Endorser / Accuser
 --------------------------
@@ -1230,7 +1230,7 @@ Docker Images
 -------------
 
 -  The ``--force-history-mode-switch`` option is now available for
-   ``tezos-node`` entrypoint. It allows the user to switch the history
+   ``octez-node`` entrypoint. It allows the user to switch the history
    mode of the node's storage.
 
 Version 10.2
@@ -1268,13 +1268,13 @@ Node
    If you were previously using Octez 10.0~rc1 or 10.0~rc2, you were using
    store version 0.0.5. If you were previously using Octez 9.x, you were
    using store version 0.0.4. In both cases, use command
-   ``tezos-node upgrade storage`` to upgrade to 0.0.6.
+   ``octez-node upgrade storage`` to upgrade to 0.0.6.
 
 -  Added an upgrade procedure to upgrade from ``v0.0.5`` to ``v0.0.6``. The
-   procedure is implemented through the ``tezos-node upgrade storage``
+   procedure is implemented through the ``octez-node upgrade storage``
    command.
 
--  Added an ``integrity-check-index`` subcommand to ``tezos-node
+-  Added an ``integrity-check-index`` subcommand to ``octez-node
    storage``, which can be used to check for corruptions (missing
    entries) in the index of the store. This command also accepts an
    optional flag ``--auto-repair`` to fix those specific corruptions
@@ -1341,7 +1341,7 @@ Node
 
 -  Added an upgrade procedure to upgrade from the previous store to the
    new one. The procedure is implemented through the
-   ``tezos-node upgrade storage`` command. This command is
+   ``octez-node upgrade storage`` command. This command is
    non-destructive: the previous store is preserved at
    ``<data_dir>/lmdb_store_to_be_removed`` and needs to be manually
    removed when the user made sure the upgrade process went well.
@@ -1359,12 +1359,12 @@ Node
          suitable for IPFS sharing
 
    -  The argument ``[output_file]`` in
-      ``tezos-node export snapshot [output_file]`` becomes optional and
+      ``octez-node export snapshot [output_file]`` becomes optional and
       defaults to a file whose name follows this pattern
       ``<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_HISTORY_MODE>``
    -  Improved the metadata of snapshots which can be displayed using
-      ``tezos-node snapshot info``
-   -  The ``tezos-node snapshot import`` command is retro-compatible
+      ``octez-node snapshot info``
+   -  The ``octez-node snapshot import`` command is retro-compatible
       with the previous snapshot format (v1) but legacy snapshots cannot
       be exported anymore
 
@@ -1378,7 +1378,7 @@ Node
    two modes were maintaining a window of ``<preserved cycles>`` cycles
    of metadata (``5`` on mainnet). These modes may now be configured to
    keep a larger window of metadata. E.g.
-   ``tezos-node run --history-mode full+2`` will maintain 2 extra cycles
+   ``octez-node run --history-mode full+2`` will maintain 2 extra cycles
    of metadata, in addition to the network’s preserved cycles. This may
    become useful for users that want to keep more data from the past:
    for instance, to compute rewards payouts. The default number of extra
@@ -1955,7 +1955,7 @@ Node
    significance are detailed in `the user
    documentation <http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes>`__.
 
--  Command ``tezos-node --version`` now exits with exit code 0 instead
+-  Command ``octez-node --version`` now exits with exit code 0 instead
    of 1.
 
 -  Fixed the synchronisation threshold which was wrongly capped with an
@@ -2031,8 +2031,8 @@ Node
 -  Fixed an issue which prevented using ports higher than 32767 in the
    client configuration file.
 
--  The ``tezos-node run`` command now automatically generates an
-   identity file as if you had run ``tezos-node identity generate`` if
+-  The ``octez-node run`` command now automatically generates an
+   identity file as if you had run ``octez-node identity generate`` if
    its data directory contains no identity file.
 
 -  Improved various log messages and errors.
@@ -2084,7 +2084,7 @@ Node
 -  Improved the performance of the progress indicator when importing
    snapshots.
 
--  Improved performance of ``tezos-node snapshot export``.
+-  Improved performance of ``octez-node snapshot export``.
 
 -  Fixed the node which sent too many “get current branch” messages to
    its peers on testchain activation.
@@ -2295,14 +2295,14 @@ Multinetwork
 -  Node and client now come with all current and past protocols that are
    still in use on Mainnet or some active test networks.
 
--  Added option ``--network`` to ``tezos-node config init`` to select
+-  Added option ``--network`` to ``octez-node config init`` to select
    which network to connect to from a list of built-in networks (e.g.
    ``carthagenet``). If you do not run ``config init`` or run it without
    the ``--network`` option, the node will use the default network
    (Mainnet).
 
--  Added option ``--network`` to ``tezos-node run`` and
-   ``tezos-node snapshot import`` which causes the node to check that it
+-  Added option ``--network`` to ``octez-node run`` and
+   ``octez-node snapshot import`` which causes the node to check that it
    is configured to use the given network.
 
 -  Added ``network`` configuration field to select which network to

@@ -369,10 +369,10 @@ For instance, the following commands import a context from the snapshot file
 into the folder ``/tmp/mainnet``,
 and generate an identity in the same folder::
 
-  $ ./tezos-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
 
-The ``./tezos-node snapshot import`` command accepts an option
+The ``./octez-node snapshot import`` command accepts an option
 ``--block <block_hash>`` that instructs the command to check that the hash of
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
@@ -475,7 +475,7 @@ In case we opted for not snapshotting the Alpha protocol, we could batch steps
 
 The script ``scripts/prepare_migration_test.sh`` receives an optional
 ``<block_hash>`` as the last argument which, if passed, will be used for the
-option ``--block <block_hash>`` to the ``./tezos-node snapshot import`` command
+option ``--block <block_hash>`` to the ``./octez-node snapshot import`` command
 when importing the context form Mainnet.
 
 After performing the steps 1--7, the migration will be ready to be tested. The
@@ -552,12 +552,12 @@ environment variable ``test-directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
 of the original context folder into the test folder.
 
-Now, we can run the ``tezos-node`` command by specifying the test folder
+Now, we can run the ``octez-node`` command by specifying the test folder
 ``$test-directory`` as the data directory. We will also specify the RPC address
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 We will now trigger the migration by baking blocks until the level reaches the
 one specified when setting the user-activated upgrades. The blocks can be baked
@@ -597,7 +597,7 @@ copy the context of the original folder into the test folder. In our example::
 
 Now we run the node in the test folder by invoking::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And finally, we bake the numbers of blocks specified by the user-activated
 upgrade, with the command::
@@ -713,8 +713,8 @@ invoking the following eight commands)::
   $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
   $ ./scripts/patch-yes_node.sh
   $ make
-  $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
   $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 Copy original folder into test folder::
@@ -723,7 +723,7 @@ Copy original folder into test folder::
 
 Run the node`::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 Bake three blocks::
 
@@ -741,7 +741,7 @@ You should see the ``STITCHING!`` message!
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
   ^C
 
 Clean up by removing test folder and copying original folder into fresh
@@ -753,7 +753,7 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 
 Run the node::
 
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And bake three blocks::
 
@@ -826,7 +826,7 @@ file ``~/mainnet.rolling`` into it. As explained in Section
 `Batch steps 1--7 above`_, the script ``scripts/prepare_migration_test.sh`` may
 receive an optional ``<block_hash>`` parameter as the last argument which, if
 present, will be used for the option ``--block <block_hash>`` of the command
-``./tezos-node snapshot import`` when importing the context form Mainnet.
+``./octez-node snapshot import`` when importing the context form Mainnet.
 
 If we opt for not snapshotting the Alpha protocol, we can prepare the automatic
 migration with the same command as above, but omitting the optional name
@@ -861,7 +861,7 @@ developer to be able to inspect the storage after the migration has been
 performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
 the developer can start the node with the migrated context by invoking::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Once the node is up, it is possible to inspect the storage by using the Tezos
 client and/or the RPCs. New blocks can be baked with any of the accounts
@@ -912,7 +912,7 @@ Run the migration test::
 
 Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Use the client, to manually inspect the storage, or for example to bake new
 blocks with the following command::
@@ -922,7 +922,7 @@ blocks with the following command::
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
   ^C
 
 And run the migration test::

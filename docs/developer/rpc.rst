@@ -9,7 +9,7 @@ network and just want to explore the RPC, you would run:
 
 ::
 
-    ./tezos-node run --rpc-addr localhost
+    ./octez-node run --rpc-addr localhost
 
 The RPC interface is self-documented and the ``tezos-client`` executable
 is able to pretty-print the RPC API. For instance, to see the API

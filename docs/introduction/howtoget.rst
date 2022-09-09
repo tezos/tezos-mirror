@@ -147,7 +147,7 @@ Using Docker Images And Docker-Compose
 For every change committed in the GitLab repository, Docker images are
 automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
-way to run an always up-to-date ``tezos-node``.
+way to run an always up-to-date ``octez-node``.
 
 One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
 We provide ``docker-compose`` files for all active
@@ -336,10 +336,10 @@ Now, install all the binaries by:
   :start-after: [install tezos]
   :end-before: [test executables]
 
-You can be more specific and only ``opam install tezos-node``, ``opam
+You can be more specific and only ``opam install octez-node``, ``opam
 install octez-baker-alpha``, ... In that case, it is enough to install
 the system dependencies of this package only by running ``opam depext
-tezos-node`` for example instead of ``opam depext tezos``.
+octez-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 

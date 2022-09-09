@@ -38,7 +38,7 @@ Memory profiling the OCaml heap
 ::
 
     M-x sturgeon-connect
-    tezos-nodememprof.1234.sturgeon
+    octez-nodememprof.1234.sturgeon
 
   (tab-completion works for finding the socket name)
 
@@ -49,7 +49,7 @@ Memory profiling the C heap
 
 ::
 
-    valgrind --tool=massif tezos-node run ...
+    valgrind --tool=massif octez-node run ...
 
 - Stop with `Ctrl-C` then display with
 
@@ -78,7 +78,7 @@ Performance profiling
      the ``--call-stack dwarf`` to get something more manageable, but
      interpreting the information can be harder.
 
-   - Let `perf` run ``tezos-node``: ``perf record -g -F 99 --call-graph=dwarf -- ./tezos-node run ...``
+   - Let `perf` run ``octez-node``: ``perf record -g -F 99 --call-graph=dwarf -- ./octez-node run ...``
 
      This will write ``perf.data`` after having stopped the node with ``Ctrl-C``.
 
@@ -91,8 +91,8 @@ Performance profiling
 
    - `flamegraph <https://github.com/brendangregg/FlameGraph>`_: command-line
      tool for generating flamegraphs
-     (`example <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`__ for tezos-node)
+     (`example <https://gitlab.com/tezos/tezos/uploads/f8f8cece73da52b54fd9c79364e656e1/flame.svg>`__ for octez-node)
    - `gprof2dot <https://github.com/jrfonseca/gprof2dot>`_: command-line
      tool for generating callgraphs
-     (`example <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`__ for tezos-node)
+     (`example <https://gitlab.com/tezos/tezos/uploads/8640f489ad8002271fe41bbd0c34dfdc/callgraph.svg>`__ for octez-node)
    - `hotspot <https://github.com/KDAB/hotspot>`_: a GUI for the `perf` tool

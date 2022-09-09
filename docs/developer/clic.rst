@@ -18,7 +18,7 @@ like this, thanks to ``tezos-clic``:
 
 ``clic`` is used for most of the binaries distributed with Octez, such
 as ``tezos-client`` and ``tezos-codec``. A notable exception is
-``tezos-node`` which uses ``cmdliner``.
+``octez-node`` which uses ``cmdliner``.
 
 In this tutorial, we will give a gentle introduction to ``clic`` by
 demonstrating how to implement a wallet command inspired by those of

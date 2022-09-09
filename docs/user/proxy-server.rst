@@ -1,7 +1,7 @@
 Proxy server
 ------------
 
-This page describes the *proxy server*, a readonly frontend to ``tezos-node``
+This page describes the *proxy server*, a readonly frontend to ``octez-node``
 which is designed to lower the load of full nodes. It can be run separately from
 a node and will handle some RPC requests by itself. It is named after two
 things:
@@ -64,7 +64,7 @@ In a terminal, start a sandboxed node:
 
     $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
       April 21 11:05:32.789 - node.config.validation: the node configuration has been successfully validated.
-      Created /tmp/tezos-node.Uzq5aGAN/config.json for network: sandbox.
+      Created /tmp/octez-node.Uzq5aGAN/config.json for network: sandbox.
       ...
 
 Leave that terminal running. In a second terminal, prepare the appropriate
@@ -194,12 +194,12 @@ and restart it as follows:
 
 ::
 
-    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/tezos-node.Uzq5aGAN
+    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/octez-node.Uzq5aGAN
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
 
 The value of the ``--data-dir`` argument was obtained by looking at the
-output of the terminal where ``tezos-node`` was launched
+output of the terminal where ``octez-node`` was launched
 (see :ref:`above <sandbox_example>`).
 
 Now, in the fourth terminal (the client's terminal), redo the request

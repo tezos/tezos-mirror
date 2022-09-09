@@ -58,7 +58,7 @@ Node manual
 The command line of the Tezos node is not currently documented as a web page, but
 you can obtain it in Unix manual format by running the node with no arguments::
 
-  tezos-node
+  octez-node
 
 The above command briefly shows the available node commands.
 Each command accepts its own set of options and arguments, see :doc:`../user/node-configuration`.

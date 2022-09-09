@@ -237,7 +237,7 @@ Node-Specific Configuration
 Configuration File
 ~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node config --help`` for the full schema of the node’s JSON
+See ``octez-node config --help`` for the full schema of the node’s JSON
 configuration file.
 
 In particular the fields:
@@ -251,7 +251,7 @@ In particular the fields:
 Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node run --help``, the ``lwt-log://`` sink configuration can
+See ``octez-node run --help``, the ``lwt-log://`` sink configuration can
 be also changed with 2 options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``

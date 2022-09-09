@@ -24,7 +24,7 @@ for peers on port ``19731`` and listening for RPC on port ``18731``.
     ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
 
 This node will store its data in a temporary directory
-``/tmp/tezos-node.xxxxxxxx`` which will be removed when the node is
+``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is
 stopped.
 The option ``--connections`` is just to remove the spurious “Too few
 connections” warnings by lowering the number of expected connection.

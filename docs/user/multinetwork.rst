@@ -34,9 +34,9 @@ Built-In Networks
 The simplest way to select the network to connect to is to use the ``--network``
 option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Limanet::
 
-  tezos-node config init --data-dir ~/tezos-limanet --network limanet
-  tezos-node identity generate --data-dir ~/tezos-limanet
-  tezos-node run --data-dir ~/tezos-limanet
+  octez-node config init --data-dir ~/tezos-limanet --network limanet
+  octez-node identity generate --data-dir ~/tezos-limanet
+  octez-node run --data-dir ~/tezos-limanet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -60,11 +60,11 @@ the following built-in networks:
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
-You can use the ``--network`` option with ``tezos-node run`` to make sure
+You can use the ``--network`` option with ``octez-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
 it runs on Limanet::
 
-  tezos-node run --data-dir ~/tezos-limanet --network limanet
+  octez-node run --data-dir ~/tezos-limanet --network limanet
 
 This command will fail with an error if the configured network is not Limanet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.

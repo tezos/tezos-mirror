@@ -49,7 +49,7 @@ will not work), run:
 
 .. code-block:: console
 
-   tezos-node snapshot import <FILE> --block <BLOCK_HASH> [--data-dir <NODE_DIR>]
+   octez-node snapshot import <FILE> --block <BLOCK_HASH> [--data-dir <NODE_DIR>]
 
 The ``--block <BLOCK_HASH>`` option argument aims to verify that the
 block contained in the snapshot is the one that you are expecting to
@@ -83,7 +83,7 @@ This information is displayed by the following command:
 
 .. code-block:: console
 
-   tezos-node snapshot info <FILE>
+   octez-node snapshot info <FILE>
 
 As can be seen in the snapshot information, a snapshot contains
 historical data corresponding to a given history mode, which can be:
@@ -118,7 +118,7 @@ point. This kind of snapshot can only be created from a ``full`` or an
 
 .. code-block:: console
 
-   tezos-node snapshot export --block <BLOCK>
+   octez-node snapshot export --block <BLOCK>
 
 The ``<BLOCK>`` hint can be given as a *block hash*, a *block level*,
 an alias (*head*, *savepoint* or *checkpoint*) and a relative block
@@ -134,7 +134,7 @@ snapshot file name can be given as an additional argument. For example:
 
 .. code-block:: console
 
-   tezos-node snapshot export recent_head_snapshot.full --block head
+   octez-node snapshot export recent_head_snapshot.full --block head
 
 Rolling export
 ~~~~~~~~~~~~~~
@@ -148,7 +148,7 @@ history.
 
 .. code-block:: console
 
-   tezos-node snapshot export <FILE>.rolling --block <BLOCK_HASH> --rolling
+   octez-node snapshot export <FILE>.rolling --block <BLOCK_HASH> --rolling
 
 Snapshot file format and IPFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -174,7 +174,7 @@ Python testing and execution framework
 
 The Tezos project uses `pytest <https://docs.pytest.org/>`_, a Python testing
 framework, combined with :doc:`tezos-launchers <python_testing_framework>`, a Python wrapper
-``tezos-node`` and ``tezos-client``, to perform integration testing
+``octez-node`` and ``tezos-client``, to perform integration testing
 of the node, the client, networks of nodes and daemons such as the baker
 and endorser.
 
@@ -435,7 +435,7 @@ guidelines:
 For system test frameworks
    System test frameworks, as :doc:`tezt` and :doc:`python_testing_framework`,
    run binaries e.g. ``tezos-client`` and
-   ``tezos-node``. Typically, they do so with calls to ``exec`` so the
+   ``octez-node``. Typically, they do so with calls to ``exec`` so the
    resulting process does not inherit the signal handlers from the
    parent process (the test framework). When writing tests in these
    frameworks, the author must ensure that the processes launched are

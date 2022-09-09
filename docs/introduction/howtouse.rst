@@ -15,7 +15,7 @@ The Binaries
 
 After a successful compilation, you should have the following binaries:
 
-- ``tezos-node``: the tezos daemon itself (see `Node`_);
+- ``octez-node``: the tezos daemon itself (see `Node`_);
 - ``tezos-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
@@ -23,7 +23,7 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
-- ``tezos-proxy-server``: a readonly frontend to ``tezos-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
+- ``tezos-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``tezos-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
@@ -33,7 +33,7 @@ bound to, and up to some version, also by its number.
 For instance, ``octez-baker-014-PtKathma`` is the baker
 for the Kathmandu protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
-The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
+The ``octez-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
 
 Read The Manual
@@ -122,7 +122,7 @@ Node Identity
 First, we need to generate a new identity for the node to
 connect to the network::
 
-    tezos-node identity generate
+    octez-node identity generate
 
 .. note::
 
@@ -198,7 +198,7 @@ internet. With the following command, it is available uniquely on the
 
 ::
 
-   tezos-node run --rpc-addr 127.0.0.1
+   octez-node run --rpc-addr 127.0.0.1
 
 Node configuration
 ~~~~~~~~~~~~~~~~~~
@@ -213,7 +213,7 @@ Many options of the node can be configured when running the node:
 
 The list of configurable options can be obtained using the following command::
 
-    tezos-node run --help
+    octez-node run --help
 
 You can read more about the :doc:`node configuration <../user/node-configuration>` and its :ref:`private mode <private-mode>`.
 
@@ -231,11 +231,11 @@ Putting together all the above instructions, you may want to run a node as follo
     # Download a snapshot for your target network, e.g. <test-net>:
     wget <snapshot-url> -O <snapshot-file>
     # Configure the node for running on <test-net>:
-    tezos-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
+    octez-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
     # Import the snapshot into the node data directory:
-    tezos-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
+    octez-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
     # Run the node:
-    tezos-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
+    octez-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
 
 .. _howtouse_tezos_client:
 
@@ -640,7 +640,7 @@ In this short tutorial we will not use some other binaries, but let as briefly r
 Validator
 ~~~~~~~~~
 
-The Tezos validator (``tezos-validator``) is an auxiliary daemon that is launched by ``tezos-node`` in order to validate operations in parallel to its main process (unless the option ``--singleprocess`` is given).
+The Tezos validator (``tezos-validator``) is an auxiliary daemon that is launched by ``octez-node`` in order to validate operations in parallel to its main process (unless the option ``--singleprocess`` is given).
 It also applies the valid operations in a block and computes the resulting context.
 
 It is not meant to be invoked directly by users.
@@ -650,7 +650,7 @@ Codec
 
 The Tezos codec (``tezos-codec``) is a utility that:
 
-- provides documentation for all the encodings used in the ``tezos-node`` (and other binaries), and
+- provides documentation for all the encodings used in the ``octez-node`` (and other binaries), and
 - allows to convert from JSON to binary and vice-versa for all these encodings.
 
 It is meant to be used by developers for tests, for generating documentation when writing libraries that share data with the node, for light scripting, etc.
