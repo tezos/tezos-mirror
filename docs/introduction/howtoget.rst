@@ -369,10 +369,11 @@ The following sections describe the individual steps above in more detail.
 Install Rust
 ~~~~~~~~~~~~
 
-Compiling Tezos requires the Rust compiler,
-version 1.52.1, and the Cargo package manager to be installed. If you
-have `rustup <https://rustup.rs/>`_ installed, it should work without
-any additional steps on your side. You can use `rustup
+Compiling Tezos requires the Rust compiler, version (see variable
+``$recommended_rust_version`` in file ``scripts/version.sh``) and the
+Cargo package manager to be installed. If you have `rustup
+<https://rustup.rs/>`_ installed, it should work without any
+additional steps on your side. You can use `rustup
 <https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
 please avoid installing it from Snapcraft; you can rather follow the
 simple installation process shown below:
