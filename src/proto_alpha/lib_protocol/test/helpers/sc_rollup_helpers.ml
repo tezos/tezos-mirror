@@ -176,3 +176,17 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
     |> Data_encoding.Binary.of_bytes_exn Sc_rollup_commitment_repr.encoding
   in
   return res
+
+let make_external_inbox_message_repr str =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Sc_rollup_inbox_message_repr.(External str |> serialize)
+
+let make_input_repr ?(inbox_level = Raw_level_repr.root)
+    ?(message_counter = Z.zero) message =
+  Sc_rollup_PVM_sig.
+    {
+      inbox_level;
+      message_counter;
+      payload = make_external_inbox_message_repr message;
+    }
