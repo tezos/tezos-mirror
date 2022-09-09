@@ -28,7 +28,7 @@
     Component:    Crypto
     Invocation:   dune build @src/lib_crypto/runtest
     Subject:      Property-tests over the interface S.SIGNATURE and its
-                  instantiations Ed25519 and Secp256k1.
+                  instantiations.
 *)
 open Lib_test.Qcheck2_helpers
 
@@ -49,8 +49,8 @@ module Signature_Properties (Desc : sig
 end)
 (X : SIGNATURE) =
 struct
-  (** Tests that a signature of [s] by a generated key and [X.sign] is
-      accepted by [X.check] with the same key.  *)
+  (** Tests that a signature of [s], with optional [watermark], by a generated
+      key and [X.sign] is accepted by [X.check] with the same key.  *)
   let test_prop_sign_check (s, watermark) =
     let _, pk, sk = X.generate_key () in
     let data = Bytes.of_string s in
@@ -84,7 +84,8 @@ module Aggregate_Signature_Properties (Desc : sig
 end)
 (X : AGGREGATE_SIGNATURE) =
 struct
-  (** Tests that signatures of [s] obtained using [X.sign] are accepted by
+  (** Tests that signatures of [msg1], [msg2], [msg3], (with optional
+      corresponding watermarks) obtained using [X.sign] are accepted by
       [X.check] when using the corresponding key. It then tests that the
       aggregation of all these signatures obtained using
       [X.aggregate_signature_opt] is accepted by [X.aggregate_check]. *)
