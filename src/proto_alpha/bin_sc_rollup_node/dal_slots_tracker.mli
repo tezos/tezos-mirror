@@ -44,6 +44,3 @@ type error += Cannot_read_block_metadata of Block_hash.t
       [Store.Dal_confirmed_slots].}
     }  *)
 val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
-
-(** [start ()] initializes the Dal_slot_tracker to track the dal slot subscriptions. *)
-val start : unit -> unit Lwt.t

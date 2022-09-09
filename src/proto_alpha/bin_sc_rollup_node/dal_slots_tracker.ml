@@ -187,4 +187,4 @@ let process_head node_ctxt head =
   let* () = fetch_and_save_subscribed_slot_headers node_ctxt head in
   compute_and_save_confirmed_slot_headers node_ctxt head
 
-let start () = Lwt.return ()
+let get_slots_history_of_hash = X.State.slots_history_of_hash
