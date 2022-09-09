@@ -37,7 +37,7 @@ export OPAMYES=true
 # [install packages]
 # [Temporary fix: removes tezos folder from PATH if added with Octez <= v13 instructions]
 PATH=${PATH##"$HOME"/tezos/:}
-sudo apt-get install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev libffi-dev g++ opam jq zlib1g-dev bc autoconf
+sudo apt-get install -y rsync git m4 build-essential patch unzip wget pkg-config libgmp-dev libev-dev libhidapi-dev g++ opam jq zlib1g-dev bc autoconf
 # [install rust]
 wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
