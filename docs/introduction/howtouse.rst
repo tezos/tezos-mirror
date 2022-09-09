@@ -20,7 +20,7 @@ After a successful compilation, you should have the following binaries:
 - ``octez-admin-client``: administration tool for the node (see :ref:`octez-admin-client`);
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
   note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
-- ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
+- ``octez-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 - ``tezos-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
@@ -640,7 +640,7 @@ In this short tutorial we will not use some other binaries, but let as briefly r
 Validator
 ~~~~~~~~~
 
-The Tezos validator (``tezos-validator``) is an auxiliary daemon that is launched by ``octez-node`` in order to validate operations in parallel to its main process (unless the option ``--singleprocess`` is given).
+The Tezos validator (``octez-validator``) is an auxiliary daemon that is launched by ``octez-node`` in order to validate operations in parallel to its main process (unless the option ``--singleprocess`` is given).
 It also applies the valid operations in a block and computes the resulting context.
 
 It is not meant to be invoked directly by users.
