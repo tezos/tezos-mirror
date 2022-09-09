@@ -25,7 +25,7 @@ After a successful compilation, you should have the following binaries:
   (see :ref:`signer`);
 - ``octez-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
-- ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
+- ``octez-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
@@ -659,7 +659,7 @@ For more details on its usage, refer to its :ref:`online manual <codec_manual>` 
 Protocol compiler
 ~~~~~~~~~~~~~~~~~
 
-The protocol compiler (``tezos-protocol-compiler``) can compile protocols within the limited environment that the shell provides.
+The protocol compiler (``octez-protocol-compiler``) can compile protocols within the limited environment that the shell provides.
 This environment is limited to a restricted set of libraries in order to constrain the possible behavior of the protocols.
 
 It is meant to be used:
