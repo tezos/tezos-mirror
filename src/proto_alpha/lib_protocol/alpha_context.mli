@@ -2833,6 +2833,15 @@ module Dal : sig
     val genesis : t
 
     val equal : t -> t -> bool
+
+    val encoding : t Data_encoding.t
+
+    module History_cache : Bounded_history_repr.S
+
+    val add_confirmed_slots_no_cache : t -> Slot.t list -> t tzresult
+
+    val add_confirmed_slots :
+      t -> History_cache.t -> Slot.t list -> (t * History_cache.t) tzresult
   end
 end
 

@@ -177,9 +177,24 @@ module Slots_history : sig
   (** First cell of this skip list. *)
   val genesis : t
 
-  (** [add_confirmed_slots cell slots] updates the given structure
-     [cell] with the list of [slots]. *)
-  val add_confirmed_slots : t -> slot list -> t
+  (** The [History_cache.t] structure is basically a bounded lookup table of
+      {!t} skip lists. (See {!Bounded_history_repr.S}). In the L1 layer, the
+      capacity (bound) is set to zero (nothing is remembered). By contrast,
+      the rollup node uses a history cache with a (sufficiently) large capacity
+      to participate in all potential refutation games occurring during the
+      challenge period. Indeed, the successive recent skip-lists stored in
+      the cache are needed to produce proofs involving slots' pages. *)
+  module History_cache : Bounded_history_repr.S
+
+  (** [add_confirmed_slots hist cache slots] updates the given structure
+      [hist] with the list of [slots]. The given [cache] is also updated to
+      add successive values of [cell] to it. *)
+  val add_confirmed_slots :
+    t -> History_cache.t -> slot list -> (t * History_cache.t) tzresult
+
+  (** [add_confirmed_slots_no_cache cell slots] same as {!add_confirmed_slots},
+      but no cache is updated. *)
+  val add_confirmed_slots_no_cache : t -> slot list -> t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
   val equal : t -> t -> bool
