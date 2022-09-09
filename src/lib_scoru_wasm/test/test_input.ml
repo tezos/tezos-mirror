@@ -121,6 +121,28 @@ let read_input () =
   assert (m = "hello") ;
   Lwt.return @@ Result.return_unit
 
+let read_input_no_messages () =
+  let open Lwt.Syntax in
+  let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let output_buffer = Output_buffer.alloc () in
+  assert (Input_buffer.num_elements input_buffer = Z.zero) ;
+  let* result =
+    Host_funcs.Internal_for_tests.aux_write_input_in_memory
+      ~input_buffer
+      ~output_buffer
+      ~memory
+      ~rtype_offset:0l
+      ~level_offset:4l
+      ~id_offset:10l
+      ~dst:50l
+      ~max_bytes:36000l
+  in
+  assert (Input_buffer.num_elements input_buffer = Z.zero) ;
+  assert (result = 0) ;
+  Lwt.return @@ Result.return_unit
+
 let test_host_fun () =
   let open Lwt.Syntax in
   let input = Input_buffer.alloc () in
@@ -181,5 +203,6 @@ let tests =
   [
     tztest "Write input" `Quick write_input;
     tztest "Read input" `Quick read_input;
+    tztest "Read input no messages" `Quick read_input_no_messages;
     tztest "Host read input" `Quick test_host_fun;
   ]

@@ -40,24 +40,34 @@ let retrieve_memory memories =
 let aux_write_input_in_memory ~input_buffer ~output_buffer ~memory ~rtype_offset
     ~level_offset ~id_offset ~dst ~max_bytes =
   let open Lwt.Syntax in
-  let* {rtype; raw_level; message_counter; payload} =
-    Input_buffer.dequeue input_buffer
-  in
-  Output_buffer.set_level output_buffer raw_level ;
-  let input_size = Bytes.length payload in
-  if Int64.of_int input_size > 4096L then
-    raise (Eval.Crash (Source.no_region, "input too large"))
-  else
-    let payload =
-      Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
-    in
-    let _ = Memory.store_bytes memory dst (Bytes.to_string payload) in
-    let _ = Memory.store_num memory rtype_offset 0l (I32 rtype) in
-    let _ = Memory.store_num memory level_offset 0l (I32 raw_level) in
-    let _ =
-      Memory.store_num memory id_offset 0l (I64 (Z.to_int64 message_counter))
-    in
-    Lwt.return input_size
+  Lwt.catch
+    (fun () ->
+      let* {rtype; raw_level; message_counter; payload} =
+        Input_buffer.dequeue input_buffer
+      in
+      Output_buffer.set_level output_buffer raw_level ;
+      let input_size = Bytes.length payload in
+      if Int64.of_int input_size > 4096L then
+        raise (Eval.Crash (Source.no_region, "input too large"))
+      else
+        let payload =
+          Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
+        in
+        let _ = Memory.store_bytes memory dst (Bytes.to_string payload) in
+        let _ = Memory.store_num memory rtype_offset 0l (I32 rtype) in
+        let _ = Memory.store_num memory level_offset 0l (I32 raw_level) in
+        let _ =
+          Memory.store_num
+            memory
+            id_offset
+            0l
+            (I64 (Z.to_int64 message_counter))
+        in
+        Lwt.return input_size)
+    (fun exn ->
+      match exn with
+      | Input_buffer.Dequeue_from_empty_queue -> Lwt.return 0
+      | _ -> raise exn)
 
 let aux_write_output ~input_buffer:_ ~output_buffer ~memory ~src ~num_bytes =
   let open Lwt.Syntax in
