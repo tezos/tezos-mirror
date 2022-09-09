@@ -438,27 +438,14 @@ module type SIGNATURE = sig
 end
 
 module type AGGREGATE_SIGNATURE = sig
-  include COMMON_SIGNATURE
+  include SIGNATURE
 
-  (** [sign sk message] produces the signature of [message] using [sk]. The
-      signature produced by this function can be aggregated to other signatures
-      with [agregate_signature_opt].*)
-  val sign : Secret_key.t -> Bytes.t -> t
-
-  (** [check pk signature message] checks that [signature] is the signature
-      produced by signing [message] with the secret key of [pk]. See
-      [aggregate_check] if you want to check an aggregated signature.*)
-  val check : Public_key.t -> t -> Bytes.t -> bool
-
-  (** [agregate_check pk_msg_list signature] checks that the list of public key
-      and message [pk_msg_list] produced a signature equal to [signature]. *)
-  val aggregate_check : (Public_key.t * bytes) list -> t -> bool
-
-  (** [generate_key ?seed ()] creates a new pair of secret key and public key
-      using the seed or with a random generated one. It also returns the hash of
-      the public key. *)
-  val generate_key :
-    ?seed:Bytes.t -> unit -> Public_key_hash.t * Public_key.t * Secret_key.t
+  (** [agregate_check pk_msg_list signature] returns [true] if the [signature]
+      is a valid aggregate signature of the signatures produced by signing
+      message [msg] (with optional [watermark]) with the secret key of [pk] for
+      each element [(pk, watermark, msg)] of the list [pk_msg_list]. *)
+  val aggregate_check :
+    (Public_key.t * watermark option * bytes) list -> t -> bool
 
   (** [agregate_signature_opt sig_list] creates an aggregated signature using
       the list of signatures [sig_list]. *)
