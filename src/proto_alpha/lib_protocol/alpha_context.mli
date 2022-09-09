@@ -3137,13 +3137,11 @@ module Sc_rollup : sig
 
       type serialized = private string
 
+      val unsafe_of_string : string -> serialized
+
       val deserialize : serialized -> t tzresult
 
-      (** This module discloses definitions that are only useful for tests and
-          must not be used otherwise. *)
-      module Internal_for_tests : sig
-        val serialize : t -> serialized tzresult
-      end
+      val serialize : t -> serialized tzresult
     end
 
     val record_applied_message :
