@@ -62,7 +62,7 @@ In a terminal, start a sandboxed node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
       April 21 11:05:32.789 - node.config.validation: the node configuration has been successfully validated.
       Created /tmp/octez-node.Uzq5aGAN/config.json for network: sandbox.
       ...

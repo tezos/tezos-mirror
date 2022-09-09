@@ -4,7 +4,7 @@ Sandboxed mode
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
--  ``./src/bin_node/tezos-sandboxed-node.sh``
+-  ``./src/bin_node/octez-sandboxed-node.sh``
 -  ``./src/bin_client/tezos-init-sandboxed-client.sh``
 
 For the moment these scripts are expected to be run on the ``master``
@@ -21,7 +21,7 @@ for peers on port ``19731`` and listening for RPC on port ``18731``.
 
 ::
 
-    ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
 This node will store its data in a temporary directory
 ``/tmp/octez-node.xxxxxxxx`` which will be removed when the node is
@@ -34,7 +34,7 @@ it will listen on port ``19739`` and ``18739``:
 
 ::
 
-    ./src/bin_node/tezos-sandboxed-node.sh 9
+    ./src/bin_node/octez-sandboxed-node.sh 9
 
 You might replace ``1`` or ``9`` by any number in between if you want to
 run more than two nodes.
@@ -131,7 +131,7 @@ can use the `DATA_DIR` environment variable.
 ::
 
     mkdir /tmp/tz-data
-    DATA_DIR='/tmp/tz-data' ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    DATA_DIR='/tmp/tz-data' ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
 You can even provide a custom `identity.json` and `config.json` to the
 sandboxed node by placing them in the data directory.

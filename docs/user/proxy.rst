@@ -43,7 +43,7 @@ start a sandboxed node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
 
 Leave that terminal running, in another terminal, prepare the appropriate
 environment for using the proxy client:

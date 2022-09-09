@@ -483,7 +483,7 @@ unshielding.
 ::
 
    # set up the sandbox
-   ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+   ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
    eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
    tezos-activate-alpha
 

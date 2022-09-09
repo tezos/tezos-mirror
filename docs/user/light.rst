@@ -79,7 +79,7 @@ start a sandboxed node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
       # This node listens to p2p events on localhost:19731
       # RPC server of the node is reachable at localhost:18731
 
@@ -88,7 +88,7 @@ Leave that terminal running. In a second terminal, start another node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 2 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 2 --connections 1
       # This node listens to p2p events on localhost:19732
       # RPC server of the node is reachable at localhost:18732
 

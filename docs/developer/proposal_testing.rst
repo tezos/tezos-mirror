@@ -36,7 +36,7 @@ latest code and run unit tests::
 
 We can run a node and a client in sandboxed mode by invoking::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
   $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
 By default, the sandbox starts from the `genesis` block at level 0, and the
@@ -489,7 +489,7 @@ Run the Migration on the Sandbox
 If we run the migration on an empty context, then we would start a sandboxed
 node as usual. In our example we can run the following::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 
 We can also start the client::
 
@@ -644,7 +644,7 @@ the following fur commands)::
 
 Run sandboxed node and client::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
   $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol and move chain one level forward::
@@ -661,9 +661,9 @@ You should see the ``STITCHING!`` message!
 To test again, restart the sandboxed node and client::
 
   $ fg
-  ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0
+  ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
   ^C
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
   $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol::
