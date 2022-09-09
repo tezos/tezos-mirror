@@ -38,7 +38,7 @@ Benchmark tool manual
 =====================
 
 .. raw:: html
-         :file: ../api/tezos-snoop.html
+         :file: ../api/octez-snoop.html
 
 
 .. _codec_manual:

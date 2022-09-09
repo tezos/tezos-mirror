@@ -26,7 +26,7 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-proxy-server``: a readonly frontend to ``octez-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``octez-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
-- ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
+- ``octez-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.

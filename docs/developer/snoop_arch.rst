@@ -1,14 +1,14 @@
-Architecture of ``tezos-snoop``
+Architecture of ``octez-snoop``
 ===============================
 
 The following figure describes the main functionalities and data
-processed by ``tezos-snoop``, to be read from top to bottom. The boxed
+processed by ``octez-snoop``, to be read from top to bottom. The boxed
 nodes represents the various kinds of data processed by the tool,
 while the unboxed items represent computational steps.
 
 .. image:: images/snoop_arch.png
 
-The code architecture of `tezos-snoop` is itself divided in the following
+The code architecture of `octez-snoop` is itself divided in the following
 main packages:
 
 - ``bin_snoop`` is the main binary (you can have a look at the :ref:`manual<benchmark_tool_manual>`).
@@ -28,7 +28,7 @@ tool.
 High-level description
 ----------------------
 
-``tezos-snoop`` is a tool for benchmarking and fitting statistical models which predict the performance of any piece of code of interest.
+``octez-snoop`` is a tool for benchmarking and fitting statistical models which predict the performance of any piece of code of interest.
 
 More concretely, let us consider a piece of code for which we wish to predict its performance. To understand the performance profile of this piece of code, we must execute it with different arguments, varying the size of the problem to be solved. As "the size of the problem to be solved" is a long expression, we will use the shorter term *workload* for that.
 
@@ -81,7 +81,7 @@ The library is meant to be used as follows:
 
 Modules implementing the ``Benchmark.S`` signature can also be registered
 via the ``Registration.register`` function which makes them available to
-``tezos-snoop``, a binary that wraps these features under a nice CLI.
+``octez-snoop``, a binary that wraps these features under a nice CLI.
 
 Defining benchmarks: the ``Generator`` module
 ---------------------------------------------
@@ -574,7 +574,7 @@ e.g. more than one hundred Michelson instructions it nice to have an
 automated tool figuring out the dependencies and scheduling the inference
 automatically.
 
-``tezos-snoop`` features this. The ``infer parameters`` command is launched
+``octez-snoop`` features this. The ``infer parameters`` command is launched
 in "full auto" mode when a *directory* is passed to it instead of a simple
 workload file. The tool then automatically scans this directory for all
 workload files, compute a dependency graph from the free variables and performs
