@@ -744,7 +744,7 @@ let test_block_of_identifier_success_savepoint chain_store table =
 let tests =
   let test_tree_cases =
     List.map
-      wrap_test
+      (wrap_test ~with_gc:false)
       [
         ("path between blocks", test_path);
         ("common ancestor", test_ancestor);

@@ -464,7 +464,8 @@ let make_tests speed genesis_parameters =
           | None | Some _ ->
               Some
                 (wrap_test
-                   ~keep_dir:true
+                   ~with_gc:true
+                   ~keep_dir:false
                    ~history_mode
                    ~patch_context:(fun ctxt ->
                      Alpha_utils.default_patch_context ctxt)
@@ -558,6 +559,7 @@ let test_rolling () =
   in
   wrap_test
     ~keep_dir:false
+    ~with_gc:true
     ~history_mode:History_mode.default
     ~patch_context
     ( Format.asprintf
@@ -705,6 +707,7 @@ let test_drag_after_import () =
   in
   wrap_test
     ~keep_dir:false
+    ~with_gc:true
     ~history_mode:History_mode.default
     ~patch_context
     ( Format.asprintf
