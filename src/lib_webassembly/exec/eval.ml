@@ -1822,8 +1822,8 @@ let section_update_module_ref : type kont a b. (kont, a, b) init_section -> bool
   | Table -> false
   | Memory -> true
 
-let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
-  function
+let init_step ~module_reg ~self host_funcs (m : module_)
+    (exts : extern Vector.t) = function
   | IK_Start ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
@@ -1834,7 +1834,7 @@ let init_step ~module_reg ~self host_funcs (m : module_) (exts : extern list) =
               empty_module_inst
               (* This is safe as long as we provide an empty list in
                  the PVM. *)
-              (Vector.of_list exts)
+              exts
               m.it.imports))
   | IK_Add_import tick when fold_right2_completed tick ->
       update_module_ref module_reg self tick.acc ;
@@ -1961,7 +1961,9 @@ let init ~module_reg ~self host_funcs (m : module_) (exts : extern list) :
   let rec go = function
     | IK_Stop inst -> Lwt.return inst
     | kont ->
-        let* kont = init_step ~module_reg ~self host_funcs m exts kont in
+        let* kont =
+          init_step ~module_reg ~self host_funcs m (Vector.of_list exts) kont
+        in
         go kont
   in
   go IK_Start
