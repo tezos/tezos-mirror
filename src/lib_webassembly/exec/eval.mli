@@ -209,7 +209,7 @@ val init_step :
   self:module_key ->
   Host_funcs.registry ->
   Ast.module_ ->
-  extern list ->
+  extern Vector.t ->
   init_kont ->
   init_kont Lwt.t
 

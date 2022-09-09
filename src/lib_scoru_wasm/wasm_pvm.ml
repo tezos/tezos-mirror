@@ -210,13 +210,37 @@ struct
                    (Invalid_state "Invalid_module: no `main` function exported"))
           )
       | Init {self; ast_module; init_kont} ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3786
+             Tickify linking, which implies taking care of Utf8 decoding *)
+          let* imports =
+            Lazy_containers.Lazy_vector.Int32Vector.to_list
+              ast_module.it.imports
+          in
+          let* externs =
+            Lwt_list.fold_left_s
+              (fun v (im : Wasm.Ast.import) ->
+                let Wasm.Ast.{module_name; item_name; _} = im.it in
+                let* module_name = Wasm.Utf8.encode module_name in
+                match module_name with
+                | "rollup_safe_core" ->
+                    (* Host functions *)
+                    let+ extern = Host_funcs.lookup item_name in
+                    let v, _ =
+                      Lazy_containers.Lazy_vector.Int32Vector.append extern v
+                    in
+                    v
+                | e -> raise (Invalid_argument Format.(sprintf "linking: %s" e)))
+              (Lazy_containers.Lazy_vector.Int32Vector.empty ())
+              imports
+          in
+          (* End of the linking phase *)
           let* init_kont =
             Wasm.Eval.init_step
               ~module_reg
               ~self
               host_funcs
               ast_module
-              []
+              externs
               init_kont
           in
           Lwt.return (Init {self; ast_module; init_kont})
