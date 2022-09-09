@@ -1,4 +1,3 @@
-open Tezos_benchmark
 open Michelson_samplers
 open Protocol
 open Internal_for_tests
@@ -47,7 +46,7 @@ module Type_name = struct
   let hash = Stdlib.Hashtbl.hash
 end
 
-module Type_name_hashtbl = Hashtbl.Make (Type_name)
+module Type_name_hashtbl = Stdlib.Hashtbl.Make (Type_name)
 
 let rec tnames_of_type :
     type a. a Script_typed_ir.ty -> type_name list -> type_name list =
