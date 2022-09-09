@@ -3075,6 +3075,8 @@ module Sc_rollup : sig
           history_proof ->
           history_proof ->
           inclusion_proof option tzresult
+
+        val serialized_proof_of_string : string -> serialized_proof
       end
     end
 

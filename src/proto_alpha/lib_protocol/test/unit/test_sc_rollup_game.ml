@@ -336,7 +336,10 @@ let test_invalid_serialized_inbox_proof () =
   in
 
   (* We create an obviously invalid inbox *)
-  let inbox_proof = Bytes.of_string "I am the big bad wolf" |> Obj.magic in
+  let inbox_proof =
+    Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string
+      "I am the big bad wolf"
+  in
   let inbox =
     Sc_rollup.Proof.
       {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
