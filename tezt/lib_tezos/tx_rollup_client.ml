@@ -199,7 +199,10 @@ let transfer ?counter tx_client ~source
       @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
-  Lwt.return out
+  out
+  =~* rex "Transaction hash: ?(\\w*)"
+  |> mandatory "transaction hash"
+  |> Lwt.return
 
 let withdraw ?counter tx_client ~source
     Rollup.Tx_rollup.(`Withdraw {qty; destination; ticket}) =
@@ -211,7 +214,10 @@ let withdraw ?counter tx_client ~source
       @ optional_arg "counter" Int64.to_string counter)
     |> Process.check_and_read_stdout
   in
-  Lwt.return out
+  out
+  =~* rex "Transaction hash: ?(\\w*)"
+  |> mandatory "transaction hash"
+  |> Lwt.return
 
 let get_batcher_queue tx_client =
   let* out =
