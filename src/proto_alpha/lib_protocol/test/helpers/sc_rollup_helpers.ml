@@ -190,3 +190,17 @@ let make_input_repr ?(inbox_level = Raw_level_repr.root)
       message_counter;
       payload = make_external_inbox_message_repr message;
     }
+
+let make_external_inbox_message str =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Sc_rollup.Inbox_message.(External str |> serialize)
+
+let make_input ?(inbox_level = Raw_level.root) ?(message_counter = Z.zero)
+    message =
+  Sc_rollup.
+    {
+      inbox_level;
+      message_counter;
+      payload = make_external_inbox_message message;
+    }
