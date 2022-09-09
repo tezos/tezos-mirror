@@ -83,7 +83,7 @@ handled.
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The welcome worker takes care of filtering all incoming connections using two
-static lists of addresses handled by ``tezos-admin-client`` and a system
+static lists of addresses handled by ``octez-admin-client`` and a system
 table that is handled automatically by the P2P layer. The node administrator can
 block (blacklist) or enable (whitelist) individual IP addresses, while the P2P layer is in charge of
 temporarily banning (greylist) IP addresses and peers who misbehave. The delay to remove an
@@ -91,7 +91,7 @@ IP address from the greylist table is defined by the configuration variable
 ``greylist_timeout``, while peers that are greylisted are periodically removed.
 
 The node administrator can also flush greylist tables with the
-``tezos-admin-client``.
+``octez-admin-client``.
 
 The node administrator can also choose to unban peers and addresses that
 were manually banned or accidentally greylisted.

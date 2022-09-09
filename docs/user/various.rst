@@ -8,7 +8,7 @@ Environment for writing Michelson contracts
 editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
 configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
 
-.. _tezos-admin-client:
+.. _octez-admin-client:
 
 Admin Client
 ------------
@@ -24,7 +24,7 @@ A useful command to debug a node that is not syncing is:
 
 ::
 
-   tezos-admin-client p2p stat
+   octez-admin-client p2p stat
 
 .. _tezos_binaries_signals_and_exit_codes:
 

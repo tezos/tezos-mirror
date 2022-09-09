@@ -8,7 +8,7 @@ obtain similar pages using shell commands such as:
 
 ::
 
-   tezos-admin-client man -verbosity 3
+   octez-admin-client man -verbosity 3
 
 The rest of this page documents the protocol-independent tools.
 The protocol-dependent tools are documented :doc:`here <../active/cli-commands>`.
@@ -20,7 +20,7 @@ Admin-client manual
 ===================
 
 .. raw:: html
-         :file: ../api/tezos-admin-client.html
+         :file: ../api/octez-admin-client.html
 
 
 .. _signer_manual:

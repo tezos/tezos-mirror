@@ -1061,7 +1061,7 @@ Node
 
    - ``shell.block_validator.limits.worker_backlog_level``
 
--  The ``tezos-admin-client show current checkpoint`` command now only
+-  The ``octez-admin-client show current checkpoint`` command now only
    outputs the current checkpoint. It no longer outputs the savepoint,
    caboose and history mode.
 
@@ -2419,7 +2419,7 @@ Client
 -  Added protocol command ``expand macros in`` to expand macros in
    Michelson code.
 
--  Added command ``tezos-admin-client protocol environment`` which
+-  Added command ``octez-admin-client protocol environment`` which
    displays the version of the environment used by a given protocol.
 
 -  Greatly reduce the time the client takes to load.

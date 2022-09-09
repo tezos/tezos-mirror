@@ -17,7 +17,7 @@ After a successful compilation, you should have the following binaries:
 
 - ``octez-node``: the tezos daemon itself (see `Node`_);
 - ``octez-client``: a command-line client and basic wallet (see `Client`_);
-- ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
+- ``octez-admin-client``: administration tool for the node (see :ref:`octez-admin-client`);
 - ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
   note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
@@ -91,7 +91,7 @@ Node
 The node is the main actor of the Tezos blockchain and it has two main
 functions: running the gossip network and updating the context.
 The gossip network is where all Tezos nodes exchange blocks and
-operations with each other (see :ref:`tezos-admin-client` to monitor
+operations with each other (see :ref:`octez-admin-client` to monitor
 p2p connections).
 Using this peer-to-peer network, an operation originated by a user can
 hop several times through other nodes until it finds its way in a

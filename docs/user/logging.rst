@@ -292,12 +292,12 @@ Processing Structured Events
 
 This is work-in-progress, see:
 
--  ``tezos-admin-client show event-logging`` outputs the configuration
-   currently understood by ``tezos-admin-client`` (hence through the
+-  ``octez-admin-client show event-logging`` outputs the configuration
+   currently understood by ``octez-admin-client`` (hence through the
    ``TEZOS_EVENTS_CONFIG`` variable) and lists all the events it knows
    about.
--  ``tezos-admin-client output schema of <Event-Name> to <File-path>``
+-  ``octez-admin-client output schema of <Event-Name> to <File-path>``
    get the JSON-Schema for an event.
 
 Example:
-``tezos-admin-client output schema of block-seen-alpha to block-seen-alpha.json``
+``octez-admin-client output schema of block-seen-alpha to block-seen-alpha.json``

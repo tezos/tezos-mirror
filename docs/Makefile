@@ -53,7 +53,7 @@ manuals: \
 	 $(PROTOCOLS:%=%/octez-baker.html) \
 	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic
-	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
+	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
