@@ -21,18 +21,18 @@
     <form>
         <div>
             <label for="selectedLevel_begin">First bloc:</label>
-            <input name="level_" id="selectedLevel_begin" type="number" value="2412550" />
+            <input name="level_" id="selectedLevel_begin" type="number" value="179000" />
             <span id='tick_begin'></span>
             <br>
             <label for="selectedLevel_end">Last bloc:</label>
-            <input name="level_" id="selectedLevel_end" type="number" value="2412700" />
+            <input name="level_" id="selectedLevel_end" type="number" value="179050" />
             <span id='tick_end'></span>
             <br>
             <label for="selectedThreshold_begin">lower threshold time(second):</label>
             <input name="threshold" id="selectedThreshold_beg" type="number" value="1" />
             <br>
             <label for="selectedThreshold_end">higher threshold time(second):</label>
-            <input name="threshold" id="selectedThreshold_end" type="number" value="30" />
+            <input name="threshold" id="selectedThreshold_end" type="number" value="10" />
             <br>
             <input type="button" id="submit_" value="Rechercher ">
 
@@ -41,49 +41,23 @@
     <div id="gamma"></div>
     <script>
 
-        const server_adress = "http://78.193.200.52";
-        var directories = {};
-        var dict_data = {};
-        var directories = {};
-        var t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-        var t_baker; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
-        var t_recep; // date de réception du bloc 
-        const delay =
-            milliseconds =>
-                new Promise(resolve =>
-                    setTimeout(resolve, milliseconds));
-        async function main() {
+        const server_adress = "http://kathmandunet.kaml.fr:8880/";
+        function main() {
             try {
 
-                $.get(server_adress, null, function (text) {
-                    //directories=$(text).find("a").text(); //fonctionne !!! 
-                    $(text).find("a").each(function () {
-                        let s = $(this).text();
-                        //console.log(typeof(s));
-                        if (s.includes('-') == true) {
-                            //console.log(s);
-                            var minmax = s.split('-');
-                            if (+minmax[0] > 0 && +minmax[1] > 0) { // filtrer les autres fichiers 
-                                directories[s] = [+minmax[0], +minmax[1]]
-                            }
+                $('#submit_').mouseup(function (e) {
+                    beg_ = document.getElementById('selectedLevel_begin').value;
+                    end_ = document.getElementById('selectedLevel_end').value;
+                    threshold_low = document.getElementById('selectedThreshold_beg').value;
+                    threshold_high = document.getElementById('selectedThreshold_end').value;
+                    const range_t = range(+threshold_low, +threshold_high);
 
+                    let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
 
-                        }
-                    })
-                    $('#submit_').mouseup(async function (e) {
-                        beg_ = document.getElementById('selectedLevel_begin').value;
-                        end_ = document.getElementById('selectedLevel_end').value;
-                        threshold_low = document.getElementById('selectedThreshold_beg').value;
-                        threshold_high = document.getElementById('selectedThreshold_end').value;
-                        const range_t = range(+threshold_low, +threshold_high);
-
-                        await populate_v0(server_adress, beg_, end_, directories, dict_data);
-                        await delay((end_ - beg_) * 100)
                         console.log(dict_data)
-                        await tri_greeks(dict_data);
-                        await delay(3000)
-                        const results = await SeriesPercIntegration(range_t, t_op_pre_valide)
-                        await delay(10000)
+                        let t_op_valide_array = delays_distribution_of_operations(dict_data);
+                        console.log(t_op_valide_array)
+                        const results = SeriesPercIntegration(range_t, t_op_valide_array[0])
                         console.log(results)
                         chart_gamma(results)
 
@@ -91,7 +65,7 @@
 
                 })
 
-            } catch (e) {
+                } catch (e) {
                 console.log(e)
             }
         }

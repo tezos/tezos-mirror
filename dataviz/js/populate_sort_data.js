@@ -17,14 +17,14 @@ function populate_v1(server_adress, beg, end) { //dès lors qu'on aura accès au
         range_bloc.map((height) => {
             return axios
                 .get(server_adress + height + ".json")
-                .then(json_data => { 
+                .then(json_data => {
                     dict_data[height] = json_data.data;
                 }, error => { console.log(error) })
 
         })).then(_ => { return dict_data })
 }
 
-const populate_v0 = async function (server, beg, end, directories, dict_data) {
+const populate_v0 = function (server, beg, end, directories, dict_data) {
     var range_bloc = range(beg, end);
     range_bloc.forEach((a) => {
         Object.entries(directories).forEach(([k, v]) => {
@@ -44,13 +44,71 @@ const populate_v0 = async function (server, beg, end, directories, dict_data) {
     return dict_data
 }
 
+function get_info_bloc(dict_data) {
+    let t_delai_bloc = {};
+    let max_round = 0;
+    let t_baker = {}
+    Object.entries(dict_data).forEach(([va, v]) => {
+        if ("blocks" in v) {
+            v["blocks"].forEach((element) => {
+                let round = 0;
+                if ("round" in element) round = element["round"];
+                if (("reception_time" in element) && ("timestamp" in element)) t_delai_bloc[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
+                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
+                if (round > max_round) {
+                    max_round = round
+                }
+            });
+        }
+    });
+    return [t_delai_bloc, t_baker, max_round]
+}
+function delegate_delays_distribution_of_operations(dict_data, delegate) {
+    let t_valide = []
+    let complete_delays = delays_distribution_of_operations(dict_data)
+    let delays_endorsement = complete_delays[1]
+    let delays_pre_endorsement = complete_delays[0]
+    Object.entries(dict_data).forEach(([va, v]) => {
+        let t_baker = {};
+        if ("blocks" in v) {
+            v["blocks"].forEach((element) => {
+                let round = 0;
+                if ("round" in element) round = element["round"];
+                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
+            })
+        }
+        Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
+            if (baker_ops["delegate"] == delegate) {
+                if ("operations" in baker_ops)
+                    baker_ops["operations"].forEach((operation) => {
+                        let round_cib = 0;
+                        if ("round" in operation) round_cib = operation["round"];
+                        if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+                            let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                            if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                let t_op_pre_valide_i = delays_pre_endorsement[va][round_cib]
+                                t_op_pre_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_pre_valide_i.indexOf(delay)
+                                t_valide.push({ "type": "preendo", "bloc": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position in sample": position_of_delegate, "size of sample": t_op_pre_valide_i.length })
+                            }
+                            else if((va in delays_endorsement) && (round_cib in delays_endorsement[va])) {
+                                let t_op_valide_i = delays_endorsement[va][round_cib]
+                                t_op_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_valide_i.indexOf(delay)
+                                t_valide.push({ "type": "endo", "bloc": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size of sample": t_op_valide_i.length })
+                            }
+                        }
+                    })
+            }
+        })
+    });
+    return t_valide
+}
 
 function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
     let t_op_valide = {}; // t_op_erreur[k]= t_op_erreur_i
     let t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-    console.log(dict_data[179100])
     Object.entries(dict_data).forEach(([va, v]) => {
-        console.log(v);
         let t_op_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
         let t_op_pre_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
         let t_baker = {};
@@ -61,6 +119,7 @@ function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
                 t_op_valide_i[round] = []; // t_op_valide[i][t_approbations]
                 t_op_pre_valide_i[round] = [];//t_op_valide[i][t_pre_approbations]
+
             })
         }
         Object.entries(v["endorsements"]).forEach(([_k, baker_ops]) => {
@@ -85,7 +144,63 @@ function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
     return [t_op_pre_valide, t_op_valide]
 }
 
-const tri_consensus_operation_specific_address = async function (adress, dict_data) {
+function classify_operations(dict_data, delegate = "") {
+    let operations_logs = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
+    Object.entries(dict_data).forEach(([_, v]) => {
+        let t_baker = {};
+        if ("blocks" in v) {
+            v["blocks"].forEach((element) => {
+                let round = 0;
+                if ("round" in element) round = element["round"];
+                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
+                operations_logs[round] = { "approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] }, "pre_approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] } }
+            })
+            if ("endorsements" in v) {
+                Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
+                    if (baker_ops["delegate"] == delegate || delegate == "") { // To look at operation of a specific delegate 
+                        if ("operations" in baker_ops) {
+                            baker_ops["operations"].forEach((operation) => {
+                                let round_cib = 0;
+                                if ("round" in operation) round_cib = operation["round"];
+                                //Valide
+                                if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
+                                    let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                                    if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                        operations_logs[round_cib]["pre_approbations"]["valide"].push(baker_ops["delegate"]);
+                                    }
+                                    else { // Est-ce qu'on prend pas en compte le fait que l'endo soit inclus au bloc ?? 
+                                        operations_logs[round_cib]["approbations"]["valide"].push(baker_ops["delegate"]);
+                                    }
+                                }
+                                //Si l'OP est valide, reception time existe pas / est null, mais op incluse(endo) =>  preendo/endo SEQUESTRE
+                                if ((round_cib in t_baker) && (!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
+                                    if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                        operations_logs[round_cib]["pre_approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                    }
+                                    else if ("included_in_blocks" in operation) {
+                                        operations_logs[round_cib]["approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                    }
+                                }
+                                //Si l'OP est valide, reception time, mais non inclus au bloc => endo oublié
+                                if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
+                                    operations_logs[round_cib]["approbations"]["oublie"].push(baker_ops["delegate"]);
+                                }
+                                // Comment on fait les invalides ?? Si erreur autre que : op reçu avant bloc candidat
+                            });
+                        }
+                        else { // 0 operations => // => bloc missed by delegate
+                            console.log(operations_logs)
+                            operations_logs[0]["approbations"]["manque"].push(baker_ops["delegate"])
+                        }
+                    }
+                });
+            }
+        }
+    });
+    return operations_logs
+}
+/*
+const tri_consensus_operation_specific_address = function (adress, dict_data) {
     t_op_valide = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet valides 
     t_op_retard = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // 
     missed_block = [];
@@ -260,42 +375,19 @@ const tri_consensus_operation_specific_address = async function (adress, dict_da
         });
     } catch (e) { console.log(e) }
     console.log(t_op_valide, missed_block)
-}
+}*/
 
-const transf_consensus_operation_specific_address = async function (t_op_valide, missed_block) {
-    //Transformation de t_op_valide, missed_block en un format adapté à la visualisation : nvo fichier ( return_t_op_valide, return_missed_block)
-    for (const [bloc_, value0] of Object.entries(t_op_valide["reception"]["endo"])) {
-        return_t_op_valide.push({ type: "endo", bloc: +bloc_, d_reception: value0, d_timestamps: t_op_valide["timestamp"]["endo"][bloc_], cat: "Endorsement" })
-
-    }
-    for (const [round_, value0] of Object.entries(t_op_valide["reception"]["preendo"])) {
-        for (const [bloc_, value1] of Object.entries(value0)) {
-
-            return_t_op_valide.push({ type: "preendo", bloc: +bloc_, d_reception: value1, d_timestamps: t_op_valide["timestamp"]["preendo"][round_][bloc_], cat: "Preendorsement round: " + round_ })
-        }
-
-    }
-    console.log(missed_block);
-    for (var elem0 in missed_block) {
-        for (var elem1 in missed_block[elem0][1]) {
-            //console.log(elem1)
-            return_missed.push({ type: "missed", bloc: +missed_block[elem0][0], round: missed_block[elem0][1][elem1] })
-        }
-
-    }
-
-    return ([return_t_op_valide, return_missed])
-}
-
-const tri_endorsement_reception_delays_for_a_block = async function (va_, dict_data) {
-    console.log(dict_data)
-    va = va_;
-    t_baker = {};
-    t_delai_bloc = {};
-    t_op_erreur = { "avance": { "t_approbations": [], "t_pre_approbations": [] } }; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-    t_recep = {};// date de réception du bloc 
-    max_round = 0; // round final du bloc
-    ano_desc = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
+/*
+const tri_endorsement_reception_delays_for_a_block = function (va_, dict_data) {
+    //console.log(dict_data)
+    let va = va_;
+    let t_baker = {};
+    let t_delai_bloc = {};
+    let t_op_valide = {};
+    let t_op_erreur = { "avance": { "t_approbations": [], "t_pre_approbations": [] } }; //  enlever
+    let t_recep = {};// date de réception du bloc 
+    let max_round = 0; // round final du bloc
+    let ano_desc = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
 
     try {
 
@@ -377,77 +469,44 @@ const tri_endorsement_reception_delays_for_a_block = async function (va_, dict_d
                         }
                         else { //L'OP est valide ?
                             if (("kind" in v["operations"][i])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                if (max_round == round_cib) {
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            t_op_valide[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                            ano_desc[round_cib]["pre_approbations"]["valide"].push(v["delegate"]);
-
-                                        }
-                                        else {
-                                            //console.log("date de récep pas dispo");
-                                            ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                        }
-                                    } else {
-                                        // jamais reçu => Manquées
-                                        ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                    }
-                                }
-                                else {
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            t_op_valide[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                            ano_desc[round_cib]["pre_approbations"]["valide"].push(v["delegate"]);
-                                        }
-                                        else {
-                                            //date de récep pas dispo et valide
-                                            ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                        }
-                                    } else {
-                                        // jamais reçu => Manquées également 
-                                        ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                    }
-                                }
-                            }
-                            else {//endo
-                                if (max_round == round_cib) {
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
-                                            if (("included_in_blocks" in v["operations"][i])) {
-                                                t_op_valide[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                                ano_desc[round_cib]["approbations"]["valide"].push(v["delegate"]);
-                                            }
-                                            else {
-                                                //console.log("Pas d'inclusion au bloc => Approbation oubliée");
-                                                ano_desc[round_cib]["approbations"]["oublie"].push(v["delegate"]);
-                                            }
-                                        }
-                                        else {
-                                            //date de récep pas dispo
-                                            ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
-                                        }
+                                if (("reception_time" in v["operations"][i])) {
+                                    if (v["operations"][i]["reception_time"] != null) {
+                                        t_op_valide[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
+                                        ano_desc[round_cib]["pre_approbations"]["valide"].push(v["delegate"]);
                                     }
                                     else {
-                                        // jamais reçu => Manquées
-                                        ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
+                                        //console.log("date de récep pas dispo");
+                                        ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
                                     }
+                                } else {
+                                    // jamais reçu => Manquées
+                                    ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
                                 }
-                                else {
-                                    if (("reception_time" in v["operations"][i])) {
-                                        if (v["operations"][i]["reception_time"] != null) {
+
+                            }
+                            else {//endo
+                                if (("reception_time" in v["operations"][i])) {
+                                    if (v["operations"][i]["reception_time"] != null) {
+                                        if (("included_in_blocks" in v["operations"][i])) {
                                             t_op_valide[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
                                             ano_desc[round_cib]["approbations"]["valide"].push(v["delegate"]);
                                         }
                                         else {
-                                            //date de récep pas dispo
-                                            ano_desc[round_cib]["approbations"]["inconnu"].push([v["delegate"], "pas d'erreur + date de recep null"]);
-                                            ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
+                                            //console.log("Pas d'inclusion au bloc => Approbation oubliée");
+                                            ano_desc[round_cib]["approbations"]["oublie"].push(v["delegate"]);
                                         }
-                                    } else {
-                                        console.log("jamais reçu => Manquées également");
+                                    }
+                                    else {
+                                        //date de récep pas dispo
                                         ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
                                     }
                                 }
+                                else {
+                                    // jamais reçu => Manquées
+                                    ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
+                                }
+
+
                             }
                         }
                     }
@@ -465,14 +524,25 @@ const tri_endorsement_reception_delays_for_a_block = async function (va_, dict_d
         console.log(t_op_erreur);
         console.log("t_valide");
         console.log(t_op_valide);
+        console.log("delays_distribution_of_operations")
+        let distrib_t = delays_distribution_of_operations(dict_data)
+        console.log(distrib_t)
         console.log("ano_desc");
         console.log(ano_desc);
-        resume_obs(ano_desc, t_baker);
-        replaceDelegate(ano_desc);
+        let logs_operation = classify_operations(dict_data)
+        console.log("ano_desc", ano_desc);
+        console.log('logs_operation', logs_operation)
+        resume_obs(logs_operation, t_baker);
+        replaceDelegate(logs_operation);
         for (let i = 0; i <= max_round; i++) {
-            chart('p', [t_op_valide[i]["t_pre_approbations"], t_op_valide[i]["t_approbations"]], va, i, t_delai_bloc[i]);
+            //chart('p', [t_op_valide[i]["t_pre_approbations"], t_op_valide[i]["t_approbations"]], va, i, t_delai_bloc[i]);
+            let va = va_;
+            chart('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
             console.log(i);
-            console.log(t_delai_bloc[i]);
+            console.log(t_delai_bloc[i]); .0
+            2.5
+            3.0
+            3.5
         }
         // Affichage du resume
 
@@ -482,9 +552,10 @@ const tri_endorsement_reception_delays_for_a_block = async function (va_, dict_d
     }
 
 }
+*/
 
 
-const percIntegration = async function (threshold, t_op_pre_valide) {
+const percIntegration = function (threshold, t_op_pre_valide) {
     console.log(t_op_pre_valide[2412550])
     let t_cible = threshold;
     var pI_level = {};
@@ -493,19 +564,20 @@ const percIntegration = async function (threshold, t_op_pre_valide) {
         pI_level[bloc] = {};
         try {
             console.log(typeof (v_bloc))
-            for (let [level, v_level] of Object.entries(v_bloc)) {
+            Object.entries(v_bloc).forEach(([level, v_level]) => {
+                //for (let [level, v_level] of Object.entries(v_bloc)) {
                 var card_valide_tcible = 0;
-                for (const element of v_level) {
+                Object.entries(v_level).forEach(element => {
                     if (element <= t_cible) {
                         card_valide_tcible += 1;
                     }
-                }
+                });
 
                 if (isNaN(card_valide_tcible / v_level.length) == false) {
                     pI_level[bloc][level] = (card_valide_tcible / (v_level.length))
                     d3_pI_level.push({ bloc: bloc, level: level, pI: (card_valide_tcible / v_level.length) })
                 }
-            }
+            });
         } catch (e) { console.log(e) }
     });
 
@@ -545,11 +617,11 @@ const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
 
 }
 
-const SeriesPercIntegration = async function (t_cibles, t_op_pre_valide) {
+const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure endorsing power 
     var t_pI = [];
-    for (const t_cible of t_cibles) {
-        var pI_level = {};
-        var l_rounds = [];
+    t_cibles.forEach((t_cible) => {
+        var pI_level = {}; // Pour chaque temps seuil, un dictionnaire garde la quantité de pre-endo reçu, x bloc et y round 
+        var l_rounds = []; // 
         Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
             pI_level[bloc] = {};
             Object.entries(v_bloc).forEach(([level, v_level]) => {
@@ -560,31 +632,23 @@ const SeriesPercIntegration = async function (t_cibles, t_op_pre_valide) {
                         card_valide_tcible += 1;
                     }
                 }
-
                 if (isNaN(card_valide_tcible / v_level.length) == false) {
                     pI_level[bloc][level] = (card_valide_tcible / (v_level.length))
                 }
             })
-
         });
 
         l_rounds = l_rounds.filter(onlyUnique);
-        console.log(l_rounds)
-
-        for (const r in l_rounds) {
+        l_rounds.forEach((r) => {
             var pi_l = [];
-            Object.entries(pI_level).forEach(([level, v_level]) => {
+            Object.entries(pI_level).forEach(([_, v_level]) => {
                 if (r in v_level) {
                     pi_l.push(v_level[r]);
-                    console.log(v_level[r])
                 }
-
             });
             t_pI.push({ temps: +t_cible, round: r, value: (pi_l.reduce((a, b) => a + b, 0) / pi_l.length) });
-            console.log({ temps: +t_cible, round: r, value: (pi_l.reduce((a, b) => a + b, 0) / pi_l.length) })
-        }
-    }
-    console.log(t_pI)
+        });
+    })
     return t_pI
 }
 
@@ -592,231 +656,234 @@ const SeriesPercIntegration = async function (t_cibles, t_op_pre_valide) {
 
 
 function chart(dom, data, niveau, round, delai_recep_bloc_) {
-    var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
-        width = 1000, // outer width of chart, in pixels
-        height = 400; // outer height of chart, in pixels 
-    if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du niveau dernièrement observé 
-        console.log(niveau + " supprimer si round 0 !!!");
-        const e = document.querySelector("p");
-        while (e.firstChild) {
-            e.removeChild(e.lastChild);
-            console.log(document.querySelector("p").childNodes);
+    if (!(isEmpty(data)) && (!([[undefined, undefined]].includesArray(data)))) {
+        var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
+            width = 1000, // outer width of chart, in pixels
+            height = 400; // outer height of chart, in pixels 
+        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du niveau dernièrement observé 
+            console.log(niveau + " supprimer si round 0 !!!");
+            const e = document.querySelector("p");
+            while (e.firstChild) {
+                e.removeChild(e.lastChild);
+                console.log(document.querySelector("p").childNodes);
+            }
+
+        }
+        const svg = d3.select("body").select(dom).append("svg").attr("height", height).attr("viewBox", [0, 0, width, height]);
+
+        const xAxis = svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`);
+        const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);//.append("title").text("↑ # Délégués");
+        const graph = svg.append("g").attr("fill", "steelblue");
+
+        let minValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
+
+        let maxValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
+
+        for (const [key, value] of Object.entries(data[0])) {
+            if (value > maxValue) {
+                maxValue = value;
+            }
+            if (value < minValue) {
+                minValue = value;
+            }
         }
 
+        bins = d3.bin().thresholds(maxValue - minValue)(data[0])
+
+        for (const [key, value] of Object.entries(data[1])) {
+            if (value > maxValue) {
+                maxValue = value;
+            }
+            if (value < minValue) {
+                minValue = value;
+            }
+        }
+
+        bins2 = d3.bin().thresholds(maxValue - minValue)(data[1]);
+        bins3 = d3.bin().thresholds(maxValue - minValue)([delai_recep_bloc_]);
+        console.log(bins3);
+
+        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([delai_recep_bloc_])); // aide à définir x: Mauavise idéé 
+
+        x = d3.scaleLinear()
+            .domain([0, bins_tot[bins_tot.length - 1].x1])
+            .range([margin.left, width - margin.right]);
+
+        y = d3.scaleLinear()
+            .domain([0, d3.max(bins_tot, d => d.length)]).nice()
+            .range([height - margin.bottom, margin.top])
+
+        graph.selectAll("rect")
+            .data(bins)
+            .join("rect")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("width", 15)
+            .attr("y", d => y(d.length))
+            .attr("height", d => y(0) - y(d.length))
+            .style("fill", "#69b3a2")
+            .style("opacity", 0.6);
+
+        graph.selectAll("rect2")
+            .data(bins2)
+            .join("rect")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("width", 15)
+            .attr("y", d => y(d.length))
+            .attr("height", d => y(0) - y(d.length))
+            .style("fill", "#404080")
+            .style("opacity", 0.6);
+
+        graph.selectAll("rect3")//block
+            .data(bins3)
+            .join("rect")
+            .attr("x", d => x(d.x0) + 1)
+            .attr("width", d => Math.max(2, x(d.x1) - x(d.x0) - 1))
+            .attr("y", margin.top)
+            .attr("height", height - margin.bottom - margin.top)
+            .style("fill", "rgba(198, 0, 0, 1)")
+            .style("opacity", 0.6);
+
+        svg.append("text")
+            .attr("x", (width / 2))
+            .attr("y", 15)
+            .attr("text-anchor", "middle")
+            .style("font-size", "15px")
+            .style("text-decoration", "underline")
+            .text("Histogram of block # " + niveau + " reception delays, for round = " + round);
+
+        svg.append("text")
+            .attr("x", -margin.left + 40)
+            .attr("y", 15)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("↑ # Delegates");
+
+        svg.append("text")
+            .attr("x", width)
+            .attr("y", height)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "end")
+            .text("reception times (seconds) →");
+
+        // Handmade legend
+        svg.append("circle").attr("cx", width - 130).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
+        svg.append("circle").attr("cx", width - 130).attr("cy", 60).attr("r", 6).style("fill", "#404080")
+        svg.append("text").attr("x", width - 110).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("text").attr("x", width - 110).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("circle").attr("cx", width - 130).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
+        svg.append("text").attr("x", width - 110).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
+
+        xAxis.call(d3.axisBottom(x).tickSizeOuter(2));
+        yAxis.call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
     }
-    const svg = d3.select("body").select(dom).append("svg").attr("height", height).attr("viewBox", [0, 0, width, height]);
-
-    const xAxis = svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`);
-    const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);//.append("title").text("↑ # Délégués");
-    const graph = svg.append("g").attr("fill", "steelblue");
-
-    let minValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
-
-    let maxValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
-
-    for (const [key, value] of Object.entries(data[0])) {
-        if (value > maxValue) {
-            maxValue = value;
-        }
-        if (value < minValue) {
-            minValue = value;
-        }
-    }
-
-    bins = d3.bin().thresholds(maxValue - minValue)(data[0])
-
-    for (const [key, value] of Object.entries(data[1])) {
-        if (value > maxValue) {
-            maxValue = value;
-        }
-        if (value < minValue) {
-            minValue = value;
-        }
-    }
-
-    bins2 = d3.bin().thresholds(maxValue - minValue)(data[1]);
-    bins3 = d3.bin().thresholds(maxValue - minValue)([delai_recep_bloc_]);
-    console.log(bins3);
-
-    bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([delai_recep_bloc_])); // aide à définir x: Mauavise idéé 
-
-    x = d3.scaleLinear()
-        .domain([0, bins_tot[bins_tot.length - 1].x1])
-        .range([margin.left, width - margin.right]);
-
-    y = d3.scaleLinear()
-        .domain([0, d3.max(bins_tot, d => d.length)]).nice()
-        .range([height - margin.bottom, margin.top])
-
-    graph.selectAll("rect")
-        .data(bins)
-        .join("rect")
-        .attr("x", d => x(d.x0) + 1)
-        .attr("width", 15)
-        .attr("y", d => y(d.length))
-        .attr("height", d => y(0) - y(d.length))
-        .style("fill", "#69b3a2")
-        .style("opacity", 0.6);
-
-    graph.selectAll("rect2")
-        .data(bins2)
-        .join("rect")
-        .attr("x", d => x(d.x0) + 1)
-        .attr("width", 15)
-        .attr("y", d => y(d.length))
-        .attr("height", d => y(0) - y(d.length))
-        .style("fill", "#404080")
-        .style("opacity", 0.6);
-
-    graph.selectAll("rect3")//block
-        .data(bins3)
-        .join("rect")
-        .attr("x", d => x(d.x0) + 1)
-        .attr("width", d => Math.max(2, x(d.x1) - x(d.x0) - 1))
-        .attr("y", margin.top)
-        .attr("height", height - margin.bottom - margin.top)
-        .style("fill", "rgba(198, 0, 0, 1)")
-        .style("opacity", 0.6);
-
-    svg.append("text")
-        .attr("x", (width / 2))
-        .attr("y", 15)
-        .attr("text-anchor", "middle")
-        .style("font-size", "15px")
-        .style("text-decoration", "underline")
-        .text("Histogram of block # " + niveau + " reception delays, for round = " + round);
-
-    svg.append("text")
-        .attr("x", -margin.left + 40)
-        .attr("y", 15)
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "start")
-        .text("↑ # Delegates");
-
-    svg.append("text")
-        .attr("x", width)
-        .attr("y", height)
-        .attr("fill", "currentColor")
-        .attr("text-anchor", "end")
-        .text("reception times (seconds) →");
-
-    // Handmade legend
-    svg.append("circle").attr("cx", width - 130).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
-    svg.append("circle").attr("cx", width - 130).attr("cy", 60).attr("r", 6).style("fill", "#404080")
-    svg.append("text").attr("x", width - 110).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-    svg.append("text").attr("x", width - 110).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-    svg.append("circle").attr("cx", width - 130).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
-    svg.append("text").attr("x", width - 110).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
-
-    xAxis.call(d3.axisBottom(x).tickSizeOuter(2));
-    yAxis.call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
 }
 
-const resume_obs = async function (data, t_baker, deleg_seq_ou_nc) {
+const resume_obs = function (data, t_baker) {
+        console.log(data);
+        Object.entries(data).forEach(([level, el]) => {
+            Object.entries(el).forEach(([k1, v1]) => {
+                Object.entries(v1).forEach(([k2, v2]) => {
+                    var new_v2 = [];
+                    for (const element of v2) {
+                        var adress_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
+                        new_v2.push(element + " ");
+                    }
+                    data[level][k1][k2] = new_v2;
+                })
 
-    console.log(data);
-    Object.entries(data).forEach(([level, el]) => {
-        Object.entries(el).forEach(([k1, v1]) => {
-            Object.entries(v1).forEach(([k2, v2]) => {
-                var new_v2 = [];
-                for (const element of v2) {
-                    var adress_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
-                    new_v2.push(element + " ");
-                }
-                data[level][k1][k2] = new_v2;
             })
+        });
+        var body = document.getElementById("resume");
+        var titre_ = document.createElement('h2');
+        titre_.appendChild(document.createTextNode("summary of operations received"));
+        try {
+            while (document.getElementById("resume").querySelector("h2")) {
+                const elements2 = document.getElementById("resume").querySelector("h2")
+                elements2.parentElement.removeChild(elements2);
 
+            }
+            const elements = document.getElementById("resume").querySelector("table");
+            elements.parentElement.removeChild(elements);
+        } catch (e) {
+            //console.log(e)
+        }
+        var tbl = document.createElement('table');
+        tbl.style.width = '100%';
+        tbl.setAttribute('border', '1');
+        var tbdy = document.createElement('tbody');
+
+        let manque = ["Manquées", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
+        let entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
+
+        var tr_manque = document.createElement('tr');
+        var tr_entete = document.createElement('tr');
+
+        entete.forEach((element) => {
+            var th = document.createElement('th');
+            th.appendChild(document.createTextNode(element));
+            tr_entete.appendChild(th);
         })
-    });
-    var body = document.getElementById("resume");
-    var titre_ = document.createElement('h2');
-    titre_.appendChild(document.createTextNode("summary of operations received"));
-    try {
-        while (document.getElementById("resume").querySelector("h2")) {
-            const elements2 = document.getElementById("resume").querySelector("h2")
-            elements2.parentElement.removeChild(elements2);
+        tbdy.appendChild(tr_entete);
 
-        }
-        const elements = document.getElementById("resume").querySelector("table");
-        elements.parentElement.removeChild(elements);
-    } catch (e) {
-        //console.log(e)
-    }
-    var tbl = document.createElement('table');
-    tbl.style.width = '100%';
-    tbl.setAttribute('border', '1');
-    var tbdy = document.createElement('tbody');
+        manque.forEach((element) => {
+            var td = document.createElement('td');
+            td.appendChild(document.createTextNode(element));
+            tr_manque.appendChild(td);
+        })
+        tbdy.appendChild(tr_manque);
 
-    let manque = ["Manquées", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
-    let entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
+        Object.entries(data).forEach(([k, v]) => {
+            if (k in t_baker) {
+                var tr_round = document.createElement('tr');
+                tr_round.appendChild(document.createTextNode("round:" + k));
+                tbdy.appendChild(tr_round);
 
-    var tr_manque = document.createElement('tr');
-    var tr_entete = document.createElement('tr');
+                let valide = ["valides", (v["approbations"]["valide"]).length];//, v["approbations"]["valide"]];//.slice(0,10)]; // à revoir 
+                var tr_valide = document.createElement('tr');
+                valide.forEach((element) => {
+                    var td = document.createElement('td');
 
-    entete.forEach((element) => {
-        var th = document.createElement('th');
-        th.appendChild(document.createTextNode(element));
-        tr_entete.appendChild(th);
-    })
-    tbdy.appendChild(tr_entete);
+                    td.appendChild(document.createTextNode(element));
+                    tr_valide.appendChild(td);
+                })
+                tbdy.appendChild(tr_valide);
 
-    manque.forEach((element) => {
-        var td = document.createElement('td');
-        td.appendChild(document.createTextNode(element));
-        tr_manque.appendChild(td);
-    })
-    tbdy.appendChild(tr_manque);
+                let oublie = ["Oubliées", (v["approbations"]["oublie"]).length, v["approbations"]["oublie"]]; // à revoir 
+                var tr_oublie = document.createElement('tr');
+                oublie.forEach((element) => {
+                    var td = document.createElement('td');
+                    td.appendChild(document.createTextNode(element));
+                    tr_oublie.appendChild(td);
+                })
+                tbdy.appendChild(tr_oublie);
 
-    Object.entries(data).forEach(([k, v]) => {
-        if (k in t_baker) {
-            var tr_round = document.createElement('tr');
-            tr_round.appendChild(document.createTextNode("round:" + k));
-            tbdy.appendChild(tr_round);
+                let invalide = ["Invalides", (v["approbations"]["invalide"]).length, v["approbations"]["invalide"]]; // à revoir 
+                var tr_invalide = document.createElement('tr');
+                invalide.forEach((element) => {
+                    var td = document.createElement('td');
+                    td.appendChild(document.createTextNode(element));
+                    tr_invalide.appendChild(td);
+                })
+                tbdy.appendChild(tr_invalide);
 
-            let valide = ["valides", (v["approbations"]["valide"]).length];//, v["approbations"]["valide"]];//.slice(0,10)]; // à revoir 
-            var tr_valide = document.createElement('tr');
-            valide.forEach((element) => {
-                var td = document.createElement('td');
+                let inconnu = ["Inconnu", (v["approbations"]["inconnu"]).length, v["approbations"]["inconnu"]]; // à revoir 
+                var tr_inconnu = document.createElement('tr');
+                inconnu.forEach((element) => {
+                    var td = document.createElement('td');
+                    td.appendChild(document.createTextNode(element));
+                    tr_inconnu.appendChild(td);
+                })
+            }
+        });
 
-                td.appendChild(document.createTextNode(element));
-                tr_valide.appendChild(td);
-            })
-            tbdy.appendChild(tr_valide);
-
-            let oublie = ["Oubliées", (v["approbations"]["oublie"]).length, v["approbations"]["oublie"]]; // à revoir 
-            var tr_oublie = document.createElement('tr');
-            oublie.forEach((element) => {
-                var td = document.createElement('td');
-                td.appendChild(document.createTextNode(element));
-                tr_oublie.appendChild(td);
-            })
-            tbdy.appendChild(tr_oublie);
-
-            let invalide = ["Invalides", (v["approbations"]["invalide"]).length, v["approbations"]["invalide"]]; // à revoir 
-            var tr_invalide = document.createElement('tr');
-            invalide.forEach((element) => {
-                var td = document.createElement('td');
-                td.appendChild(document.createTextNode(element));
-                tr_invalide.appendChild(td);
-            })
-            tbdy.appendChild(tr_invalide);
-
-            let inconnu = ["Inconnu", (v["approbations"]["inconnu"]).length, v["approbations"]["inconnu"]]; // à revoir 
-            var tr_inconnu = document.createElement('tr');
-            inconnu.forEach((element) => {
-                var td = document.createElement('td');
-                td.appendChild(document.createTextNode(element));
-                tr_inconnu.appendChild(td);
-            })
-        }
-    });
-
-    tbl.appendChild(tbdy);
-    body.appendChild(titre_);
-    body.appendChild(tbl);
+        tbl.appendChild(tbdy);
+        body.appendChild(titre_);
+        body.appendChild(tbl);
+    
 }
 
 function chart_gamma(data) {
+    if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),
         width = 850 - margin.left - margin.right;//1000, // outer width of chart, in pixels
     height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
@@ -901,10 +968,12 @@ function chart_gamma(data) {
 
 
     } catch (e) { console.log(e) }
-
+    }else{
+        alert("Invalid value. Enter valid threshold range and/or valid block level range.")
+    }
 }
 
-const replaceDelegate = async function (data) {
+const replaceDelegate = function (data) {
     if (Object.keys(data).length <= 1) {
 
         try {
@@ -1008,6 +1077,7 @@ const replaceDelegate = async function (data) {
 }
 
 function chart_alpha(data) {
+    if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
         width = 560 - margin.left - margin.right;//1000, // outer width of chart, in pixels
     height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
@@ -1085,10 +1155,14 @@ function chart_alpha(data) {
 
 
     } catch (e) { console.log(e) }
+}else{
+    alert("Invalid value. Enter valid threshold and/or valid block level range.")
+}
 
 }
 
 function chart_beta(data) {
+    if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
         width = 800 - margin.left - margin.right;//1000, // outer width of chart, in pixels
     height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
@@ -1159,120 +1233,138 @@ function chart_beta(data) {
             .text(" # bloc →");
 
     } catch (e) { console.log(e) }
-
+    }else{
+        alert("erreur")
+    }
 }
 
 function chart_consensus_operation_specific_address(data) {
-    console.log(data)
-    var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
-        width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-    height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
-    try {
+    if (!(isEmpty(data))) {
+        //console.log(data)
+        var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
+            width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
         try {
-            while (document.getElementById("dataviz").querySelector("svg")) {
-                const elements3 = document.getElementById("dataviz").querySelector("svg");
-                document.getElementById("dataviz").removeChild(elements3);
+            try {
+                while (document.getElementById("dataviz").querySelector("svg")) {
+                    const elements3 = document.getElementById("dataviz").querySelector("svg");
+                    document.getElementById("dataviz").removeChild(elements3);
+                }
+            } catch (e) {
+                console.log(e)
             }
-        } catch (e) {
-            console.log(e)
-        }
-        const svg = d3.select("body").select("#dataviz").append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom);
+            const svg = d3.select("body").select("#dataviz").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom);
 
-        const svgg = svg.append("g")
-            .attr("transform",
-                "translate(" + margin.left + "," + margin.top + ")");
+            const svgg = svg.append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
 
-        var myX = d3.map(data, d => d.bloc)
-        var myY = d3.map(data, d => d.d_timestamps)
-        console.log("my", myX, myY);
+            var myX = d3.map(data, d => d.bloc)
+            var myY = d3.map(data, d => d.timestamp_delay)
+            //console.log("my", myX, myY);
 
-        var sumstat = d3.group(data, d => d.cat);
+            var sumstat = d3.group(data, d => d.cat);
+            //console.log(sumstat)
 
-        // Add X axis --> it is a date format
-        var x = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.bloc))
-            .range([0, width]);
-        svgg.append("g")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(x).ticks(5));
+            // Add X axis --> it is a date format
+            var x = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.bloc))
+                .range([0, width]);
+            svgg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x).ticks(5));
 
-        // Add Y axis
-        var y = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.d_timestamps))
-            .range([height, 0]);
-        svgg.append("g")
-            .attr("transform", "translate(0,0)")
-            .call(d3.axisLeft(y).tickSizeOuter(0));
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.timestamp_delay))
+                .range([height, 0]);
+            svgg.append("g")
+                .attr("transform", "translate(0,0)")
+                .call(d3.axisLeft(y).tickSizeOuter(0));
 
-        // color palette
-        var res = Array.from(sumstat.keys()); // list of group names
-        var color = d3.scaleOrdinal()
-            .domain(res)
-            .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'])
+            // color palette
+            var res = Array.from(sumstat.keys()); // list of group names
+            var color = d3.scaleOrdinal()
+                .domain(res)
+                .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'])
 
-        var legend = d3.legendColor().scale(color);
+            var legend = d3.legendColor().scale(color);
 
-        svgg.append("g").attr("transform", "translate(" + (width) + ",10)").call(legend);
+            svgg.append("g").attr("transform", "translate(" + (width) + ",10)").call(legend);
 
-        //MAJ
-        var color_dots = d3.scaleOrdinal()
-            .domain(["Endorsement", "Preendorsement round: 0", "Preendorsement round: 1", "Preendorsement round: 2", "Preendorsement round: 3", "Preendorsement round: 4", "Preendorsement round: 5", "Preendorsement round: 6", "Preendorsement round: 7"])
-            .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'])
-
-        svgg.append('g')
-            .selectAll("dot")
-            .data(data, function (d) { return d.bloc + ':' + d.d_timestamps; })
-            .enter()
-            .append("circle")
-            .attr("fill", "#000000")
-            .attr("stroke", "none")
-            .attr('stroke-width', 1.5)
-            .attr("cx", function (d) { return x(d.bloc) })
-            .attr("cy", function (d) { return y(d.d_timestamps) })
-            .attr("r", 3)
-            .style("fill", function (d) { return color_dots(d.cat) })
-            .on("mouseover", function (event, d) {// pour afficher les infos d'un point : https://stackoverflow.com/questions/67473725/how-to-fix-undefined-issue-on-d3-tooltip
-                var xPosition = parseFloat(d3.select(this).attr("cx"));
-                var yPosition = parseFloat(d3.select(this).attr("cy"));
+            //MAJ
+            var color_dots = d3.scaleOrdinal()
+                .domain(["Endorsement", "Preendorsement round 0", "Preendorsement round 1", "Preendorsement round 2", "Preendorsement round 3", "Preendorsement round 4", "Preendorsement round 5", "Preendorsement round 6", "Preendorsement round 7"])
+                .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999']);
+            //ar legend = d3.legendColor().scale(color_dots);
 
 
-                svg.append("text")
-                    .attr("id", "tooltip")
-                    .attr("x", xPosition)
-                    .attr("y", yPosition)
-                    .text("Bloc: " + d.bloc)
 
-            })
-            .on("mouseout", function () {
+            svgg.append('g')
+                .selectAll("dot")
+                .data(data, function (d) { return d.bloc + ':' + d.timestamp_delay; })
+                .enter()
+                .append("circle")
+                .attr("fill", "#000000")
+                .attr("stroke", "none")
+                .attr('stroke-width', 1.5)
+                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cy", function (d) { return y(d.timestamp_delay) })
+                .attr("r", 3)
+                .style("fill", function (d) { return color(d.cat) })
+                .on("mouseover", function (event, d) {// pour afficher les infos d'un point : https://stackoverflow.com/questions/67473725/how-to-fix-undefined-issue-on-d3-tooltip
+                    var xPosition = parseFloat(d3.select(this).attr("cx"));
+                    var yPosition = parseFloat(d3.select(this).attr("cy"));
 
-                //Remove the tooltip
-                d3.select("#tooltip").remove();
-            }
-            )
 
-        svgg.append("text")
-            .attr("x", -margin.left + 40)
-            .attr("y", -5)
-            .attr("fill", "currentColor")
-            .attr("text-anchor", "start")
-            .text("↑ Delays between operations receipt time and candidate block timestamps (seconds)");
+                    svg.append("text")
+                        .attr("id", "tooltip")
+                        .attr("x", xPosition)
+                        .attr("y", yPosition)
+                        .text("Bloc: " + d.bloc)
 
-        svgg.append("text")
-            .attr("x", width + margin.right - 120)
-            .attr("y", height)
-            .attr("fill", "currentColor")
-            .attr("text-anchor", "end")
-            .text(" # Bloc →");
+                })
+                .on("mouseout", function () {
 
-        svgg.append("text")
-            .attr("x", width + 40)
-            .attr("y", 0)
-            .attr("fill", "currentColor")
-            .attr("text-anchor", "end")
-            .text("Type:");
+                    //Remove the tooltip
+                    d3.select("#tooltip").remove();
+                }
+                )
 
-    } catch (e) { console.log(e) }
+            svgg.append("text")
+                .attr("x", -margin.left + 40)
+                .attr("y", -5)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "start")
+                .text("↑ Delays between operations receipt time and candidate block timestamps (seconds)");
 
+            svgg.append("text")
+                .attr("x", width + margin.right - 120)
+                .attr("y", height)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text(" # Bloc →");
+
+            svgg.append("text")
+                .attr("x", width + 40)
+                .attr("y", 0)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text("Type:");
+
+        } catch (e) { console.log(e) }
+    }
+    else{
+            alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc ")
+    }
+}
+
+function isEmpty(obj) {
+    return Object.keys(obj).length === 0;
+}
+
+Array.prototype.includesArray = function (arr) {
+    return this.map(i => JSON.stringify(i)).includes(JSON.stringify(arr))
 }

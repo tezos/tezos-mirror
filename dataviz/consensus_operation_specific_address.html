@@ -20,80 +20,40 @@
     <form>
         <div>
             <label for="selectedLevel_begin">First bloc:</label>
-            <input name="level_" id="selectedLevel_begin" type="number" value="2497000" />
+            <input name="level_" id="selectedLevel_begin" type="number" value="179000" />
             <span id='tick_begin'></span>
             <br>
             <label for="selectedLevel_end">Last bloc:</label>
-            <input name="level_" id="selectedLevel_end" type="number" value="2497100" />
+            <input name="level_" id="selectedLevel_end" type="number" value="179020" />
             <span id='tick_end'></span>
             <br>
             <label for="adress_">adresse:</label>
-            <input name="adress_" id="adress_" type="string" value="tz1VQnqCCqX4K5sP3FNkVSNKTdCAMJDd3E1n" />
+            <input name="adress_" id="adress_" type="string" value="tz1iZ9LkpAhN8X1L6RpBtfy3wxpEWzFrXz8j" />
             <input type="button" id="submit_" value="Rechercher ">
 
         </div>
     </form>
     <script>
         var dict_data = {};
-        const server_adress = "http://78.193.200.52";
-        var directories = {};
-        var t_op_valide = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet valides 
-        var return_t_op_valide = []
-        var t_op_retard = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // 
-        var missed_block = [];
-        var return_missed = [];
-        var op_sequestre = [];
-        var op_oublies = [];
-        var baker;
-        var t_baker = {}; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
-        var t_recep = {}; // date de réception du bloc 
-        var t_delai_bloc = {};
-        var round_bloc; // round final du bloc
-        var ano_desc = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
-
-        const delay =
-            milliseconds =>
-                new Promise(resolve =>
-                    setTimeout(resolve, milliseconds));
-        async function main() {
+        const server_adress = "http://kathmandunet.kaml.fr:8880/";
+        
+        function main() {
             try {
+                $('#submit_').mouseup(async function (e) {
+                    beg_ = document.getElementById('selectedLevel_begin').value;
+                    end_ = document.getElementById('selectedLevel_end').value;
+                    adresse = document.getElementById('adress_').value;
 
-                $.get(server_adress, null, function (text) {
-                    //directories=$(text).find("a").text(); //fonctionne !!! 
-                    $(text).find("a").each(function () {
-                        let s = $(this).text();
-                        //console.log(typeof(s));
-                        if (s.includes('-') == true) {
-                            //console.log(s);
-                            var minmax = s.split('-');
-                            if (+minmax[0] > 0 && +minmax[1] > 0) { // filtrer les autres fichiers 
-                                directories[s] = [+minmax[0], +minmax[1]]
-                            }
-                        }
+                    let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
+                        let t_valide=delegate_delays_distribution_of_operations(dict_data, adresse);
+                        //console.log(t_valide)
+                        //const results = transf_consensus_operation_specific_address(t_op_valide, missed_block);
+                        chart_consensus_operation_specific_address(t_valide)
                     })
-                    $('#submit_').mouseup(async function (e) {
-                        beg_ = document.getElementById('selectedLevel_begin').value;
-                        end_ = document.getElementById('selectedLevel_end').value;
-                        adresse = document.getElementById('adress_').value;
-                        /*console.log(adresse);
-                        const main_ = new Promise((resolve) => {
-                            resolve(Resume_OP_cons_adress(beg_, end_, adresse));
-                        })
-                        main_.then(res => {
-                            console.log(res);
-                            chart_timestamps(res[0]);
-                        })*/
-                        await populate_v0(server_adress, beg_, end_, directories, dict_data);
-                        await delay((end_-beg_)*100)
-                        console.log(dict_data)
-                        await tri_consensus_operation_specific_address(adresse, dict_data);
-                        const results= await transf_consensus_operation_specific_address(t_op_valide, missed_block);
-                        await delay(3000)
-                        chart_consensus_operation_specific_address(results[0])
 
-                    });
+                });
 
-                })
+
             } catch (e) {
                 console.log(e)
             }

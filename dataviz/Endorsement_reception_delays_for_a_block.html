@@ -21,7 +21,7 @@
         <label for="selectedLevel">Level</label>
         <tr>
             <td rowspan="2">
-                <input name="level" id="selectedLevel" type="text" value="1229476" />
+                <input name="level" id="selectedLevel" type="number" value="179000" />
             </td>
             <td>
                 <input id="plus" type="button" value=" Next " onclick="this.form.level.value++;">
@@ -32,20 +32,9 @@
         </tr>
     </form>
     <script>
-        var directories = {};
-        var va;// = "2369254"; //#block
-        var dict_data = {};
-        const server_adress = "http://78.193.200.52/";
-        var t_op_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet valides 
-        var t_op_erreur = { "avance": { "t_approbations": [], "t_pre_approbations": [] } }; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides ( PS: avance car ces OP sont reçus par le noeud avant le bloc canidat !)
-        var t_baker = {}; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
-        var t_recep = {}; // date de réception du bloc 
-        var t_delai_bloc = {};
-        var max_round; // round final du bloc
-        var ano_desc = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
+        const server_adress = "http://kathmandunet.kaml.fr:8880/";
 
-        
-        function MessageErreur() {
+        /*function MessageErreur() {
             try {
                 const elements5 = document.querySelector("p");
                 const myNode = document.querySelector("p");;
@@ -91,66 +80,71 @@
                 document.getElementById("resume").appendChild(mess_erreur);
             }
 
-        }
-        async function main() {
+        }*/
+        function main() {
             try {
-
-                $.get(server_adress, null, function (text) {
-                    //directories=$(text).find("a").text(); //fonctionne !!! 
-                    $(text).find("a").each(function () {
-                        let s = $(this).text();
-                        //console.log(typeof(s));
-                        if (s.includes('-') == true) {
-                            //console.log(s);
-                            var minmax = s.split('-');
-                            if (+minmax[0] > 0 && +minmax[1] > 0) { // filtrer les autres fichiers 
-                                directories[s] = [+minmax[0], +minmax[1]]
-                            }
-
-
+                $('form').keyup(function (e) {
+                    var va = document.getElementById('selectedLevel').value; e.target.value;
+                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
+                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let logs_operation = classify_operations(dict_data)
+                        let result = get_info_bloc(dict_data);
+                        let t_delai_bloc=result[0]
+                        let t_baker=result[1]
+                        let max_round=result[2]  
+                        resume_obs(logs_operation, t_baker);
+                        replaceDelegate(logs_operation);
+                        for (let i = 0; i <= max_round; i++) {
+                            chart('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
                         }
-                    })
-                    //Réagir à la saisie de texte
-                    $('form').keyup(async function (e) {
-                        var va = e.target.value;
-                        //visualise(va);
-                        await populate_v0(server_adress, va, va, directories, dict_data);
-                        await tri_endorsement_reception_delays_for_a_block(va, dict_data);
-                
+
                     });
-
-                    //Réagir à un click sur les boutons 
-                    $('#plus').click(async function () {
-
-                        va = document.getElementById('selectedLevel').value;
-                        await populate_v0(server_adress, va, va, directories, dict_data);
-                        //console.log(dict_data)
-                        await delay(1000)
-                        await tri_endorsement_reception_delays_for_a_block(va, dict_data);
-                        
-                    });
-
-                    $('#moins').click(async function () {
-
-                        va = document.getElementById('selectedLevel').value;
-                        await populate_v0(server_adress, va, va, directories, dict_data);
-                        await delay(1000)
-                        await tri_endorsement_reception_delays_for_a_block(va, dict_data);
-                        
-                    });
-
                 });
+
+                //Réagir à un click sur les boutons 
+                $('#plus').click(function (e) {
+                    var va = document.getElementById('selectedLevel').value; e.target.value;
+                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
+                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let logs_operation = classify_operations(dict_data)
+                        let result = get_info_bloc(dict_data);
+                        let t_delai_bloc=result[0]
+                        let t_baker=result[1]
+                        let max_round=result[2]
+                        resume_obs(logs_operation, t_baker);
+                        replaceDelegate(logs_operation);
+                        for (let i = 0; i <= max_round; i++) {
+                            chart('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
+                        }
+                    });
+                });
+
+                $('#moins').click(function (e) {
+                    var va = document.getElementById('selectedLevel').value; e.target.value;
+                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
+                        let distrib_t = delays_distribution_of_operations(dict_data)
+                        let logs_operation = classify_operations(dict_data)
+                        let result = get_info_bloc(dict_data);
+                        let t_delai_bloc=result[0]
+                        let t_baker=result[1]
+                        let max_round=result[2]
+                        console.log(t_baker)
+                        resume_obs(logs_operation, t_baker);
+                        replaceDelegate(logs_operation);
+                        for (let i = 0; i <= max_round; i++) {
+                            chart('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
+                        }
+                    });
+                });
+
+
 
             } catch (erreur) {
                 console.log(erreur);
             }
         }
-        const delay =
-    milliseconds =>
-    new Promise(resolve =>
-        setTimeout(resolve, milliseconds));
-        
         main()
+
 
     </script>
     <p></p>
