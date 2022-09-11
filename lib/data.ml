@@ -191,7 +191,9 @@ let block_data_encoding =
   let open Data_encoding in
   merge_objs
     Block.encoding
-    (obj1 (req "operations" (list Consensus_ops.block_op_encoding)))
+    (obj2
+       (req "endorsements" (list Consensus_ops.block_op_encoding))
+       (dft "preendorsements" (list Consensus_ops.block_op_encoding) []))
 
 module Anomaly = struct
   (* only anomalies related to endorsements are considered for now *)

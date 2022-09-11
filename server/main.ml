@@ -177,6 +177,29 @@ let maybe_create_tables db_pool =
           else return_unit))
     db_pool
 
+let insert_operations_from_block (module Db : Caqti_lwt.CONNECTION) level
+    block_hash operations =
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
+  if operations <> [] then
+    let* () =
+      Db.exec
+        (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+           ~oneshot:true
+           (Teztale_lib.Sql_requests.maybe_insert_operations_from_block
+              ~level
+              operations))
+        ()
+    in
+    Db.exec
+      (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
+         ~oneshot:true
+         (Teztale_lib.Sql_requests.insert_included_operations
+            block_hash
+            ~level
+            operations))
+      ()
+  else return_unit
+
 let endorsing_rights_callback db_pool g rights =
   let level = Int32.of_string (Re.Group.get g 1) in
   let out =
@@ -212,7 +235,7 @@ let endorsing_rights_callback db_pool g rights =
 let block_callback db_pool g source
     ( Teztale_lib.Data.Block.
         {delegate; timestamp; reception_time; round; hash; _},
-      operations ) =
+      (endorsements, preendorsements) ) =
   let out =
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     Caqti_lwt.Pool.use
@@ -251,26 +274,14 @@ let block_callback db_pool g source
                     ())
                 reception_time
             in
-            if operations <> [] then
-              let* () =
-                Db.exec
-                  (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                     ~oneshot:true
-                     (Teztale_lib.Sql_requests
-                      .maybe_insert_operations_from_block
-                        ~level:(Int32.pred level)
-                        operations))
-                  ()
-              in
-              Db.exec
-                (Caqti_request.Infix.(Caqti_type.(unit ->. unit))
-                   ~oneshot:true
-                   (Teztale_lib.Sql_requests.insert_included_operations
-                      hash
-                      ~level:(Int32.pred level)
-                      operations))
-                ()
-            else return_unit))
+            let* () =
+              insert_operations_from_block
+                (module Db)
+                (Int32.pred level)
+                hash
+                endorsements
+            in
+            insert_operations_from_block (module Db) level hash preendorsements))
       db_pool
   in
   with_caqti_error out (fun () ->
