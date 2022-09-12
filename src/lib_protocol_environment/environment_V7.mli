@@ -95,10 +95,10 @@ module type T = sig
        and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls12_381.Fr.t = Bls12_381.Fr.t
-       and type Plonk.proof = Plonk.Main_protocol.proof
+       and type Plonk.proof = Tezos_protocol_environment_structs.V7.Plonk.proof
        and type Plonk.public_parameters =
-        Plonk.Main_protocol.verifier_public_parameters
-        * Plonk.Main_protocol.transcript
+        Tezos_protocol_environment_structs.V7.Plonk.verifier_public_parameters
+        * Tezos_protocol_environment_structs.V7.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.commitment
 
