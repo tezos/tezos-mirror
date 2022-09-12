@@ -1628,7 +1628,7 @@ let test_timeout () =
                operation_result =
                  Applied
                    (Sc_rollup_timeout_result
-                     {game_status = Ended (Timeout, looser); _});
+                     {game_status = Ended (Loser (Timeout, looser)); _});
                _;
              });
      };

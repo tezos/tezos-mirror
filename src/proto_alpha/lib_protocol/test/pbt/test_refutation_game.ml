@@ -1330,31 +1330,37 @@ let build_proof ~player_client start_tick (game : Game.t) =
     If there is a disputed section where the distance is one tick, it
     produces a proof. Otherwise, provides another dissection.
 *)
-let next_move ~number_of_sections ~player_client (game : Game.t) =
+let next_move ~player_client (game : Game.t) =
   let open Lwt_result_syntax in
-  let disputed_sections =
-    disputed_sections ~our_states:player_client.states game.dissection
-  in
-  assert (Compare.List_length_with.(disputed_sections > 0)) ;
-  let single_tick_disputed_sections =
-    single_tick_disputed_sections disputed_sections
-  in
-  match single_tick_disputed_sections with
-  | (start_chunk, _stop_chunk) :: _ ->
-      let tick = start_chunk.tick in
+  match game.game_state with
+  | Dissecting {dissection; default_number_of_sections} -> (
+      let disputed_sections =
+        disputed_sections ~our_states:player_client.states dissection
+      in
+      assert (Compare.List_length_with.(disputed_sections > 0)) ;
+      let single_tick_disputed_sections =
+        single_tick_disputed_sections disputed_sections
+      in
+      match single_tick_disputed_sections with
+      | (start_chunk, _stop_chunk) :: _ ->
+          let tick = start_chunk.tick in
+          let+ proof = build_proof ~player_client tick game in
+          Game.{choice = tick; step = Proof proof}
+      | [] ->
+          (* If we reach this case, there is necessarily a disputed section. *)
+          let start_chunk, stop_chunk = Stdlib.List.hd disputed_sections in
+          let dissection =
+            build_dissection
+              ~number_of_sections:default_number_of_sections
+              ~start_chunk
+              ~stop_chunk
+              ~our_states:player_client.states
+          in
+          return Game.{choice = start_chunk.tick; step = Dissection dissection})
+  | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
+      let tick = agreed_start_chunk.tick in
       let+ proof = build_proof ~player_client tick game in
       Game.{choice = tick; step = Proof proof}
-  | [] ->
-      (* If we reach this case, there is necessarily a disputed section. *)
-      let start_chunk, stop_chunk = Stdlib.List.hd disputed_sections in
-      let dissection =
-        build_dissection
-          ~number_of_sections
-          ~start_chunk
-          ~stop_chunk
-          ~our_states:player_client.states
-      in
-      return Game.{choice = start_chunk.tick; step = Dissection dissection}
 
 type outcome_for_tests = Defender_wins | Refuter_wins
 
@@ -1366,8 +1372,7 @@ type outcome_for_tests = Defender_wins | Refuter_wins
     - A player played an invalid refutation and was rejected by the
       protocol.
 *)
-let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
-    ~rollup block =
+let play_until_outcome ~refuter_client ~defender_client ~rollup block =
   let rec play ~player_turn ~opponent block =
     let open Lwt_result_syntax in
     let* game_opt =
@@ -1377,9 +1382,7 @@ let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
         player_turn.player.pkh
     in
     let game, _, _ = WithExceptions.Option.get ~loc:__LOC__ game_opt in
-    let* refutation =
-      next_move ~number_of_sections ~player_client:player_turn game
-    in
+    let* refutation = next_move ~player_client:player_turn game in
     let* incr = Incremental.begin_construction block in
     let* operation_refutation =
       Op.sc_rollup_refute
@@ -1394,7 +1397,7 @@ let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
     | Ongoing ->
         let* block = Incremental.finalize_block incr in
         play ~player_turn:opponent ~opponent:player_turn block
-    | Ended (_reason, loser) as outcome ->
+    | Ended (Loser (_reason, loser)) as outcome ->
         let () =
           Format.printf
             "@,ending outcome: %a@,"
@@ -1404,6 +1407,8 @@ let play_until_outcome ~number_of_sections ~refuter_client ~defender_client
         if loser = Account.pkh_of_contract_exn refuter_client.player.contract
         then return Defender_wins
         else return Refuter_wins
+    | Ended Draw ->
+        QCheck2.Test.fail_reportf "Game ended in a draw, which is unexpected"
   in
   play ~player_turn:refuter_client ~opponent:defender_client block
 
@@ -1612,15 +1617,9 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
           None
       in
       let* block = Block.bake ~operation:operation_start_game block in
-      let number_of_sections =
-        Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
-          .sc_rollup
-          .number_of_sections_in_dissection
-      in
       let* outcome =
         play_until_outcome
           ~rollup
-          ~number_of_sections
           ~refuter_client:refuter
           ~defender_client:defender
           block
