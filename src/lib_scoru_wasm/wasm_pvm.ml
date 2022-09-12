@@ -255,15 +255,16 @@ struct
 
     let next_tick_state pvm_state =
       let to_stuck exn =
-        let error = Wasm_pvm_errors.refine_error exn in
+        let error = Wasm_pvm_errors.extract_interpreter_error exn in
         let wasm_error =
-          if Wasm_pvm_errors.is_interpreter_error exn then
-            match pvm_state.tick_state with
-            | Decode _ -> Wasm_pvm_errors.Decode_error error
-            | Init _ -> Init_error error
-            | Eval _ -> Eval_error error
-            | Stuck _ -> Unknown_error error.raw_exception
-          else Unknown_error error.raw_exception
+          match error with
+          | `Interpreter error -> (
+              match pvm_state.tick_state with
+              | Decode _ -> Wasm_pvm_errors.Decode_error error
+              | Init _ -> Init_error error
+              | Eval _ -> Eval_error error
+              | Stuck _ -> Unknown_error error.raw_exception)
+          | `Unknown raw_exception -> Unknown_error raw_exception
         in
         Lwt.return (Stuck wasm_error)
       in

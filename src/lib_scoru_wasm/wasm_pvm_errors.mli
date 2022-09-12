@@ -49,11 +49,9 @@ type t =
   | Unknown_error of raw_exception
       (** Wraps unexpected exceptions raised by the interpreter. *)
 
-(** [is_interpreter_error exn] returns true if the exception comes
-    from the interpreter. *)
-
-val is_interpreter_error : exn -> bool
-
-val refine_error : exn -> interpreter_error
+(** [extract_interpreter_error exn] returns the source of the exception (either
+    a known interpreter error or an unknown one) and its encodable representation. *)
+val extract_interpreter_error :
+  exn -> [`Interpreter of interpreter_error | `Unknown of raw_exception]
 
 val encoding : t Data_encoding.t

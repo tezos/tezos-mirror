@@ -34,41 +34,6 @@ type t =
   | Invalid_state of string
   | Unknown_error of string
 
-let is_interpreter_error =
-  let open Lazy_containers in
-  function
-  (* Decoder errors. *)
-  | Values.TypeError _ | Binary_exn.EOS | Binary_exn.Utf8
-  | Binary_exn.Decode_error.Error _ | Binary_exn.Encode_error.Error _
-  | Decode.Step_error _
-  (* Lazy_containers errors: these should've already been wrapped by
-     the decoder or the memory, but we consider them as interpreter
-     errors nonetheless. *)
-  | Lazy_map.UnexpectedAccess | Lazy_vector.Bounds | Lazy_vector.SizeOverflow
-  | Chunked_byte_vector.Bounds | Chunked_byte_vector.SizeOverflow
-  (* Validator errors: should not happen at all, but some usages of
-     the validator happens in the parser. *)
-  | Valid.Invalid _
-  (* Table errors. *)
-  | Table.Type | Table.SizeLimit | Table.OutOfMemory | Table.Bounds
-  | Table.SizeOverflow
-  (* Memory errors. *)
-  | Memory.Type | Memory.SizeLimit | Memory.OutOfMemory | Memory.Bounds
-  | Memory.SizeOverflow
-  (* Globals errors. *)
-  | Global.Type | Global.NotMutable
-  (* Evaluation errors. *)
-  | Eval.Link _ | Eval.Trap _ | Eval.Crash _ | Eval.Exhaustion _ | Ixx.Overflow
-  | Eval.Init_step_error _ | Ixx.DivideByZero | Ixx.InvalidConversion
-  (* Inputs errors. *)
-  | Input_buffer.Bounds | Input_buffer.SizeOverflow
-  | Input_buffer.Cannot_store_an_earlier_message
-  | Input_buffer.Dequeue_from_empty_queue | Import.Unknown _
-  (* Init errors. *)
-  | Eval.Missing_memory_0_export ->
-      true
-  | _ -> false
-
 let decode_state_to_string = function
   | Decode.Byte_vector_step -> "Byte_vector_step"
   | Instr_step -> "Instr_step"
@@ -90,7 +55,7 @@ let eval_state_to_string = function
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
 
-let refine_error exn =
+let extract_interpreter_error exn =
   let open Lazy_containers in
   let raw_exception = Printexc.to_string exn in
   match exn with
@@ -103,7 +68,7 @@ let refine_error exn =
   | Eval.Crash (_, explanation)
   | Eval.Exhaustion (_, explanation)
   | Import.Unknown (_, explanation) ->
-      {raw_exception; explanation = Some explanation}
+      `Interpreter {raw_exception; explanation = Some explanation}
   | Values.TypeError _ | Binary_exn.EOS | Binary_exn.Utf8
   | Lazy_map.UnexpectedAccess | Lazy_vector.Bounds | Lazy_vector.SizeOverflow
   | Chunked_byte_vector.Bounds | Chunked_byte_vector.SizeOverflow | Table.Type
@@ -113,14 +78,17 @@ let refine_error exn =
   | Ixx.DivideByZero | Ixx.InvalidConversion | Input_buffer.Bounds
   | Input_buffer.SizeOverflow | Input_buffer.Cannot_store_an_earlier_message
   | Input_buffer.Dequeue_from_empty_queue ->
-      {raw_exception; explanation = None}
+      `Interpreter {raw_exception; explanation = None}
   | Decode.Step_error state ->
-      {raw_exception; explanation = Some (decode_state_to_string state)}
+      `Interpreter
+        {raw_exception; explanation = Some (decode_state_to_string state)}
   | Eval.Init_step_error state ->
-      {raw_exception; explanation = Some (eval_state_to_string state)}
+      `Interpreter
+        {raw_exception; explanation = Some (eval_state_to_string state)}
   | Eval.Missing_memory_0_export ->
-      {raw_exception; explanation = Some "Module must export memory 0"}
-  | _ -> {raw_exception; explanation = None}
+      `Interpreter
+        {raw_exception; explanation = Some "Module must export memory 0"}
+  | _ -> `Unknown raw_exception
 
 let encoding =
   let open Data_encoding in
