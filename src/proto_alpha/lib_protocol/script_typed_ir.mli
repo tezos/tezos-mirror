@@ -117,7 +117,7 @@ module Script_bls : sig
   module Fr : sig
     (** [t] is made algebraic in order to distinguish it from the other type
         parameters of [Script_typed_ir.ty]. *)
-    type t = Fr_tag of Bls12_381.Fr.t [@@ocaml.unboxed]
+    type t = Fr_tag of Bls.Primitive.Fr.t [@@ocaml.unboxed]
 
     include S with type t := t and type fr := t
 
@@ -129,7 +129,7 @@ module Script_bls : sig
   module G1 : sig
     (** [t] is made algebraic in order to distinguish it from the other type
         parameters of [Script_typed_ir.ty]. *)
-    type t = G1_tag of Bls12_381.G1.t [@@ocaml.unboxed]
+    type t = G1_tag of Bls.Primitive.G1.t [@@ocaml.unboxed]
 
     include S with type t := t and type fr := Fr.t
   end
@@ -137,7 +137,7 @@ module Script_bls : sig
   module G2 : sig
     (** [t] is made algebraic in order to distinguish it from the other type
         parameters of [Script_typed_ir.ty]. *)
-    type t = G2_tag of Bls12_381.G2.t [@@ocaml.unboxed]
+    type t = G2_tag of Bls.Primitive.G2.t [@@ocaml.unboxed]
 
     include S with type t := t and type fr := Fr.t
   end
