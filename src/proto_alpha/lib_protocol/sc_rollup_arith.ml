@@ -53,6 +53,44 @@ let reference_initial_state_hash =
   State_hash.of_b58check_exn
     "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
 
+type error +=
+  | Arith_proof_production_failed
+  | Arith_output_proof_production_failed
+  | Arith_invalid_claim_about_outbox
+
+let () =
+  let open Data_encoding in
+  let msg = "Invalid claim about outbox" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_invalid_claim_about_outbox"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_invalid_claim_about_outbox -> Some () | _ -> None)
+    (fun () -> Arith_invalid_claim_about_outbox) ;
+  let msg = "Output proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_output_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_output_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_output_proof_production_failed) ;
+  let msg = "Proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_proof_production_failed)
+
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
@@ -1105,8 +1143,6 @@ module Make (Context : P) :
     | Some (_, request) ->
         return (PS.input_request_equal request proof.requested)
 
-  type error += Arith_proof_production_failed
-
   let produce_proof context input_given state =
     let open Lwt_tzresult_syntax in
     let*! result =
@@ -1178,10 +1214,6 @@ module Make (Context : P) :
     let transition = has_output p.output_proof_output in
     let* result = Context.verify_proof p.output_proof transition in
     match result with None -> return false | Some _ -> return true
-
-  type error += Arith_output_proof_production_failed
-
-  type error += Arith_invalid_claim_about_outbox
 
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in
