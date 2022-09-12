@@ -77,6 +77,53 @@ let assert_fails ~loc ?error m =
 let assert_equal_z ~loc x y =
   Assert.equal ~loc Z.equal "Compare Z.t" Z.pp_print x y
 
+let get_game_status_result incr =
+  match Incremental.rev_tickets incr with
+  | [
+   Operation_metadata
+     {
+       contents =
+         Single_result
+           (Manager_operation_result {operation_result = Applied op; _});
+     };
+  ] -> (
+      match op with
+      | Sc_rollup_refute_result {game_status; _} -> (game_status, `Refute)
+      | Sc_rollup_timeout_result {game_status; _} -> (game_status, `Timeout)
+      | _ ->
+          Stdlib.failwith
+            "The operation applied is neither a [Sc_rollup_refute_result] or a \
+             [Sc_rollup_timeout_result]")
+  | _ ->
+      Stdlib.failwith
+        "Failed to found an applied operation result in the metadata"
+
+let assert_equal_game_status ?game_status actual_game_status =
+  match game_status with
+  | None -> return_unit
+  | Some game_status ->
+      if game_status = actual_game_status then return_unit
+      else
+        let msg =
+          Format.asprintf
+            "Expected game status [%a] but got [%a]"
+            Sc_rollup.Game.pp_status
+            game_status
+            Sc_rollup.Game.pp_status
+            actual_game_status
+        in
+        Stdlib.failwith msg
+
+let assert_refute_result ?game_status incr =
+  let actual_game_status, op_type = get_game_status_result incr in
+  assert (op_type = `Refute) ;
+  assert_equal_game_status ?game_status actual_game_status
+
+let assert_timeout_result ?game_status incr =
+  let actual_game_status, op_type = get_game_status_result incr in
+  assert (op_type = `Timeout) ;
+  assert_equal_game_status ?game_status actual_game_status
+
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
@@ -176,11 +223,17 @@ let number_of_ticks_exn n =
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
-let dummy_commitment ctxt rollup =
+let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
   let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let predecessor = genesis_info.commitment_hash in
-  let* {compressed_state; _} =
-    Context.Sc_rollup.commitment ctxt rollup genesis_info.commitment_hash
+  let* compressed_state =
+    match compressed_state with
+    | None ->
+        let* {compressed_state; _} =
+          Context.Sc_rollup.commitment ctxt rollup genesis_info.commitment_hash
+        in
+        return compressed_state
+    | Some compressed_state -> return compressed_state
   in
   let root_level = genesis_info.level in
   let* inbox_level =
@@ -197,7 +250,7 @@ let dummy_commitment ctxt rollup =
       {
         predecessor;
         inbox_level;
-        number_of_ticks = number_of_ticks_exn 3000L;
+        number_of_ticks = number_of_ticks_exn number_of_ticks;
         compressed_state;
       }
 
@@ -1613,25 +1666,179 @@ let test_timeout () =
   let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr timeout in
-  match Incremental.rev_tickets incr with
-  | [
-   Operation_metadata
-     {
-       contents =
-         Single_result
-           (Manager_operation_result
-             {
-               operation_result =
-                 Applied
-                   (Sc_rollup_timeout_result
-                     {game_status = Ended (Loser (Timeout, looser)); _});
-               _;
-             });
-     };
-  ]
-    when looser = pkh2 ->
-      return_unit
-  | _ -> assert false
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended (Loser (Timeout, pkh2))
+  in
+  assert_timeout_result ~game_status:expected_game_status incr
+
+let init_with_conflict () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["first"])
+  in
+  let* commitment1 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["second"])
+  in
+  let* commitment2 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  return (block, (account1, pkh1), (account2, pkh2), rollup)
+
+module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+
+let dumb_proof ~choice =
+  let open Lwt_result_syntax in
+  let context_arith_pvm = Tezos_context_memory.make_empty_context () in
+  let*! arith_state = Arith_pvm.initial_state context_arith_pvm in
+  let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
+  let input = Sc_rollup_helpers.make_input "c4c4" in
+  let* proof =
+    Arith_pvm.produce_proof context_arith_pvm (Some input) arith_state
+    >|= Environment.wrap_tzresult
+  in
+  let pvm_step =
+    Sc_rollup.Arith_pvm_with_proof
+      (module struct
+        include Arith_pvm
+
+        let proof = proof
+      end)
+  in
+  let inbox_proof =
+    Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string "c4c4"
+  in
+  let inbox =
+    Sc_rollup.Proof.
+      {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
+  in
+  let proof = Sc_rollup.Proof.{pvm_step; inbox = Some inbox} in
+  return Sc_rollup.Game.{choice; step = Proof proof}
+
+(** Test that two invalid proofs from the two players lead to a draw
+    in the refutation game. *)
+let test_draw_with_two_invalid_moves () =
+  let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Player2 will also send an invalid final move. *)
+  let* incr =
+    let* p2_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+    let* p2_final_move_op =
+      Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some p2_refutation)
+    in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr p2_final_move_op
+  in
+
+  (* As both players played invalid moves, the game ends in a draw. *)
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  assert_refute_result ~game_status:expected_game_status incr
+
+(** Test that timeout a player during the final move ends the game if
+    the other player played. *)
+let test_timeout_during_final_move () =
+  let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Player2 will not play and it will be timeout. *)
+  let* incr =
+    let* constants = Context.get_constants (B block) in
+    let Constants.Parametric.{timeout_period_in_blocks; _} =
+      constants.parametric.sc_rollup
+    in
+    let* block = Block.bake_n timeout_period_in_blocks block in
+    let game_index = Sc_rollup.Game.Index.make p1_pkh p2_pkh in
+    let* timeout = Op.sc_rollup_timeout (B block) p1 rollup game_index in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr timeout
+  in
+
+  (* As the player1 played an invalid move, the timeout is counted
+     as an invalid one too. The game ends in a draw. *)
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  assert_timeout_result ~game_status:expected_game_status incr
+
+(** Test that playing a dissection during a final move is rejected. *)
+let test_dissection_during_final_move () =
+  let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Player2 will play a dissection. *)
+  let* incr =
+    let dumb_dissection =
+      let choice = Sc_rollup.Tick.initial in
+      Sc_rollup.Game.{choice; step = Dissection []}
+    in
+    let* p2_op =
+      Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some dumb_dissection)
+    in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr p2_op
+  in
+
+  (* That's an obviously invalid move, player2 loses. *)
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended
+      (Loser
+         ( Invalid_move
+             (Proof_invalid "Final move has started, unexpected dissection"),
+           p2_pkh ))
+  in
+  assert_refute_result ~game_status:expected_game_status incr
 
 let tests =
   [
@@ -1722,4 +1929,16 @@ let tests =
        and related timeout value."
       `Quick
       test_timeout;
+    Tztest.tztest
+      "Two invalid final moves end the game in a draw situation"
+      `Quick
+      test_draw_with_two_invalid_moves;
+    Tztest.tztest
+      "Timeout during the final move can end the game in a draw situation"
+      `Quick
+      test_timeout_during_final_move;
+    Tztest.tztest
+      "Cannot play a dissection when the final move has started"
+      `Quick
+      test_dissection_during_final_move;
   ]
