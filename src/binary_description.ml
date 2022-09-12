@@ -291,6 +291,7 @@ let describe (type x) (encoding : x Encoding.t) =
     | Ref ref_name ->
         UF.union uf ~existing:ref_name ~new_canonical ;
         (ref_name, references)
+    | Zero_width -> (name, references)
     | layout ->
         UF.add uf new_canonical ;
         ( name,
@@ -321,10 +322,10 @@ let describe (type x) (encoding : x Encoding.t) =
           fields None recursives references right.encoding
         in
         (left_fields @ right_fields, references)
-    | Null -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Empty -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Ignore -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
-    | Constant _ -> ([Anonymous_field (`Fixed 0, Zero_width)], references)
+    | Null -> ([], references)
+    | Empty -> ([], references)
+    | Ignore -> ([], references)
+    | Constant _ -> ([], references)
     | Dynamic_size {kind; encoding} ->
         let fields, refs =
           fields None recursives references encoding.encoding
@@ -539,16 +540,21 @@ let describe (type x) (encoding : x Encoding.t) =
         let fields2, references =
           fields None recursives references right.encoding
         in
-        let references =
-          add_reference name (obj (fields1 @ fields2)) references
-        in
-        (Ref name, references)
+        let fields = fields1 @ fields2 in
+        if fields = [] then (Zero_width, references)
+        else
+          let references =
+            add_reference name (obj (fields1 @ fields2)) references
+          in
+          (Ref name, references)
     | Tup {encoding; _} -> layout ref_name recursives references encoding
     | Tups _ as descr ->
         let name = may_new_reference ref_name in
         let fields, references = fields None recursives references descr in
-        let references = add_reference name (obj fields) references in
-        (Ref name, references)
+        if fields = [] then (Zero_width, references)
+        else
+          let references = add_reference name (obj fields) references in
+          (Ref name, references)
     | Union {kind; tag_size; cases; _} ->
         let name, references =
           union ref_name recursives references kind tag_size cases

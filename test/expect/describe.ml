@@ -38,11 +38,7 @@ let%expect_test _ =
     {|
       This value's binary representation is empty. It takes zero (0) bytes of output.
 
-      { "toplevel":
-           { "fields":
-               [ { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Fixed" } } ] },
-         "fields": [] } |}] ;
+      { "toplevel": { "fields": [] }, "fields": [] } |}] ;
   dump Data_encoding.(uint8) ;
   [%expect
     {|
@@ -100,11 +96,7 @@ let%expect_test _ =
     {|
       This value's binary representation is empty. It takes zero (0) bytes of output.
 
-      { "toplevel":
-           { "fields":
-               [ { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Fixed" } } ] },
-         "fields": [] } |}] ;
+      { "toplevel": { "fields": [] }, "fields": [] } |}] ;
   dump Data_encoding.(tup1 (constant "foo")) ;
   [%expect
     {|
@@ -198,10 +190,7 @@ let%expect_test _ =
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
                                "data_kind": { "size": 1, "kind": "Fixed" },
-                               "kind": "named" },
-                             { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                               "data_kind": { "size": 0, "kind": "Fixed" } } ],
-                         "name": "None" },
+                               "kind": "named" } ], "name": "None" },
                        { "tag": 1,
                          "fields":
                            [ { "name": "Tag",
@@ -211,28 +200,19 @@ let%expect_test _ =
   dump Data_encoding.(obj2 (req "foo" tup2_zero_width) (req "bar" uint8)) ;
   [%expect
     {|
-      +------+---------+------------------------+
-      | Name | Size    | Contents               |
-      +======+=========+========================+
-      | foo  | 0 bytes | $X_0                   |
-      +------+---------+------------------------+
-      | bar  | 1 byte  | unsigned 8-bit integer |
-      +------+---------+------------------------+
+      +------+--------+------------------------+
+      | Name | Size   | Contents               |
+      +======+========+========================+
+      | bar  | 1 byte | unsigned 8-bit integer |
+      +------+--------+------------------------+
 
 
-      X_0
-      ***
-
-      This value's binary representation is empty. It takes zero (0) bytes of output.
 
       { "toplevel":
-          { "fields":
-              [ { "name": "foo", "layout": { "name": "X_0", "kind": "Ref" },
-                  "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" },
-                { "name": "bar", "layout": { "size": "Uint8", "kind": "Int" },
-                  "data_kind": { "size": 1, "kind": "Fixed" }, "kind": "named" } ] },
-        "fields":
-          [ { "description": { "title": "X_0" }, "encoding": { "fields": [] } } ] } |}] ;
+           { "fields":
+               [ { "name": "bar", "layout": { "size": "Uint8", "kind": "Int" },
+                   "data_kind": { "size": 1, "kind": "Fixed" }, "kind": "named" } ] },
+         "fields": [] } |}] ;
   let obj2_zero_width =
     Data_encoding.(
       obj2 (req "l" (constant "left")) (req "r" (constant "right")))
@@ -289,10 +269,7 @@ let%expect_test _ =
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
                                "data_kind": { "size": 1, "kind": "Fixed" },
-                               "kind": "named" },
-                             { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                               "data_kind": { "size": 0, "kind": "Fixed" } } ],
-                         "name": "None" },
+                               "kind": "named" } ], "name": "None" },
                        { "tag": 1,
                          "fields":
                            [ { "name": "Tag",
@@ -309,10 +286,6 @@ let%expect_test _ =
       +-----------------+----------------------+----------+
 
 
-      X_0
-      ***
-
-      This value's binary representation is empty. It takes zero (0) bytes of output.
       X_1
       ***
 
@@ -327,13 +300,10 @@ let%expect_test _ =
 
       { "toplevel":
            { "fields":
-               [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Fixed" } },
-                 { "layout": { "name": "X_1", "kind": "Ref" }, "kind": "anon",
+               [ { "layout": { "name": "X_1", "kind": "Ref" }, "kind": "anon",
                    "data_kind": { "kind": "Dynamic" } } ] },
          "fields":
-           [ { "description": { "title": "X_0" }, "encoding": { "fields": [] } },
-             { "description": { "title": "X_1" },
+           [ { "description": { "title": "X_1" },
                "encoding":
                  { "fields":
                      [ { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
@@ -569,10 +539,6 @@ let%expect_test _ =
     +-----------------+----------------------+-------------+
 
 
-    X_0
-    ***
-
-    This value's binary representation is empty. It takes zero (0) bytes of output.
     weird-list (Determined from data, 8-bit tag)
     ********************************************
 
@@ -605,8 +571,7 @@ let%expect_test _ =
              [ { "layout": { "name": "weird-list", "kind": "Ref" },
                  "kind": "anon", "data_kind": { "kind": "Dynamic" } } ] },
        "fields":
-         [ { "description": { "title": "X_0" }, "encoding": { "fields": [] } },
-           { "description": { "title": "weird-list" },
+         [ { "description": { "title": "weird-list" },
              "encoding":
                { "tag_size": "Uint8", "kind": { "kind": "Dynamic" },
                  "cases":
@@ -616,9 +581,6 @@ let%expect_test _ =
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
-                           { "layout": { "name": "X_0", "kind": "Ref" },
-                             "kind": "anon",
-                             "data_kind": { "size": 0, "kind": "Fixed" } },
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
                              "data_kind": { "size": 1, "kind": "Fixed" } },
@@ -630,10 +592,7 @@ let%expect_test _ =
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
                              "data_kind": { "size": 1, "kind": "Fixed" },
-                             "kind": "named" },
-                           { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                             "data_kind": { "size": 0, "kind": "Fixed" } } ],
-                       "name": "s" } ] } } ] } |}] ;
+                             "kind": "named" } ], "name": "s" } ] } } ] } |}] ;
   let obj2_opt_zero =
     Data_encoding.(
       obj2 (opt "l" (constant "left")) (opt "r" (constant "right")))
