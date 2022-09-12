@@ -376,3 +376,9 @@ let aggregate_check pk_msg_list signature =
   Bls12_381.Signature.MinPk.Aug.aggregate_verify pk_msg_list signature
 
 let aggregate_signature_opt = Bls12_381.Signature.MinPk.aggregate_signature_opt
+
+module Primitive = struct
+  include Bls12_381
+
+  let pairing_check = Bls12_381.Pairing.pairing_check
+end
