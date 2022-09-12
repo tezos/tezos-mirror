@@ -132,9 +132,8 @@ Codec
 Docker Images
 -------------
 
--  Bump up base image to ``alpine:3.16``. In particular, it changes rust
-   and python versions to 1.60.0 and 3.10.5 respectively.
-
+-  Bump up base image to ``alpine:3.16``. In particular, it changes Rust
+   and Python versions to 1.60.0 and 3.10.5 respectively.
 
 Rollups
 -------

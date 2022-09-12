@@ -369,7 +369,7 @@ The following sections describe the individual steps above in more detail.
 Install Rust
 ~~~~~~~~~~~~
 
-Compiling Tezos requires the Rust compiler, version (see variable
+Compiling Tezos requires the Rust compiler (see recommended version in variable
 ``$recommended_rust_version`` in file ``scripts/version.sh``) and the
 Cargo package manager to be installed. If you have `rustup
 <https://rustup.rs/>`_ installed, it should work without any
