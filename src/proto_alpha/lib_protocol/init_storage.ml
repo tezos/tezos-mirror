@@ -101,8 +101,19 @@ let patch_script (address, hash, patched_code) ctxt =
          context."
         address ;
       return ctxt
+module Patch_vdf_difficulty_for_ghostnet = struct
+  let ghostnet_id =
+    let id = Chain_id.of_b58check_exn "NetXnHfVqm9iesp" in
+    if Chain_id.equal id Constants_repr.mainnet_id then assert false else id
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
+  let patch_constant chain_id ctxt =
+    if Chain_id.equal chain_id ghostnet_id then
+      Raw_context.patch_constants ctxt (fun c ->
+          {c with vdf_difficulty = Int64.div c.vdf_difficulty 4L})
+    else Lwt.return ctxt
+end
+
+let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -166,6 +177,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Delegate_cycles.Migration_from_Kathmandu.update ctxt >>=? fun ctxt ->
+      Patch_vdf_difficulty_for_ghostnet.patch_constant chain_id ctxt >>= fun ctxt ->
       return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
