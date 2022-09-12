@@ -317,9 +317,11 @@ let timeout ctxt rollup stakers =
     in
     fail_unless
       Raw_level_repr.(level > level_of_timeout)
-      (Sc_rollup_timeout_level_not_reached
-         ( level_of_timeout,
-           match game.turn with Alice -> stakers.alice | Bob -> stakers.bob ))
+      (let blocks_left = Raw_level_repr.(diff level_of_timeout level) in
+       let staker =
+         match game.turn with Alice -> stakers.alice | Bob -> stakers.bob
+       in
+       Sc_rollup_timeout_level_not_reached (blocks_left, staker))
   in
   let outcome =
     match game.game_state with

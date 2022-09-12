@@ -1541,21 +1541,16 @@ let test_timeout () =
   let* block = Block.bake_n (timeout_period_in_blocks - 1) block in
   let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
   (* Testing to send a timeout before it's allowed. There is one block left
-     before timeout is allowed. *)
+     before timeout is allowed, that is, the current block. *)
   let* _incr =
-    let*? current_level =
-      Context.get_level (B block) >|? fun lvl ->
-      Raw_level.to_int32 lvl |> Raw_level_repr.of_int32_exn
-    in
-    let expected_block_left = 1l in
+    let expected_block_left = 0l in
     let expect_apply_failure = function
       | Environment.Ecoproto_error
           (Sc_rollup_errors.Sc_rollup_timeout_level_not_reached
-             (level_timeout, staker) as e)
+             (blocks_left, staker) as e)
         :: _ ->
           Assert.test_error_encodings e ;
-          let block_left = Raw_level_repr.diff level_timeout current_level in
-          if block_left = expected_block_left && pkh1 = staker then return_unit
+          if blocks_left = expected_block_left && pkh1 = staker then return_unit
           else
             failwith
               "It should have failed with [Sc_rollup_timeout_level_not_reached \
@@ -1564,7 +1559,7 @@ let test_timeout () =
               expected_block_left
               Signature.Public_key_hash.pp
               pkh1
-              block_left
+              blocks_left
               Signature.Public_key_hash.pp
               staker
       | _ ->
