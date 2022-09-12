@@ -50,7 +50,7 @@ let bls_pk =
   let _pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
   public_key
 
-let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
+let l2_address = Bls.Public_key.hash bls_pk
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -146,7 +146,7 @@ let v1_batch =
      tests here as the bytes length stays the same. *)
   let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
   let aggregated_signature =
-    Environment.Bls_signature.unsafe_signature_of_bytes bytes
+    Bls12_381.Signature.MinPk.unsafe_signature_of_bytes bytes
   in
   V1.{aggregated_signature; contents}
 

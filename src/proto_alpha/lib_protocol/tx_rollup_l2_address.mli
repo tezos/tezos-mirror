@@ -30,29 +30,9 @@
 
 (** The hash of a BLS public key is used as the primary identifier
     of ticket holders within a transaction rollup. *)
-type t
+include module type of Bls.Public_key_hash with type t = Bls.Public_key_hash.t
 
 type address = t
-
-val encoding : t Data_encoding.t
-
-val pp : Format.formatter -> t -> unit
-
-val to_b58check : t -> string
-
-val of_b58check_opt : string -> t option
-
-val of_b58check_exn : string -> t
-
-val of_bytes_exn : bytes -> t
-
-val of_bytes_opt : bytes -> t option
-
-include Compare.S with type t := t
-
-(** [of_bls_pk pk] computes the address of the L2 tickets holder
-    authentified by [pk]. *)
-val of_bls_pk : Bls_signature.pk -> t
 
 (** [in_memory_size a] returns the number of bytes allocated in RAM for [a]. *)
 val in_memory_size : t -> Cache_memory_helpers.sint

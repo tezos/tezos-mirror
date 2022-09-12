@@ -314,8 +314,8 @@ let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
         (* Generate random identities *)
         let sk1, pk1 = gen_l2_account rng_state in
         let sk2, pk2 = gen_l2_account rng_state in
-        let addr1 = Tx_rollup_l2_address.of_bls_pk pk1 in
-        let addr2 = Tx_rollup_l2_address.of_bls_pk pk2 in
+        let addr1 = Bls.Public_key.hash pk1 in
+        let addr2 = Bls.Public_key.hash pk2 in
         (* Pick indexes *)
         let aidx = Int32.of_int !idx_addr in
         let () = incr idx_addr in
@@ -439,7 +439,7 @@ let create_operation ~rng_state input senders =
       index_or_value couple.addr2.index couple.addr2.addr
     else
       (* create new address *)
-      gen_l2_account rng_state |> snd |> Tx_rollup_l2_address.of_bls_pk
+      gen_l2_account rng_state |> snd |> Bls.Public_key.hash
       |> Indexable.from_value
   in
   let qty =

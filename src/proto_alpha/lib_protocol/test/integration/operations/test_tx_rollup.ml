@@ -327,7 +327,7 @@ let gen_l2_account ?rng_state () =
       rng_state
   in
   let _pkh, public_key, secret_key = Bls.generate_key ?seed () in
-  (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
+  (secret_key, public_key, Bls.Public_key.hash public_key)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
     of the ticket containing [contents] of type [ty], crafted by [ticketer] and
@@ -2498,10 +2498,7 @@ module Rejection = struct
     let signatures =
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
-    let signature =
-      assert_some
-      @@ Environment.Bls_signature.aggregate_signature_opt signatures
-    in
+    let signature = assert_some @@ Bls.aggregate_signature_opt signatures in
     let batch =
       Tx_rollup_l2_batch.V1.
         {contents = [transaction]; aggregated_signature = signature}

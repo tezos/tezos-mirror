@@ -33,9 +33,6 @@ type t = {
 (** See {!Tx_rollup_repr}. *)
 val rollup_address : t
 
-(** See {!Tx_rollup_l2_address}. *)
-val l2_address : t
-
 (** See {!Tx_rollup_inbox_repr}. *)
 val inbox_hash : t
 

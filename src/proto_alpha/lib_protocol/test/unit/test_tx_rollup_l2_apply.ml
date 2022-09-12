@@ -134,7 +134,7 @@ let eq_metadata = Alcotest.of_pp pp_metadata
 
 let check_metadata ctxt name_account description counter pk =
   let open Syntax in
-  let addr = Tx_rollup_l2_address.of_bls_pk pk in
+  let addr = Bls.Public_key.hash pk in
   (* We ignore the created [ctxt] because it should be a get only. *)
   let* _ctxt, _, aidx = Address_index.get_or_associate_index ctxt addr in
   let* metadata = Address_metadata.get ctxt aidx in

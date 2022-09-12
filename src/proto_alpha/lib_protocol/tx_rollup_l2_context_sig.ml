@@ -24,17 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type signature = Bls_signature.signature
-
-let signature_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    (fun signature -> Bls_signature.signature_to_bytes signature)
-    (fun bytes ->
-      match Bls_signature.signature_of_bytes_opt bytes with
-      | Some x -> Ok x
-      | None -> Error "Not a valid bls_signature")
-    (Fixed.bytes Bls_signature.signature_size_in_bytes)
+type signature = Bls.t
 
 module Ticket_indexable = Indexable.Make (Alpha_context.Ticket_hash)
 
@@ -61,7 +51,7 @@ type ticket_index = Ticket_indexable.index
 
     The [public_key] allows to authenticate the owner of the address,
     by verifying BLS signatures. *)
-type metadata = {counter : int64; public_key : Bls_signature.pk}
+type metadata = {counter : int64; public_key : Bls.Public_key.t}
 
 type error +=
   | Balance_too_low
@@ -218,7 +208,7 @@ module type CONTEXT = sig
 
   (** [bls_aggregate_verify] allows to verify the aggregated signature
       of a batch. *)
-  val bls_verify : (Bls_signature.pk * bytes) list -> signature -> bool m
+  val bls_verify : (Bls.Public_key.t * bytes) list -> signature -> bool m
 
   (** The metadata associated to an address. *)
   module Address_metadata : sig
@@ -241,7 +231,7 @@ module type CONTEXT = sig
 
         This can fails with [Metadata_already_initialized] if this
         function has already been called with [idx]. *)
-    val init_with_public_key : t -> address_index -> Bls_signature.pk -> t m
+    val init_with_public_key : t -> address_index -> Bls.Public_key.t -> t m
 
     (**/**)
 

@@ -25,40 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Tx_rollup_l2_address"
-
-      let title =
-        "The hash of a BLS public key used to identify a L2 ticket holders"
-
-      let b58check_prefix = Tx_rollup_prefixes.l2_address.b58check_prefix
-
-      let size = Some Tx_rollup_prefixes.l2_address.hash_size
-    end)
-
-include Compare.Make (struct
-  type nonrec t = t
-
-  let compare = compare
-end)
+include Bls.Public_key_hash
 
 type address = t
-
-let () = Tx_rollup_prefixes.(check_encoding l2_address b58check_encoding)
-
-let of_bls_pk : Bls_signature.pk -> t =
- fun pk -> hash_bytes [Bls_signature.pk_to_bytes pk]
 
 let in_memory_size : t -> Cache_memory_helpers.sint =
  fun _ ->
   let open Cache_memory_helpers in
-  header_size +! word_size
-  +! string_size_gen Tx_rollup_prefixes.l2_address.hash_size
+  header_size +! word_size +! string_size_gen Bls.Public_key_hash.size
 
-let size _ = Tx_rollup_prefixes.l2_address.hash_size
+let size _ = Bls.Public_key_hash.size
 
 module Indexable = struct
   include Indexable.Make (struct

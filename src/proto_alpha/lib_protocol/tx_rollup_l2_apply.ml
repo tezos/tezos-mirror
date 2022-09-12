@@ -37,7 +37,7 @@ type error +=
     }
   | Incorrect_aggregated_signature
   | Unallocated_metadata of int32
-  | Multiple_operations_for_signer of Bls_signature.pk
+  | Multiple_operations_for_signer of Bls.Public_key.t
   | Invalid_transaction_encoding
   | Invalid_batch_encoding
   | Unexpectedly_indexed_ticket
@@ -95,7 +95,7 @@ let () =
     ~description:
       "The signer signed multiple operations in the same transaction. He must \
        gather all the contents in a single operation"
-    (obj1 (req "pk" Tx_rollup_l2_context.pk_encoding))
+    (obj1 (req "pk" Bls.Public_key.encoding))
     (function Multiple_operations_for_signer idx -> Some idx | _ -> None)
     (function idx -> Multiple_operations_for_signer idx) ;
   (* Invalid transaction encoding *)
@@ -425,7 +425,7 @@ module Make (Context : CONTEXT) = struct
         (ctxt
         * indexes
         * (Indexable.index_only, 'content) operation
-        * Bls_signature.pk)
+        * Bls.Public_key.t)
         m =
      fun ctxt indexes op ->
       let* ctxt, indexes, pk, idx =
@@ -438,7 +438,7 @@ module Make (Context : CONTEXT) = struct
             return (ctxt, indexes, pk, address_index)
         | Right (Bls_pk signer_pk) -> (
             (* Initialize the ctxt with public_key if it's necessary. *)
-            let addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
+            let addr = Bls.Public_key.hash signer_pk in
             let* ctxt, created, idx =
               Address_index.get_or_associate_index ctxt addr
             in
@@ -521,13 +521,7 @@ module Make (Context : CONTEXT) = struct
             let* ctxt, indexes, op, pk =
               operation_with_signer_index ctxt indexes op
             in
-            let compare x y =
-              Bytes.compare
-                (Bls_signature.pk_to_bytes x)
-                (Bls_signature.pk_to_bytes y)
-            in
-            let equal x y = Compare.Int.( = ) (compare x y) 0 in
-            if List.mem ~equal pk signers then
+            if List.mem ~equal:Bls.Public_key.equal pk signers then
               fail (Multiple_operations_for_signer pk)
             else
               return
@@ -621,7 +615,7 @@ module Make (Context : CONTEXT) = struct
         Compare.Int64.(counter = Int64.succ metadata.counter)
         (Counter_mismatch
            {
-             account = Tx_rollup_l2_address.of_bls_pk metadata.public_key;
+             account = Bls.Public_key.hash metadata.public_key;
              expected = Int64.succ metadata.counter;
              provided = counter;
            })

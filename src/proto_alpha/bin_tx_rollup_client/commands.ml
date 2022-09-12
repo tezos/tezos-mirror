@@ -361,7 +361,7 @@ let conv_counter = parameter (fun _ counter -> return (Int64.of_string counter))
 
 let signer_to_address : Tx_rollup_l2_batch.signer -> Tx_rollup_l2_address.t =
   function
-  | Bls_pk pk -> Tx_rollup_l2_address.of_bls_pk pk
+  | Bls_pk pk -> Bls.Public_key.hash pk
   | L2_addr addr -> addr
 
 let wait_for_synchronized ?(quiet = false)
@@ -672,7 +672,7 @@ let prepare_operation_parameters cctxt signer counter =
     | Some pk -> ok pk
     | None -> error_with "missing signer public key in the wallet"
   in
-  let signer_addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
+  let signer_addr = Bls.Public_key.hash signer_pk in
   let* () = wait_for_synchronized cctxt in
   let* counter =
     match counter with
