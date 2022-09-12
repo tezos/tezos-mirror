@@ -49,7 +49,9 @@ let flush store = IStore.flush (IStore.repo store)
 let close store = IStore.Repo.close (IStore.repo store)
 
 let info message =
-  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
+  let date =
+    Tezos_base.Time.(System.now () |> System.to_protocol |> Protocol.to_seconds)
+  in
   Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
 
 module type Mutable_value = sig
