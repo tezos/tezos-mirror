@@ -999,7 +999,10 @@ module Make (Context : P) :
       return ()
     in
     let is_digit d = Compare.Char.(d >= '0' && d <= '9') in
-    let is_letter d = Compare.Char.(d >= 'a' && d <= 'z') in
+    let is_letter d =
+      Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
+    in
+    let is_identifier_char d = is_digit d || is_letter d in
     let* parser_state = Parser_state.get in
     match parser_state with
     | ParseInt -> (
@@ -1021,7 +1024,7 @@ module Make (Context : P) :
     | ParseVar -> (
         let* char = current_char in
         match char with
-        | Some d when is_letter d -> next_char
+        | Some d when is_identifier_char d -> next_char
         | Some '+' ->
             let* () = produce_var in
             let* () = produce_add in
@@ -1052,7 +1055,7 @@ module Make (Context : P) :
         | None -> stop_parsing true
         | _ -> stop_parsing false)
 
-  let output v =
+  let output destination v =
     let open Monad.Syntax in
     let open Sc_rollup_outbox_message_repr in
     let* counter = Output_counter.get in
@@ -1060,7 +1063,6 @@ module Make (Context : P) :
     let unparsed_parameters =
       Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
-    let destination = Contract_hash.zero in
     let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
     let message = Atomic_transaction_batch {transactions = [transaction]} in
@@ -1069,6 +1071,13 @@ module Make (Context : P) :
       Sc_rollup_PVM_sig.{outbox_level; message_index = counter; message}
     in
     Output.set (Z.to_string counter) output
+
+  let identifies_target_contract x =
+    if Compare.String.(x = "out") then Some Contract_hash.zero
+    else if
+      Compare.Int.(String.length x >= 3) && String.(equal (sub x 0 3) "KT1")
+    then Contract_hash.of_b58check_opt x
+    else None
 
   let evaluate =
     let open Monad.Syntax in
@@ -1080,8 +1089,10 @@ module Make (Context : P) :
         let* v = Stack.top in
         match v with
         | None -> stop_evaluating false
-        | Some v ->
-            if Compare.String.(x = "out") then output v else Vars.set x v)
+        | Some v -> (
+            match identifies_target_contract x with
+            | Some hash -> output hash v
+            | None -> Vars.set x v))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with

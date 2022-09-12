@@ -26,6 +26,7 @@
 open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
+open Protocol
 
 let get_head store =
   let open Lwt_result_syntax in
@@ -147,15 +148,19 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
   module Outbox = Outbox.Make (PVM)
 
-  let get_context (node_ctxt : Node_context.t) =
+  let get_context ?block_hash (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
-    let* head = get_head node_ctxt.store in
-    let* ctxt = Node_context.checkout_context node_ctxt head in
+    let* block_hash =
+      match block_hash with
+      | None -> get_head node_ctxt.store
+      | Some block_hash -> return block_hash
+    in
+    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     return ctxt
 
-  let get_state (node_ctxt : Node_context.t) =
+  let get_state ?block_hash (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
-    let* ctxt = get_context node_ctxt in
+    let* ctxt = get_context ?block_hash node_ctxt in
     let*! state = PVM.State.find ctxt in
     match state with None -> failwith "No state" | Some state -> return state
 
@@ -266,7 +271,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.current_outbox ())
       (fun () () ->
         let open Lwt_result_syntax in
-        let* state = get_state node_ctxt in
+        let store = node_ctxt.Node_context.store in
+        let*! lcc_level = Store.Last_cemented_commitment_level.get store in
+        let*! block_hash =
+          Layer1.hash_of_level
+            store
+            (Alpha_context.Raw_level.to_int32 lcc_level)
+        in
+        let* state = get_state ~block_hash node_ctxt in
         let*! outbox = PVM.get_outbox state in
         return outbox)
 
