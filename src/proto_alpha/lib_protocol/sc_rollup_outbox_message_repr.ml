@@ -72,7 +72,7 @@ let transaction_encoding =
   @@ obj3
        (req "parameters" Script_repr.expr_encoding)
        (req "destination" Contract_repr.originated_encoding)
-       (req "entrypoint" Entrypoint_repr.simple_encoding)
+       Entrypoint_repr.(dft "entrypoint" simple_encoding default)
 
 let encoding =
   let open Data_encoding in
