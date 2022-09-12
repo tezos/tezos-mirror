@@ -23,9 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type price = {id : Ticket_hash_repr.t; amount : Z.t}
+
 type t = {
   op_code : int;
-  price : Ticket_hash_repr.t * Z.t;
+  price : price;
   l1_dst : Signature.Public_key_hash.t;
   rollup_id : Zk_rollup_repr.t;
   payload : Zk_rollup_scalar.t array;
@@ -46,13 +48,20 @@ let to_scalar_array {op_code; price; l1_dst; rollup_id; payload} =
     [
       [|
         int_to_scalar op_code;
-        ticket_hash_to_scalar (fst price);
-        Zk_rollup_scalar.of_z (snd price);
+        ticket_hash_to_scalar price.id;
+        Zk_rollup_scalar.of_z price.amount;
         pkh_to_scalar l1_dst;
         Zk_rollup_repr.to_scalar rollup_id;
       |];
       payload;
     ]
+
+let price_encoding =
+  Data_encoding.(
+    conv
+      (fun {id; amount} -> (id, amount))
+      (fun (id, amount) -> {id; amount})
+      (obj2 (req "id" Ticket_hash_repr.encoding) (req "amount" z)))
 
 let encoding =
   Data_encoding.(
@@ -63,7 +72,7 @@ let encoding =
         {op_code; price; l1_dst; rollup_id; payload})
       (obj5
          (req "op_code" int31)
-         (req "price" (tup2 Ticket_hash_repr.encoding z))
+         (req "price" price_encoding)
          (req "l1_dst" Signature.Public_key_hash.encoding)
          (req "rollup_id" Zk_rollup_repr.Address.encoding)
          (req "payload" Plonk.scalar_array_encoding)))

@@ -2358,9 +2358,11 @@ module Zk_rollup : sig
 
   (** This module re-exports definitions from {!Zk_rollup_operation_repr}. *)
   module Operation : sig
+    type price = {id : Ticket_hash.t; amount : Z.t}
+
     type t = {
       op_code : int;
-      price : Ticket_hash.t * Z.t;
+      price : price;
       l1_dst : Signature.Public_key_hash.t;
       rollup_id : Address.t;
       payload : scalar array;

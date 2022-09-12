@@ -97,7 +97,12 @@ let gen_z =
 let gen_l2_op =
   let open Gen in
   let* op_code = nat in
-  let* price = map2 (fun x y -> (x, y)) gen_ticket_hash gen_z in
+  let* price =
+    map2
+      (fun id amount -> Zk_rollup_operation_repr.{id; amount})
+      gen_ticket_hash
+      gen_z
+  in
   let* l1_dst = gen_pkh in
   let* rollup_id = gen_zkr_address in
   let+ payload = array gen_scalar in
