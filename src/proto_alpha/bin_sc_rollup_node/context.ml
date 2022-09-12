@@ -209,7 +209,7 @@ module Inbox = struct
   end)
 end
 
-(** State of the PVM that this rollup node deals with *)
+(** State of the PVM that this rollup node deals with. *)
 module PVMState = struct
   type value = tree
 
