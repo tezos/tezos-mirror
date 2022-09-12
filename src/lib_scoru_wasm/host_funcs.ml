@@ -150,8 +150,6 @@ let write_output =
       | _ -> raise Bad_input)
 
 let lookup name =
-  let open Lwt.Syntax in
-  let+ name = Utf8.encode name in
   match name with
   | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
   | "write_output" ->

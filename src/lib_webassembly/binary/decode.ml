@@ -1238,8 +1238,8 @@ let check_size {size; start} s =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
-  | NKStop of int Vector.t  (** UTF8 name final step.*)
+  | NKParse of pos * Buffer.t * int  (** UTF8 char parsing. *)
+  | NKStop of string  (** UTF8 name final step.*)
 
 let name_step s =
   let open Lwt.Syntax in
@@ -1247,15 +1247,16 @@ let name_step s =
   | NKStart ->
       let pos = pos s in
       let+ len = len32 s in
-      NKParse (pos, init_lazy_vec 0l, len)
-  | NKParse (_, LazyVec {vector; _}, 0) -> Lwt.return @@ NKStop vector
-  | NKParse (pos, LazyVec lv, len) ->
-      let* d, offset =
+      require (len <= 512) s pos "Names cannot exceed 512 bytes" ;
+      NKParse (pos, Buffer.create len, len)
+  | NKParse (_, buffer, 0) -> Lwt.return @@ NKStop (Buffer.contents buffer)
+  | NKParse (pos, buffer, len) ->
+      let* _, bytes =
         try Utf8.decode_step get s
         with Utf8 -> error s pos "malformed UTF-8 encoding"
       in
-      let vec = LazyVec {lv with vector = Vector.grow 1l lv.vector} in
-      Lwt.return @@ NKParse (pos, lazy_vec_step d vec, len - offset)
+      List.iter (Buffer.add_int8 buffer) bytes ;
+      Lwt.return @@ NKParse (pos, buffer, len - List.length bytes)
   (* final step, cannot reduce. *)
   | NKStop _ -> raise (Step_error Name_step)
 

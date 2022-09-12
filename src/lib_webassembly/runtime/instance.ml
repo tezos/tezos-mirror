@@ -9,11 +9,11 @@ end)
 module Vector = Lazy_vector.Int32Vector
 
 module NameMap = Lazy_map.Make (struct
-  type t = Ast.name_list
+  type t = Ast.name
 
-  let compare = List.compare Int.compare
+  let compare = String.compare
 
-  let to_string = Utf8.encode_list
+  let to_string = Ast.string_of_name
 end)
 
 type module_key = Module_key of string [@@deriving show]

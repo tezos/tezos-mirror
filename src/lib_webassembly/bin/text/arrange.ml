@@ -24,7 +24,7 @@ let add_char buf = function
   | c when '\x20' <= c && c < '\x7f' -> Buffer.add_char buf c
   | c -> add_hex_char buf c
 
-let add_unicode_char buf = function
+let _add_unicode_char buf = function
   | (0x09 | 0x0a) as uc -> add_char buf (Char.chr uc)
   | uc when 0x20 <= uc && uc < 0x7f -> add_char buf (Char.chr uc)
   | uc -> Printf.bprintf buf "\\u{%02x}" uc
@@ -40,9 +40,7 @@ let bytes = string_with String.iter add_hex_char
 
 let string = string_with String.iter add_char
 
-let name n =
-  let n = Lazy_vector.Int32Vector.loaded_bindings n in
-  string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
+let name n = string_with String.iter (fun buf uc -> add_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
 

@@ -87,7 +87,7 @@ type byte_vector_kont =
 
 type name_step =
   | NKStart  (** UTF8 name starting point. *)
-  | NKParse of pos * int lazy_vec_kont * int  (** UTF8 char parsing. *)
+  | NKParse of pos * Buffer.t * int  (** UTF8 char parsing. *)
   | NKStop of Ast.name  (** UTF8 name final step.*)
 
 type func_type_kont =

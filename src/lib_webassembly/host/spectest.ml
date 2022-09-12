@@ -49,8 +49,6 @@ let register_host_funcs registry =
   Host_funcs.register ~global_name:"spectest_print_f64_f64" print registry
 
 let lookup name =
-  let open Lwt.Syntax in
-  let+ name = Utf8.encode name in
   let empty () = Lazy_vector.Int32Vector.create 0l in
   let singleton i = Lazy_vector.Int32Vector.(create 1l |> set 0l i) in
   let two i j = Lazy_vector.Int32Vector.(create 2l |> set 0l i |> set 1l j) in

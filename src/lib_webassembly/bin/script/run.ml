@@ -365,7 +365,6 @@ let lookup_instance name at =
       | exn -> raise exn)
 
 let lookup_registry module_name item_name =
-  let* item_name = Lazy_vector.Int32Vector.to_list item_name in
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found
 
@@ -389,7 +388,6 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let* inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.Int32Vector.to_list name in
       let* export = Instance.export inst name in
       match export with
       | Some (Instance.ExternFunc f) ->
@@ -419,7 +417,6 @@ let run_action act : Values.value list Lwt.t =
         trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...")
       in
       let* inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.Int32Vector.to_list name in
       let+ export = Instance.export inst name in
       match export with
       | Some (Instance.ExternGlobal gl) -> [Global.load gl]
@@ -599,10 +596,9 @@ let rec run_command cmd : unit Lwt.t =
       quote := cmd :: !quote ;
       if not !Flags.dry then (
         trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...") ;
-        let* inst = lookup_instance x_opt cmd.at in
-        let* utf8_name = Utf8.encode name in
-        registry := Map.add utf8_name inst !registry ;
-        Import.register ~module_name:name (lookup_registry utf8_name))
+        let+ inst = lookup_instance x_opt cmd.at in
+        registry := Map.add name inst !registry ;
+        Import.register ~module_name:name (lookup_registry name))
       else Lwt.return_unit
   | Action act ->
       quote := cmd :: !quote ;

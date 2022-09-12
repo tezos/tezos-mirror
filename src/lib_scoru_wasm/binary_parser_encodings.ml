@@ -104,7 +104,17 @@ module Byte_vector = struct
 end
 
 module Name = struct
-  let utf8 = value [] Data_encoding.int31
+  let buffer_encoding =
+    value
+      []
+      Data_encoding.(
+        conv
+          (fun b -> (Buffer.contents b, Buffer.length b))
+          (fun (content, length) ->
+            let b = Buffer.create length in
+            Buffer.add_string b content ;
+            b)
+          (tup2 string int31))
 
   let nkstart_case =
     case
@@ -116,7 +126,7 @@ module Name = struct
   let nkparse_case =
     let value_enc =
       let pos = value ["pos"] Data_encoding.int31 in
-      let buffer = scope ["lazy_kont"] (Lazy_vec.encoding utf8) in
+      let buffer = scope ["buffer"] buffer_encoding in
       let length = value ["length"] Data_encoding.int31 in
       tup3 ~flatten:true pos buffer length
     in
@@ -129,7 +139,7 @@ module Name = struct
   let nkstop_case =
     case
       "NKStop"
-      (vector_encoding utf8)
+      (value [] Data_encoding.string)
       (function Decode.NKStop v -> Some v | _ -> None)
       (fun v -> Decode.NKStop v)
 
@@ -138,8 +148,6 @@ module Name = struct
   let encoding =
     tagged_union tag_encoding [nkstart_case; nkparse_case; nkstop_case]
 end
-
-let name_encoding = vector_encoding Name.utf8
 
 module Func_type = struct
   type tags = FKStart | FKIns | FKOut | FKStop
@@ -188,6 +196,8 @@ module Func_type = struct
       [fkstart_case; fkins_case; fkout_case; fkstop_case]
 end
 
+let name_encoding = value [] Data_encoding.string
+
 module Import = struct
   let impkstart_case =
     let tag = "ImpKStart" in
@@ -200,14 +210,17 @@ module Import = struct
   let impkmodulename_case =
     case
       "ImpKModuleName"
-      Name.encoding
+      (scope ["module_name"] Name.encoding)
       (function Decode.ImpKModuleName n -> Some n | _ -> None)
       (fun n -> ImpKModuleName n)
 
   let impkitemname_case =
     case
       "ImpKItemName"
-      (tup2 ~flatten:true name_encoding Name.encoding)
+      (tup2
+         ~flatten:false
+         (scope ["module_name"] name_encoding)
+         (scope ["item_name"] Name.encoding))
       (function Decode.ImpKItemName (m, i) -> Some (m, i) | _ -> None)
       (fun (m, i) -> ImpKItemName (m, i))
 

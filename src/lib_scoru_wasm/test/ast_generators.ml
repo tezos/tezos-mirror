@@ -394,7 +394,10 @@ let map_gen gen =
   return
   @@ Instance.NameMap.create
        ~produce_value:(fun key ->
-         let rand = Random.State.make @@ Array.of_list (key @ seeds) in
+         let seeds =
+           String.fold_left (fun seeds c -> Char.code c :: seeds) seeds key
+         in
+         let rand = Random.State.make @@ Array.of_list seeds in
          Lwt.return @@ generate1 ~rand gen)
        ()
 

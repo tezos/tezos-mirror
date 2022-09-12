@@ -42,7 +42,6 @@ let code min n =
 
 let decode_step get s =
   let open Lwt.Syntax in
-  let i = ref 0 in
   let get s =
     (* In the testsuite, some tests are supposed to break during reading the
        UTF8. As such, the module is not fully implemented and `get` might come
@@ -50,36 +49,36 @@ let decode_step get s =
        original implementation since the UTF8 string is read fully and splitted,
        and the end of file state is actually caught by the list pattern
        matching. In that case, [decode] raises [Utf8]. *)
-    try
-      incr i ;
-      get s
-    with Decode_error.Error _ -> raise Utf8
+    try get s with Decode_error.Error _ -> raise Utf8
   in
   let* b1 = get s in
-  let* code =
-    if b1 < 0x80 then Lwt.return @@ code 0x0 b1
-    else if b1 < 0xc0 then raise Utf8
+  if b1 < 0x80 then Lwt.return (code 0x0 b1, [b1])
+  else if b1 < 0xc0 then raise Utf8
+  else
+    let* b2 = get s in
+    if b1 < 0xe0 then
+      let decoded = code 0x80 (((b1 land 0x1f) lsl 6) + con b2) in
+      Lwt.return (decoded, [b1; b2])
     else
-      let* b2 = get s in
-      if b1 < 0xe0 then Lwt.return @@ code 0x80 (((b1 land 0x1f) lsl 6) + con b2)
+      let* b3 = get s in
+      if b1 < 0xf0 then
+        let decoded =
+          code 0x800 (((b1 land 0x0f) lsl 12) + (con b2 lsl 6) + con b3)
+        in
+        Lwt.return (decoded, [b1; b2; b3])
       else
-        let* b3 = get s in
-        if b1 < 0xf0 then
-          Lwt.return
-          @@ code 0x800 (((b1 land 0x0f) lsl 12) + (con b2 lsl 6) + con b3)
-        else
-          let* b4 = get s in
-          if b1 < 0xf8 then
-            Lwt.return
-            @@ code
-                 0x10000
-                 (((b1 land 0x07) lsl 18)
-                 + (con b2 lsl 12)
-                 + (con b3 lsl 6)
-                 + con b4)
-          else raise Utf8
-  in
-  Lwt.return (code, !i)
+        let* b4 = get s in
+        if b1 < 0xf8 then
+          let decoded =
+            code
+              0x10000
+              (((b1 land 0x07) lsl 18)
+              + (con b2 lsl 12)
+              + (con b3 lsl 6)
+              + con b4)
+          in
+          Lwt.return (decoded, [b1; b2; b3; b4])
+        else raise Utf8
 
 let rec decode s =
   Lazy_vector.Int32Vector.of_list
