@@ -65,7 +65,7 @@ let number_of_ticks_of_int64_exn ?(__LOC__ = __LOC__) n =
 let make_external_inbox_message str =
   WithExceptions.Result.get_ok
     ~loc:__LOC__
-    Inbox.Message.(External str |> serialize)
+    Inbox_message.(External str |> serialize)
 
 let game_status_of_refute_op_result = function
   | [

@@ -114,7 +114,7 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
       when Sc_rollup.Address.(rollup = rollup_address) ->
         let messages =
           List.map
-            (fun message -> Sc_rollup.Inbox.Message.External message)
+            (fun message -> Sc_rollup.Inbox_message.External message)
             messages
         in
         List.rev_append messages accu
@@ -137,8 +137,8 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
         let+ payload =
           Environment.wrap_tzresult @@ Script_repr.force_decode parameters
         in
-        let message = Sc_rollup.Inbox.Message.{payload; sender; source} in
-        Sc_rollup.Inbox.Message.Internal message :: accu
+        let message = Sc_rollup.Inbox_message.{payload; sender; source} in
+        Sc_rollup.Inbox_message.Internal message :: accu
     | _ -> return accu
   in
   let*? messages =
@@ -194,7 +194,7 @@ let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
         lift
         @@ let*? level = Raw_level.of_int32 level in
            let*? messages =
-             List.map_e Sc_rollup.Inbox.Message.serialize messages
+             List.map_e Sc_rollup.Inbox_message.serialize messages
            in
            if messages = [] then return (history, inbox, ctxt)
            else

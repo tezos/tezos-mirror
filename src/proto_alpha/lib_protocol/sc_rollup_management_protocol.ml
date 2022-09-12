@@ -64,7 +64,7 @@ let make_internal_inbox_message ctxt ty ~payload ~sender ~source =
       payload
   in
   let payload = Micheline.strip_locations payload in
-  (Sc_rollup.Inbox.Message.Internal {payload; sender; source}, ctxt)
+  (Sc_rollup.Inbox_message.Internal {payload; sender; source}, ctxt)
 
 let transactions_batch_of_internal ctxt transactions =
   let open Lwt_tzresult_syntax in
@@ -167,5 +167,5 @@ module Internal_for_tests = struct
     Sc_rollup.Outbox.Message.Internal_for_tests.serialize
       output_message_internal
 
-  let deserialize_inbox_message = Sc_rollup.Inbox.Message.deserialize
+  let deserialize_inbox_message = Sc_rollup.Inbox_message.deserialize
 end

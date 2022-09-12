@@ -146,7 +146,7 @@ end
 module Inbox : sig
   type t = Sc_rollup.Inbox.t
 
-  module Message : module type of Sc_rollup.Inbox.Message
+  module Message : module type of Sc_rollup.Inbox_message
 
   val pp : Format.formatter -> t -> unit
 

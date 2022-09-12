@@ -2917,29 +2917,48 @@ module Sc_rollup : sig
     val hash_string : unreachable -> t
   end
 
+  (** See {!Sc_rollup_inbox_message_repr}. *)
+  module Inbox_message : sig
+    type internal_inbox_message = {
+      payload : Script.expr;
+      sender : Contract_hash.t;
+      source : public_key_hash;
+    }
+
+    type t = Internal of internal_inbox_message | External of string
+
+    type serialized = private string
+
+    val encoding : t Data_encoding.t
+
+    val unsafe_of_string : string -> serialized
+
+    val serialize : t -> serialized tzresult
+
+    val deserialize : serialized -> t tzresult
+  end
+
+  type input = {
+    inbox_level : Raw_level.t;
+    message_counter : Z.t;
+    payload : Inbox_message.serialized;
+  }
+
+  val input_equal : input -> input -> bool
+
+  val input_encoding : input Data_encoding.t
+
+  type input_request =
+    | No_input_required
+    | Initial
+    | First_after of Raw_level.t * Z.t
+
+  val input_request_encoding : input_request Data_encoding.t
+
+  val input_request_equal : input_request -> input_request -> bool
+
   module Inbox : sig
     type t
-
-    (** See {!Sc_rollup_inbox_message_repr}. *)
-    module Message : sig
-      type internal_inbox_message = {
-        payload : Script.expr;
-        sender : Contract_hash.t;
-        source : public_key_hash;
-      }
-
-      type t = Internal of internal_inbox_message | External of string
-
-      type serialized = private string
-
-      val encoding : t Data_encoding.t
-
-      val unsafe_of_string : string -> serialized
-
-      val serialize : t -> serialized tzresult
-
-      val deserialize : serialized -> t tzresult
-    end
 
     val pp : Format.formatter -> t -> unit
 
@@ -2985,7 +3004,7 @@ module Sc_rollup : sig
         History.t ->
         t ->
         Raw_level.t ->
-        Message.serialized list ->
+        Inbox_message.serialized list ->
         tree option ->
         (tree * History.t * t) tzresult Lwt.t
 
@@ -2993,12 +3012,12 @@ module Sc_rollup : sig
         inbox_context ->
         t ->
         Raw_level.t ->
-        Message.serialized list ->
+        Inbox_message.serialized list ->
         tree option ->
         (tree * t) tzresult Lwt.t
 
       val get_message_payload :
-        tree -> Z.t -> Sc_rollup_inbox_message_repr.serialized option Lwt.t
+        tree -> Z.t -> Inbox_message.serialized option Lwt.t
 
       val form_history_proof :
         inbox_context ->
@@ -3032,18 +3051,17 @@ module Sc_rollup : sig
         Raw_level.t * Z.t ->
         history_proof ->
         proof ->
-        Sc_rollup_PVM_sig.input option tzresult Lwt.t
+        input option tzresult Lwt.t
 
       val produce_proof :
         inbox_context ->
         History.t ->
         history_proof ->
         Raw_level.t * Z.t ->
-        (proof * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
+        (proof * input option) tzresult Lwt.t
 
       val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
 
-      (*xx*)
       module Internal_for_tests : sig
         val eq_tree : tree -> tree -> bool
 
@@ -3104,25 +3122,6 @@ module Sc_rollup : sig
 
     val inbox : context -> rollup -> (t * context) tzresult Lwt.t
   end
-
-  type input = {
-    inbox_level : Raw_level.t;
-    message_counter : Z.t;
-    payload : Inbox.Message.serialized;
-  }
-
-  val input_equal : input -> input -> bool
-
-  val input_encoding : input Data_encoding.t
-
-  type input_request =
-    | No_input_required
-    | Initial
-    | First_after of Raw_level.t * Z.t
-
-  val input_request_encoding : input_request Data_encoding.t
-
-  val input_request_equal : input_request -> input_request -> bool
 
   module Outbox : sig
     (** See {!Sc_rollup_outbox_message_repr}. *)
@@ -3457,7 +3456,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       pvm_name:string ->
       t ->
-      (bool * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
+      (bool * input option) tzresult Lwt.t
 
     val produce :
       (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t

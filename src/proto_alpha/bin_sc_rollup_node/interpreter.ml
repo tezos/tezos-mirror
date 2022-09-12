@@ -106,7 +106,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   (** [mutate input] corrupts the payload of [input] for testing purposes. *)
   let mutate input =
-    let payload = Inbox.Message.unsafe_of_string "0xC4C4" in
+    let payload = Sc_rollup.Inbox_message.unsafe_of_string "0xC4C4" in
     {input with Sc_rollup.payload}
 
   (** [feed_input level message_index ~fuel ~failing_ticks state
@@ -163,7 +163,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           List.fold_left_i_es
             (fun message_counter (state, fuel) message ->
               let*? payload =
-                Sc_rollup.Inbox.Message.(
+                Sc_rollup.Inbox_message.(
                   message |> serialize |> Environment.wrap_tzresult)
               in
               let input =
