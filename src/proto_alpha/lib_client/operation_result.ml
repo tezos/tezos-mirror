@@ -322,12 +322,12 @@ let pp_manager_operation_content (type kind) source ppf
         "Smart contract rollup origination:@,\
          Kind: %s@,\
          Parameter type: %a@,\
-         Boot sector: '%a'"
+         Boot sector Blake2B hash: '%a'"
         R.name
         pp_micheline_from_lazy_expr
         parameters_ty
-        R.pp_boot_sector
-        boot_sector
+        Blake2B.pp
+        (Blake2B.hash_string [boot_sector])
   | Sc_rollup_add_messages {rollup; messages = _} ->
       Format.fprintf
         ppf
