@@ -206,8 +206,7 @@ module Sc_rollup_add_external_messages_benchmark = struct
       let open Lwt_result_syntax in
       let* block, _ = Context.init1 () in
       let+ b = Incremental.begin_construction block in
-      let state = Incremental.validation_state b in
-      let ctxt = state.application_state.ctxt in
+      let ctxt = Incremental.alpha_ctxt b in
       (* Necessary to originate rollups. *)
       let ctxt =
         Alpha_context.Origination_nonce.init ctxt Operation_hash.zero

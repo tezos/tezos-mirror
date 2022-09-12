@@ -162,7 +162,9 @@ val alpha_context :
    with the given operations. It's a shortcut for [begin_application]
 *)
 val get_application_vstate :
-  t -> Protocol.operation list -> validation_state tzresult Lwt.t
+  t ->
+  Protocol.operation list ->
+  (validation_state * application_state) tzresult Lwt.t
 
 (**
    [get_construction_vstate ?policy ?timestamp ?protocol_data pred]
@@ -176,7 +178,7 @@ val get_construction_vstate :
   ?timestamp:Timestamp.time ->
   ?protocol_data:block_header_data option ->
   block ->
-  validation_state tzresult Lwt.t
+  (validation_state * application_state) tzresult Lwt.t
 
 (** applies a signed header and its operations to a block and
     obtains a new block *)

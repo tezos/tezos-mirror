@@ -62,6 +62,11 @@ type validation_state = {
   block_state : block_state;
 }
 
+(** Return the context stored in the state. Note that this is the
+    context at the beginning of the block / mempool: indeed, it is not
+    modified by [validate_operation]. *)
+val get_initial_ctxt : validation_state -> context
+
 (** Initialize the {!info} and {!state} for the validation of an
     existing block (in preparation for its future application). *)
 val begin_application :

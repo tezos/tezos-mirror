@@ -121,6 +121,7 @@ module type T = sig
        and type operation_receipt = P.operation_receipt
        and type operation = P.operation
        and type validation_state = P.validation_state
+       and type application_state = P.validation_state
 
   class ['chain, 'block] proto_rpc_context :
     Tezos_rpc.RPC_context.t

@@ -462,6 +462,31 @@ let nb_validation_passes = List.length Main.validation_passes
 let empty_operations =
   WithExceptions.List.init ~loc:__LOC__ nb_validation_passes (fun _ -> [])
 
+let begin_validation_and_application ctxt chain_id mode ~predecessor =
+  let open Lwt_result_syntax in
+  let* validation_state =
+    Main.begin_validation ctxt chain_id mode ~predecessor
+  in
+  let* application_state =
+    Main.begin_application ctxt chain_id mode ~predecessor
+  in
+  return (validation_state, application_state)
+
+let validate_and_apply_operation (validation_state, application_state) op =
+  let open Lwt_result_syntax in
+  let oph = Operation.hash_packed op in
+  let* validation_state = Main.validate_operation validation_state oph op in
+  let* application_state, receipt =
+    Main.apply_operation application_state oph op
+  in
+  return ((validation_state, application_state), receipt)
+
+let finalize_validation_and_application (validation_state, application_state)
+    shell_header =
+  let open Lwt_result_syntax in
+  let* () = Main.finalize_validation validation_state in
+  Main.finalize_application application_state shell_header
+
 let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let open Lwt_result_syntax in
   let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
@@ -519,26 +544,26 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     let*! r =
       let open Environment.Error_monad in
       let* vstate =
-        Main.begin_construction
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp:(Store.Block.timestamp pred)
-          ~predecessor_level:(Store.Block.level pred)
-          ~predecessor_fitness:(Store.Block.fitness pred)
-          ~predecessor:(Store.Block.hash pred)
-          ~timestamp:shell.timestamp
-          ~protocol_data
-          ()
+        begin_validation_and_application
+          predecessor_context
+          chain_id
+          (Construction
+             {
+               predecessor_hash = Store.Block.hash pred;
+               timestamp = shell.timestamp;
+               block_header_data = protocol_data;
+             })
+          ~predecessor:(Store.Block.shell_header pred)
       in
       let* vstate =
         List.fold_left_es
           (List.fold_left_es (fun vstate op ->
-               let* state, _result = apply_operation vstate op in
+               let* state, _result = validate_and_apply_operation vstate op in
                return state))
           vstate
           operations
       in
-      Main.finalize_block vstate (Some shell)
+      finalize_validation_and_application vstate (Some shell)
     in
     let*? r = Environment.wrap_tzresult r in
     return r

@@ -97,9 +97,8 @@ let context_gen : Alpha_context.t QCheck2.Gen.t =
        (let open Lwt_result_syntax in
        let* b, _contract = Context.init1 () in
        let+ inc = Incremental.begin_construction b in
-       let state = Incremental.validation_state inc in
        Alpha_context.Gas.set_limit
-         state.application_state.ctxt
+         (Incremental.alpha_ctxt inc)
          Alpha_context.Gas.Arith.(fp (integral_of_int_exn 100_000_000)))
      |> function
      | Ok a -> a

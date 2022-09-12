@@ -1470,7 +1470,6 @@ module Make
         let chain_store = Distributed_db.chain_store chain_db in
         Prevalidation_t.create
           chain_store
-          ?protocol_data:None
           ~predecessor
           ~live_operations
           ~timestamp

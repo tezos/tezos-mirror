@@ -41,14 +41,14 @@ val validation_state : incremental -> validation_state
 val level : incremental -> int32
 
 (** [begin_construction ?mempool_mode predecessor] uses
-    [Main.begin_construction] to create a validation state on top of
-    [predecessor].
+    {!Main.begin_validation_and_application} to create a validation and
+    application state on top of [predecessor] for the construction of a
+    new block.
 
     Optional arguments allow to override defaults:
 
-    {ul {li [?mempool_mode:bool]: set the validation state to
-    [partial_construction], [construction] otherwise (default).}}
-*)
+    {ul {li [?mempool_mode:bool]: when [true], use [Partial_construction]
+    mode. By default, it is [false] and the mode is [Construction].}} *)
 val begin_construction :
   ?timestamp:Time.Protocol.t ->
   ?seed_nonce_hash:Nonce_hash.t ->
@@ -81,10 +81,11 @@ val validate_operation :
   incremental tzresult Lwt.t
 
 (** [add_operation ?expect_failure ?expect_apply_failure ?check_size i
-    op] tries to apply [op] in the validation state of [i]. If the
-    validation of [op] succeeds, the function returns the incremental
-    value with a validation state updated after the application of
-    [op]. Otherwise raise the error from the validation of [op].
+    op] tries to validate then apply [op] in the validation and
+    application state of [i]. If the validation of [op] succeeds, the
+    function returns the incremental value with a validation state
+    updated after the application of [op]. Otherwise raise the error
+    from the validation of [op].
 
     Optional arguments allow to override defaults:
 
@@ -110,10 +111,9 @@ val add_operation :
   Operation.packed ->
   incremental tzresult Lwt.t
 
-(** [finalize_block i] creates a [Block.t] based on the
-    validation_state and the operations contained in [i]. The function
-    calls [Main.finalize_block] to compute a new context.
-*)
+(** [finalize_block i] creates a [Block.t] based on the protocol
+    states and the operations contained in [i]. The function calls
+    [Main.finalize_application] to compute a new context. *)
 val finalize_block : incremental -> Block.t tzresult Lwt.t
 
 (** [assert_validate_operation_fails expect_failure operation block]

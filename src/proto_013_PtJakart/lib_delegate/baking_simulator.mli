@@ -43,7 +43,7 @@ val check_context_consistency :
 
 val begin_construction :
   timestamp:Time.Protocol.t ->
-  ?protocol_data:block_header_data ->
+  protocol_data:block_header_data ->
   Abstract_context_index.t ->
   Baking_state.block_info ->
   Chain_id.t ->

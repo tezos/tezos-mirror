@@ -120,6 +120,7 @@ module type T = sig
        and type operation_receipt = P.operation_receipt
        and type operation = P.operation
        and type validation_state = P.validation_state
+       and type application_state = P.application_state
 
   class ['chain, 'block] proto_rpc_context :
     Tezos_rpc.RPC_context.t
@@ -1102,113 +1103,70 @@ struct
           let*! r = f x in
           Lwt.return (wrap_tzresult r))
 
-    (*
-       [load_predecessor_cache] ensures that the cache is correctly
-       loaded in memory before running any operations.
-    *)
-    let load_predecessor_cache ~chain_id ~predecessor_context
-        ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp ~cache =
+    (** Ensure that the cache is correctly loaded in memory
+        before running any operations. *)
+    let load_predecessor_cache predecessor_context chain_id mode
+        (predecessor_header : Block_header.shell_header) cache =
       let open Lwt_result_syntax in
+      let predecessor_hash, timestamp =
+        match mode with
+        | Application block_header | Partial_application block_header ->
+            (block_header.shell.predecessor, block_header.shell.timestamp)
+        | Construction {predecessor_hash; timestamp; _}
+        | Partial_construction {predecessor_hash; timestamp} ->
+            (predecessor_hash, timestamp)
+      in
       let* value_of_key =
         value_of_key
           ~chain_id
           ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_level
-          ~predecessor_fitness
-          ~predecessor
-          ~timestamp
-      in
-      Context.load_cache predecessor predecessor_context cache value_of_key
-
-    let begin_partial_application ~chain_id ~ancestor_context
-        ~(predecessor : Block_header.t) ~predecessor_hash ~cache
-        (raw_block : block_header) =
-      let open Lwt_result_syntax in
-      let* ancestor_context =
-        load_predecessor_cache
-          ~chain_id
-          ~predecessor_context:ancestor_context
-          ~predecessor_timestamp:predecessor.shell.timestamp
-          ~predecessor_level:predecessor.shell.level
-          ~predecessor_fitness:predecessor.shell.fitness
+          ~predecessor_timestamp:predecessor_header.timestamp
+          ~predecessor_level:predecessor_header.level
+          ~predecessor_fitness:predecessor_header.fitness
           ~predecessor:predecessor_hash
-          ~timestamp:raw_block.shell.timestamp
-          ~cache
-      in
-      let*! r =
-        begin_partial_application
-          ~chain_id
-          ~ancestor_context
-          ~predecessor_timestamp:predecessor.shell.timestamp
-          ~predecessor_fitness:predecessor.shell.fitness
-          raw_block
-      in
-      Lwt.return (wrap_tzresult r)
-
-    let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
-        ~predecessor_fitness ~cache (raw_block : block_header) =
-      let open Lwt_result_syntax in
-      let* predecessor_context =
-        load_predecessor_cache
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_level:(Int32.pred raw_block.shell.level)
-          ~predecessor_fitness
-          ~predecessor:raw_block.shell.predecessor
-          ~timestamp:raw_block.shell.timestamp
-          ~cache
-      in
-      let*! r =
-        begin_application
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_fitness
-          raw_block
-      in
-      Lwt.return (wrap_tzresult r)
-
-    let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
-        ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
-        ?protocol_data ~cache () =
-      let open Lwt_result_syntax in
-      let* predecessor_context =
-        load_predecessor_cache
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_level
-          ~predecessor_fitness
-          ~predecessor
           ~timestamp
-          ~cache
       in
-      let*! r =
-        begin_construction
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_level
-          ~predecessor_fitness
-          ~predecessor
-          ~timestamp
-          ?protocol_data
-          ()
+      Context.load_cache predecessor_hash predecessor_context cache value_of_key
+
+    let begin_validation ctxt chain_id mode ~predecessor ~cache =
+      let open Lwt_result_syntax in
+      let* ctxt = load_predecessor_cache ctxt chain_id mode predecessor cache in
+      let*! validation_state =
+        begin_validation ctxt chain_id mode ~predecessor
       in
-      Lwt.return (wrap_tzresult r)
+      Lwt.return (wrap_tzresult validation_state)
 
-    let apply_operation c o =
+    let validate_operation ?check_signature validation_state oph operation =
       let open Lwt_syntax in
-      let+ r = apply_operation c o in
-      wrap_tzresult r
+      let+ validation_state =
+        validate_operation ?check_signature validation_state oph operation
+      in
+      wrap_tzresult validation_state
 
-    let finalize_block c shell_header =
+    let finalize_validation validation_state =
       let open Lwt_syntax in
-      let+ r = finalize_block c shell_header in
-      wrap_tzresult r
+      let+ res = finalize_validation validation_state in
+      wrap_tzresult res
+
+    let begin_application ctxt chain_id mode ~predecessor ~cache =
+      let open Lwt_result_syntax in
+      let* ctxt = load_predecessor_cache ctxt chain_id mode predecessor cache in
+      let*! application_state =
+        begin_application ctxt chain_id ~predecessor mode
+      in
+      Lwt.return (wrap_tzresult application_state)
+
+    let apply_operation application_state oph operation =
+      let open Lwt_syntax in
+      let+ application_state =
+        apply_operation application_state oph operation
+      in
+      wrap_tzresult application_state
+
+    let finalize_application state shell_header =
+      let open Lwt_syntax in
+      let+ res = finalize_application state shell_header in
+      wrap_tzresult res
 
     let init chain_id c bh =
       let open Lwt_syntax in
@@ -1245,14 +1203,12 @@ struct
         let open Lwt_result_syntax in
         let* ctxt =
           load_predecessor_cache
-            ~chain_id
-            ~predecessor_context:ctxt
-            ~predecessor_timestamp:head_header.Block_header.timestamp
-            ~predecessor_level:head_header.Block_header.level
-            ~predecessor_fitness:head_header.Block_header.fitness
-            ~predecessor:head_hash
-            ~timestamp:current_timestamp
-            ~cache
+            ctxt
+            chain_id
+            (Partial_construction
+               {predecessor_hash = head_hash; timestamp = current_timestamp})
+            head_header
+            cache
         in
         let*! r =
           init ctxt chain_id ~head_hash ~head_header ~current_timestamp

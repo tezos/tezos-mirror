@@ -251,7 +251,8 @@ let init config ?(validation_state : validation_state option) ~predecessor () =
   ignore config ;
   (match validation_state with
   | None -> return empty
-  | Some {application_state = {ctxt; _}; _} ->
+  | Some validation_state ->
+      let ctxt = Validate.get_initial_ctxt validation_state in
       let {
         Tezos_base.Block_header.fitness = predecessor_fitness;
         timestamp = predecessor_timestamp;
@@ -459,7 +460,8 @@ let size_of_operation op =
 let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas op
     =
   let hard_gas_limit_per_block =
-    Constants.hard_gas_limit_per_block validation_state.application_state.ctxt
+    Constants.hard_gas_limit_per_block
+      (Validate.get_initial_ctxt validation_state)
   in
   let max_size = managers_quota.max_size in
   let size = match size with None -> size_of_operation op | Some s -> s in
@@ -872,12 +874,12 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
   let*! res =
     Validate.validate_operation
       ~check_signature:(nb_successful_prechecks <= 0)
-      validation_state.validity_state
+      validation_state
       oph
       operation
   in
   match res with
-  | Ok validity_state -> return {validation_state with validity_state}
+  | Ok validation_state -> return validation_state
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -938,10 +940,9 @@ let proto_validate_manager_operation validation_state oph
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
   let operation_state =
-    Validate.remove_operation validation_state.validity_state.operation_state op
+    Validate.remove_operation validation_state.Validate.operation_state op
   in
-  let validity_state = {validation_state.validity_state with operation_state} in
-  {validation_state with validity_state}
+  {validation_state with operation_state}
 
 (** Call the protocol validation on a manager operation and handle
     potential conflicts: if either the 1M restriction is triggered or
@@ -1361,11 +1362,14 @@ let rec post_filter_manager :
       | `Refused _ as errs -> errs)
 
 let post_filter config ~(filter_state : state) ~validation_state_before:_
-    ~validation_state_after:
-      ({application_state = {ctxt; _}; _} : validation_state) (_op, receipt) =
+    ~validation_state_after (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata {contents} -> (
+      let handle_manager result =
+        let ctxt = Validate.get_initial_ctxt validation_state_after in
+        Lwt.return (post_filter_manager ctxt filter_state result config)
+      in
       match contents with
       | Single_result (Preendorsement_result _)
       | Single_result (Endorsement_result _)
@@ -1381,6 +1385,6 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
       | Single_result Ballot_result ->
           Lwt.return (`Passed_postfilter filter_state)
       | Single_result (Manager_operation_result _) as result ->
-          Lwt.return (post_filter_manager ctxt filter_state result config)
+          handle_manager result
       | Cons_result (Manager_operation_result _, _) as result ->
-          Lwt.return (post_filter_manager ctxt filter_state result config))
+          handle_manager result)

@@ -502,6 +502,8 @@ let init_block_state vi =
     endorsement_power = 0;
   }
 
+let get_initial_ctxt {info; _} = info.ctxt
+
 (** Validation of consensus operations (validation pass [0]):
     preendorsement, endorsement, and dal_slot_availability. *)
 module Consensus = struct

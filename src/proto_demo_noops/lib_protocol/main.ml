@@ -68,19 +68,20 @@ let compare_operations _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Fitness.t}
 
-let begin_application ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header) =
-  let fitness = raw_block.shell.fitness in
-  return {context; fitness}
+type application_state = validation_state
 
-let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
-    ~predecessor_fitness block_header =
-  begin_application
-    ~chain_id
-    ~predecessor_context:ancestor_context
-    ~predecessor_timestamp
-    ~predecessor_fitness
-    block_header
+type mode =
+  | Application of block_header
+  | Partial_application of block_header
+  | Construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+      block_header_data : block_header_data;
+    }
+  | Partial_construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+    }
 
 let version_number = "\001"
 
@@ -92,14 +93,18 @@ let int64_to_bytes i =
 let fitness_from_level level =
   [Bytes.of_string version_number; int64_to_bytes level]
 
-let begin_construction ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness:_
-    ~predecessor:_ ~timestamp:_ ?protocol_data () =
-  let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
-  let _mode =
-    match protocol_data with Some _ -> "block" | None -> "mempool"
+let begin_validation context _chain_id mode
+    ~(predecessor : Block_header.shell_header) =
+  let fitness =
+    match mode with
+    | Application block_header | Partial_application block_header ->
+        block_header.shell.fitness
+    | Construction _ | Partial_construction _ ->
+        fitness_from_level Int64.(succ (of_int32 predecessor.level))
   in
   return {context; fitness}
+
+let begin_application = begin_validation
 
 type error += No_error
 
@@ -114,18 +119,21 @@ let () =
     (function No_error -> Some () | _ -> None)
     (fun () -> No_error)
 
-let apply_operation _state _op = fail No_error
+let validate_operation ?check_signature:_ _state _oph _op = fail No_error
 
-let finalize_block state _ =
-  let fitness = state.fitness in
+let apply_operation _state _oph _op = fail No_error
+
+let finalize_validation _state = return_unit
+
+let finalize_application application_state _shell_header =
   return
     ( {
-      Updater.message = None;
-      context = state.context;
-      fitness;
-      max_operations_ttl = 0;
-      last_allowed_fork_level = 0l;
-    },
+        Updater.message = None;
+        context = application_state.context;
+        fitness = application_state.fitness;
+        max_operations_ttl = 0;
+        last_allowed_fork_level = 0l;
+      },
       () )
 
 let init _chain_id context block_header =
