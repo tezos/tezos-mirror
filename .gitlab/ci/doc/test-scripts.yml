@@ -98,7 +98,7 @@ compile_master_sources_buster:
   image: ocaml/opam:debian-10
   extends: .compile_sources_template
   script:
-    - ./docs/introduction/compile-sources.sh master
+    - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
 .install_python_debian_ubuntu_template:
   extends:
