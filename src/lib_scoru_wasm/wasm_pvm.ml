@@ -47,7 +47,7 @@ type pvm_state = {
   last_input_info : Wasm_pvm_sig.input_info option;
       (** Info about last read input. *)
   current_tick : Z.t;  (** Current tick of the PVM. *)
-  kernel : Lazy_containers.Chunked_byte_vector.t;  (** The loaded kernel. *)
+  durable : Durable.t;  (** The durable storage of the PVM. *)
   module_reg : Wasm.Instance.module_reg;
       (** Module registry of the loaded kernel. *)
   tick_state : tick_state;  (** The current tick state. *)
@@ -128,14 +128,14 @@ struct
       conv
         (fun ( last_input_info,
                current_tick,
-               kernel,
+               durable,
                module_reg,
                tick_state,
                input_request ) ->
           {
             last_input_info;
             current_tick;
-            kernel;
+            durable;
             module_reg;
             tick_state;
             input_request;
@@ -143,14 +143,14 @@ struct
         (fun {
                last_input_info;
                current_tick;
-               kernel;
+               durable;
                module_reg;
                tick_state;
                input_request;
              } ->
           ( last_input_info,
             current_tick,
-            kernel,
+            durable,
             module_reg,
             tick_state,
             input_request ))
@@ -158,12 +158,14 @@ struct
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
-           (scope ["durable"; "kernel"; "boot.wasm"] chunked_byte_vector)
+           (scope ["durable"] Durable.encoding)
            (scope ["modules"] Wasm_encoding.module_instances_encoding)
            (scope ["wasm"] tick_state_encoding)
            (scope ["input"; "consuming"] input_request_encoding))
 
-    let unsafe_next_tick_state {module_reg; kernel; tick_state; _} =
+    let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
+
+    let unsafe_next_tick_state {module_reg; durable; tick_state; _} =
       let open Lwt_syntax in
       match tick_state with
       | Decode {module_kont = MKStop ast_module; _} ->
@@ -172,6 +174,7 @@ struct
              module registry, why we can ignore the result here. *)
           Lwt.return (Init {self; ast_module; init_kont = IK_Start})
       | Decode m ->
+          let* kernel = Durable.find_value_exn durable kernel_key in
           let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
           Decode m
       | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
