@@ -1,4 +1,4 @@
-bls_signature.mli
+bls.mli
 bytes.mli
 char.mli
 either.mli

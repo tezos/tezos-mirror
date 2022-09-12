@@ -71,6 +71,9 @@ module type T = sig
        and type P256.Public_key_hash.t = P256.Public_key_hash.t
        and type P256.Public_key.t = P256.Public_key.t
        and type P256.t = P256.t
+       and type Bls.Public_key_hash.t = Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Bls.Public_key.t
+       and type Bls.t = Bls.t
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
@@ -91,10 +94,8 @@ module type T = sig
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
-       and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
-       and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
-       and type Bls12_381.Fr.t = Bls12_381.Fr.t
+       and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
        and type Plonk.proof = Tezos_protocol_environment_structs.V7.Plonk.proof
        and type Plonk.public_parameters =
         Tezos_protocol_environment_structs.V7.Plonk.verifier_public_parameters
@@ -259,24 +260,10 @@ struct
   end
 
   module Time = Time.Protocol
-
-  module Bls12_381 = struct
-    include Bls12_381
-
-    let pairing_check = Bls12_381.Pairing.pairing_check
-  end
-
-  module Bls_signature = struct
-    include Bls12_381.Signature.MinPk
-
-    let verify = Aug.verify
-
-    let aggregate_verify = Aug.aggregate_verify
-  end
-
   module Ed25519 = Ed25519
   module Secp256k1 = Secp256k1
   module P256 = P256
+  module Bls = Bls
   module Signature = Signature
   module Timelock = Timelock
   module Vdf = Class_group_vdf.Vdf_self_contained
@@ -440,6 +427,15 @@ struct
 
       (** Check a signature *)
       val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
+    end
+
+    module type AGGREGATE_SIGNATURE = sig
+      include SIGNATURE
+
+      val aggregate_check :
+        (Public_key.t * watermark option * bytes) list -> t -> bool
+
+      val aggregate_signature_opt : t list -> t option
     end
 
     module type FIELD = sig

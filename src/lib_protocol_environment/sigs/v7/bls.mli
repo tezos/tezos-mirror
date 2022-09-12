@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.ch>                      *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Fr : S.PRIME_FIELD
+(** Tezos - BLS12-381 cryptography *)
 
-module G1 : S.CURVE with type Scalar.t = Fr.t
+include S.AGGREGATE_SIGNATURE with type watermark := bytes
 
-module G2 : S.CURVE with type Scalar.t = Fr.t
+(** Module to access/expose the primitives of BLS12-381 *)
+module Primitive : sig
+  module Fr : S.PRIME_FIELD
 
-val pairing_check : (G1.t * G2.t) list -> bool
+  module G1 : S.CURVE with type Scalar.t = Fr.t
+
+  module G2 : S.CURVE with type Scalar.t = Fr.t
+
+  val pairing_check : (G1.t * G2.t) list -> bool
+end

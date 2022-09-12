@@ -234,6 +234,14 @@ module type SIGNATURE = sig
   val check : ?watermark:watermark -> Public_key.t -> t -> bytes -> bool
 end
 
+module type AGGREGATE_SIGNATURE = sig
+  include SIGNATURE
+
+  val aggregate_check : (Public_key.t * watermark option * bytes) list -> t -> bool
+
+  val aggregate_signature_opt : t list -> t option
+end
+
 module type FIELD = sig
   type t
 
