@@ -182,7 +182,7 @@ module Global = struct
         | Ok message -> {outbox_level; message_index; message})
     |+ field "outbox_level" RPC_arg.int32 0l (fun o ->
            Raw_level.to_int32 o.outbox_level)
-    |+ field "message_counter" RPC_arg.int64 0L (fun o ->
+    |+ field "message_index" RPC_arg.int64 0L (fun o ->
            Z.to_int64 o.message_index)
     |+ field "serialized_outbox_message" RPC_arg.string "" (fun o ->
            match Outbox.Message.serialize o.message with
@@ -194,7 +194,7 @@ module Global = struct
     RPC_service.get_service
       ~description:"Generate serialized output proof for some outbox message"
       ~query:outbox_proof_query
-      ~output:Data_encoding.(tup2 string string)
+      ~output:Data_encoding.(tup2 Sc_rollup.Commitment.Hash.encoding string)
       (prefix / "proofs" / "outbox")
 end
 

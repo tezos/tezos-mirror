@@ -270,6 +270,12 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let*! outbox = PVM.get_outbox state in
         return outbox)
 
+  let register_outbox_proof node_ctxt dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.outbox_proof ())
+      (fun output () -> Outbox.proof_of_output node_ctxt output)
+
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -287,6 +293,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_dal_slots node_ctxt.store
     |> register_dal_confirmed_slots node_ctxt.store
     |> register_current_outbox node_ctxt
+    |> register_outbox_proof node_ctxt
 
   let start node_ctxt configuration =
     Common.start configuration (register node_ctxt configuration)
