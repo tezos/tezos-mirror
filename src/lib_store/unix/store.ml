@@ -2691,7 +2691,7 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   (* Emit a warning if context GC is not allowed. *)
   let*! () =
     if
-      Chain.history_mode main_chain_store = Archive
+      (not (Chain.history_mode main_chain_store = Archive))
       && not (Context.is_gc_allowed context_index)
     then Store_events.(emit context_gc_is_not_allowed) ()
     else Lwt.return_unit
