@@ -57,6 +57,9 @@ module V2_0_0 : sig
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
+
+    (** [get_outbox state] returns the outbox in [state]. *)
+    val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
   module type P = sig

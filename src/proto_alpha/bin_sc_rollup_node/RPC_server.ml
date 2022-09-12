@@ -145,11 +145,17 @@ end
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
   module PVM = PVM
+  module Outbox = Outbox.Make (PVM)
 
-  let get_state (node_ctxt : Node_context.t) =
+  let get_context (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
     let* head = get_head node_ctxt.store in
     let* ctxt = Node_context.checkout_context node_ctxt head in
+    return ctxt
+
+  let get_state (node_ctxt : Node_context.t) =
+    let open Lwt_result_syntax in
+    let* ctxt = get_context node_ctxt in
     let*! state = PVM.State.find ctxt in
     match state with None -> failwith "No state" | Some state -> return state
 
@@ -254,6 +260,16 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.dal_confirmed_slots ())
       (fun () () -> get_dal_confirmed_slots store)
 
+  let register_current_outbox node_ctxt dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.current_outbox ())
+      (fun () () ->
+        let open Lwt_result_syntax in
+        let* state = get_state node_ctxt in
+        let*! outbox = PVM.get_outbox state in
+        return outbox)
+
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -270,6 +286,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_dal_slot_subscriptions node_ctxt.store
     |> register_dal_slots node_ctxt.store
     |> register_dal_confirmed_slots node_ctxt.store
+    |> register_current_outbox node_ctxt
 
   let start node_ctxt configuration =
     Common.start configuration (register node_ctxt configuration)

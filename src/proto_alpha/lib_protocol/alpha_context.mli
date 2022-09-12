@@ -3158,6 +3158,8 @@ module Sc_rollup : sig
     message : Outbox.Message.t;
   }
 
+  val output_encoding : output Data_encoding.t
+
   module PVM : sig
     type boot_sector = string
 
@@ -3289,6 +3291,8 @@ module Sc_rollup : sig
       type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
       val get_status : state -> status Lwt.t
+
+      val get_outbox : state -> output list Lwt.t
     end
 
     val reference_initial_state_hash : State_hash.t
@@ -3339,6 +3343,8 @@ module Sc_rollup : sig
       type status = Computing | Waiting_for_input_message
 
       val get_status : state -> status Lwt.t
+
+      val get_outbox : state -> output list Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t

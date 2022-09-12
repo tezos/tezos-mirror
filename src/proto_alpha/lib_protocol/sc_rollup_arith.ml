@@ -92,6 +92,8 @@ module type S = sig
 
   val get_status : state -> status Lwt.t
 
+  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
+
   type instruction =
     | IPush : int -> instruction
     | IAdd : instruction
@@ -365,6 +367,8 @@ module Make (Context : P) :
 
       let set k v = set_value (key k) P.encoding v
 
+      let entries = children [P.name] P.encoding
+
       let mapped_to k v state =
         let open Lwt_syntax in
         let* state', _ = Monad.(run (set k v) state) in
@@ -374,7 +378,7 @@ module Make (Context : P) :
 
       let pp =
         let open Monad.Syntax in
-        let* l = children [P.name] P.encoding in
+        let* l = entries in
         let pp_elem fmt (key, value) =
           Format.fprintf fmt "@[%s : %a@]" key P.pp value
         in
@@ -818,6 +822,11 @@ module Make (Context : P) :
     result_of ~default:PS.No_input_required @@ is_input_state_monadic
 
   let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
+
+  let get_outbox state =
+    let open Lwt_syntax in
+    let* entries = (result_of ~default:[] @@ Output.entries) state in
+    return @@ List.map snd entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
