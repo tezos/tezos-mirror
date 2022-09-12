@@ -118,6 +118,7 @@ module Dal = struct
   end
 
   module Slots_history = Dal_slot_repr.Slots_history
+  module Slots_storage = Dal_slot_storage
 end
 
 module Dal_errors = Dal_errors_repr
