@@ -942,7 +942,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             availability_threshold = 50;
             slot_size = 1 lsl 20;
             redundancy_factor = 16;
-            segment_size = 4096;
+            page_size = 4096;
           }
       in
       (* Inherit values that existed in previous protocol and haven't changed.

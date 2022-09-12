@@ -473,10 +473,10 @@ let test_dal_node_slot_management =
     RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
   in
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3804
-     Only check that the function to retrieve segments succeeds, actual
+     Only check that the function to retrieve pages succeeds, actual
      contents will be checked in a test upcoming. *)
-  let* _slots_as_segments =
-    RPC.call dal_node (Rollup.Dal.RPC.slot_segments slot_header)
+  let* _slots_as_pages =
+    RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_header)
   in
   assert (slot_content = received_slot_content) ;
   return ()

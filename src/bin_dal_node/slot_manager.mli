@@ -53,14 +53,14 @@ val get_slot :
   Cryptobox.commitment ->
   slot tzresult Lwt.t
 
-(** [get_slot_segments] behaves as [get_slot], except that it also
-    splits the slot into segments before returning them.
+(** [get_slot_pages] behaves as [get_slot], except that it also
+    splits the slot into pages before returning them.
 
     Returns an [Error _] if the length of the slot associated to the
     [Cryptobox.commitment] is ill-formed. Specifically, when its
-    length is not a multiple of the segment-size specified in the
+    length is not a multiple of the page-size specified in the
     [Cryptobox.parameters] argument. *)
-val get_slot_segments :
+val get_slot_pages :
   Cryptobox.parameters ->
   Cryptobox.t ->
   Store.t ->

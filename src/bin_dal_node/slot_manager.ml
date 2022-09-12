@@ -30,7 +30,7 @@ type error +=
   | Missing_shards
   | Illformed_shard
   | Slot_not_found
-  | Illformed_segments
+  | Illformed_pages
 
 let () =
   register_error_kind
@@ -90,14 +90,13 @@ let () =
     (fun () -> Illformed_shard) ;
   register_error_kind
     `Permanent
-    ~id:"dal.node.illformed_segments"
-    ~title:"Illformed segments"
-    ~description:"Illformed segments found in the store"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Illformed segments found in the store")
+    ~id:"dal.node.illformed_pages"
+    ~title:"Illformed pages"
+    ~description:"Illformed pages found in the store"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Illformed pages found in the store")
     Data_encoding.(unit)
-    (function Illformed_segments -> Some () | _ -> None)
-    (fun () -> Illformed_segments)
+    (function Illformed_pages -> Some () | _ -> None)
+    (fun () -> Illformed_pages)
 
 type slot = bytes
 
@@ -202,20 +201,20 @@ let get_slot initial_constants dal_constants store slot_header =
   in
   return slot
 
-let get_slot_segments ({Cryptobox.segment_size; _} as initial_constants)
-    dal_constants store slot_header =
+let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
+    store slot_header =
   let open Lwt_result_syntax in
   let* slot = get_slot initial_constants dal_constants store slot_header in
-  (* The slot size `Bytes.length slot` should be an exact multiple of `segment_size`.
-     If this is not the case, we throw an `Illformed_segments` error.
+  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
+     If this is not the case, we throw an `Illformed_pages` error.
   *)
-  let*? segments =
+  let*? pages =
     String.chunk_bytes
-      segment_size
+      page_size
       slot
-      ~error_on_partial_chunk:(TzTrace.make Illformed_segments)
+      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in
-  return segments
+  return pages
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 
