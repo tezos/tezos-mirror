@@ -52,9 +52,10 @@ module Chunk = struct
   type t = (int, int8_unsigned_elt, c_layout) Array1.t
 
   (** Number of bits in an address for the chunk offset *)
-  let offset_bits = 12
+  let offset_bits = 9
 
-  (** Size of a chunk in bytes - with 12 bits of address space the chunk is 4KiB *)
+  (** Size of a chunk in bytes - with 9 bits of address space the
+      chunk is 512 bytes *)
   let size = Int64.shift_left 1L offset_bits
 
   (** Get the chunk index for an address. *)
@@ -221,9 +222,8 @@ let to_bytes vector =
       (* The last chunk (at `length - 1`) is not necessarily of size
          [Chunk.size], i.e. if the length of the chunked_byte_vector is not a
          multiple of [Chunk.size]. *)
-      if index >= Int64.pred chunks_number then
-        Int64.rem vector.length Chunk.size
-      else Chunk.size
+      let r = Int64.rem vector.length Chunk.size in
+      if index >= Int64.pred chunks_number && r <> 0L then r else Chunk.size
     in
     for offset = 0 to Int64.to_int rem - 1 do
       let address =
