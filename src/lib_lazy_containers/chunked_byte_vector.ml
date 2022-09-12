@@ -119,10 +119,7 @@ let grow vector size_delta =
          error in case of absent value (which is the case when
          growing the chunked byte vector requires to allocate new
          chunks). *)
-      Vector.grow
-        ~default:(fun () -> Chunk.alloc ())
-        chunk_count_delta
-        vector.chunks ;
+      Vector.grow chunk_count_delta vector.chunks ;
     vector.length <- new_size)
 
 let allocate length =
@@ -133,7 +130,10 @@ let allocate length =
 let length vector = vector.length
 
 let get_chunk index {chunks; _} =
-  Lwt.catch (fun () -> Vector.get index chunks) reraise
+  Lwt.catch
+    (fun () -> Vector.get index chunks)
+    (function
+      | Lazy_vector.Bounds as exn -> reraise exn | _ -> def_get_chunk ())
 
 let set_chunk index chunk {chunks; _} =
   try Vector.set index chunk chunks with exn -> reraise exn

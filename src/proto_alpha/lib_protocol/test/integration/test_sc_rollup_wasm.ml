@@ -118,13 +118,8 @@ module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
 
    If #2198 is addressed, and a constant is added to the protocol to
    limit the maximum size of a valid SCORU proof, then the value here
-   should reflect that.
-
-   The size set here is the minimum size that makes the current tests
-   pass. It should be updated to [16 * 1024] once the small ticks
-   milestone is completed.
-*)
-let proof_size_limit = 21_542
+   should reflect that. *)
+let proof_size_limit = 16 * 1024
 
 let check_proof_size ~loc context input_opt s =
   let open Lwt_result_syntax in
