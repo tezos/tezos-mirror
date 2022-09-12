@@ -114,11 +114,7 @@ module V2_0_0 = struct
 
     let proof_start_state proof = Context.proof_before proof
 
-    let proof_stop_state input_given input_request proof =
-      match (input_given, input_request) with
-      | None, PS.No_input_required -> Some (Context.proof_after proof)
-      | None, _ -> None
-      | _ -> Some (Context.proof_after proof)
+    let proof_stop_state proof = Context.proof_after proof
 
     let name = "wasm_2_0_0"
 

@@ -81,11 +81,7 @@ val start : t -> State_hash.t
 (** The state hash of the machine after the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val stop :
-  Sc_rollup_PVM_sig.input option ->
-  Sc_rollup_PVM_sig.input_request ->
-  t ->
-  State_hash.t option
+val stop : t -> State_hash.t
 
 (** Check the validity of a proof.
 

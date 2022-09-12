@@ -3188,8 +3188,7 @@ module Sc_rollup : sig
 
       val proof_start_state : proof -> hash
 
-      val proof_stop_state :
-        input option -> input_request -> proof -> hash option
+      val proof_stop_state : proof -> hash
 
       val state_hash : state -> hash Lwt.t
 

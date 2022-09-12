@@ -814,7 +814,17 @@ let check_proof_start_stop ~start_chunk ~stop_chunk input_given input_request
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let* () = check Z.(equal dist one) (Proof_unexpected_section_size dist) in
   let start_proof = Sc_rollup_proof_repr.start proof in
-  let stop_proof = Sc_rollup_proof_repr.stop input_given input_request proof in
+  let stop_proof =
+    match (input_given, input_request) with
+    | None, Sc_rollup_PVM_sig.No_input_required
+    | Some _, Sc_rollup_PVM_sig.Initial
+    | Some _, Sc_rollup_PVM_sig.First_after _ ->
+        Some (Sc_rollup_proof_repr.stop proof)
+    | Some _, Sc_rollup_PVM_sig.No_input_required
+    | None, Sc_rollup_PVM_sig.Initial
+    | None, Sc_rollup_PVM_sig.First_after _ ->
+        None
+  in
   let* () =
     check
       (Option.equal State_hash.equal start_chunk.state_hash (Some start_proof))

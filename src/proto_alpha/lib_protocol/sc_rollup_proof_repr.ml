@@ -82,9 +82,9 @@ let start proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   P.proof_start_state P.proof
 
-let stop input input_request proof =
+let stop proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
-  P.proof_stop_state input input_request P.proof
+  P.proof_stop_state P.proof
 
 (* This takes an [input] and checks if it is at or above the given level.
    It returns [None] if this is the case.
