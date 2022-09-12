@@ -63,7 +63,9 @@ let is_interpreter_error =
   (* Inputs errors. *)
   | Input_buffer.Bounds | Input_buffer.SizeOverflow
   | Input_buffer.Cannot_store_an_earlier_message
-  | Input_buffer.Dequeue_from_empty_queue | Import.Unknown _ ->
+  | Input_buffer.Dequeue_from_empty_queue | Import.Unknown _
+  (* Init errors. *)
+  | Eval.Missing_memory_0_export ->
       true
   | _ -> false
 
@@ -116,6 +118,8 @@ let refine_error exn =
       {raw_exception; explanation = Some (decode_state_to_string state)}
   | Eval.Init_step_error state ->
       {raw_exception; explanation = Some (eval_state_to_string state)}
+  | Eval.Missing_memory_0_export ->
+      {raw_exception; explanation = Some "Module must export memory 0"}
   | _ -> {raw_exception; explanation = None}
 
 let encoding =

@@ -239,6 +239,7 @@ struct
           (* End of the linking phase *)
           let* init_kont =
             Wasm.Eval.init_step
+              ~check_module_exports:Exports_memory_0
               ~module_reg
               ~self
               host_funcs
@@ -408,6 +409,13 @@ struct
         let open Lwt_syntax in
         let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         pvm_state.tick_state
+
+      let is_stuck tree =
+        let open Lwt.Syntax in
+        let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+        match pvm.tick_state with
+        | Stuck error -> Lwt.return_some error
+        | _ -> Lwt.return_none
     end
   end
 

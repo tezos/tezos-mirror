@@ -58,6 +58,8 @@ module type Internal_for_tests = sig
   type tick_state
 
   val get_tick_state : tree -> tick_state Lwt.t
+
+  val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)

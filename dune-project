@@ -214,6 +214,7 @@
 (package (name tezos-validator))
 (package (name tezos-version))
 (package (name tezos-webassembly-interpreter))
+(package (name tezos-webassembly-interpreter-extra))
 (package (name tezos-workers))
 (package (name tezt))
 (package (name tezt-performance-regression))

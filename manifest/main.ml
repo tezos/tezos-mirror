@@ -1155,6 +1155,22 @@ let octez_webassembly_interpreter =
     ~deps:[octez_lwt_result_stdlib; zarith; lazy_containers |> open_]
     ~preprocess:[pps ppx_deriving_show]
 
+let octez_webassembly_interpreter_extra =
+  public_lib
+    "tezos-webassembly-interpreter-extra"
+    ~path:"src/lib_webassembly/extra"
+    ~license:"Apache-2.0"
+    ~extra_authors:["WebAssembly Authors"]
+    ~synopsis:"Additional modules from the WebAssembly REPL used in testing"
+    ~dune:
+      Dune.[[S "include_subdirs"; S "unqualified"]; [S "include"; S "dune.inc"]]
+    ~deps:
+      [
+        octez_webassembly_interpreter |> open_;
+        lwt_unix;
+        lazy_containers |> open_;
+      ]
+
 let _octez_webassembly_repl =
   private_exe
     "main"
@@ -1164,6 +1180,7 @@ let _octez_webassembly_repl =
     ~deps:
       [
         octez_webassembly_interpreter |> open_;
+        octez_webassembly_interpreter_extra |> open_;
         lwt_unix;
         tree_encoding |> open_;
         lazy_containers |> open_;
@@ -3076,6 +3093,7 @@ let _octez_scoru_wasm_tests =
         qcheck_alcotest;
         alcotest_lwt;
         tezt_lib;
+        octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 

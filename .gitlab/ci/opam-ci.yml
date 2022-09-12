@@ -1618,6 +1618,13 @@ opam:tezos-webassembly-interpreter:
   variables:
     package: tezos-webassembly-interpreter
 
+opam:tezos-webassembly-interpreter-extra:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-webassembly-interpreter-extra
+
 opam:tezos-workers:
   extends:
     - .opam_template

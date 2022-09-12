@@ -5,18 +5,6 @@
 
 (data_only_dirs test)
 
-(subdir
- text
- (rule
-  (target lexer.ml)
-  (deps lexer.mll)
-  (action
-   (chdir
-    %{workspace_root}
-    (run %{bin:ocamllex} -ml -q -o %{target} %{deps}))))
- (ocamlyacc
-  (modules parser)))
-
 (rule
  ; Run the WebAssembly core tests.
  ; See src/bin_webassembly/test/core/README.md for details.

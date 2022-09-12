@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,26 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+open Tezos_webassembly_interpreter
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("Module Initialisation", Test_init.tests);
-    ]
-  |> Lwt_main.run
+let parse_module code =
+  let def = Parse.string_to_module code in
+  match def.it with
+  | Script.Textual m -> m
+  | _ -> Stdlib.failwith "Failed to parse WebAssembly module"
+
+let wat2wasm code =
+  let modul = parse_module code in
+  Encode.encode modul
