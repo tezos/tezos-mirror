@@ -40,17 +40,15 @@ open Protocol.Tx_rollup_l2_apply
 
 let seed_gen = bytes_fixed_gen 32
 
-let bls_pk =
+let l2_address, bls_pk =
   (* Generating byte sequences in Qcheck2 is slow. We hard code one
      32byte IKMs: *)
   let ikm =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let _pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
-  public_key
-
-let l2_address = Bls.Public_key.hash bls_pk
+  let pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
+  (pkh, public_key)
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in

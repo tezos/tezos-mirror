@@ -608,8 +608,8 @@ end)
       let seed =
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
       in
-      let _pkh, public_key, _secret_key = Bls.generate_key ~seed () in
-      Tx_rollup_l2_address.Indexable.value (Bls.Public_key.hash public_key)
+      let pkh, _pk, _sk = Bls.generate_key ~seed () in
+      Tx_rollup_l2_address.Indexable.value pkh
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in

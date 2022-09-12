@@ -132,9 +132,8 @@ let pp_metadata fmt Tx_rollup_l2_context_sig.{counter; public_key} =
 
 let eq_metadata = Alcotest.of_pp pp_metadata
 
-let check_metadata ctxt name_account description counter pk =
+let check_metadata ctxt name_account description counter addr pk =
   let open Syntax in
-  let addr = Bls.Public_key.hash pk in
   (* We ignore the created [ctxt] because it should be a get only. *)
   let* _ctxt, _, aidx = Address_index.get_or_associate_index ctxt addr in
   let* metadata = Address_metadata.get ctxt aidx in
@@ -1272,7 +1271,7 @@ let test_update_counter () =
   let open Context_l2.Syntax in
   let* ctxt, _, accounts = with_initial_setup [ticket1] [[]] in
 
-  let sk1, pk1, _addr1, _idx1, _ = nth_exn accounts 0 in
+  let sk1, pk1, addr1, _idx1, _ = nth_exn accounts 0 in
 
   let transactions =
     transfers
@@ -1308,6 +1307,7 @@ let test_update_counter () =
           "addr1"
           "the counter should have been incremented"
           5L
+          addr1
           pk1
       in
       return_unit
@@ -1337,6 +1337,7 @@ let test_pre_apply_batch () =
       "pk1"
       "check_signature must have created a metadata"
       0L
+      addr1
       pk1
   in
   let* () =
@@ -1345,6 +1346,7 @@ let test_pre_apply_batch () =
       "pk1"
       "check_signature must have created a metadata"
       0L
+      addr2
       pk2
   in
 
