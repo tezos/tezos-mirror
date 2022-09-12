@@ -22,6 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3811
+   Remove this module and use `Signature` module instead.
+*)
+
 type public_key_hash = Bls12_381 of Bls.Public_key_hash.t
 
 type public_key = Bls12_381 of Bls.Public_key.t
