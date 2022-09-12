@@ -845,3 +845,15 @@ val get_chain_block_context_delegate_voting_info :
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_voting_power :
   ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** Call RPC /chains/[chain]/blocks/[block]/context/dal/confirmed_slots_history.
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_dal_confirmed_slots_history :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** Call RPC /chains/[chain]/blocks/[block]/context/raw/json.
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_raw_json :
+  ?chain:string -> ?block:string -> ?path:string list -> unit -> JSON.t t

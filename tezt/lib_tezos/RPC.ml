@@ -988,4 +988,26 @@ let get_chain_block_context_delegate_voting_power ?(chain = "main")
     ]
     Fun.id
 
+let get_chain_block_context_dal_confirmed_slots_history ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "dal";
+      "confirmed_slots_history";
+    ]
+    Fun.id
+
+let get_chain_block_context_raw_json ?(chain = "main") ?(block = "head")
+    ?(path = []) () =
+  make
+    GET
+    (["chains"; chain; "blocks"; block; "context"; "raw"; "json"] @ path)
+    Fun.id
+
 let make = RPC_core.make
