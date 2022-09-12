@@ -2612,8 +2612,8 @@ let init_validation_state ctxt mode chain_id all_expected_consensus_features
      established by the protocol
    - the size of an operation does not exceed [max_operation_data_length]
 *)
-let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
-    (block_header : Block_header.t) fitness ~is_partial =
+let begin_any_application ctxt chain_id ~predecessor_level
+    ~predecessor_timestamp (block_header : Block_header.t) fitness ~is_partial =
   let open Lwt_tzresult_syntax in
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
@@ -2676,10 +2676,10 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
        all_expected_consensus_features
        ~predecessor_level)
 
-let begin_partial_application ~ancestor_context chain_id ~predecessor_level
-    ~predecessor_timestamp (block_header : Block_header.t) fitness =
-  begin_application
-    ancestor_context
+let begin_partial_application ctxt chain_id ~predecessor_level
+    ~predecessor_timestamp block_header fitness =
+  begin_any_application
+    ctxt
     chain_id
     ~predecessor_level
     ~predecessor_timestamp
@@ -2688,8 +2688,8 @@ let begin_partial_application ~ancestor_context chain_id ~predecessor_level
     ~is_partial:true
 
 let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
-    (block_header : Block_header.t) fitness =
-  begin_application
+    block_header fitness =
+  begin_any_application
     ctxt
     chain_id
     ~predecessor_level

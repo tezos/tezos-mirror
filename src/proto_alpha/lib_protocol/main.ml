@@ -198,7 +198,7 @@ let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
   let*? fitness = Fitness.from_raw block_header.shell.fitness in
   let* validity_state =
     Validate.begin_partial_application
-      ~ancestor_context
+      ancestor_context
       chain_id
       ~predecessor_level
       ~predecessor_timestamp

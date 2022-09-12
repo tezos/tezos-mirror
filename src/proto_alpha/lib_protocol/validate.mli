@@ -74,9 +74,14 @@ val begin_application :
   validation_state tzresult Lwt.t
 
 (** Initialize the {!info} and {!state} for the partial validation of
-    an existing block. *)
+    an existing block.
+
+    Note that the given context may be based on an ancestor
+    block. Indeed, we may not have access to the predecessor context
+    when trying to quickly assess a series of blocks in a cousin branch
+    (multipass validation). *)
 val begin_partial_application :
-  ancestor_context:context ->
+  context ->
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_timestamp:Time.t ->
