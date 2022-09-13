@@ -97,7 +97,6 @@ let parse_ticket ~ticketer ~contents ~ty ctxt =
 let publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops =
   let open Lwt_result_syntax in
   let*? () = assert_feature_enabled ctxt in
-
   let open Zk_rollup.Operation in
   (* Deposits (i.e. L2 operations with a positive price) cannot be published
      through an external operation *)
@@ -236,3 +235,257 @@ let transaction_to_zk_rollup ~ctxt ~parameters_ty ~parameters ~dst_rollup ~since
            }))
   in
   (ctxt, result, [])
+
+(*
+   A ZKRU Update will set a new ZKRU state if the proof sent in the payload
+   is verified. In order to verify this proof, the protocol needs to
+   compute the "public inputs" expected by the Plonk circuits that define
+   a given ZKRU.
+   The proof's public inputs have to be collected by the protocol, as some of
+   them will be passed in the operation's payload, but some must be computed
+   by the protocol (e.g. the current L2 state).
+   These public inputs will be collected as a string map linking
+   the circuit identifier to a list of inputs for it (as a circuit might have
+   been used several times in a proof).
+   As explained in the documentation, circuits in ZKRUs will be grouped into
+   three categories: pending (public) operations, private batches and
+   fee circuit.
+   Each of these expects a different set of public inputs. For this reason,
+   the collection of circuit inputs will be collected in three separate steps.
+*)
+
+module SMap = Map.Make (String)
+
+(* Helper function to collect inputs *)
+let insert s x =
+  SMap.update s (function None -> Some [x] | Some l -> Some (x :: l))
+
+(* Traverse the list of pending L2 operations paired with their corresponding
+   inputs sent in the [Update] computing the full set of inputs for each of
+   them.
+   Collect the L2 fees of all L2 operations, and the list of boolean flags
+   determining whether each L2 operation will trigger an exit.
+*)
+let collect_pending_ops_inputs ~zk_rollup ~account ~rev_pi_map
+    ~pending_ops_and_pis =
+  let open Lwt_result_syntax in
+  let open Zk_rollup.Update in
+  let open Zk_rollup.Account in
+  let* rev_pi_map, new_state, fees, rev_exit_validites =
+    List.fold_left_es
+      (fun (rev_pi_map, old_state, fees, rev_exit_validites)
+           ((l2_op, _ticket_hash_opt), (name, (sent_pi : op_pi))) ->
+        let new_state = sent_pi.new_state in
+        let*? () =
+          error_unless
+            Compare.Int.(Array.length new_state = account.static.state_length)
+            Zk_rollup.Errors.Inconsistent_state_update
+        in
+        let pi =
+          Zk_rollup.Circuit_public_inputs.(
+            Pending_op
+              {
+                old_state;
+                new_state;
+                fee = sent_pi.fee;
+                exit_validity = sent_pi.exit_validity;
+                zk_rollup;
+                l2_op;
+              })
+        in
+        let rev_pi_map =
+          insert
+            name
+            (Zk_rollup.Circuit_public_inputs.to_scalar_array pi)
+            rev_pi_map
+        in
+        return
+          ( rev_pi_map,
+            new_state,
+            Bls.Primitive.Fr.add fees sent_pi.fee,
+            sent_pi.exit_validity :: rev_exit_validites ))
+      (rev_pi_map, account.dynamic.state, Bls.Primitive.Fr.zero, [])
+      pending_ops_and_pis
+  in
+  return (rev_pi_map, new_state, fees, List.rev rev_exit_validites)
+
+(* Traverse the partial inputs for the batches of private operations
+   that the [update] claims to process, computing the full set of inputs.
+   Check that all circuit identifiers used here are allowed to be used for
+   private operations and collect the L2 fees. *)
+let collect_pivate_batch_inputs ~zk_rollup ~account ~rev_pi_map ~update
+    ~prev_state ~fees =
+  let open Lwt_result_syntax in
+  let open Zk_rollup.Update in
+  let open Zk_rollup.Account in
+  let is_private = function Some `Private -> true | _ -> false in
+  List.fold_left_es
+    (fun (rev_pi_map, old_state, fees) (name, (sent_pi : private_inner_pi)) ->
+      let*? () =
+        error_unless
+          (is_private
+             (Zk_rollup.Account.SMap.find name account.static.circuits_info))
+          Zk_rollup.Errors.Invalid_circuit
+      in
+      let new_state = sent_pi.new_state in
+      let*? () =
+        error_unless
+          Compare.Int.(Array.length new_state = account.static.state_length)
+          Zk_rollup.Errors.Inconsistent_state_update
+      in
+      let pi =
+        Zk_rollup.Circuit_public_inputs.(
+          Private_batch {old_state; new_state; fees = sent_pi.fees; zk_rollup})
+      in
+      let rev_pi_map =
+        insert
+          name
+          (Zk_rollup.Circuit_public_inputs.to_scalar_array pi)
+          rev_pi_map
+      in
+
+      return (rev_pi_map, new_state, Bls.Primitive.Fr.add fees sent_pi.fees))
+    (rev_pi_map, prev_state, fees)
+    update.private_pis
+
+let collect_fee_inputs ~prev_state ~update ~fees ~rev_pi_map =
+  let open Zk_rollup.Update in
+  let old_state = prev_state in
+  let new_state = update.fee_pi.new_state in
+  let pi = Zk_rollup.Circuit_public_inputs.(Fee {old_state; new_state; fees}) in
+  let rev_pi_map =
+    insert "fee" (Zk_rollup.Circuit_public_inputs.to_scalar_array pi) rev_pi_map
+  in
+  (rev_pi_map, new_state)
+
+(* Collect and validate the public inputs for the verification *)
+let collect_inputs ~zk_rollup ~account ~rev_pi_map ~pending_ops_and_pis ~update
+    =
+  let open Lwt_result_syntax in
+  (* Collect the inputs for the pending L2 ops *)
+  let* rev_pi_map, new_state, fees, exit_validities =
+    collect_pending_ops_inputs
+      ~zk_rollup
+      ~account
+      ~rev_pi_map
+      ~pending_ops_and_pis
+  in
+  (* Collect the inputs for private batches of L2 ops *)
+  let* rev_pi_map, new_state, fees =
+    collect_pivate_batch_inputs
+      ~zk_rollup
+      ~account
+      ~rev_pi_map
+      ~update
+      ~prev_state:new_state
+      ~fees
+  in
+  (* Collect the inputs for the fee circuit, always identified as "fee" *)
+  let rev_pi_map, new_state =
+    collect_fee_inputs ~prev_state:new_state ~update ~fees ~rev_pi_map
+  in
+  let pi_map = SMap.map List.rev rev_pi_map in
+  return (pi_map, exit_validities, new_state)
+
+(* Perform the exits corresponding to the processed public l2 operations *)
+let perform_exits ctxt exits =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun (ctxt, storage_diff) ((op, ticket_hash_opt), exit_validity) ->
+      let open Zk_rollup.Operation in
+      match ticket_hash_opt with
+      | None ->
+          let*? () =
+            error_unless
+              Compare.Z.(Z.zero = op.price.amount)
+              Zk_rollup.Errors.Invalid_deposit_amount
+          in
+          return (ctxt, storage_diff)
+      | Some receiver_ticket_hash ->
+          if exit_validity then
+            let*? amount =
+              Option.value_e
+                ~error:
+                  (Error_monad.trace_of_error
+                     Zk_rollup.Errors.Invalid_deposit_amount)
+                (Ticket_amount.of_zint (Z.abs @@ op.price.amount))
+            in
+            let* ctxt, diff =
+              Tx_rollup_ticket.transfer_ticket_with_hashes
+                ctxt
+                ~src_hash:op.price.id
+                ~dst_hash:receiver_ticket_hash
+                amount
+            in
+            return (ctxt, Z.add diff storage_diff)
+          else return (ctxt, storage_diff))
+    (ctxt, Z.zero)
+    exits
+
+let update ~ctxt_before_op ~ctxt ~zk_rollup ~update =
+  let open Lwt_result_syntax in
+  let open Zk_rollup.Update in
+  let*? () = assert_feature_enabled ctxt in
+  let rev_pi_map = SMap.empty in
+  let* ctxt, account = Zk_rollup.account ctxt zk_rollup in
+  let update_public_length = List.length update.pending_pis in
+  let* ctxt, pending_list_length =
+    Zk_rollup.get_pending_length ctxt zk_rollup
+  in
+  let min_pending_to_process =
+    Constants.zk_rollup_min_pending_to_process ctxt
+  in
+  (* The number of pending operations processed by an update must be at least
+     [min(pending_list_length, min_pending_to_process)] and at most
+     [pending_list_length].*)
+  let*? () =
+    error_when
+      Compare.Int.(
+        update_public_length < pending_list_length
+        && update_public_length < min_pending_to_process)
+      Zk_rollup.Errors.Pending_bound
+  in
+  let* ctxt, pending_ops =
+    Zk_rollup.get_prefix ctxt zk_rollup update_public_length
+  in
+  (* It's safe to use [combine_drop], as at this point both lists will have the
+     same length. *)
+  let pending_ops_and_pis = List.combine_drop pending_ops update.pending_pis in
+  (* Collect the inputs for the verification *)
+  let* pi_map, exit_validities, new_state =
+    collect_inputs ~zk_rollup ~account ~rev_pi_map ~pending_ops_and_pis ~update
+  in
+  (* Run the verification of the Plonk proof *)
+  let verified =
+    Plonk.verify_multi_circuits
+      account.static.public_parameters
+      ~public_inputs:(SMap.bindings pi_map)
+      update.proof
+  in
+  let*? () = error_unless verified Zk_rollup.Errors.Invalid_verification in
+  (* Update the ZKRU storage with the new state and dropping the processed
+     public L2 operations from the pending list *)
+  let* ctxt =
+    Zk_rollup.update
+      ctxt
+      zk_rollup
+      ~pending_to_drop:update_public_length
+      ~new_account:
+        {account with dynamic = {account.dynamic with state = new_state}}
+  in
+  (* Perform exits of processed public L2 operations *)
+  let exits = List.combine_drop pending_ops exit_validities in
+  let* ctxt, exits_paid_storage_size_diff = perform_exits ctxt exits in
+
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/3544
+     Carbonate ZKRU operations *)
+  let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
+  let result =
+    Apply_results.Zk_rollup_update_result
+      {
+        balance_updates = [];
+        consumed_gas;
+        paid_storage_size_diff = exits_paid_storage_size_diff;
+      }
+  in
+  return (ctxt, result, [])

@@ -32,6 +32,10 @@ type error +=
       payload_size : Saturation_repr.may_saturate Saturation_repr.t;
       limit : int;
     }
+  | Invalid_verification
+  | Invalid_circuit
+  | Inconsistent_state_update
+  | Pending_bound
 
 let () =
   register_error_kind
@@ -88,4 +92,45 @@ let () =
           Some (payload_size, limit)
       | _ -> None)
     (fun (payload_size, limit) ->
-      Ticket_payload_size_limit_exceeded {payload_size; limit})
+      Ticket_payload_size_limit_exceeded {payload_size; limit}) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.zk_rollup_failed_verification"
+    ~title:"Zk_rollup_update: failed verification"
+    ~description:"Zk_rollup_update: failed verification"
+    ~pp:(fun ppf () -> Format.fprintf ppf "The proof verification failed")
+    Data_encoding.empty
+    (function Invalid_verification -> Some () | _ -> None)
+    (fun () -> Invalid_verification) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.zk_rollup_invalid_circuit"
+    ~title:"Zk_rollup_update: invalid circuit"
+    ~description:"Zk_rollup_update: invalid circuit"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Invalid circuit in proof verification")
+    Data_encoding.empty
+    (function Invalid_circuit -> Some () | _ -> None)
+    (fun () -> Invalid_circuit) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.zk_rollup_inconsistent_state_update"
+    ~title:"Zk_rollup_update: inconsistent state update"
+    ~description:"Zk_rollup_update: new state is of incorrect size"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Zk_rollup_update: new state is of incorrect size")
+    Data_encoding.empty
+    (function Inconsistent_state_update -> Some () | _ -> None)
+    (fun () -> Inconsistent_state_update) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.zk_rollup_pending_bound"
+    ~title:"Zk_rollup_update: update with fewer pending ops than allowed"
+    ~description:"Zk_rollup_update: update with fewer pending ops than allowed"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Zk_rollup_update: update with fewer pending ops than allowed")
+    Data_encoding.empty
+    (function Pending_bound -> Some () | _ -> None)
+    (fun () -> Pending_bound)
