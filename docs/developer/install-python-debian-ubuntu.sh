@@ -47,20 +47,20 @@ pyenv --version
 [ "$PYENV_VIRTUALENV_INIT" = "1" ]
 
 ##
-## Install python 3.9.5 through pyenv
+## Install python 3.10.5 through pyenv
 ##
 ## References:
 ##  - https://github.com/pyenv/pyenv#usage
 
 # [install python through pyenv]
-pyenv install 3.9.5
-pyenv global 3.9.5
+pyenv install 3.10.5
+pyenv global 3.10.5
 
 # [print python version]
-python --version # should output 3.9.5
+python --version # should output 3.10.5
 
 # [verify python version]
-[ "$(python --version)" = "Python 3.9.5" ]
+[ "$(python --version)" = "Python 3.10.5" ]
 
 ##
 ## Install poetry
@@ -70,16 +70,16 @@ python --version # should output 3.9.5
 
 # [install poetry]
 curl -sSL https://install.python-poetry.org -o install-poetry.py
-python install-poetry.py --version 1.0.10 --yes
+python install-poetry.py --version 1.1.13 --yes
 
 # [setup shell for poetry]
 export PATH=$PATH:$HOME/.local/bin
 
 # [print poetry version]
-poetry --version # should output 1.0.10
+poetry --version # should output 1.1.13
 
 # [verify poetry version]
-[ "$(poetry --version)" = "Poetry version 1.0.10" ]
+[ "$(poetry --version)" = "Poetry version 1.1.13" ]
 
 ##
 ## Test installing Octez python development dependencies

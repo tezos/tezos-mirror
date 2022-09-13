@@ -103,7 +103,8 @@ tezos-client drain delegate <mgr> to <key>
 ```shell
 tezos-client drain delegate <mgr> to <dest_key> with <consensus_key>
 ```
-	
+
+
 Baker
 -----
 
@@ -131,8 +132,13 @@ Codec
 Docker Images
 -------------
 
+-  Bump up base image to ``alpine:3.16``. In particular, it changes Rust
+   and Python versions to 1.60.0 and 3.10.5 respectively.
+
 Rollups
 -------
 
 Miscellaneous
 -------------
+
+-  Recommend rust version 1.60.0 instead of 1.52.1.
