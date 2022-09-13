@@ -55,3 +55,6 @@ let get_slot cctxt ?(trim_slot = false) header =
 
 let get_shard cctxt header shard_index =
   call cctxt (Services.shard ()) (((), header), shard_index) () ()
+
+let get_slot_pages cctxt header =
+  call cctxt (Services.slot_pages ()) ((), header) () ()

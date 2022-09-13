@@ -208,13 +208,15 @@ let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
   (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
      If this is not the case, we throw an `Illformed_pages` error.
   *)
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
+     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
   let*? pages =
     String.chunk_bytes
       page_size
       slot
       ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
   in
-  return pages
+  return @@ List.map (fun page -> String.to_bytes page) pages
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 

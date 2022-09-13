@@ -65,7 +65,7 @@ val get_slot_pages :
   Cryptobox.t ->
   Store.t ->
   Cryptobox.commitment ->
-  string list tzresult Lwt.t
+  bytes list tzresult Lwt.t
 
 module Utils : sig
   (** [trim_x00 s] removes trailing '\000' at the end of [s] and returns
