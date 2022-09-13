@@ -30,12 +30,29 @@ let config_reset node args =
 let register () =
   Test.register ~__FILE__ ~title:"config reset" ~tags:["config"] @@ fun () ->
   let node = Node.create [] in
+  let check_default_config ~__LOC__ c =
+    let keys = JSON.as_object c |> List.map fst |> List.sort String.compare in
+    Check.((keys = ["data-dir"; "p2p"]) ~__LOC__ (list string))
+      ~error_msg:"Config should contain keys %R but contains keys %L." ;
+    let p2p = JSON.(c |-> "p2p") in
+    let p2p_keys =
+      JSON.as_object p2p |> List.map fst |> List.sort String.compare
+    in
+    Check.(
+      (p2p_keys = ["bootstrap-peers"; "listen-addr"]) ~__LOC__ (list string))
+      ~error_msg:"P2P config should contain keys %R but contains keys %L." ;
+    let addr = JSON.(p2p |-> "listen-addr" |> as_string) in
+    Check.((addr = "[::]:9732") ~__LOC__ string)
+      ~error_msg:"P2P listening address should be %R but is %L."
+  in
   let* c1 = config_reset node [] in
+  check_default_config ~__LOC__ c1 ;
   let* c2 = config_reset node ["--rpc-addr=:1234"] in
   let c2_addr = JSON.(c2 |-> "rpc" |-> "listen-addrs" |=> 0 |> as_string) in
   Check.((c2_addr = ":1234") string)
     ~error_msg:"config.rpc.listen-addrs[0] contains %L but should contain %R." ;
   let* c3 = config_reset node [] in
+  check_default_config ~__LOC__ c3 ;
   Check.((JSON.encode c1 = JSON.encode c3) string)
     ~error_msg:
       "Configs after reset should be identical. Was %L before, and now %R." ;
