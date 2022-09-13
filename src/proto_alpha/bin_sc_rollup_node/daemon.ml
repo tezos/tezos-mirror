@@ -474,7 +474,9 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
         ())
       configuration.sc_rollup_node_operators
   in
-  let*! store = Store.load configuration in
+  let*! store =
+    Store.load Configuration.(default_storage_dir configuration.data_dir)
+  in
   let*! context = Context.load configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =

@@ -4473,6 +4473,25 @@ module Protocol = Protocol
         ~inline_tests:ppx_expect
         ~linkall:true
     in
+    let layer2_utils =
+      only_if N.(number >= 015) @@ fun () ->
+      public_lib
+        (sf "tezos-layer2-utils-%s" name_dash)
+        ~path:(path // "lib_layer2_utils")
+        ~synopsis:"Tezos/Protocol: protocol specific library for Layer 2 utils"
+        ~deps:
+          [
+            octez_base |> open_ ~m:"TzPervasives";
+            main |> open_;
+            client |> if_some |> open_;
+            octez_rpc |> open_;
+            irmin_pack;
+            irmin_pack_unix;
+            irmin;
+          ]
+        ~inline_tests:ppx_expect
+        ~linkall:true
+    in
     let sc_rollup =
       only_if N.(number >= 013) @@ fun () ->
       public_lib
@@ -4543,6 +4562,7 @@ module Protocol = Protocol
             octez_dal_node_services;
             octez_shell_services |> open_;
             sc_rollup |> if_some |> open_;
+            layer2_utils |> if_some |> open_;
             data_encoding;
             irmin_pack;
             irmin_pack_unix;

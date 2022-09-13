@@ -9,32 +9,17 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
+  "ppx_expect"
   "tezos-base"
-  "tezos-client-commands"
-  "tezos-stdlib-unix"
-  "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-client-alpha"
-  "tezos-context"
   "tezos-protocol-alpha"
-  "tezos-protocol-plugin-alpha"
+  "tezos-client-alpha"
   "tezos-rpc"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-dal-node-services"
-  "tezos-shell-services"
-  "tezos-sc-rollup-alpha"
-  "tezos-layer2-utils-alpha"
-  "data-encoding" { >= "0.6" & < "0.7" }
   "irmin-pack" { >= "3.4.0" & < "3.5.0" }
   "irmin" { >= "3.4.0" & < "3.5.0" }
-  "ringo" { >= "0.9" }
-  "ringo-lwt" { >= "0.9" }
-  "tezos-injector-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: Smart Contract Rollup node binary"
+synopsis: "Tezos/Protocol: protocol specific library for Layer 2 utils"
