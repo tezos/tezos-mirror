@@ -235,5 +235,7 @@ module Utils = struct
 
   let fill_x00 slot_size b =
     let len = Bytes.length b in
-    Bytes.extend b 0 (slot_size - len)
+    let extended = Bytes.extend b 0 (slot_size - len) in
+    let () = Bytes.fill extended len (slot_size - len) '\000' in
+    extended
 end
