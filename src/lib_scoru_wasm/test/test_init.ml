@@ -42,7 +42,9 @@ let initial_tree code =
 let eval_until_stuck tree =
   let open Lwt.Syntax in
   let rec go counter tree =
-    let* tree = Wasm.compute_step tree in
+    let* tree =
+      Wasm.Internal_for_tests.compute_step_many ~max_steps:Int64.max_int tree
+    in
     let* stuck = Wasm.Internal_for_tests.is_stuck tree in
     match stuck with
     | Some stuck -> Lwt_result.return stuck

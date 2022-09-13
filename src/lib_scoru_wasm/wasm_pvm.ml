@@ -275,11 +275,10 @@ struct
       in
       Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
-    let compute_step tree =
+    let compute_step_inner pvm_state =
       let open Lwt_syntax in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Calculate the next tick state. *)
-      let* durable, tick_state = next_tick_state pvm_state in
+      let+ durable, tick_state = next_tick_state pvm_state in
       let input_request, tick_state =
         match tick_state with
         | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
@@ -309,6 +308,32 @@ struct
         }
       in
 
+      pvm_state
+
+    let compute_step_many ?(max_steps = 1L) tree =
+      let open Lwt.Syntax in
+      assert (max_steps > 0L) ;
+
+      let should_continue pvm_state =
+        match (pvm_state.input_request, pvm_state.tick_state) with
+        | Wasm_pvm_sig.Input_required, _ -> false
+        | _, Stuck _ -> false
+        | _ -> true
+      in
+
+      let rec go steps_left pvm_state =
+        if steps_left > 0L && should_continue pvm_state then
+          let* pvm_state = compute_step_inner pvm_state in
+          go (Int64.pred steps_left) pvm_state
+        else Lwt.return pvm_state
+      in
+
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      (* Make sure we perform at least 1 step. The assertion above ensures that
+         we were asked to perform at least 1. *)
+      let* pvm_state = compute_step_inner pvm_state in
+      let* pvm_state = go (Int64.pred max_steps) pvm_state in
+
       (* {{Note tick state clean-up}}
 
          The "wasm" directory in the Irmin tree of the PVM is used to
@@ -325,7 +350,10 @@ struct
          With this, we gain an additional 5% of proof size in the
          worst tick of the computation.wasm kernel. *)
       let* tree = T.remove tree ["wasm"] in
+
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let compute_step tree = compute_step_many ~max_steps:1L tree
 
     let out_encoding =
       Tree_encoding.scope
@@ -424,6 +452,8 @@ struct
         match pvm.tick_state with
         | Stuck error -> Lwt.return_some error
         | _ -> Lwt.return_none
+
+      let compute_step_many = compute_step_many
     end
   end
 
