@@ -51,4 +51,5 @@ val get_shard :
 
 (** [get_slot_pages cctxt header ] fetches from the dal node the pages
     of the slot with header [header]. *)
-val get_slot_pages : #cctxt -> Dal.Slot.Header.t -> string list tzresult Lwt.t
+val get_slot_pages :
+  #cctxt -> Dal.Slot.Header.t -> Dal.Page.content list tzresult Lwt.t

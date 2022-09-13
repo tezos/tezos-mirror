@@ -144,19 +144,7 @@ module Contexts :
     stored as a list of bindings from [Dal_slot_index.t]
     to [Dal.Slot.t]. The encoding function converts this
     list into a [Dal.Slot_index.t]-indexed map. *)
-module Dal_slots :
-  Store_utils.Nested_map
-    with type primary_key = Block_hash.t
-     and type secondary_key = Dal.Slot_index.t
-     and type value = Dal.Slot.t
-
-(** Confirmed slot headers per block hash, stored as a list of bindings from
-    [Dal_slot_index.t] to [Dal.Slot.t]. The encoding function converts this
-    list into a [Dal.Slot_index.t]-indexed map. Note that the block_hash
-    refers to the block where slots headers have been confirmed, not
-    the block where they have been published.
-*)
-module Dal_confirmed_slots :
+module Dal_slots_headers :
   Store_utils.Nested_map
     with type primary_key = Block_hash.t
      and type secondary_key = Dal.Slot_index.t
@@ -175,3 +163,16 @@ module Dal_confirmed_slots_histories :
   Store_utils.Map
     with type key = Block_hash.t
      and type value = Dal.Slots_history.History_cache.t
+
+(** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
+    of dal slots fetched by the rollup node, as a list of pages. The values of
+    this storage module have type `string option list`. The value[None] for
+    elements of the list is used to denote pages of slots that have not been
+    confirmed. A value of the form [Some page_contents] refers to a page of
+    a slot that has been confirmed, and whose contents are [page_contents].
+*)
+module Dal_slot_pages :
+  Store_utils.Nested_map
+    with type primary_key = Block_hash.t
+     and type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
+     and type value = Dal.Page.content option
