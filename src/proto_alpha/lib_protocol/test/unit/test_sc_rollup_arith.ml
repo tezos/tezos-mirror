@@ -229,7 +229,7 @@ let syntactically_valid_messages =
 let syntactically_invalid_messages =
   List.map
     (fun s -> (s, []))
-    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a1"]
+    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a_"]
 
 let test_parsing_messages () =
   List.iter_es (test_parsing_message ~valid:true) syntactically_valid_messages
