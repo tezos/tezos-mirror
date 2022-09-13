@@ -149,20 +149,31 @@ let exn_gen =
     ]
 
 let error_state_gen =
+  (* The generator produces only known interpreter errors. *)
+  let extract_error = function
+    | `Interpreter e -> e
+    | `Unknown _ -> assert false
+  in
   let open QCheck2.Gen in
   let decode_error =
     let+ exn = exn_gen in
-    let error = Wasm_pvm_errors.refine_error exn in
+    let error =
+      Wasm_pvm_errors.extract_interpreter_error exn |> extract_error
+    in
     Wasm_pvm_errors.Decode_error error
   in
   let init_error =
     let+ exn = exn_gen in
-    let error = Wasm_pvm_errors.refine_error exn in
+    let error =
+      Wasm_pvm_errors.extract_interpreter_error exn |> extract_error
+    in
     Wasm_pvm_errors.Init_error error
   in
   let eval_error =
     let+ exn = exn_gen in
-    let error = Wasm_pvm_errors.refine_error exn in
+    let error =
+      Wasm_pvm_errors.extract_interpreter_error exn |> extract_error
+    in
     Wasm_pvm_errors.Eval_error error
   in
   let unknown_error =
