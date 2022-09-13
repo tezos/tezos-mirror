@@ -28,7 +28,7 @@ module Test = struct
     (* We take mainnet parameters we divide by [16] to speed up the test. *)
     let number_of_shards = 2048 / 16 in
     let slot_size = 1048576 / 16 in
-    let segment_size = 4096 / 16 in
+    let page_size = 4096 / 16 in
     let msg_size = slot_size in
     let msg = Bytes.create msg_size in
     for i = 0 to (msg_size / 8) - 1 do
@@ -43,14 +43,14 @@ module Test = struct
       (fun redundancy_factor ->
         let* t =
           Cryptobox.make
-            {redundancy_factor; slot_size; segment_size; number_of_shards}
+            {redundancy_factor; slot_size; page_size; number_of_shards}
         in
         let* p = Cryptobox.polynomial_from_slot t msg in
         let cm = Cryptobox.commit t p in
-        let* pi = Cryptobox.prove_segment t p 1 in
-        let segment = Bytes.sub msg segment_size segment_size in
+        let* pi = Cryptobox.prove_page t p 1 in
+        let page = Bytes.sub msg page_size page_size in
         let* check =
-          Cryptobox.verify_segment t cm {index = 1; content = segment} pi
+          Cryptobox.verify_page t cm {index = 1; content = page} pi
         in
 
         assert check ;

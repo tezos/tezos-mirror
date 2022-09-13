@@ -510,7 +510,7 @@ module Dal = struct
       number_of_shards : int;
       redundancy_factor : int;
       slot_size : int;
-      segment_size : int;
+      page_size : int;
     }
 
     let parameter_file protocol =
@@ -525,8 +525,8 @@ module Dal = struct
       let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
       let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
       let slot_size = JSON.(json |-> "slot_size" |> as_int) in
-      let segment_size = JSON.(json |-> "segment_size" |> as_int) in
-      return {number_of_shards; redundancy_factor; slot_size; segment_size}
+      let page_size = JSON.(json |-> "page_size" |> as_int) in
+      return {number_of_shards; redundancy_factor; slot_size; page_size}
   end
 
   module RPC = struct
@@ -557,6 +557,10 @@ module Dal = struct
         ["slot"; "content"; slot_header]
         ~query_string:[("trim", "")]
         JSON.as_string
+
+    let slot_pages slot_header =
+      make GET ["slot"; "pages"; slot_header] (fun pages ->
+          pages |> JSON.as_list |> List.map JSON.as_string)
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox
@@ -564,16 +568,14 @@ module Dal = struct
   let make
       ?(on_error =
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
-      Parameters.{redundancy_factor; number_of_shards; slot_size; segment_size}
-      =
+      Parameters.{redundancy_factor; number_of_shards; slot_size; page_size} =
     let initialisation_parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
         ~slot_size
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
     match
-      Cryptobox.make
-        {redundancy_factor; slot_size; segment_size; number_of_shards}
+      Cryptobox.make {redundancy_factor; slot_size; page_size; number_of_shards}
     with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg

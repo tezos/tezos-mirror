@@ -29,7 +29,7 @@ open Cryptobox_intf
     a value of type [t] *)
 type parameters = {
   redundancy_factor : int;
-  segment_size : int;
+  page_size : int;
   slot_size : int;
   number_of_shards : int;
 }
@@ -49,7 +49,7 @@ type t
 
     1. A proof that a commitment is valid
 
-    2. A proof that a segment is valid
+    2. A proof that a page is valid
 
    A technicality is that the economic protocol is able to configure
    those cryptographic primitives via several constants.  Also, an SRS
@@ -111,8 +111,8 @@ type scalar
       1. A commitment ensures that the size of the [slot] has a
      bounded size (typically [slot_size]).
 
-      2. A commitment can be used to verify that a segment of fixed size
-      (typically [segment_size]) is part of the original slot. *)
+      2. A commitment can be used to verify that a page of fixed size
+      (typically [page_size]) is part of the original slot. *)
 type polynomial
 
 (** [polynomial_degree polynomial] returns the degree of the
@@ -185,14 +185,11 @@ val verify_shard : t -> commitment -> shard -> shard_proof -> bool
      maximum slot size. *)
 val prove_commitment : t -> polynomial -> commitment_proof
 
-(** [prove_segment] produces a proof that the [n]th segment computed
-     is part of a commitment. This segment corresponds to the original
-     data and are split into [C.segment_size]. *)
-val prove_segment :
-  t ->
-  polynomial ->
-  int ->
-  (segment_proof, [> `Segment_index_out_of_range]) result
+(** [prove_page] produces a proof that the [n]th page computed
+     is part of a commitment. This page corresponds to the original
+     data and are split into [C.page_size]. *)
+val prove_page :
+  t -> polynomial -> int -> (page_proof, [> `Segment_index_out_of_range]) result
 
 (** [prove_shards] computes the proofs for all the [shards] that
      each [shard] is a valid piece of data associated to a polynomial

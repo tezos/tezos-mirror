@@ -30,6 +30,7 @@ type error +=
   | Missing_shards
   | Illformed_shard
   | Slot_not_found
+  | Illformed_pages
 
 let () =
   register_error_kind
@@ -86,7 +87,16 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Illformed shard found in the store")
     Data_encoding.(unit)
     (function Illformed_shard -> Some () | _ -> None)
-    (fun () -> Illformed_shard)
+    (fun () -> Illformed_shard) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.illformed_pages"
+    ~title:"Illformed pages"
+    ~description:"Illformed pages found in the store"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Illformed pages found in the store")
+    Data_encoding.(unit)
+    (function Illformed_pages -> Some () | _ -> None)
+    (fun () -> Illformed_pages)
 
 type slot = bytes
 
@@ -190,6 +200,21 @@ let get_slot initial_constants dal_constants store slot_header =
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
   in
   return slot
+
+let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
+    store slot_header =
+  let open Lwt_result_syntax in
+  let* slot = get_slot initial_constants dal_constants store slot_header in
+  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
+     If this is not the case, we throw an `Illformed_pages` error.
+  *)
+  let*? pages =
+    String.chunk_bytes
+      page_size
+      slot
+      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
+  in
+  return pages
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 

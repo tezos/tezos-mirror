@@ -29,7 +29,7 @@ type t
 (** Parameters to build a value of type [t] *)
 type parameters = {
   redundancy_factor : int;
-  segment_size : int;
+  page_size : int;
   slot_size : int;
   number_of_shards : int;
 }
@@ -74,29 +74,29 @@ val commitment_proof_encoding : commitment_proof Data_encoding.t
      exceed [C.slot_size]. The verification time is constant. *)
 val verify_commitment : t -> commitment -> commitment_proof -> bool
 
-(** The original slot can be split into a list of segments of size
-     [segment_size]. A segment is consequently encoded as a pair of an
-     [index] and the content of this segment. *)
-type segment = {index : int; content : bytes}
+(** The original slot can be split into a list of pages of size
+     [page_size]. A page is consequently encoded as a pair of an
+     [index] and the content of this page. *)
+type page = {index : int; content : bytes}
 
 (** A proof that the evaluation of points of a polynomial is part of
      a commitment. *)
-type segment_proof
+type page_proof
 
-(** An encoding for the proof of a segment. *)
-val segment_proof_encoding : segment_proof Data_encoding.t
+(** An encoding for the proof of a page. *)
+val page_proof_encoding : page_proof Data_encoding.t
 
-(** [verify_segment t commitment segment segment_proof] returns [Ok
-     true] if the [proof] certifies that the [slot_segment] is indeed
+(** [verify_page t commitment page page_proof] returns [Ok
+     true] if the [proof] certifies that the [slot_page] is indeed
      included in the slot committed with commitment
      [commitment]. Returns [Ok false] otherwise.
 
-      Fails if the index of the segment is out of range. *)
-val verify_segment :
+      Fails if the index of the page is out of range. *)
+val verify_page :
   t ->
   commitment ->
-  segment ->
-  segment_proof ->
+  page ->
+  page_proof ->
   ( bool,
     [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
   Result.t

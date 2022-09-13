@@ -220,7 +220,7 @@ module Dal : sig
       number_of_shards : int;
       redundancy_factor : int;
       slot_size : int;
-      segment_size : int;
+      page_size : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t
@@ -234,6 +234,9 @@ module Dal : sig
 
     (** [slot_content slot_header] gets slot/content of [slot_header] *)
     val slot_content : string -> (Dal_node.t, string) RPC_core.t
+
+    (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
+    val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox

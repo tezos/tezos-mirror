@@ -781,7 +781,7 @@ module Constants : sig
       availability_threshold : int;
       slot_size : int;
       redundancy_factor : int;
-      segment_size : int;
+      page_size : int;
     }
 
     val dal_encoding : dal Data_encoding.t

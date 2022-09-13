@@ -105,7 +105,7 @@ let initialisation_parameters_from_files ~g1_path ~g2_path =
 type srs = {
   raw : initialisation_parameters;
   kate_amortized_srs_g2_shards : Bls12_381.G2.t;
-  kate_amortized_srs_g2_segments : Bls12_381.G2.t;
+  kate_amortized_srs_g2_pages : Bls12_381.G2.t;
 }
 
 module Inner = struct
@@ -135,9 +135,9 @@ module Inner = struct
 
   type _proof_single = Bls12_381.G1.t
 
-  type segment_proof = Bls12_381.G1.t
+  type page_proof = Bls12_381.G1.t
 
-  type segment = {index : int; content : bytes}
+  type page = {index : int; content : bytes}
 
   type share = Scalar.t array
 
@@ -145,7 +145,7 @@ module Inner = struct
 
   type shard = {index : int; share : share}
 
-  type shards_proofs_precomputation = Scalar.t array * segment_proof array array
+  type shards_proofs_precomputation = Scalar.t array * page_proof array array
 
   module Encoding = struct
     open Data_encoding
@@ -167,7 +167,7 @@ module Inner = struct
 
     let _proof_single_encoding = g1_encoding
 
-    let segment_proof_encoding = g1_encoding
+    let page_proof_encoding = g1_encoding
 
     let share_encoding = array fr_encoding
 
@@ -269,7 +269,7 @@ module Inner = struct
   type t = {
     redundancy_factor : int;
     slot_size : int;
-    segment_size : int;
+    page_size : int;
     number_of_shards : int;
     k : int;
     n : int;
@@ -281,9 +281,9 @@ module Inner = struct
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
     shard_size : int;
     (* Length of a shard in terms of scalar elements. *)
-    nb_segments : int;
-    (* Number of slot segments. *)
-    segment_length : int;
+    nb_pages : int;
+    (* Number of slot pages. *)
+    page_length : int;
     remaining_bytes : int;
     evaluations_log : int;
     (* Log of the number of evaluations that constitute an erasure encoded
@@ -303,11 +303,10 @@ module Inner = struct
     in
     if
       not
-        (is_pow_of_two t.slot_size
-        && is_pow_of_two t.segment_size
-        && is_pow_of_two t.n)
+        (is_pow_of_two t.slot_size && is_pow_of_two t.page_size
+       && is_pow_of_two t.n)
     then
-      (* According to the specification the lengths of a slot a slot segment are
+      (* According to the specification the lengths of a slot page are
          in MiB *)
       fail (`Fail "Wrong slot size: expected MiB")
     else if not (Z.(log2 (of_int t.n)) <= 32 && is_pow_of_two t.k && t.n > t.k)
@@ -329,21 +328,21 @@ module Inner = struct
 
   type parameters = {
     redundancy_factor : int;
-    segment_size : int;
+    page_size : int;
     slot_size : int;
     number_of_shards : int;
   }
 
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make {redundancy_factor; slot_size; segment_size; number_of_shards} =
+  let make {redundancy_factor; slot_size; page_size; number_of_shards} =
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
     let shard_size = n / number_of_shards in
     let evaluations_log = Z.(log2 (of_int n)) in
     let evaluations_per_proof_log = Z.(log2 (of_int shard_size)) in
-    let segment_length = Int.div segment_size scalar_bytes_amount + 1 in
+    let page_length = Int.div page_size scalar_bytes_amount + 1 in
     let* srs =
       match !initialisation_parameters with
       | None -> fail (`Fail "Dal_cryptobox.make: DAL was not initialisated.")
@@ -353,15 +352,15 @@ module Inner = struct
               raw;
               kate_amortized_srs_g2_shards =
                 Srs_g2.get raw.srs_g2 (1 lsl evaluations_per_proof_log);
-              kate_amortized_srs_g2_segments =
-                Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int segment_length)));
+              kate_amortized_srs_g2_pages =
+                Srs_g2.get raw.srs_g2 (1 lsl Z.(log2up (of_int page_length)));
             }
     in
     let t =
       {
         redundancy_factor;
         slot_size;
-        segment_size;
+        page_size;
         number_of_shards;
         k;
         n;
@@ -369,9 +368,9 @@ module Inner = struct
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
         shard_size;
-        nb_segments = slot_size / segment_size;
-        segment_length;
-        remaining_bytes = segment_size mod scalar_bytes_amount;
+        nb_pages = slot_size / page_size;
+        page_length;
+        remaining_bytes = page_size mod scalar_bytes_amount;
         evaluations_log;
         evaluations_per_proof_log;
         proofs_log = evaluations_log - evaluations_per_proof_log;
@@ -389,7 +388,7 @@ module Inner = struct
     let evaluations = List.map (evaluation_fft d) ps in
     interpolation_fft d (mul_c ~evaluations ())
 
-  (* We encode by segments of [segment_size] bytes each.  The segments
+  (* We encode by pages of [page_size] bytes each.  The pages
      are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_from_bytes' (t : t) slot =
@@ -400,19 +399,19 @@ module Inner = struct
     else
       let offset = ref 0 in
       let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
-      for segment = 0 to t.nb_segments - 1 do
-        for elt = 0 to t.segment_length - 1 do
+      for page = 0 to t.nb_pages - 1 do
+        for elt = 0 to t.page_length - 1 do
           if !offset > t.slot_size then ()
-          else if elt = t.segment_length - 1 then (
+          else if elt = t.page_length - 1 then (
             let dst = Bytes.create t.remaining_bytes in
             Bytes.blit slot !offset dst 0 t.remaining_bytes ;
             offset := !offset + t.remaining_bytes ;
-            res.((elt * t.nb_segments) + segment) <- Scalar.of_bytes_exn dst)
+            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst)
           else
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
-            res.((elt * t.nb_segments) + segment) <- Scalar.of_bytes_exn dst
+            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst
         done
       done ;
       Ok res
@@ -422,11 +421,11 @@ module Inner = struct
     let* data = polynomial_from_bytes' t slot in
     Ok (Evaluations.interpolation_fft2 t.domain_k data)
 
-  let eval_coset t eval slot offset segment =
-    for elt = 0 to t.segment_length - 1 do
-      let idx = (elt * t.nb_segments) + segment in
+  let eval_coset t eval slot offset page =
+    for elt = 0 to t.page_length - 1 do
+      let idx = (elt * t.nb_pages) + page in
       let coeff = Scalar.to_bytes (Array.get eval idx) in
-      if elt = t.segment_length - 1 then (
+      if elt = t.page_length - 1 then (
         Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
         offset := !offset + t.remaining_bytes)
       else (
@@ -434,14 +433,14 @@ module Inner = struct
         offset := !offset + scalar_bytes_amount)
     done
 
-  (* The segments are arranged in cosets to evaluate in batch with Kate
+  (* The pages are arranged in cosets to evaluate in batch with Kate
      amortized. *)
   let polynomial_to_bytes t p =
     let eval = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
-    for segment = 0 to t.nb_segments - 1 do
-      eval_coset t eval slot offset segment
+    for page = 0 to t.nb_pages - 1 do
+      eval_coset t eval slot offset page
     done ;
     slot
 
@@ -790,42 +789,41 @@ module Inner = struct
           (proof, G2.(add h_secret (negate (mul (copy one) point))));
         ])
 
-  let prove_segment t p segment_index =
-    if segment_index < 0 || segment_index >= t.nb_segments then
+  let prove_page t p page_index =
+    if page_index < 0 || page_index >= t.nb_pages then
       Error `Segment_index_out_of_range
     else
-      let l = 1 lsl Z.(log2up (of_int t.segment_length)) in
-      let wi = Domains.get t.domain_k segment_index in
+      let l = 1 lsl Z.(log2up (of_int t.page_length)) in
+      let wi = Domains.get t.domain_k page_index in
       let quotient, _ =
         Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
       Ok (commit t quotient)
 
-  (* Parses the [slot_segment] to get the evaluations that it contains. The
-     evaluation points are given by the [slot_segment_index]. *)
-  let verify_segment t cm {index = slot_segment_index; content = slot_segment}
-      proof =
-    if slot_segment_index < 0 || slot_segment_index >= t.nb_segments then
+  (* Parses the [slot_page] to get the evaluations that it contains. The
+     evaluation points are given by the [slot_page_index]. *)
+  let verify_page t cm {index = slot_page_index; content = slot_page} proof =
+    if slot_page_index < 0 || slot_page_index >= t.nb_pages then
       Error `Segment_index_out_of_range
     else
-      let domain = Domains.build ~log:Z.(log2up (of_int t.segment_length)) in
-      let slot_segment_evaluations =
+      let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
+      let slot_page_evaluations =
         Array.init
-          (1 lsl Z.(log2up (of_int t.segment_length)))
+          (1 lsl Z.(log2up (of_int t.page_length)))
           (function
-            | i when i < t.segment_length - 1 ->
+            | i when i < t.page_length - 1 ->
                 let dst = Bytes.create scalar_bytes_amount in
                 Bytes.blit
-                  slot_segment
+                  slot_page
                   (i * scalar_bytes_amount)
                   dst
                   0
                   scalar_bytes_amount ;
                 Scalar.of_bytes_exn dst
-            | i when i = t.segment_length - 1 ->
+            | i when i = t.page_length - 1 ->
                 let dst = Bytes.create t.remaining_bytes in
                 Bytes.blit
-                  slot_segment
+                  slot_page
                   (i * scalar_bytes_amount)
                   dst
                   0
@@ -837,9 +835,9 @@ module Inner = struct
         (verify
            t
            cm
-           t.srs.kate_amortized_srs_g2_segments
+           t.srs.kate_amortized_srs_g2_pages
            domain
-           (Domains.get t.domain_k slot_segment_index, slot_segment_evaluations)
+           (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
            proof)
 end
 

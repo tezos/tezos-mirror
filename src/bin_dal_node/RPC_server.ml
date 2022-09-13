@@ -48,10 +48,12 @@ let handle_slot initial_constants dal_constants store (_, commitment) trim () =
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
 
+let handle_slot_pages initial_constants dal_constants store (_, commitment) ()
+    () =
+  Slot_manager.get_slot_pages initial_constants dal_constants store commitment
+
 let handle_shard store ((_, commitment), shard) () () =
-  let open Lwt_result_syntax in
-  let* shard = Slot_manager.get_shard store commitment shard in
-  return shard
+  Slot_manager.get_shard store commitment shard
 
 let register_split_slot {Node_context.dal_parameters; dal_constants; _} store
     dir =
@@ -67,6 +69,13 @@ let register_show_slot {Node_context.dal_parameters; dal_constants; _} store dir
     (Services.slot ())
     (handle_slot dal_parameters dal_constants store)
 
+let register_show_slot_pages {Node_context.dal_parameters; dal_constants; _}
+    store dir =
+  RPC_directory.register
+    dir
+    (Services.slot_pages ())
+    (handle_slot_pages dal_parameters dal_constants store)
+
 let register_shard store dir =
   RPC_directory.register dir (Services.shard ()) (handle_shard store)
 
@@ -75,6 +84,7 @@ let register ctxt store =
   |> register_split_slot ctxt store
   |> register_show_slot ctxt store
   |> register_shard store
+  |> register_show_slot_pages ctxt store
 
 let start configuration dir =
   let open Lwt_syntax in
