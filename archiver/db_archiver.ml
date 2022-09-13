@@ -30,6 +30,8 @@ type t = Sqlite3.db
 
 (* TODO: use prepared statements instead of exec (and thus also use Sql.Data) *)
 
+let name = "db-archiver"
+
 let register_rights db level rights aliases =
   let query =
     Format.asprintf
@@ -128,21 +130,20 @@ let launch db source =
 
 let stop () = chunk_feeder None
 
-let add_received ?unaccurate level items =
+let add_mempool ?unaccurate ~level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level block_hash ~round timestamp reception_time baker block_info
-    =
+let add_block ~level (block, (endos, preendos)) =
   chunk_feeder
     (Some
        (Block
           ( level,
-            block_hash,
-            round,
-            timestamp,
-            reception_time,
-            baker,
-            block_info )))
+            block.Data.Block.hash,
+            block.round,
+            block.timestamp,
+            Stdlib.Option.get block.reception_time,
+            block.delegate,
+            endos @ preendos )))
 
 let add_rights ~level rights aliases =
   chunk_feeder (Some (Rights (level, rights, aliases)))

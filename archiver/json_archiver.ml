@@ -27,6 +27,8 @@ open Lwt_result_syntax
 
 class type t = Tezos_client_base.Client_context.full
 
+let name = "json-archiver"
+
 let levels_per_folder = 4096l
 
 module Anomaly = struct
@@ -526,21 +528,20 @@ let launch cctxt prefix =
 
 let stop () = chunk_feeder None
 
-let add_received ?unaccurate level items =
+let add_mempool ?unaccurate ~level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level block_hash ~round timestamp reception_time baker block_info
-    =
+let add_block ~level (block, (endos, preendos)) =
   chunk_feeder
     (Some
        (Block
           ( level,
-            block_hash,
-            round,
-            timestamp,
-            reception_time,
-            baker,
-            block_info )))
+            block.Data.Block.hash,
+            block.round,
+            block.timestamp,
+            Stdlib.Option.get block.reception_time,
+            block.delegate,
+            endos @ preendos )))
 
-(* only used by the db archiver *)
+(* not used *)
 let add_rights ~level:_ _rights _aliases = ()

@@ -60,9 +60,115 @@ let endpoint_param =
     ~desc:"Teztale server to feed"
     (Clic.parameter (fun _ p -> return (Uri.of_string p)))
 
+let new_file_parameter =
+  Clic.parameter (fun _ p ->
+      if Sys.file_exists p then failwith "File already exist: '%s'" p
+      else return p)
+
+let path_parameter =
+  Clic.parameter (fun _ p ->
+      if not (Sys.file_exists p) then failwith "File does not exist: '%s'" p
+      else return p)
+
+let directory_parameter =
+  Clic.parameter (fun _ p ->
+      if not (Sys.file_exists p && Sys.is_directory p) then
+        failwith "Directory doesn't exist: '%s'" p
+      else return p)
+
+let main_db cctxt db_path source =
+  let* () = Client_confirmations.wait_for_bootstrapped cctxt in
+  (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
+  let db = Sqlite3.db_open db_path in
+  let () = Db.set_pragma_use_foreign_keys db in
+  let dumper = Db_archiver.launch db source in
+  let main =
+    let*! () =
+      Lwt.Infix.(
+        General_archiver.Db_loops.blocks_loop cctxt
+        <&> General_archiver.Db_loops.endorsements_loop cctxt)
+    in
+    let () = Db_archiver.stop () in
+    Lwt.return_unit
+  in
+  let*! out = Lwt.join [dumper; main] in
+  return out
+
+let main_json cctxt prefix =
+  let* () = Client_confirmations.wait_for_bootstrapped cctxt in
+  (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
+  let dumper = Json_archiver.launch cctxt prefix in
+  let main =
+    let*! () =
+      Lwt.Infix.(
+        General_archiver.Json_loops.blocks_loop cctxt
+        <&> General_archiver.Json_loops.endorsements_loop cctxt)
+    in
+    let () = Json_archiver.stop () in
+    Lwt.return_unit
+  in
+  let*! out = Lwt.join [dumper; main] in
+  return out
+
+let main_server state cctxt =
+  let* () = Client_confirmations.wait_for_bootstrapped cctxt in
+  (* let* () = await_protocol_activation cctxt Loops.protocol_hash in *)
+  let dumper = Server_archiver.launch state "source-not-used" in
+  let main =
+    let*! () =
+      Lwt.Infix.(
+        General_archiver.Server_loops.blocks_loop cctxt
+        <&> General_archiver.Server_loops.endorsements_loop cctxt)
+    in
+    let () = Server_archiver.stop () in
+    Lwt.return_unit
+  in
+  let*! out = Lwt.join [dumper; main] in
+  return out
+
 let select_commands _ctxt Client_config.{chain; _} =
   return
     [
+      Clic.command
+        ~group
+        ~desc:"create empty Sqlite3 database"
+        Clic.no_options
+        (Clic.prefixes ["create"; "database"; "in"]
+        @@ Clic.param
+             ~name:"db_path"
+             ~desc:"path to file in which to store the Sqlite3 database"
+             new_file_parameter
+        @@ Clic.stop)
+        (fun () db_path _cctxt ->
+          Db.create_db db_path ;
+          return_unit);
+      Clic.command
+        ~group
+        ~desc:"run the db archiver"
+        Clic.no_options
+        (Clic.prefixes ["run"; "db-archiver"; "on"]
+        @@ Clic.param
+             ~name:"db_path"
+             ~desc:"path to Sqlite3 database file where to store the data"
+             path_parameter
+        @@ Clic.prefix "for"
+        @@ Clic.param
+             ~name:"source"
+             ~desc:"name of the data source (i.e. of the node)"
+             (Clic.parameter (fun _ p -> return p))
+        @@ Clic.stop)
+        (fun () db_path source cctxt -> main_db cctxt db_path source);
+      Clic.command
+        ~group
+        ~desc:"run the json archiver"
+        Clic.no_options
+        (Clic.prefixes ["run"; "json-archiver"; "in"]
+        @@ Clic.param
+             ~name:"archive_path"
+             ~desc:"folder in which to dump files"
+             directory_parameter
+        @@ Clic.stop)
+        (fun () prefix cctxt -> main_json cctxt prefix);
       Clic.command
         ~group
         ~desc:"upload a file hierarchy to a server"
@@ -106,14 +212,17 @@ let select_commands _ctxt Client_config.{chain; _} =
                 in
                 Conduit_lwt_unix.init ~tls_authenticator ()
           in
-          let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-          Server_archiver.rights
-            ctx
-            (source, pass)
-            endpoint
-            chain
-            starting
-            cctxt);
+          let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+          let state =
+            Server_archiver.{cohttp_ctx; auth = (source, pass); endpoint}
+          in
+          let dumper = Server_archiver.launch state "source-not-used" in
+          let main =
+            General_archiver.print_failures
+              (General_archiver.Server_loops.rights chain starting cctxt)
+          in
+          let*! out = Lwt.join [dumper; main] in
+          return out);
       Clic.command
         ~group
         ~desc:"inject past blocks in a teztale_server"
@@ -129,14 +238,17 @@ let select_commands _ctxt Client_config.{chain; _} =
                 in
                 Conduit_lwt_unix.init ~tls_authenticator ()
           in
-          let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-          Server_archiver.blocks
-            ctx
-            (source, pass)
-            endpoint
-            chain
-            starting
-            cctxt);
+          let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+          let state =
+            Server_archiver.{cohttp_ctx; auth = (source, pass); endpoint}
+          in
+          let dumper = Server_archiver.launch state "source-not-used" in
+          let main =
+            General_archiver.print_failures
+              (General_archiver.Server_loops.blocks chain starting cctxt)
+          in
+          let*! out = Lwt.join [dumper; main] in
+          return out);
       Clic.command
         ~group
         ~desc:"run the archiver and feed an aggregator"
@@ -152,15 +264,9 @@ let select_commands _ctxt Client_config.{chain; _} =
                 in
                 Conduit_lwt_unix.init ~tls_authenticator ()
           in
-          let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
-          let*! () =
-            Lwt.join
-              [
-                Server_archiver.endorsements_loop ctx auth endpoint cctxt;
-                Server_archiver.blocks_loop ctx auth endpoint cctxt;
-              ]
-          in
-          return_unit);
+          let cohttp_ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+          let state = Server_archiver.{cohttp_ctx; auth; endpoint} in
+          main_server state cctxt);
     ]
 
 let () = Client_main_run.run (module Client_config) ~select_commands
