@@ -26,6 +26,331 @@
 
 open Sc_rollup_repr
 
+(** {2 Refutation game errors} *)
+
+type error +=
+  | (* `Temporary *)
+      Dissection_choice_not_found of Sc_rollup_tick_repr.t
+  | (* `Temporary *)
+      Dissection_number_of_sections_mismatch of {
+      expected : Z.t;
+      given : Z.t;
+    }
+  | (* `Permanent *) Dissection_invalid_number_of_sections of Z.t
+  | (* `Temporary *)
+      Dissection_start_hash_mismatch of {
+      expected : Sc_rollup_repr.State_hash.t option;
+      given : Sc_rollup_repr.State_hash.t option;
+    }
+  | (* `Temporary *)
+      Dissection_stop_hash_mismatch of
+      Sc_rollup_repr.State_hash.t option
+  | (* `Temporary *)
+      Dissection_edge_ticks_mismatch of {
+      dissection_start_tick : Sc_rollup_tick_repr.t;
+      dissection_stop_tick : Sc_rollup_tick_repr.t;
+      chunk_start_tick : Sc_rollup_tick_repr.t;
+      chunk_stop_tick : Sc_rollup_tick_repr.t;
+    }
+  | (* `Permanent *) Dissection_ticks_not_increasing
+  | (* `Permanent *) Dissection_invalid_distribution
+  | (* `Permanent *) Dissection_invalid_successive_states_shape
+  | (* `Permanent *) Proof_unexpected_section_size of Z.t
+  | (* `Temporary *)
+      Proof_start_state_hash_mismatch of {
+      start_state_hash : Sc_rollup_repr.State_hash.t option;
+      start_proof : Sc_rollup_repr.State_hash.t;
+    }
+  | (* `Temporary *)
+      Proof_stop_state_hash_failed_to_refute of {
+      stop_state_hash : Sc_rollup_repr.State_hash.t option;
+      stop_proof : Sc_rollup_repr.State_hash.t option;
+    }
+  | (* `Temporary *)
+      Proof_stop_state_hash_failed_to_validate of {
+      stop_state_hash : Sc_rollup_repr.State_hash.t option;
+      stop_proof : Sc_rollup_repr.State_hash.t option;
+    }
+  | (* `Temporary *) Dissecting_during_final_move
+
+let pp_hash_opt fmt = function
+  | None -> Format.fprintf fmt "None"
+  | Some x -> Sc_rollup_repr.State_hash.pp fmt x
+
+let () =
+  let description = "Dissection choice not found" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissection_choice_not_found"
+    ~title:description
+    ~description
+    ~pp:(fun ppf choice ->
+      Format.fprintf
+        ppf
+        "No section starting with tick %a found"
+        Sc_rollup_tick_repr.pp
+        choice)
+    Data_encoding.(obj1 (req "choice" Sc_rollup_tick_repr.encoding))
+    (function Dissection_choice_not_found tick -> Some tick | _ -> None)
+    (fun tick -> Dissection_choice_not_found tick) ;
+  let description = "Mismatch in the number of sections in the dissection" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissection_number_of_sections_mismatch"
+    ~title:description
+    ~description
+    ~pp:(fun ppf (expected, given) ->
+      Format.fprintf
+        ppf
+        "The number of sections must be equal to %a instead of %a"
+        Z.pp_print
+        expected
+        Z.pp_print
+        given)
+    Data_encoding.(obj2 (req "expected" n) (req "given" n))
+    (function
+      | Dissection_number_of_sections_mismatch {expected; given} ->
+          Some (expected, given)
+      | _ -> None)
+    (fun (expected, given) ->
+      Dissection_number_of_sections_mismatch {expected; given}) ;
+  let description = "Invalid number of sections in the dissection" in
+  register_error_kind
+    `Permanent
+    ~id:"Dissection_invalid_number_of_sections"
+    ~title:description
+    ~description
+    ~pp:(fun ppf n ->
+      Format.fprintf
+        ppf
+        "A dissection with %a sections can never be valid"
+        Z.pp_print
+        n)
+    Data_encoding.(obj1 (req "value" n))
+    (function Dissection_invalid_number_of_sections n -> Some n | _ -> None)
+    (fun n -> Dissection_invalid_number_of_sections n) ;
+  let description = "Mismatch in the start hash of the dissection" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissection_start_hash_mismatch"
+    ~title:description
+    ~description
+    ~pp:(fun ppf (given, expected) ->
+      match given with
+      | None -> Format.fprintf ppf "The start hash must not be None"
+      | Some _ ->
+          Format.fprintf
+            ppf
+            "The start hash should be equal to %a, but the provided hash is %a"
+            pp_hash_opt
+            expected
+            pp_hash_opt
+            given)
+    Data_encoding.(
+      obj2
+        (req "expected" (option Sc_rollup_repr.State_hash.encoding))
+        (req "given" (option Sc_rollup_repr.State_hash.encoding)))
+    (function
+      | Dissection_start_hash_mismatch {expected; given} ->
+          Some (expected, given)
+      | _ -> None)
+    (fun (expected, given) -> Dissection_start_hash_mismatch {expected; given}) ;
+  let description = "Mismatch in the stop hash of the dissection" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissection_stop_hash_mismatch"
+    ~title:description
+    ~description
+    ~pp:(fun ppf h ->
+      Format.fprintf ppf "The stop hash should not be equal to %a" pp_hash_opt h)
+    Data_encoding.(
+      obj1 (req "hash" (option Sc_rollup_repr.State_hash.encoding)))
+    (function Dissection_stop_hash_mismatch hopt -> Some hopt | _ -> None)
+    (fun hopt -> Dissection_stop_hash_mismatch hopt) ;
+  let description = "Mismatch in the edge ticks of the dissection" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissection_edge_ticks_mismatch"
+    ~title:description
+    ~description
+    ~pp:
+      (fun ppf
+           ( dissection_start_tick,
+             dissection_stop_tick,
+             chunk_start_tick,
+             chunk_stop_tick ) ->
+      Sc_rollup_tick_repr.(
+        Format.fprintf
+          ppf
+          "We should have dissection_start_tick(%a) = %a and \
+           dissection_stop_tick(%a) = %a"
+          pp
+          dissection_start_tick
+          pp
+          chunk_start_tick
+          pp
+          dissection_stop_tick
+          pp
+          chunk_stop_tick))
+    Data_encoding.(
+      obj4
+        (req "dissection_start_tick" Sc_rollup_tick_repr.encoding)
+        (req "dissection_stop_tick" Sc_rollup_tick_repr.encoding)
+        (req "chunk_start_tick" Sc_rollup_tick_repr.encoding)
+        (req "chunk_stop_tick" Sc_rollup_tick_repr.encoding))
+    (function
+      | Dissection_edge_ticks_mismatch e ->
+          Some
+            ( e.dissection_start_tick,
+              e.dissection_stop_tick,
+              e.chunk_start_tick,
+              e.chunk_stop_tick )
+      | _ -> None)
+    (fun ( dissection_start_tick,
+           dissection_stop_tick,
+           chunk_start_tick,
+           chunk_stop_tick ) ->
+      Dissection_edge_ticks_mismatch
+        {
+          dissection_start_tick;
+          dissection_stop_tick;
+          chunk_start_tick;
+          chunk_stop_tick;
+        }) ;
+  let description = "Ticks should only increase in dissection" in
+  register_error_kind
+    `Permanent
+    ~id:"Dissection_ticks_not_increasing"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.pp_print_string ppf description)
+    Data_encoding.empty
+    (function Dissection_ticks_not_increasing -> Some () | _ -> None)
+    (fun () -> Dissection_ticks_not_increasing) ;
+  let description =
+    "Maximum tick increment in a section cannot be more than half total \
+     dissection length"
+  in
+  register_error_kind
+    `Permanent
+    ~id:"Dissection_invalid_distribution"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.pp_print_string ppf description)
+    Data_encoding.empty
+    (function Dissection_invalid_distribution -> Some () | _ -> None)
+    (fun () -> Dissection_invalid_distribution) ;
+  let description = "Cannot recover from a blocked state in a dissection" in
+  register_error_kind
+    `Permanent
+    ~id:"Dissection_invalid_successive_states_shape"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.pp_print_string ppf description)
+    Data_encoding.empty
+    (function
+      | Dissection_invalid_successive_states_shape -> Some () | _ -> None)
+    (fun () -> Dissection_invalid_successive_states_shape) ;
+  let description = "The distance for a proof should be equal to 1" in
+  register_error_kind
+    `Permanent
+    ~id:"Dissection_unexpected_section_size"
+    ~title:description
+    ~description
+    ~pp:(fun ppf n ->
+      Format.fprintf
+        ppf
+        "Distance should be equal to 1 in a proof, but got %a"
+        Z.pp_print
+        n)
+    Data_encoding.(obj1 (req "n" n))
+    (function Proof_unexpected_section_size n -> Some n | _ -> None)
+    (fun n -> Proof_unexpected_section_size n) ;
+  let description = "The start state hash of the proof is invalid" in
+  register_error_kind
+    `Temporary
+    ~id:"Proof_start_state_hash_mismatch"
+    ~title:description
+    ~description
+    ~pp:(fun ppf (start_state_hash, start_proof) ->
+      Format.fprintf
+        ppf
+        "start(%a) should be equal to start_proof(%a)"
+        pp_hash_opt
+        start_state_hash
+        Sc_rollup_repr.State_hash.pp
+        start_proof)
+    Data_encoding.(
+      obj2
+        (req "start_state_hash" (option Sc_rollup_repr.State_hash.encoding))
+        (req "start_proof" Sc_rollup_repr.State_hash.encoding))
+    (function
+      | Proof_start_state_hash_mismatch {start_state_hash; start_proof} ->
+          Some (start_state_hash, start_proof)
+      | _ -> None)
+    (fun (start_state_hash, start_proof) ->
+      Proof_start_state_hash_mismatch {start_state_hash; start_proof}) ;
+  let description = "Failed to refute the stop state hash with the proof" in
+  register_error_kind
+    `Temporary
+    ~id:"Proof_stop_state_hash_failed_to_refute"
+    ~title:description
+    ~description
+    ~pp:(fun ppf (stop_state_hash, stop_proof) ->
+      Format.fprintf
+        ppf
+        "Trying to refute %a, the stop_proof must not be equal to %a"
+        pp_hash_opt
+        stop_state_hash
+        pp_hash_opt
+        stop_proof)
+    Data_encoding.(
+      obj2
+        (req "stop_state_hash" (option Sc_rollup_repr.State_hash.encoding))
+        (req "stop_proof" (option Sc_rollup_repr.State_hash.encoding)))
+    (function
+      | Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof} ->
+          Some (stop_state_hash, stop_proof)
+      | _ -> None)
+    (fun (stop_state_hash, stop_proof) ->
+      Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof}) ;
+  let description = "Failed to validate the stop state hash with the proof" in
+  register_error_kind
+    `Temporary
+    ~id:"Proof_stop_state_hash_failed_to_validate"
+    ~title:description
+    ~description
+    ~pp:(fun ppf (stop_state_hash, stop_proof) ->
+      Format.fprintf
+        ppf
+        "Trying to validate %a, the stop_proof must not be equal to %a"
+        pp_hash_opt
+        stop_state_hash
+        pp_hash_opt
+        stop_proof)
+    Data_encoding.(
+      obj2
+        (req "stop_state_hash" (option Sc_rollup_repr.State_hash.encoding))
+        (req "stop_proof" (option Sc_rollup_repr.State_hash.encoding)))
+    (function
+      | Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof}
+        ->
+          Some (stop_state_hash, stop_proof)
+      | _ -> None)
+    (fun (stop_state_hash, stop_proof) ->
+      Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof}) ;
+  let description = "Tried to play a dissecting when the final move started" in
+  register_error_kind
+    `Temporary
+    ~id:"Dissecting_during_final_move"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.pp_print_string ppf description)
+    Data_encoding.empty
+    (function Dissecting_during_final_move -> Some () | _ -> None)
+    (fun () -> Dissecting_during_final_move) ;
+  ()
+
 type player = Alice | Bob
 
 module V1 = struct
@@ -153,7 +478,8 @@ module V1 = struct
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
-  let pp_player ppf player = Format.fprintf ppf "%s" (string_of_player player)
+  let pp_player ppf player =
+    Format.pp_print_string ppf (string_of_player player)
 
   let opponent = function Alice -> Bob | Bob -> Alice
 
@@ -441,310 +767,11 @@ let refutation_encoding =
        (req "choice" Sc_rollup_tick_repr.encoding)
        (req "step" step_encoding))
 
-type invalid_move =
-  | Dissection_choice_not_found of Sc_rollup_tick_repr.t
-  | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
-  | Dissection_invalid_number_of_sections of Z.t
-  | Dissection_start_hash_mismatch of {
-      expected : State_hash.t option;
-      given : State_hash.t option;
-    }
-  | Dissection_stop_hash_mismatch of State_hash.t option
-  | Dissection_edge_ticks_mismatch of {
-      dissection_start_tick : Sc_rollup_tick_repr.t;
-      dissection_stop_tick : Sc_rollup_tick_repr.t;
-      chunk_start_tick : Sc_rollup_tick_repr.t;
-      chunk_stop_tick : Sc_rollup_tick_repr.t;
-    }
-  | Dissection_ticks_not_increasing
-  | Dissection_invalid_distribution
-  | Dissection_invalid_successive_states_shape
-  | Proof_unexpected_section_size of Z.t
-  | Proof_start_state_hash_mismatch of {
-      start_state_hash : State_hash.t option;
-      start_proof : State_hash.t;
-    }
-  | Proof_stop_state_hash_failed_to_refute of {
-      stop_state_hash : State_hash.t option;
-      stop_proof : State_hash.t option;
-    }
-  | Proof_stop_state_hash_failed_to_validate of {
-      stop_state_hash : State_hash.t option;
-      stop_proof : State_hash.t option;
-    }
-  | Proof_invalid of string
-
-let pp_invalid_move fmt =
-  let pp_hash_opt fmt = function
-    | None -> Format.fprintf fmt "None"
-    | Some x -> State_hash.pp fmt x
-  in
-  function
-  | Dissection_choice_not_found tick ->
-      Format.fprintf
-        fmt
-        "No section starting with tick %a found"
-        Sc_rollup_tick_repr.pp
-        tick
-  | Dissection_number_of_sections_mismatch {expected; given} ->
-      Format.fprintf
-        fmt
-        "The number of sections must be equal to %a instead of %a"
-        Z.pp_print
-        expected
-        Z.pp_print
-        given
-  | Dissection_invalid_number_of_sections n ->
-      Format.fprintf
-        fmt
-        "A dissection with %a sections can never be valid"
-        Z.pp_print
-        n
-  | Dissection_start_hash_mismatch {given = None; _} ->
-      Format.fprintf fmt "The start hash must not be None"
-  | Dissection_start_hash_mismatch {given; expected} ->
-      Format.fprintf
-        fmt
-        "The start hash should be equal to %a, but the provided hash is %a"
-        pp_hash_opt
-        expected
-        pp_hash_opt
-        given
-  | Dissection_stop_hash_mismatch h ->
-      Format.fprintf fmt "The stop hash should not be equal to %a" pp_hash_opt h
-  | Dissection_edge_ticks_mismatch
-      {
-        dissection_start_tick;
-        dissection_stop_tick;
-        chunk_start_tick;
-        chunk_stop_tick;
-      } ->
-      Sc_rollup_tick_repr.(
-        Format.fprintf
-          fmt
-          "We should have dissection_start_tick(%a) = %a and \
-           dissection_stop_tick(%a) = %a"
-          pp
-          dissection_start_tick
-          pp
-          chunk_start_tick
-          pp
-          dissection_stop_tick
-          pp
-          chunk_stop_tick)
-  | Dissection_ticks_not_increasing ->
-      Format.fprintf fmt "Ticks should only increase in dissection"
-  | Dissection_invalid_successive_states_shape ->
-      Format.fprintf
-        fmt
-        "Cannot return to a Some state after being at a None state"
-  | Dissection_invalid_distribution ->
-      Format.fprintf
-        fmt
-        "Maximum tick increment in a section cannot be more than half total \
-         dissection length"
-  | Proof_unexpected_section_size n ->
-      Format.fprintf
-        fmt
-        "dist should be equal to 1 in a proof, but got %a"
-        Z.pp_print
-        n
-  | Proof_start_state_hash_mismatch {start_state_hash; start_proof} ->
-      Format.fprintf
-        fmt
-        "start(%a) should be equal to start_proof(%a)"
-        pp_hash_opt
-        start_state_hash
-        State_hash.pp
-        start_proof
-  | Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof} ->
-      Format.fprintf
-        fmt
-        "Trying to refute %a, the stop_proof must not be equal to %a"
-        pp_hash_opt
-        stop_state_hash
-        pp_hash_opt
-        stop_proof
-  | Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof} ->
-      Format.fprintf
-        fmt
-        "Trying to validate %a, the stop_proof must be equal to %a"
-        pp_hash_opt
-        stop_state_hash
-        pp_hash_opt
-        stop_proof
-  | Proof_invalid s -> Format.fprintf fmt "Invalid proof: %s" s
-
-let invalid_move_encoding =
-  let open Data_encoding in
-  union
-    ~tag_size:`Uint8
-    [
-      case
-        ~title:"sc_rollup_dissection_choice_not_found"
-        (Tag 0)
-        (obj2
-           (req "kind" (constant "dissection_choice_not_found"))
-           (req "tick" Sc_rollup_tick_repr.encoding))
-        (function
-          | Dissection_choice_not_found tick -> Some ((), tick) | _ -> None)
-        (fun ((), tick) -> Dissection_choice_not_found tick);
-      case
-        ~title:"sc_rollup_dissection_number_of_sections_mismatch"
-        (Tag 1)
-        (obj3
-           (req "kind" (constant "dissection_number_of_sections_mismatch"))
-           (req "expected" n)
-           (req "given" n))
-        (function
-          | Dissection_number_of_sections_mismatch {expected; given} ->
-              Some ((), expected, given)
-          | _ -> None)
-        (fun ((), expected, given) ->
-          Dissection_number_of_sections_mismatch {expected; given});
-      case
-        ~title:"sc_rollup_dissection_invalid_number_of_sections"
-        (Tag 2)
-        (obj2
-           (req "kind" (constant "dissection_invalid_number_of_sections"))
-           (req "value" n))
-        (function
-          | Dissection_invalid_number_of_sections value -> Some ((), value)
-          | _ -> None)
-        (fun ((), value) -> Dissection_invalid_number_of_sections value);
-      case
-        ~title:"sc_rollup_dissection_unexpected_start_hash"
-        (Tag 3)
-        (obj3
-           (req "kind" (constant "dissection_unexpected_start_hash"))
-           (req "expected" (option State_hash.encoding))
-           (req "given" (option State_hash.encoding)))
-        (function
-          | Dissection_start_hash_mismatch {expected; given} ->
-              Some ((), expected, given)
-          | _ -> None)
-        (fun ((), expected, given) ->
-          Dissection_start_hash_mismatch {expected; given});
-      case
-        ~title:"sc_rollup_dissection_stop_hash_mismatch"
-        (Tag 4)
-        (obj2
-           (req "kind" (constant "dissection_stop_hash_mismatch"))
-           (req "hash" (option State_hash.encoding)))
-        (function
-          | Dissection_stop_hash_mismatch hopt -> Some ((), hopt) | _ -> None)
-        (fun ((), hopt) -> Dissection_stop_hash_mismatch hopt);
-      case
-        ~title:"sc_rollup_dissection_edge_ticks_mismatch"
-        (Tag 5)
-        (obj5
-           (req "kind" (constant "dissection_edge_ticks_mismatch"))
-           (req "dissection_start_tick" Sc_rollup_tick_repr.encoding)
-           (req "dissection_stop_tick" Sc_rollup_tick_repr.encoding)
-           (req "chunk_start_tick" Sc_rollup_tick_repr.encoding)
-           (req "chunk_stop_tick" Sc_rollup_tick_repr.encoding))
-        (function
-          | Dissection_edge_ticks_mismatch e ->
-              Some
-                ( (),
-                  e.dissection_start_tick,
-                  e.dissection_stop_tick,
-                  e.chunk_start_tick,
-                  e.chunk_stop_tick )
-          | _ -> None)
-        (fun ( (),
-               dissection_start_tick,
-               dissection_stop_tick,
-               chunk_start_tick,
-               chunk_stop_tick ) ->
-          Dissection_edge_ticks_mismatch
-            {
-              dissection_start_tick;
-              dissection_stop_tick;
-              chunk_start_tick;
-              chunk_stop_tick;
-            });
-      case
-        ~title:"sc_rollup_dissection_ticks_not_increasing"
-        (Tag 6)
-        (obj1 (req "kind" (constant "dissection_ticks_not_increasing")))
-        (function Dissection_ticks_not_increasing -> Some () | _ -> None)
-        (fun () -> Dissection_ticks_not_increasing);
-      case
-        ~title:"sc_rollup_dissection_invalid_distribution"
-        (Tag 7)
-        (obj1 (req "kind" (constant "dissection_invalid_distribution")))
-        (function Dissection_invalid_distribution -> Some () | _ -> None)
-        (fun () -> Dissection_invalid_distribution);
-      case
-        ~title:"sc_rollup_dissection_invalid_successive_states_shape"
-        (Tag 8)
-        (obj1
-           (req "kind" (constant "dissection_invalid_successive_states_shape")))
-        (function
-          | Dissection_invalid_successive_states_shape -> Some () | _ -> None)
-        (fun () -> Dissection_invalid_successive_states_shape);
-      case
-        ~title:"sc_rollup_proof_unexpected_section_size"
-        (Tag 9)
-        (obj2
-           (req "kind" (constant "proof_unexpected_section_size"))
-           (req "value" n))
-        (function Proof_unexpected_section_size n -> Some ((), n) | _ -> None)
-        (fun ((), n) -> Proof_unexpected_section_size n);
-      case
-        ~title:"sc_rollup_proof_start_state_hash_mismatch"
-        (Tag 10)
-        (obj3
-           (req "kind" (constant "proof_start_state_hash_mismatch"))
-           (req "start_state_hash" (option State_hash.encoding))
-           (req "start_proof" State_hash.encoding))
-        (function
-          | Proof_start_state_hash_mismatch e ->
-              Some ((), e.start_state_hash, e.start_proof)
-          | _ -> None)
-        (fun ((), start_state_hash, start_proof) ->
-          Proof_start_state_hash_mismatch {start_state_hash; start_proof});
-      case
-        ~title:"sc_rollup_proof_stop_state_hash_failed_to_refute"
-        (Tag 11)
-        (obj3
-           (req "kind" (constant "proof_stop_state_hash_failed_to_refute"))
-           (req "stop_state_hash" (option State_hash.encoding))
-           (req "stop_proof" (option State_hash.encoding)))
-        (function
-          | Proof_stop_state_hash_failed_to_refute e ->
-              Some ((), e.stop_state_hash, e.stop_proof)
-          | _ -> None)
-        (fun ((), stop_state_hash, stop_proof) ->
-          Proof_stop_state_hash_failed_to_refute {stop_state_hash; stop_proof});
-      case
-        ~title:"sc_rollup_proof_stop_state_hash_failed_to_validate"
-        (Tag 12)
-        (obj3
-           (req "kind" (constant "proof_stop_state_hash_failed_to_validate"))
-           (req "stop_state_hash" (option State_hash.encoding))
-           (req "stop_proof" (option State_hash.encoding)))
-        (function
-          | Proof_stop_state_hash_failed_to_validate e ->
-              Some ((), e.stop_state_hash, e.stop_proof)
-          | _ -> None)
-        (fun ((), stop_state_hash, stop_proof) ->
-          Proof_stop_state_hash_failed_to_validate {stop_state_hash; stop_proof});
-      case
-        ~title:"sc_rollup_proof_invalid"
-        (Tag 13)
-        (obj2 (req "kind" (constant "proof_invalid")) (req "message" string))
-        (function Proof_invalid s -> Some ((), s) | _ -> None)
-        (fun ((), s) -> Proof_invalid s);
-    ]
-
-type reason = Conflict_resolved | Invalid_move of invalid_move | Timeout
+type reason = Conflict_resolved | Timeout
 
 let pp_reason ppf reason =
   match reason with
   | Conflict_resolved -> Format.fprintf ppf "conflict resolved"
-  | Invalid_move mv -> Format.fprintf ppf "invalid move(%a)" pp_invalid_move mv
   | Timeout -> Format.fprintf ppf "timeout"
 
 let reason_encoding =
@@ -759,14 +786,8 @@ let reason_encoding =
         (function Conflict_resolved -> Some () | _ -> None)
         (fun () -> Conflict_resolved);
       case
-        ~title:"Invalid_move"
-        (Tag 1)
-        invalid_move_encoding
-        (function Invalid_move reason -> Some reason | _ -> None)
-        (fun s -> Invalid_move s);
-      case
         ~title:"Timeout"
-        (Tag 2)
+        (Tag 1)
         (constant "timeout")
         (function Timeout -> Some () | _ -> None)
         (fun () -> Timeout);
@@ -831,28 +852,20 @@ let status_encoding =
         (fun r -> Ended r);
     ]
 
-let invalid_move reason =
-  let open Lwt_result_syntax in
-  fail (Invalid_move reason)
-
 let find_choice dissection tick =
-  let open Lwt_result_syntax in
+  let open Tzresult_syntax in
   let rec traverse states =
     match states with
     | ({state_hash = _; tick = state_tick} as curr) :: next :: others ->
         if Sc_rollup_tick_repr.(tick = state_tick) then return (curr, next)
         else traverse (next :: others)
-    | _ -> invalid_move (Dissection_choice_not_found tick)
+    | _ -> fail (Dissection_choice_not_found tick)
   in
   traverse dissection
 
-let check pred reason =
-  let open Lwt_result_syntax in
-  if pred then return () else invalid_move reason
-
 let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     dissection =
-  let open Lwt_result_syntax in
+  let open Tzresult_syntax in
   let len = Z.of_int @@ List.length dissection in
   let dist = Sc_rollup_tick_repr.distance start_chunk.tick stop_chunk.tick in
   let should_be_equal_to expected =
@@ -861,24 +874,24 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
   let num_sections = Z.of_int @@ default_number_of_sections in
   let* () =
     if Z.geq dist num_sections then
-      check Z.(equal len num_sections) (should_be_equal_to num_sections)
+      error_unless Z.(equal len num_sections) (should_be_equal_to num_sections)
     else if Z.(gt dist one) then
-      check Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
-    else invalid_move (Dissection_invalid_number_of_sections len)
+      error_unless Z.(equal len (succ dist)) (should_be_equal_to Z.(succ dist))
+    else fail (Dissection_invalid_number_of_sections len)
   in
   let* () =
     match (List.hd dissection, List.last_opt dissection) with
     | Some {state_hash = a; tick = a_tick}, Some {state_hash = b; tick = b_tick}
       ->
         let* () =
-          check
+          error_unless
             (Option.equal State_hash.equal a start_chunk.state_hash
             && not (Option.is_none a))
             (Dissection_start_hash_mismatch
                {expected = start_chunk.state_hash; given = a})
         in
         let* () =
-          check
+          error_unless
             (not (Option.equal State_hash.equal b stop_chunk.state_hash))
             ((* If the [b] state is equal to [stop_chunk], that means we
                 agree on the after state of the section. But, we're trying
@@ -887,7 +900,7 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
                stop_chunk.state_hash)
         in
         Sc_rollup_tick_repr.(
-          check
+          error_unless
             (a_tick = start_chunk.tick && b_tick = stop_chunk.tick)
             (Dissection_edge_ticks_mismatch
                {
@@ -899,19 +912,19 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     | _ ->
         (* This case is probably already handled by the
            [Dissection_invalid_number_of_sections] returned above *)
-        invalid_move (Dissection_invalid_number_of_sections len)
+        fail (Dissection_invalid_number_of_sections len)
   in
   let half_dist = Z.(div dist (of_int 2) |> succ) in
   let rec traverse states =
     match states with
     | {state_hash = None; _} :: {state_hash = Some _; _} :: _ ->
-        invalid_move Dissection_invalid_successive_states_shape
+        fail Dissection_invalid_successive_states_shape
     | {tick; _} :: ({tick = next_tick; state_hash = _} as next) :: others ->
         if Sc_rollup_tick_repr.(tick < next_tick) then
           let incr = Sc_rollup_tick_repr.distance tick next_tick in
           if Z.(leq incr half_dist) then traverse (next :: others)
-          else invalid_move Dissection_invalid_distribution
-        else invalid_move Dissection_ticks_not_increasing
+          else fail Dissection_invalid_distribution
+        else fail Dissection_ticks_not_increasing
     | _ -> return ()
   in
   traverse dissection
@@ -919,12 +932,12 @@ let check_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
 (** Check that the chosen interval is a single tick. *)
 let check_proof_distance_is_one ~start_tick ~stop_tick =
   let dist = Sc_rollup_tick_repr.distance start_tick stop_tick in
-  check Z.(equal dist one) (Proof_unexpected_section_size dist)
+  error_unless Z.(equal dist one) (Proof_unexpected_section_size dist)
 
 (** Check the proof begins with the correct state. *)
 let check_proof_start_state ~start_state proof =
   let start_proof = Sc_rollup_proof_repr.start proof in
-  check
+  error_unless
     (Option.equal State_hash.equal start_state (Some start_proof))
     (Proof_start_state_hash_mismatch
        {start_state_hash = start_state; start_proof})
@@ -945,7 +958,7 @@ let check_proof_stop_state ~stop_state input_given
     | None, Needs_reveal _ ->
         None
   in
-  check
+  error_unless
     (let b = Option.equal State_hash.equal stop_state stop_proof in
      if validate then b else not b)
     (if validate then
@@ -963,6 +976,7 @@ let check_proof_validate_stop_state ~stop_state input input_request proof =
 let check_proof_refute_stop_state ~stop_state input input_request proof =
   check_proof_stop_state ~stop_state input input_request proof false
 
+(** Returns the validity of the first final move on top of a dissection. *)
 let validity_final_move ~first_move ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
   let*! res =
@@ -970,19 +984,19 @@ let validity_final_move ~first_move ~proof ~game ~start_chunk ~stop_chunk =
     let*! valid =
       Sc_rollup_proof_repr.valid inbox_snapshot inbox_level ~pvm_name proof
     in
-    let* () =
+    let*? () =
       if first_move then
         check_proof_distance_is_one
           ~start_tick:start_chunk.tick
           ~stop_tick:stop_chunk.tick
-      else return_unit
+      else ok ()
     in
-    let* () =
+    let*? () =
       check_proof_start_state ~start_state:start_chunk.state_hash proof
     in
     match valid with
     | Ok (input, input_request) ->
-        let* () =
+        let*? () =
           if first_move then
             check_proof_refute_stop_state
               ~stop_state:stop_chunk.state_hash
@@ -1036,27 +1050,51 @@ let loser_of_results ~alice_result ~bob_result =
   | true, false -> Some Bob
 
 let play ~stakers game refutation =
-  let open Lwt_syntax in
+  let open Lwt_tzresult_syntax in
   let mk_loser reason loser =
     let loser = Index.staker stakers loser in
     Either.Left (Loser {loser; reason})
   in
-  let* result =
-    let open Lwt_result_syntax in
-    match (refutation.step, game.game_state) with
-    | Dissection states, Dissecting {dissection; default_number_of_sections} ->
-        let* start_chunk, stop_chunk =
-          find_choice dissection refutation.choice
-        in
-        let* () =
-          check_dissection
-            ~default_number_of_sections
-            ~start_chunk
-            ~stop_chunk
-            states
-        in
+  match (refutation.step, game.game_state) with
+  | Dissection states, Dissecting {dissection; default_number_of_sections} ->
+      let*? start_chunk, stop_chunk =
+        find_choice dissection refutation.choice
+      in
+      let*? () =
+        check_dissection
+          ~default_number_of_sections
+          ~start_chunk
+          ~stop_chunk
+          states
+      in
+      let new_game_state =
+        Dissecting {dissection = states; default_number_of_sections}
+      in
+      return
+        (Either.Right
+           {
+             turn = opponent game.turn;
+             inbox_snapshot = game.inbox_snapshot;
+             start_level = game.start_level;
+             inbox_level = game.inbox_level;
+             pvm_name = game.pvm_name;
+             game_state = new_game_state;
+           })
+  | Dissection _, Final_move _ -> fail Dissecting_during_final_move
+  | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
+      let*? start_chunk, stop_chunk =
+        find_choice dissection refutation.choice
+      in
+      let*! player_result =
+        validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk
+      in
+      if player_result then
+        return @@ mk_loser Conflict_resolved (opponent game.turn)
+      else
         let new_game_state =
-          Dissecting {dissection = states; default_number_of_sections}
+          let agreed_start_chunk = start_chunk in
+          let refuted_stop_chunk = stop_chunk in
+          Final_move {agreed_start_chunk; refuted_stop_chunk}
         in
         return
           (Either.Right
@@ -1068,52 +1106,20 @@ let play ~stakers game refutation =
                pvm_name = game.pvm_name;
                game_state = new_game_state;
              })
-    | Dissection _, Final_move _ ->
-        invalid_move
-          (Proof_invalid "Final move has started, unexpected dissection")
-    | Proof proof, Dissecting {dissection; default_number_of_sections = _} ->
-        let* start_chunk, stop_chunk =
-          find_choice dissection refutation.choice
-        in
-        let*! player_result =
-          validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk
-        in
-        if player_result then
-          return @@ mk_loser Conflict_resolved (opponent game.turn)
-        else
-          let new_game_state =
-            let agreed_start_chunk = start_chunk in
-            let refuted_stop_chunk = stop_chunk in
-            Final_move {agreed_start_chunk; refuted_stop_chunk}
-          in
-          return
-            (Either.Right
-               {
-                 turn = opponent game.turn;
-                 inbox_snapshot = game.inbox_snapshot;
-                 start_level = game.start_level;
-                 inbox_level = game.inbox_level;
-                 pvm_name = game.pvm_name;
-                 game_state = new_game_state;
-               })
-    | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
-        let*! player_result =
-          validity_second_final_move
-            ~agreed_start_chunk
-            ~refuted_stop_chunk
-            ~game
-            ~proof
-        in
-        if player_result then
-          (* If we play when the final move started, the opponent provided
-             a invalid proof. So if the defender manages to provide a valid
-             proof, he wins. *)
-          return @@ mk_loser Conflict_resolved (opponent game.turn)
-        else return (Either.Left Draw)
-  in
-  match result with
-  | Ok x -> return x
-  | Error reason -> return @@ mk_loser reason game.turn
+  | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
+      let*! player_result =
+        validity_second_final_move
+          ~agreed_start_chunk
+          ~refuted_stop_chunk
+          ~game
+          ~proof
+      in
+      if player_result then
+        (* If we play when the final move started, the opponent provided
+           a invalid proof. So if the defender manages to provide a valid
+           proof, he wins. *)
+        return @@ mk_loser Conflict_resolved (opponent game.turn)
+      else return (Either.Left Draw)
 
 module Internal_for_tests = struct
   let find_choice = find_choice

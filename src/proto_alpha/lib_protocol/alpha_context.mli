@@ -3597,42 +3597,7 @@ module Sc_rollup : sig
 
     val pp_refutation : Format.formatter -> refutation -> unit
 
-    type invalid_move =
-      | Dissection_choice_not_found of Tick.t
-      | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
-      | Dissection_invalid_number_of_sections of Z.t
-      | Dissection_start_hash_mismatch of {
-          expected : State_hash.t option;
-          given : State_hash.t option;
-        }
-      | Dissection_stop_hash_mismatch of State_hash.t option
-      | Dissection_edge_ticks_mismatch of {
-          dissection_start_tick : Tick.t;
-          dissection_stop_tick : Tick.t;
-          chunk_start_tick : Tick.t;
-          chunk_stop_tick : Tick.t;
-        }
-      | Dissection_ticks_not_increasing
-      | Dissection_invalid_distribution
-      | Dissection_invalid_successive_states_shape
-      | Proof_unexpected_section_size of Z.t
-      | Proof_start_state_hash_mismatch of {
-          start_state_hash : State_hash.t option;
-          start_proof : State_hash.t;
-        }
-      | Proof_stop_state_hash_failed_to_refute of {
-          stop_state_hash : State_hash.t option;
-          stop_proof : State_hash.t option;
-        }
-      | Proof_stop_state_hash_failed_to_validate of {
-          stop_state_hash : State_hash.t option;
-          stop_proof : State_hash.t option;
-        }
-      | Proof_invalid of string
-
-    val pp_invalid_move : Format.formatter -> invalid_move -> unit
-
-    type reason = Conflict_resolved | Invalid_move of invalid_move | Timeout
+    type reason = Conflict_resolved | Timeout
 
     val pp_reason : Format.formatter -> reason -> unit
 
@@ -3664,11 +3629,47 @@ module Sc_rollup : sig
       t
 
     val play :
-      stakers:Index.t -> t -> refutation -> (game_result, t) Either.t Lwt.t
+      stakers:Index.t ->
+      t ->
+      refutation ->
+      (game_result, t) Either.t tzresult Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
 
     val timeout_encoding : timeout Data_encoding.t
+
+    type error +=
+      | Dissection_choice_not_found of Tick.t
+      | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
+      | Dissection_invalid_number_of_sections of Z.t
+      | Dissection_start_hash_mismatch of {
+          expected : State_hash.t option;
+          given : State_hash.t option;
+        }
+      | Dissection_stop_hash_mismatch of State_hash.t option
+      | Dissection_edge_ticks_mismatch of {
+          dissection_start_tick : Tick.t;
+          dissection_stop_tick : Tick.t;
+          chunk_start_tick : Tick.t;
+          chunk_stop_tick : Tick.t;
+        }
+      | Dissection_ticks_not_increasing
+      | Dissection_invalid_distribution
+      | Dissection_invalid_successive_states_shape
+      | Proof_unexpected_section_size of Z.t
+      | Proof_start_state_hash_mismatch of {
+          start_state_hash : State_hash.t option;
+          start_proof : State_hash.t;
+        }
+      | Proof_stop_state_hash_failed_to_refute of {
+          stop_state_hash : State_hash.t option;
+          stop_proof : State_hash.t option;
+        }
+      | Proof_stop_state_hash_failed_to_validate of {
+          stop_state_hash : State_hash.t option;
+          stop_proof : State_hash.t option;
+        }
+      | Dissecting_during_final_move
 
     module Internal_for_tests : sig
       val check_dissection :
@@ -3676,7 +3677,7 @@ module Sc_rollup : sig
         start_chunk:dissection_chunk ->
         stop_chunk:dissection_chunk ->
         dissection_chunk list ->
-        (unit, reason) result Lwt.t
+        unit tzresult
     end
   end
 

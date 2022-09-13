@@ -92,18 +92,24 @@ let print_dissection = Format.asprintf "%a" Game.pp_dissection
 
 let print_our_states _ = "<our states>"
 
-let expect_invalid_move expected = function
-  | Error (Game.Invalid_move reason) ->
-      if reason = expected then true
+(** Assert that the computation fails with the given message. *)
+let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
+    expected_err =
+  match res with
+  | Error trace ->
+      let expected_trace =
+        Environment.Error_monad.trace_of_error expected_err
+      in
+      if expected_trace = trace then Lwt.return true
       else
-        let pp = Game.pp_invalid_move in
+        let pp = Environment.Error_monad.pp_trace in
         QCheck2.Test.fail_reportf
           "@[Expected reason: %a@;Actual reason: %a@]"
           pp
-          expected
+          expected_trace
           pp
-          reason
-  | _ -> false
+          trace
+  | Ok () -> Lwt.return false
 
 let initial_of_dissection dissection =
   List.hd dissection |> WithExceptions.Option.get ~loc:__LOC__
@@ -127,15 +133,12 @@ let modify_start f dissection =
     {!Sc_rollup_game_repr.check_dissection}. *)
 let valid_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
     dissection =
-  let open Lwt_syntax in
-  let* res =
-    Game.Internal_for_tests.check_dissection
-      ~default_number_of_sections
-      ~start_chunk
-      ~stop_chunk
-      dissection
-  in
-  return (Result.is_ok res)
+  Game.Internal_for_tests.check_dissection
+    ~default_number_of_sections
+    ~start_chunk
+    ~stop_chunk
+    dissection
+  |> Result.is_ok
 
 (** [disputed_sections ~our_states dissection] returns the list of sections
     in the [dissection] on which the player dissecting disagree with.
@@ -480,18 +483,18 @@ module Dissection = struct
         match new_dissection with
         | None -> return (final_dissection ~our_states dissection)
         | Some (new_dissection, start_chunk, stop_chunk) ->
-            valid_dissection
-              ~default_number_of_sections
-              ~start_chunk
-              ~stop_chunk
-              new_dissection)
+            return
+            @@ valid_dissection
+                 ~default_number_of_sections
+                 ~start_chunk
+                 ~stop_chunk
+                 new_dissection)
 
   (** Truncate a [dissection] and expect the
       {!Sc_rollup_game_repr.check_dissection} to fail with an invalid
       number of sections, where [expected_number_of_sections] is expected. *)
   let truncate_and_check_error dissection start_chunk stop_chunk
       default_number_of_sections expected_number_of_sections =
-    let open Lwt_syntax in
     let truncated_dissection =
       match dissection with
       | x :: _ :: z :: rst -> x :: z :: rst
@@ -499,19 +502,19 @@ module Dissection = struct
           (* If the dissection is valid, this case can not be reached. *)
           assert false
     in
-    let* res =
-      Game.Internal_for_tests.check_dissection
-        ~default_number_of_sections
-        ~start_chunk
-        ~stop_chunk
-        truncated_dissection
-    in
     let expected_len = Z.of_int expected_number_of_sections in
     let expected_reason =
       Game.Dissection_number_of_sections_mismatch
         {expected = expected_len; given = Z.pred expected_len}
     in
-    return (expect_invalid_move expected_reason res)
+    assert_fails_with
+      ~__LOC__
+      (Game.Internal_for_tests.check_dissection
+         ~default_number_of_sections
+         ~start_chunk
+         ~stop_chunk
+         truncated_dissection)
+      expected_reason
 
   (** Test that if a dissection is smaller than the default number of
       sections, the length is equal to (distance + 1) of the dissected
@@ -605,25 +608,21 @@ module Dissection = struct
              stop_chunk,
              default_number_of_sections,
              new_state_hash ) ->
-        let open Lwt_syntax in
         (* Check that we can not change the start hash. *)
         let dissection_with_different_start =
           modify_start
             (fun chunk -> Game.{chunk with state_hash = Some new_state_hash})
             dissection
         in
-        let* res =
-          Game.Internal_for_tests.check_dissection
-            ~default_number_of_sections
-            ~start_chunk
-            ~stop_chunk
-            dissection_with_different_start
-        in
-        let expected_reason =
-          Game.Dissection_start_hash_mismatch
-            {expected = start_chunk.state_hash; given = Some new_state_hash}
-        in
-        return (expect_invalid_move expected_reason res))
+        assert_fails_with
+          ~__LOC__
+          (Game.Internal_for_tests.check_dissection
+             ~default_number_of_sections
+             ~start_chunk
+             ~stop_chunk
+             dissection_with_different_start)
+          (Game.Dissection_start_hash_mismatch
+             {expected = start_chunk.state_hash; given = Some new_state_hash}))
 
   (** Test that we can not produce a dissection that agrees with the stop hash.
       Otherwise, there would be nothing to dispute. *)
@@ -653,24 +652,14 @@ module Dissection = struct
               dissection
           in
           let stop_chunk = Game.{stop_chunk with state_hash = stop_hash} in
-          let* res =
-            Game.Internal_for_tests.check_dissection
-              ~default_number_of_sections
-              ~start_chunk
-              ~stop_chunk
-              invalid_dissection
-          in
-          let expected_reason =
-            Game.Dissection_stop_hash_mismatch stop_hash
-            (* match stop_hash with
-             * | None -> "The stop hash should not be None."
-             * | Some stop ->
-             *     Format.asprintf
-             *       "The stop hash should not be equal to %a"
-             *       State_hash.pp
-             *       stop *)
-          in
-          return (expect_invalid_move expected_reason res)
+          assert_fails_with
+            ~__LOC__
+            (Game.Internal_for_tests.check_dissection
+               ~default_number_of_sections
+               ~start_chunk
+               ~stop_chunk
+               invalid_dissection)
+            (Game.Dissection_stop_hash_mismatch stop_hash)
         in
         let* b1 = check_failure_on_same_stop_hash None in
         let* b2 = check_failure_on_same_stop_hash stop_chunk.state_hash in
@@ -698,7 +687,7 @@ module Dissection = struct
         return (new_dissection, start_chunk, stop_chunk, number_of_sections))
       (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
         let open Lwt_syntax in
-        let expected_reason dissection =
+        let expected_error dissection =
           match (List.hd dissection, List.last_opt dissection) with
           | Some Game.{tick = a_tick; _}, Some {tick = b_tick; _} ->
               Game.Dissection_edge_ticks_mismatch
@@ -716,15 +705,15 @@ module Dissection = struct
               (fun chunk -> Game.{chunk with tick = Tick.next chunk.tick})
               dissection
           in
-          let* res =
-            Game.Internal_for_tests.check_dissection
-              ~default_number_of_sections
-              ~start_chunk
-              ~stop_chunk
-              invalid_dissection
-          in
-          let expected_reason = expected_reason invalid_dissection in
-          return (expect_invalid_move expected_reason res)
+          let expected_error = expected_error invalid_dissection in
+          assert_fails_with
+            ~__LOC__
+            (Game.Internal_for_tests.check_dissection
+               ~default_number_of_sections
+               ~start_chunk
+               ~stop_chunk
+               invalid_dissection)
+            expected_error
         in
         (* We modify the start tick and expect the failure. *)
         let* b1 = modify_tick modify_start dissection in
@@ -769,7 +758,6 @@ module Dissection = struct
              stop_chunk,
              default_number_of_sections,
              picked_section ) ->
-        let open Lwt_syntax in
         (* We put a distance of [1] in every section. Then, we put the
            distance's left in the [picked_section], it will create
            an invalid section. *)
@@ -800,16 +788,14 @@ module Dissection = struct
         let invalid_dissection =
           replace_distances start_chunk.tick picked_section dissection
         in
-        let* res =
-          Game.Internal_for_tests.check_dissection
-            ~default_number_of_sections
-            ~start_chunk
-            ~stop_chunk
-            invalid_dissection
-        in
-        let expected_reason = Game.Dissection_invalid_distribution in
-
-        return (expect_invalid_move expected_reason res))
+        assert_fails_with
+          ~__LOC__
+          (Game.Internal_for_tests.check_dissection
+             ~default_number_of_sections
+             ~start_chunk
+             ~stop_chunk
+             invalid_dissection)
+          Game.Dissection_invalid_distribution)
 
   let tests =
     ( "Dissection",
@@ -1405,10 +1391,7 @@ let play_until_game_result ~refuter_client ~defender_client ~rollup block =
         play ~player_turn:opponent ~opponent:player_turn block
     | Ended (Loser {reason = _; loser}) as game_result ->
         let () =
-          Format.printf
-            "@,ending result: %a@,"
-            Sc_rollup.Game.pp_status
-            game_result
+          Format.printf "@,ending result: %a@," Game.pp_status game_result
         in
         if loser = Account.pkh_of_contract_exn refuter_client.player.contract
         then return Defender_wins

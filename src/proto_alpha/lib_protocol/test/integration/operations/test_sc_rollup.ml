@@ -1842,30 +1842,25 @@ let test_dissection_during_final_move () =
   in
 
   (* Player2 will play a dissection. *)
-  let* incr =
-    let dumb_dissection =
-      let choice = Sc_rollup.Tick.initial in
-      Sc_rollup.Game.{choice; step = Dissection []}
-    in
-    let* p2_op =
-      Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some dumb_dissection)
-    in
-    let* incr = Incremental.begin_construction block in
-    Incremental.add_operation incr p2_op
+  let dumb_dissection =
+    let choice = Sc_rollup.Tick.initial in
+    Sc_rollup.Game.{choice; step = Dissection []}
   in
-
-  (* That's an obviously invalid move, player2 loses. *)
-  let expected_game_status : Sc_rollup.Game.status =
-    Ended
-      (Loser
-         {
-           reason =
-             Invalid_move
-               (Proof_invalid "Final move has started, unexpected dissection");
-           loser = p2_pkh;
-         })
+  let* p2_op =
+    Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some dumb_dissection)
   in
-  assert_refute_result ~game_status:expected_game_status incr
+  (* Dissecting is no longer accepted. *)
+  let* incr = Incremental.begin_construction block in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_game_repr.Dissecting_during_final_move as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Dissecting_during_final_move]"
+  in
+  let* _incr = Incremental.add_operation ~expect_apply_failure incr p2_op in
+  return_unit
 
 let tests =
   [

@@ -40,21 +40,10 @@ module R = Sc_rollup_refutation_storage
 module G = Sc_rollup_game_repr
 module Tick = Sc_rollup_tick_repr
 
-let check_reason ~loc (game_result : Sc_rollup_game_repr.game_result option) s =
-  match game_result with
-  | Some (Loser {reason; _}) -> (
-      match reason with
-      | Conflict_resolved -> assert false
-      | Timeout -> assert false
-      | Invalid_move r ->
-          Assert.equal
-            ~loc
-            String.equal
-            "Compare invalid_move reasons"
-            Format.pp_print_string
-            (Format.asprintf "%a" G.pp_invalid_move r)
-            (Format.asprintf "%a" G.pp_invalid_move s))
-  | _ -> assert false
+(** Assert that the computation fails with the given error. *)
+let assert_fails_with ~__LOC__ k expected_err =
+  let*! res = k in
+  Assert.proto_error ~loc:__LOC__ res (( = ) expected_err)
 
 let tick_of_int_exn n =
   match Tick.of_int n with None -> assert false | Some t -> t
@@ -164,10 +153,10 @@ let test_poorly_distributed_dissection () =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
   let move = init_refutation ~size ~init_tick start_hash in
-  let* game_result, _ctxt =
-    T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move
-  in
-  check_reason ~loc:__LOC__ game_result Dissection_invalid_distribution
+  assert_fails_with
+    ~__LOC__
+    (T.lift @@ R.game_move ctxt rollup ~player:refuter ~opponent:defender move)
+    Sc_rollup_game_repr.Dissection_invalid_distribution
 
 let test_single_valid_game_move () =
   let* ctxt, rollup, refuter, defender = two_stakers_in_conflict () in

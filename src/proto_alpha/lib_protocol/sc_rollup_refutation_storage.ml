@@ -288,7 +288,7 @@ let game_move ctxt rollup ~player ~opponent refutation =
          (Sc_rollup_game_repr.Index.staker stakers game.turn))
       Sc_rollup_wrong_turn
   in
-  let*! move_result = Sc_rollup_game_repr.play ~stakers game refutation in
+  let* move_result = Sc_rollup_game_repr.play ~stakers game refutation in
   match move_result with
   | Either.Left game_result -> return (Some game_result, ctxt)
   | Either.Right new_game ->
