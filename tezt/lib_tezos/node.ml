@@ -186,6 +186,22 @@ let spawn_config_init node arguments =
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
 
+let config_reset node arguments =
+  spawn_command
+    node
+    ("config" :: "reset" :: "--data-dir" :: node.persistent_state.data_dir
+   :: arguments)
+  |> Process.check
+
+let config_show node =
+  let* output =
+    spawn_command
+      node
+      ["config"; "show"; "--data-dir"; node.persistent_state.data_dir]
+    |> Process.check_and_read_stdout
+  in
+  return (JSON.parse ~origin:"config" output)
+
 module Config_file = struct
   let filename node = sf "%s/config.json" @@ data_dir node
 
