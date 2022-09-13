@@ -39,3 +39,15 @@ cp target/wasm32-unknown-unknown/release/test_kernel.wasm unreachable.wasm
 # Strips binary down to 9.7K
 wasm-strip unreachable.wasm
 ```
+
+## [test-write-debug.wasm](./test-write-debug.wasm)
+This kernel is designed to call the `write_debug` host function, which is a no-op in the PVM.
+
+It may be originated directly within a boot sector.
+
+To build the `test-write-debug.wasm` kernel, run the following from the checked-out `trili/kernel` repo:
+```shell
+git checkout 0c98b17c4599d6f656312b16f17798406d491d77
+
+./scripts/build-unit-kernel.sh "test-write-debug"
+```

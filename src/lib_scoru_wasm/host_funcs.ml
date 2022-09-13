@@ -149,11 +149,66 @@ let write_output =
           Lwt.return (durable, [Values.(Num (I32 x))])
       | _ -> raise Bad_input)
 
+let write_debug_name = "tezos_write_debug"
+
+let write_debug_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Vector.empty () in
+  Types.FuncType (input_types, output_types)
+
+(* [write_debug] accepts a pointer to the start of a sequence of
+   bytes, and a length.
+
+   The PVM, however, does not check that these are valid: from its
+   point of view, [write_debug] is a no-op. *)
+let write_debug =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable _memories inputs ->
+      match inputs with
+      | [Values.(Num (I32 _src)); Values.(Num (I32 _num_bytes))] ->
+          Lwt.return (durable, [])
+      | _ -> raise Bad_input)
+
+(* [alternate_write_debug] may be used to replace the default
+   [write_debug] implementation when debugging the PVM/kernel, and
+   prints the debug message.
+
+   NB this does slightly change the semantics of 'write_debug', as it may
+   load the memory pointed to by [src] & [num_bytes].
+*)
+let _alternate_write_debug =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      match inputs with
+      | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
+          let open Lwt_syntax in
+          let* memory = retrieve_memory memories in
+          let mem_size = I32.of_int_s @@ I64.to_int_s @@ Memory.bound memory in
+          let* s =
+            if src < mem_size then
+              let truncated =
+                Int32.(src |> sub (min (add src num_bytes) mem_size) |> to_int)
+              in
+              Memory.load_bytes memory src truncated
+            else
+              Lwt.return
+              @@ Printf.sprintf
+                   "DEBUG FAILED: address %s out of bounds (maximum %s)\n"
+                   (Int32.to_string src)
+                   (Int32.to_string mem_size)
+          in
+          Printf.printf "DEBUG: %s\n" s ;
+          Lwt.return (durable, [])
+      | _ -> raise Bad_input)
+
 let lookup name =
   match name with
   | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
   | "write_output" ->
       ExternFunc (HostFunc (write_output_type, write_output_name))
+  | "write_debug" -> ExternFunc (HostFunc (write_debug_type, write_debug_name))
   | _ -> raise Not_found
 
 let register_host_funcs registry =
@@ -161,7 +216,11 @@ let register_host_funcs registry =
     (fun _acc (global_name, host_function) ->
       Host_funcs.register ~global_name host_function registry)
     ()
-    [(read_input_name, read_input); (write_output_name, write_output)]
+    [
+      (read_input_name, read_input);
+      (write_output_name, write_output);
+      (write_debug_name, write_debug);
+    ]
 
 module Internal_for_tests = struct
   let aux_write_output = aux_write_output
