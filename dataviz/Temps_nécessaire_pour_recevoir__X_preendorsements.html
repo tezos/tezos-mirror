@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Temps nécessaire pour recevoir n% des preendorsements authorisés</title>
+    <title>Time required to receive n% of validated pre-endorsements</title>
     <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7.4.4/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
@@ -16,7 +16,7 @@
 
 <body>
     <script type="text/javascript" src="./js/populate_sort_data.js"></script>
-    <h1> Temps nécessaire pour recevoir n% des preendorsements authorisés</h1>
+    <h1> Time required to receive n% of validated pre-endorsements</h1>
     <form>
         <div>
             <label for="selectedLevel_begin">First bloc:</label>
@@ -30,7 +30,7 @@
             <label for="selectedThreshold">Percentage threshold (n):</label>
             <input name="threshold" id="selectedThreshold" type="number" value="66" />
             <br>
-            <input type="button" id="submit_" value="Rechercher ">
+            <input type="button" id="submit_" value="Search ">
 
         </div>
         <div id="beta"></div>
@@ -38,15 +38,7 @@
     <script>
 
         const server_adress = "http://kathmandunet.kaml.fr:8880/";
-        //var dict_data = {};
-        //var t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
-        //var t_baker; // date de préparation supposé dans le fichier qui correspond au nom et date de publication dans le fichier suivant(c'est à ce moment qu'il est visible pour les délégués)
-        //var t_recep; // date de réception du bloc 
-        const delay =
-            milliseconds =>
-                new Promise(resolve =>
-                    setTimeout(resolve, milliseconds));
-
+        
         function main() {
             try {
                 $('#submit_').mouseup(function (e) {
@@ -61,7 +53,7 @@
                 
                     let results = TimeForPercIntegration(threshold_, t_op_valide_array[0])
                     console.log(results)
-                    chart_beta(results)
+                    chart_time_required(results)
                 })
 
                 });

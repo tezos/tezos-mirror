@@ -10,7 +10,7 @@ function onlyUnique(value, index, self) {
     return self.indexOf(value) === index;
 }
 
-function populate_v1(server_adress, beg, end) { //dès lors qu'on aura accès au nouveau serveur 
+function populate_v1(server_adress, beg, end) { 
     let dict_data = {};
     var range_bloc = range(beg, end);
     return Promise.all(
@@ -105,20 +105,20 @@ function delegate_delays_distribution_of_operations(dict_data, delegate) {
     return t_valide
 }
 
-function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
-    let t_op_valide = {}; // t_op_erreur[k]= t_op_erreur_i
-    let t_op_pre_valide = {}; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet invalides 
+function delays_distribution_of_operations(dict_data) { 
+    let t_op_valide = {}; 
+    let t_op_pre_valide = {}; 
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
-        let t_op_pre_valide_i = {}; // t_op_erreur[k]= t_op_erreur_i
+        let t_op_valide_i = {}; 
+        let t_op_pre_valide_i = {}; 
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                t_op_valide_i[round] = []; // t_op_valide[i][t_approbations]
-                t_op_pre_valide_i[round] = [];//t_op_valide[i][t_pre_approbations]
+                t_op_valide_i[round] = []; 
+                t_op_pre_valide_i[round] = []
 
             })
         }
@@ -129,7 +129,7 @@ function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
                     if ("round" in operation) round_cib = operation["round"];
                     if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                         let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
-                        if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                        if (("kind" in operation)) { 
                             t_op_pre_valide_i[round_cib].push(delay);
                         }
                         else {
@@ -145,19 +145,19 @@ function delays_distribution_of_operations(dict_data) { //ex : tri_greeks
 }
 
 function classify_operations(dict_data, delegate = "") {
-    let operations_logs = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
-    Object.entries(dict_data).forEach(([_, v]) => {
+    let operations_logs = {}; 
+    Object.entries(dict_data).forEach(([height, v]) => {
+        console.log(height);
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                operations_logs[round] = { "approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] }, "pre_approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] } }
+                if(!(round in operations_logs)) operations_logs[round] = { "approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] }, "pre_approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
-                    if (baker_ops["delegate"] == delegate || delegate == "") { // To look at operation of a specific delegate 
                         if ("operations" in baker_ops) {
                             baker_ops["operations"].forEach((operation) => {
                                 let round_cib = 0;
@@ -165,394 +165,64 @@ function classify_operations(dict_data, delegate = "") {
                                 //Valide
                                 if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                                     let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
-                                    if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                    if (("kind" in operation)) { 
+                                        if (delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["pre_approbations"]["valide"].push(baker_ops["delegate"]);
+                                        }else if(baker_ops["delegate"] == delegate){
+                                            operations_logs[round_cib]["pre_approbations"]["valide"].push(height);
+                                        }
                                     }
-                                    else { // Est-ce qu'on prend pas en compte le fait que l'endo soit inclus au bloc ?? 
+                                    else {
+                                        if ( delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["approbations"]["valide"].push(baker_ops["delegate"]);
+                                        }else if(baker_ops["delegate"] == delegate){ 
+                                            operations_logs[round_cib]["approbations"]["valide"].push(height);
+                                        }
                                     }
                                 }
-                                //Si l'OP est valide, reception time existe pas / est null, mais op incluse(endo) =>  preendo/endo SEQUESTRE
+//If the Operation is valid, the reception time does not exist or is null, but the operation is still included in the chain => preendo/endo ESCROW
                                 if ((round_cib in t_baker) && (!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
                                     if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                        if (delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["pre_approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                        }else if(baker_ops["delegate"] == delegate){ 
+                                            operations_logs[round_cib]["pre_approbations"]["sequestre"].push(height);
+                                        }
                                     }
                                     else if ("included_in_blocks" in operation) {
+                                        if ( delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                        }else if(baker_ops["delegate"] == delegate){ 
+                                            operations_logs[round_cib]["approbations"]["sequestre"].push(height);
+                                        }
                                     }
                                 }
-                                //Si l'OP est valide, reception time, mais non inclus au bloc => endo oublié
-                                if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
+                                //If the OP is valid, reception time has a value, but the operation is not included in the block => endo forgotten
+                                if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) &&(!("included_in_blocks"in operation))&& ("reception_time" in operation) && (!("kind" in operation))) {
+                                    if ( delegate == "") { // To look at operation of a specific delegate 
                                     operations_logs[round_cib]["approbations"]["oublie"].push(baker_ops["delegate"]);
+                                    }else if (baker_ops["delegate"] == delegate){
+                                        operations_logs[round_cib]["approbations"]["oublie"].push(height);
+                                    }
                                 }
-                                // Comment on fait les invalides ?? Si erreur autre que : op reçu avant bloc candidat
+                                // // How do we deal with invalids ope?? If error other than: op received before candidate block
                             });
                         }
                         else { // 0 operations => // => bloc missed by delegate
                             console.log(operations_logs)
+                            if ( delegate == "") { // To look at operation of a specific delegate 
                             operations_logs[0]["approbations"]["manque"].push(baker_ops["delegate"])
+                            }else if(baker_ops["delegate"] == delegate){ 
+                                operations_logs[0]["approbations"]["manque"].push(height)
+                            }
                         }
-                    }
+                    
                 });
             }
         }
     });
     return operations_logs
 }
-/*
-const tri_consensus_operation_specific_address = function (adress, dict_data) {
-    t_op_valide = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // contient plusieurs dict, chacun associé à un round. Ces dict contiennent 2 listes, qui sont les délais de réception pour les Préendorsement et les endorsmenet valides 
-    t_op_retard = { "timestamp": { "endo": {}, "preendo": {} }, "reception": { "endo": {}, "preendo": {} } }; // 
-    missed_block = [];
-    op_sequestre = [];
-    op_oublies = [];
-    t_baker = {};
-    max_round = 0; // round final du bloc
-    t_recep = {};// date de réception du bloc 
-
-    try {
-        Object.entries(dict_data).forEach(([k, v]) => {
-            let va = k;
-            dict_data[va]["blocks"].forEach((element) => {
-                var round = 0;
-                if (typeof element["round"] !== "undefined") round = element["round"]
-                else round = 0;
-                t_baker[round] = new Date(element["timestamp"]);
-                t_recep[round] = new Date(element["reception_time"]);
-
-            })
-            Object.entries(dict_data[va]["endorsements"]).forEach(([k, v]) => {
-                if (v['delegate'] == adress) { //s'il s'agit du délégué visé 
-                    try { //traitement des blocs avec block round > 0 et payload round = 0                                      
-                        if ("operations" in v) {
-                            var participation_in_round = [];
-                            for (let i = 0; i < (v["operations"]).length; i++) {
-
-                                round_cib = v["operations"][i]["round"];
-                                participation_in_round.push(round_cib);
-                                if ("errors" in v["operations"][i]) { // L'OP n'est pas valide ?
-                                    if ("expected_max" in v["operations"][i]["errors"][0]) {
-                                        if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
-                                            if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
-
-
-
-                                                if (("reception_time" in v["operations"][i]) && (v["operations"][i]["reception_time"] != null)) {
-
-                                                    if (v["operations"][i]["errors"][0]["expected_max"] in t_op_retard["timestamp"]["preendo"]) {
-                                                        t_op_retard["timestamp"]["preendo"]["expected_max"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); // 
-                                                        t_op_retard["reception"]["preendo"]["expected_max"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds(); // 
-                                                    }
-                                                    else {
-                                                        t_op_retard["timestamp"]["preendo"]["expected_max"] = {};
-                                                        t_op_retard["reception"]["preendo"]["expected_max"] = {};
-                                                        t_op_retard["timestamp"]["preendo"]["expected_max"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); // 
-                                                        t_op_retard["reception"]["preendo"]["expected_max"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds();
-                                                    }
-
-                                                }
-
-
-                                            }
-
-
-
-                                        }
-                                        else {//endo
-
-                                            if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                                if (("reception_time" in v["operations"][i]) && (v["operations"][i]["reception_time"] != null)) {
-
-                                                    t_op_retard["timestamp"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); // 
-                                                    t_op_retard["reception"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds();
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                }
-                                else { //L'OP est valide ?
-
-                                    if (("kind" in v["operations"][i])) { // preendo  if (round_cib != round_bloc) { <= aller chercher round cib
-                                        if (("reception_time" in v["operations"][i]) && ("round" in v["operations"][i]) && (v["operations"][i]["reception_time"] != null)) {
-
-                                            if (round_cib in t_op_valide["timestamp"]["preendo"]) {
-                                                t_op_valide["timestamp"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                t_op_valide["reception"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds(); //
-                                            } else {
-                                                t_op_valide["timestamp"]["preendo"][round_cib] = {};
-                                                t_op_valide["reception"]["preendo"][round_cib] = {};
-                                                t_op_valide["timestamp"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                t_op_valide["reception"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds(); //
-
-                                            }
-                                        }// pas de "else", il y a pas moyen de savoir si un preendo est oublié
-                                    }
-                                    else {//endo
-
-                                        if (("reception_time" in v["operations"][i]) && ("round" in v["operations"][i])) {
-                                            if ("included_in_blocks" in v["operations"][i]) {
-                                                if (v["operations"][i]["reception_time"] != null) {
-
-
-                                                    t_op_valide["timestamp"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                    t_op_valide["reception"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds(); //
-
-
-                                                }
-
-                                            } else {
-                                                op_oublies.push(k);
-                                            }
-                                        }
-                                        else {
-                                            if (("included_in_blocks" in v["operations"][i]) && (!("reception_time" in v["operations"][i]))) {
-                                                op_sequestre.push(k);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            let one = Object.keys(t_baker);
-                            console.log(one, participation_in_round)
-                            var round_missed = one.filter(function (item) { //obj :obtenir les rounds manqués par un délégué dans un bloc 
-                                console.log(item, participation_in_round.indexOf(+item) === -1);
-                                return participation_in_round.indexOf(+item) === -1;
-                            });
-                            if (round_missed.length > 0) {
-                                missed_block.push([va, round_missed]);
-                            }
-                        }
-                        else {
-                            missed_block.push([va, [-1]]);//ajouter aux manqués !!
-                        }
-                        try {
-                            if ("operations" in v) {
-                                for (let i = 0; i < v["operations"].length; i++) {//
-                                    if ((("errors" in v["operations"][i]))) { //dès lors qu'on trouve une erreur, on vérifier qu'il s'agit d'une erreur concernant le block ciblé(va) et son round.
-                                        if (v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                            var block_cib = (v["operations"][i]["errors"][0]["provided"]).toString();
-                                            var round_cib = v["operations"][i]["round"];
-                                            if (block_cib == va) {
-                                                if ("kind" in v["operations"][i]) { // c'est un preendo
-                                                    if (round_cib in t_op_valide["timestamp"]["preendo"]) {
-                                                        t_op_valide["timestamp"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                        t_op_valide["reception"]["preendo"][round_cib][va] = 0; //
-                                                    } else {
-                                                        t_op_valide["timestamp"]["preendo"][round_cib] = {};
-                                                        t_op_valide["reception"]["preendo"][round_cib] = {};
-                                                        t_op_valide["timestamp"]["preendo"][round_cib][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                        t_op_valide["reception"]["preendo"][round_cib][va] = 0; //
-
-                                                    }
-                                                }
-                                                else {
-                                                    t_op_valide["timestamp"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds(); //
-                                                    t_op_valide["reception"]["endo"][va] = new Date(new Date(v["operations"][i]["reception_time"]) - t_recep[round_cib]).getSeconds(); //
-                                                }
-
-                                            }
-
-                                        }
-                                    }
-
-                                }
-                            }
-
-                        }
-                        catch (error) {
-                            console.log(error); // endo manqués
-                        }
-                    } catch (error) {
-
-                        console.log(error);
-
-                    }
-                }
-            });
-
-        });
-    } catch (e) { console.log(e) }
-    console.log(t_op_valide, missed_block)
-}*/
-
-/*
-const tri_endorsement_reception_delays_for_a_block = function (va_, dict_data) {
-    //console.log(dict_data)
-    let va = va_;
-    let t_baker = {};
-    let t_delai_bloc = {};
-    let t_op_valide = {};
-    let t_op_erreur = { "avance": { "t_approbations": [], "t_pre_approbations": [] } }; //  enlever
-    let t_recep = {};// date de réception du bloc 
-    let max_round = 0; // round final du bloc
-    let ano_desc = {}; // COntient les différentes catégories d'opérations, ainsi qu'une liste des délégué associé aux op de chaque catégorie
-
-    try {
-
-        let json_data = dict_data[va];
-
-        try {
-            dict_data[va]["blocks"].forEach((element) => {
-                var round = 0;
-                if (typeof element["round"] !== "undefined") round = element["round"]
-                else round = 0;
-                t_baker[round] = new Date(element["timestamp"]);
-                t_recep[round] = new Date(element["reception_time"]);
-                t_delai_bloc[round] = (new Date(t_recep[round] - t_baker[round])).getSeconds();
-                t_op_erreur[round] = { "t_approbations": [], "t_pre_approbations": [] };
-                t_op_valide[round] = { "t_approbations": [], "t_pre_approbations": [] };
-                ano_desc[round] = { "approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] }, "pre_approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] } }
-            });
-        } catch (e) {
-            console.log(e);
-        }
-
-        if ((json_data["blocks"]).length == 0 || !("round" in json_data["blocks"][0])) {
-            max_round = 0;
-        }
-        else {
-            max_round = + dict_data[va]["blocks"][0]["round"];
-            if (isNaN(max_round)) max_round = 0;
-            console.log("Le nombre final de round du bloc est: " + max_round);
-        }
-
-        Object.entries(dict_data[va]["endorsements"]).forEach(([_k, v]) => {
-
-
-            try { //traitement des blocs avec block round > 0 et payload round = 0
-                //console.log((v["operations"]).length);
-                if (!("operations" in v && (v["operations"]).length > 0))
-                    ano_desc["0"]["approbations"]["manque"].push(v["delegate"])
-                else
-                    for (let i = 0; i < (v["operations"]).length; i++) {
-                        round_cib = v["operations"][i]["round"];
-                        if ("errors" in v["operations"][i]) { // L'OP n'est pas valide ?
-                            if (("kind" in v["operations"][i])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                if ("reception_time" in v["operations"][i] && v["operations"][i]["reception_time"] != null) {
-                                    if (("expected_max" in v["operations"][i]["errors"][0] ||
-                                        "expected" in v["operations"][i]["errors"][0] && "provided" in v["operations"][i]["errors"][0]) &&
-                                        v["operations"][i]["errors"][0]["kind"] == "temporary") {
-                                        console.log("A");
-                                        t_op_valide[round_cib]["t_pre_approbations"].push(0); // OP valable, reçu avant le block candidat
-                                        ano_desc[round_cib]["pre_approbations"]["valide"].push(v["delegate"]);
-                                    }
-                                    t_op_erreur["avance"]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                }
-                                else {
-                                    //date de récep pas dispo
-                                    ano_desc[round_cib]["pre_approbations"]["inconnu"].push([v["delegate"], "erreur date de récep pas dispo"])
-                                }
-                            }
-                            else {//endo
-                                if (("reception_time" in v["operations"][i])) {
-                                    if (v["operations"][i]["reception_time"] != null) {
-                                        if (("included_in_blocks" in v["operations"][i])) {
-                                            t_op_erreur["avance"]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                        }
-                                        else {
-                                            console.log("Pas d'inclusion au bloc => Approbation oubliée");
-                                            ano_desc[round_cib]["approbations"]["inconnu"].push([v["delegate"], "erreur et inclus dans aucun bloc"]);
-                                        }
-                                    }
-                                    else {
-                                        //date de récep pas dispo
-                                        ano_desc[round_cib]["approbations"]["inconnu"].push([v["delegate"], "erreur et date de recep null"]);
-                                    }
-                                }
-                                else {
-                                    ano_desc[round_cib]["approbations"]["inconnu"].push([v["delegate"], "erreur et pas de date de recep"]);
-                                    // jamais reçu => Manquées
-                                }
-                            }
-                        }
-                        else { //L'OP est valide ?
-                            if (("kind" in v["operations"][i])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                if (("reception_time" in v["operations"][i])) {
-                                    if (v["operations"][i]["reception_time"] != null) {
-                                        t_op_valide[round_cib]["t_pre_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                        ano_desc[round_cib]["pre_approbations"]["valide"].push(v["delegate"]);
-                                    }
-                                    else {
-                                        //console.log("date de récep pas dispo");
-                                        ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                    }
-                                } else {
-                                    // jamais reçu => Manquées
-                                    ano_desc[round_cib]["pre_approbations"]["sequestre"].push(v["delegate"]);
-                                }
-
-                            }
-                            else {//endo
-                                if (("reception_time" in v["operations"][i])) {
-                                    if (v["operations"][i]["reception_time"] != null) {
-                                        if (("included_in_blocks" in v["operations"][i])) {
-                                            t_op_valide[round_cib]["t_approbations"].push(new Date(new Date(v["operations"][i]["reception_time"]) - t_baker[round_cib]).getSeconds());
-                                            ano_desc[round_cib]["approbations"]["valide"].push(v["delegate"]);
-                                        }
-                                        else {
-                                            //console.log("Pas d'inclusion au bloc => Approbation oubliée");
-                                            ano_desc[round_cib]["approbations"]["oublie"].push(v["delegate"]);
-                                        }
-                                    }
-                                    else {
-                                        //date de récep pas dispo
-                                        ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
-                                    }
-                                }
-                                else {
-                                    // jamais reçu => Manquées
-                                    ano_desc[round_cib]["approbations"]["sequestre"].push(v["delegate"]);
-                                }
-
-
-                            }
-                        }
-                    }
-            } catch (error) {
-                console.log(error);
-            }
-        }
-        );
-
-
-        console.log(t_recep);
-        console.log(t_baker);
-        console.log(t_delai_bloc);
-        console.log("t_op_erreur");
-        console.log(t_op_erreur);
-        console.log("t_valide");
-        console.log(t_op_valide);
-        console.log("delays_distribution_of_operations")
-        let distrib_t = delays_distribution_of_operations(dict_data)
-        console.log(distrib_t)
-        console.log("ano_desc");
-        console.log(ano_desc);
-        let logs_operation = classify_operations(dict_data)
-        console.log("ano_desc", ano_desc);
-        console.log('logs_operation', logs_operation)
-        resume_obs(logs_operation, t_baker);
-        replaceDelegate(logs_operation);
-        for (let i = 0; i <= max_round; i++) {
-            //chart('p', [t_op_valide[i]["t_pre_approbations"], t_op_valide[i]["t_approbations"]], va, i, t_delai_bloc[i]);
-            let va = va_;
-            chart('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
-            console.log(i);
-            console.log(t_delai_bloc[i]); .0
-            2.5
-            3.0
-            3.5
-        }
-        // Affichage du resume
-
-    } catch (e) {
-        console.log(e)
-        MessageErreur();
-    }
-
-}
-*/
 
 
 const percIntegration = function (threshold, t_op_pre_valide) {
@@ -586,8 +256,8 @@ const percIntegration = function (threshold, t_op_pre_valide) {
 
 const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
     let l_ = threshold / 100;
-    const qd_ = 25; // nombre de slots pour ce block; endorsing power ? 
-    var t_min_ = {}; // dict pour relier le temps min pour qu'un bloc soit valide à son #bloc
+    const qd_ = 25; // number of slots for this block, before including endorsing power
+    var t_min_ = {}; 
     var d3_t_min_ = [];
     Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
         try {
@@ -598,12 +268,12 @@ const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
                     return a - b
                 });
             }
-            var block_fin = v_bloc[last_round_[last_round_.length - 1]]; // On se base pour ce graphe sur les rounds valides... généralement le dernier du bloc
+            var block_fin = v_bloc[last_round_[last_round_.length - 1]]; // This graph is based on the valid rounds, i.e. the last round of each block
             console.log(block_fin);
             block_fin.sort(function (a, b) {
                 return a - b;
-            });// trier le vecteur de délais de récep, par ordre croissant
-            seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date à laquelle on a le nombre min de preendo pour que le round soit valide 
+            });// sort the receipt delay vector, in ascending order
+            seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date on which we have the minimum number of pre endo for the round to be valid 
             t_min_[bloc] = seuil_validation;
             if (isNaN(seuil_validation) == false) {
                 d3_t_min_.push({ bloc: (+bloc), t: (+seuil_validation) });
@@ -620,7 +290,7 @@ const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
 const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure endorsing power 
     var t_pI = [];
     t_cibles.forEach((t_cible) => {
-        var pI_level = {}; // Pour chaque temps seuil, un dictionnaire garde la quantité de pre-endo reçu, x bloc et y round 
+        var pI_level = {}; // For each threshold time, a dictionary keeps the amount of pre-endo received, x block and y round
         var l_rounds = []; // 
         Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
             pI_level[bloc] = {};
@@ -655,7 +325,7 @@ const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure en
 
 
 
-function chart(dom, data, niveau, round, delai_recep_bloc_) {
+function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
     if (!(isEmpty(data)) && (!([[undefined, undefined]].includesArray(data)))) {
         var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
             width = 1000, // outer width of chart, in pixels
@@ -675,9 +345,9 @@ function chart(dom, data, niveau, round, delai_recep_bloc_) {
         const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);//.append("title").text("↑ # Délégués");
         const graph = svg.append("g").attr("fill", "steelblue");
 
-        let minValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
+        let minValue = Object.values(data[0])[0]; //We calculate the Range of time values measured for a block, in order to adjust the display dimensions
 
-        let maxValue = Object.values(data[0])[0]; //On calcule le Range des valeurs de temps mesuré pour un bloc, afin d'ajuster les dimensions d'affichage 
+        let maxValue = Object.values(data[0])[0]; ////We calculate the Range of time values measured for a block, in order to adjust the display dimensions
 
         for (const [key, value] of Object.entries(data[0])) {
             if (value > maxValue) {
@@ -778,7 +448,7 @@ function chart(dom, data, niveau, round, delai_recep_bloc_) {
     }
 }
 
-const resume_obs = function (data, t_baker) {
+const resume_obs = function (data, t_baker,delegate="") {
         console.log(data);
         Object.entries(data).forEach(([level, el]) => {
             Object.entries(el).forEach(([k1, v1]) => {
@@ -812,8 +482,14 @@ const resume_obs = function (data, t_baker) {
         tbl.setAttribute('border', '1');
         var tbdy = document.createElement('tbody');
 
-        let manque = ["Manquées", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
-        let entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
+        let manque = ["missed", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
+        let entete;
+        if(delegate==""){
+    entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
+        }else{
+            entete = ["Type", "Proportion", "Corresponding blocs"];
+
+        }
 
         var tr_manque = document.createElement('tr');
         var tr_entete = document.createElement('tr');
@@ -838,7 +514,7 @@ const resume_obs = function (data, t_baker) {
                 tr_round.appendChild(document.createTextNode("round:" + k));
                 tbdy.appendChild(tr_round);
 
-                let valide = ["valides", (v["approbations"]["valide"]).length];//, v["approbations"]["valide"]];//.slice(0,10)]; // à revoir 
+                let valide = ["valids", (v["approbations"]["valide"]).length];
                 var tr_valide = document.createElement('tr');
                 valide.forEach((element) => {
                     var td = document.createElement('td');
@@ -848,7 +524,7 @@ const resume_obs = function (data, t_baker) {
                 })
                 tbdy.appendChild(tr_valide);
 
-                let oublie = ["Oubliées", (v["approbations"]["oublie"]).length, v["approbations"]["oublie"]]; // à revoir 
+                let oublie = ["forgotten", (v["approbations"]["oublie"]).length, v["approbations"]["oublie"]]; 
                 var tr_oublie = document.createElement('tr');
                 oublie.forEach((element) => {
                     var td = document.createElement('td');
@@ -857,7 +533,7 @@ const resume_obs = function (data, t_baker) {
                 })
                 tbdy.appendChild(tr_oublie);
 
-                let invalide = ["Invalides", (v["approbations"]["invalide"]).length, v["approbations"]["invalide"]]; // à revoir 
+                let invalide = ["invalids", (v["approbations"]["invalide"]).length, v["approbations"]["invalide"]]; 
                 var tr_invalide = document.createElement('tr');
                 invalide.forEach((element) => {
                     var td = document.createElement('td');
@@ -866,7 +542,7 @@ const resume_obs = function (data, t_baker) {
                 })
                 tbdy.appendChild(tr_invalide);
 
-                let inconnu = ["Inconnu", (v["approbations"]["inconnu"]).length, v["approbations"]["inconnu"]]; // à revoir 
+                let inconnu = ["Unknown", (v["approbations"]["inconnu"]).length, v["approbations"]["inconnu"]]; 
                 var tr_inconnu = document.createElement('tr');
                 inconnu.forEach((element) => {
                     var td = document.createElement('td');
@@ -882,7 +558,7 @@ const resume_obs = function (data, t_baker) {
     
 }
 
-function chart_gamma(data) {
+function chart_preendorsement_inclusion_based_on_multiple_threshold_time(data) {
     if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),
         width = 850 - margin.left - margin.right;//1000, // outer width of chart, in pixels
@@ -1076,7 +752,8 @@ const replaceDelegate = function (data) {
     }
 }
 
-function chart_alpha(data) {
+function chart_preendorsement_inclusion_based_on_threshold_time(data) {
+    console.log(data)
     if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
         width = 560 - margin.left - margin.right;//1000, // outer width of chart, in pixels
@@ -1161,7 +838,8 @@ function chart_alpha(data) {
 
 }
 
-function chart_beta(data) {
+function chart_time_required(data) {
+    console.log(data)
     if (!(isEmpty(data))) {
     var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
         width = 800 - margin.left - margin.right;//1000, // outer width of chart, in pixels
@@ -1186,7 +864,7 @@ function chart_beta(data) {
             .range([0, width]);
         svg.append("g")
             .attr("transform", "translate(0," + (height + 5) + ")")
-            .call(d3.axisBottom(x).ticks(5).tickSizeOuter(0)); //(0," + (height + 5) + ")")
+            .call(d3.axisBottom(x).ticks(5).tickSizeOuter(0)); 
 
 
         var y = d3.scaleLinear()
@@ -1223,7 +901,7 @@ function chart_beta(data) {
             .attr("y", 0)
             .attr("fill", "currentColor")
             .attr("text-anchor", "start")
-            .text("↑ Temps minimun(s)");
+            .text("↑ minimum time(s)");
 
         svg.append("text")
             .attr("x", width + margin.right)
@@ -1314,7 +992,7 @@ function chart_consensus_operation_specific_address(data) {
                 .attr("cy", function (d) { return y(d.timestamp_delay) })
                 .attr("r", 3)
                 .style("fill", function (d) { return color(d.cat) })
-                .on("mouseover", function (event, d) {// pour afficher les infos d'un point : https://stackoverflow.com/questions/67473725/how-to-fix-undefined-issue-on-d3-tooltip
+                .on("mouseover", function (event, d) {// to print dot properties: https://stackoverflow.com/questions/67473725/how-to-fix-undefined-issue-on-d3-tooltip
                     var xPosition = parseFloat(d3.select(this).attr("cx"));
                     var yPosition = parseFloat(d3.select(this).attr("cy"));
 
@@ -1357,7 +1035,15 @@ function chart_consensus_operation_specific_address(data) {
         } catch (e) { console.log(e) }
     }
     else{
-            alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc ")
+        alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc \n No Graph. \nIt can be due to:\n - not producing any valid operations")
+        try {
+            while (document.getElementById("dataviz").querySelector("svg")) {
+                const elements3 = document.getElementById("dataviz").querySelector("svg");
+                document.getElementById("dataviz").removeChild(elements3);
+            }
+        } catch (e) {
+            console.log(e)
+        }
     }
 }
 

@@ -34,87 +34,62 @@
     <script>
         const server_adress = "http://kathmandunet.kaml.fr:8880/";
 
-        /*function MessageErreur() {
-            try {
-                const elements5 = document.querySelector("p");
-                const myNode = document.querySelector("p");;
-                while (myNode.firstChild) {
-                    myNode.removeChild(myNode.lastChild);
-                }
-            } catch (e) {
-                console.log(e)
-            }
-            try {
-                const elements2 = document.getElementById("tab_delegates").querySelector("h2")
-                elements2.parentElement.removeChild(elements2);
-            } catch (e) {
-                //console.log(e)
-            }
-            try {
-                const elements = document.getElementById("tab_delegates").querySelector("table");
-                elements.parentElement.removeChild(elements);
-            } catch (e) {
-                // console.log(e)
-            }
-
-            try {
-                while (document.getElementById("resume").querySelector("h2")) {
-                    const elements3 = document.getElementById("resume").querySelector("h2");
-                    document.getElementById("resume").removeChild(elements3);
-                }
-            } catch (e) {
-                console.log(e)
-            }
-            try {
-                const elements4 = document.getElementById("resume").querySelector("table");
-                elements4.parentElement.removeChild(elements4);
-            } catch (e) {
-                //console.log(e)
-            }
-            if (document.getElementById("resume").querySelector("h2")) {
-
-            }
-            else {
-                var mess_erreur = document.createElement('h2');
-                mess_erreur.appendChild(document.createTextNode("Oops, i can't find this block !"));
-                document.getElementById("resume").appendChild(mess_erreur);
-            }
-
-        }*/
         function main() {
             try {
+                const params = new Proxy(new URLSearchParams(window.location.search), {
+                    get: (searchParams, prop) => searchParams.get(prop),
+                });
+                // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
+                let bloc_value = parseInt(params.bloc); // "some_value"
+                //console.log()
+                if(bloc_value){
+                    let dict_data = populate_v1(server_adress, bloc_value, bloc_value).then(dict_data => {
+                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let logs_operation = classify_operations(dict_data)
+                        let result = get_info_bloc(dict_data);
+                        let t_delai_bloc = result[0]
+                        let t_baker = result[1]
+                        let max_round = result[2]
+                        resume_obs(logs_operation, t_baker);
+                        replaceDelegate(logs_operation);
+                        for (let i = 0; i <= max_round; i++) {
+                            chart_delays_for_a_block('p', [ditribution_delays[0][bloc_value][i], ditribution_delays[1][bloc_value][i]], bloc_value, i, t_delai_bloc[i]);
+                        }
+
+                    });
+
+                }              
                 $('form').keyup(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_bloc(dict_data);
-                        let t_delai_bloc=result[0]
-                        let t_baker=result[1]
-                        let max_round=result[2]  
+                        let t_delai_bloc = result[0]
+                        let t_baker = result[1]
+                        let max_round = result[2]
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
                         }
 
                     });
                 });
 
-                //Réagir à un click sur les boutons 
                 $('#plus').click(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_bloc(dict_data);
-                        let t_delai_bloc=result[0]
-                        let t_baker=result[1]
-                        let max_round=result[2]
+                        let t_delai_bloc = result[0]
+                        let t_baker = result[1]
+                        let max_round = result[2]
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
                         }
                     });
                 });
@@ -125,26 +100,23 @@
                         let distrib_t = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_bloc(dict_data);
-                        let t_delai_bloc=result[0]
-                        let t_baker=result[1]
-                        let max_round=result[2]
+                        let t_delai_bloc = result[0]
+                        let t_baker = result[1]
+                        let max_round = result[2]
                         console.log(t_baker)
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
                         }
                     });
                 });
-
-
 
             } catch (erreur) {
                 console.log(erreur);
             }
         }
         main()
-
 
     </script>
     <p></p>
