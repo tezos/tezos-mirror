@@ -38,7 +38,38 @@ module Wasm = Wasm_pvm.Make (Test_encodings_util.Tree)
 (* Kernel failing at `kernel_next` invocation. *)
 let unreachable_kernel = "unreachable"
 
-let is_stuck = function Wasm_pvm.Stuck _ -> true | _ -> false
+(** [check_error kind reason error] checks a Wasm PVM error [error] is of a
+    given [kind] with a possible [reason].
+
+    - If [kind] is [None], returns true.
+
+    - If [reason] is [None], it simply check the given kind, otherwise it
+    actually check the reason in the error. *)
+let check_error expected_kind expected_reason error =
+  let check_reason actual_reason =
+    match expected_reason with
+    | None -> true
+    | _ -> expected_reason = actual_reason
+  in
+  match (expected_kind, error) with
+  | Some `Decode, Wasm_pvm_errors.Decode_error {explanation; _} ->
+      check_reason explanation
+  | Some `Init, Init_error {explanation; _} -> check_reason explanation
+  | Some `Eval, Eval_error {explanation; _} -> check_reason explanation
+  | Some `Invalid_state, Invalid_state explanation ->
+      check_reason (Some explanation)
+  (* Unknown_error encapsulate a raw exception produced by `Printexc.to_string`.
+     It depends on the backend, if there are registered printers or not, it is
+     not safe to rely on its string representation. *)
+  | Some `Unknown, Unknown_error _ -> true
+  (* The expected step doesn't corresponds to the actual stuck step. *)
+  | Some _, _ -> false
+  (* No check to do, we simply assume the PVM is in a stuck state. *)
+  | None, _ -> true
+
+let is_stuck ?step ?reason = function
+  | Wasm_pvm.Stuck err -> check_error step reason err
+  | _ -> false
 
 let initial_boot_sector_from_kernel kernel =
   let open Lwt_syntax in
@@ -90,8 +121,14 @@ let should_boot_unreachable_kernel kernel =
   let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
-  (* The kernel is expected to fail, then ths PVM should be in stuck state. *)
-  assert (is_stuck state_after_first_message) ;
+  (* The kernel is expected to fail, then ths PVM should be in stuck state, and
+     have failed during the evaluation when evaluating a `Unreachable`
+     instruction. *)
+  assert (
+    is_stuck
+      ~step:`Eval
+      ~reason:"unreachable executed"
+      state_after_first_message) ;
 
   (* Feeding it with one input *)
   let* tree = set_input_step "test" 1 tree in
@@ -107,7 +144,11 @@ let should_boot_unreachable_kernel kernel =
     Z.lt
       info_after_first_message.current_tick
       info_after_second_message.current_tick) ;
-  assert (is_stuck state_after_second_message) ;
+  assert (
+    is_stuck
+      ~step:`Eval
+      ~reason:"unreachable executed"
+      state_after_second_message) ;
   return_unit
 
 let test_with_kernel kernel test () =
