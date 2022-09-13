@@ -188,7 +188,7 @@ let test_parsing_message ~valid (source, expected_code) =
   Assert.equal
     ~loc:__LOC__
     (Option.equal Bool.equal)
-    "Unexpected parsing resutlt"
+    "Unexpected parsing result"
     (fun fmt r ->
       Format.fprintf
         fmt
