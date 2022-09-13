@@ -402,7 +402,7 @@ let run_action act : Values.value list Lwt.t =
                 Script.error v.at "wrong type of argument")
             vs
             ins_l ;
-          let+ result =
+          let+ _, result =
             Eval.invoke
               ~module_reg:instances
               ~caller:(Module_key "__empty")

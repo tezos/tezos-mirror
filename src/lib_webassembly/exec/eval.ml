@@ -320,7 +320,8 @@ let block_type inst bt =
 
 let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
-let invoke_step (module_reg : module_reg) c frame at = function
+let invoke_step ?(durable = Durable_storage.empty) (module_reg : module_reg) c
+    frame at = function
   | Inv_stop _ -> assert false
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
@@ -331,16 +332,17 @@ let invoke_step (module_reg : module_reg) c frame at = function
       match func with
       | Func.AstFunc (_, inst', f) ->
           Lwt.return
-            (Inv_prepare_locals
-               {
-                 arity = n2;
-                 args;
-                 vs = vs';
-                 instructions = es;
-                 inst = inst';
-                 func = f;
-                 locals_kont = map_kont f.it.locals;
-               })
+            ( durable,
+              Inv_prepare_locals
+                {
+                  arity = n2;
+                  args;
+                  vs = vs';
+                  instructions = es;
+                  inst = inst';
+                  func = f;
+                  locals_kont = map_kont f.it.locals;
+                } )
       | Func.HostFunc (_, global_name) ->
           Lwt.catch
             (fun () ->
@@ -349,9 +351,11 @@ let invoke_step (module_reg : module_reg) c frame at = function
               in
               let* inst = resolve_module_ref module_reg frame.inst in
               let* args = Vector.to_list args in
-              let+ res = f c.input c.output inst.memories (List.rev args) in
+              let+ durable, res =
+                f c.input c.output durable inst.memories (List.rev args)
+              in
               let vs' = Vector.prepend_list res vs' in
-              Inv_stop {code = (vs', es); fresh_frame = None})
+              (durable, Inv_stop {code = (vs', es); fresh_frame = None}))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -365,38 +369,41 @@ let invoke_step (module_reg : module_reg) c frame at = function
       }
     when map_completed locals_kont ->
       Lwt.return
-        (Inv_prepare_args
-           {
-             arity = n2;
-             vs = vs';
-             instructions = es;
-             inst = inst';
-             func = f;
-             locals = locals_kont.destination;
-             args_kont = map_kont args;
-           })
+        ( durable,
+          Inv_prepare_args
+            {
+              arity = n2;
+              vs = vs';
+              instructions = es;
+              inst = inst';
+              func = f;
+              locals = locals_kont.destination;
+              args_kont = map_kont args;
+            } )
   | Inv_prepare_locals {arity; args; vs; instructions; inst; func; locals_kont}
     ->
       let+ locals_kont =
         map_step locals_kont (fun x -> ref (default_value x))
       in
-      Inv_prepare_locals
-        {arity; args; vs; instructions; inst; func; locals_kont}
+      ( durable,
+        Inv_prepare_locals
+          {arity; args; vs; instructions; inst; func; locals_kont} )
   | Inv_prepare_args {arity; vs; instructions; inst; func; locals; args_kont}
     when map_completed args_kont ->
       Lwt.return
-        (Inv_concat
-           {
-             arity;
-             vs;
-             instructions;
-             inst;
-             func;
-             concat_kont = concat_kont args_kont.destination locals;
-           })
+        ( durable,
+          Inv_concat
+            {
+              arity;
+              vs;
+              instructions;
+              inst;
+              func;
+              concat_kont = concat_kont args_kont.destination locals;
+            } )
   | Inv_prepare_args tick ->
       let+ args_kont = map_rev_step tick.args_kont ref in
-      Inv_prepare_args {tick with args_kont}
+      (durable, Inv_prepare_args {tick with args_kont})
   | Inv_concat
       {
         arity = n2;
@@ -409,30 +416,31 @@ let invoke_step (module_reg : module_reg) c frame at = function
     when concat_completed concat_kont ->
       let frame' = {inst = inst'; locals = concat_kont.res} in
       Lwt.return
-        (Inv_stop
-           {
-             code = (vs', es);
-             fresh_frame =
-               Some
-                 {
-                   frame_arity = Some n2;
-                   frame_specs = frame';
-                   frame_label_kont =
-                     label_kont
-                       {
-                         label_arity = Some n2;
-                         label_frame_specs = frame';
-                         label_break = None;
-                         label_code =
-                           ( Vector.empty (),
-                             Vector.singleton
-                               (From_block (f.it.body, 0l) @@ f.at) );
-                       };
-                 };
-           })
+        ( durable,
+          Inv_stop
+            {
+              code = (vs', es);
+              fresh_frame =
+                Some
+                  {
+                    frame_arity = Some n2;
+                    frame_specs = frame';
+                    frame_label_kont =
+                      label_kont
+                        {
+                          label_arity = Some n2;
+                          label_frame_specs = frame';
+                          label_break = None;
+                          label_code =
+                            ( Vector.empty (),
+                              Vector.singleton
+                                (From_block (f.it.body, 0l) @@ f.at) );
+                        };
+                  };
+            } )
   | Inv_concat tick ->
       let+ concat_kont = concat_step tick.concat_kont in
-      Inv_concat {tick with concat_kont}
+      (durable, Inv_concat {tick with concat_kont})
 
 (* Evaluation *)
 
@@ -1224,8 +1232,13 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         label_kont_with_code vs' [Trapping (numeric_error at exn) @@ at])
 
 let label_step :
-    module_reg -> config -> frame -> label_step_kont -> label_step_kont Lwt.t =
- fun module_reg c frame label_kont ->
+    Durable_storage.t ->
+    module_reg ->
+    config ->
+    frame ->
+    label_step_kont ->
+    (Durable_storage.t * label_step_kont) Lwt.t =
+ fun durable module_reg c frame label_kont ->
   match label_kont with
   | LS_Push_frame _ | LS_Modify_top _ -> assert false
   | LS_Start (Label_stack (label, stack)) ->
@@ -1233,161 +1246,182 @@ let label_step :
       let vs, es = label.label_code in
       if 0l < Vector.num_elements es then
         let* e, es = Vector.pop es in
-        match e.it with
-        | Plain e' ->
-            let+ kont = step_instr module_reg label vs e.at e' es stack in
-            LS_Modify_top kont
-        | From_block (Block_label b, i) ->
-            let* inst = resolve_module_ref module_reg frame.inst in
-            let* block = Vector.get b inst.allocations.blocks in
-            let length = Vector.num_elements block in
-            if i = length then
+        let+ kont =
+          match e.it with
+          | Plain e' ->
+              let+ kont = step_instr module_reg label vs e.at e' es stack in
+              LS_Modify_top kont
+          | From_block (Block_label b, i) ->
+              let* inst = resolve_module_ref module_reg frame.inst in
+              let* block = Vector.get b inst.allocations.blocks in
+              let length = Vector.num_elements block in
+              if i = length then
+                Lwt.return
+                  (LS_Modify_top
+                     (Label_stack ({label with label_code = (vs, es)}, stack)))
+              else
+                let+ instr = Vector.get i block in
+                LS_Modify_top
+                  (Label_stack
+                     ( {
+                         label with
+                         label_code =
+                           ( vs,
+                             Vector.prepend_list
+                               [
+                                 Plain instr.it @@ instr.at;
+                                 From_block (Block_label b, Int32.succ i)
+                                 @@ e.at;
+                               ]
+                               es );
+                       },
+                       stack ))
+          | Refer r ->
               Lwt.return
                 (LS_Modify_top
-                   (Label_stack ({label with label_code = (vs, es)}, stack)))
-            else
-              let+ instr = Vector.get i block in
+                   (Label_stack
+                      ( {label with label_code = (Vector.cons (Ref r) vs, es)},
+                        stack )))
+          | Trapping msg ->
+              Lwt.return (LS_Modify_top (Label_trapped (msg @@ e.at)))
+          | Returning vs0 -> Lwt.return (LS_Modify_top (Label_result vs0))
+          | Breaking (0l, vs0) ->
+              let vs0 = vmtake label.label_arity vs0 in
+              if Vector.num_elements stack = 0l then
+                Lwt.return (LS_Modify_top (Label_result vs0))
+              else
+                let+ label', stack = Vector.pop stack in
+                let vs, es = label'.label_code in
+                LS_Consolidate_top
+                  ( label',
+                    concat_kont vs0 vs,
+                    Vector.prepend_list
+                      (List.map plain (Option.to_list label.label_break))
+                      es,
+                    stack )
+          | Breaking (k, vs0) ->
+              if Vector.num_elements stack = 0l then
+                Crash.error e.at "undefined label" ;
+              let+ label', stack = Vector.pop stack in
+              let vs', es' = label'.label_code in
               LS_Modify_top
                 (Label_stack
                    ( {
-                       label with
+                       label' with
                        label_code =
-                         ( vs,
-                           Vector.prepend_list
-                             [
-                               Plain instr.it @@ instr.at;
-                               From_block (Block_label b, Int32.succ i) @@ e.at;
-                             ]
-                             es );
+                         ( vs',
+                           Vector.cons
+                             (Breaking (Int32.pred k, vs0) @@ e.at)
+                             es' );
                      },
                      stack ))
-        | Refer r ->
-            Lwt.return
-              (LS_Modify_top
-                 (Label_stack
-                    ( {label with label_code = (Vector.cons (Ref r) vs, es)},
-                      stack )))
-        | Trapping msg ->
-            Lwt.return (LS_Modify_top (Label_trapped (msg @@ e.at)))
-        | Returning vs0 -> Lwt.return (LS_Modify_top (Label_result vs0))
-        | Breaking (0l, vs0) ->
-            let vs0 = vmtake label.label_arity vs0 in
-            if Vector.num_elements stack = 0l then
-              Lwt.return (LS_Modify_top (Label_result vs0))
-            else
-              let+ label', stack = Vector.pop stack in
-              let vs, es = label'.label_code in
-              LS_Consolidate_top
-                ( label',
-                  concat_kont vs0 vs,
-                  Vector.prepend_list
-                    (List.map plain (Option.to_list label.label_break))
-                    es,
-                  stack )
-        | Breaking (k, vs0) ->
-            if Vector.num_elements stack = 0l then
-              Crash.error e.at "undefined label" ;
-            let+ label', stack = Vector.pop stack in
-            let vs', es' = label'.label_code in
-            LS_Modify_top
-              (Label_stack
-                 ( {
-                     label' with
-                     label_code =
-                       ( vs',
-                         Vector.cons (Breaking (Int32.pred k, vs0) @@ e.at) es'
-                       );
-                   },
-                   stack ))
-        | Invoke func ->
-            Lwt.return
-              (LS_Craft_frame
-                 (Label_stack (label, stack), Inv_start {func; code = (vs, es)}))
+          | Invoke func ->
+              Lwt.return
+                (LS_Craft_frame
+                   ( Label_stack (label, stack),
+                     Inv_start {func; code = (vs, es)} ))
+        in
+        (durable, kont)
       else if Vector.num_elements stack = 0l then
-        Lwt.return (LS_Modify_top (Label_result vs))
+        Lwt.return (durable, LS_Modify_top (Label_result vs))
       else
         let+ label', stack = Vector.pop stack in
         let vs', es' = label'.label_code in
-        LS_Consolidate_top (label', concat_kont vs vs', es', stack)
+        (durable, LS_Consolidate_top (label', concat_kont vs vs', es', stack))
   | LS_Consolidate_top (label', tick, es', stack) when concat_completed tick ->
       Lwt.return
-        (LS_Modify_top
-           (Label_stack ({label' with label_code = (tick.res, es')}, stack)))
+        ( durable,
+          LS_Modify_top
+            (Label_stack ({label' with label_code = (tick.res, es')}, stack)) )
   | LS_Consolidate_top (label', tick, es', stack) ->
       let+ tick = concat_step tick in
-      LS_Consolidate_top (label', tick, es', stack)
+      (durable, LS_Consolidate_top (label', tick, es', stack))
   | LS_Craft_frame (Label_stack (label, stack), Inv_stop {code; fresh_frame}) ->
       let label_kont = Label_stack ({label with label_code = code}, stack) in
       Lwt.return
-        (match fresh_frame with
-        | Some frame_stack -> LS_Push_frame (label_kont, frame_stack)
-        | None -> LS_Modify_top label_kont)
+        ( durable,
+          match fresh_frame with
+          | Some frame_stack -> LS_Push_frame (label_kont, frame_stack)
+          | None -> LS_Modify_top label_kont )
   | LS_Craft_frame (label, istep) ->
-      let+ istep = invoke_step module_reg c frame no_region istep in
-      LS_Craft_frame (label, istep)
+      let+ durable, istep =
+        invoke_step ~durable module_reg c frame no_region istep
+      in
+      (durable, LS_Craft_frame (label, istep))
 
-let frame_step module_reg c = function
+let frame_step durable module_reg c = function
   | SK_Result _ | SK_Trapped _ -> assert false
-  | SK_Start (frame, stack) -> (
-      match frame.frame_label_kont with
-      | Label_trapped msg -> Lwt.return (SK_Trapped msg)
-      | Label_result vs0 ->
-          if Vector.num_elements stack = 0l then
-            let vs0 = vmtake frame.frame_arity vs0 in
-            Lwt.return (SK_Result vs0)
-          else
-            let+ frame', stack = Vector.pop stack in
-            let label, lstack =
-              match frame'.frame_label_kont with
-              | Label_stack (label, lstack) -> (label, lstack)
-            in
-            let vs, es = label.label_code in
-            SK_Consolidate_label_result
-              (frame', stack, label, concat_kont vs0 vs, es, lstack)
-      | Label_stack _ as label ->
-          Lwt.return (SK_Next (frame, stack, LS_Start label)))
+  | SK_Start (frame, stack) ->
+      let+ kont =
+        match frame.frame_label_kont with
+        | Label_trapped msg -> Lwt.return (SK_Trapped msg)
+        | Label_result vs0 ->
+            if Vector.num_elements stack = 0l then
+              let vs0 = vmtake frame.frame_arity vs0 in
+              Lwt.return (SK_Result vs0)
+            else
+              let+ frame', stack = Vector.pop stack in
+              let label, lstack =
+                match frame'.frame_label_kont with
+                | Label_stack (label, lstack) -> (label, lstack)
+              in
+              let vs, es = label.label_code in
+              SK_Consolidate_label_result
+                (frame', stack, label, concat_kont vs0 vs, es, lstack)
+        | Label_stack _ as label ->
+            Lwt.return (SK_Next (frame, stack, LS_Start label))
+      in
+      (durable, kont)
   | SK_Consolidate_label_result (frame', stack, label, tick, es, lstack)
     when concat_completed tick ->
       let label_kont =
         Label_stack ({label with label_code = (tick.res, es)}, lstack)
       in
-      Lwt.return (SK_Start ({frame' with frame_label_kont = label_kont}, stack))
+      Lwt.return
+        (durable, SK_Start ({frame' with frame_label_kont = label_kont}, stack))
   | SK_Consolidate_label_result (frame', stack, label, tick, es, lstack) ->
       let+ tick = concat_step tick in
-      SK_Consolidate_label_result (frame', stack, label, tick, es, lstack)
+      ( durable,
+        SK_Consolidate_label_result (frame', stack, label, tick, es, lstack) )
   | SK_Next (frame, stack, LS_Modify_top label_kont) ->
       let frame = {frame with frame_label_kont = label_kont} in
-      Lwt.return (SK_Start (frame, stack))
+      Lwt.return (durable, SK_Start (frame, stack))
   | SK_Next (frame, stack, LS_Push_frame (label_kont, frame')) ->
       let stack_size = Int32.(succ (Vector.num_elements stack) |> to_int) in
       if c.stack_size_limit <= stack_size then
         Exhaustion.error no_region "call stack exhausted" ;
       let frame = {frame with frame_label_kont = label_kont} in
-      Lwt.return (SK_Start (frame', Vector.cons frame stack))
+      Lwt.return (durable, SK_Start (frame', Vector.cons frame stack))
   | SK_Next (frame, stack, istep) ->
-      let+ istep = label_step module_reg c frame.frame_specs istep in
-      SK_Next (frame, stack, istep)
+      let+ durable, istep =
+        label_step durable module_reg c frame.frame_specs istep
+      in
+      (durable, SK_Next (frame, stack, istep))
 
-let step module_reg c =
+let step ?(durable = Durable_storage.empty) module_reg c =
   match c.step_kont with
   | SK_Result _ | SK_Trapped _ -> assert false
   | kont ->
-      let+ step_kont = frame_step module_reg c kont in
-      {c with step_kont}
+      let+ durable, step_kont = frame_step durable module_reg c kont in
+      (durable, {c with step_kont})
 
-let rec eval module_reg (c : config) : value list Lwt.t =
+let rec eval durable module_reg (c : config) :
+    (Durable_storage.t * value list) Lwt.t =
   match c.step_kont with
-  | SK_Result vs -> Vector.to_list vs
+  | SK_Result vs ->
+      let+ values = Vector.to_list vs in
+      (durable, values)
   | SK_Trapped {it = msg; at} -> Trap.error at msg
   | _ ->
-      let* c = step module_reg c in
-      eval module_reg c
+      let* durable, c = step ~durable module_reg c in
+      eval durable module_reg c
 
 (* Functions & Constants *)
 
 let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
-    ?(output = Output_buffer.alloc ()) host_funcs (func : func_inst)
-    (vs : value list) : value list Lwt.t =
+    ?(output = Output_buffer.alloc ()) ?(durable = Durable_storage.empty)
+    host_funcs (func : func_inst) (vs : value list) :
+    (Durable_storage.t * value list) Lwt.t =
   let at = match func with Func.AstFunc (_, _, f) -> f.at | _ -> no_region in
   let (FuncType (ins, out)) = Func.type_of func in
   let* ins_l = Lazy_vector.Int32Vector.to_list ins in
@@ -1416,8 +1450,8 @@ let invoke ~module_reg ~caller ?(input = Input_buffer.alloc ())
   in
   Lwt.catch
     (fun () ->
-      let+ values = eval module_reg c in
-      List.rev values)
+      let+ durable, values = eval durable module_reg c in
+      (durable, List.rev values))
     (function
       | Stack_overflow -> Exhaustion.error at "call stack exhausted"
       | exn -> Lwt.fail exn)
@@ -1443,7 +1477,7 @@ let eval_const_step module_reg = function
         EC_Stop v
       else Crash.error Source.no_region "wrong number of results on stack"
   | EC_Next c ->
-      let+ c = step module_reg c in
+      let+ _, c = step module_reg c in
       EC_Next c
   | EC_Stop _ -> assert false
 
@@ -1979,7 +2013,7 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
       Lwt.return (IK_Stop inst)
   | IK_Eval (_, {step_kont = SK_Trapped {it = msg; at}; _}) -> Trap.error at msg
   | IK_Eval (inst, config) ->
-      let+ config = step module_reg config in
+      let+ _, config = step module_reg config in
       IK_Eval (inst, config)
   | IK_Stop _ -> raise (Init_step_error Init_step)
 

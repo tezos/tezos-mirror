@@ -26,6 +26,7 @@
 module T = Tree_encoding.Wrapped
 module Runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
 module E = Tree_encoding
+module Storage = Tezos_webassembly_interpreter.Durable_storage
 
 type t = T.tree
 
@@ -33,11 +34,16 @@ exception Invalid_key of string
 
 exception Not_found
 
+exception Durable_empty
+
 let encoding = E.wrapped_tree
 
-let of_tree = T.select
+let of_storage ~default s =
+  match Storage.to_tree s with Some t -> T.select t | None -> default
 
-let to_tree = T.wrap
+let of_storage_exn s = T.select @@ Storage.to_tree_exn s
+
+let to_storage d = Storage.of_tree @@ T.wrap d
 
 type key = string list
 

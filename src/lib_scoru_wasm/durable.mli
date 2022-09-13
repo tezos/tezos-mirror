@@ -33,12 +33,19 @@ exception Invalid_key of string
 (** A value was not found in the durable store. *)
 exception Not_found
 
+(** [Durable_storage.t] was empty. *)
+exception Durable_empty
+
 (** [encoding] is a [Tree_encoding] for [t]. *)
 val encoding : t Tree_encoding.t
 
-val of_tree : Lazy_containers.Lazy_map.tree -> t
+val of_storage :
+  default:t -> Tezos_webassembly_interpreter.Durable_storage.t -> t
 
-val to_tree : t -> Lazy_containers.Lazy_map.tree
+(** @raise Durable_empty *)
+val of_storage_exn : Tezos_webassembly_interpreter.Durable_storage.t -> t
+
+val to_storage : t -> Tezos_webassembly_interpreter.Durable_storage.t
 
 (** [key] is the type that indexes [t]. It enforces several constraints:
     - a key's length is bounded.

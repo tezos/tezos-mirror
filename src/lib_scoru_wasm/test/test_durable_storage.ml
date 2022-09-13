@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Lib_scoru_wasm durable
-    Invocation:   dune exec  src/lib_scoru_wasm/test/test_scoru_wasm.exe \
+    Invocation:   dune exec src/lib_scoru_wasm/test/test_scoru_wasm.exe \
                     -- test "Durable storage"
     Subject:      Durable storage tests for the tezos-scoru-wasm library
 *)
@@ -38,7 +38,7 @@ include Test_encodings_util
 module Wasm = Wasm_pvm.Make (Tree)
 module Wrapped_tree_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
 
-let wrap_as_durable tree =
+let wrap_as_durable_storage tree =
   let open Lwt.Syntax in
   let* tree =
     Tree_encoding_runner.encode
@@ -51,7 +51,8 @@ let wrap_as_durable tree =
       (Tree_encoding.scope ["durable"] Tree_encoding.wrapped_tree)
       tree
   in
-  Tree_encoding.Wrapped.wrap tree
+  Tezos_webassembly_interpreter.Durable_storage.of_tree
+  @@ Tree_encoding.Wrapped.wrap tree
 
 let assert_invalid_key run =
   let open Lwt_syntax in
@@ -78,8 +79,8 @@ let test_durable_find_value () =
       value
       tree
   in
-  let* tree = wrap_as_durable tree in
-  let durable = Durable.of_tree tree in
+  let* tree = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn tree in
   let* r =
     Durable.find_value durable @@ Durable.key_of_string_exn "/hello/value"
   in

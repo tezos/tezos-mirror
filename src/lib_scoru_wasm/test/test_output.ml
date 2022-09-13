@@ -129,7 +129,7 @@ let test_write_host_fun () =
   in
   let values = Values.[Num (I32 50l); Num (I32 5l)] in
 
-  let* result =
+  let* _, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key
@@ -146,7 +146,7 @@ let test_write_host_fun () =
   assert (level = 2l) ;
   assert (id = Z.zero) ;
   let values = Values.[Num (I32 50l); Num (I32 5000l)] in
-  let* result =
+  let* _, result =
     Eval.invoke
       ~module_reg
       ~caller:module_key

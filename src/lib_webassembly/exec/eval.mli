@@ -235,12 +235,17 @@ val invoke :
   caller:module_key ->
   ?input:Input_buffer.t ->
   ?output:Output_buffer.t ->
+  ?durable:Durable_storage.t ->
   Host_funcs.registry ->
   func_inst ->
   value list ->
-  value list Lwt.t (* raises Trap *)
+  (Durable_storage.t * value list) Lwt.t (* raises Trap *)
 
-val step : module_reg -> config -> config Lwt.t
+val step :
+  ?durable:Durable_storage.t ->
+  module_reg ->
+  config ->
+  (Durable_storage.t * config) Lwt.t
 
 val config :
   ?input:input_inst ->

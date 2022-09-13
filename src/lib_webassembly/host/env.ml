@@ -28,14 +28,14 @@ let int = function
 
 let abort =
   Host_funcs.Host_func
-    (fun _input _output _mod_inst vs ->
+    (fun _input _output _durable _mod_inst vs ->
       empty vs ;
       print_endline "Abort!" ;
       exit (-1))
 
 let exit =
   Host_funcs.Host_func
-    (fun _input _output _mod_inst vs -> exit (int (single vs)))
+    (fun _input _output _durable _mod_inst vs -> exit (int (single vs)))
 
 let register_host_funcs registry =
   Host_funcs.register ~global_name:"abort" abort registry ;

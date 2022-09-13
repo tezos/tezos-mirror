@@ -34,10 +34,10 @@ let print_value v =
 
 let print =
   Host_funcs.Host_func
-    (fun _i _o _m vs ->
+    (fun _i _o d _m vs ->
       List.iter print_value vs ;
       flush_all () ;
-      Lwt.return_nil)
+      Lwt.return (d, []))
 
 let register_host_funcs registry =
   Host_funcs.register ~global_name:"spectest_print" print registry ;
