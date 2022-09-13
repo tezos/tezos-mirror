@@ -1002,7 +1002,9 @@ module Make (Context : P) :
     let is_letter d =
       Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
     in
-    let is_identifier_char d = is_digit d || is_letter d in
+    let is_identifier_char d =
+      is_digit d || is_letter d || Compare.Char.(d = '%')
+    in
     let* parser_state = Parser_state.get in
     match parser_state with
     | ParseInt -> (
@@ -1055,7 +1057,7 @@ module Make (Context : P) :
         | None -> stop_parsing true
         | _ -> stop_parsing false)
 
-  let output destination v =
+  let output (destination, entrypoint) v =
     let open Monad.Syntax in
     let open Sc_rollup_outbox_message_repr in
     let* counter = Output_counter.get in
@@ -1063,7 +1065,6 @@ module Make (Context : P) :
     let unparsed_parameters =
       Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
-    let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
     let message = Atomic_transaction_batch {transactions = [transaction]} in
     let* outbox_level = Current_level.get in
@@ -1073,11 +1074,28 @@ module Make (Context : P) :
     Output.set (Z.to_string counter) output
 
   let identifies_target_contract x =
-    if Compare.String.(x = "out") then Some Contract_hash.zero
+    let open Option_syntax in
+    if Compare.String.(x = "out") then
+      return (Contract_hash.zero, Entrypoint_repr.default)
     else if
       Compare.Int.(String.length x >= 3) && String.(equal (sub x 0 3) "KT1")
-    then Contract_hash.of_b58check_opt x
-    else None
+    then
+      match String.split_on_char '%' x with
+      | destination :: entrypoint ->
+          let* destination = Contract_hash.of_b58check_opt destination in
+          let* entrypoint =
+            match entrypoint with
+            | [] -> return Entrypoint_repr.default
+            | _ ->
+                let* entrypoint =
+                  Non_empty_string.of_string (String.concat "" entrypoint)
+                in
+                let* entrypoint = Entrypoint_repr.of_annot_lax_opt entrypoint in
+                return entrypoint
+          in
+          return (destination, entrypoint)
+      | [] -> fail
+    else fail
 
   let evaluate =
     let open Monad.Syntax in
@@ -1091,7 +1109,7 @@ module Make (Context : P) :
         | None -> stop_evaluating false
         | Some v -> (
             match identifies_target_contract x with
-            | Some hash -> output hash v
+            | Some contract_entrypoint -> output contract_entrypoint v
             | None -> Vars.set x v))
     | Some IAdd -> (
         let* v = Stack.pop in
