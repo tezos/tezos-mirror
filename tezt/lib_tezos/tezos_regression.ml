@@ -44,6 +44,7 @@ let replace_variables string =
       ("scs\\w{51}\\b", "[SC_ROLLUP_PVM_STATE_HASH]");
       ("scc1\\w{50}\\b", "[SC_ROLLUP_COMMITMENT_HASH]");
       ("scib1\\w{50}\\b", "[SC_ROLLUP_INBOX_HASH]");
+      ("sh1\\w{71}\\b", "[DAL_SLOT_HEADER]");
       ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
       ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
       ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
