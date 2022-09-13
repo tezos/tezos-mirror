@@ -38,10 +38,8 @@ let init () =
 
 (** Return contents of a given file as string. *)
 let read_file f =
-  let ic = open_in f in
-  let res = really_input_string ic (in_channel_length ic) in
-  close_in ic ;
-  res
+  In_channel.with_open_text f (fun ic ->
+      really_input_string ic (in_channel_length ic))
 
 (** Loads a script from file. *)
 let load_script ~storage file =

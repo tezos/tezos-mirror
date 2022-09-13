@@ -4201,8 +4201,10 @@ and parse_instr :
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
-      let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
-      typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+      if legacy then
+        let instr = {apply = (fun k -> IOpen_chest (loc, k))} in
+        typed ctxt loc instr (Item_t (union_bytes_bool_t, rest))
+      else fail (Deprecated_instruction I_OPEN_CHEST)
   (* Events *)
   | Prim (loc, I_EMIT, [], annot), Item_t (data, rest) ->
       check_packable ~legacy loc data >>?= fun () ->

@@ -32,6 +32,7 @@
 *)
 
 open Protocol
+open Lwt_result_syntax
 
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
@@ -54,29 +55,44 @@ let simple_test () =
   assert (result = expected_result) ;
   return_unit
 
+let deprecated_chest_open () =
+  (* Verify contract fails origination as OPEN_CHEST is marked as legacy (deprecated )*)
+  let* block, baker, source_contract, _src2 = Contract_helpers.init () in
+  let storage = "0xdeadbeef" in
+  let script = Contract_helpers.read_file "./contracts/timelock.tz" in
+  Contract_helpers.originate_contract_from_string_hash
+    ~script
+    ~storage
+    ~source_contract
+    ~baker
+    block
+  >>= function
+  | Ok _ -> Alcotest.fail "script originated successfully, expected an error"
+  | Error lst
+    when List.mem
+           ~equal:( = )
+           (Environment.Ecoproto_error
+              (Script_tc_errors.Deprecated_instruction I_OPEN_CHEST))
+           lst ->
+      return ()
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
+
+(* Test to verify open_chest correctness
+   DISABLED as open_chest is deprecated, but is expected to return.
+*)
 let contract_test () =
-  (* Parse a Michelson contract from string. *)
-  let originate_contract file storage src b =
-    let load_file f =
-      let ic = open_in f in
-      let res = really_input_string ic (in_channel_length ic) in
-      close_in ic ;
-      res
-    in
-    let contract_string = load_file file in
-    let code = Expr.toplevel_from_string contract_string in
-    let storage = Expr.from_string storage in
-    let script =
-      Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
-    in
-    Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
-    >>=? fun (operation, dst) ->
-    Incremental.begin_construction b >>=? fun incr ->
-    Incremental.add_operation incr operation >>=? fun incr ->
-    Incremental.finalize_block incr >|=? fun b -> (dst, b)
+  let* block, baker, source_contract, _src2 = Contract_helpers.init () in
+  let storage = "0xdeadbeef" in
+  let script = Contract_helpers.read_file "./contracts/timelock.tz" in
+  let* dst, _script, block =
+    Contract_helpers.originate_contract_from_string
+      ~script
+      ~storage
+      ~source_contract
+      ~baker
+      block
   in
-  Context.init3 ~consensus_threshold:0 () >>=? fun (b, (src, _c2, _c3)) ->
-  originate_contract "contracts/timelock.tz" "0xaa" src b >>=? fun (dst, b) ->
   let public, secret = Timelock.gen_rsa_keys () in
   let locked_value = Timelock.gen_locked_value public in
   let time = 1000 in
@@ -109,9 +125,15 @@ let contract_test () =
       Alpha_context.Script.(lazy_expr (Expr.from_string michelson_string))
     in
     let fee = Test_tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst (Test_tez.of_int 3) ~parameters
+    Op.transaction
+      ~fee
+      (B block)
+      source_contract
+      dst
+      (Test_tez.of_int 3)
+      ~parameters
     >>=? fun operation ->
-    Incremental.begin_construction b >>=? fun incr ->
+    Incremental.begin_construction block >>=? fun incr ->
     Incremental.add_operation incr operation >>=? fun incr ->
     Incremental.finalize_block incr >>=? fun block ->
     Incremental.begin_construction block >>=? fun incr ->
@@ -160,8 +182,29 @@ let contract_test () =
   check_storage chest_correct chest_key_incorrect "01" >>=? fun () ->
   return_unit
 
+(**
+   Expect fail wrapper for tests that you expect to return Error or throw an exception.
+   Useful to keep tests enabled even if they fail, but still run them.
+   @param test_f test function that is expected to fail.
+   *)
+let expect_fail_result_lwt test_f () =
+  let open Lwt_syntax in
+  try
+    let* res = test_f () in
+    match res with
+    | Ok _ -> Alcotest.fail "Expect failure"
+    | Error _ -> return_ok_unit
+  with _ -> return_ok_unit
+
 let tests =
   [
     Tztest.tztest "simple test" `Quick simple_test;
-    Tztest.tztest "contract test" `Quick contract_test;
+    Tztest.tztest
+      "verify chest_open fails origination"
+      `Quick
+      deprecated_chest_open;
+    Tztest.tztest
+      "contract test with chest_open (OK when it fails)"
+      `Quick
+      (expect_fail_result_lwt contract_test);
   ]
