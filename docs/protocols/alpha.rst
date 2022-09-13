@@ -187,8 +187,13 @@ Data Availability Layer (ongoing)
 Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
 :gl:`!6024`, :gl:`!5959`)
 
+
 Breaking Changes
 ----------------
+
+- Deprecate timelock functionality, that is the `CHEST_OPEN`
+  instruction, in michelson to prevent origination of new contracts using. A
+  safer version of timelock will come in a future procotol.  (MR :gl: `!6260`)
 
 - Rename the parameter ``tokens_per_roll`` to ``minimal_stake``. (MR :gl:`!5897`)
 
