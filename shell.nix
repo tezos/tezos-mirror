@@ -85,10 +85,6 @@ let
       })
     );
 
-    cf = addFrameworksInputs [ "CoreServices" "CoreFoundation" ] prev.cf;
-
-    fsevents = addFrameworksInputs [ "CoreServices" "CoreFoundation" ] prev.fsevents;
-
     # This package makes no sense to build on MacOS. Some OPAM package
     # incorrectly depends on it universally.
     inotify = null;
