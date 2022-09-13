@@ -81,13 +81,14 @@ type outbox_proof = {commitment_hash : string; proof : string}
     [entrypoint] with the given [parameters]. *)
 val outbox_proof_single :
   ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
   ?entrypoint:string ->
   t ->
   message_index:int ->
   outbox_level:int ->
   destination:string ->
   parameters:string ->
-  outbox_proof Lwt.t
+  outbox_proof option Lwt.t
 
 type transaction = {
   destination : string;
@@ -99,11 +100,12 @@ type transaction = {
     of output transactions. *)
 val outbox_proof_batch :
   ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
   t ->
   message_index:int ->
   outbox_level:int ->
   transaction list ->
-  outbox_proof Lwt.t
+  outbox_proof option Lwt.t
 
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option

@@ -2992,15 +2992,19 @@ let test_refutation_reward_and_punishment protocols =
 
    The input depends on the PVM.
 *)
-let test_outbox_message_generic skip input_message expected_storage kind =
+let test_outbox_message_generic ?expected_error skip earliness entrypoint
+    input_message expected_storage kind =
   let commitment_period = 2 and challenge_window = 5 in
+  let variant =
+    (if entrypoint = "" then "" else entrypoint) ^ "_" ^ string_of_int earliness
+  in
   test_scenario
     ~kind
     ~commitment_period
     ~challenge_window
     {
       tags = ["outbox"];
-      variant = kind;
+      variant;
       description = "an outbox message should be executable";
     }
   @@ fun _protocol sc_rollup_node sc_rollup _node client ->
@@ -3011,15 +3015,15 @@ let test_outbox_message_generic skip input_message expected_storage kind =
     let prg =
       {|
       {
-        parameter (int :p);
+        parameter (or (int %default) (int %aux));
         storage (int :s);
 
         code
           {
             UNPAIR;
-            SWAP ;
-            DROP;
-            NIL operation;
+            IF_LEFT
+              { SWAP ; DROP; NIL operation }
+              { SWAP ; DROP; NIL operation };
             PAIR;
           }
       } |}
@@ -3047,54 +3051,66 @@ let test_outbox_message_generic skip input_message expected_storage kind =
   in
   let perform_rollup_execution_and_cement address =
     let* () = send_text_messages client sc_rollup [input_message address] in
-    let* () =
-      repeat (2 + (2 * commitment_period) + challenge_window) @@ fun () ->
-      Client.bake_for client
+    let blocks_to_wait =
+      2 + (2 * commitment_period) + challenge_window - earliness
     in
-    let* _c, l = last_cemented_commitment_hash_with_level ~sc_rollup client in
-    Check.(
-      (l = 6) int ~error_msg:"Invalid level for LCC: expected '%R', 'got '%L'.") ;
-    return ()
+    repeat blocks_to_wait @@ fun () -> Client.bake_for client
   in
   let trigger_outbox_message_execution address =
-    let* {commitment_hash; proof} =
+    let* outbox = Sc_rollup_client.outbox sc_client in
+    Log.info "Outbox is %s" outbox ;
+    let* answer =
       let message_index = 0 in
       let outbox_level = 4 in
       let destination = address in
       let parameters = "37" in
+      let entrypoint = if entrypoint = "" then None else Some entrypoint in
       Sc_rollup_client.outbox_proof_single
         sc_client
+        ?expected_error
         ~message_index
         ~outbox_level
         ~destination
+        ?entrypoint
         ~parameters
     in
-    let*! () =
-      Client.Sc_rollup.execute_outbox_message
-        ~burn_cap:(Tez.of_int 10)
-        ~rollup:sc_rollup
-        ~src
-        ~commitment_hash
-        ~proof
-        client
-    in
-    Client.bake_for client
+    match (answer, expected_error) with
+    | Some _, Some _ -> assert false
+    | None, None -> failwith "Unexpected error during proof generation"
+    | None, Some _ -> return ()
+    | Some {commitment_hash; proof}, None ->
+        let*! () =
+          Client.Sc_rollup.execute_outbox_message
+            ~burn_cap:(Tez.of_int 10)
+            ~rollup:sc_rollup
+            ~src
+            ~commitment_hash
+            ~proof
+            client
+        in
+        Client.bake_for client
   in
   if skip then return ()
   else
     let* target_contract_address = originate_target_contract () in
     let* () = perform_rollup_execution_and_cement target_contract_address in
     let* () = trigger_outbox_message_execution target_contract_address in
-    let* () =
-      check_contract_execution target_contract_address expected_storage
-    in
-    return ()
+    match expected_error with
+    | None ->
+        let* () =
+          check_contract_execution target_contract_address expected_storage
+        in
+        return ()
+    | Some _ -> return ()
 
-let test_outbox_message ~kind =
+let test_outbox_message ?expected_error ~earliness entrypoint ~kind =
   let skip, input_message, expected_storage =
+    let entrypoint = if entrypoint = "" then entrypoint else "%" ^ entrypoint in
     match kind with
     | "arith" ->
-        (false, (fun contract_address -> "37 " ^ contract_address), "37\n")
+        ( false,
+          (fun contract_address -> "37 " ^ contract_address ^ entrypoint),
+          "37\n" )
     | "wasm_2_0_0" ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790
            For the moment, the WASM PVM has no support for
@@ -3104,7 +3120,14 @@ let test_outbox_message ~kind =
         (* There is no other PVM in the protocol. *)
         assert false
   in
-  test_outbox_message_generic skip input_message expected_storage kind
+  test_outbox_message_generic
+    ?expected_error
+    skip
+    earliness
+    entrypoint
+    input_message
+    expected_storage
+    kind
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -3217,7 +3240,20 @@ let register ~kind ~protocols =
   test_consecutive_commitments protocols ~kind ;
   test_refutation protocols ~kind ;
   test_late_rollup_node protocols ~kind ;
-  test_outbox_message protocols ~kind
+  test_outbox_message ~earliness:0 "" protocols ~kind ;
+  test_outbox_message ~earliness:0 "aux" protocols ~kind ;
+  test_outbox_message
+    ~expected_error:(Base.rex ".*Invalid claim about outbox")
+    ~earliness:5
+    ""
+    protocols
+    ~kind ;
+  test_outbox_message
+    ~expected_error:(Base.rex ".*Invalid claim about outbox")
+    ~earliness:5
+    "aux"
+    protocols
+    ~kind
 
 let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind

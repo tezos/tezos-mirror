@@ -120,7 +120,7 @@ let string_of_transaction {destination; entrypoint; parameters} =
     destination
     (match entrypoint with
     | None -> ""
-    | Some entrypoint -> {| "entrypoint" : |} ^ entrypoint)
+    | Some entrypoint -> Format.asprintf {| "entrypoint" : "%s", |} entrypoint)
     parameters
 
 let string_of_batch ts =
@@ -128,8 +128,9 @@ let string_of_batch ts =
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
-let outbox_proof_batch ?hooks sc_client ~message_index ~outbox_level batch =
-  let* answer =
+let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
+    ~outbox_level batch =
+  let process =
     spawn_command
       ?hooks
       sc_client
@@ -147,18 +148,24 @@ let outbox_proof_batch ?hooks sc_client ~message_index ~outbox_level batch =
         "transferring";
         string_of_batch batch;
       ]
-    |> Process.check_and_read_stdout
   in
-  let open JSON in
-  let json = parse ~origin:"outbox_proof" answer in
-  let commitment_hash = json |-> "commitment_hash" |> as_string in
-  let proof = json |-> "proof" |> as_string in
-  return {commitment_hash; proof}
+  match expected_error with
+  | None ->
+      let* answer = Process.check_and_read_stdout process in
+      let open JSON in
+      let json = parse ~origin:"outbox_proof" answer in
+      let commitment_hash = json |-> "commitment_hash" |> as_string in
+      let proof = json |-> "proof" |> as_string in
+      return (Some {commitment_hash; proof})
+  | Some msg ->
+      let* () = Process.check_error ~msg process in
+      return None
 
-let outbox_proof_single ?hooks ?entrypoint sc_client ~message_index
-    ~outbox_level ~destination ~parameters =
+let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
+    ~message_index ~outbox_level ~destination ~parameters =
   outbox_proof_batch
     ?hooks
+    ?expected_error
     sc_client
     ~message_index
     ~outbox_level
