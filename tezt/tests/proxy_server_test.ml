@@ -175,15 +175,15 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let get_one_value key_hash =
     let* _ =
-      RPC.Big_maps.get
-        ?endpoint
-        ~id:
-          (* This big_map id can be found in origination response
-             e.g. "New map(4) of type (big_map string nat)".
-             In this dumb test we know it is always 4. *)
-          "4"
-        ~key_hash
-        client
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_context_big_map
+           ~id:
+             (* This big_map id can be found in origination response
+                e.g. "New map(4) of type (big_map string nat)".
+                In this dumb test we know it is always 4. *)
+             "4"
+           ~key_hash
+           ()
     in
     Lwt.return_unit
   in

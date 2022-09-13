@@ -438,7 +438,9 @@ let test_rollup_get_genesis_info ~kind =
     (Format.asprintf "%s - get genesis info of a sc rollup" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
-      let* current_level = RPC.get_current_level client in
+      let* current_level =
+        RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+      in
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
@@ -479,7 +481,9 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
-        let* origination_level = RPC.get_current_level client in
+        let* origination_level =
+          RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+        in
 
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
            from the level of the head node. *)

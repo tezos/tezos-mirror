@@ -488,6 +488,62 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
     Fun.id
 
+let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
+    ?delegate () =
+  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
+    Fun.id
+
+let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
+    ?(offset = 0) () =
+  let query_string = [("offset", string_of_int offset)] in
+  make
+    ~query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "current_level"]
+    Fun.id
+
+let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
+    ?delegate () =
+  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+  make
+    ?query_string
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
+    Fun.id
+
+let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
+    Fun.id
+
+let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
+    ~key_hash () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
+    Fun.id
+
+let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
+    ?offset ?length () =
+  let query_string =
+    [
+      Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
+      Option.map (fun length -> ("length", Int.to_string length)) length;
+    ]
+    |> List.filter_map Fun.id
+  in
+  make
+    GET
+    ~query_string
+    ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

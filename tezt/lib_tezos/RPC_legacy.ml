@@ -26,56 +26,6 @@
 
 type ctxt_type = Bytes | Json
 
-let get_baking_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"] in
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let get_current_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?(offset = 0) client =
-  let path = ["chains"; chain; "blocks"; block; "helpers"; "current_level"] in
-  let query_string = [("offset", string_of_int offset)] in
-  Client.rpc ?endpoint ?hooks ~query_string GET path client
-
-let get_endorsing_rights ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-    ?delegate client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
-  in
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
-  Client.rpc ?endpoint ?hooks ?query_string GET path client
-
-let get_levels_in_current_cycle ?endpoint ?hooks ?(chain = "main")
-    ?(block = "head") client =
-  let path =
-    ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
-  in
-  Client.rpc ?endpoint ?hooks GET path client
-
-module Big_maps = struct
-  let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
-      client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; id; key_hash]
-    in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
-      ?offset ?length client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
-    in
-    let query_string =
-      [
-        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length;
-      ]
-      |> List.filter_map Fun.id
-    in
-    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
-end
-
 module Contracts = struct
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in

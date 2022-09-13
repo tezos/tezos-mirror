@@ -60,7 +60,9 @@ module Helpers = struct
     {level; level_position; cycle; cycle_position; expected_commitment}
 
   let get_current_level client =
-    let* json = RPC.get_current_level client in
+    let* json =
+      RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
     return (decode_level json)
 
   let check_current_level client expected_level =
@@ -70,7 +72,9 @@ module Helpers = struct
     unit
 
   let bake_and_wait_block node client =
-    let* level_json = RPC.get_current_level client in
+    let* level_json =
+      RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
     let level = JSON.(level_json |-> "level" |> as_int) in
     let* () =
       Client.bake_for ~context_path:(Node.data_dir node // "context") client

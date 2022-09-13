@@ -615,10 +615,22 @@ let test_misc_protocol _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_constants ()
   in
-  let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
-  let* _ = RPC.get_current_level ?endpoint ~hooks client in
-  let* _ = RPC.get_endorsing_rights ?endpoint ~hooks client in
-  let* _ = RPC.get_levels_in_current_cycle ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_baking_rights ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_current_level ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_endorsing_rights ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
+  in
   unit
 
 let mempool_hooks =
