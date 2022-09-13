@@ -80,27 +80,3 @@ module type PROTOCOL_SERVICES = sig
     (Signature.public_key_hash * Time.Protocol.t * int * Block_hash.t) tzresult
     Lwt.t
 end
-
-module type MAIN_LOOPS = sig
-  val protocol_hash : Protocol_hash.t
-
-  val blocks_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
-
-  val endorsements_loop : Tezos_client_base.Client_context.full -> unit Lwt.t
-end
-
-module type JSON_COMMANDS = sig
-  val register_json_commands : unit -> unit
-end
-
-module type DB_COMMANDS = sig
-  val register_db_commands : unit -> unit
-end
-
-module Make_main_loops
-    (Protocol_services : PROTOCOL_SERVICES)
-    (Archiver : Archiver.S) : MAIN_LOOPS
-
-module Make_json_commands (Loop : MAIN_LOOPS) : JSON_COMMANDS
-
-module Make_db_commands (Loop : MAIN_LOOPS) : DB_COMMANDS

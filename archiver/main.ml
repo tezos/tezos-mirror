@@ -187,33 +187,4 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
      ]
     @ proto_commands)
 
-let () =
-  let () = PtCJ7pwo_machine.register_json_commands () in
-  let () = PsYLVpVv_machine.register_json_commands () in
-  let () = PsddFKi3_machine.register_json_commands () in
-  let () = Pt24m4xi_machine.register_json_commands () in
-  let () = PsBabyM1_machine.register_json_commands () in
-  let () = PsCARTHA_machine.register_json_commands () in
-  let () = PsDELPH1_machine.register_json_commands () in
-  let () = PtEdo2Zk_machine.register_json_commands () in
-  let () = PsFLoren_machine.register_json_commands () in
-  let () = PtGRANAD_machine.register_json_commands () in
-  let () = PtHangz2_machine.register_json_commands () in
-  let () = Psithaca_machine.register_json_commands () in
-  let () = PtJakart_machine.register_json_commands () in
-  let () = PtKathma_machine.register_json_commands () in
-  let () = PtCJ7pwo_machine.register_db_commands () in
-  let () = PsYLVpVv_machine.register_db_commands () in
-  let () = PsddFKi3_machine.register_db_commands () in
-  let () = Pt24m4xi_machine.register_db_commands () in
-  let () = PsBabyM1_machine.register_db_commands () in
-  let () = PsCARTHA_machine.register_db_commands () in
-  let () = PsDELPH1_machine.register_db_commands () in
-  let () = PtEdo2Zk_machine.register_db_commands () in
-  let () = PsFLoren_machine.register_db_commands () in
-  let () = PtGRANAD_machine.register_db_commands () in
-  let () = PtHangz2_machine.register_db_commands () in
-  let () = Psithaca_machine.register_db_commands () in
-  let () = PtJakart_machine.register_db_commands () in
-  let () = PtKathma_machine.register_db_commands () in
-  Client_main_run.run (module Client_config) ~select_commands
+let () = Client_main_run.run (module Client_config) ~select_commands

@@ -203,9 +203,3 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         header.protocol_data.contents.priority,
         header.hash )
 end
-
-module Json_loops =
-  Protocol_machinery.Make_main_loops (Services) (Json_archiver)
-module Db_loops = Protocol_machinery.Make_main_loops (Services) (Db_archiver)
-include Protocol_machinery.Make_json_commands (Json_loops)
-include Protocol_machinery.Make_db_commands (Db_loops)
