@@ -1718,13 +1718,15 @@ let dumb_proof ~choice =
       end)
   in
   let inbox_proof =
-    Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string "c4c4"
+    Sc_rollup.Proof.Inbox_proof
+      {
+        level = Raw_level.root;
+        message_counter = Z.zero;
+        proof =
+          Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string "c4c4";
+      }
   in
-  let inbox =
-    Sc_rollup.Proof.
-      {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
-  in
-  let proof = Sc_rollup.Proof.{pvm_step; inbox = Some inbox} in
+  let proof = Sc_rollup.Proof.{pvm_step; input_proof = Some inbox_proof} in
   return Sc_rollup.Game.{choice; step = Proof proof}
 
 (** Test that two invalid proofs from the two players lead to a draw

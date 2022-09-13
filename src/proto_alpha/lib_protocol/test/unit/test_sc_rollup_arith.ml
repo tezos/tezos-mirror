@@ -129,7 +129,7 @@ let test_boot () =
   boot "" @@ fun _ctxt state ->
   is_input_state state >>= function
   | Initial -> return ()
-  | First_after _ ->
+  | Needs_reveal _ | First_after _ ->
       failwith
         "After booting, the machine should be waiting for the initial input."
   | No_input_required ->
@@ -142,7 +142,7 @@ let test_input_message () =
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   is_input_state state >>= function
-  | Initial | First_after _ ->
+  | Initial | Needs_reveal _ | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
   | No_input_required -> return ()

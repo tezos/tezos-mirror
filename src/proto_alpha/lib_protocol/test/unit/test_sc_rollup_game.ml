@@ -340,11 +340,13 @@ let test_invalid_serialized_inbox_proof () =
     Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string
       "I am the big bad wolf"
   in
-  let inbox =
-    Sc_rollup.Proof.
+  let inbox_proof =
+    Sc_rollup.Proof.Inbox_proof
       {level = Raw_level.root; message_counter = Z.zero; proof = inbox_proof}
   in
-  let proof = Sc_rollup.Proof.{pvm_step = wrapped_proof; inbox = Some inbox} in
+  let proof =
+    Sc_rollup.Proof.{pvm_step = wrapped_proof; input_proof = Some inbox_proof}
+  in
 
   let*! res =
     T.lift
