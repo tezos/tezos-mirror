@@ -60,13 +60,13 @@ module type S = sig
     'a t ->
     ('a t * context) tzresult
 
-  val map :
+  val map_e :
     context ->
     (context -> key -> 'a -> ('b * context) tzresult) ->
     'a t ->
     ('b t * context) tzresult
 
-  val fold :
+  val fold_e :
     context ->
     (context -> 'state -> key -> 'value -> ('state * context) tzresult) ->
     'state ->
@@ -189,7 +189,7 @@ module Make_builder (C : COMPARABLE) = struct
         map
         (map1, ctxt)
 
-    let fold ctxt f empty {map; size} =
+    let fold_e ctxt f empty {map; size} =
       G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
       M.fold_e
         (fun key value (acc, ctxt) ->
@@ -207,10 +207,10 @@ module Make_builder (C : COMPARABLE) = struct
         map
         (empty, ctxt)
 
-    let map ctxt f {map; size} =
+    let map_e ctxt f {map; size} =
       (* We cannot use the standard map function because [f] also meters the gas
          cost at each invocation. *)
-      fold
+      fold_e
         ctxt
         (fun ctxt map key value ->
           (* Invoking [f] must also account for gas. *)

@@ -249,7 +249,7 @@ let ticket_diffs_of_operations ctxt operations =
     (fun ctxt acc ticket_token destination_map ->
       (* Calculate the total amount of outgoing units for the current
          ticket-token. *)
-      Destination_map.fold
+      Destination_map.fold_e
         ctxt
         (fun ctxt total_amount _destination (amount : Ticket_amount.t) ->
           Gas.consume

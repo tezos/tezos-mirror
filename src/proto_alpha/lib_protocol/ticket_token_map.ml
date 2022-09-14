@@ -69,7 +69,7 @@ let update ctxt key f m =
   Ticket_token_map.update ctxt key_hash f m |> Lwt.return
 
 let fold ctxt f =
-  Ticket_token_map.fold ctxt (fun ctxt acc _key_hash (tkn, value) ->
+  Ticket_token_map.fold_e ctxt (fun ctxt acc _key_hash (tkn, value) ->
       f ctxt acc tkn value)
 
 let find ctxt ticket_token map =
@@ -99,7 +99,7 @@ let of_list ctxt ~merge_overlap token_values =
     token_values
 
 let map ctxt f =
-  Ticket_token_map.map ctxt (fun ctxt _key (tkn, value) ->
+  Ticket_token_map.map_e ctxt (fun ctxt _key (tkn, value) ->
       f ctxt tkn value >|? fun (new_value, ctxt) -> ((tkn, new_value), ctxt))
 
 let to_list ctxt map =

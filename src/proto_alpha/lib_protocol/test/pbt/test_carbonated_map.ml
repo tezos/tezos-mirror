@@ -429,7 +429,7 @@ let test_size_add_one =
 
     [map] ----to_list---> [list]
       |                     |
-    [map f]              [List.map f]
+    [map_e f]            [List.map f]
       |                     |
       v                     v
     [map] --- to_list --> [list]
@@ -439,7 +439,7 @@ let test_map =
   int_map_test "Test that map commutes with mapping over list" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let* kvs, ctxt = CM.to_list ctxt map in
-  let* map', ctxt = CM.map ctxt (fun ctxt _ x -> Ok (x + 1, ctxt)) map in
+  let* map', ctxt = CM.map_e ctxt (fun ctxt _ x -> Ok (x + 1, ctxt)) map in
   let kvs' = List.map (fun (k, v) -> (k, v + 1)) kvs in
   assert_map_contains ctxt map' kvs'
 
@@ -449,7 +449,7 @@ let test_fold_empty =
   let open Result_syntax in
   unit_test "Fold empty" @@ fun () ->
   let ctxt = unsafe_new_context () in
-  let* x, _ = CM.fold ctxt (fun _ctxt _acc _k _v -> dummy_fail) 0 CM.empty in
+  let* x, _ = CM.fold_e ctxt (fun _ctxt _acc _k _v -> dummy_fail) 0 CM.empty in
   Ok (x = 0)
 
 (** Test that folding over a map is equivalent to folding over the corresponding
@@ -457,7 +457,7 @@ let test_fold_empty =
 
     [map] -- to_list --> [list]
       |                    |
-    [fold f z]      [List.fold_left f z]
+    [fold_e f z]    [List.fold_left f z]
       |                    |
      res <----- id -----> res
 *)
@@ -468,7 +468,7 @@ let test_fold =
   let* kvs, ctxt = CM.to_list ctxt map in
   let sum = List.fold_left (fun sum (k, v) -> k + v + sum) 0 kvs in
   let* sum', _ =
-    CM.fold ctxt (fun ctxt sum k v -> Ok (k + v + sum, ctxt)) 0 map
+    CM.fold_e ctxt (fun ctxt sum k v -> Ok (k + v + sum, ctxt)) 0 map
   in
   Ok (sum = sum')
 
@@ -481,7 +481,7 @@ let test_fold_to_list =
   let ctxt = unsafe_new_context () in
   let* kvs, ctxt = CM.to_list ctxt map in
   let* kvs', _ =
-    CM.fold ctxt (fun ctxt kvs k v -> Ok ((k, v) :: kvs, ctxt)) [] map
+    CM.fold_e ctxt (fun ctxt kvs k v -> Ok ((k, v) :: kvs, ctxt)) [] map
   in
   Ok (kvs = List.rev kvs')
 
@@ -490,7 +490,7 @@ let test_map_fail =
   int_map_test "Test map with failing function" @@ fun map ->
   let ctxt = unsafe_new_context () in
   Result.ok
-    (match CM.map ctxt (fun _ctxt _key _val -> dummy_fail) map with
+    (match CM.map_e ctxt (fun _ctxt _key _val -> dummy_fail) map with
     | Ok _ when CM.size map = 0 -> true
     | Error _ -> true
     | Ok _ -> false)

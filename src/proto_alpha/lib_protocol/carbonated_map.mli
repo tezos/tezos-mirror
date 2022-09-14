@@ -91,28 +91,28 @@ module type S = sig
     'a t ->
     ('a t * context) tzresult
 
-  (** [map ctxt f m] maps over all key-value pairs in the map [m] using the
+  (** [map_e ctxt f m] maps over all key-value pairs in the map [m] using the
       function [f]. It accounts for gas costs associated with traversing the
       elements. The mapping function [f] should also account for its own gas
       cost. The complexity is linear in the size of the map [m]. *)
-  val map :
+  val map_e :
     context ->
     (context -> key -> 'a -> ('b * context) tzresult) ->
     'a t ->
     ('b t * context) tzresult
 
-  (** [fold ctxt f z m] folds over the key-value pairs of the given map [m],
+  (** [fold_e ctxt f z m] folds over the key-value pairs of the given map [m],
       accumulating values using [f], with [z] as the initial state. The function
       [f] must account for its own gas cost. The complexity is linear in the
       size of the map [m]. *)
-  val fold :
+  val fold_e :
     context ->
     (context -> 'state -> key -> 'value -> ('state * context) tzresult) ->
     'state ->
     'value t ->
     ('state * context) tzresult
 
-  (** Lwt-aware variant of {!fold}. *)
+  (** Lwt-aware variant of {!fold_e}. *)
   val fold_es :
     context ->
     (context -> 'state -> key -> 'value -> ('state * context) tzresult Lwt.t) ->
