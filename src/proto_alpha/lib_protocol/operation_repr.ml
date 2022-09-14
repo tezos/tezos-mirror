@@ -1091,7 +1091,7 @@ module Encoding = struct
           name = "sc_rollup_originate";
           encoding =
             obj4
-              (req "kind" Sc_rollups.Kind.encoding)
+              (req "pvm_kind" Sc_rollups.Kind.encoding)
               (req "boot_sector" string_to_bytes_encoding)
               (req "origination_proof" string_to_bytes_encoding)
               (req "parameters_ty" Script_repr.lazy_expr_encoding);
