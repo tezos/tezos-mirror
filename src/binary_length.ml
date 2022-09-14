@@ -230,8 +230,19 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Describe {encoding = e; _} -> maximum_length e
   | Splitted {encoding = e; _} -> maximum_length e
   | Dynamic_size {kind; encoding = e} ->
-      let* s = maximum_length e in
-      Some (s + Binary_size.integer_to_size kind)
+      (* NOTE: technically the [kind] limits the range of possible sizes for the
+         payload and so bounds the overall maximum size even if the payload has
+         no limit.
+         But in practice we end up returning 4+max_int31 a lot and it makes the
+         function brittle on 32bit machines. *)
+      let* inner_maximum_length = maximum_length e in
+      let inner_maximum_length =
+        (* the size may be restricted by the size's size
+           E.g., if [kind] is [`Uint8], the payload's size cannot be more than
+           256. *)
+        min inner_maximum_length (Binary_size.max_int kind)
+      in
+      Some (Binary_size.integer_to_size kind + inner_maximum_length)
   | Check_size {limit; encoding = e} -> (
       (* NOTE: it is possible that the statically-provable maximum size exceeds
          the dynamically checked limit. But the difference might be explained by
