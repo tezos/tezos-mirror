@@ -94,14 +94,7 @@ let can_write_after_grow =
          chunk of [vector], that was filled in the process. *)
       let init_size = Int64.(sub chunk_size 100L) in
       let vector =
-        create
-          ~get_chunk:(function
-            | 0L ->
-                Lwt.return
-                  (Chunked_byte_vector.Chunk.of_bytes
-                  @@ Bytes.make (Int64.to_int chunk_size) 'a')
-            | _otherwise -> assert false)
-          init_size
+        of_string (String.make (Int64.to_int chunk_size - 100) 'a')
       in
       let* v = load_byte vector 0L in
       assert (v = Char.code 'a') ;
