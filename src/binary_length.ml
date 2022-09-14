@@ -125,6 +125,8 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Splitted {encoding = e; _} -> length e value
   | Dynamic_size {kind; encoding = e} ->
       let length = length e value in
+      if length > Binary_size.max_int kind then
+        raise (Write_error Size_limit_exceeded) ;
       Binary_size.integer_to_size kind + length
   | Check_size {limit; encoding = e} ->
       let length = length e value in
@@ -132,10 +134,15 @@ let rec length : type x. x Encoding.t -> x -> int =
       length
   | Delayed f -> length (f ()) value
 
+let length_res e x =
+  match length e x with
+  | v -> Ok v
+  | exception Binary_error_types.Write_error e -> Error e
+
+let ( let* ) = Option.bind
+
 let rec maximum_length : type a. a Encoding.t -> int option =
  fun e ->
-  let ( >>? ) = Option.bind in
-  let ( >|? ) x f = Option.map f x in
   let open Encoding in
   match e.encoding with
   (* Fixed *)
@@ -160,7 +167,9 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | RangedFloat _ -> Some Binary_size.float
   | Bytes (`Fixed n, _) -> Some n
   | String (`Fixed n, _) -> Some n
-  | Padded (e, n) -> maximum_length e >|? fun s -> s + n
+  | Padded (e, n) ->
+      let* s = maximum_length e in
+      Some (s + n)
   | String_enum (_, arr) ->
       Some (Binary_size.integer_to_size @@ Binary_size.enum_size arr)
   | Objs {kind = `Fixed n; _} -> Some n
@@ -168,7 +177,8 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Union {kind = `Fixed n; _} -> Some n
   (* Dynamic *)
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
-      maximum_length e >|? fun s -> s + Binary_size.uint8
+      let* s = maximum_length e in
+      Some (s + Binary_size.uint8)
   (* Variable *)
   | Ignore -> Some 0
   | Bytes (`Variable, _) -> None
@@ -176,29 +186,42 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Array {length_limit; elts = e} -> (
       match length_limit with
       | No_limit -> None
-      | At_most max_length -> maximum_length e >|? fun s -> s * max_length
-      | Exactly exact_length -> maximum_length e >|? fun s -> s * exact_length)
+      | At_most max_length ->
+          let* s = maximum_length e in
+          Some (s * max_length)
+      | Exactly exact_length ->
+          let* s = maximum_length e in
+          Some (s * exact_length))
   | List {length_limit; elts = e} -> (
       match length_limit with
       | No_limit -> None
-      | At_most max_length -> maximum_length e >|? fun s -> s * max_length
-      | Exactly exact_length -> maximum_length e >|? fun s -> s * exact_length)
+      | At_most max_length ->
+          let* s = maximum_length e in
+          Some (s * max_length)
+      | Exactly exact_length ->
+          let* s = maximum_length e in
+          Some (s * exact_length))
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> maximum_length e
   (* Variable or Dynamic we don't care for those constructors *)
   | Union {kind = `Dynamic | `Variable; tag_size; cases; _} ->
-      List.fold_left
-        (fun acc (Case {encoding = e; _}) ->
-          acc >>? fun acc ->
-          maximum_length e >|? fun s -> Stdlib.max acc s)
-        (Some 0)
-        cases
-      >|? fun s -> s + Binary_size.tag_size tag_size
+      let* s =
+        List.fold_left
+          (fun acc (Case {encoding = e; _}) ->
+            let* acc = acc in
+            let* s = maximum_length e in
+            Some (Stdlib.max acc s))
+          (Some 0)
+          cases
+      in
+      Some (s + Binary_size.tag_size tag_size)
   | Objs {kind = `Dynamic | `Variable; left; right} ->
-      maximum_length left >>? fun l ->
-      maximum_length right >|? fun r -> l + r
+      let* l = maximum_length left in
+      let* r = maximum_length right in
+      Some (l + r)
   | Tups {kind = `Dynamic | `Variable; left; right} ->
-      maximum_length left >>? fun l ->
-      maximum_length right >|? fun r -> l + r
+      let* l = maximum_length left in
+      let* r = maximum_length right in
+      Some (l + r)
   | Mu _ ->
       (* There could be bounded-size uses of Mu but it's unreasonable to expect
          to detect them statically this way. Use `check_size` around the mu to
@@ -212,14 +235,24 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Describe {encoding = e; _} -> maximum_length e
   | Splitted {encoding = e; _} -> maximum_length e
   | Dynamic_size {kind; encoding = e} ->
-      maximum_length e >|? fun s -> s + Binary_size.integer_to_size kind
-  | Check_size {limit; encoding = e} ->
+      (* NOTE: technically the [kind] limits the range of possible sizes for the
+         payload and so bounds the overall maximum size even if the payload has
+         no limit.
+         But in practice we end up returning 4+max_int31 a lot and it makes the
+         function brittle on 32bit machines. *)
+      let* inner_maximum_length = maximum_length e in
+      let inner_maximum_length =
+        (* the size may be restricted by the size's size
+           E.g., if [kind] is [`Uint8], the payload's size cannot be more than
+           256. *)
+        min inner_maximum_length (Binary_size.max_int kind)
+      in
+      Some (Binary_size.integer_to_size kind + inner_maximum_length)
+  | Check_size {limit; encoding = e} -> (
       (* NOTE: it is possible that the statically-provable maximum size exceeds
          the dynamically checked limit. But the difference might be explained by
          subtle invariants that do not appear in the encoding. *)
-      Some
-        (Option.fold
-           (maximum_length e)
-           ~some:(fun s -> min s limit)
-           ~none:limit)
+      match maximum_length e with
+      | Some s -> Some (min s limit)
+      | None -> Some limit)
   | Delayed f -> maximum_length (f ())
