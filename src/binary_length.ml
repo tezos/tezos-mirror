@@ -125,6 +125,8 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Splitted {encoding = e; _} -> length e value
   | Dynamic_size {kind; encoding = e} ->
       let length = length e value in
+      if length > Binary_size.max_int kind then
+        raise (Write_error Size_limit_exceeded) ;
       Binary_size.integer_to_size kind + length
   | Check_size {limit; encoding = e} ->
       let length = length e value in
