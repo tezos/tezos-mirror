@@ -160,6 +160,9 @@ let test_string_enum_boundary () =
   run_test entries2 ;
   run_test (("256", 256) :: entries2)
 
+let test_stream_fixed_list =
+  stream Alcotest.(list int) (Fixed.list 2 uint8) [1; 2]
+
 let test_bounded_string_list =
   let test name ~total ~elements v =
     ( "bounded_string_list." ^ name,
@@ -359,3 +362,4 @@ let tests =
   @ all "mu_list" Alcotest.(list int) (mu_list_enc int31) [1; 2; 3; 4; 5]
   @ test_bounded_string_list
   @ [("string_enum_boundary", `Quick, test_string_enum_boundary)]
+  @ [("test_stream_fixed_list", `Quick, test_stream_fixed_list)]
