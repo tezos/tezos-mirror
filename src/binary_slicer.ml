@@ -269,9 +269,9 @@ let rec read_rec :
   | Array {length_limit; length_encoding = None; elts = e} ->
       let l =
         match length_limit with
-        | No_limit -> read_list Array_too_long max_int e ?name state
+        | No_limit -> read_variable_list Array_too_long max_int e ?name state
         | At_most max_length ->
-            read_list Array_too_long max_length e ?name state
+            read_variable_list Array_too_long max_length e ?name state
         | Exactly exact_length -> read_fixed_list exact_length e ?name state
       in
       Array.of_list l
@@ -295,8 +295,9 @@ let rec read_rec :
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> read_list List_too_long max_int e ?name state
-      | At_most max_length -> read_list List_too_long max_length e ?name state
+      | No_limit -> read_variable_list List_too_long max_int e ?name state
+      | At_most max_length ->
+          read_variable_list List_too_long max_length e ?name state
       | Exactly exact_length -> read_fixed_list exact_length e ?name state)
   | List
       {
@@ -430,7 +431,7 @@ and read_variable_pair :
   | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
   | `Variable, (`Variable | `Dynamic) -> assert false
 
-and read_list :
+and read_variable_list :
     type a.
     read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list
     =

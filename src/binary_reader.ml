@@ -210,8 +210,9 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | Array {length_limit; length_encoding = None; elts = e} ->
       let l =
         match length_limit with
-        | No_limit -> read_list Array_too_long max_int e state
-        | At_most max_length -> read_list Array_too_long max_length e state
+        | No_limit -> read_variable_list Array_too_long max_int e state
+        | At_most max_length ->
+            read_variable_list Array_too_long max_length e state
         | Exactly exact_length -> read_fixed_list exact_length e state
       in
       Array.of_list l
@@ -237,8 +238,9 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> read_list List_too_long max_int e state
-      | At_most max_length -> read_list List_too_long max_length e state
+      | No_limit -> read_variable_list List_too_long max_int e state
+      | At_most max_length ->
+          read_variable_list List_too_long max_length e state
       | Exactly exact_length -> read_fixed_list exact_length e state)
   | List
       {
@@ -363,9 +365,10 @@ and read_variable_pair :
   | `Dynamic, (`Fixed _ | `Dynamic) -> assert false
   | `Fixed _, (`Fixed _ | `Dynamic) -> assert false
   | `Variable, (`Variable | `Dynamic) -> assert false
-
 (* Should be rejected by [Encoding.Kind.combine] *)
-and read_list : type a. read_error -> int -> a Encoding.t -> state -> a list =
+
+and read_variable_list :
+    type a. read_error -> int -> a Encoding.t -> state -> a list =
  fun error max_length e state ->
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
