@@ -259,6 +259,67 @@ However, this setup **does not guarantee confidentiality**: an eavesdropper can
 see the transactions that you sign (on a public blockchain this may be less of a concern).
 In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
 
+.. _consensus_key:
+
+Consensus Key
+-------------
+
+A delegate may choose to use a different key to sign consensus operations (bakes, endorsements and preendorsements).
+
+The consensus key can then be rotated without redelegation.
+
+It also allows establishment of baking operations in an environment where access is not ultimately guaranteed:
+for example, a cloud platform providing hosted Key Management Systems where the private key is
+generated within the system and can never be downloaded by the operator. The baker can designate
+such KMS key as consensus key. Shall they lose access to the cloud platform for any reason, they can simply rotate to a new key.
+
+However, both the delegate key and the consensus have total control over the delegate's funds: indeed, the consensus key may sign a
+Drain operation to transfer the delegate's free balance to a third account of their choice.
+
+As a consequence, the consensus key should be treated with equal care than the delegate's key.
+
+Registering a Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A consensus key can be changed at any point. This may be done with the command::
+
+   tezos-client set consensus key for <mgr> to <key>
+
+The update becomes active after `PRESERVED_CYCLES + 1` cycles. We therefore distinguish
+the active consensus key and the pending consensus keys. (There can be multiple pending updates.)
+The active consensus key is by default the baker’s regular key, called its manager key, which cannot change.
+
+It is also possible to register as a delegate and immediately set the consensus key::
+
+   tezos-client register key <mgr> as delegate with consensus key <key>
+
+Baking With a Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In your baker's command, replace the delegate's manager key alias with the consenus key alias::
+
+   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
+
+While transitioning from the delegate's manager key, it is possible to pass the alias for both delegate's manager key and consensus key.
+The baker will seamlessly keep baking when the transition happens::
+
+   tezos-baker-0XX-Psxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
+
+Draining a Manager's Account With its Consensus Key
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This operation immediately transfers all the spendable balance of the `baker_pkh`’s implicit account into the `destination_pkh` implicit account::
+
+   tezos-client drain delegate <baker_pkh> to <destination_pkh>
+
+The active consensus key is the signer for this operation, therefore the private key associated to the consensus key must be available
+in the wallet of the client typing the command. The delegate's private key needs not be present.
+
+`drain delegate` has no effect on the frozen balance.
+
+A fixed fraction of the drained baker’s spendable balance is transferred as fees to the baker that includes the operation,
+i.e. the maximum between 1tz or 1% of the spendable balance.
+
 .. _activate_fundraiser_account:
 
 Getting keys for fundraiser accounts
