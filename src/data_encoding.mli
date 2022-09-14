@@ -1574,7 +1574,9 @@ let expr_encoding =
   type 'a compact = 'a Compact.t
 end
 
-include module type of Encoding with type 'a t = 'a Encoding.t
+include module type of struct
+  include Encoding
+end
 
 (** Create a {!Data_encoding.t} value which records knowledge of
       older versions of a given encoding as long as one can "upgrade"
