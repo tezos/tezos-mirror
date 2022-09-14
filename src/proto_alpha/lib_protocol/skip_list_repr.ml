@@ -75,11 +75,31 @@ module type S = sig
     'ptr list ->
     bool
 
+  type ('ptr, 'content) search_cell_result =
+    | Found of ('ptr, 'content) cell
+    | Nearest of {
+        lower : ('ptr, 'content) cell;
+        upper : ('ptr, 'content) cell option;
+      }
+    | No_exact_or_lower_ptr
+    | Deref_returned_none
+
+  type ('ptr, 'content) search_result = {
+    rev_path : ('ptr, 'content) cell list;
+    last_cell : ('ptr, 'content) search_cell_result;
+  }
+
+  val pp_search_result :
+    pp_cell:(Format.formatter -> ('ptr, 'content) cell -> unit) ->
+    Format.formatter ->
+    ('ptr, 'content) search_result ->
+    unit
+
   val search :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     compare:('content -> int Lwt.t) ->
-    cell_ptr:'ptr ->
-    'ptr list option Lwt.t
+    cell:('content, 'ptr) cell ->
+    ('content, 'ptr) search_result Lwt.t
 end
 
 module Make (Parameters : sig
@@ -319,39 +339,136 @@ end) : S = struct
     | first_cell_ptr :: path ->
         equal_ptr first_cell_ptr cell_ptr && valid_path cell_index cell_ptr path
 
-  let search ~deref ~compare ~cell_ptr =
-    let open Lwt_option_syntax in
-    let rec aux path ptr ix =
-      let*? cell = deref ptr in
-      let*? candidate_ptr = back_pointer cell ix in
-      let*? candidate_cell = deref candidate_ptr in
-      let*! comparison = compare candidate_cell.content in
-      if Compare.Int.(comparison = 0) then
-        (* In this case, we have reached our target cell. *)
-        return (List.rev (candidate_ptr :: ptr :: path))
-      else if Compare.Int.(comparison < 0) then
-        if Compare.Int.(ix = 0) then
-          (* If the first back pointer is 'too far' ([comparison < 0]),
-             that means we won't find a valid target cell. *)
-          fail
-        else
-          (* If a back pointer other than the first is 'too far'
-             we can then backtrack to the previous back pointer. *)
-          let*? new_ptr = back_pointer cell (ix - 1) in
-          aux (ptr :: path) new_ptr 0
-      else if Compare.Int.(ix + 1 >= FallbackArray.length cell.back_pointers)
-      then
-        (* If we reach the final back pointer and still have
-           [comparison > 0], we should continue from that cell. *)
-        aux (ptr :: path) candidate_ptr 0
+  type ('ptr, 'content) search_cell_result =
+    | Found of ('ptr, 'content) cell
+    | Nearest of {
+        lower : ('ptr, 'content) cell;
+        upper : ('ptr, 'content) cell option;
+      }
+    | No_exact_or_lower_ptr
+    | Deref_returned_none
+
+  type ('ptr, 'content) search_result = {
+    rev_path : ('ptr, 'content) cell list;
+    last_cell : ('ptr, 'content) search_cell_result;
+  }
+
+  let pp_rev_path ~pp_cell =
+    Format.pp_print_list ~pp_sep:Format.pp_print_space pp_cell
+
+  let pp_search_cell_result ~pp_cell fmt = function
+    | Found ptr -> Format.fprintf fmt "Found(%a)" pp_cell ptr
+    | Nearest {lower; upper} ->
+        Format.fprintf
+          fmt
+          "Nearest(lower=%a;upper=%a)"
+          pp_cell
+          lower
+          (Format.pp_print_option pp_cell)
+          upper
+    | No_exact_or_lower_ptr -> Format.fprintf fmt "No_exact_or_lower_ptr"
+    | Deref_returned_none -> Format.fprintf fmt "Deref_returned_none"
+
+  let pp_search_result ~pp_cell fmt {rev_path; last_cell} =
+    Format.fprintf
+      fmt
+      "{rev_path = %a; last_point = %a}"
+      (pp_rev_path ~pp_cell)
+      rev_path
+      (pp_search_cell_result ~pp_cell)
+      last_cell
+
+  let search (type ptr) ~(deref : ptr -> ('content, ptr) cell option) ~compare
+      ~cell =
+    let open Lwt_syntax in
+    let ( = ), ( < ), ( > ) = Compare.Int.(( = ), ( < ), ( > )) in
+    (* Given a cell, to compute the minimal path, we need to find the
+       good back-pointer. This is done linearly with respect to the
+       number of back-pointers. This number of back-pointers is
+       logarithmic with respect to the number of non-empty
+       inboxes. The complexity is consequently in O(log_2^2(n)). Since
+       in practice, [n < 2^32], we have at most [1000] calls. Besides,
+       the recursive function is tail recursive.
+
+       The linear search could be turned into a dichotomy search if
+       necessary. But since this piece of code won't be used in a
+       carbonated function, we prefer to keep a simple implementation
+       for the moment. *)
+    let rec aux rev_path cell ix =
+      (* Below, we call the [target] the cell for which [compare target = 0]. *)
+
+      (* Invariant:
+
+         - compare cell > target
+         - ix >= 0
+         - if cell <> genesis => ix < List.length (back_pointers cell)
+         - \exists path' rev_path = cell:path'
+      *)
+      let back_pointers_length = FallbackArray.length cell.back_pointers in
+      if back_pointers_length = 0 then
+        (* [cell] is the genesis cell. *)
+        return {rev_path; last_cell = No_exact_or_lower_ptr}
       else
-        (* Final case, we just try the next back pointer. *)
-        aux path ptr (ix + 1)
+        let candidate_ptr =
+          match back_pointer cell ix with
+          | None ->
+              (* At this point we have [cell <> genesis]. Consequently,
+                 thanks to the invariant of this function, we have [ix
+                 < List.length (back_pointers cell)]. Consequently, the
+                 call to [back_pointer] cannot fail. *)
+              assert false
+          | Some candidate_ptr -> candidate_ptr
+        in
+        match deref candidate_ptr with
+        | None ->
+            (* If we cannot dereference a pointer, We stop the search
+               and returns the current path. *)
+            return {rev_path; last_cell = Deref_returned_none}
+        | Some next_cell -> (
+            let* comparison = compare next_cell.content in
+            if comparison = 0 then
+              (* We have found the target.*)
+              let rev_path = next_cell :: rev_path in
+              return {rev_path; last_cell = Found next_cell}
+            else if comparison > 0 then
+              if ix < back_pointers_length - 1 then
+                (* There might be a short path by dereferencing the next pointer. *)
+                aux rev_path cell (ix + 1)
+              else
+                (* The last pointer is still above the target. We are on the good track, *)
+                let rev_path = next_cell :: rev_path in
+                aux rev_path next_cell 0
+            else if ix = 0 then
+              (* We found a cell lower than the target. *)
+              (* The first back pointers gives a cell below the target *)
+              let rev_path = next_cell :: rev_path in
+              return
+                {
+                  rev_path;
+                  last_cell = Nearest {lower = next_cell; upper = Some cell};
+                }
+            else
+              (* We found a cell lower than the target. *)
+              (* The previous pointer was actually the good one. *)
+              let good_candidate_ptr =
+                match back_pointer cell (ix - 1) with
+                | None -> assert false
+                | Some candidate_ptr -> candidate_ptr
+              in
+              match deref good_candidate_ptr with
+              | None ->
+                  (* We already dereferenced this pointer before. *)
+                  assert false
+              | Some good_next_cell ->
+                  let rev_path = good_next_cell :: rev_path in
+                  aux rev_path good_next_cell 0)
     in
-    let*? cell = deref cell_ptr in
-    let*! comparison = compare cell.content in
-    (* We must check that we aren't already at the target cell before
-       starting the recursion. *)
-    if Compare.Int.(comparison = 0) then return [cell_ptr]
-    else aux [] cell_ptr 0
+    let* comparison = compare cell.content in
+    if Compare.Int.(comparison = 0) then
+      (* Particular case where the target is the start cell. *)
+      return {rev_path = [cell]; last_cell = Found cell}
+    else if Compare.Int.(comparison < 0) then
+      return
+        {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
+    else aux [cell] cell 0
 end

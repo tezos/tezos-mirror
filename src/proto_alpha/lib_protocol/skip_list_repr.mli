@@ -118,21 +118,71 @@ module type S = sig
     'ptr list ->
     bool
 
-  (** [search ~deref ~compare ~cell_ptr] is similar to {!back_path} except
-      that it will search through the skip list to find a cell at which
-      [compare content] is zero. This will only work if [compare] is a
-      function that returns a negative integer for cells before the
-      target and a positive integer for cells after the target.
+  type ('ptr, 'content) search_cell_result =
+    | Found of ('ptr, 'content) cell
+    | Nearest of {
+        lower : ('ptr, 'content) cell;
+        upper : ('ptr, 'content) cell option;
+      }
+    | No_exact_or_lower_ptr
+    | Deref_returned_none
 
-      If [d] is the distance in the skip list between the original
-      [cell_ptr] and the final target cell, this function involves
-      [O(log_basis(d))] calls to [deref] and [compare] (the logarithm's
-      base is the [basis] parameter in the skip list). *)
+  type ('ptr, 'content) search_result = {
+    rev_path : ('ptr, 'content) cell list;
+    last_cell : ('ptr, 'content) search_cell_result;
+  }
+
+  val pp_search_result :
+    pp_cell:(Format.formatter -> ('ptr, 'content) cell -> unit) ->
+    Format.formatter ->
+    ('ptr, 'content) search_result ->
+    unit
+
+  (** [search ~deref ~compare ~cell] allows to find a cell of the skip
+     list according to its content. This function assumes that the
+     content of the cells is in increasing order according to the
+     ordering defined by the function [compare]. In other words, this
+     function assumes that [compare] is a function that returns a
+     negative integer for cells before the target and a positive
+     integer for cells after the target. The value returned by this
+     function is [{rev_path; last_cell}] such that.
+
+     - [rev_path = []] if and only if [compare (content cell) > 0]
+
+     - For all the cases below, if there is a path from cell [A] to
+     cell [B], [rev_path] contains the list of cells to go from [B] to
+     [A]. Consequently, the first element of [rev_path] is [B] and the
+     path is minimal.
+
+     - [last_pointer = Deref_returned_none] if [deref] fails to
+     associate a cell to a pointer during the search. In that case,
+     [rev_path] is a path from [cell] to [candidate] where [candidate]
+     is the last cell for which candidate did not fail and such that
+     [compare (content (candidate)) > 0].
+
+     - [last_pointer = No_exact_or_lower_ptr] if for all cell of the
+     skip list, [compare (content cell) > 0]. In that case, [rev_path]
+     is a path from [cell] to the genesis cell.
+
+     - [last_pointer = Found target] if there is a cell [target] such
+     that [compare (content target) = 0] and a path from [cell] to
+     [target]. In that case, [rev_path] is the minimal path from
+     [cell] to [target].
+
+     - [last_pointer = Nearest_lower {lower;upper}] if there is no
+     cell in the skip list such that [compare (content cell) = 0]. In
+     that case [lower] is the unique cell such that [compare (content
+     lower) < 0] and for all other cells [candidate] such that
+     [compare (content candidate) < 0] then there is a path from
+     [lower] to [candidate]. [upper], if it exists is the successor
+     cell to [lower], i.e. [deref ((back_pointer upper) 0) = Some
+     lower].  In that case, [rev_path] is the minimal path from [cell]
+     to [lower]. *)
   val search :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     compare:('content -> int Lwt.t) ->
-    cell_ptr:'ptr ->
-    'ptr list option Lwt.t
+    cell:('content, 'ptr) cell ->
+    ('content, 'ptr) search_result Lwt.t
 end
 
 module Make (_ : sig

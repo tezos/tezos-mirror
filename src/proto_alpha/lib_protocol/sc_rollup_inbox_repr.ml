@@ -1073,22 +1073,22 @@ struct
           | None -> -1
           | Some level -> Raw_level_repr.compare level l)
     in
-    let* path =
-      option_to_result
-        (Format.sprintf
-           "Skip_list.search failed to find path to requested level (%ld)"
-           (Raw_level_repr.to_int32 l))
-        (Skip_list.search ~deref ~compare ~cell_ptr)
-    in
-    let* inc =
-      option_to_result
-        "failed to deref some level in the path"
-        (Lwt.return (lift_ptr_path deref path))
-    in
-    let* level =
-      option_to_result
-        "Skip_list.search returned empty list"
-        (Lwt.return (List.last_opt inc))
+    let*! result = Skip_list.search ~deref ~compare ~cell:inbox in
+    let* inc, level =
+      match result with
+      | Skip_list.{rev_path; last_cell = Found level} ->
+          return (List.rev rev_path, level)
+      | {last_cell = Nearest _; _}
+      | {last_cell = No_exact_or_lower_ptr; _}
+      | {last_cell = Deref_returned_none; _} ->
+          (* We are only interested to the result where [search] than a
+             path to the cell we were looking for. All the other cases
+             should be considered as an error. *)
+          proof_error
+            (Format.asprintf
+               "Skip_list.search failed to find a valid path: %a"
+               (Skip_list.pp_search_result ~pp_cell:pp_history_proof)
+               result)
     in
     let* level_tree =
       option_to_result
