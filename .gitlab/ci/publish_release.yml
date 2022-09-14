@@ -26,7 +26,7 @@ opam:release:
     - gitlab:release
   script:
     # create opam release and push to github (also pushes latest master branch)
-    - ./scripts/ci/opam-release.sh
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-release
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
