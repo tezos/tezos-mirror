@@ -83,15 +83,13 @@ let initial_boot_sector_from_kernel kernel =
     ~empty_tree
     origination_message
 
-let rec eval_until_input_requested tree =
+let rec eval_until_input_requested ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
   let* info = Wasm.get_info tree in
   match info.input_request with
   | No_input_required ->
-      let* tree =
-        Wasm.Internal_for_tests.compute_step_many ~max_steps:Int64.max_int tree
-      in
-      eval_until_input_requested tree
+      let* tree = Wasm.Internal_for_tests.compute_step_many ~max_steps tree in
+      eval_until_input_requested ~max_steps tree
   | Input_required -> return tree
 
 let set_input_step message message_counter tree =
@@ -106,17 +104,17 @@ let set_input_step message message_counter tree =
   in
   Wasm.set_input_step input_info message tree
 
-let should_boot_unreachable_kernel kernel =
+let should_boot_unreachable_kernel ~max_steps kernel =
   let open Lwt_syntax in
   let* tree = initial_boot_sector_from_kernel kernel in
   (* Make the first ticks of the WASM PVM (parsing of origination
      message, parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
-  let* tree = eval_until_input_requested tree in
+  let* tree = eval_until_input_requested ~max_steps tree in
   (* Feeding it with one input *)
   let* tree = set_input_step "test" 0 tree in
   (* running until waiting for input *)
-  let* tree = eval_until_input_requested tree in
+  let* tree = eval_until_input_requested ~max_steps tree in
   let* info_after_first_message = Wasm.get_info tree in
   let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
@@ -170,7 +168,21 @@ let test_with_kernel kernel test () =
 let tests =
   [
     tztest
-      "Test unreachable kernel"
+      "Test unreachable kernel (tick per tick)"
       `Quick
-      (test_with_kernel unreachable_kernel should_boot_unreachable_kernel);
+      (test_with_kernel
+         unreachable_kernel
+         (should_boot_unreachable_kernel ~max_steps:1L));
+    tztest
+      "Test unreachable kernel (10 ticks at a time)"
+      `Quick
+      (test_with_kernel
+         unreachable_kernel
+         (should_boot_unreachable_kernel ~max_steps:10L));
+    tztest
+      "Test unreachable kernel (in one go)"
+      `Quick
+      (test_with_kernel
+         unreachable_kernel
+         (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
   ]

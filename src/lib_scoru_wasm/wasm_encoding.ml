@@ -47,7 +47,7 @@ let lazy_vector_encoding field_name tree_encoding =
 let lazy_vector_encoding' tree_encoding =
   int32_lazy_vector (value [] Data_encoding.int32) tree_encoding
 
-let func_encoding =
+let func'_encoding =
   let ftype = value ["ftype"] Interpreter_encodings.Ast.var_encoding in
   let locals =
     lazy_vector_encoding
@@ -56,10 +56,15 @@ let func_encoding =
   in
   let body = value ["body"] Interpreter_encodings.Ast.block_label_encoding in
   conv
-    (fun (ftype, locals, body) ->
-      Source.(Ast.{ftype; locals; body} @@ no_region))
-    (fun {it = {ftype; locals; body}; _} -> (ftype, locals, body))
+    (fun (ftype, locals, body) -> Ast.{ftype; locals; body})
+    (fun {ftype; locals; body} -> (ftype, locals, body))
     (tup3 ~flatten:true ftype locals body)
+
+let func_encoding =
+  conv
+    (fun func -> Source.(func @@ no_region))
+    (fun {it = func; _} -> func)
+    func'_encoding
 
 let function_type_encoding =
   conv
