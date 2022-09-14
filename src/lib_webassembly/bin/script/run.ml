@@ -325,7 +325,8 @@ let instantiate_module x_opt m imports =
         Instance.Module_key (Printf.sprintf "__unnamed_%i" index)
     | Some name -> Instance.Module_key name.it
   in
-  Eval.init ~module_reg:instances ~self host_funcs_registry m imports
+  let buffers = Eval.buffers () in
+  Eval.init ~module_reg:instances ~self buffers host_funcs_registry m imports
 
 let bind_lazy module_reg name instance =
   Option.iter

@@ -126,9 +126,9 @@ type step_kont =
   | SK_Result of value Vector.t
   | SK_Trapped of string Source.phrase
 
+type buffers = {input : input_inst; output : output_inst}
+
 type config = {
-  input : input_inst;
-  output : output_inst;
   step_kont : step_kont;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
@@ -216,6 +216,7 @@ val init_step :
   ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
   self:module_key ->
+  buffers ->
   Host_funcs.registry ->
   Ast.module_ ->
   extern Vector.t ->
@@ -225,6 +226,7 @@ val init_step :
 val init :
   module_reg:module_reg ->
   self:module_key ->
+  buffers ->
   Host_funcs.registry ->
   Ast.module_ ->
   extern list ->
@@ -245,14 +247,15 @@ val step :
   ?durable:Durable_storage.t ->
   module_reg ->
   config ->
+  buffers ->
   (Durable_storage.t * config) Lwt.t
 
 val config :
-  ?input:input_inst ->
-  ?output:output_inst ->
   Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
   value Vector.t ->
   admin_instr Vector.t ->
   config
+
+val buffers : ?input:input_inst -> ?output:output_inst -> unit -> buffers
