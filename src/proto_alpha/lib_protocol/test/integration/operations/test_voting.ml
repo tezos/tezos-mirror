@@ -362,28 +362,20 @@ let proposals_contain_duplicate duplicate_proposal loc = function
   | err -> wrong_error "Proposals_contain_duplicate" err loc
 
 let too_many_proposals loc = function
-  | [Environment.Ecoproto_error Too_many_proposals] -> return_unit
+  | [Environment.Ecoproto_error (Too_many_proposals _)] -> return_unit
   | err -> wrong_error "Too_many_proposals" err loc
 
 let already_proposed already_proposed_proposal loc = function
-  | [Environment.Ecoproto_error (Already_proposed {proposal})] ->
+  | [Environment.Ecoproto_error (Already_proposed {proposal; _})] ->
       Assert.equal_protocol_hash
         ~loc:(append_loc ~caller_loc:loc __LOC__)
         proposal
         already_proposed_proposal
   | err -> wrong_error "Already_proposed" err loc
 
-let conflict_too_many_proposals loc = function
-  | [Environment.Ecoproto_error (Conflict_too_many_proposals _)] -> return_unit
-  | err -> wrong_error "Conflict_too_many_proposals" err loc
-
-let conflict_already_proposed already_proposed_proposal loc = function
-  | [Environment.Ecoproto_error (Conflict_already_proposed {proposal; _})] ->
-      Assert.equal_protocol_hash
-        ~loc:(append_loc ~caller_loc:loc __LOC__)
-        proposal
-        already_proposed_proposal
-  | err -> wrong_error "Conflict_already_proposed" err loc
+let conflicting_proposals loc = function
+  | [Environment.Ecoproto_error (Conflicting_proposals _)] -> return_unit
+  | err -> wrong_error "Conflicting_proposals" err loc
 
 let ballot_for_wrong_proposal ~current_proposal ~op_proposal loc = function
   | [
@@ -1483,16 +1475,15 @@ let test_conflict_too_many_proposals () =
   let* op = Op.proposals (B block) proposer [protos.(0)] in
   let* _i =
     Incremental.validate_operation
-      ~expect_failure:(conflict_too_many_proposals __LOC__)
+      ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
       op
   in
   return_unit
 
-(** Test that a Proposals operation fails when one of its proposals
-    has already been submitted by the same proposer in a previously
-    validated operation of the current block/mempool. *)
-let test_conflict_already_proposed () =
+(** Test that a Proposals operation fails when its source has already
+    submitted a Proposals operation in the current block/mempool. *)
+let test_conflicting_proposal () =
   let open Lwt_result_syntax in
   let* block, proposer = context_init1 () in
   let proposal = protos.(0) in
@@ -1504,9 +1495,17 @@ let test_conflict_already_proposed () =
   let* op = Op.proposals (B block) proposer [proposal] in
   let* _i =
     Incremental.validate_operation
-      ~expect_failure:(conflict_already_proposed proposal __LOC__)
+      ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
       op
+  in
+  let proposal' = protos.(1) in
+  let* op' = Op.proposals (B block) proposer [proposal'] in
+  let* _i =
+    Incremental.validate_operation
+      ~expect_failure:(conflicting_proposals __LOC__)
+      current_block_state
+      op'
   in
   return_unit
 
@@ -1639,7 +1638,7 @@ let test_too_many_proposals_in_one_operation () =
     try
       let* _ = Op.proposals (B b0) proposer0 protos in
       failwith
-        "Encoding of proposals operation with too many proposal should fail"
+        "Encoding of proposals operation with too many proposals should fail"
     with Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
   in
   return_unit
@@ -2060,9 +2059,9 @@ let tests =
       `Quick
       test_conflict_too_many_proposals;
     Tztest.tztest
-      "Conflict: proposal already proposed in current block/mempool"
+      "Conflicting proposals in current block/mempool"
       `Quick
-      test_conflict_already_proposed;
+      test_conflicting_proposal;
     Tztest.tztest "Valid Proposals operations" `Quick test_valid_proposals;
     (* Validity tests on Ballot *)
     Tztest.tztest

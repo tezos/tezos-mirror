@@ -295,7 +295,7 @@ let begin_partial_construction ~chain_id ~predecessor_context
   let*? grandparent_round =
     Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
   in
-  let* validity_state =
+  let validity_state =
     Validate.begin_partial_construction
       ctxt
       chain_id
@@ -352,7 +352,7 @@ let validate_operation validity_state
 let apply_operation (state : validation_state)
     (packed_operation : Alpha_context.packed_operation) =
   let open Lwt_result_syntax in
-  let* validate_state =
+  let* validation_state =
     validate_operation state.validity_state packed_operation
   in
   let operation_hash = Alpha_context.Operation.hash_packed packed_operation in
@@ -363,11 +363,7 @@ let apply_operation (state : validation_state)
       packed_operation
   in
   return
-    ( {
-        validity_state = {state.validity_state with state = validate_state};
-        application_state;
-      },
-      operation_receipt )
+    ({validity_state = validation_state; application_state}, operation_receipt)
 
 let finalize_block state shell_header =
   let open Lwt_result_syntax in

@@ -23,28 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The purpose of this module is to provide, that decides quickly
-   whether an operation may safely be included in a block or whether a
-   block can be advertised through the network.
+(** The purpose of this module is to provide the {!validate_operation}
+    function, that decides quickly whether an operation may safely be
+    included in a block. See the function's description for further
+    information.
+
+    This module also provide functions to check the validity of a
+    block and the consistency of its block_header.
 
     Most elements in this module are either used or wrapped in the
-   {!Main} module. *)
-
-(** Static information needed by {!validate_operation} or for a block
-   validation.
-
-    It lives in memory, not in the storage. *)
-type info
-
-(** State used and modified by {!validate_operation} or by a block
-   validation.
-
-    It lives in memory, not in the storage. *)
-type state
-
-type validation_state = {info : info; state : state}
+    {!Main} module. *)
 
 open Alpha_context
+open Validate_errors
+
+(** Static information required to validate blocks and operations. *)
+type info
+
+(** State used to register operations effects used to establish
+    potential conflicts. This state is serializable which allows it to
+    be exchanged with another source. See {Mempool_validation} *)
+type operation_conflict_state
+
+(** Encoding for the [operation_conflict_state]. *)
+val operation_conflict_state_encoding : operation_conflict_state Data_encoding.t
+
+(** State used to register global block validity dependent
+    effects. This state is used and updated by the
+    [validate_operation] function and will also be used during the
+    [finalize_block]. For instance, it registers inter-operations
+    checks (e.g. total gas used in the block so far). *)
+type block_state
+
+(** Validation state *)
+type validation_state = {
+  info : info;
+  operation_state : operation_conflict_state;
+  block_state : block_state;
+}
 
 (** Initialize the {!info} and {!state} for the validation of an
     existing block (in preparation for its future application). *)
@@ -88,9 +104,8 @@ val begin_partial_construction :
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
-  predecessor_hash:Block_hash.t ->
   grandparent_round:Round.t ->
-  validation_state tzresult Lwt.t
+  validation_state
 
 (** Initialize the {!info} and {!state} without providing any
    predecessor information. This will cause any preendorsement or
@@ -166,23 +181,46 @@ val validate_operation :
   validation_state ->
   ?should_check_signature:bool ->
   Operation_hash.t ->
-  Alpha_context.packed_operation ->
-  state tzresult Lwt.t
+  packed_operation ->
+  validation_state tzresult Lwt.t
+
+(** Check the operation validity, see {!validate_operation} for
+    more information
+
+    Note: Should only be called in mempool mode *)
+val check_operation :
+  info -> ?should_check_signature:bool -> 'kind operation -> unit tzresult Lwt.t
+
+(** Check that the operation does not conflict with other operations
+    already validated and included in the {!operation_conflict_state}
+
+    Note: Should only be called in mempool mode *)
+val check_operation_conflict :
+  operation_conflict_state ->
+  Operation_hash.t ->
+  'kind operation ->
+  (unit, operation_conflict) result
+
+(** Add the operation in the {!operation_conflict_state}. The
+    operation should be validated before being added
+
+    Note: Should only be called in mempool mode *)
+val add_valid_operation :
+  operation_conflict_state ->
+  Operation_hash.t ->
+  'kind operation ->
+  operation_conflict_state
+
+(** Remove the operation from the {!operation_conflict_state}.
+
+    Hypothesis:
+    - the [operation] has been validated and added to
+      [operation_conflict_state];
+    - this function is only valid for the mempool mode. *)
+val remove_operation :
+  operation_conflict_state -> 'kind operation -> operation_conflict_state
 
 (** Check the consistency of the block_header information with the one
     computed (Endorsement power, payload hash, etc) while validating
     the block operations. Checks vary depending on the mode. *)
 val finalize_block : validation_state -> unit tzresult Lwt.t
-
-(** Remove a manager operation from the {!validate_operation_state}.
-
-    This function is intended for a mempool: when an operation A has
-    already been validated, but another operation B conflicts with A
-    (e.g. they have the same manager) and is more desirable than A
-    (e.g. better fees/gas ratio), then the mempool may remove A in
-    order to validate B instead.
-
-    This function will be replaced with a generic function
-    [remove_operation] in the future. *)
-val remove_manager_operation :
-  validation_state -> 'a Kind.manager operation -> state

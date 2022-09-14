@@ -25,6 +25,28 @@
 
 open Alpha_context
 
+type operation_conflict =
+  | Operation_conflict of {
+      existing : Operation_hash.t;
+      new_operation : Operation_hash.t;
+    }
+
+let operation_conflict_encoding =
+  let open Data_encoding in
+  def
+    "operation_conflict"
+    ~title:"Conflict error"
+    ~description:"Conflict between two operations"
+  @@ conv
+       (function
+         | Operation_conflict {existing; new_operation} ->
+             (existing, new_operation))
+       (fun (existing, new_operation) ->
+         Operation_conflict {existing; new_operation})
+       (obj2
+          (req "existing" Operation_hash.encoding)
+          (req "new_operation" Operation_hash.encoding))
+
 module Consensus = struct
   type error += Zero_frozen_deposits of Signature.Public_key_hash.t
 
@@ -51,6 +73,7 @@ module Consensus = struct
     | Preendorsement
     | Endorsement
     | Grandparent_endorsement
+    | Dal_slot_availability
 
   let consensus_operation_kind_encoding =
     Data_encoding.string_enum
@@ -58,12 +81,14 @@ module Consensus = struct
         ("Preendorsement", Preendorsement);
         ("Endorsement", Endorsement);
         ("Grandparent_endorsement", Grandparent_endorsement);
+        ("Dal_slot_availability", Dal_slot_availability);
       ]
 
   let consensus_operation_kind_pp fmt = function
     | Preendorsement -> Format.fprintf fmt "Preendorsement"
     | Endorsement -> Format.fprintf fmt "Endorsement"
     | Grandparent_endorsement -> Format.fprintf fmt "Grandparent endorsement"
+    | Dal_slot_availability -> Format.fprintf fmt "Dal_slot_availability"
 
   (** Errors for preendorsements and endorsements. *)
   type error +=
@@ -106,7 +131,10 @@ module Consensus = struct
     | Wrong_slot_used_for_consensus_operation of {
         kind : consensus_operation_kind;
       }
-    | Conflicting_consensus_operation of {kind : consensus_operation_kind}
+    | Conflicting_consensus_operation of {
+        kind : consensus_operation_kind;
+        conflict : operation_conflict;
+      }
     | Consensus_operation_not_allowed
 
   let () =
@@ -334,16 +362,25 @@ module Consensus = struct
       ~id:"validate.double_inclusion_of_consensus_operation"
       ~title:"Double inclusion of consensus operation"
       ~description:"Double inclusion of consensus operation."
-      ~pp:(fun ppf kind ->
+      ~pp:(fun ppf (kind, Operation_conflict {existing; new_operation}) ->
         Format.fprintf
           ppf
-          "Double inclusion of %a operation"
+          "%a operation %a conflicts with existing %a"
           consensus_operation_kind_pp
-          kind)
-      Data_encoding.(obj1 (req "kind" consensus_operation_kind_encoding))
+          kind
+          Operation_hash.pp
+          new_operation
+          Operation_hash.pp
+          existing)
+      Data_encoding.(
+        obj2
+          (req "kind" consensus_operation_kind_encoding)
+          (req "conflict" operation_conflict_encoding))
       (function
-        | Conflicting_consensus_operation {kind} -> Some kind | _ -> None)
-      (fun kind -> Conflicting_consensus_operation {kind}) ;
+        | Conflicting_consensus_operation {kind; conflict} ->
+            Some (kind, conflict)
+        | _ -> None)
+      (fun (kind, conflict) -> Conflicting_consensus_operation {kind; conflict}) ;
     register_error_kind
       `Branch
       ~id:"validate.consensus_operation_not_allowed"
@@ -354,30 +391,6 @@ module Consensus = struct
       Data_encoding.empty
       (function Consensus_operation_not_allowed -> Some () | _ -> None)
       (fun () -> Consensus_operation_not_allowed)
-
-  type error +=
-    | Conflicting_dal_slot_availability of {
-        endorser : Signature.Public_key_hash.t;
-      }
-
-  let () =
-    register_error_kind
-      `Temporary
-      ~id:"validate.conflicting_dal_slot_availability"
-      ~title:"Conflicting Dal slot availability"
-      ~description:"Conflicting Dal slot availability."
-      ~pp:(fun ppf endorser ->
-        Format.fprintf
-          ppf
-          "Dal slot availability for %a has already been validated for the \
-           current validation state."
-          Signature.Public_key_hash.pp
-          endorser)
-      Data_encoding.(obj1 (req "endorser" Signature.Public_key_hash.encoding))
-      (function
-        | Conflicting_dal_slot_availability {endorser} -> Some endorser
-        | _ -> None)
-      (fun endorser -> Conflicting_dal_slot_availability {endorser})
 end
 
 module Voting = struct
@@ -395,22 +408,10 @@ module Voting = struct
     | (* Proposals errors *)
         Empty_proposals
     | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
-    | Too_many_proposals
     | Already_proposed of {proposal : Protocol_hash.t}
-    | Conflict_too_many_proposals of {
-        max_allowed : int;
-        count_previous_blocks : int;
-        count_current_block : int;
-        count_operation : int;
-        conflicting_operations : Operation_hash.t list;
-      }
-    | Conflict_already_proposed of {
-        proposal : Protocol_hash.t;
-        conflicting_operation : Operation_hash.t;
-      }
-    | Conflicting_dictator_proposals of Operation_hash.t
+    | Too_many_proposals of {previous_count : int; operation_count : int}
+    | Conflicting_proposals of operation_conflict
     | Testnet_dictator_multiple_proposals
-    | Testnet_dictator_conflicting_operation
     | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
@@ -418,8 +419,8 @@ module Voting = struct
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
-    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
     | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Conflicting_ballot of operation_conflict
 
   let () =
     (* Shared voting errors *)
@@ -509,18 +510,6 @@ module Voting = struct
       (function
         | Proposals_contain_duplicate {proposal} -> Some proposal | _ -> None)
       (fun proposal -> Proposals_contain_duplicate {proposal}) ;
-    let description =
-      "The proposer exceeded the maximum number of allowed proposals."
-    in
-    register_error_kind
-      `Branch
-      ~id:"validate.operation.too_many_proposals"
-      ~title:"Too many proposals"
-      ~description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-      Data_encoding.empty
-      (function Too_many_proposals -> Some () | _ -> None)
-      (fun () -> Too_many_proposals) ;
     register_error_kind
       `Branch
       ~id:"validate.operation.already_proposed"
@@ -544,105 +533,38 @@ module Voting = struct
         "The delegate exceeded the maximum number of allowed proposals due to, \
          among others, previous Proposals operations in the current \
          block/mempool."
-      ~pp:
-        (fun ppf
-             ( max_allowed,
-               count_previous_blocks,
-               count_current_block,
-               count_operation,
-               conflicting_operations ) ->
+      ~pp:(fun ppf (previous_count, operation_count) ->
         Format.fprintf
           ppf
-          "The delegate has submitted too many proposals (the maximum allowed \
-           is %d): %d in previous blocks, %d in the considered operation, and \
-           %d in the following validated operations of the current \
-           block/mempool: %a."
-          max_allowed
-          count_previous_blocks
-          count_operation
-          count_current_block
-          (Format.pp_print_list Operation_hash.pp)
-          conflicting_operations)
+          "The delegate cannot submit too many protocol proposals: it \
+           currently voted for %d and is trying to vote for %d more."
+          previous_count
+          operation_count)
       Data_encoding.(
-        obj5
-          (req "max_allowed" int8)
-          (req "count_previous_blocks" int8)
-          (req "count_current_block" int8)
-          (req "count_operation" int8)
-          (req "conflicting_operations" (list Operation_hash.encoding)))
+        obj2 (req "previous_count" int8) (req "operation_count" int31))
       (function
-        | Conflict_too_many_proposals
-            {
-              max_allowed;
-              count_previous_blocks;
-              count_current_block;
-              count_operation;
-              conflicting_operations;
-            } ->
-            Some
-              ( max_allowed,
-                count_previous_blocks,
-                count_current_block,
-                count_operation,
-                conflicting_operations )
+        | Too_many_proposals {previous_count; operation_count} ->
+            Some (previous_count, operation_count)
         | _ -> None)
-      (fun ( max_allowed,
-             count_previous_blocks,
-             count_current_block,
-             count_operation,
-             conflicting_operations ) ->
-        Conflict_too_many_proposals
-          {
-            max_allowed;
-            count_previous_blocks;
-            count_current_block;
-            count_operation;
-            conflicting_operations;
-          }) ;
+      (fun (previous_count, operation_count) ->
+        Too_many_proposals {previous_count; operation_count}) ;
     register_error_kind
       `Temporary
-      ~id:"validate.operation.conflict_already_proposed"
-      ~title:"Conflict already proposed"
-      ~description:
-        "The delegate has already submitted one of the operation's proposals \
-         in a previously validated operation of the current block or mempool."
-      ~pp:(fun ppf (proposal, conflicting_oph) ->
-        Format.fprintf
-          ppf
-          "The delegate has already proposed the protocol hash %a in the \
-           previously validated operation %a of the current block or mempool."
-          Protocol_hash.pp
-          proposal
-          Operation_hash.pp
-          conflicting_oph)
-      Data_encoding.(
-        obj2
-          (req "proposal" Protocol_hash.encoding)
-          (req "conflicting_operation" Operation_hash.encoding))
-      (function
-        | Conflict_already_proposed {proposal; conflicting_operation} ->
-            Some (proposal, conflicting_operation)
-        | _ -> None)
-      (fun (proposal, conflicting_operation) ->
-        Conflict_already_proposed {proposal; conflicting_operation}) ;
-    register_error_kind
-      `Branch
-      ~id:"validate.operation.conflicting_dictator_proposals"
-      ~title:"Conflicting dictator proposals"
+      ~id:"validate.operation.conflicting_proposals"
+      ~title:"Conflicting proposals"
       ~description:
         "The current block/mempool already contains a testnest dictator \
          proposals operation, so it cannot have any other voting operation."
-      ~pp:(fun ppf dictator_operation ->
+      ~pp:(fun ppf (Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
-          "The current block/mempool already contains the testnest dictator \
-           proposals operation %a, so it cannot have any other voting \
-           operation."
+          "The current block/mempool already contains a conflicting operation \
+           %a."
           Operation_hash.pp
-          dictator_operation)
-      Data_encoding.(obj1 (req "dictator_operation" Operation_hash.encoding))
-      (function Conflicting_dictator_proposals oph -> Some oph | _ -> None)
-      (fun oph -> Conflicting_dictator_proposals oph) ;
+          existing)
+      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (function Conflicting_proposals conflict -> Some conflict | _ -> None)
+      (fun conflict -> Conflicting_proposals conflict) ;
     let description =
       "A testnet dictator cannot submit more than one proposal at a time."
     in
@@ -655,19 +577,6 @@ module Voting = struct
       Data_encoding.empty
       (function Testnet_dictator_multiple_proposals -> Some () | _ -> None)
       (fun () -> Testnet_dictator_multiple_proposals) ;
-    let description =
-      "A testnet dictator proposals operation cannot be included in a block or \
-       mempool that already contains any other voting operation."
-    in
-    register_error_kind
-      `Branch
-      ~id:"validate.operation.testnet_dictator_conflicting_operation"
-      ~title:"Testnet dictator conflicting operation"
-      ~description
-      ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
-      Data_encoding.empty
-      (function Testnet_dictator_conflicting_operation -> Some () | _ -> None)
-      (fun () -> Testnet_dictator_conflicting_operation) ;
     register_error_kind
       `Permanent
       ~id:"operation.proposals_from_unregistered_delegate"
@@ -722,26 +631,6 @@ module Voting = struct
       (function Already_submitted_a_ballot -> Some () | _ -> None)
       (fun () -> Already_submitted_a_ballot) ;
     register_error_kind
-      `Temporary
-      ~id:"validate.operation.conflicting_ballot"
-      ~title:"Conflicting ballot"
-      ~description:
-        "The delegate has already submitted a ballot in a previously validated \
-         operation of the current block or mempool."
-      ~pp:(fun ppf conflicting_oph ->
-        Format.fprintf
-          ppf
-          "The delegate has already submitted a ballot in the previously \
-           validated operation %a of the current block or mempool."
-          Operation_hash.pp
-          conflicting_oph)
-      Data_encoding.(obj1 (req "conflicting_operation" Operation_hash.encoding))
-      (function
-        | Conflicting_ballot {conflicting_operation} ->
-            Some conflicting_operation
-        | _ -> None)
-      (fun conflicting_operation -> Conflicting_ballot {conflicting_operation}) ;
-    register_error_kind
       `Permanent
       ~id:"operation.ballot_from_unregistered_delegate"
       ~title:"Ballot from an unregistered delegate"
@@ -754,13 +643,33 @@ module Voting = struct
           c)
       Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
       (function Ballot_from_unregistered_delegate c -> Some c | _ -> None)
-      (fun c -> Ballot_from_unregistered_delegate c)
+      (fun c -> Ballot_from_unregistered_delegate c) ;
+    register_error_kind
+      `Temporary
+      ~id:"validate.operation.conflicting_ballot"
+      ~title:"Conflicting ballot"
+      ~description:
+        "The delegate has already submitted a ballot in a previously validated \
+         operation of the current block or mempool."
+      ~pp:(fun ppf (Operation_conflict {existing; _}) ->
+        Format.fprintf
+          ppf
+          "The delegate has already submitted a ballot in the previously \
+           validated operation %a of the current block or mempool."
+          Operation_hash.pp
+          existing)
+      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (function Conflicting_ballot conflict -> Some conflict | _ -> None)
+      (fun conflict -> Conflicting_ballot conflict)
 end
 
 module Anonymous = struct
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
-    | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
+    | Conflicting_activation of {
+        edpkh : Ed25519.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
 
   let () =
     register_error_kind
@@ -787,7 +696,7 @@ module Anonymous = struct
       ~description:
         "The account has already been activated by a previous operation in the \
          current validation state."
-      ~pp:(fun ppf (edpkh, oph) ->
+      ~pp:(fun ppf (edpkh, Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
           "Invalid activation: the account %a has already been activated in \
@@ -795,14 +704,15 @@ module Anonymous = struct
           Ed25519.Public_key_hash.pp
           edpkh
           Operation_hash.pp
-          oph)
+          existing)
       Data_encoding.(
         obj2
-          (req "account_edpkh" Ed25519.Public_key_hash.encoding)
-          (req "conflicting_op_hash" Operation_hash.encoding))
+          (req "edpkh" Ed25519.Public_key_hash.encoding)
+          (req "conflict" operation_conflict_encoding))
       (function
-        | Conflicting_activation (edpkh, oph) -> Some (edpkh, oph) | _ -> None)
-      (fun (edpkh, oph) -> Conflicting_activation (edpkh, oph))
+        | Conflicting_activation {edpkh; conflict} -> Some (edpkh, conflict)
+        | _ -> None)
+      (fun (edpkh, conflict) -> Conflicting_activation {edpkh; conflict})
 
   type denunciation_kind = Preendorsement | Endorsement | Block
 
@@ -842,9 +752,7 @@ module Anonymous = struct
       }
     | Conflicting_denunciation of {
         kind : denunciation_kind;
-        delegate : Signature.Public_key_hash.t;
-        level : Level.t;
-        hash : Operation_hash.t;
+        conflict : operation_conflict;
       }
     | Too_early_denunciation of {
         kind : denunciation_kind;
@@ -966,31 +874,23 @@ module Anonymous = struct
       ~description:
         "The same denunciation has already been validated in the current \
          validation state."
-      ~pp:(fun ppf (kind, delegate, level, hash) ->
+      ~pp:(fun ppf (kind, Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
-          "Double %a evidence for the delegate %a at level %a already exists \
-           in the current validation state as operation %a."
+          "Double %a evidence already exists in the current validation state \
+           as operation %a."
           pp_denunciation_kind
           kind
-          Signature.Public_key_hash.pp
-          delegate
-          Level.pp
-          level
           Operation_hash.pp
-          hash)
+          existing)
       Data_encoding.(
-        obj4
+        obj2
           (req "denunciation_kind" denunciation_kind_encoding)
-          (req "delegate" Signature.Public_key_hash.encoding)
-          (req "level" Level.encoding)
-          (req "hash" Operation_hash.encoding))
+          (req "conflict" operation_conflict_encoding))
       (function
-        | Conflicting_denunciation {kind; delegate; level; hash} ->
-            Some (kind, delegate, level, hash)
+        | Conflicting_denunciation {kind; conflict} -> Some (kind, conflict)
         | _ -> None)
-      (fun (kind, delegate, level, hash) ->
-        Conflicting_denunciation {kind; delegate; level; hash}) ;
+      (fun (kind, conflict) -> Conflicting_denunciation {kind; conflict}) ;
     register_error_kind
       `Temporary
       ~id:"validate.operation.block.too_early_denunciation"
@@ -1046,7 +946,7 @@ module Anonymous = struct
       (fun (kind, level, last_cycle) ->
         Outdated_denunciation {kind; level; last_cycle})
 
-  type error += Conflicting_nonce_revelation
+  type error += Conflicting_nonce_revelation of operation_conflict
 
   let () =
     register_error_kind
@@ -1056,13 +956,37 @@ module Anonymous = struct
       ~description:
         "A revelation for the same nonce has already been validated for the \
          current validation state."
-      ~pp:(fun ppf () ->
+      ~pp:(fun ppf (Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
-          "This nonce was previously revealed in the current block")
-      Data_encoding.unit
-      (function Conflicting_nonce_revelation -> Some () | _ -> None)
-      (fun () -> Conflicting_nonce_revelation)
+          "This nonce revelation is conflicting with an existing revelation %a"
+          Operation_hash.pp
+          existing)
+      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (function
+        | Conflicting_nonce_revelation conflict -> Some conflict | _ -> None)
+      (fun conflict -> Conflicting_nonce_revelation conflict)
+
+  type error += Conflicting_vdf_revelation of operation_conflict
+
+  let () =
+    register_error_kind
+      `Branch
+      ~id:"validate.operation.conflicting_vdf_revelation"
+      ~title:"Conflicting vdf revelation in the current validation state)."
+      ~description:
+        "A revelation for the same vdf has already been validated for the \
+         current validation state."
+      ~pp:(fun ppf (Operation_conflict {existing; _}) ->
+        Format.fprintf
+          ppf
+          "This vdf revelation is conflicting with an existing revelation %a"
+          Operation_hash.pp
+          existing)
+      Data_encoding.(obj1 (req "conflict" operation_conflict_encoding))
+      (function
+        | Conflicting_vdf_revelation conflict -> Some conflict | _ -> None)
+      (fun conflict -> Conflicting_vdf_revelation conflict)
 
   type error +=
     | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
@@ -1078,7 +1002,10 @@ module Anonymous = struct
         destination : Signature.Public_key_hash.t;
         min_amount : Tez.t;
       }
-    | Conflicting_drain of {delegate : Signature.Public_key_hash.t}
+    | Conflicting_drain_delegate of {
+        delegate : Signature.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
 
   let () =
     register_error_kind
@@ -1188,25 +1115,36 @@ module Anonymous = struct
           {delegate; destination; min_amount}) ;
     register_error_kind
       `Branch
-      ~id:"validate_operation.conflicting_drain"
+      ~id:"validate.operation.conflicting_drain"
       ~title:"Conflicting drain in the current validation state)."
       ~description:
         "A manager operation or another drain operation is in conflict."
-      ~pp:(fun ppf delegate ->
+      ~pp:(fun ppf (delegate, Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
-          "This drain operation is conflicting with another drain operation or \
-           a manager operation for delegate %a"
+          "This drain operation conflicts with operation %a for the delegate %a"
+          Operation_hash.pp
+          existing
           Signature.Public_key_hash.pp
           delegate)
-      Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-      (function Conflicting_drain {delegate} -> Some delegate | _ -> None)
-      (fun delegate -> Conflicting_drain {delegate})
+      Data_encoding.(
+        obj2
+          (req "delegate" Signature.Public_key_hash.encoding)
+          (req "conflict" operation_conflict_encoding))
+      (function
+        | Conflicting_drain_delegate {delegate; conflict} ->
+            Some (delegate, conflict)
+        | _ -> None)
+      (fun (delegate, conflict) ->
+        Conflicting_drain_delegate {delegate; conflict})
 end
 
 module Manager = struct
   type error +=
-    | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
+    | Manager_restriction of {
+        source : Signature.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
     | Inconsistent_sources
     | Inconsistent_counters
     | Incorrect_reveal_position
@@ -1224,22 +1162,22 @@ module Manager = struct
       ~description:
         "An operation with the same manager has already been validated in the \
          current block."
-      ~pp:(fun ppf (d, hash) ->
+      ~pp:(fun ppf (source, Operation_conflict {existing; _}) ->
         Format.fprintf
           ppf
           "Manager %a already has the operation %a in the current block."
           Signature.Public_key_hash.pp
-          d
+          source
           Operation_hash.pp
-          hash)
+          existing)
       Data_encoding.(
         obj2
-          (req "manager" Signature.Public_key_hash.encoding)
-          (req "hash" Operation_hash.encoding))
+          (req "source" Signature.Public_key_hash.encoding)
+          (req "conflict" operation_conflict_encoding))
       (function
-        | Manager_restriction (manager, hash) -> Some (manager, hash)
+        | Manager_restriction {source; conflict} -> Some (source, conflict)
         | _ -> None)
-      (fun (manager, hash) -> Manager_restriction (manager, hash)) ;
+      (fun (source, conflict) -> Manager_restriction {source; conflict}) ;
     let inconsistent_sources_description =
       "The operation batch includes operations from different sources."
     in
@@ -1337,7 +1275,7 @@ module Manager = struct
     in
     register_error_kind
       `Permanent
-      ~id:"validate_operation.zk_rollup_disabled"
+      ~id:"validate.operation.zk_rollup_disabled"
       ~title:"ZK rollups are disabled"
       ~description:zkru_disabled_description
       ~pp:(fun ppf () -> Format.fprintf ppf "%s" zkru_disabled_description)

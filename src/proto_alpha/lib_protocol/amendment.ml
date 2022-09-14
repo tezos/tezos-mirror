@@ -148,11 +148,16 @@ let may_start_new_voting_period ctxt =
   Voting_period.is_last_block ctxt >>=? fun is_last ->
   if is_last then start_new_voting_period ctxt else return ctxt
 
+let get_testnet_dictator ctxt chain_id =
+  (* This function should always, ALWAYS, return None on mainnet!!!! *)
+  match Constants.testnet_dictator ctxt with
+  | Some pkh when Chain_id.(chain_id <> Constants.mainnet_id) -> Some pkh
+  | _ -> None
+
 let is_testnet_dictator ctxt chain_id delegate =
   (* This function should always, ALWAYS, return false on mainnet!!!! *)
-  match Constants.testnet_dictator ctxt with
-  | Some pkh when Chain_id.(chain_id <> Constants.mainnet_id) ->
-      Signature.Public_key_hash.equal pkh delegate
+  match get_testnet_dictator ctxt chain_id with
+  | Some pkh -> Signature.Public_key_hash.equal pkh delegate
   | _ -> false
 
 (** {2 Application of voting operations} *)

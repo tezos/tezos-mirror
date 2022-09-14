@@ -23,21 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Validate_errors
 open Alpha_context
-
-(** {2 Definition and initialization of [info] and [state]}
-
-    These live in memory during the validation of a block, or until a
-    change of head block; they are never put in the storage. *)
 
 (** Since the expected features of preendorsement and endorsement are
     the same for all operations in the considered block, we compute
     them once and for all at the begining of the block.
 
-    See [expected_features_for_block_validation],
-    [expected_features_for_block_construction], and
-    [expected_features_for_mempool] in the [Consensus] module below. *)
-
+    See [expected_features_for_application],
+    [expected_features_for_construction], and
+    [expected_features_for_partial_construction] in the [Consensus]
+    module below. *)
 type expected_features = {
   level : Raw_level.t;
   round : Round.t option;
@@ -52,19 +48,20 @@ type expected_preendorsement =
   | Expected_preendorsement of {
       expected_features : expected_features;
       block_round : Round.t option;
-          (** During block validation or construction, we must also check
-              that the preendorsement round is lower than the block
-              round. In mempool mode, this field is [None]. *)
     }
+      (** During block validation or construction, we must also check
+          that the preendorsement round is lower than the block
+          round. In mempool mode, this field is [None]. *)
   | No_locked_round_for_block_validation_preendorsement
       (** A preexisting block whose fitness indicates no locked round
           should contain no preendorsements. *)
-  | Fresh_proposal_for_block_construction_preendorsement
+  | Fresh_proposal_for_construction_preendorsement
       (** A constructed block with a fresh proposal should contain no
           preendorsements. *)
-  | No_expected_branch_for_mempool_preendorsement of {
+  | No_expected_branch_for_partial_construction_preendorsement of {
       expected_level : Raw_level.t;
-    }  (** See [No_expected_branch_for_mempool_endorsement] below. *)
+    }
+      (** See [No_expected_branch_for_partial_construction_endorsement] below. *)
   | No_predecessor_info_cannot_validate_preendorsement
       (** We do not have access to predecessor level, round, etc. so any
           preendorsement validation will fail. *)
@@ -75,7 +72,9 @@ type expected_endorsement =
       (** The context contains no branch: this happens to the first block
           that uses the Tenderbake consensus algorithm. This block contains
           no endorsements. *)
-  | No_expected_branch_for_mempool_endorsement of {expected_level : Raw_level.t}
+  | No_expected_branch_for_partial_construction_endorsement of {
+      expected_level : Raw_level.t;
+    }
       (** Same as [No_expected_branch_for_block_endorsement]. This has a
           separate constructor because the error raised is distinct: in
           mempool mode, we simply assume that we have received a
@@ -88,9 +87,10 @@ type expected_endorsement =
 type all_expected_consensus_features = {
   expected_preendorsement : expected_preendorsement;
   expected_endorsement : expected_endorsement;
-  expected_grandparent_endorsement_for_mempool : expected_features option;
+  expected_grandparent_endorsement_for_partial_construction :
+    expected_features option;
       (** This only has a value in Mempool mode and when the [ctxt] has a
-          [grand_parent_branch]; it is [None] in all other cases. *)
+          [grandparent_branch]; it is [None] in all other cases. *)
 }
 
 type consensus_info = {
@@ -106,72 +106,150 @@ let init_consensus_info ctxt all_expected_features =
     endorsement_slot_map = Consensus.allowed_endorsements ctxt;
   }
 
+module Consensus_content_map = Map.Make (struct
+  type t = consensus_content
+
+  let compare {slot; level; round; block_payload_hash}
+      {
+        slot = slot';
+        level = level';
+        round = round';
+        block_payload_hash = block_payload_hash';
+      } =
+    Compare.or_else (Raw_level.compare level level') @@ fun () ->
+    Compare.or_else (Slot.compare slot slot') @@ fun () ->
+    Compare.or_else (Round.compare round round') @@ fun () ->
+    Compare.or_else
+      (Block_payload_hash.compare block_payload_hash block_payload_hash')
+    @@ fun () -> 0
+end)
+
 type consensus_state = {
-  preendorsements_seen : Slot.Set.t;
-  endorsements_seen : Slot.Set.t;
-  endorsement_power : int;
-  grandparent_endorsements_seen : Signature.Public_key_hash.Set.t;
-  locked_round_evidence : (Round.t * int) option;
-  dal_slot_availability_seen : Signature.Public_key_hash.Set.t;
+  predecessor_level : Raw_level.t;
+  preendorsements_seen : Operation_hash.t Slot.Map.t;
+  endorsements_seen : Operation_hash.t Slot.Map.t;
+  grandparent_endorsements_seen : Operation_hash.t Slot.Map.t;
+  dal_slot_availability_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
 }
 
-let empty_consensus_state =
+let slot_map_encoding element_encoding =
+  let open Data_encoding in
+  conv
+    (fun slot_map -> Slot.Map.bindings slot_map)
+    (fun l -> Slot.Map.(List.fold_left (fun m (k, v) -> add k v m) empty l))
+    (list (tup2 Slot.encoding element_encoding))
+
+let consensus_state_encoding =
+  let open Data_encoding in
+  def "consensus_state"
+  @@ conv
+       (fun {
+              predecessor_level;
+              preendorsements_seen;
+              endorsements_seen;
+              grandparent_endorsements_seen;
+              dal_slot_availability_seen;
+            } ->
+         ( predecessor_level,
+           preendorsements_seen,
+           endorsements_seen,
+           grandparent_endorsements_seen,
+           dal_slot_availability_seen ))
+       (fun ( predecessor_level,
+              preendorsements_seen,
+              endorsements_seen,
+              grandparent_endorsements_seen,
+              dal_slot_availability_seen ) ->
+         {
+           predecessor_level;
+           preendorsements_seen;
+           endorsements_seen;
+           grandparent_endorsements_seen;
+           dal_slot_availability_seen;
+         })
+       (obj5
+          (req "predecessor_level" Raw_level.encoding)
+          (req
+             "preendorsements_seen"
+             (slot_map_encoding Operation_hash.encoding))
+          (req "endorsements_seen" (slot_map_encoding Operation_hash.encoding))
+          (req
+             "grandparent_endorsements_seen"
+             (slot_map_encoding Operation_hash.encoding))
+          (req
+             "dal_slot_availability_seen"
+             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
+
+let init_consensus_state ~predecessor_level =
   {
-    preendorsements_seen = Slot.Set.empty;
-    endorsements_seen = Slot.Set.empty;
-    endorsement_power = 0;
-    grandparent_endorsements_seen = Signature.Public_key_hash.Set.empty;
-    locked_round_evidence = None;
-    dal_slot_availability_seen = Signature.Public_key_hash.Set.empty;
+    predecessor_level;
+    preendorsements_seen = Slot.Map.empty;
+    endorsements_seen = Slot.Map.empty;
+    grandparent_endorsements_seen = Slot.Map.empty;
+    dal_slot_availability_seen = Signature.Public_key_hash.Map.empty;
   }
 
-(** Summary of previously validated Proposals operations by a given
-    proposer in the current block/mempool. *)
-type proposer_history = {
-  count : int;
-      (** Total number of protocols submitted by the proposer in
-          previously validated operations. *)
-  operations : Operation_hash.t list;
-      (** Hashes of the previously validated Proposals operations from
-          the proposer. *)
-  proposed : Operation_hash.t Protocol_hash.Map.t;
-      (** A map indexed by the protocols that have been submitted by the
-          proposer in previously validated operations. Each protocol
-          points to the operation in which it was proposed. *)
-}
-
 type voting_state = {
-  proposals_validated : proposer_history Signature.Public_key_hash.Map.t;
+  proposals_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
       (** Summary of all Proposals operations validated in the current
           block/mempool, indexed by the operation's source aka
-          proposer. *)
-  dictator_proposals_validated : Operation_hash.t option;
-      (** If a testnet dictator Proposals operation has been validated
-          in the current block/mempool, then its hash is recorded
-          here. Since such an operation can change the voting period
-          kind, it is mutually exclusive with any other voting operation
-          in a single block (otherwise we would loose the commutativity
-          of validated operation application: see
-          {!Validate_operation}). *)
-  ballots_validated : Operation_hash.t Signature.Public_key_hash.Map.t;
+          proposer. This includes Testnet dictators proposals. *)
+  ballots_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
       (** To each delegate that has submitted a ballot in a previously
           validated operation, associates the hash of this operation.  *)
 }
 
-let empty_voting_state =
-  {
-    proposals_validated = Signature.Public_key_hash.Map.empty;
-    dictator_proposals_validated = None;
-    ballots_validated = Signature.Public_key_hash.Map.empty;
-  }
+let voting_state_encoding =
+  let open Data_encoding in
+  def "voting_state"
+  @@ conv
+       (fun {proposals_seen; ballots_seen} -> (proposals_seen, ballots_seen))
+       (fun (proposals_seen, ballots_seen) -> {proposals_seen; ballots_seen})
+       (obj2
+          (req
+             "proposals_seen"
+             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding))
+          (req
+             "ballots_seen"
+             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
 
-module Double_evidence = Map.Make (struct
-  type t = Signature.Public_key_hash.t * Level.t
+module Double_baking_evidence_map = struct
+  include Map.Make (struct
+    type t = Raw_level.t * Round.t
 
-  let compare (d1, l1) (d2, l2) =
-    let res = Signature.Public_key_hash.compare d1 d2 in
-    if Compare.Int.equal res 0 then Level.compare l1 l2 else res
-end)
+    let compare (l, r) (l', r') =
+      Compare.or_else (Raw_level.compare l l') @@ fun () ->
+      Compare.or_else (Round.compare r r') @@ fun () -> 0
+  end)
+
+  let encoding elt_encoding =
+    Data_encoding.conv
+      (fun map -> bindings map)
+      (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
+      Data_encoding.(
+        list (tup2 (tup2 Raw_level.encoding Round.encoding) elt_encoding))
+end
+
+module Double_endorsing_evidence_map = struct
+  include Map.Make (struct
+    type t = Raw_level.t * Round.t * Slot.t
+
+    let compare (l, r, s) (l', r', s') =
+      Compare.or_else (Raw_level.compare l l') @@ fun () ->
+      Compare.or_else (Round.compare r r') @@ fun () ->
+      Compare.or_else (Slot.compare s s') @@ fun () -> 0
+  end)
+
+  let encoding elt_encoding =
+    Data_encoding.conv
+      (fun map -> bindings map)
+      (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
+      Data_encoding.(
+        list
+          (tup2
+             (tup3 Raw_level.encoding Round.encoding Slot.encoding)
+             elt_encoding))
+end
 
 (** State used and modified when validating anonymous operations.
     These fields are used to enforce that we do not validate the same
@@ -186,20 +264,72 @@ end)
     - In mempool mode, bounding the number of operations in this map
     is the responsability of the prevalidator on the shell side. *)
 type anonymous_state = {
-  blinded_pkhs_seen : Operation_hash.t Blinded_public_key_hash.Map.t;
-  double_baking_evidences_seen : Operation_hash.t Double_evidence.t;
-  double_consensus_evidences_seen : Operation_hash.t Double_evidence.t;
-  seed_nonce_levels_seen : Raw_level.Set.t;
-  vdf_solution_seen : bool;
+  activation_pkhs_seen : Operation_hash.t Ed25519.Public_key_hash.Map.t;
+  double_baking_evidences_seen : Operation_hash.t Double_baking_evidence_map.t;
+  double_endorsing_evidences_seen :
+    Operation_hash.t Double_endorsing_evidence_map.t;
+  seed_nonce_levels_seen : Operation_hash.t Raw_level.Map.t;
+  vdf_solution_seen : Operation_hash.t option;
 }
+
+let raw_level_map_encoding elt_encoding =
+  let open Data_encoding in
+  conv
+    (fun map -> Raw_level.Map.bindings map)
+    (fun l ->
+      Raw_level.Map.(List.fold_left (fun m (k, v) -> add k v m) empty l))
+    (list (tup2 Raw_level.encoding elt_encoding))
+
+let anonymous_state_encoding =
+  let open Data_encoding in
+  def "anonymous_state"
+  @@ conv
+       (fun {
+              activation_pkhs_seen;
+              double_baking_evidences_seen;
+              double_endorsing_evidences_seen;
+              seed_nonce_levels_seen;
+              vdf_solution_seen;
+            } ->
+         ( activation_pkhs_seen,
+           double_baking_evidences_seen,
+           double_endorsing_evidences_seen,
+           seed_nonce_levels_seen,
+           vdf_solution_seen ))
+       (fun ( activation_pkhs_seen,
+              double_baking_evidences_seen,
+              double_endorsing_evidences_seen,
+              seed_nonce_levels_seen,
+              vdf_solution_seen ) ->
+         {
+           activation_pkhs_seen;
+           double_baking_evidences_seen;
+           double_endorsing_evidences_seen;
+           seed_nonce_levels_seen;
+           vdf_solution_seen;
+         })
+       (obj5
+          (req
+             "activation_pkhs_seen"
+             (Ed25519.Public_key_hash.Map.encoding Operation_hash.encoding))
+          (req
+             "double_baking_evidences_seen"
+             (Double_baking_evidence_map.encoding Operation_hash.encoding))
+          (req
+             "double_endorsing_evidences_seen"
+             (Double_endorsing_evidence_map.encoding Operation_hash.encoding))
+          (req
+             "seed_nonce_levels_seen"
+             (raw_level_map_encoding Operation_hash.encoding))
+          (opt "vdf_solution_seen" Operation_hash.encoding))
 
 let empty_anonymous_state =
   {
-    blinded_pkhs_seen = Blinded_public_key_hash.Map.empty;
-    double_baking_evidences_seen = Double_evidence.empty;
-    double_consensus_evidences_seen = Double_evidence.empty;
-    seed_nonce_levels_seen = Raw_level.Set.empty;
-    vdf_solution_seen = false;
+    activation_pkhs_seen = Ed25519.Public_key_hash.Map.empty;
+    double_baking_evidences_seen = Double_baking_evidence_map.empty;
+    double_endorsing_evidences_seen = Double_endorsing_evidence_map.empty;
+    seed_nonce_levels_seen = Raw_level.Map.empty;
+    vdf_solution_seen = None;
   }
 
 (** Static information used to validate manager operations. *)
@@ -232,14 +362,20 @@ type manager_state = {
             map is the responsability of the mempool. (E.g. the plugin used
             by Octez has a [max_prechecked_manager_operations] parameter to
             ensure this.) *)
-  remaining_block_gas : Gas.Arith.fp;
 }
 
-let init_manager_state ctxt =
-  {
-    managers_seen = Signature.Public_key_hash.Map.empty;
-    remaining_block_gas = Gas.Arith.fp (Constants.hard_gas_limit_per_block ctxt);
-  }
+let manager_state_encoding =
+  let open Data_encoding in
+  def "manager_state"
+  @@ conv
+       (fun {managers_seen} -> managers_seen)
+       (fun managers_seen -> {managers_seen})
+       (obj1
+          (req
+             "managers_seen"
+             (Signature.Public_key_hash.Map.encoding Operation_hash.encoding)))
+
+let empty_manager_state = {managers_seen = Signature.Public_key_hash.Map.empty}
 
 (** Mode-dependent information needed in final checks. *)
 type application_info = {
@@ -281,8 +417,7 @@ type mode =
     }
   | Mempool
 
-(** {2 Definition and initialization of [info] and
-    [state]} *)
+(** {2 Definition and initialization of [info] and [state]} *)
 
 type info = {
   ctxt : t;  (** The context at the beginning of the block or mempool. *)
@@ -293,17 +428,43 @@ type info = {
   manager_info : manager_info;
 }
 
-type state = {
+type operation_conflict_state = {
   consensus_state : consensus_state;
   voting_state : voting_state;
   anonymous_state : anonymous_state;
   manager_state : manager_state;
-  op_count : int;
-  recorded_operations_rev : Operation_hash.t list;
-  last_op_validation_pass : int option;
 }
 
-type validation_state = {info : info; state : state}
+let operation_conflict_state_encoding =
+  let open Data_encoding in
+  def "operation_conflict_state"
+  @@ conv
+       (fun {consensus_state; voting_state; anonymous_state; manager_state} ->
+         (consensus_state, voting_state, anonymous_state, manager_state))
+       (fun (consensus_state, voting_state, anonymous_state, manager_state) ->
+         {consensus_state; voting_state; anonymous_state; manager_state})
+       (obj4
+          (req "consensus_state" consensus_state_encoding)
+          (req "voting_state" voting_state_encoding)
+          (req "anonymous_state" anonymous_state_encoding)
+          (req "manager_state" manager_state_encoding))
+
+type block_state = {
+  op_count : int;
+  remaining_block_gas : Gas.Arith.fp;
+  recorded_operations_rev : Operation_hash.t list;
+  last_op_validation_pass : int option;
+  locked_round_evidence : (Round.t * int) option;
+  endorsement_power : int;
+}
+
+type validation_state = {
+  info : info;
+  operation_state : operation_conflict_state;
+  block_state : block_state;
+}
+
+let ok_unit = Result_syntax.return_unit
 
 let init_info ctxt mode chain_id all_expected_consensus_characteristics =
   {
@@ -316,18 +477,29 @@ let init_info ctxt mode chain_id all_expected_consensus_characteristics =
     manager_info = init_manager_info ctxt;
   }
 
-let init_info ctxt mode chain_id all_expected_consensus_characteristics =
-  init_info ctxt mode chain_id all_expected_consensus_characteristics
-
-let init_state ctxt =
+let empty_voting_state =
   {
-    consensus_state = empty_consensus_state;
+    proposals_seen = Signature.Public_key_hash.Map.empty;
+    ballots_seen = Signature.Public_key_hash.Map.empty;
+  }
+
+let init_operation_conflict_state ~predecessor_level =
+  {
+    consensus_state = init_consensus_state ~predecessor_level;
     voting_state = empty_voting_state;
     anonymous_state = empty_anonymous_state;
-    manager_state = init_manager_state ctxt;
+    manager_state = empty_manager_state;
+  }
+
+let init_block_state vi =
+  {
     op_count = 0;
+    remaining_block_gas =
+      Gas.Arith.fp (Constants.hard_gas_limit_per_block vi.ctxt);
     recorded_operations_rev = [];
     last_op_validation_pass = None;
+    locked_round_evidence = None;
+    endorsement_power = 0;
   }
 
 (** Validation of consensus operations (validation pass [0]):
@@ -356,7 +528,7 @@ module Consensus = struct
         in
         Expected_endorsement {expected_features}
 
-  let expected_features_for_block_validation ctxt fitness payload_hash
+  let expected_features_for_application ctxt fitness payload_hash
       ~predecessor_level ~predecessor_round ~predecessor_hash =
     let expected_preendorsement =
       match Fitness.locked_round fitness with
@@ -379,17 +551,17 @@ module Consensus = struct
     {
       expected_preendorsement;
       expected_endorsement;
-      expected_grandparent_endorsement_for_mempool = None;
+      expected_grandparent_endorsement_for_partial_construction = None;
     }
 
-  let expected_features_for_block_construction ctxt round payload_hash
+  let expected_features_for_construction ctxt round payload_hash
       ~predecessor_level ~predecessor_round ~predecessor_hash =
     let expected_preendorsement =
       if Block_payload_hash.(payload_hash = zero) then
         (* When the proposal is fresh, a fake [payload_hash] of [zero]
            has been provided. In this case, the block should not
            contain any preendorsements. *)
-        Fresh_proposal_for_block_construction_preendorsement
+        Fresh_proposal_for_construction_preendorsement
       else
         let expected_features =
           {
@@ -407,17 +579,19 @@ module Consensus = struct
     {
       expected_preendorsement;
       expected_endorsement;
-      expected_grandparent_endorsement_for_mempool = None;
+      expected_grandparent_endorsement_for_partial_construction = None;
     }
 
-  let expected_features_for_mempool ctxt ~predecessor_level ~predecessor_round
-      ~grandparent_round =
+  let expected_features_for_partial_construction ctxt ~predecessor_level
+      ~predecessor_round ~grandparent_round =
     let expected_preendorsement, expected_endorsement =
       match Consensus.endorsement_branch ctxt with
       | None ->
           let expected_level = predecessor_level.Level.level in
-          ( No_expected_branch_for_mempool_preendorsement {expected_level},
-            No_expected_branch_for_mempool_endorsement {expected_level} )
+          ( No_expected_branch_for_partial_construction_preendorsement
+              {expected_level},
+            No_expected_branch_for_partial_construction_endorsement
+              {expected_level} )
       | Some (branch, payload_hash) ->
           let expected_features =
             expected_endorsement_features
@@ -429,7 +603,7 @@ module Consensus = struct
           ( Expected_preendorsement {expected_features; block_round = None},
             Expected_endorsement {expected_features} )
     in
-    let expected_grandparent_endorsement_for_mempool =
+    let expected_grandparent_endorsement_for_partial_construction =
       match
         ( Consensus.grand_parent_branch ctxt,
           Raw_level.pred predecessor_level.level )
@@ -441,13 +615,13 @@ module Consensus = struct
     {
       expected_preendorsement;
       expected_endorsement;
-      expected_grandparent_endorsement_for_mempool;
+      expected_grandparent_endorsement_for_partial_construction;
     }
 
   open Validate_errors.Consensus
 
   let check_frozen_deposits_are_positive ctxt delegate_pkh =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let* frozen_deposits = Delegate.frozen_deposits ctxt delegate_pkh in
     fail_unless
       Tez.(frozen_deposits.current_amount > zero)
@@ -463,32 +637,19 @@ module Consensus = struct
        Consensus_operation_for_old_level {kind; expected; provided}
       else Consensus_operation_for_future_level {kind; expected; provided})
 
-  let check_round_equal vs kind expected_features
+  let check_round kind expected (consensus_content : consensus_content) =
+    let provided = consensus_content.round in
+    error_unless
+      (Round.equal expected provided)
+      (if Round.(expected > provided) then
+       Consensus_operation_for_old_round {kind; expected; provided}
+      else Consensus_operation_for_future_round {kind; expected; provided})
+
+  let check_round_equal kind expected_features
       (consensus_content : consensus_content) =
-    let check expected =
-      let provided = consensus_content.round in
-      error_unless
-        (Round.equal expected provided)
-        (if Round.(expected > provided) then
-         Consensus_operation_for_old_round {kind; expected; provided}
-        else Consensus_operation_for_future_round {kind; expected; provided})
-    in
     match expected_features.round with
-    | Some expected -> check expected
-    | None -> (
-        (* For preendorsements in block construction mode,
-           [expected_features.round] has been set to [None] because we
-           could not know yet whether there is a locked round. *)
-        match vs.consensus_state.locked_round_evidence with
-        | None ->
-            (* This is the first validated preendorsement in
-               construction mode: there is nothing to check. *)
-            ok ()
-        | Some (expected, _power) ->
-            (* Other preendorsements have already been validated: we
-               check that the current operation has the same round as
-               them. *)
-            check expected)
+    | Some expected -> check_round kind expected consensus_content
+    | None -> ok_unit
 
   let check_branch_equal kind expected_features (operation : 'a operation) =
     let expected = expected_features.branch in
@@ -505,53 +666,23 @@ module Consensus = struct
       (Block_payload_hash.equal expected provided)
       (Wrong_payload_hash_for_consensus_operation {kind; expected; provided})
 
-  let check_consensus_features vs kind (expected : expected_features)
+  let check_consensus_features kind (expected : expected_features)
       (consensus_content : consensus_content) (operation : 'a operation) =
     let open Result_syntax in
     let* () = check_level_equal kind expected consensus_content in
-    let* () = check_round_equal vs kind expected consensus_content in
+    let* () = check_round_equal kind expected consensus_content in
     let* () = check_branch_equal kind expected operation in
     check_payload_hash_equal kind expected consensus_content
-
-  let ensure_conflict_free_preendorsement vs slot =
-    error_unless
-      (not (Slot.Set.mem slot vs.consensus_state.preendorsements_seen))
-      (Conflicting_consensus_operation {kind = Preendorsement})
-
-  let update_validity_state_preendorsement vs slot round voting_power =
-    let locked_round_evidence =
-      match vs.consensus_state.locked_round_evidence with
-      | None -> Some (round, voting_power)
-      | Some (_stored_round, evidences) -> Some (round, evidences + voting_power)
-      (* In mempool mode, round and stored_round can be different when
-         one of them corresponds to a grandparent preendorsement; this
-         doesn't matter because quorum certificates are not used in
-         mempool mode. For other cases, {!check_round_equal} ensures
-         that all preendorsements have the same round. Indeed, during
-         block validation, they are all checked to be the same
-         {!recfield:expected_features.round}; and during block
-         construction, the round of the first validated preendorsement
-         is stored in [locked_round_evidence] then all subsequent
-         preendorsements are checked to have the same round in
-         {!check_round_equal}. *)
-    in
-    let preendorsements_seen =
-      Slot.Set.add slot vs.consensus_state.preendorsements_seen
-    in
-    {
-      vs with
-      consensus_state =
-        {vs.consensus_state with locked_round_evidence; preendorsements_seen};
-    }
 
   let get_expected_preendorsements_features consensus_info consensus_content =
     match consensus_info.all_expected_features.expected_preendorsement with
     | Expected_preendorsement {expected_features; block_round} ->
         ok (expected_features, block_round)
     | No_locked_round_for_block_validation_preendorsement
-    | Fresh_proposal_for_block_construction_preendorsement ->
+    | Fresh_proposal_for_construction_preendorsement ->
         error Unexpected_preendorsement_in_block
-    | No_expected_branch_for_mempool_preendorsement {expected_level} ->
+    | No_expected_branch_for_partial_construction_preendorsement
+        {expected_level} ->
         error
           (Consensus_operation_for_future_level
              {
@@ -564,7 +695,7 @@ module Consensus = struct
 
   let check_round_not_too_high ~block_round ~provided =
     match block_round with
-    | None -> ok ()
+    | None -> ok_unit
     | Some block_round ->
         error_unless
           Round.(provided < block_round)
@@ -575,14 +706,13 @@ module Consensus = struct
       (Slot.Map.find consensus_content.slot slot_map)
       ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
 
-  let validate_preendorsement vi vs ~should_check_signature
+  let check_preendorsement vi ~should_check_signature
       (operation : Kind.preendorsement operation) =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
     let kind = Preendorsement in
-    let*? () = ensure_conflict_free_preendorsement vs consensus_content.slot in
     let*? expected_features, block_round =
       get_expected_preendorsements_features vi.consensus_info consensus_content
     in
@@ -591,7 +721,6 @@ module Consensus = struct
     in
     let*? () =
       check_consensus_features
-        vs
         kind
         expected_features
         consensus_content
@@ -612,51 +741,88 @@ module Consensus = struct
           consensus_key.consensus_pk
           vi.chain_id
           operation
-      else ok ()
+      else ok_unit
     in
-    return
-      (update_validity_state_preendorsement
-         vs
-         consensus_content.slot
-         consensus_content.round
-         voting_power)
+    return voting_power
 
-  let ensure_conflict_free_grandparent_endorsement vs delegate =
-    error_unless
-      (not
-         (Signature.Public_key_hash.Set.mem
-            delegate
-            vs.consensus_state.grandparent_endorsements_seen))
-      (Conflicting_consensus_operation {kind = Grandparent_endorsement})
+  let check_preendorsement_conflict vs oph (op : Kind.preendorsement operation)
+      =
+    let (Single (Preendorsement consensus_content)) =
+      op.protocol_data.contents
+    in
+    match
+      Slot.Map.find_opt
+        consensus_content.slot
+        vs.consensus_state.preendorsements_seen
+    with
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | None -> ok_unit
 
-  let update_validity_state_grandparent_endorsement vs delegate =
-    {
-      vs with
-      consensus_state =
-        {
-          vs.consensus_state with
-          grandparent_endorsements_seen =
-            Signature.Public_key_hash.Set.add
-              delegate
-              vs.consensus_state.grandparent_endorsements_seen;
-        };
-    }
+  let wrap_preendorsement_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        error
+          Validate_errors.Consensus.(
+            Conflicting_consensus_operation {kind = Preendorsement; conflict})
 
-  (** Validate an endorsement pointing to the grandparent block. This
-      function will only be called in [Mempool] mode. *)
-  let validate_grandparent_endorsement vi vs ~should_check_signature expected
-      (consensus_content : consensus_content) (operation : 'kind operation) =
-    let open Lwt_result_syntax in
+  let add_preendorsement vs oph (op : Kind.preendorsement operation) =
+    let (Single (Preendorsement consensus_content)) =
+      op.protocol_data.contents
+    in
+    let preendorsements_seen =
+      Slot.Map.add
+        consensus_content.slot
+        oph
+        vs.consensus_state.preendorsements_seen
+    in
+    {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
+
+  let may_update_locked_round_evidence block_state mode
+      (consensus_content : consensus_content) voting_power =
+    let locked_round_evidence =
+      match mode with
+      | Mempool -> None
+      | Application _ | Partial_application _ | Construction _ -> (
+          match block_state.locked_round_evidence with
+          | None -> Some (consensus_content.round, voting_power)
+          | Some (_stored_round, evidences) ->
+              (* [_stored_round] is always equal to
+                 [consensus_content.round]: this is ensured by
+                 {!check_round_equal} in application and partial
+                 application modes, and by
+                 {!check_locked_round_evidence} in construction
+                 mode. *)
+              Some (consensus_content.round, evidences + voting_power))
+    in
+    {block_state with locked_round_evidence}
+
+  (* Hypothesis: this function will only be called in mempool mode *)
+  let remove_preendorsement vs (operation : Kind.preendorsement operation) =
+    (* As we are in mempool mode, we do not update
+       [locked_round_evidence]. *)
+    let (Single (Preendorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    let preendorsements_seen =
+      Slot.Map.remove
+        consensus_content.slot
+        vs.consensus_state.preendorsements_seen
+    in
+    {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
+
+  (** Validates an endorsement pointing to the grandparent block. This
+      function will only be called in [Partial_construction] mode. *)
+  let check_grandparent_endorsement vi ~should_check_signature expected
+      operation (consensus_content : consensus_content) =
+    let open Lwt_tzresult_syntax in
     let kind = Grandparent_endorsement in
     let level = Level.from_raw vi.ctxt consensus_content.level in
-    let* _ctxt, consensus_key =
+    let* (_ctxt : t), consensus_key =
       Stake_distribution.slot_owner vi.ctxt level consensus_content.slot
     in
     let*? () =
-      ensure_conflict_free_grandparent_endorsement vs consensus_key.delegate
-    in
-    let*? () =
-      check_consensus_features vs kind expected consensus_content operation
+      check_consensus_features kind expected consensus_content operation
     in
     let*? () =
       if should_check_signature then
@@ -664,27 +830,46 @@ module Consensus = struct
           consensus_key.consensus_pk
           vi.chain_id
           operation
-      else ok ()
+      else ok_unit
     in
-    return
-      (update_validity_state_grandparent_endorsement vs consensus_key.delegate)
+    return_unit
 
-  let ensure_conflict_free_endorsement vs slot =
-    error_unless
-      (not (Slot.Set.mem slot vs.consensus_state.endorsements_seen))
-      (Conflicting_consensus_operation {kind = Endorsement})
-
-  let update_validity_state_endorsement vs slot voting_power =
+  let add_grandparent_endorsement vs oph (consensus_content : consensus_content)
+      =
     {
       vs with
       consensus_state =
         {
           vs.consensus_state with
-          endorsements_seen =
-            Slot.Set.add slot vs.consensus_state.endorsements_seen;
-          endorsement_power =
-            vs.consensus_state.endorsement_power + voting_power;
+          grandparent_endorsements_seen =
+            Slot.Map.add
+              consensus_content.slot
+              oph
+              vs.consensus_state.grandparent_endorsements_seen;
         };
+    }
+
+  let check_grandparent_endorsement_conflict vs oph
+      (consensus_content : consensus_content) =
+    match
+      Slot.Map.find_opt
+        consensus_content.slot
+        vs.consensus_state.grandparent_endorsements_seen
+    with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let remove_grandparent_endorsement vs (consensus_content : consensus_content)
+      =
+    let grandparent_endorsements_seen =
+      Slot.Map.remove
+        consensus_content.slot
+        vs.consensus_state.grandparent_endorsements_seen
+    in
+    {
+      vs with
+      consensus_state = {vs.consensus_state with grandparent_endorsements_seen};
     }
 
   let get_expected_endorsements_features consensus_info consensus_content =
@@ -692,7 +877,8 @@ module Consensus = struct
     | Expected_endorsement {expected_features} -> ok expected_features
     | No_expected_branch_for_block_endorsement ->
         error Unexpected_endorsement_in_block
-    | No_expected_branch_for_mempool_endorsement {expected_level} ->
+    | No_expected_branch_for_partial_construction_endorsement {expected_level}
+      ->
         error
           (Consensus_operation_for_future_level
              {
@@ -703,20 +889,23 @@ module Consensus = struct
     | No_predecessor_info_cannot_validate_endorsement ->
         error Consensus_operation_not_allowed
 
+  type endorsement_kind = Grandparent_endorsement | Normal_endorsement of int
+
   (** Validate an endorsement pointing to the predecessor, aka a
       "normal" endorsement. Only this kind of endorsement may be found
       during block validation or construction. *)
-  let validate_normal_endorsement vi vs ~should_check_signature
-      (consensus_content : consensus_content) (operation : 'kind operation) =
-    let open Lwt_result_syntax in
+  let check_normal_endorsement vi ~should_check_signature
+      (operation : Kind.endorsement operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Endorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
     let kind = Endorsement in
-    let*? () = ensure_conflict_free_endorsement vs consensus_content.slot in
     let*? expected_features =
       get_expected_endorsements_features vi.consensus_info consensus_content
     in
     let*? () =
       check_consensus_features
-        vs
         kind
         expected_features
         consensus_content
@@ -737,64 +926,121 @@ module Consensus = struct
           consensus_key.consensus_pk
           vi.chain_id
           operation
-      else ok ()
+      else ok_unit
     in
-    return
-      (update_validity_state_endorsement vs consensus_content.slot voting_power)
+    return voting_power
 
-  let validate_endorsement vi vs ~should_check_signature
-      (operation : Kind.endorsement operation) =
-    let (Single (Endorsement consensus_content)) =
-      operation.protocol_data.contents
-    in
+  let check_normal_endorsement_conflict vs oph
+      (consensus_content : consensus_content) =
     match
-      vi.consensus_info.all_expected_features
-        .expected_grandparent_endorsement_for_mempool
+      Slot.Map.find_opt
+        consensus_content.slot
+        vs.consensus_state.endorsements_seen
     with
-    | Some expected_grandparent_endorsement
-      when Raw_level.(
-             consensus_content.level = expected_grandparent_endorsement.level)
-      ->
-        validate_grandparent_endorsement
-          vi
-          vs
-          ~should_check_signature
-          expected_grandparent_endorsement
-          consensus_content
-          operation
-    | _ ->
-        validate_normal_endorsement
-          vi
-          vs
-          ~should_check_signature
-          consensus_content
-          operation
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
-  let ensure_conflict_free_dal_slot_availability vs endorser =
-    error_unless
-      (not
-         (Signature.Public_key_hash.Set.mem
-            endorser
-            vs.consensus_state.dal_slot_availability_seen))
-      (Conflicting_dal_slot_availability {endorser})
-
-  let update_validity_state_dal_slot_availabitiy vs endorser =
+  let add_normal_endorsement vs oph (consensus_content : consensus_content) =
     {
       vs with
       consensus_state =
         {
           vs.consensus_state with
-          dal_slot_availability_seen =
-            Signature.Public_key_hash.Set.add
-              endorser
-              vs.consensus_state.dal_slot_availability_seen;
+          endorsements_seen =
+            Slot.Map.add
+              consensus_content.slot
+              oph
+              vs.consensus_state.endorsements_seen;
         };
     }
 
-  let validate_dal_slot_availability vi vs ~should_check_signature:_
+  (* Hypothesis: this function will only be called in mempool mode *)
+  let remove_normal_endorsement vs (consensus_content : consensus_content) =
+    (* We do not remove the endorsement power because it is not
+       relevant for the mempool mode. *)
+    let endorsements_seen =
+      Slot.Map.remove
+        consensus_content.slot
+        vs.consensus_state.endorsements_seen
+    in
+    {vs with consensus_state = {vs.consensus_state with endorsements_seen}}
+
+  let check_endorsement vi ~should_check_signature
+      (operation : Kind.endorsement operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Endorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    match
+      vi.consensus_info.all_expected_features
+        .expected_grandparent_endorsement_for_partial_construction
+    with
+    | Some expected_grandparent_endorsement
+      when Raw_level.(
+             consensus_content.level = expected_grandparent_endorsement.level)
+      ->
+        let* () =
+          check_grandparent_endorsement
+            vi
+            ~should_check_signature
+            expected_grandparent_endorsement
+            operation
+            (consensus_content : consensus_content)
+        in
+        return Grandparent_endorsement
+    | _ ->
+        let* voting_power =
+          check_normal_endorsement vi ~should_check_signature operation
+        in
+        return (Normal_endorsement voting_power)
+
+  let is_normal_endorsement_assuming_valid vs
+      (consensus_content : consensus_content) =
+    Raw_level.equal vs.consensus_state.predecessor_level consensus_content.level
+
+  let check_endorsement_conflict vs oph (operation : Kind.endorsement operation)
+      =
+    let (Single (Endorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    if is_normal_endorsement_assuming_valid vs consensus_content then
+      check_normal_endorsement_conflict vs oph consensus_content
+    else check_grandparent_endorsement_conflict vs oph consensus_content
+
+  let wrap_endorsement_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        error
+          Validate_errors.Consensus.(
+            Conflicting_consensus_operation {kind = Endorsement; conflict})
+
+  let add_endorsement vs oph (op : Kind.endorsement operation) endorsement_kind
+      =
+    let (Single (Endorsement consensus_content)) = op.protocol_data.contents in
+    match endorsement_kind with
+    | Grandparent_endorsement ->
+        add_grandparent_endorsement vs oph consensus_content
+    | Normal_endorsement _voting_power ->
+        add_normal_endorsement vs oph consensus_content
+
+  let may_update_endorsement_power block_state = function
+    | Grandparent_endorsement -> block_state
+    | Normal_endorsement voting_power ->
+        {
+          block_state with
+          endorsement_power = block_state.endorsement_power + voting_power;
+        }
+
+  let remove_endorsement vs (op : Kind.endorsement operation) =
+    let (Single (Endorsement consensus_content)) = op.protocol_data.contents in
+    if is_normal_endorsement_assuming_valid vs consensus_content then
+      remove_normal_endorsement vs consensus_content
+    else remove_grandparent_endorsement vs consensus_content
+
+  let check_dal_slot_availability vi
       (operation : Kind.dal_slot_availability operation) =
     (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
-
        This is a temporary operation. Some checks are missing for the
        moment. In particular, the signature is not
        checked. Consequently, it is really important to ensure this
@@ -803,16 +1049,146 @@ module Consensus = struct
        endorsement encoding. However, once the DAL is ready, this
        operation should be merged with an endorsement or at least
        refined. *)
-    let open Lwt_result_syntax in
-    let (Single (Dal_slot_availability (endorser, slot_availability))) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Dal_slot_availability (_endorser, slot_availability))) =
       operation.protocol_data.contents
     in
-    let*? () = ensure_conflict_free_dal_slot_availability vs endorser in
     let*? () =
       (* Note that this function checks the dal feature flag. *)
       Dal_apply.validate_data_availability vi.ctxt slot_availability
     in
-    return (update_validity_state_dal_slot_availabitiy vs endorser)
+    return_unit
+
+  let check_dal_slot_availability_conflict vs oph
+      (operation : Kind.dal_slot_availability operation) =
+    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+      operation.protocol_data.contents
+    in
+    match
+      Signature.Public_key_hash.Map.find_opt
+        endorser
+        vs.consensus_state.dal_slot_availability_seen
+    with
+    | None -> ok_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let wrap_dal_slot_availability_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        error
+          Validate_errors.Consensus.(
+            Conflicting_consensus_operation
+              {kind = Dal_slot_availability; conflict})
+
+  let add_dal_slot_availability vs oph
+      (operation : Kind.dal_slot_availability operation) =
+    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+      operation.protocol_data.contents
+    in
+    {
+      vs with
+      consensus_state =
+        {
+          vs.consensus_state with
+          dal_slot_availability_seen =
+            Signature.Public_key_hash.Map.add
+              endorser
+              oph
+              vs.consensus_state.dal_slot_availability_seen;
+        };
+    }
+
+  let remove_dal_slot_availability vs
+      (operation : Kind.dal_slot_availability operation) =
+    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+      operation.protocol_data.contents
+    in
+    let dal_slot_availability_seen =
+      Signature.Public_key_hash.Map.remove
+        endorser
+        vs.consensus_state.dal_slot_availability_seen
+    in
+    {
+      vs with
+      consensus_state = {vs.consensus_state with dal_slot_availability_seen};
+    }
+
+  let check_construction_preendorsement_round_consistency vi block_state kind
+      (consensus_content : consensus_content) =
+    let open Result_syntax in
+    let* expected_features, _block_round =
+      get_expected_preendorsements_features vi.consensus_info consensus_content
+    in
+    match expected_features.round with
+    | Some _ ->
+        (* When [expected_features.round] has a value (ie. in
+           application and partial application modes when the block
+           fitness has a [locked_round], and always in mempool mode),
+           [check_preendorsement] already checks that all
+           preendorsements have this expected round, so checking
+           anything here would be redundant. Also note that when the
+           fitness contains no [locked_round], this code is
+           unreachable because [get_expected_preendorsements_features]
+           returns an error. *)
+        return_unit
+    | None -> (
+        (* For preendorsements in block construction mode,
+           [expected_features.round] has been set to [None] because we
+           could not know yet whether there is a locked round. *)
+        match block_state.locked_round_evidence with
+        | None ->
+            (* This is the first validated preendorsement in
+               construction mode: there is nothing to check. *)
+            return_unit
+        | Some (expected, _power) ->
+            (* Other preendorsements have already been validated: we
+               check that the current operation has the same round as
+               them. *)
+            check_round kind expected consensus_content)
+
+  let validate_preendorsement ~should_check_signature info operation_state
+      block_state oph (operation : Kind.preendorsement operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Preendorsement consensus_content)) =
+      operation.protocol_data.contents
+    in
+    let* voting_power =
+      check_preendorsement info ~should_check_signature operation
+    in
+    let*? () =
+      check_construction_preendorsement_round_consistency
+        info
+        block_state
+        Preendorsement
+        consensus_content
+    in
+    let*? () =
+      check_preendorsement_conflict operation_state oph operation
+      |> wrap_preendorsement_conflict
+    in
+    (* We need to update the block state *)
+    let block_state =
+      may_update_locked_round_evidence
+        block_state
+        info.mode
+        consensus_content
+        voting_power
+    in
+    let operation_state = add_preendorsement operation_state oph operation in
+    return {info; operation_state; block_state}
+
+  let validate_endorsement ~should_check_signature info operation_state
+      block_state oph operation =
+    let open Lwt_tzresult_syntax in
+    let* kind = check_endorsement info ~should_check_signature operation in
+    let*? () =
+      check_endorsement_conflict operation_state oph operation
+      |> wrap_endorsement_conflict
+    in
+    let block_state = may_update_endorsement_power block_state kind in
+    let operation_state = add_endorsement operation_state oph operation kind in
+    return {info; operation_state; block_state}
 end
 
 (** {2 Validation of voting operations}
@@ -829,153 +1205,6 @@ end
 
 module Voting = struct
   open Validate_errors.Voting
-
-  let check_count_conflict ~count_previous_blocks ~count_operation
-      proposer_history =
-    let max_allowed = Constants.max_proposals_per_delegate in
-    let count_before_op = count_previous_blocks + proposer_history.count in
-    (* [count_before_op] should never have been increased above
-       [max_proposals_per_delegate]. *)
-    assert (Compare.Int.(count_before_op <= max_allowed)) ;
-    error_unless
-      Compare.Int.(count_before_op + count_operation <= max_allowed)
-      (Conflict_too_many_proposals
-         {
-           max_allowed;
-           count_previous_blocks;
-           count_current_block = proposer_history.count;
-           count_operation;
-           conflicting_operations = proposer_history.operations;
-         })
-
-  (** Check that a regular (ie. non-dictator) Proposals operation is
-      compatible with previously validated voting operations in the
-      current block/mempool, and update the [state] with this
-      operation.
-
-      @return [Error Conflict_too_many_proposals] if the total number
-      of proposals by [proposer] in previously applied operations in
-      [ctxt], in previously validated operations in the current
-      block/mempool, and in the operation to validate, exceeds
-      {!Constants.max_proposals_per_delegate}.
-
-      @return [Error Conflict_already_proposed] if one of the
-      operation's [proposals] has already been submitted by [proposer]
-      in the current block/mempool.
-
-      @return [Error Conflicting_dictator_proposals] if the current
-      block/mempool already contains a testnet dictator Proposals
-      operation (see {!recfield:dictator_proposals_validated}).
-
-      Note that this function is designed to be called in addition to
-      {!check_proposal_list_sanity} and {!check_count} further below,
-      not instead of them: that's why nothing is done when the
-      [proposer] is not in {!recfield:proposals_validated}. More
-      precisely, this function should be called {e after} the
-      aforementioned functions, whose potential errors
-      e.g. [Proposals_contain_duplicate] or [Too_many_proposals] should
-      take precedence because they are independent from the validation
-      [state]. *)
-  let check_proposals_conflicts_and_update_state state oph proposer proposals
-      ~count_in_ctxt ~proposals_length =
-    let open Tzresult_syntax in
-    let* new_proposer_history =
-      match
-        Signature.Public_key_hash.Map.find proposer state.proposals_validated
-      with
-      | None ->
-          let proposed =
-            List.fold_left
-              (fun acc proposal -> Protocol_hash.Map.add proposal oph acc)
-              Protocol_hash.Map.empty
-              proposals
-          in
-          return {count = proposals_length; operations = [oph]; proposed}
-      | Some proposer_history ->
-          let* () =
-            check_count_conflict
-              ~count_previous_blocks:count_in_ctxt
-              ~count_operation:proposals_length
-              proposer_history
-          in
-          let add_proposal proposed_map proposal =
-            match Protocol_hash.Map.find proposal proposer_history.proposed with
-            | Some conflicting_operation ->
-                error
-                  (Conflict_already_proposed {proposal; conflicting_operation})
-            | None -> ok (Protocol_hash.Map.add proposal oph proposed_map)
-          in
-          let* proposed =
-            List.fold_left_e add_proposal proposer_history.proposed proposals
-          in
-          return
-            {
-              count = proposer_history.count + proposals_length;
-              operations = oph :: proposer_history.operations;
-              proposed;
-            }
-    in
-    let* () =
-      match state.dictator_proposals_validated with
-      | None -> ok ()
-      | Some dictator_oph -> error (Conflicting_dictator_proposals dictator_oph)
-    in
-    let proposals_validated =
-      Signature.Public_key_hash.Map.add
-        proposer
-        new_proposer_history
-        state.proposals_validated
-    in
-    return {state with proposals_validated}
-
-  (** Check that a Proposals operation from a testnet dictator is
-      compatible with previously validated voting operations in the
-      current block/mempool (ie. that no other voting operation has
-      been validated), and update the [state] with this operation.
-
-      @return [Error Testnet_dictator_conflicting_operation] if the
-      current block or mempool already contains any validated voting
-      operation. *)
-  let check_dictator_proposals_conflicts_and_update_state state oph =
-    let open Tzresult_syntax in
-    let* () =
-      error_unless
-        (Signature.Public_key_hash.Map.is_empty state.proposals_validated
-        && Option.is_none state.dictator_proposals_validated
-        && Signature.Public_key_hash.Map.is_empty state.ballots_validated)
-        Testnet_dictator_conflicting_operation
-    in
-    return {state with dictator_proposals_validated = Some oph}
-
-  (** Check that a Ballot operation is compatible with previously
-      validated voting operations in the current block/mempool.
-
-      @return [Error Conflicting_ballot] if the [delegate] has already
-      submitted a ballot in the current block/mempool.
-
-      @return [Error Conflicting_dictator_proposals] if the current
-      block/mempool already contains a testnet dictator Proposals
-      operation (see {!recfield:dictator_proposals_validated}). *)
-  let check_ballot_conflicts state voter =
-    let open Tzresult_syntax in
-    let* () =
-      match
-        Signature.Public_key_hash.Map.find voter state.ballots_validated
-      with
-      | None -> ok ()
-      | Some conflicting_operation ->
-          error (Conflicting_ballot {conflicting_operation})
-    in
-    match state.dictator_proposals_validated with
-    | None -> ok ()
-    | Some dictator_oph -> error (Conflicting_dictator_proposals dictator_oph)
-
-  (** Update the [state] when a Ballot operation is validated. *)
-  let update_state_on_ballot state oph voter =
-    let ballots_validated =
-      Signature.Public_key_hash.Map.add voter oph state.ballots_validated
-    in
-    {state with ballots_validated}
 
   (** Check that [record_proposals] below will not fail.
 
@@ -1002,7 +1231,7 @@ module Voting = struct
            initialized. However, this cannot happen because the current
            function is only called in [validate_proposals] after a
            successful call to {!Voting_period.get_current}. *)
-        ok ()
+        ok_unit
     | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
 
   let check_period_index ~expected period_index =
@@ -1016,11 +1245,11 @@ module Voting = struct
     fail_unless is_registered (Proposals_from_unregistered_delegate source)
 
   (** Check that the list of proposals is not empty and does not contain
-    duplicates. *)
+      duplicates. *)
   let check_proposal_list_sanity proposals =
     let open Tzresult_syntax in
     let* () =
-      match proposals with [] -> error Empty_proposals | _ :: _ -> ok ()
+      match proposals with [] -> error Empty_proposals | _ :: _ -> ok_unit
     in
     let* (_ : Protocol_hash.Set.t) =
       List.fold_left_e
@@ -1038,7 +1267,7 @@ module Voting = struct
 
   let check_period_kind_for_proposals current_period =
     match current_period.Voting_period.kind with
-    | Proposal -> ok ()
+    | Proposal -> ok_unit
     | (Exploration | Cooldown | Promotion | Adoption) as current ->
         error (Wrong_voting_period_kind {current; expected = [Proposal]})
 
@@ -1054,7 +1283,8 @@ module Voting = struct
     error_unless
       Compare.Int.(
         count_in_ctxt + proposals_length <= Constants.max_proposals_per_delegate)
-      Too_many_proposals
+      (Too_many_proposals
+         {previous_count = count_in_ctxt; operation_count = proposals_length})
 
   let check_already_proposed ctxt proposer proposals =
     let open Lwt_tzresult_syntax in
@@ -1066,7 +1296,7 @@ module Voting = struct
 
   let check_period_kind_for_ballot current_period =
     match current_period.Voting_period.kind with
-    | Exploration | Promotion -> ok ()
+    | Exploration | Promotion -> ok_unit
     | (Cooldown | Proposal | Adoption) as current ->
         error
           (Wrong_voting_period_kind
@@ -1110,14 +1340,10 @@ module Voting = struct
     @return [Error Source_not_in_vote_listings] if the source is not
     in the vote listings.
 
-    @return [Error Too_many_proposals] if the operation would make the
-    source's total number of proposals exceed
-    {!Constants.recorded_proposal_count_for_delegate}.
-
     @return [Error Already_proposed] if one of the proposals has
     already been proposed by the source.
 
-    @return [Error Conflict_too_many_proposals] if the total count of
+    @return [Error Too_many_proposals] if the total count of
     proposals submitted by the source in previous blocks, in previously
     validated operations of the current block/mempool, and in the
     operation to validate, exceeds
@@ -1127,22 +1353,14 @@ module Voting = struct
     operation's proposals has already been submitted by the source in
     the current block/mempool.
 
-    @return [Error Conflicting_dictator_proposals] if a testnet
-    dictator Proposals operation has already been validated in the
-    current block/mempool.
-
     @return [Error Testnet_dictator_multiple_proposals] if the source
     is a testnet dictator and the operation contains more than one
     proposal.
 
-    @return [Error Testnet_dictator_conflicting_operation] if the
-    source is a testnet dictator and the current block or mempool
-    already contains any validated voting operation.
-
     @return [Error Operation.Missing_signature] or [Error
     Operation.Invalid_signature] if the operation is unsigned or
     incorrectly signed. *)
-  let validate_proposals vi vs ~should_check_signature oph
+  let check_proposals vi ~should_check_signature
       (operation : Kind.proposals operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Proposals {source; period; proposals})) =
@@ -1150,13 +1368,10 @@ module Voting = struct
     in
     let* current_period = Voting_period.get_current vi.ctxt in
     let*? () = check_period_index ~expected:current_period.index period in
-    let* voting_state =
+    let* () =
       if Amendment.is_testnet_dictator vi.ctxt vi.chain_id source then
         let*? () = check_testnet_dictator_proposals vi.chain_id proposals in
-        Lwt.return
-          (check_dictator_proposals_conflicts_and_update_state
-             vs.voting_state
-             oph)
+        return_unit
       else
         let* () = check_proposals_source_is_registered vi.ctxt source in
         let*? () = check_proposal_list_sanity proposals in
@@ -1165,29 +1380,57 @@ module Voting = struct
         let* count_in_ctxt = Vote.get_delegate_proposal_count vi.ctxt source in
         let proposals_length = List.length proposals in
         let*? () = check_count ~count_in_ctxt ~proposals_length in
-        let* () = check_already_proposed vi.ctxt source proposals in
-        Lwt.return
-          (check_proposals_conflicts_and_update_state
-             vs.voting_state
-             oph
-             source
-             proposals
-             ~count_in_ctxt
-             ~proposals_length)
+        check_already_proposed vi.ctxt source proposals
     in
-    (* The signature check is done last because it is more costly than
-       most checks. *)
-    let* () =
-      when_ should_check_signature (fun () ->
-          (* Retrieving the public key cannot fail. Indeed, we have
-             already checked that the delegate is in the vote listings
-             (or is a testnet dictator), which implies that it is a
-             manager with a revealed key. *)
-          let* public_key = Contract.get_manager_key vi.ctxt source in
-          Lwt.return
-            (Operation.check_signature public_key vi.chain_id operation))
+    if should_check_signature then
+      (* Retrieving the public key should not fail as it *should* be
+         called after checking that the delegate is in the vote
+         listings (or is a testnet dictator), which implies that it
+         is a manager with a revealed key. *)
+      let* public_key = Contract.get_manager_key vi.ctxt source in
+      Lwt.return (Operation.check_signature public_key vi.chain_id operation)
+    else return_unit
+
+  (** Check that a Proposals operation is compatible with previously
+      validated voting operations in the current block/mempool..
+
+      @return [Error Conflicting_proposals] if the current
+      block/mempool already contains a same source Proposals
+      operation. *)
+  let check_proposals_conflict vs oph (operation : Kind.proposals operation) =
+    let open Tzresult_syntax in
+    let (Single (Proposals {source; _})) = operation.protocol_data.contents in
+    match
+      Signature.Public_key_hash.Map.find_opt
+        source
+        vs.voting_state.proposals_seen
+    with
+    | None -> return_unit
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
+
+  let wrap_proposals_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        error Validate_errors.Voting.(Conflicting_proposals conflict)
+
+  let add_proposals vs oph (operation : Kind.proposals operation) =
+    let (Single (Proposals {source; _})) = operation.protocol_data.contents in
+    let proposals_seen =
+      Signature.Public_key_hash.Map.add
+        source
+        oph
+        vs.voting_state.proposals_seen
     in
-    return {vs with voting_state}
+    let voting_state = {vs.voting_state with proposals_seen} in
+    {vs with voting_state}
+
+  let remove_proposals vs (operation : Kind.proposals operation) =
+    let (Single (Proposals {source; _})) = operation.protocol_data.contents in
+    let proposals_seen =
+      Signature.Public_key_hash.Map.remove source vs.voting_state.proposals_seen
+    in
+    {vs with voting_state = {vs.voting_state with proposals_seen}}
 
   (** Check that a Ballot operation can be safely applied.
 
@@ -1196,10 +1439,6 @@ module Voting = struct
 
     @return [Error Conflicting_ballot] if the source has already
     submitted a ballot in the current block/mempool.
-
-    @return [Error Conflicting_dictator_proposals] if the current
-    block/mempool already contains a validated testnet dictator
-    Proposals operation.
 
     @return [Error Wrong_voting_period_index] if the operation's
     period and the [context]'s current period do not have the same
@@ -1220,63 +1459,121 @@ module Voting = struct
     @return [Error Operation.Missing_signature] or [Error
     Operation.Invalid_signature] if the operation is unsigned or
     incorrectly signed. *)
-  let validate_ballot vi vs ~should_check_signature oph
+  let check_ballot vi ~should_check_signature
       (operation : Kind.ballot operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Ballot {source; period; proposal; ballot = _})) =
       operation.protocol_data.contents
     in
     let* () = check_ballot_source_is_registered vi.ctxt source in
-    let*? () = check_ballot_conflicts vs.voting_state source in
     let* current_period = Voting_period.get_current vi.ctxt in
     let*? () = check_period_index ~expected:current_period.index period in
     let*? () = check_period_kind_for_ballot current_period in
     let* () = check_current_proposal vi.ctxt proposal in
     let* () = check_source_has_not_already_voted vi.ctxt source in
     let* () = check_in_listings vi.ctxt source in
-    (* The signature check is done last because it is more costly than
-       most checks. *)
-    let* () =
-      when_ should_check_signature (fun () ->
-          (* Retrieving the public key cannot fail. Indeed, we have
-             already checked that the delegate is in the vote listings,
-             which implies that it is a manager with a revealed key. *)
-          let* public_key = Contract.get_manager_key vi.ctxt source in
-          Lwt.return
-            (Operation.check_signature public_key vi.chain_id operation))
+    when_ should_check_signature (fun () ->
+        (* Retrieving the public key cannot fail. Indeed, we have
+           already checked that the delegate is in the vote listings,
+           which implies that it is a manager with a revealed key. *)
+        let* public_key = Contract.get_manager_key vi.ctxt source in
+        Lwt.return (Operation.check_signature public_key vi.chain_id operation))
+
+  (** Check that a Ballot operation is compatible with previously
+      validated voting operations in the current block/mempool.
+
+      @return [Error Conflicting_ballot] if the [delegate] has already
+      submitted a ballot in the current block/mempool. *)
+  let check_ballot_conflict vs oph (operation : Kind.ballot operation) =
+    let (Single (Ballot {source; _})) = operation.protocol_data.contents in
+    match
+      Signature.Public_key_hash.Map.find_opt source vs.voting_state.ballots_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_ballot_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Conflicting_ballot conflict)
+
+  let add_ballot vs oph (operation : Kind.ballot operation) =
+    let (Single (Ballot {source; _})) = operation.protocol_data.contents in
+    let ballots_seen =
+      Signature.Public_key_hash.Map.add source oph vs.voting_state.ballots_seen
     in
-    let voting_state = update_state_on_ballot vs.voting_state oph source in
-    return {vs with voting_state}
+    let voting_state = {vs.voting_state with ballots_seen} in
+    {vs with voting_state}
+
+  let remove_ballot vs (operation : Kind.ballot operation) =
+    let (Single (Ballot {source; _})) = operation.protocol_data.contents in
+    let ballots_seen =
+      Signature.Public_key_hash.Map.remove source vs.voting_state.ballots_seen
+    in
+    {vs with voting_state = {vs.voting_state with ballots_seen}}
 end
 
 module Anonymous = struct
   open Validate_errors.Anonymous
 
-  let validate_activate_account vi vs oph
-      (Activate_account {id = edpkh; activation_code}) =
-    let open Lwt_result_syntax in
+  let check_activate_account vi (operation : Kind.activate_account operation) =
+    let (Single (Activate_account {id = edpkh; activation_code})) =
+      operation.protocol_data.contents
+    in
+    let open Lwt_tzresult_syntax in
     let blinded_pkh =
       Blinded_public_key_hash.of_ed25519_pkh activation_code edpkh
     in
-    let*? () =
-      match
-        Blinded_public_key_hash.Map.find
-          blinded_pkh
-          vs.anonymous_state.blinded_pkhs_seen
-      with
-      | None -> ok ()
-      | Some oph' -> error (Conflicting_activation (edpkh, oph'))
-    in
     let*! exists = Commitment.exists vi.ctxt blinded_pkh in
     let*? () = error_unless exists (Invalid_activation {pkh = edpkh}) in
-    let blinded_pkhs_seen =
-      Blinded_public_key_hash.Map.add
-        blinded_pkh
-        oph
-        vs.anonymous_state.blinded_pkhs_seen
+    return_unit
+
+  let check_activate_account_conflict vs oph
+      (operation : Kind.activate_account operation) =
+    let (Single (Activate_account {id = edpkh; _})) =
+      operation.protocol_data.contents
     in
-    return
-      {vs with anonymous_state = {vs.anonymous_state with blinded_pkhs_seen}}
+    match
+      Ed25519.Public_key_hash.Map.find_opt
+        edpkh
+        vs.anonymous_state.activation_pkhs_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_activate_account_conflict
+      (operation : Kind.activate_account operation) = function
+    | Ok () -> ok_unit
+    | Error conflict ->
+        let (Single (Activate_account {id = edpkh; _})) =
+          operation.protocol_data.contents
+        in
+        error (Conflicting_activation {edpkh; conflict})
+
+  let add_activate_account vs oph (operation : Kind.activate_account operation)
+      =
+    let (Single (Activate_account {id = edpkh; _})) =
+      operation.protocol_data.contents
+    in
+    let activation_pkhs_seen =
+      Ed25519.Public_key_hash.Map.add
+        edpkh
+        oph
+        vs.anonymous_state.activation_pkhs_seen
+    in
+    {vs with anonymous_state = {vs.anonymous_state with activation_pkhs_seen}}
+
+  let remove_activate_account vs (operation : Kind.activate_account operation) =
+    let (Single (Activate_account {id = edpkh; _})) =
+      operation.protocol_data.contents
+    in
+    let activation_pkhs_seen =
+      Ed25519.Public_key_hash.Map.remove
+        edpkh
+        vs.anonymous_state.activation_pkhs_seen
+    in
+    {vs with anonymous_state = {vs.anonymous_state with activation_pkhs_seen}}
 
   let check_denunciation_age vi kind given_level =
     let open Result_syntax in
@@ -1295,11 +1592,11 @@ module Anonymous = struct
       (Outdated_denunciation
          {kind; level = given_level; last_cycle = last_slashable_cycle})
 
-  let validate_double_consensus (type kind)
-      ~consensus_operation:denunciation_kind vi vs oph
+  let check_double_endorsing_evidence (type kind)
+      ~consensus_operation:denunciation_kind vi
       (op1 : kind Kind.consensus Operation.t)
       (op2 : kind Kind.consensus Operation.t) =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     match (op1.protocol_data.contents, op2.protocol_data.contents) with
     | Single (Preendorsement e1), Single (Preendorsement e2)
     | Single (Endorsement e1), Single (Endorsement e2) ->
@@ -1337,18 +1634,6 @@ module Anonymous = struct
                {kind = denunciation_kind; delegate1; delegate2})
         in
         let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
-        let*? () =
-          match
-            Double_evidence.find
-              (delegate, level)
-              vs.anonymous_state.double_consensus_evidences_seen
-          with
-          | None -> ok ()
-          | Some oph' ->
-              error
-                (Conflicting_denunciation
-                   {kind = denunciation_kind; delegate; level; hash = oph'})
-        in
         let* already_slashed =
           Delegate.already_slashed_for_double_endorsing ctxt delegate level
         in
@@ -1359,36 +1644,121 @@ module Anonymous = struct
         in
         let*? () = Operation.check_signature delegate_pk vi.chain_id op1 in
         let*? () = Operation.check_signature delegate_pk vi.chain_id op2 in
-        let double_consensus_evidences_seen =
-          Double_evidence.add
-            (delegate, level)
-            oph
-            vs.anonymous_state.double_consensus_evidences_seen
-        in
-        return
-          {
-            vs with
-            anonymous_state =
-              {vs.anonymous_state with double_consensus_evidences_seen};
-          }
+        return_unit
 
-  let validate_double_preendorsement_evidence vi vs oph
-      (Double_preendorsement_evidence {op1; op2}) =
-    validate_double_consensus
+  let check_double_preendorsement_evidence vi
+      (operation : Kind.double_preendorsement_evidence operation) =
+    let (Single (Double_preendorsement_evidence {op1; op2})) =
+      operation.protocol_data.contents
+    in
+    check_double_endorsing_evidence
       ~consensus_operation:Preendorsement
       vi
-      vs
-      oph
       op1
       op2
 
-  let validate_double_endorsement_evidence vi vs oph
-      (Double_endorsement_evidence {op1; op2}) =
-    validate_double_consensus ~consensus_operation:Endorsement vi vs oph op1 op2
+  let check_double_endorsement_evidence vi
+      (operation : Kind.double_endorsement_evidence operation) =
+    let (Single (Double_endorsement_evidence {op1; op2})) =
+      operation.protocol_data.contents
+    in
+    check_double_endorsing_evidence ~consensus_operation:Endorsement vi op1 op2
 
-  let validate_double_baking_evidence vi vs oph
-      (Double_baking_evidence {bh1; bh2}) =
-    let open Lwt_result_syntax in
+  let check_double_endorsing_evidence_conflict (type kind) vs oph
+      (op1 : kind Kind.consensus Operation.t) =
+    match op1.protocol_data.contents with
+    | Single (Preendorsement e1) | Single (Endorsement e1) -> (
+        match
+          Double_endorsing_evidence_map.find
+            (e1.level, e1.round, e1.slot)
+            vs.anonymous_state.double_endorsing_evidences_seen
+        with
+        | None -> ok_unit
+        | Some oph' ->
+            Error (Operation_conflict {existing = oph'; new_operation = oph}))
+
+  let check_double_preendorsement_evidence_conflict vs oph
+      (operation : Kind.double_preendorsement_evidence operation) =
+    let (Single (Double_preendorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    check_double_endorsing_evidence_conflict vs oph op1
+
+  let check_double_endorsement_evidence_conflict vs oph
+      (operation : Kind.double_endorsement_evidence operation) =
+    let (Single (Double_endorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    check_double_endorsing_evidence_conflict vs oph op1
+
+  let wrap_denunciation_conflict kind = function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Conflicting_denunciation {kind; conflict})
+
+  let add_double_endorsing_evidence (type kind) vs oph
+      (op1 : kind Kind.consensus Operation.t) =
+    match op1.protocol_data.contents with
+    | Single (Preendorsement e1) | Single (Endorsement e1) ->
+        let double_endorsing_evidences_seen =
+          Double_endorsing_evidence_map.add
+            (e1.level, e1.round, e1.slot)
+            oph
+            vs.anonymous_state.double_endorsing_evidences_seen
+        in
+        {
+          vs with
+          anonymous_state =
+            {vs.anonymous_state with double_endorsing_evidences_seen};
+        }
+
+  let add_double_endorsement_evidence vs oph
+      (operation : Kind.double_endorsement_evidence operation) =
+    let (Single (Double_endorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    add_double_endorsing_evidence vs oph op1
+
+  let add_double_preendorsement_evidence vs oph
+      (operation : Kind.double_preendorsement_evidence operation) =
+    let (Single (Double_preendorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    add_double_endorsing_evidence vs oph op1
+
+  let remove_double_endorsing_evidence (type kind) vs
+      (op : kind Kind.consensus Operation.t) =
+    match op.protocol_data.contents with
+    | Single (Endorsement e) | Single (Preendorsement e) ->
+        let double_endorsing_evidences_seen =
+          Double_endorsing_evidence_map.remove
+            (e.level, e.round, e.slot)
+            vs.anonymous_state.double_endorsing_evidences_seen
+        in
+        let anonymous_state =
+          {vs.anonymous_state with double_endorsing_evidences_seen}
+        in
+        {vs with anonymous_state}
+
+  let remove_double_preendorsement_evidence vs
+      (operation : Kind.double_preendorsement_evidence operation) =
+    let (Single (Double_preendorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    remove_double_endorsing_evidence vs op1
+
+  let remove_double_endorsement_evidence vs
+      (operation : Kind.double_endorsement_evidence operation) =
+    let (Single (Double_endorsement_evidence {op1; _})) =
+      operation.protocol_data.contents
+    in
+    remove_double_endorsing_evidence vs op1
+
+  let check_double_baking_evidence vi
+      (operation : Kind.double_baking_evidence operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Double_baking_evidence {bh1; bh2})) =
+      operation.protocol_data.contents
+    in
     let hash1 = Block_header.hash bh1 in
     let hash2 = Block_header.hash bh2 in
     let*? bh1_fitness = Fitness.from_raw bh1.shell.fitness in
@@ -1427,18 +1797,6 @@ module Anonymous = struct
         (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
     in
     let delegate_pk, delegate = (consensus_key1.consensus_pk, delegate1) in
-    let*? () =
-      match
-        Double_evidence.find
-          (delegate, level)
-          vs.anonymous_state.double_baking_evidences_seen
-      with
-      | None -> ok ()
-      | Some oph' ->
-          error
-            (Conflicting_denunciation
-               {kind = Block; delegate; level; hash = oph'})
-    in
     let* already_slashed =
       Delegate.already_slashed_for_double_baking ctxt delegate level
     in
@@ -1449,60 +1807,123 @@ module Anonymous = struct
     in
     let*? () = Block_header.check_signature bh1 vi.chain_id delegate_pk in
     let*? () = Block_header.check_signature bh2 vi.chain_id delegate_pk in
+    return_unit
+
+  let check_double_baking_evidence_conflict vs oph
+      (operation : Kind.double_baking_evidence operation) =
+    let (Single (Double_baking_evidence {bh1; _})) =
+      operation.protocol_data.contents
+    in
+    let bh1_fitness =
+      Fitness.from_raw bh1.shell.fitness |> function
+      | Ok f -> f
+      | Error _ ->
+          (* We assume the operation valid, it cannot fail anymore *)
+          assert false
+    in
+    let round = Fitness.round bh1_fitness in
+    let level = Fitness.level bh1_fitness in
+    match
+      Double_baking_evidence_map.find
+        (level, round)
+        vs.anonymous_state.double_baking_evidences_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let add_double_baking_evidence vs oph
+      (operation : Kind.double_baking_evidence operation) =
+    let (Single (Double_baking_evidence {bh1; _})) =
+      operation.protocol_data.contents
+    in
+    let bh1_fitness =
+      Fitness.from_raw bh1.shell.fitness |> function
+      | Ok f -> f
+      | Error _ -> assert false
+    in
+    let round = Fitness.round bh1_fitness in
+    let level = Fitness.level bh1_fitness in
     let double_baking_evidences_seen =
-      Double_evidence.add
-        (delegate, level)
+      Double_baking_evidence_map.add
+        (level, round)
         oph
         vs.anonymous_state.double_baking_evidences_seen
     in
-    return
-      {
-        vs with
-        anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
-      }
+    {
+      vs with
+      anonymous_state = {vs.anonymous_state with double_baking_evidences_seen};
+    }
 
-  let validate_drain_delegate vi vs ~should_check_signature oph
+  let remove_double_baking_evidence vs
+      (operation : Kind.double_baking_evidence operation) =
+    let (Single (Double_baking_evidence {bh1; _})) =
+      operation.protocol_data.contents
+    in
+    let bh1_fitness, level =
+      match
+        (Fitness.from_raw bh1.shell.fitness, Raw_level.of_int32 bh1.shell.level)
+      with
+      | Ok v, Ok v' -> (v, v')
+      | _ ->
+          (* The operation is valid therefore decoding cannot fail *)
+          assert false
+    in
+    let round = Fitness.round bh1_fitness in
+    let double_baking_evidences_seen =
+      Double_baking_evidence_map.remove
+        (level, round)
+        vs.anonymous_state.double_baking_evidences_seen
+    in
+    let anonymous_state =
+      {vs.anonymous_state with double_baking_evidences_seen}
+    in
+    {vs with anonymous_state}
+
+  let check_drain_delegate info ~should_check_signature
       (operation : Kind.drain_delegate Operation.t) =
     let open Lwt_tzresult_syntax in
     let (Single (Drain_delegate {delegate; destination; consensus_key})) =
       operation.protocol_data.contents
     in
-    let*! is_registered = Delegate.registered vi.ctxt delegate in
+    let*! is_registered = Delegate.registered info.ctxt delegate in
     let* () =
       fail_unless
         is_registered
         (Drain_delegate_on_unregistered_delegate delegate)
     in
-    let* active_pk = Delegate.Consensus_key.active_pubkey vi.ctxt delegate in
+    let* active_pk = Delegate.Consensus_key.active_pubkey info.ctxt delegate in
     let* () =
-      if
-        not
-          (Signature.Public_key_hash.equal
-             active_pk.consensus_pkh
-             consensus_key)
-      then
-        fail
-          (Invalid_drain_delegate_inactive_key
-             {
-               delegate;
-               consensus_key;
-               active_consensus_key = active_pk.consensus_pkh;
-             })
-      else if Signature.Public_key_hash.equal active_pk.consensus_pkh delegate
-      then fail (Invalid_drain_delegate_no_consensus_key delegate)
-      else if Signature.Public_key_hash.equal destination delegate then
-        fail (Invalid_drain_delegate_noop delegate)
-      else return_unit
+      fail_unless
+        (Signature.Public_key_hash.equal active_pk.consensus_pkh consensus_key)
+        (Invalid_drain_delegate_inactive_key
+           {
+             delegate;
+             consensus_key;
+             active_consensus_key = active_pk.consensus_pkh;
+           })
+    in
+    let* () =
+      fail_when
+        (Signature.Public_key_hash.equal active_pk.consensus_pkh delegate)
+        (Invalid_drain_delegate_no_consensus_key delegate)
+    in
+    let* () =
+      fail_when
+        (Signature.Public_key_hash.equal destination delegate)
+        (Invalid_drain_delegate_noop delegate)
     in
     let*! is_destination_allocated =
-      Contract.allocated vi.ctxt (Contract.Implicit destination)
+      Contract.allocated info.ctxt (Contract.Implicit destination)
     in
-    let* balance = Contract.get_balance vi.ctxt (Contract.Implicit delegate) in
+    let* balance =
+      Contract.get_balance info.ctxt (Contract.Implicit delegate)
+    in
     let*? origination_burn =
       if is_destination_allocated then ok Tez.zero
       else
-        let cost_per_byte = Constants.cost_per_byte vi.ctxt in
-        let origination_size = Constants.origination_size vi.ctxt in
+        let cost_per_byte = Constants.cost_per_byte info.ctxt in
+        let origination_size = Constants.origination_size info.ctxt in
         Tez.(cost_per_byte *? Int64.of_int origination_size)
     in
     let* drain_fees =
@@ -1518,65 +1939,141 @@ module Anonymous = struct
     in
     let*? () =
       if should_check_signature then
-        Operation.check_signature active_pk.consensus_pk vi.chain_id operation
-      else ok ()
+        Operation.check_signature active_pk.consensus_pk info.chain_id operation
+      else ok_unit
     in
-    let*? () =
-      match
-        Signature.Public_key_hash.Map.find
-          delegate
-          vs.manager_state.managers_seen
-      with
-      | None -> ok ()
-      | Some _ -> error (Conflicting_drain {delegate})
+    return_unit
+
+  let check_drain_delegate_conflict state oph
+      (operation : Kind.drain_delegate Operation.t) =
+    let (Single (Drain_delegate {delegate; _})) =
+      operation.protocol_data.contents
+    in
+    match
+      Signature.Public_key_hash.Map.find_opt
+        delegate
+        state.manager_state.managers_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_drain_delegate_conflict (operation : Kind.drain_delegate Operation.t)
+      =
+    let (Single (Drain_delegate {delegate; _})) =
+      operation.protocol_data.contents
+    in
+    function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Conflicting_drain_delegate {delegate; conflict})
+
+  let add_drain_delegate state oph (operation : Kind.drain_delegate Operation.t)
+      =
+    let (Single (Drain_delegate {delegate; _})) =
+      operation.protocol_data.contents
     in
     let managers_seen =
       Signature.Public_key_hash.Map.add
         delegate
         oph
-        vs.manager_state.managers_seen
+        state.manager_state.managers_seen
     in
-    return {vs with manager_state = {vs.manager_state with managers_seen}}
+    {state with manager_state = {managers_seen}}
 
-  let validate_seed_nonce_revelation vi vs
-      (Seed_nonce_revelation {level = commitment_raw_level; nonce}) =
-    let open Lwt_result_syntax in
-    let commitment_level = Level.from_raw vi.ctxt commitment_raw_level in
-    let*? () =
-      error_unless
-        (not
-           (Raw_level.Set.mem
-              commitment_raw_level
-              vs.anonymous_state.seed_nonce_levels_seen))
-        Conflicting_nonce_revelation
+  let remove_drain_delegate state (operation : Kind.drain_delegate Operation.t)
+      =
+    let (Single (Drain_delegate {delegate; _})) =
+      operation.protocol_data.contents
     in
+    let managers_seen =
+      Signature.Public_key_hash.Map.remove
+        delegate
+        state.manager_state.managers_seen
+    in
+    {state with manager_state = {managers_seen}}
+
+  let check_seed_nonce_revelation vi
+      (operation : Kind.seed_nonce_revelation operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Seed_nonce_revelation {level = commitment_raw_level; nonce})) =
+      operation.protocol_data.contents
+    in
+    let commitment_level = Level.from_raw vi.ctxt commitment_raw_level in
     let* () = Nonce.check_unrevealed vi.ctxt commitment_level nonce in
+    return_unit
+
+  let check_seed_nonce_revelation_conflict vs oph
+      (operation : Kind.seed_nonce_revelation operation) =
+    let (Single (Seed_nonce_revelation {level = commitment_raw_level; _})) =
+      operation.protocol_data.contents
+    in
+    match
+      Raw_level.Map.find_opt
+        commitment_raw_level
+        vs.anonymous_state.seed_nonce_levels_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_seed_nonce_revelation_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Conflicting_nonce_revelation conflict)
+
+  let add_seed_nonce_revelation vs oph
+      (operation : Kind.seed_nonce_revelation operation) =
+    let (Single (Seed_nonce_revelation {level = commitment_raw_level; _})) =
+      operation.protocol_data.contents
+    in
     let seed_nonce_levels_seen =
-      Raw_level.Set.add
+      Raw_level.Map.add
+        commitment_raw_level
+        oph
+        vs.anonymous_state.seed_nonce_levels_seen
+    in
+    let anonymous_state = {vs.anonymous_state with seed_nonce_levels_seen} in
+    {vs with anonymous_state}
+
+  let remove_seed_nonce_revelation vs
+      (operation : Kind.seed_nonce_revelation operation) =
+    let (Single (Seed_nonce_revelation {level = commitment_raw_level; _})) =
+      operation.protocol_data.contents
+    in
+    let seed_nonce_levels_seen =
+      Raw_level.Map.remove
         commitment_raw_level
         vs.anonymous_state.seed_nonce_levels_seen
     in
-    let new_vs =
-      {
-        vs with
-        anonymous_state = {vs.anonymous_state with seed_nonce_levels_seen};
-      }
-    in
-    return new_vs
+    let anonymous_state = {vs.anonymous_state with seed_nonce_levels_seen} in
+    {vs with anonymous_state}
 
-  let validate_vdf_revelation vi vs (Vdf_revelation {solution}) =
-    let open Lwt_result_syntax in
-    let*? () =
-      error_unless
-        (not vs.anonymous_state.vdf_solution_seen)
-        Seed_storage.Already_accepted
+  let check_vdf_revelation vi (operation : Kind.vdf_revelation operation) =
+    let open Lwt_tzresult_syntax in
+    let (Single (Vdf_revelation {solution})) =
+      operation.protocol_data.contents
     in
     let* () = Seed.check_vdf vi.ctxt solution in
-    return
-      {
-        vs with
-        anonymous_state = {vs.anonymous_state with vdf_solution_seen = true};
-      }
+    return_unit
+
+  let check_vdf_revelation_conflict vs oph =
+    match vs.anonymous_state.vdf_solution_seen with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_vdf_revelation_conflict = function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Conflicting_vdf_revelation conflict)
+
+  let add_vdf_revelation vs oph =
+    {
+      vs with
+      anonymous_state = {vs.anonymous_state with vdf_solution_seen = Some oph};
+    }
+
+  let remove_vdf_revelation vs =
+    let anonymous_state = {vs.anonymous_state with vdf_solution_seen = None} in
+    {vs with anonymous_state}
 end
 
 module Manager = struct
@@ -1596,15 +2093,7 @@ module Manager = struct
             TODO: https://gitlab.com/tezos/tezos/-/issues/3209 Change
             empty account cleanup mechanism to avoid the need for this
             field. *)
-    remaining_block_gas : Gas.Arith.fp;
-        (** In Block_validation mode, this is what remains of the block gas
-            quota after subtracting the gas_limit of all previously
-            validated operations in the block. In Mempool mode, only
-            previous gas for previous operations in the same batch has been
-            subtracted from the block quota. Cf
-            {!maybe_update_remaining_block_gas}:
-            [vs.manager_state.remaining_block_gas] is updated only in
-            Block_validation mode. *)
+    total_gas_used : Gas.Arith.fp;
   }
 
   (** Check a few simple properties of the batch, and return the
@@ -1629,7 +2118,7 @@ module Manager = struct
       so all operations in the batch are required to originate from the
       same manager. This may change in the future, in order to allow
       several managers to group-sign a sequence of operations. *)
-  let check_sanity_and_find_public_key vi vs
+  let check_sanity_and_find_public_key vi
       (contents_list : _ Kind.manager contents_list) =
     let open Result_syntax in
     let check_source_and_counter ~expected_source ~source ~previous_counter
@@ -1691,7 +2180,7 @@ module Manager = struct
           check_batch_tail_sanity source counter rest >>? fun () ->
           ok (source, None, counter)
     in
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let*? source, revealed_key, first_counter = check_batch contents_list in
     let* balance = Contract.check_allocated_and_get_balance vi.ctxt source in
     let* () = Contract.check_counter_increment vi.ctxt source first_counter in
@@ -1717,30 +2206,16 @@ module Manager = struct
            the call to {!Contract.check_allocated_and_get_balance}
            above. *)
         is_allocated = true;
-        remaining_block_gas = vs.manager_state.remaining_block_gas;
+        total_gas_used = Gas.Arith.zero;
       }
     in
     return (initial_batch_state, pk)
 
-  let check_gas_limit_and_consume_from_block_gas vi ~remaining_block_gas
-      ~gas_limit =
-    (match vi.mode with
-    | Application _ | Partial_application _ | Construction _ -> fun res -> res
-    | Mempool ->
-        (* [Gas.check_limit_and_consume_from_block_gas] will only
-           raise a "temporary" error, however when
-           {!validate_operation} is called on a batch in isolation
-           (like e.g. in the mempool) it must "refuse" operations
-           whose total gas limit (the sum of the [gas_limit]s of each
-           operation) is already above the block limit. We add the
-           "permanent" error [Gas.Gas_limit_too_high] on top of the
-           trace to this effect. *)
-        record_trace Gas.Gas_limit_too_high)
-      (Gas.check_limit_and_consume_from_block_gas
-         ~hard_gas_limit_per_operation:
-           vi.manager_info.hard_gas_limit_per_operation
-         ~remaining_block_gas
-         ~gas_limit)
+  let check_gas_limit info ~gas_limit =
+    Gas.check_gas_limit
+      ~hard_gas_limit_per_operation:
+        info.manager_info.hard_gas_limit_per_operation
+      ~gas_limit
 
   let check_storage_limit vi storage_limit =
     error_unless
@@ -1768,12 +2243,12 @@ module Manager = struct
   let assert_not_zero_messages messages =
     match messages with
     | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
-    | _ -> ok ()
+    | _ -> ok_unit
 
   let assert_zk_rollup_feature_enabled vi =
     error_unless (Constants.zk_rollup_enable vi.ctxt) Zk_rollup_feature_disabled
 
-  let consume_decoding_gas ctxt lexpr =
+  let consume_decoding_gas remaining_gas lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
     @@ (* Fail early if the operation does not have enough gas to
           cover the deserialization cost. We always consider the full
@@ -1783,21 +2258,18 @@ module Manager = struct
           before (e.g. when retrieved in JSON format). Note that the
           lazy_expr is not actually decoded here; its deserialization
           cost is estimated from the size of its bytes. *)
-    Script.consume_decoding_gas ctxt lexpr
+    Script.consume_decoding_gas remaining_gas lexpr
 
   let validate_tx_rollup_submit_batch vi remaining_gas content =
     let open Result_syntax in
     let* () = assert_tx_rollup_feature_enabled vi in
-    let size_limit = Constants.tx_rollup_hard_size_limit_per_message vi.ctxt in
     let _message, message_size = Tx_rollup_message.make_batch content in
     let* cost = Tx_rollup_gas.hash_cost message_size in
-    let* remaining_gas = Gas.consume_from remaining_gas cost in
-    let* () =
-      error_unless
-        Compare.Int.(message_size <= size_limit)
-        Tx_rollup_errors.Message_size_exceeds_limit
-    in
-    return remaining_gas
+    let size_limit = Constants.tx_rollup_hard_size_limit_per_message vi.ctxt in
+    let* (_ : Gas.Arith.fp) = Gas.consume_from remaining_gas cost in
+    error_unless
+      Compare.Int.(message_size <= size_limit)
+      Tx_rollup_errors.Message_size_exceeds_limit
 
   let validate_tx_rollup_dispatch_tickets vi remaining_gas operation =
     let open Result_syntax in
@@ -1825,16 +2297,19 @@ module Manager = struct
         Compare.List_length_with.(tickets_info > max_withdrawals_per_batch)
         Tx_rollup_errors.Too_many_withdrawals
     in
-    record_trace
-      Gas_quota_exceeded_init_deserialize
-      (List.fold_left_e
-         (fun remaining_gas Tx_rollup_reveal.{contents; ty; _} ->
-           let* remaining_gas =
-             Script.consume_decoding_gas remaining_gas contents
-           in
-           Script.consume_decoding_gas remaining_gas ty)
-         remaining_gas
-         tickets_info)
+    let* (_ : Gas.Arith.fp) =
+      record_trace
+        Gas_quota_exceeded_init_deserialize
+        (List.fold_left_e
+           (fun remaining_gas Tx_rollup_reveal.{contents; ty; _} ->
+             let* remaining_gas =
+               Script.consume_decoding_gas remaining_gas contents
+             in
+             Script.consume_decoding_gas remaining_gas ty)
+           remaining_gas
+           tickets_info)
+    in
+    return_unit
 
   let validate_tx_rollup_rejection vi operation =
     let open Result_syntax in
@@ -1864,18 +2339,36 @@ module Manager = struct
       (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
       ~count_limit:max_messages_per_inbox
 
-  let validate_contents (type kind) vi batch_state
-      (contents : kind Kind.manager contents) =
-    let open Lwt_result_syntax in
+  let may_trace_gas_limit_too_high info =
+    match info.mode with
+    | Application _ | Partial_application _ | Construction _ -> fun x -> x
+    | Mempool ->
+        (* [Gas.check_limit] will only
+           raise a "temporary" error, however when
+           {!validate_operation} is called on a batch in isolation
+           (like e.g. in the mempool) it must "refuse" operations
+           whose total gas limit (the sum of the [gas_limit]s of each
+           operation) is already above the block limit. We add the
+           "permanent" error [Gas.Gas_limit_too_high] on top of the
+           trace to this effect. *)
+        record_trace Gas.Gas_limit_too_high
+
+  let check_contents (type kind) vi batch_state
+      (contents : kind Kind.manager contents) remaining_block_gas =
+    let open Lwt_tzresult_syntax in
     let (Manager_operation
           {source; fee; counter = _; operation; gas_limit; storage_limit}) =
       contents
     in
-    let*? remaining_block_gas =
-      check_gas_limit_and_consume_from_block_gas
-        vi
-        ~remaining_block_gas:batch_state.remaining_block_gas
-        ~gas_limit
+    let*? () = check_gas_limit vi ~gas_limit in
+    let total_gas_used =
+      Gas.Arith.(add batch_state.total_gas_used (fp gas_limit))
+    in
+    let*? () =
+      may_trace_gas_limit_too_high vi
+      @@ error_unless
+           Gas.Arith.(fp total_gas_used <= remaining_block_gas)
+           Gas.Block_quota_exceeded
     in
     let*? remaining_gas =
       record_trace
@@ -1894,68 +2387,67 @@ module Manager = struct
         batch_state.is_allocated
         (Contract_storage.Empty_implicit_contract source)
     in
-    let*? (_remaining_gas : Gas.Arith.fp) =
+    let*? () =
       let open Result_syntax in
       match operation with
-      | Reveal pk ->
-          let* () = Contract.check_public_key pk source in
-          return remaining_gas
+      | Reveal pk -> Contract.check_public_key pk source
       | Transaction {parameters; _} ->
-          consume_decoding_gas remaining_gas parameters
+          let* (_ : Gas.Arith.fp) =
+            consume_decoding_gas remaining_gas parameters
+          in
+          return_unit
       | Origination {script; _} ->
           let* remaining_gas = consume_decoding_gas remaining_gas script.code in
-          consume_decoding_gas remaining_gas script.storage
+          let* (_ : Gas.Arith.fp) =
+            consume_decoding_gas remaining_gas script.storage
+          in
+          return_unit
       | Register_global_constant {value} ->
-          consume_decoding_gas remaining_gas value
+          let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas value in
+          return_unit
       | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _
       | Update_consensus_key _ ->
-          return remaining_gas
-      | Tx_rollup_origination ->
-          let* () = assert_tx_rollup_feature_enabled vi in
-          return remaining_gas
+          return_unit
+      | Tx_rollup_origination -> assert_tx_rollup_feature_enabled vi
       | Tx_rollup_submit_batch {content; _} ->
           validate_tx_rollup_submit_batch vi remaining_gas content
       | Tx_rollup_commit _ | Tx_rollup_return_bond _
       | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-          let* () = assert_tx_rollup_feature_enabled vi in
-          return remaining_gas
+          assert_tx_rollup_feature_enabled vi
       | Transfer_ticket {contents; ty; _} ->
           let* () = assert_tx_rollup_feature_enabled vi in
           let* remaining_gas = consume_decoding_gas remaining_gas contents in
-          consume_decoding_gas remaining_gas ty
+          let* (_ : Gas.Arith.fp) = consume_decoding_gas remaining_gas ty in
+          return_unit
       | Tx_rollup_dispatch_tickets _ ->
           validate_tx_rollup_dispatch_tickets vi remaining_gas operation
-      | Tx_rollup_rejection _ ->
-          let* () = validate_tx_rollup_rejection vi operation in
-          return remaining_gas
+      | Tx_rollup_rejection _ -> validate_tx_rollup_rejection vi operation
       | Sc_rollup_originate _ | Sc_rollup_cement _ | Sc_rollup_publish _
       | Sc_rollup_refute _ | Sc_rollup_timeout _
       | Sc_rollup_execute_outbox_message _ ->
-          let* () = assert_sc_rollup_feature_enabled vi in
-          return remaining_gas
+          assert_sc_rollup_feature_enabled vi
       | Sc_rollup_add_messages {messages; _} ->
           let* () = assert_sc_rollup_feature_enabled vi in
-          let* () = assert_not_zero_messages messages in
-          return remaining_gas
+          assert_not_zero_messages messages
       | Sc_rollup_recover_bond _ ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3063
              Should we successfully precheck Sc_rollup_recover_bond and any
              (simple) Sc rollup operation, or should we add some some checks to make
              the operations Branch_delayed if they cannot be successfully
              prechecked? *)
-          let* () = assert_sc_rollup_feature_enabled vi in
-          return remaining_gas
+          assert_sc_rollup_feature_enabled vi
       | Sc_rollup_dal_slot_subscribe _ ->
           let* () = assert_sc_rollup_feature_enabled vi in
-          let* () = assert_dal_feature_enabled vi in
-          return remaining_gas
+          assert_dal_feature_enabled vi
       | Dal_publish_slot_header {slot} ->
-          let* () = Dal_apply.validate_publish_slot_header vi.ctxt slot in
-          return remaining_gas
+          Dal_apply.validate_publish_slot_header vi.ctxt slot
       | Zk_rollup_origination _ | Zk_rollup_publish _ ->
-          let* () = assert_zk_rollup_feature_enabled vi in
-          return remaining_gas
+          assert_zk_rollup_feature_enabled vi
     in
+    (* Gas should no longer be consumed below this point, because it
+       would not take into account any gas consumed during the pattern
+       matching right above. If you really need to consume gas here, then you
+       need to make this pattern matching return the [remaining_gas].*)
     let* balance, is_allocated =
       Contract.simulate_spending
         vi.ctxt
@@ -1963,70 +2455,85 @@ module Manager = struct
         ~amount:fee
         source
     in
-    return {remaining_block_gas; balance; is_allocated}
+    return {total_gas_used; balance; is_allocated}
 
-  (** This would be [fold_left_es (validate_contents vi) batch_state
+  (** This would be [fold_left_es (check_contents vi) batch_state
       contents_list] if [contents_list] were an ordinary [list]. *)
-  let rec validate_contents_list :
+  let rec check_contents_list :
       type kind.
       info ->
       batch_state ->
       kind Kind.manager contents_list ->
-      batch_state tzresult Lwt.t =
-   fun vi batch_state contents_list ->
-    let open Lwt_result_syntax in
+      Gas.Arith.fp ->
+      Gas.Arith.fp tzresult Lwt.t =
+   fun vi batch_state contents_list remaining_gas ->
+    let open Lwt_tzresult_syntax in
     match contents_list with
-    | Single contents -> validate_contents vi batch_state contents
+    | Single contents ->
+        let* batch_state =
+          check_contents vi batch_state contents remaining_gas
+        in
+        return batch_state.total_gas_used
     | Cons (contents, tail) ->
-        let* batch_state = validate_contents vi batch_state contents in
-        validate_contents_list vi batch_state tail
+        let* batch_state =
+          check_contents vi batch_state contents remaining_gas
+        in
+        check_contents_list vi batch_state tail remaining_gas
 
-  (** Return the new value that [remaining_block_gas] should have in
-      [state] after the validation of a manager
-      operation:
-
-      - In [Block] (ie. block validation or block full construction)
-        mode, this value is [batch_state.remaining_block_gas], in which
-        the gas from the validated operation has been subtracted.
-
-      - In [Mempool] mode, the [remaining_block_gas] in
-        [state] should remain unchanged. Indeed, we
-        only want each batch to not exceed the block limit individually,
-        without taking other operations into account. *)
-  let maybe_update_remaining_block_gas vi vs batch_state =
-    match vi.mode with
-    | Application _ | Partial_application _ | Construction _ ->
-        batch_state.remaining_block_gas
-    | Mempool -> vs.manager_state.remaining_block_gas
-
-  let validate_manager_operation vi vs ~should_check_signature source oph
-      (type kind) (operation : kind Kind.manager operation) =
-    let open Lwt_result_syntax in
-    let*? () =
-      (* One-operation-per-manager-per-block restriction (1M).
-
-         We want to check 1M before we call
-         {!Contract.check_counter_increment} in
-         {!check_batch_sanity_and_find_public_key}. Indeed, if a block
-         contains two operations from the same manager, it is more
-         relevant to fail the second one with {!Manager_restriction}
-         than with {!Contract_storage.Counter_in_the_future}. *)
-      match
-        Signature.Public_key_hash.Map.find source vs.manager_state.managers_seen
-      with
-      | None -> Result.return_unit
-      | Some conflicting_oph ->
-          error (Manager_restriction (source, conflicting_oph))
-    in
+  let check_manager_operation vi ~should_check_signature
+      (operation : _ Kind.manager operation) remaining_block_gas =
+    let open Lwt_tzresult_syntax in
     let contents_list = operation.protocol_data.contents in
     let* batch_state, source_pk =
-      check_sanity_and_find_public_key vi vs contents_list
+      check_sanity_and_find_public_key vi contents_list
     in
-    let* batch_state = validate_contents_list vi batch_state contents_list in
+    let* gas_used =
+      check_contents_list vi batch_state contents_list remaining_block_gas
+    in
     let*? () =
       if should_check_signature then
         Operation.check_signature source_pk vi.chain_id operation
-      else ok ()
+      else ok_unit
+    in
+    return gas_used
+
+  let check_manager_operation_conflict (type kind) vs oph
+      (operation : kind Kind.manager operation) =
+    let source =
+      match operation.protocol_data.contents with
+      | Single (Manager_operation {source; _})
+      | Cons (Manager_operation {source; _}, _) ->
+          source
+    in
+    (* One-operation-per-manager-per-block restriction (1M) *)
+    match
+      Signature.Public_key_hash.Map.find_opt
+        source
+        vs.manager_state.managers_seen
+    with
+    | None -> ok_unit
+    | Some oph' ->
+        Error (Operation_conflict {existing = oph'; new_operation = oph})
+
+  let wrap_check_manager_operation_conflict (type kind)
+      (operation : kind Kind.manager operation) =
+    let source =
+      match operation.protocol_data.contents with
+      | Single (Manager_operation {source; _})
+      | Cons (Manager_operation {source; _}, _) ->
+          source
+    in
+    function
+    | Ok () -> ok_unit
+    | Error conflict -> error (Manager_restriction {source; conflict})
+
+  let add_manager_operation (type kind) vs oph
+      (operation : kind Kind.manager operation) =
+    let source =
+      match operation.protocol_data.contents with
+      | Single (Manager_operation {source; _})
+      | Cons (Manager_operation {source; _}, _) ->
+          source
     in
     let managers_seen =
       Signature.Public_key_hash.Map.add
@@ -2034,64 +2541,67 @@ module Manager = struct
         oph
         vs.manager_state.managers_seen
     in
-    let remaining_block_gas =
-      maybe_update_remaining_block_gas vi vs batch_state
-    in
-    return {vs with manager_state = {managers_seen; remaining_block_gas}}
+    {vs with manager_state = {managers_seen}}
 
-  let rec sum_batch_gas_limit :
-      type kind.
-      Gas.Arith.integral ->
-      kind Kind.manager contents_list ->
-      Gas.Arith.integral =
-   fun acc contents_list ->
-    match contents_list with
-    | Single (Manager_operation {gas_limit; _}) -> Gas.Arith.add gas_limit acc
-    | Cons (Manager_operation {gas_limit; _}, tail) ->
-        sum_batch_gas_limit (Gas.Arith.add gas_limit acc) tail
+  (* Return the new [block_state] with the updated remaining gas used:
+     - In non-mempool modes, this value is
+       [block_state.remaining_block_gas], in which the gas from the
+       validated operation has been subtracted.
 
-  let remove_manager_operation (type manager_kind) vi vs
-      (operation : manager_kind Kind.manager operation) =
+     - In [Mempool] mode, the [block_state] should remain
+       unchanged. Indeed, we only want each batch to not exceed the
+       block limit individually, without taking other operations
+       into account. *)
+  let may_update_remaining_gas_used mode (block_state : block_state)
+      operation_gas_used =
+    match mode with
+    | Application _ | Partial_application _ | Construction _ ->
+        let remaining_block_gas =
+          Gas.Arith.(sub block_state.remaining_block_gas operation_gas_used)
+        in
+        {block_state with remaining_block_gas}
+    | Mempool -> block_state
+
+  let remove_manager_operation (type kind) vs
+      (operation : kind Kind.manager operation) =
     let source =
       match operation.protocol_data.contents with
       | Single (Manager_operation {source; _})
       | Cons (Manager_operation {source; _}, _) ->
           source
     in
-    match
-      Signature.Public_key_hash.Map.find_opt
-        source
-        vs.manager_state.managers_seen
-    with
-    | None -> (* Nothing to do *) vs
-    | Some _oph ->
-        let managers_seen =
-          Signature.Public_key_hash.Map.remove
-            source
-            vs.manager_state.managers_seen
-        in
-        let remaining_block_gas =
-          match vi.mode with
-          | Application _ | Partial_application _ | Construction _ ->
-              let gas_limit =
-                sum_batch_gas_limit
-                  Gas.Arith.zero
-                  operation.protocol_data.contents
-              in
-              Gas.Arith.(
-                sub vs.manager_state.remaining_block_gas (fp gas_limit))
-          | Mempool ->
-              (* The remaining block gas is never updated in [Mempool]
-                 mode anyway (see {!maybe_update_remaining_block_gas}). *)
-              vs.manager_state.remaining_block_gas
-        in
-        {vs with manager_state = {managers_seen; remaining_block_gas}}
+    let managers_seen =
+      Signature.Public_key_hash.Map.remove source vs.manager_state.managers_seen
+    in
+    {vs with manager_state = {managers_seen}}
+
+  let validate_manager_operation ~should_check_signature info operation_state
+      block_state oph operation =
+    let open Lwt_tzresult_syntax in
+    let* gas_used =
+      check_manager_operation
+        info
+        ~should_check_signature
+        operation
+        block_state.remaining_block_gas
+    in
+    let*? () =
+      check_manager_operation_conflict operation_state oph operation
+      |> wrap_check_manager_operation_conflict operation
+    in
+    let operation_state = add_manager_operation operation_state oph operation in
+    let block_state =
+      may_update_remaining_gas_used info.mode block_state gas_used
+    in
+    return {info; operation_state; block_state}
 end
 
-let init_info_and_state ctxt mode chain_id all_expected_consensus_features =
+let init_validation_state ctxt mode chain_id all_expected_consensus_features
+    ~predecessor_level =
   let info = init_info ctxt mode chain_id all_expected_consensus_features in
-  let state = init_state ctxt in
-  {info; state}
+  let operation_state = init_operation_conflict_state ~predecessor_level in
+  let block_state = init_block_state info in
+  {info; operation_state; block_state}
 
 (* Pre-condition: Shell block headers' checks have already been done.
    These checks must ensure that:
@@ -2104,7 +2614,7 @@ let init_info_and_state ctxt mode chain_id all_expected_consensus_features =
 *)
 let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
     (block_header : Block_header.t) fitness ~is_partial =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
@@ -2149,7 +2659,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
     else Application application_info
   in
   let all_expected_consensus_features =
-    Consensus.expected_features_for_block_validation
+    Consensus.expected_features_for_application
       ctxt
       fitness
       payload_hash
@@ -2157,8 +2667,14 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
       ~predecessor_round
       ~predecessor_hash
   in
+  let predecessor_level = predecessor_level.level in
   return
-    (init_info_and_state ctxt mode chain_id all_expected_consensus_features)
+    (init_validation_state
+       ctxt
+       mode
+       chain_id
+       all_expected_consensus_features
+       ~predecessor_level)
 
 let begin_partial_application ~ancestor_context chain_id ~predecessor_level
     ~predecessor_timestamp (block_header : Block_header.t) fitness =
@@ -2185,7 +2701,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
 let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
     ~predecessor_timestamp ~predecessor_hash round
     (header_contents : Block_header.contents) =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let round_durations = Constants.round_durations ctxt in
   let timestamp = Timestamp.current ctxt in
   let*? () =
@@ -2210,7 +2726,7 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       ~round:header_contents.payload_round
   in
   let all_expected_consensus_features =
-    Consensus.expected_features_for_block_construction
+    Consensus.expected_features_for_construction
       ctxt
       round
       header_contents.payload_hash
@@ -2218,8 +2734,9 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
       ~predecessor_round
       ~predecessor_hash
   in
+  let predecessor_level = predecessor_level.level in
   let validation_state =
-    init_info_and_state
+    init_validation_state
       ctxt
       (Construction
          {
@@ -2232,23 +2749,29 @@ let begin_full_construction ctxt chain_id ~predecessor_level ~predecessor_round
          })
       chain_id
       all_expected_consensus_features
+      ~predecessor_level
   in
   return validation_state
 
 let begin_partial_construction ctxt chain_id ~predecessor_level
-    ~predecessor_round ~predecessor_hash:_ ~grandparent_round =
-  let open Lwt_result_syntax in
+    ~predecessor_round ~grandparent_round =
   let all_expected_consensus_features =
-    Consensus.expected_features_for_mempool
+    Consensus.expected_features_for_partial_construction
       ctxt
       ~predecessor_level
       ~predecessor_round
       ~grandparent_round
   in
+  let predecessor_level = predecessor_level.level in
   let validation_state =
-    init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
+    init_validation_state
+      ctxt
+      Mempool
+      chain_id
+      all_expected_consensus_features
+      ~predecessor_level
   in
-  return validation_state
+  validation_state
 
 let begin_no_predecessor_info ctxt chain_id =
   let all_expected_consensus_features =
@@ -2256,24 +2779,239 @@ let begin_no_predecessor_info ctxt chain_id =
       expected_preendorsement =
         No_predecessor_info_cannot_validate_preendorsement;
       expected_endorsement = No_predecessor_info_cannot_validate_endorsement;
-      expected_grandparent_endorsement_for_mempool = None;
+      expected_grandparent_endorsement_for_partial_construction = None;
     }
   in
-  init_info_and_state ctxt Mempool chain_id all_expected_consensus_features
+  let current_level = Level.current ctxt in
+  let predecessor_level =
+    match Raw_level.pred current_level.level with
+    | None -> current_level.level
+    | Some level -> level
+  in
+  init_validation_state
+    ctxt
+    Mempool
+    chain_id
+    all_expected_consensus_features
+    ~predecessor_level
 
-(** Increment [vs.op_count] for all operations, and record
-   non-consensus operation hashes in [vs.recorded_operations_rev]. *)
-let record_operation vs ophash validation_pass_opt =
-  let op_count = vs.op_count + 1 in
-  match validation_pass_opt with
-  | Some n when Compare.Int.(n = Operation_repr.consensus_pass) ->
-      {vs with op_count}
-  | _ ->
-      {
-        vs with
-        op_count;
-        recorded_operations_rev = ophash :: vs.recorded_operations_rev;
-      }
+let check_operation info ?(should_check_signature = true) (type kind)
+    (operation : kind operation) : unit tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  match operation.protocol_data.contents with
+  | Single (Preendorsement _) ->
+      let* (_voting_power : int) =
+        Consensus.check_preendorsement info ~should_check_signature operation
+      in
+      return_unit
+  | Single (Endorsement _) ->
+      let* (_kind : Consensus.endorsement_kind) =
+        Consensus.check_endorsement info ~should_check_signature operation
+      in
+      return_unit
+  | Single (Dal_slot_availability _) ->
+      Consensus.check_dal_slot_availability info operation
+  | Single (Proposals _) ->
+      Voting.check_proposals info ~should_check_signature operation
+  | Single (Ballot _) ->
+      Voting.check_ballot info ~should_check_signature operation
+  | Single (Activate_account _) ->
+      Anonymous.check_activate_account info operation
+  | Single (Double_preendorsement_evidence _) ->
+      Anonymous.check_double_preendorsement_evidence info operation
+  | Single (Double_endorsement_evidence _) ->
+      Anonymous.check_double_endorsement_evidence info operation
+  | Single (Double_baking_evidence _) ->
+      Anonymous.check_double_baking_evidence info operation
+  | Single (Drain_delegate _) ->
+      Anonymous.check_drain_delegate info ~should_check_signature operation
+  | Single (Seed_nonce_revelation _) ->
+      Anonymous.check_seed_nonce_revelation info operation
+  | Single (Vdf_revelation _) -> Anonymous.check_vdf_revelation info operation
+  | Single (Manager_operation _) ->
+      let remaining_gas =
+        Gas.Arith.fp (Constants.hard_gas_limit_per_block info.ctxt)
+      in
+      let* (_remaining_gas : Gas.Arith.fp) =
+        Manager.check_manager_operation
+          info
+          ~should_check_signature
+          operation
+          remaining_gas
+      in
+      return_unit
+  | Cons (Manager_operation _, _) ->
+      let remaining_gas =
+        Gas.Arith.fp (Constants.hard_gas_limit_per_block info.ctxt)
+      in
+      let* (_remaining_gas : Gas.Arith.fp) =
+        Manager.check_manager_operation
+          info
+          ~should_check_signature
+          operation
+          remaining_gas
+      in
+      return_unit
+  | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error
+
+let check_operation_conflict (type kind) operation_conflict_state oph
+    (operation : kind operation) =
+  match operation.protocol_data.contents with
+  | Single (Preendorsement _) ->
+      Consensus.check_preendorsement_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Endorsement _) ->
+      Consensus.check_endorsement_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Dal_slot_availability _) ->
+      Consensus.check_dal_slot_availability_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Proposals _) ->
+      Voting.check_proposals_conflict operation_conflict_state oph operation
+  | Single (Ballot _) ->
+      Voting.check_ballot_conflict operation_conflict_state oph operation
+  | Single (Activate_account _) ->
+      Anonymous.check_activate_account_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Double_preendorsement_evidence _) ->
+      Anonymous.check_double_preendorsement_evidence_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Double_endorsement_evidence _) ->
+      Anonymous.check_double_endorsement_evidence_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Double_baking_evidence _) ->
+      Anonymous.check_double_baking_evidence_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Drain_delegate _) ->
+      Anonymous.check_drain_delegate_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Seed_nonce_revelation _) ->
+      Anonymous.check_seed_nonce_revelation_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Vdf_revelation _) ->
+      Anonymous.check_vdf_revelation_conflict operation_conflict_state oph
+  | Single (Manager_operation _) ->
+      Manager.check_manager_operation_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Cons (Manager_operation _, _) ->
+      Manager.check_manager_operation_conflict
+        operation_conflict_state
+        oph
+        operation
+  | Single (Failing_noop _) -> (* Nothing to do *) ok_unit
+
+let add_valid_operation operation_conflict_state oph (type kind)
+    (operation : kind operation) =
+  match operation.protocol_data.contents with
+  | Single (Preendorsement _) ->
+      Consensus.add_preendorsement operation_conflict_state oph operation
+  | Single (Endorsement consensus_content) ->
+      let endorsement_kind =
+        if
+          Consensus.is_normal_endorsement_assuming_valid
+            operation_conflict_state
+            consensus_content
+        then Consensus.Normal_endorsement 0
+        else Grandparent_endorsement
+      in
+      Consensus.add_endorsement
+        operation_conflict_state
+        oph
+        operation
+        endorsement_kind
+  | Single (Dal_slot_availability _) ->
+      Consensus.add_dal_slot_availability operation_conflict_state oph operation
+  | Single (Proposals _) ->
+      Voting.add_proposals operation_conflict_state oph operation
+  | Single (Ballot _) ->
+      Voting.add_ballot operation_conflict_state oph operation
+  | Single (Activate_account _) ->
+      Anonymous.add_activate_account operation_conflict_state oph operation
+  | Single (Double_preendorsement_evidence _) ->
+      Anonymous.add_double_preendorsement_evidence
+        operation_conflict_state
+        oph
+        operation
+  | Single (Double_endorsement_evidence _) ->
+      Anonymous.add_double_endorsement_evidence
+        operation_conflict_state
+        oph
+        operation
+  | Single (Double_baking_evidence _) ->
+      Anonymous.add_double_baking_evidence
+        operation_conflict_state
+        oph
+        operation
+  | Single (Drain_delegate _) ->
+      Anonymous.add_drain_delegate operation_conflict_state oph operation
+  | Single (Seed_nonce_revelation _) ->
+      Anonymous.add_seed_nonce_revelation operation_conflict_state oph operation
+  | Single (Vdf_revelation _) ->
+      Anonymous.add_vdf_revelation operation_conflict_state oph
+  | Single (Manager_operation _) ->
+      Manager.add_manager_operation operation_conflict_state oph operation
+  | Cons (Manager_operation _, _) ->
+      Manager.add_manager_operation operation_conflict_state oph operation
+  | Single (Failing_noop _) -> (* Nothing to do *) operation_conflict_state
+
+(* Hypothesis:
+   - the [operation] has been validated and is present in [vs];
+   - this function is only valid for the mempool mode. *)
+let remove_operation operation_conflict_state (type kind)
+    (operation : kind operation) =
+  match operation.protocol_data.contents with
+  | Single (Preendorsement _) ->
+      Consensus.remove_preendorsement operation_conflict_state operation
+  | Single (Endorsement _) ->
+      Consensus.remove_endorsement operation_conflict_state operation
+  | Single (Dal_slot_availability _) ->
+      Consensus.remove_dal_slot_availability operation_conflict_state operation
+  | Single (Proposals _) ->
+      Voting.remove_proposals operation_conflict_state operation
+  | Single (Ballot _) -> Voting.remove_ballot operation_conflict_state operation
+  | Single (Activate_account _) ->
+      Anonymous.remove_activate_account operation_conflict_state operation
+  | Single (Double_preendorsement_evidence _) ->
+      Anonymous.remove_double_preendorsement_evidence
+        operation_conflict_state
+        operation
+  | Single (Double_endorsement_evidence _) ->
+      Anonymous.remove_double_endorsement_evidence
+        operation_conflict_state
+        operation
+  | Single (Double_baking_evidence _) ->
+      Anonymous.remove_double_baking_evidence operation_conflict_state operation
+  | Single (Drain_delegate _) ->
+      Anonymous.remove_drain_delegate operation_conflict_state operation
+  | Single (Seed_nonce_revelation _) ->
+      Anonymous.remove_seed_nonce_revelation operation_conflict_state operation
+  | Single (Vdf_revelation _) ->
+      Anonymous.remove_vdf_revelation operation_conflict_state
+  | Single (Manager_operation _) ->
+      Manager.remove_manager_operation operation_conflict_state operation
+  | Cons (Manager_operation _, _) ->
+      Manager.remove_manager_operation operation_conflict_state operation
+  | Single (Failing_noop _) -> (* Nothing to do *) operation_conflict_state
 
 let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_tzresult_syntax in
@@ -2293,112 +3031,190 @@ let check_validation_pass_consistency vi vs validation_pass =
           return {vs with last_op_validation_pass = Some validation_pass}
       | Some _, None -> fail Validate_errors.Failing_noop_error)
 
-let validate_operation {info; state} ?(should_check_signature = true) oph
-    (packed_operation : packed_operation) =
+(** Increment [vs.op_count] for all operations, and record
+    non-consensus operation hashes in [vs.recorded_operations_rev]. *)
+let record_operation vs ophash validation_pass_opt =
+  let op_count = vs.op_count + 1 in
+  match validation_pass_opt with
+  | Some n when Compare.Int.(n = Operation_repr.consensus_pass) ->
+      {vs with op_count}
+  | _ ->
+      {
+        vs with
+        op_count;
+        recorded_operations_rev = ophash :: vs.recorded_operations_rev;
+      }
+
+let validate_operation {info; operation_state; block_state}
+    ?(should_check_signature = true) oph (packed_operation : packed_operation) =
   let open Lwt_tzresult_syntax in
-  let validation_pass_opt =
-    Alpha_context.Operation.acceptable_pass packed_operation
-  in
   let {shell; protocol_data = Operation_data protocol_data} =
     packed_operation
   in
-  let* state =
-    check_validation_pass_consistency info state validation_pass_opt
+  let validation_pass_opt =
+    Alpha_context.Operation.acceptable_pass packed_operation
   in
-  let state = record_operation state oph validation_pass_opt in
+  let* block_state =
+    check_validation_pass_consistency info block_state validation_pass_opt
+  in
+  let block_state = record_operation block_state oph validation_pass_opt in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
-  let* state =
-    match (info.mode, validation_pass_opt) with
-    | Partial_application _, Some n
-      when Compare.Int.(n <> Operation_repr.consensus_pass) ->
-        (* Do not validate non consensus operation in [Partial_application] mode *)
-        return state
-    | Partial_application _, _
-    | Mempool, _
-    | Construction _, _
-    | Application _, _ -> (
-        match operation.protocol_data.contents with
-        | Single (Preendorsement _) ->
-            Consensus.validate_preendorsement
-              info
-              state
-              ~should_check_signature
-              operation
-        | Single (Endorsement _) ->
-            Consensus.validate_endorsement
-              info
-              state
-              ~should_check_signature
-              operation
-        | Single (Dal_slot_availability _) ->
-            Consensus.validate_dal_slot_availability
-              info
-              state
-              ~should_check_signature
-              operation
-        | Single (Proposals _) ->
-            Voting.validate_proposals
-              info
-              state
-              ~should_check_signature
+  match (info.mode, validation_pass_opt) with
+  | Partial_application _, Some n
+    when Compare.Int.(n <> Operation_repr.consensus_pass) ->
+      (* Do not validate non-consensus operation in [Partial_application] mode *)
+      return {info; operation_state; block_state}
+  | Partial_application _, _ | Mempool, _ | Construction _, _ | Application _, _
+    -> (
+      match operation.protocol_data.contents with
+      | Single (Preendorsement _) ->
+          Consensus.validate_preendorsement
+            ~should_check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
+      | Single (Endorsement _) ->
+          Consensus.validate_endorsement
+            ~should_check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
+      | Single (Dal_slot_availability _) ->
+          let open Consensus in
+          let* () = check_dal_slot_availability info operation in
+          let*? () =
+            check_dal_slot_availability_conflict operation_state oph operation
+            |> wrap_dal_slot_availability_conflict
+          in
+          let operation_state =
+            add_dal_slot_availability operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Proposals _) ->
+          let open Voting in
+          let* () = check_proposals info ~should_check_signature operation in
+          let*? () =
+            check_proposals_conflict operation_state oph operation
+            |> wrap_proposals_conflict
+          in
+          let operation_state = add_proposals operation_state oph operation in
+          return {info; operation_state; block_state}
+      | Single (Ballot _) ->
+          let open Voting in
+          let* () = check_ballot info ~should_check_signature operation in
+          let*? () =
+            check_ballot_conflict operation_state oph operation
+            |> wrap_ballot_conflict
+          in
+          let operation_state = add_ballot operation_state oph operation in
+          return {info; operation_state; block_state}
+      | Single (Activate_account _) ->
+          let open Anonymous in
+          let* () = check_activate_account info operation in
+          let*? () =
+            check_activate_account_conflict operation_state oph operation
+            |> wrap_activate_account_conflict operation
+          in
+          let operation_state =
+            add_activate_account operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Double_preendorsement_evidence _) ->
+          let open Anonymous in
+          let* () = check_double_preendorsement_evidence info operation in
+          let*? () =
+            check_double_preendorsement_evidence_conflict
+              operation_state
               oph
               operation
-        | Single (Ballot _) ->
-            Voting.validate_ballot
-              info
-              state
-              ~should_check_signature
+            |> wrap_denunciation_conflict Preendorsement
+          in
+          let operation_state =
+            add_double_preendorsement_evidence operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Double_endorsement_evidence _) ->
+          let open Anonymous in
+          let* () = check_double_endorsement_evidence info operation in
+          let*? () =
+            check_double_endorsement_evidence_conflict
+              operation_state
               oph
               operation
-        | Single (Activate_account _ as contents) ->
-            Anonymous.validate_activate_account info state oph contents
-        | Single (Double_preendorsement_evidence _ as contents) ->
-            Anonymous.validate_double_preendorsement_evidence
-              info
-              state
-              oph
-              contents
-        | Single (Double_endorsement_evidence _ as contents) ->
-            Anonymous.validate_double_endorsement_evidence
-              info
-              state
-              oph
-              contents
-        | Single (Double_baking_evidence _ as contents) ->
-            Anonymous.validate_double_baking_evidence info state oph contents
-        | Single (Drain_delegate _) ->
-            Anonymous.validate_drain_delegate
-              info
-              state
-              ~should_check_signature
-              oph
-              operation
-        | Single (Seed_nonce_revelation _ as contents) ->
-            Anonymous.validate_seed_nonce_revelation info state contents
-        | Single (Vdf_revelation _ as contents) ->
-            Anonymous.validate_vdf_revelation info state contents
-        | Single (Manager_operation {source; _}) ->
-            Manager.validate_manager_operation
-              info
-              state
-              ~should_check_signature
-              source
-              oph
-              operation
-        | Cons (Manager_operation {source; _}, _) ->
-            Manager.validate_manager_operation
-              info
-              state
-              ~should_check_signature
-              source
-              oph
-              operation
-        | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error)
-  in
-  return state
+            |> wrap_denunciation_conflict Endorsement
+          in
+          let operation_state =
+            add_double_endorsement_evidence operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Double_baking_evidence _) ->
+          let open Anonymous in
+          let* () = check_double_baking_evidence info operation in
+          let*? () =
+            check_double_baking_evidence_conflict operation_state oph operation
+            |> wrap_denunciation_conflict Block
+          in
+          let operation_state =
+            add_double_baking_evidence operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Drain_delegate _) ->
+          let open Anonymous in
+          let* () =
+            check_drain_delegate info ~should_check_signature operation
+          in
+          let*? () =
+            check_drain_delegate_conflict operation_state oph operation
+            |> wrap_drain_delegate_conflict operation
+          in
+          let operation_state =
+            add_drain_delegate operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Seed_nonce_revelation _) ->
+          let open Anonymous in
+          let* () = check_seed_nonce_revelation info operation in
+          let*? () =
+            check_seed_nonce_revelation_conflict operation_state oph operation
+            |> wrap_seed_nonce_revelation_conflict
+          in
+          let operation_state =
+            add_seed_nonce_revelation operation_state oph operation
+          in
+          return {info; operation_state; block_state}
+      | Single (Vdf_revelation _) ->
+          let open Anonymous in
+          let* () = check_vdf_revelation info operation in
+          let*? () =
+            check_vdf_revelation_conflict operation_state oph
+            |> wrap_vdf_revelation_conflict
+          in
+          let operation_state = add_vdf_revelation operation_state oph in
+          return {info; operation_state; block_state}
+      | Single (Manager_operation _) ->
+          Manager.validate_manager_operation
+            ~should_check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
+      | Cons (Manager_operation _, _) ->
+          Manager.validate_manager_operation
+            ~should_check_signature
+            info
+            operation_state
+            block_state
+            oph
+            operation
+      | Single (Failing_noop _) -> fail Validate_errors.Failing_noop_error)
 
 let are_endorsements_required vi =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let+ first_level = First_level_of_protocol.get vi.ctxt in
   (* [Comment from Legacy_apply] NB: the first level is the level
      of the migration block. There are no endorsements for this
@@ -2409,9 +3225,9 @@ let are_endorsements_required vi =
   in
   Compare.Int32.(level_position_in_protocol > 1l)
 
-let check_endorsement_power vi vs =
-  let required = Constants.consensus_threshold vi.ctxt
-  and provided = vs.consensus_state.endorsement_power in
+let check_endorsement_power vi bs =
+  let required = Constants.consensus_threshold vi.ctxt in
+  let provided = bs.endorsement_power in
   error_unless
     Compare.Int.(provided >= required)
     (Validate_errors.Block.Not_enough_endorsements {required; provided})
@@ -2423,7 +3239,7 @@ let finalize_validate_block_header vi vs checkable_payload_hash
     Option.map
       (fun (preendorsement_round, preendorsement_count) ->
         Block_header.{preendorsement_round; preendorsement_count})
-      vs.consensus_state.locked_round_evidence
+      vs.locked_round_evidence
   in
   Block_header.finalize_validate_block_header
     ~block_header_contents
@@ -2433,33 +3249,34 @@ let finalize_validate_block_header vi vs checkable_payload_hash
     ~locked_round_evidence
     ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
 
-let compute_payload_hash (vs : state)
+let compute_payload_hash block_state
     (block_header_contents : Alpha_context.Block_header.contents) predecessor =
   let operations_hash =
-    Operation_list_hash.compute (List.rev vs.recorded_operations_rev)
+    Operation_list_hash.compute (List.rev block_state.recorded_operations_rev)
   in
   Block_payload.hash
     ~predecessor
     block_header_contents.payload_round
     operations_hash
 
-let finalize_block {info; state} =
+let finalize_block {info; block_state; _} =
   let open Lwt_tzresult_syntax in
   match info.mode with
   | Application {fitness; predecessor_hash; block_data_contents; _} ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
-        if are_endorsements_required then check_endorsement_power info state
-        else ok ()
+        if are_endorsements_required then
+          check_endorsement_power info block_state
+        else ok_unit
       in
       let block_payload_hash =
-        compute_payload_hash state block_data_contents predecessor_hash
+        compute_payload_hash block_state block_data_contents predecessor_hash
       in
       let round = Fitness.round fitness in
       let*? () =
         finalize_validate_block_header
           info
-          state
+          block_state
           (Block_header.Expected_payload_hash block_payload_hash)
           block_data_contents
           round
@@ -2469,16 +3286,17 @@ let finalize_block {info; state} =
   | Partial_application _ ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
-        if are_endorsements_required then check_endorsement_power info state
-        else ok ()
+        if are_endorsements_required then
+          check_endorsement_power info block_state
+        else ok_unit
       in
       return_unit
   | Construction
       {predecessor_round; predecessor_hash; round; block_data_contents; _} ->
       let block_payload_hash =
-        compute_payload_hash state block_data_contents predecessor_hash
+        compute_payload_hash block_state block_data_contents predecessor_hash
       in
-      let locked_round_evidence = state.consensus_state.locked_round_evidence in
+      let locked_round_evidence = block_state.locked_round_evidence in
       let checkable_payload_hash =
         match locked_round_evidence with
         | Some _ -> Block_header.Expected_payload_hash block_payload_hash
@@ -2494,8 +3312,9 @@ let finalize_block {info; state} =
       in
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
-        if are_endorsements_required then check_endorsement_power info state
-        else ok ()
+        if are_endorsements_required then
+          check_endorsement_power info block_state
+        else ok_unit
       in
       let* fitness =
         let locked_round =
@@ -2512,7 +3331,7 @@ let finalize_block {info; state} =
       let*? () =
         finalize_validate_block_header
           info
-          state
+          block_state
           checkable_payload_hash
           block_data_contents
           round
@@ -2522,8 +3341,3 @@ let finalize_block {info; state} =
   | Mempool ->
       (* Nothing to do for the mempool mode*)
       return_unit
-
-(* This function will be replaced with a generic remove_operation in
-   the future. *)
-let remove_manager_operation {info; state} =
-  Manager.remove_manager_operation info state

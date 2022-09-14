@@ -246,6 +246,7 @@ let gen_ctxt_req : ctxt_cstrs -> ctxt_req QCheck2.Gen.t =
     fund_src;
     fund_dest;
     fund_del;
+    reveal_accounts = true;
     fund_tx;
     fund_sc;
     fund_zk;

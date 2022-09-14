@@ -202,7 +202,7 @@ let test_revelation_early_wrong_right_twice () =
   in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_nonce_revelation -> true
+        | Validate_errors.Anonymous.Conflicting_nonce_revelation _ -> true
         | _ -> false)
   in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
@@ -492,7 +492,7 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let* () =
         Assert.proto_error ~loc:__LOC__ e (function
-            | Seed_storage.Already_accepted -> true
+            | Validate_errors.Anonymous.Conflicting_vdf_revelation _ -> true
             | _ -> false)
       in
       (* verify the balance was credited following operation inclusion *)

@@ -238,6 +238,8 @@ module Raw_level : sig
   val of_int32_exn : int32 -> raw_level
 
   module Set : Set.S with type elt = raw_level
+
+  module Map : Map.S with type key = raw_level
 end
 
 (** This module re-exports definitions from {!Cycle_repr}. *)
@@ -446,23 +448,15 @@ module Gas : sig
   (** See {!Raw_context.consume_gas_limit_in_block}. *)
   val consume_limit_in_block : context -> 'a Arith.t -> context tzresult
 
-  (** Check that [gas_limit] is a valid operation gas limit (at most
-      [hard_gas_limit_per_operation] and nonnegative), then subtract it
-      from [remaining_block_gas] and return the difference.
+  (** Check that [gas_limit] is a valid operation gas limit: at most
+      [hard_gas_limit_per_operation] and nonnegative.
 
       @return [Error Gas_limit_too_high] if [gas_limit] is greater
-      than [hard_gas_limit_per_operation] or negative.
-
-      @return [Error Block_quota_exceeded] if [gas_limit] is greater
-      than [remaining_block_gas].
-
-      This function mimics {!consume_limit_in_block} but bypasses the
-      context. *)
-  val check_limit_and_consume_from_block_gas :
+      than [hard_gas_limit_per_operation] or negative. *)
+  val check_gas_limit :
     hard_gas_limit_per_operation:Arith.integral ->
-    remaining_block_gas:Arith.fp ->
     gas_limit:Arith.integral ->
-    Arith.fp tzresult
+    unit tzresult
 
   (** The cost of free operation is [0]. *)
   val free : cost

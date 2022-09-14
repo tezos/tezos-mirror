@@ -74,6 +74,10 @@ open Alpha_context
     the state machine of the amendment procedure. *)
 val may_start_new_voting_period : context -> context tzresult Lwt.t
 
+(** Return the registered testchain dictator, if any. This function will always
+    return None on mainnet. *)
+val get_testnet_dictator : context -> Chain_id.t -> public_key_hash option
+
 (** Check whether the given public key hash corresponds to the
     registered testchain dictator, if any. This function will always
     return false on mainnet. *)

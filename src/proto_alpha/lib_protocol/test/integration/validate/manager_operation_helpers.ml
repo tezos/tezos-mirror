@@ -121,6 +121,7 @@ type ctxt_req = {
   fund_src : Tez.t option;
   fund_dest : Tez.t option;
   fund_del : Tez.t option;
+  reveal_accounts : bool;
   fund_tx : Tez.t option;
   fund_sc : Tez.t option;
   fund_zk : Tez.t option;
@@ -152,6 +153,7 @@ let ctxt_req_default_to_flag flags =
     fund_src = Some Tez.one;
     fund_dest = Some Tez.one;
     fund_del = Some Tez.one;
+    reveal_accounts = true;
     fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
     fund_zk = Some Tez.one;
@@ -251,6 +253,7 @@ let pp_ctxt_req pp
       fund_src;
       fund_dest;
       fund_del;
+      reveal_accounts;
       fund_tx;
       fund_sc;
       fund_zk;
@@ -263,6 +266,7 @@ let pp_ctxt_req pp
      fund_src: %a tz@,\
      fund_dest: %a tz@,\
      fund_del: %a tz@,\
+     reveal_accounts: %b tz@,\
      fund_tx: %a tz@,\
      fund_sc: %a tz@,\
      fund_zk: %a tz@,\
@@ -279,6 +283,7 @@ let pp_ctxt_req pp
     fund_dest
     (pp_opt Tez.pp)
     fund_del
+    reveal_accounts
     (pp_opt Tez.pp)
     fund_tx
     (pp_opt Tez.pp)
@@ -434,6 +439,7 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
        fund_src;
        fund_dest;
        fund_del;
+       reveal_accounts;
        fund_tx;
        fund_sc;
        fund_zk;
@@ -466,6 +472,15 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
       ~dal_enable:flags.dal
       ~zk_rollup_enable:flags.zkru
       ()
+  in
+  let reveal_accounts_operations b l =
+    List.filter_map_es
+      (function
+        | None -> return_none
+        | Some account ->
+            let* op = Op.revelation ~gas_limit:Low (B b) account.Account.pk in
+            return_some op)
+      l
   in
   let get_bootstrap bootstraps n = Stdlib.List.nth bootstraps n in
   let source = Account.new_account () in
@@ -512,7 +527,13 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
       ~fee:Tez.zero
       ~script:Op.dummy_script
   in
-  let+ block = Block.bake ~operation:create_contract_hash block in
+  let* reveal_operations =
+    if reveal_accounts then
+      reveal_accounts_operations block [Some source; dest; del]
+    else return []
+  in
+  let operations = create_contract_hash :: reveal_operations in
+  let+ block = Block.bake ~operations block in
   let ctxt = {block; originated_contract; tx_rollup; sc_rollup; zk_rollup} in
   {ctxt; accounts = {source; dest; del; tx; sc; zk}}
 

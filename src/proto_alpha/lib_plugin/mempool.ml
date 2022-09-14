@@ -883,9 +883,7 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
       operation
   in
   match res with
-  | Ok state ->
-      let validity_state = {validation_state.validity_state with state} in
-      return {validation_state with validity_state}
+  | Ok validity_state -> return {validation_state with validity_state}
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -935,17 +933,20 @@ let proto_validate_manager_operation validation_state oph
       match err with
       | Environment.Ecoproto_error
           (Validate_errors.Manager.Manager_restriction
-            (_manager, conflicting_oph))
+            {
+              source = _manager;
+              conflict = Operation_conflict {existing; new_operation = _};
+            })
         :: _ ->
-          return (`Conflict (conflicting_oph, error_classification))
+          return (`Conflict (existing, error_classification))
       | _ -> fail error_classification)
 
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
-  let state =
-    Validate.remove_manager_operation validation_state.validity_state op
+  let operation_state =
+    Validate.remove_operation validation_state.validity_state.operation_state op
   in
-  let validity_state = {validation_state.validity_state with state} in
+  let validity_state = {validation_state.validity_state with operation_state} in
   {validation_state with validity_state}
 
 (** Call the protocol validation on a manager operation and handle

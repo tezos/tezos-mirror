@@ -227,19 +227,6 @@ module Gas = struct
     | Some remaining_gas -> ok remaining_gas
     | None -> error Operation_quota_exceeded
 
-  let check_limit_and_consume_from_block_gas
-      ~(hard_gas_limit_per_operation : Arith.integral)
-      ~(remaining_block_gas : Arith.fp) ~(gas_limit : Arith.integral) =
-    let open Result_syntax in
-    let* () = check_gas_limit ~hard_gas_limit_per_operation ~gas_limit in
-    let gas_limit_fp = Arith.fp gas_limit in
-    let* () =
-      error_unless
-        Arith.(gas_limit_fp <= remaining_block_gas)
-        Block_quota_exceeded
-    in
-    return (Arith.sub remaining_block_gas gas_limit_fp)
-
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 
   let update_remaining_operation_gas =
