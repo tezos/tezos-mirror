@@ -1405,20 +1405,8 @@ module Building_state = struct
 
   let elems_encoding = vector_encoding (no_region_encoding Elem.elem_encoding)
 
-  let func_encoding' =
-    conv
-      (fun (ftype, locals, body) -> Ast.{ftype; locals; body})
-      (fun {ftype; locals; body} -> (ftype, locals, body))
-    @@ tup3
-         ~flatten:false
-         (value ["ftype"] Interpreter_encodings.Ast.var_encoding)
-         (scope
-            ["locals"]
-            (vector_encoding
-               (value [] Interpreter_encodings.Types.value_type_encoding)))
-         (value ["body"] Interpreter_encodings.Ast.block_label_encoding)
-
-  let code_encoding = vector_encoding (no_region_encoding func_encoding')
+  let code_encoding =
+    vector_encoding (no_region_encoding Wasm_encoding.func'_encoding)
 
   let datas_encoding =
     vector_encoding (no_region_encoding Data.data_segment_encoding)
