@@ -314,8 +314,7 @@ struct
           | `Interpreter error -> (
               match pvm_state.tick_state with
               | Decode _ -> Wasm_pvm_errors.Decode_error error
-              (* TODO: add Link_error *)
-              | Link _ -> Init_error error
+              | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
               | Init _ -> Init_error error
               | Eval _ -> Eval_error error
               | Stuck _ -> Unknown_error error.raw_exception)

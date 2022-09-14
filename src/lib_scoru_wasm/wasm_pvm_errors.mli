@@ -40,6 +40,8 @@ type interpreter_error = {
 type t =
   | Decode_error of interpreter_error
       (** Wraps exceptions raised during parsing. *)
+  | Link_error of explanation
+      (** Errors or possible raw exceptions raised during linking. *)
   | Init_error of interpreter_error
       (** Wraps exceptions raised during initialization. *)
   | Eval_error of interpreter_error
