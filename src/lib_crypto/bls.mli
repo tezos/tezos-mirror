@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Tezos - BLS12-381 cryptography *)
+
 include
   S.AGGREGATE_SIGNATURE
     with type Public_key.t = Bls12_381.Signature.MinPk.pk
      and type Secret_key.t = Bls12_381.Signature.sk
      and type t = Bls12_381.Signature.MinPk.signature
+     and type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t

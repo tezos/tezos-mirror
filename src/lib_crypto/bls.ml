@@ -239,6 +239,8 @@ end
 
 type t = Bls12_381.Signature.MinPk.signature
 
+type watermark = Bytes.t
+
 let name = "Bls12_381.Signature"
 
 let title = "A Bls12_381 signature"
@@ -319,9 +321,21 @@ end)
 
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
-let sign = Bls12_381.Signature.MinPk.Aug.sign
+let zero =
+  Bls12_381.Signature.MinPk.signature_of_bytes_exn
+  @@ Bytes.of_string
+       "\192\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
 
-let check pk signature msg =
+let sign ?watermark sk msg =
+  let msg =
+    match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
+  in
+  Bls12_381.Signature.MinPk.Aug.sign sk msg
+
+let check ?watermark pk signature msg =
+  let msg =
+    match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
+  in
   Bls12_381.Signature.MinPk.Aug.verify pk msg signature
 
 (* [seed] must be at least of 32 bytes or [Bls12_381.Signature.generate_sk] will
@@ -340,7 +354,25 @@ let generate_key ?seed () =
   let pkh = Public_key.hash pk in
   (pkh, pk, sk)
 
+let deterministic_nonce sk msg =
+  let key = Secret_key.to_bytes sk in
+  Hacl.Hash.SHA256.HMAC.digest ~key ~msg
+
+let deterministic_nonce_hash sk msg =
+  Blake2B.to_bytes (Blake2B.hash_bytes [deterministic_nonce sk msg])
+
 let aggregate_check pk_msg_list signature =
+  let pk_msg_list =
+    List.map
+      (fun (pk, watermark, msg) ->
+        let msg =
+          match watermark with
+          | None -> msg
+          | Some prefix -> Bytes.cat prefix msg
+        in
+        (pk, msg))
+      pk_msg_list
+  in
   Bls12_381.Signature.MinPk.Aug.aggregate_verify pk_msg_list signature
 
 let aggregate_signature_opt = Bls12_381.Signature.MinPk.aggregate_signature_opt
