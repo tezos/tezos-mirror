@@ -3,11 +3,9 @@ let name = "wasm"
 let version = "2.0"
 
 let configure () =
-  let open Lwt.Syntax in
-  let* () =
-    Import.register ~module_name:(Utf8.decode "spectest") Spectest.lookup
-  in
-  let+ () = Import.register ~module_name:(Utf8.decode "env") Env.lookup in
+  let lift lookup name = Lwt.return (lookup name) in
+  Import.register ~module_name:"spectest" @@ lift Spectest.lookup ;
+  Import.register ~module_name:"env" @@ lift Env.lookup ;
   Spectest.register_host_funcs Run.host_funcs_registry ;
   Env.register_host_funcs Run.host_funcs_registry
 
@@ -46,7 +44,7 @@ let run () =
   let open Lwt.Syntax in
   Lwt.catch
     (fun () ->
-      let* _ = configure () in
+      configure () ;
       Arg.parse
         argspec
         (fun file -> add_arg ("(input " ^ quote file ^ ")"))

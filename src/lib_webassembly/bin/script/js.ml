@@ -238,9 +238,7 @@ let lookup (mods : modules) x_opt name at =
   in
   try NameMap.find name exports
   with Not_found ->
-    raise
-      (Eval.Crash
-         (at, "unknown export \"" ^ string_of_name name ^ "\" within module"))
+    raise (Eval.Crash (at, "unknown export \"" ^ name ^ "\" within module"))
 
 (* Vectors wrappers *)
 
@@ -458,34 +456,34 @@ let wrap item_name wrap_action wrap_assertion at =
   in
   let imports_list =
     [
-      {module_name = Utf8.decode "module"; item_name; idesc} @@ at;
+      {module_name = "module"; item_name; idesc} @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "externref";
+        module_name = "spectest";
+        item_name = "externref";
         idesc = FuncImport (1l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "is_externref";
+        module_name = "spectest";
+        item_name = "is_externref";
         idesc = FuncImport (2l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "is_funcref";
+        module_name = "spectest";
+        item_name = "is_funcref";
         idesc = FuncImport (3l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "eq_externref";
+        module_name = "spectest";
+        item_name = "eq_externref";
         idesc = FuncImport (4l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "eq_funcref";
+        module_name = "spectest";
+        item_name = "eq_funcref";
         idesc = FuncImport (5l @@ at) @@ at;
       }
       @@ at;
@@ -502,7 +500,7 @@ let wrap item_name wrap_action wrap_assertion at =
   let imports = imports_list |> Lazy_vector.Int32Vector.of_list in
   let edesc = FuncExport item @@ at in
   let exports =
-    [{name = Utf8.decode "run"; edesc} @@ at] |> Lazy_vector.Int32Vector.of_list
+    [{name = "run"; edesc} @@ at] |> Lazy_vector.Int32Vector.of_list
   in
   let body =
     [Block (ValBlockType None, Block_label 1l) @@ at; Unreachable @@ at]
@@ -565,8 +563,10 @@ let of_string_with iter add_char s =
 let of_bytes = of_string_with String.iter add_hex_char
 
 let of_name n =
-  let n = Lazy_vector.Int32Vector.loaded_bindings n in
-  of_string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
+  of_string_with
+    String.iter
+    (fun buf uc -> add_unicode_char buf (Char.code uc))
+    n
 
 let of_float z =
   match string_of_float z with

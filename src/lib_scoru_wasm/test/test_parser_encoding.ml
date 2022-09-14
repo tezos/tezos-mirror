@@ -199,34 +199,35 @@ end
 module Names = struct
   open Utils
 
-  let gen_utf8 = QCheck2.Gen.small_nat
-
   let gen =
     let open QCheck2.Gen in
     let start = return Decode.NKStart in
     let parse =
-      let* (Decode.LazyVec {vector; _} as buffer) = LazyVec.gen gen_utf8 in
-      let vector_length = Int32.to_int (V.num_elements vector) in
-      let* offset = int_range 0 vector_length in
-      let+ length = int_range vector_length (vector_length * 2) in
-      Decode.NKParse (offset, buffer, length)
+      let* length = int_range 0 256 in
+      let offset = int_range 0 length in
+      let+ contents = string_size offset in
+      let buffer = Buffer.create length in
+      Buffer.add_string buffer contents ;
+      Decode.NKParse (String.length contents, buffer, length)
     in
     let stop =
-      let+ buffer = Vec.gen small_nat in
+      let offset = int_range 0 256 in
+      let+ buffer = string_size offset in
       Decode.NKStop buffer
     in
     oneof [start; parse; stop]
 
   let check ns ns' =
-    let open Lwt_result_syntax in
-    let eq_value x y = return (x = y) in
     match (ns, ns') with
-    | Decode.NKStart, Decode.NKStart -> return true
+    | Decode.NKStart, Decode.NKStart -> true
     | NKParse (offset, buffer, length), NKParse (offset', buffer', length') ->
-        let+ eq_bs = LazyVec.check eq_value buffer buffer' in
-        eq_bs && offset = offset' && length = length'
-    | NKStop vec, NKStop vec' -> Vec.check eq_value vec vec'
-    | _, _ -> return false
+        Buffer.contents buffer = Buffer.contents buffer'
+        && Buffer.length buffer = Buffer.length buffer'
+        && offset = offset' && length = length'
+    | NKStop s, NKStop s' -> String.equal s s'
+    | _, _ -> false
+
+  let check ns ns' = Lwt_result.return (check ns ns')
 
   let tests = [tztest "Names" `Quick (make_test Parser.Name.encoding gen check)]
 end
@@ -288,20 +289,20 @@ module Imports = struct
 
   let import_gen =
     let open QCheck2.Gen in
-    let* modl = Vec.gen Names.gen_utf8 in
-    let* item = Vec.gen Names.gen_utf8 in
+    let* modl = string in
+    let* item = string in
     let+ idesc = Ast_generators.import_desc_gen in
     Ast.{module_name = modl; item_name = item; idesc}
 
   let gen =
     let open QCheck2.Gen in
     let start = return Decode.ImpKStart in
-    let module_name =
+    let item_name =
       let+ modl = Names.gen in
       Decode.ImpKModuleName modl
     in
-    let item_name =
-      let* modl = Vec.gen Names.gen_utf8 in
+    let desc =
+      let* modl = string in
       let+ item = Names.gen in
       Decode.ImpKItemName (modl, item)
     in
@@ -309,16 +310,12 @@ module Imports = struct
       let+ import = import_gen in
       Decode.ImpKStop import
     in
-    oneof [start; module_name; item_name; stop]
+    oneof [start; item_name; desc; stop]
 
   let import_check import import' =
-    let open Lwt_result_syntax in
-    let eq_value x y = return (x = y) in
-    let* eq_m =
-      Vec.check eq_value import.Ast.module_name import'.Ast.module_name
-    in
-    let+ eq_i = Vec.check eq_value import.item_name import'.item_name in
-    eq_m && eq_i && import.idesc = import'.idesc
+    import.Ast.module_name = import'.Ast.module_name
+    && import.item_name = import'.item_name
+    && import.idesc = import'.idesc
 
   let check import import' =
     let open Lwt_result_syntax in
@@ -326,11 +323,9 @@ module Imports = struct
     | Decode.ImpKStart, Decode.ImpKStart -> return true
     | ImpKModuleName m, ImpKModuleName m' -> Names.check m m'
     | ImpKItemName (m, i), ImpKItemName (m', i') ->
-        let eq_value x y = return (x = y) in
-        let* eq_m = Vec.check eq_value m m' in
-        let+ eq_i = Names.check i i' in
-        eq_m && eq_i
-    | ImpKStop imp, ImpKStop imp' -> import_check imp imp'
+        let* eq_items = Names.check i i' in
+        return (m = m' && eq_items)
+    | ImpKStop imp, ImpKStop imp' -> return (import_check imp imp')
     | _, _ -> return false
 
   let tests =
@@ -372,7 +367,7 @@ module Exports = struct
 
   let export_gen =
     let open QCheck2.Gen in
-    let* name = Vec.gen Names.gen_utf8 in
+    let* name = string in
     let+ edesc = Ast_generators.export_desc_gen in
     Ast.{name; edesc}
 
@@ -390,17 +385,14 @@ module Exports = struct
     oneof [start; name; stop]
 
   let export_check exp exp' =
-    let open Lwt_result_syntax in
-    let eq_value x y = return (x = y) in
-    let+ eq_n = Vec.check eq_value exp.Ast.name exp'.Ast.name in
-    eq_n && exp.edesc = exp'.edesc
+    exp.Ast.name = exp'.Ast.name && exp.edesc = exp'.edesc
 
   let check export export' =
     let open Lwt_result_syntax in
     match (export, export') with
     | Decode.ExpKStart, Decode.ExpKStart -> return true
     | ExpKName n, ExpKName n' -> Names.check n n'
-    | ExpKStop exp, ExpKStop exp' -> export_check exp exp'
+    | ExpKStop exp, ExpKStop exp' -> return (export_check exp exp')
     | _, _ -> return false
 
   let tests =
@@ -904,12 +896,14 @@ module Field = struct
     | Decode.DataCountField, Decode.DataCountField -> return (x = y)
     | StartField, StartField -> return (x = y)
     | TypeField, TypeField -> Func_type.func_type_check x.Source.it y.Source.it
-    | ImportField, ImportField -> Imports.import_check x.Source.it y.Source.it
+    | ImportField, ImportField ->
+        return (Imports.import_check x.Source.it y.Source.it)
     | FuncField, FuncField -> return (x = y)
     | TableField, TableField -> return (x = y)
     | MemoryField, MemoryField -> return (x = y)
     | GlobalField, GlobalField -> return (x = y)
-    | ExportField, ExportField -> Exports.export_check x.Source.it y.Source.it
+    | ExportField, ExportField ->
+        return (Exports.export_check x.Source.it y.Source.it)
     | ElemField, ElemField -> Elem.elem_check x.Source.it y.Source.it
     | CodeField, CodeField -> Code.check_func x.Source.it y.Source.it
     | DataField, DataField -> Data.data_check x.Source.it y.Source.it
@@ -978,19 +972,22 @@ module Field = struct
         } =
     let open Lwt_result_syntax in
     let check_no_region check v v' = check v.Source.it v'.Source.it in
+    let check_no_region_lwt check v v' =
+      return (check v.Source.it v'.Source.it)
+    in
     let eq v v' = return (v = v') in
     let* eq_types =
       Vec.check (check_no_region Func_type.func_type_check) types types'
     in
     let* eq_imports =
-      Vec.check (check_no_region Imports.import_check) imports imports'
+      Vec.check (check_no_region_lwt Imports.import_check) imports imports'
     in
     let* eq_vars = Vec.check (check_no_region eq) vars vars' in
     let* eq_tables = Vec.check (check_no_region eq) tables tables' in
     let* eq_memories = Vec.check (check_no_region eq) memories memories' in
     let* eq_globals = Vec.check (check_no_region eq) globals globals' in
     let* eq_exports =
-      Vec.check (check_no_region Exports.export_check) exports exports'
+      Vec.check (check_no_region_lwt Exports.export_check) exports exports'
     in
     let* eq_start = return (start = start') in
     let* eq_elems = Vec.check (check_no_region Elem.elem_check) elems elems' in
@@ -1180,6 +1177,11 @@ module Module = struct
     in
     eq_blocks && eq_datas
 
+  let check_no_region check v v' = check v.Source.it v'.Source.it
+
+  let check_no_region_lwt check v v' =
+    Lwt.return_ok (check v.Source.it v'.Source.it)
+
   let check_module
       Source.
         {
@@ -1220,7 +1222,6 @@ module Module = struct
           _;
         } =
     let open Lwt_result_syntax in
-    let check_no_region check v v' = check v.Source.it v'.Source.it in
     let eq v v' = return (v = v') in
     let* eq_types =
       Vec.check (check_no_region Func_type.func_type_check) types types'
@@ -1233,16 +1234,14 @@ module Module = struct
     let* eq_elems = Vec.check (check_no_region Elem.elem_check) elems elems' in
     let* eq_datas = Vec.check (check_no_region Data.data_check) datas datas' in
     let* eq_imports =
-      Vec.check (check_no_region Imports.import_check) imports imports'
+      Vec.check (check_no_region_lwt Imports.import_check) imports imports'
     in
     let* eq_exports =
-      Vec.check (check_no_region Exports.export_check) exports exports'
+      Vec.check (check_no_region_lwt Exports.export_check) exports exports'
     in
     let+ eq_allocations = check_allocations allocations allocations' in
     eq_types && eq_globals && eq_funcs && eq_tables && eq_memories && eq_start
     && eq_elems && eq_datas && eq_imports && eq_exports && eq_allocations
-
-  let check_without_region check x y = check x.Source.it y.Source.it
 
   let check_option f x y =
     match (x, y) with
@@ -1274,9 +1273,7 @@ module Module = struct
         MKElaborateFunc (fts', fbs', kont', iterators', datas') ) ->
         let eq_vars v v' = return (v = v') in
         let* eq_fts = Vec.check eq_vars fts fts' in
-        let* eq_fbs =
-          Vec.check (check_without_region Code.check_func) fbs fbs'
-        in
+        let* eq_fbs = Vec.check (check_no_region Code.check_func) fbs fbs' in
         let* eq_its =
           check_option
             (LazyVec.check (LazyVec.check eq_instr))
@@ -1284,12 +1281,12 @@ module Module = struct
             iterators'
         in
         let+ eq_kont =
-          LazyVec.check (check_without_region Code.check_func) kont kont'
+          LazyVec.check (check_no_region Code.check_func) kont kont'
         in
         eq_fts && eq_fbs && eq_kont && eq_its && datas = datas'
     | MKBuild (Some funcs, datas), MKBuild (Some funcs', datas') ->
         let+ eq_funcs =
-          Vec.check (check_without_region Code.check_func) funcs funcs'
+          Vec.check (check_no_region Code.check_func) funcs funcs'
         in
         eq_funcs && datas = datas'
     | MKBuild (None, datas), MKBuild (None, datas') -> return (datas = datas')
@@ -1302,7 +1299,7 @@ module Module = struct
         let* eq_size = Size.check size size' in
         let+ eq_vec_kont =
           LazyVec.check
-            (check_without_region Func_type.func_type_check)
+            (check_no_region Func_type.func_type_check)
             vec_kont
             vec_kont'
         in
@@ -1313,7 +1310,7 @@ module Module = struct
         let* eq_size = Size.check size size' in
         let+ eq_vec_kont =
           LazyVec.check
-            (check_without_region Imports.import_check)
+            (check_no_region_lwt Imports.import_check)
             vec_kont
             vec_kont'
         in
@@ -1324,7 +1321,7 @@ module Module = struct
         let* eq_size = Size.check size size' in
         let+ eq_vec_kont =
           LazyVec.check
-            (check_without_region Exports.export_check)
+            (check_no_region_lwt Exports.export_check)
             vec_kont
             vec_kont'
         in
@@ -1343,10 +1340,7 @@ module Module = struct
         let* eq_elem_kont = Elem.check elem_kont elem_kont' in
         let* eq_size = Size.check size size' in
         let+ eq_vec_kont =
-          LazyVec.check
-            (check_without_region Elem.elem_check)
-            vec_kont
-            vec_kont'
+          LazyVec.check (check_no_region Elem.elem_check) vec_kont vec_kont'
         in
         eq_elem_kont && eq_size && eq_vec_kont && pos = pos'
     | ( MKData (data_kont, pos, size, vec_kont),
@@ -1362,10 +1356,7 @@ module Module = struct
         let* eq_code_kont = Code.check code_kont code_kont' in
         let* eq_size = Size.check size size' in
         let+ eq_vec_kont =
-          LazyVec.check
-            (check_without_region Code.check_func)
-            vec_kont
-            vec_kont'
+          LazyVec.check (check_no_region Code.check_func) vec_kont vec_kont'
         in
         eq_code_kont && eq_size && eq_vec_kont && pos = pos'
     | _, _ -> return_false

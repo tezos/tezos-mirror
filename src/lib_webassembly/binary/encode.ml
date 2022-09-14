@@ -117,7 +117,7 @@ struct
     len (String.length bs) ;
     put_string s bs
 
-  let name n = string (Utf8.encode_unsafe n)
+  let name n = string n
 
   let list f xs = List.iter f xs
 

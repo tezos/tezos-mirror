@@ -196,12 +196,9 @@ struct
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
           in
-          let* main_name =
-            Wasm.Instance.Vector.to_list @@ Wasm.Utf8.decode wasm_entrypoint
-          in
           let* extern =
             Wasm.Instance.NameMap.get
-              main_name
+              wasm_entrypoint
               module_inst.Wasm.Instance.exports
           in
           match extern with
@@ -235,15 +232,14 @@ struct
             Lazy_containers.Lazy_vector.Int32Vector.to_list
               ast_module.it.imports
           in
-          let* externs =
-            Lwt_list.fold_left_s
+          let externs =
+            List.fold_left
               (fun v (im : Wasm.Ast.import) ->
                 let Wasm.Ast.{module_name; item_name; _} = im.it in
-                let* module_name = Wasm.Utf8.encode module_name in
                 match module_name with
                 | "rollup_safe_core" ->
                     (* Host functions *)
-                    let+ extern = Host_funcs.lookup item_name in
+                    let extern = Host_funcs.lookup item_name in
                     let v, _ =
                       Lazy_containers.Lazy_vector.Int32Vector.append extern v
                     in

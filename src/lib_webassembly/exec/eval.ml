@@ -1547,20 +1547,18 @@ let create_data (seg : data_segment) : data_inst =
 let add_import (m : module_) (ext : extern) (im : import) (inst : module_inst) :
     module_inst Lwt.t =
   let* t = import_type m im in
-  let* type_match = match_extern_type (extern_type_of ext) t in
-  let+ () =
-    if not type_match then
-      let* module_name = Utf8.encode im.it.module_name in
-      let+ item_name = Utf8.encode im.it.item_name in
-      Link.error
-        im.at
-        ("incompatible import type for " ^ "\"" ^ module_name ^ "\" " ^ "\""
-       ^ item_name ^ "\": " ^ "expected "
-        ^ Types.string_of_extern_type t
-        ^ ", got "
-        ^ Types.string_of_extern_type (extern_type_of ext))
-    else Lwt.return_unit
-  in
+  let+ type_match = match_extern_type (extern_type_of ext) t in
+  (if not type_match then
+   let module_name = im.it.module_name in
+   let item_name = im.it.item_name in
+   Link.error
+     im.at
+     ("incompatible import type for " ^ "\"" ^ module_name ^ "\" " ^ "\""
+    ^ item_name ^ "\": " ^ "expected "
+     ^ Types.string_of_extern_type t
+     ^ ", got "
+     ^ Types.string_of_extern_type (extern_type_of ext))) ;
+
   match ext with
   | ExternFunc func -> {inst with funcs = Vector.cons func inst.funcs}
   | ExternTable tab -> {inst with tables = Vector.cons tab inst.tables}
@@ -1945,8 +1943,7 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
   | IK_Exports (inst0, tick) ->
       let+ tick =
         fold_left_s_step tick (fun acc export ->
-            let* k, v = create_export inst0 export in
-            let+ k = Instance.Vector.to_list k in
+            let+ k, v = create_export inst0 export in
             {
               exports = NameMap.set k v acc.exports;
               exports_memory_0 =

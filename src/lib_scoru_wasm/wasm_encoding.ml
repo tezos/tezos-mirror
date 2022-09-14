@@ -545,7 +545,7 @@ let value_encoding =
 
 let values_encoding = lazy_vector_encoding' value_encoding
 
-let name_encoding key = lazy_vector_encoding key (value [] Data_encoding.int31)
+let name_encoding key = value [key] Data_encoding.string
 
 let memory_encoding =
   conv

@@ -174,8 +174,13 @@ let pp_extern out = function
   | Instance.ExternGlobal g -> Format.fprintf out "ExternGlobal %a" pp_global g
 
 let pp_map pp out map =
-  let pp_name_list = pp_list Format.pp_print_int in
-  pp_list (pp_pair pp_name_list pp) out (Instance.NameMap.loaded_bindings map)
+  let pp_name out name =
+    Format.fprintf
+      out
+      "%s"
+      (Tezos_webassembly_interpreter.Ast.string_of_name name)
+  in
+  pp_list (pp_pair pp_name pp) out (Instance.NameMap.loaded_bindings map)
 
 let pp_elems out ref = pp_vector Values.pp_ref_ out !ref
 

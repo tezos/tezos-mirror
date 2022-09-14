@@ -286,7 +286,7 @@ type num = Values.num Source.phrase [@@deriving show]
 
 type vec = Values.vec Source.phrase [@@deriving show]
 
-type name = int Vector.t
+type name = string
 
 type name_list = int list
 
@@ -573,9 +573,9 @@ let export_type (m : module_) (ex : export) : extern_type Lwt.t =
       ExternGlobalType (nth gts x.it)
 
 let string_of_name n =
-  let n = Vector.loaded_bindings n in
   let b = Buffer.create 16 in
-  let escape (_, uc) =
+  let escape uc =
+    let uc = Char.code uc in
     if uc < 0x20 || uc >= 0x7f then
       Buffer.add_string b (Printf.sprintf "\\u{%02x}" uc)
     else
@@ -583,5 +583,5 @@ let string_of_name n =
       if c = '\"' || c = '\\' then Buffer.add_char b '\\' ;
       Buffer.add_char b c
   in
-  List.iter escape n ;
+  String.iter escape n ;
   Buffer.contents b

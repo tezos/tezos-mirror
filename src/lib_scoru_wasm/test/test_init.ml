@@ -87,4 +87,46 @@ let test_memory0_export () =
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"
 
-let tests = [tztest "init requires memory 0 export" `Quick test_memory0_export]
+let test_module_name_size () =
+  let open Lwt_result_syntax in
+  let build_module size =
+    let b = Buffer.create size in
+    let rec build size =
+      if size = 0 then Buffer.contents b
+      else (
+        Buffer.add_char b 'a' ;
+        build (size - 1))
+    in
+    Format.sprintf
+      {|
+        (module
+          (memory 1)
+          (export "mem"(memory 0))
+          (func (export "%s")
+            (unreachable)
+          )
+          (func (export "kernel_next")
+            (unreachable)
+          )
+        )|}
+      (build size)
+  in
+  let*! bad_module_tree = initial_tree (build_module 513) in
+  let* stuck = eval_until_stuck bad_module_tree in
+  let* () =
+    match stuck with
+    | Decode_error {explanation = Some "Names cannot exceed 512 bytes"; _} ->
+        Lwt_result.return ()
+    | _ -> failwith "Unexpected stuck state!"
+  in
+  let*! good_module_tree = initial_tree (build_module 512) in
+  let* stuck = eval_until_stuck good_module_tree in
+  match stuck with
+  | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
+  | _ -> failwith "Unexpected stuck state!"
+
+let tests =
+  [
+    tztest "init requires memory 0 export" `Quick test_memory0_export;
+    tztest "names are limited to 512 bytes" `Quick test_module_name_size;
+  ]

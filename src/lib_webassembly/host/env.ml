@@ -42,20 +42,17 @@ let register_host_funcs registry =
   Host_funcs.register ~global_name:"abort" exit registry
 
 let lookup name =
-  let open Lwt.Syntax in
-  let+ name = Utf8.encode name in
   match name with
   | "abort" ->
       let global_name = "env_abort" in
       ExternFunc
         (Func.alloc_host
            ~global_name
-           (FuncType (Vector.of_list [], Vector.of_list [])))
+           (FuncType (Vector.empty (), Vector.empty ())))
   | "exit" ->
       let global_name = "env_exit" in
       ExternFunc
         (Func.alloc_host
            ~global_name
-           (FuncType
-              (Vector.of_list [Types.(NumType I32Type)], Vector.of_list [])))
+           (FuncType (Vector.singleton Types.(NumType I32Type), Vector.empty ())))
   | _ -> raise Not_found
