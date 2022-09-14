@@ -756,8 +756,8 @@ let tx_rollup_dispatch_tickets ?force_reveal ?counter ?fee ?gas_limit
   sign account.sk ctxt to_sign_op
 
 let transfer_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
-    ~(source : Contract.t) ~contents ~ty ~ticketer amount ~destination
-    entrypoint =
+    ~(source : Contract.t) ~contents ~ty ~ticketer ~amount ~destination
+    ~entrypoint =
   manager_operation
     ?force_reveal
     ?counter

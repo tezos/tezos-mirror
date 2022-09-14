@@ -110,6 +110,7 @@ let contract_originate block account =
                 PUSH nat 0;
                 PUSH string "ticket payload";
                 TICKET;
+                ASSERT_SOME;
                 TRANSFER_TOKENS;
               } {
                 IF_LEFT {
@@ -118,6 +119,7 @@ let contract_originate block account =
                   PUSH nat 137;
                   PUSH string "G";
                   TICKET;
+                  ASSERT_SOME;
                   TRANSFER_TOKENS;
                 } {
                   NEVER
@@ -334,9 +336,12 @@ let test_transfer_zero_amount_ticket () =
       ~param
       ~entrypoint:"transfer_zero_ticket"
       ~expect_apply_failure:
-        (check_proto_error ~loc:__LOC__ ~exp:"Forbidden_zero_ticket_quantity"
-         @@ function
-         | [Ticket_scanner.Forbidden_zero_ticket_quantity] -> return_unit
+        (check_proto_error ~loc:__LOC__ ~exp:"Script_rejected" @@ function
+         | [
+             Script_interpreter.Runtime_contract_error _;
+             Script_interpreter.Reject _;
+           ] ->
+             return_unit
          | _ -> raise Unexpected_error)
   in
   return_unit

@@ -203,6 +203,7 @@ tickets to a Transaction Rollup::
                      PUSH nat 10;
                      PUSH unit Unit;
                      TICKET;
+                     ASSERT_SOME;
 
                      PAIR ;
 
@@ -723,6 +724,7 @@ rollup can be found in the integration tests of the feature.::
            CAR;
            UNPAIR 4;
            TICKET;
+           ASSERT_SOME;
            PAIR;
            SWAP;
            CONTRACT %deposit (pair (ticket string) tx_rollup_l2_address);

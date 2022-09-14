@@ -2876,31 +2876,34 @@ let commands_rw () =
            cctxt ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
-        let* _res =
-          transfer_ticket
-            cctxt
-            ~chain:cctxt#chain
-            ~block:cctxt#block
-            ~dry_run
-            ~verbose_signing
-            ?fee
-            ?storage_limit
-            ?counter
-            ?confirmations:cctxt#confirmations
-            ~simulation
-            ~source
-            ~src_pk
-            ~src_sk
-            ~fee_parameter
-            ~contents
-            ~ty
-            ~ticketer
-            ~amount
-            ~destination
-            ~entrypoint
-            ()
-        in
-        return_unit);
+        match Ticket_amount.of_zint amount with
+        | Some amount ->
+            let* _res =
+              transfer_ticket
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~dry_run
+                ~verbose_signing
+                ?fee
+                ?storage_limit
+                ?counter
+                ?confirmations:cctxt#confirmations
+                ~simulation
+                ~source
+                ~src_pk
+                ~src_sk
+                ~fee_parameter
+                ~contents
+                ~ty
+                ~ticketer
+                ~amount
+                ~destination
+                ~entrypoint
+                ()
+            in
+            return_unit
+        | None -> cctxt#error "ticket quantity should not be zero or negative");
     command
       ~group
       ~desc:"Originate a new smart-contract rollup."

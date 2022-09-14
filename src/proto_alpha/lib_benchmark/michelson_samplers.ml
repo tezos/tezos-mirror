@@ -803,7 +803,12 @@ end)
       let ticketer =
         Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
       in
-      let amount = Michelson_base.nat rng_state in
+      let amount =
+        let open Ticket_amount in
+        match of_n (Michelson_base.nat rng_state) with
+        | Some amount -> add amount one
+        | None -> one
+      in
       Script_typed_ir.{ticketer; contents; amount}
 
     let comparable ty = value ty

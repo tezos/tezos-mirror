@@ -214,7 +214,9 @@ let chain_id_size = !!16 (* by Obj.reachable_words. *)
 
 (* [contents] is handled by the recursion scheme in [value_size]. *)
 let ticket_size {ticketer; contents = _; amount} =
-  h3w +! Contract.in_memory_size ticketer +! script_nat_size amount
+  h3w
+  +! Contract.in_memory_size ticketer
+  +! script_nat_size (amount :> Script_int.n Script_int.num)
 
 let chest_size chest =
   (*
@@ -650,6 +652,10 @@ and kinstr_size :
           accu
           (base1 loc k +! (word_size *? 2) +! dup_n_gadt_witness_size n w)
     | ITicket (loc, cty, k) ->
+        ret_succ_adding
+          accu
+          (base1 loc k +! ty_for_logging_size cty +! word_size)
+    | ITicket_deprecated (loc, cty, k) ->
         ret_succ_adding
           accu
           (base1 loc k +! ty_for_logging_size cty +! word_size)

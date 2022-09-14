@@ -27,6 +27,7 @@ code { CAR ;
                     PUSH nat 1 ;
                     PUSH string "BLUE" ;
                     TICKET ;
+                    ASSERT_SOME ;
                     DIG 3 ;
                     SWAP ;
                     SOME ;

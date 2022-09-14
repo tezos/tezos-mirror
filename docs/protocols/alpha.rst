@@ -196,6 +196,12 @@ Breaking Changes
   safer version of timelock will come in a future procotol.  (MR :gl: `!6260`)
 
 - Rename the parameter ``tokens_per_roll`` to ``minimal_stake``. (MR :gl:`!5897`)
+- Disallow creation, transfer and storage of tickets with zero amounts.
+  ``TICKET`` instruction now returns ``option ticket 'a`` instead of ``ticket 'a``.
+  For contracts already originated, their ``TICKET`` instructions are renamed to ``TICKET_DEPRECATED``.
+  Note that it is not possible to originate contracts containing ``TICKET_DEPRECATED``
+  after the migration.
+  (MR :gl:`!5963`)
 
 RPC Changes
 -----------

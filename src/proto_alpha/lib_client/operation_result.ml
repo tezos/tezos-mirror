@@ -305,7 +305,7 @@ let pp_manager_operation_content (type kind) source ppf
         Contract.pp
         ticketer
         Z.pp_print
-        amount
+        Script_int.(to_zint (amount :> n num))
         Contract.pp
         destination
         (fun ppf entrypoint ->

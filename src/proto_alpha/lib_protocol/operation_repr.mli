@@ -481,7 +481,7 @@ and _ manager_operation =
       ty : Script_repr.lazy_expr;
           (** Type of the withdrawn ticket's contents *)
       ticketer : Contract_repr.t;  (** Ticketer of the withdrawn ticket *)
-      amount : Z.t;
+      amount : Ticket_amount.t;
           (** Quantity of the withdrawn ticket. Must match the
           amount that was enabled.  *)
       destination : Contract_repr.t;

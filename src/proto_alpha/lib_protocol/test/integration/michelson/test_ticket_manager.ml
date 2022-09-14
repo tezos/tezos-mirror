@@ -57,7 +57,7 @@ let init_env () =
 let collect_token_amounts ctxt tickets =
   let accum (tokens, ctxt) ticket =
     let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
-    let tokens = (token, Script_int.to_zint amount) :: tokens in
+    let tokens = (token, Script_int.(to_zint (amount :> n num))) :: tokens in
     return (tokens, ctxt)
   in
   List.fold_left_es accum ([], ctxt) tickets
@@ -65,12 +65,7 @@ let collect_token_amounts ctxt tickets =
 let tokens_of_value ~include_lazy ctxt ty x =
   let*? has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
   let* tickets, ctxt =
-    Ticket_scanner.tickets_of_value
-      ~include_lazy
-      ~allow_zero_amount_tickets:true
-      ctxt
-      has_tickets
-      x
+    Ticket_scanner.tickets_of_value ~include_lazy ctxt has_tickets x
   in
   let* tas, ctxt = collect_token_amounts ctxt tickets in
   let* bm, ctxt =
@@ -290,6 +285,7 @@ module Ticket_manager = struct
                             DUP 3 ;
                             DUP 6 ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             DUP 5 ;
                             GET_AND_UPDATE ;
@@ -297,6 +293,7 @@ module Ticket_manager = struct
                             DUP 3 ;
                             DUP 6 ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             DUP 5 ;
                             GET_AND_UPDATE ;
@@ -304,6 +301,7 @@ module Ticket_manager = struct
                             DIG 2 ;
                             DIG 4 ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             DIG 3 ;
                             GET_AND_UPDATE ;
@@ -320,6 +318,7 @@ module Ticket_manager = struct
                             DIG 3 ;
                             DIG 3 ;
                             TICKET ;
+                            ASSERT_SOME ;
                             CONS ;
                             PAIR ;
                             NIL operation ;
@@ -330,6 +329,7 @@ module Ticket_manager = struct
                         DUP 3 ;
                         DUG 2 ;
                         TICKET ;
+                        ASSERT_SOME ;
                         PUSH mutez 0 ;
                         DIG 2 ;
                         SOME ;
@@ -346,6 +346,7 @@ module Ticket_manager = struct
                         PUSH nat 99 ;
                         PUSH string "NEW_TICKET_IN_ORIGINATED_CONTRACT" ;
                         TICKET ;
+                        ASSERT_SOME ;
                         SOME ;
                         PUSH int 1 ;
                         GET_AND_UPDATE ;
@@ -408,6 +409,7 @@ module Ticket_manager = struct
                         PUSH nat 1 ;
                         PUSH string "ADDED_BY_REPLACE_BIG_MAP" ;
                         TICKET ;
+                        ASSERT_SOME ;
                         SOME ;
                         PUSH int 11 ;
                         GET_AND_UPDATE ;
@@ -419,6 +421,7 @@ module Ticket_manager = struct
                         PUSH nat 1 ;
                         PUSH string "ADDED_BY_REPLACE_BIG_MAP" ;
                         TICKET ;
+                        ASSERT_SOME ;
                         SOME ;
                         PUSH int 11 ;
                         GET_AND_UPDATE ;
@@ -479,6 +482,7 @@ module Ticket_manager = struct
                             DIG 5 ;
                             DIG 5 ;
                             TICKET ;
+                            ASSERT_SOME ;
                             TRANSFER_TOKENS ;
                             DUG 2 ;
                             PAIR ;
@@ -508,6 +512,7 @@ module Ticket_manager = struct
                             PUSH nat 1 ;
                             PUSH string "ADDED_BY_SEND_SELF_REPLACE" ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             PUSH int 10 ;
                             GET_AND_UPDATE ;
@@ -528,6 +533,7 @@ module Ticket_manager = struct
                             PUSH nat 1 ;
                             PUSH string "ADDED_BY_SEND_SELF_REPLACE_TO_STORAGE" ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             PUSH int 11 ;
                             GET_AND_UPDATE ;

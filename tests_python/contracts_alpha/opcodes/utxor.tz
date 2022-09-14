@@ -4,6 +4,7 @@ code { UNPAIR ; DIP { DUP } ;
        SWAP ;
        PUSH nat 5 ; SWAP ;
        TICKET ;
+       ASSERT_SOME ;
        PUSH nat 2 ; PUSH nat 3 ; PAIR ;
        SWAP ;
        SPLIT_TICKET ;

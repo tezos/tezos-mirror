@@ -9,6 +9,7 @@ code {
        PUSH nat 0;
        SWAP;
        TICKET;
+       ASSERT_SOME;
        READ_TICKET; CDR; CAR;
        SWAP; READ_TICKET; CDR; CAR;
        SWAP; DROP;

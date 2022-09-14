@@ -74,6 +74,8 @@ type error += Tx_rollup_bad_deposit_parameter of Script.location * Script.expr
 
 type error += Tx_rollup_invalid_ticket_amount of Z.t
 
+type error += Forbidden_zero_ticket_quantity
+
 type error += Tx_rollup_addresses_disabled of Script.location
 
 (* Smart-contract rollup errors *)

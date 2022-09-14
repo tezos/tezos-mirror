@@ -79,7 +79,8 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[migrate_from]
+    ~loser_protocols:[migrate_from] ;
+  Iticket_migration.register ~migrate_from ~migrate_to
 
 let register_protocol_agnostic_tests () =
   (* Tests that are relatively protocol-agnostic.

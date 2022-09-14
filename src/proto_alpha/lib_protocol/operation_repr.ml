@@ -417,7 +417,7 @@ and _ manager_operation =
       contents : Script_repr.lazy_expr;
       ty : Script_repr.lazy_expr;
       ticketer : Contract_repr.t;
-      amount : Z.t;
+      amount : Ticket_amount.t;
       destination : Contract_repr.t;
       entrypoint : Entrypoint_repr.t;
     }
@@ -1035,7 +1035,7 @@ module Encoding = struct
               (req "ticket_contents" Script_repr.lazy_expr_encoding)
               (req "ticket_ty" Script_repr.lazy_expr_encoding)
               (req "ticket_ticketer" Contract_repr.encoding)
-              (req "ticket_amount" n)
+              (req "ticket_amount" Ticket_amount.encoding)
               (req "destination" Contract_repr.encoding)
               (req "entrypoint" Entrypoint_repr.simple_encoding);
           select =

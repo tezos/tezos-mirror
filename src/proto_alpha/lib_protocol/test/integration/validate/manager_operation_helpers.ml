@@ -842,13 +842,13 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
          (match infos.accounts.tx with
          | None -> infos.accounts.source
          | Some tx -> tx))
-    Z.zero
+    ~amount:Ticket_amount.one
     ~destination:
       (contract_of
          (match infos.accounts.dest with
          | None -> infos.accounts.source
          | Some dest -> dest))
-    Entrypoint.default
+    ~entrypoint:Entrypoint.default
 
 let mk_tx_rollup_dispacth_ticket (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in

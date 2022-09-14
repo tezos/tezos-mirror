@@ -16,6 +16,7 @@ code {
                  UNIT;
                  PAIR;
                  TICKET;
+                 ASSERT_SOME;
                  PAIR;
 
                  # amount for transfering

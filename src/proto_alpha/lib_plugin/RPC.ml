@@ -806,6 +806,7 @@ module Scripts = struct
       | IComb_set _ -> pp_print_string fmt "UPDATE"
       | IDup_n _ -> pp_print_string fmt "DUP"
       | ITicket _ -> pp_print_string fmt "TICKET"
+      | ITicket_deprecated _ -> pp_print_string fmt "TICKET_DEPRECATED"
       | IRead_ticket _ -> pp_print_string fmt "READ_TICKET"
       | ISplit_ticket _ -> pp_print_string fmt "SPLIT_TICKET"
       | IJoin_tickets _ -> pp_print_string fmt "JOIN_TICKETS"

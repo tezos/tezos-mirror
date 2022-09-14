@@ -254,6 +254,15 @@ let () =
     (obj1 (req "requested_value" Data_encoding.z))
     (function Tx_rollup_invalid_ticket_amount z -> Some z | _ -> None)
     (fun z -> Tx_rollup_invalid_ticket_amount z) ;
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.forbidden_zero_amount_ticket"
+    ~title:"Zero ticket amount is not allowed"
+    ~description:
+      "It is not allowed to use a zero amount ticket in this operation."
+    Data_encoding.empty
+    (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
+    (fun () -> Forbidden_zero_ticket_quantity) ;
   (* Tx rollup addresses disabled *)
   register_error_kind
     `Permanent

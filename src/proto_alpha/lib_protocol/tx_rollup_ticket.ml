@@ -55,17 +55,9 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   let ticket_token =
     Ticket_token.Ex_token {ticketer; contents_type; contents}
   in
-  Option.value_e
-    ~error:
-      (Error_monad.trace_of_error
-     @@ Tx_rollup_errors.Internal_error
-          "Ticket quantity is negative, this can't happen because it comes \
-           from a qty.")
-    Script_int.(is_nat @@ of_zint amount)
-  >>?= fun amount_node ->
   Script_typed_ir.ticket_t Micheline.dummy_location contents_type
   >>?= fun ticket_ty ->
-  let ticket = Script_typed_ir.{ticketer; contents; amount = amount_node} in
+  let ticket = Script_typed_ir.{ticketer; contents; amount} in
   Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
   >>=? fun (parameters_expr, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost parameters_expr)
@@ -100,7 +92,9 @@ let make_withdraw_order ctxt tx_rollup ex_ticket claimer amount =
   in
   return (ctxt, withdrawal)
 
-let transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash qty =
+let transfer_ticket_with_hashes ctxt ~src_hash ~dst_hash
+    (qty : Script_typed_ir.ticket_amount) =
+  let qty = Script_int.(to_zint (qty :> n num)) in
   Ticket_balance.adjust_balance ctxt src_hash ~delta:(Z.neg qty)
   >>=? fun (src_storage_diff, ctxt) ->
   Ticket_balance.adjust_balance ctxt dst_hash ~delta:qty

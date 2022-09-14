@@ -339,13 +339,14 @@ let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
     {Ticket_operations_diff.ticket_token; total_amount = _; destinations} =
   let open Lwt_tzresult_syntax in
   List.fold_left_es
-    (fun (acc_storage_diff, ctxt) (target_destination, amount) ->
+    (fun (acc_storage_diff, ctxt)
+         (target_destination, (amount : Script_typed_ir.ticket_amount)) ->
       let* storage_diff, ctxt =
         transfer_ticket_token
           ctxt
           ~source_destination
           ~target_destination
-          ~amount:(Script_int.to_zint amount)
+          ~amount:Script_int.(to_zint (amount :> n num))
           ticket_token
       in
       return (Z.(add acc_storage_diff storage_diff), ctxt))
@@ -480,10 +481,7 @@ let execute_outbox_message ctxt ~validate_and_decode_output_proof rollup
      as they cannot be tracked by the ticket-balance table.
   *)
   let* ticket_token_diffs, ctxt =
-    Ticket_operations_diff.ticket_diffs_of_operations
-      ctxt
-      ~allow_zero_amount_tickets:false
-      operations
+    Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
   in
   (* Update the ticket-balance table by transferring ticket-tokens to new
      destinations for each transaction. This fails in case the rollup does not

@@ -251,7 +251,7 @@ let ticket_sampler rng_state =
   let pkh, _, _ = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
   let ticketer = Alpha_context.Contract.Implicit pkh in
   Script_typed_ir.
-    {ticketer; contents = Script_int.zero; amount = Script_int.one_n}
+    {ticketer; contents = Script_int.zero; amount = Ticket_amount.one}
 
 (** A benchmark for {!Ticket_costs.Constants.cost_collect_tickets_step}. *)
 module Collect_tickets_benchmark : Benchmark.S = struct
@@ -285,7 +285,6 @@ module Collect_tickets_benchmark : Benchmark.S = struct
               (Ticket_scanner.tickets_of_value
                  ctxt
                  ~include_lazy:true
-                 ~allow_zero_amount_tickets:true
                  has_tickets
                  boxed_ticket_list))
        in

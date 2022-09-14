@@ -149,6 +149,7 @@ type prim =
   | I_SHA3
   | I_PAIRING_CHECK
   | I_TICKET
+  | I_TICKET_DEPRECATED
   | I_READ_TICKET
   | I_SPLIT_TICKET
   | I_JOIN_TICKETS
@@ -219,8 +220,9 @@ let namespace = function
   | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS | I_SENDER
   | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE | I_SOME
   | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ | I_SWAP
-  | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT | I_UNPACK
-  | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST | I_EMIT ->
+  | I_TICKET | I_TICKET_DEPRECATED | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS
+  | I_UNIT | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR
+  | I_OPEN_CHEST | I_EMIT ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -357,6 +359,7 @@ let string_of_prim = function
   | I_SHA3 -> "SHA3"
   | I_PAIRING_CHECK -> "PAIRING_CHECK"
   | I_TICKET -> "TICKET"
+  | I_TICKET_DEPRECATED -> "TICKET_DEPRECATED"
   | I_READ_TICKET -> "READ_TICKET"
   | I_SPLIT_TICKET -> "SPLIT_TICKET"
   | I_JOIN_TICKETS -> "JOIN_TICKETS"
@@ -514,6 +517,7 @@ let prim_of_string = function
   | "VOTING_POWER" -> ok I_VOTING_POWER
   | "TOTAL_VOTING_POWER" -> ok I_TOTAL_VOTING_POWER
   | "TICKET" -> ok I_TICKET
+  | "TICKET_DEPRECATED" -> ok I_TICKET_DEPRECATED
   | "READ_TICKET" -> ok I_READ_TICKET
   | "SPLIT_TICKET" -> ok I_SPLIT_TICKET
   | "JOIN_TICKETS" -> ok I_JOIN_TICKETS
@@ -746,7 +750,7 @@ let prim_encoding =
          ("ticket", T_ticket);
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_008 addition *)
-         ("TICKET", I_TICKET);
+         ("TICKET_DEPRECATED", I_TICKET_DEPRECATED);
          ("READ_TICKET", I_READ_TICKET);
          ("SPLIT_TICKET", I_SPLIT_TICKET);
          ("JOIN_TICKETS", I_JOIN_TICKETS);
@@ -770,7 +774,8 @@ let prim_encoding =
          ("EMIT", I_EMIT);
          (* Alpha_015 addition *)
          ("Lambda_rec", D_Lambda_rec);
-         ("LAMBDA_REC", I_LAMBDA_REC)
+         ("LAMBDA_REC", I_LAMBDA_REC);
+         ("TICKET", I_TICKET)
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *);
        ]

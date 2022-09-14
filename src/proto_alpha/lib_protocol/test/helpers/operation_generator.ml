@@ -643,7 +643,15 @@ let generate_transfer_ticket random_state :
     let ty = Script.lazy_expr (Expr.from_string "nat") in
     let ticketer = random_contract random_state in
     let destination = random_contract random_state in
-    let amount = random_counter random_state in
+    let amount =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ Ticket_amount.of_n
+      @@ Script_int.(
+           add_n one_n
+           @@ Option.value ~default:zero_n
+           @@ is_nat @@ of_zint
+           @@ random_counter random_state)
+    in
     let entrypoint = Entrypoint.default in
     Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
   in

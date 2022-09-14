@@ -1509,7 +1509,9 @@ module Cost_of = struct
       in
       Gas.(
         contents_comparison +@ compare_address
-        +@ add_nat ticket_a.amount ticket_b.amount)
+        +@ add_nat
+             (ticket_a.amount :> Script_int.n Script_int.num)
+             (ticket_b.amount :> Script_int.n Script_int.num))
 
     let emit = atomic_step_cost cost_N_IEmit
 

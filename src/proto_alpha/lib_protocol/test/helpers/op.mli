@@ -528,9 +528,9 @@ val transfer_ticket :
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
   ticketer:Contract.t ->
-  Z.t ->
+  amount:Ticket_amount.t ->
   destination:Contract.t ->
-  Entrypoint_repr.t ->
+  entrypoint:Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
 
 (** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
