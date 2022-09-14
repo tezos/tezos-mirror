@@ -4,13 +4,8 @@ sanity_ci:
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
   stage: sanity
-  before_script:
-    - . ./scripts/version.sh
   script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
-    - make -C manifest check
-    - scripts/lint.sh --check-gitlab-ci-yml
+    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci sanity-ci
 
 docker:hadolint:
   extends:
@@ -19,5 +14,4 @@ docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   script:
-    - hadolint build.Dockerfile
-    - hadolint Dockerfile
+    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci docker-hadolint

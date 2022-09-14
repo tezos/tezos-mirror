@@ -191,13 +191,19 @@ test-js:
 build-tezt:
 	@dune build tezt
 
-.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+.PHONY: test-tezt
 test-tezt:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
+
+.PHONY: test-tezt-i
 test-tezt-i:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
+
+.PHONY: test-tezt-c
 test-tezt-c:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
+
+.PHONY: test-tezt-v
 test-tezt-v:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
@@ -230,7 +236,6 @@ test-webassembly:
 .PHONY: lint-opam-dune
 lint-opam-dune:
 	@dune build --profile=$(PROFILE) @runtest_dune_template
-
 
 # Ensure that all unit tests are restricted to their opam package
 # (change 'tezos-test-helpers' to one the most elementary packages of
@@ -273,7 +278,7 @@ lint-ometrics-gitlab:
 .PHONY: test
 test: test-code
 
-.PHONY: check-linting check-python-linting
+.PHONY: check-linting check-python-linting check-ocaml-linting
 
 check-linting:
 	@scripts/lint.sh --check-scripts

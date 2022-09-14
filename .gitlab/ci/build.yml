@@ -12,25 +12,7 @@
     GIT_DATETIME: "1970-01-01 00:00:00 +0000%"
     GIT_VERSION: "dev"
   script:
-    # We remove protocols not needed for tests in order to speed up the CI.
-    - ./scripts/remove-old-protocols.sh
-    - . ./scripts/version.sh
-    # 1. Some basic, fast sanity checks
-    - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
-        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab/ci/templates.yml'." ;
-        echo "${build_deps_image_version} != ${opam_repository_tag}" ;
-        exit 1 ;
-      fi
-    - diff poetry.lock /home/tezos/poetry.lock
-    - diff pyproject.toml /home/tezos/pyproject.toml
-    # 2. Actually build
-    - make build-unreleased
-    # 3. Also build the tps evaluation tool which is not part of the default build.
-    #    NOTE: We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
-    #    build artifacts.
-    - dune build $COVERAGE_OPTIONS src/bin_tps_evaluation
-    # 4. clean-up caches before uploading the cache
-    - opam clean
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
   cache:
     key: "$CI_COMMIT_REF_SLUG"
     paths:
@@ -82,14 +64,7 @@ build_get_contracts:
   variables:
     ARCH: ""
   script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
-    # Create destination directory
-    - mkdir -pv tezos-binaries
-    # Build and install static binaries
-    - ./scripts/build_and_install_static_binaries.sh "tezos-binaries/$ARCH"
-    # Strip debug symbols and compress binaries (parallelized)
-    - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" | xargs -n1 -P$(nproc) -i sh -c 'strip --strip-debug {}; upx -6q {};'
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci build-static-binaries
 
   artifacts:
     paths:

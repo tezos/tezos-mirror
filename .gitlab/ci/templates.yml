@@ -344,9 +344,7 @@ variables:
   # underlying tests have been fixed.
   retry: 2
   script:
-    - opam remote add dev-repo ./_opam-repo-for-release
-    - opam install --yes ${package}.dev
-    - opam reinstall --yes --with-test ${package}.dev
+    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci opam-configure
   needs: [opam:prepare]
   dependencies: [opam:prepare]
   after_script:

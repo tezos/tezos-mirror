@@ -5,7 +5,7 @@
 integration:compiler-rejections:
   extends: .test_template
   script:
-    - dune build @runtest_rejections
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-compiler-rejections
 
 ############################################################
 ## Stage: run scripts to check they are working properly  ##
@@ -17,28 +17,15 @@ script:prepare_migration_test:
   extends: .test_template
   needs: ["build_x86_64"]
   before_script:
-    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
-    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
-    - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
     - make
   script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
-    - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-prepare-migration-test
 
 script:snapshot_alpha_and_link:
   extends: .test_template
   needs: ["build_x86_64"]
   script:
-    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
-    - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
-    - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
-    - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
-    - make tezos-protocol-compiler
-    - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
-    - make
-    - dune build src/proto_"$new_proto_version"_*/
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-snapshot-alpha-and-link
 
 script:test-gen-genesis:
   extends:
@@ -56,7 +43,7 @@ script:test_release_versions:
   extends: .test_template
   script:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
+    - sudo chown -R $(id -u):$(id -g) ${CI_PROJECT_DIR}
     - ./scripts/test_release_version.sh
 
 ############################################################
@@ -88,9 +75,7 @@ integration:static-binaries:
   dependencies:
     - build:static-x86_64-linux-binaries
   script:
-    - sudo cp -a ../tezos-binaries/x86_64/* ../
-    - make -C ../ build-parameters
-    - poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-static-binaries
 
 .pytest_integration:
   extends:
@@ -102,8 +87,7 @@ integration:static-binaries:
   variables:
     TESTS: ""
   script:
-    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 $TESTS
-    - ../scripts/ci/merge_coverage.sh
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-pytest
   artifacts:
     paths:
       - tests_python/tmp/
@@ -134,5 +118,4 @@ integration:pytest_old_protocols:
 integration:pytest_examples:
   extends: .pytest_template
   script:
-    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
-    - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-pytest-example
