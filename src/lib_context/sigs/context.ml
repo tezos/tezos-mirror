@@ -722,6 +722,10 @@ module type TEZOS_CONTEXT = sig
     will return [None]. *)
   val gc : index -> Context_hash.t -> unit Lwt.t
 
+  (** Sync the context with disk. Only useful for read-only instances.
+      Does not fail when the context is not in read-only mode. *)
+  val sync : index -> unit Lwt.t
+
   (** [is_gc_allowed index] returns whether or not it is possible to
      run a GC on the given context tree. If false is returned, it
      means that the context was run, at least once, with the indexing

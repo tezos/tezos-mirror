@@ -206,6 +206,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let is_gc_allowed _ = (* not implemented for in-memory context *) false
 
+  let sync _ = (* not implemented for in-memory context *) Lwt.return_unit
+
   (*-- Generic Store Primitives ------------------------------------------------*)
 
   let data_key key = current_data_key @ key
