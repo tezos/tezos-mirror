@@ -282,11 +282,15 @@ let assert_tx_rollup_feature_enabled ctxt =
 let assert_sc_rollup_feature_enabled ctxt =
   error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
-let update_script_storage_and_ticket_balances ctxt ~self storage
+let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
-  Contract.update_script_storage ctxt self storage lazy_storage_diff
+  Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
-  Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
+  Ticket_accounting.update_ticket_balances
+    ctxt
+    ~self_contract
+    ~ticket_diffs
+    operations
 
 let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Contract.Delegate.set ctxt source delegate >|=? fun ctxt ->
@@ -387,7 +391,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                  ctxt ) ->
       update_script_storage_and_ticket_balances
         ctxt
-        ~self:contract
+        ~self_contract:contract
         storage
         lazy_storage_diff
         ticket_diffs
@@ -2410,7 +2414,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                (* update CPMM storage *)
                update_script_storage_and_ticket_balances
                  ctxt
-                 ~self:liquidity_baking_cpmm_contract
+                 ~self_contract:liquidity_baking_cpmm_contract
                  storage
                  lazy_storage_diff
                  ticket_diffs

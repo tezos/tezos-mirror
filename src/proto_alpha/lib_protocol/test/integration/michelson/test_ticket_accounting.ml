@@ -995,7 +995,7 @@ let test_update_invalid_transfer () =
     (fun () ->
       Ticket_accounting.update_ticket_balances
         ctxt
-        ~self:src
+        ~self_contract:src
         ~ticket_diffs:Ticket_token_map.empty
         [operation])
 
@@ -1025,7 +1025,12 @@ let test_update_ticket_self_diff () =
          [(red_token, Z.of_int 10)])
   in
   let* _, ctxt =
-    wrap (Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs [])
+    wrap
+      (Ticket_accounting.update_ticket_balances
+         ctxt
+         ~self_contract:self
+         ~ticket_diffs
+         [])
   in
   (* After update, we should have 10 added red tokens. *)
   let* red_self_token_hash, ctxt =
@@ -1078,7 +1083,7 @@ let test_update_self_ticket_transfer () =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
-         ~self
+         ~self_contract:self
          ~ticket_diffs:Ticket_token_map.empty
          [operation])
   in
@@ -1147,7 +1152,7 @@ let test_update_valid_transfer () =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
-         ~self
+         ~self_contract:self
          ~ticket_diffs
          [operation])
   in
@@ -1208,7 +1213,7 @@ let test_update_transfer_tickets_to_self () =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
-         ~self
+         ~self_contract:self
          ~ticket_diffs
          [operation])
   in
@@ -1251,7 +1256,7 @@ let test_update_invalid_origination () =
     (fun () ->
       Ticket_accounting.update_ticket_balances
         ctxt
-        ~self:src
+        ~self_contract:src
         ~ticket_diffs:Ticket_token_map.empty
         [operation])
 
@@ -1298,7 +1303,7 @@ let test_update_valid_origination () =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
-         ~self
+         ~self_contract:self
          ~ticket_diffs
          [operation])
   in
@@ -1343,7 +1348,7 @@ let test_update_self_origination () =
     wrap
       (Ticket_accounting.update_ticket_balances
          ctxt
-         ~self
+         ~self_contract:self
          ~ticket_diffs:Ticket_token_map.empty
          [operation])
   in
@@ -1376,7 +1381,12 @@ let test_ticket_token_map_of_list_with_duplicates () =
          [(red_token, Z.of_int 10); (red_token, Z.of_int 5)])
   in
   let* _, ctxt =
-    wrap (Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs [])
+    wrap
+      (Ticket_accounting.update_ticket_balances
+         ctxt
+         ~self_contract:self
+         ~ticket_diffs
+         [])
   in
   (* After update, we should have 10 + 5 added red tokens. *)
   let* red_self_token_hash, ctxt =

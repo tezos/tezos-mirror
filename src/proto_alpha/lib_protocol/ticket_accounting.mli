@@ -45,7 +45,7 @@ val ticket_diffs :
   lazy_storage_diff:Lazy_storage.diffs_item list ->
   (Z.t Ticket_token_map.t * Ticket_receipt.t * context) tzresult Lwt.t
 
-(** [update_ticket_balances ctxt self ~ticket_diffs operations] updates the
+(** [update_ticket_balances ctxt ~self_contract ~ticket_diffs operations] updates the
     ticket balances according to the [ticket_diffs] map and the set of
     operations. The function also returns the storage size diff resulting from
     updating the ticket-balance table in the context.
@@ -60,7 +60,7 @@ val ticket_diffs :
 *)
 val update_ticket_balances :
   context ->
-  self:Contract.t ->
+  self_contract:Contract.t ->
   ticket_diffs:Z.t Ticket_token_map.t ->
   Script_typed_ir.packed_internal_operation list ->
   (Z.t * context) tzresult Lwt.t
