@@ -72,7 +72,7 @@ let deprecated_chest_open () =
     when List.mem
            ~equal:( = )
            (Environment.Ecoproto_error
-              (Script_tc_errors.Deprecated_instruction I_OPEN_CHEST))
+              (Script_tc_errors.Deprecated_instruction T_chest_key))
            lst ->
       return ()
   | Error errs ->
