@@ -50,7 +50,7 @@ val parse_ticket_and_operation :
   source:Contract.t ->
   destination:Contract_hash.t ->
   entrypoint:Entrypoint.t ->
-  amount:Z.t ->
+  amount:Script_typed_ir.ticket_amount ->
   context ->
   (context * Ticket_token.ex_token * Script_typed_ir.packed_internal_operation)
   tzresult
@@ -85,7 +85,7 @@ val transfer_ticket_with_hashes :
   context ->
   src_hash:Ticket_hash.t ->
   dst_hash:Ticket_hash.t ->
-  Z.t ->
+  Script_typed_ir.ticket_amount ->
   (context * Z.t) tzresult Lwt.t
 
 (** [transfer_ticket ctxt ~src ~dst ex_token qty] updates the table of
@@ -100,5 +100,5 @@ val transfer_ticket :
   src:Destination.t ->
   dst:Destination.t ->
   Ticket_token.ex_token ->
-  counter ->
+  Script_typed_ir.ticket_amount ->
   (context * counter, error trace) result Lwt.t

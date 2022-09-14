@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/send_tickets_in_big_map.tz]
 
 Well typed
-Gas remaining: 1039969.352 units remaining
+Gas remaining: 1039967.113 units remaining
 { parameter address ;
   storage unit ;
   code { CAR
@@ -76,8 +76,9 @@ Gas remaining: 1039969.352 units remaining
                       /* [ string : nat : big_map int (ticket string) : int : int
                          : contract (big_map int (ticket string)) ] */ ;
                       TICKET
-                      /* [ ticket string : big_map int (ticket string) : int : int
+                      /* [ option (ticket string) : big_map int (ticket string) : int : int
                          : contract (big_map int (ticket string)) ] */ ;
+                      ASSERT_SOME ;
                       DIG 3
                       /* [ int : ticket string : big_map int (ticket string) : int
                          : contract (big_map int (ticket string)) ] */ ;

@@ -74,18 +74,16 @@ module Ticket_token_map = struct
 end
 
 let ticket_balances_of_value ctxt ~include_lazy ty value =
-  Ticket_scanner.tickets_of_value
-    ~include_lazy
-    ~allow_zero_amount_tickets:true
-    ctxt
-    ty
-    value
+  Ticket_scanner.tickets_of_value ~include_lazy ctxt ty value
   >>=? fun (tickets, ctxt) ->
   List.fold_left_e
     (fun (acc, ctxt) ticket ->
       let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
       Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
-      >|? fun ctxt -> ((token, Script_int.to_zint amount) :: acc, ctxt))
+      >|? fun ctxt ->
+      ( (token, Script_int.to_zint (amount :> Script_int.n Script_int.num))
+        :: acc,
+        ctxt ))
     ([], ctxt)
     tickets
   >>?= fun (list, ctxt) -> Ticket_token_map.of_list ctxt list
@@ -220,10 +218,7 @@ let update_ticket_balances ctxt ~self ~ticket_diffs operations =
       (Compare.Z.(Script_int.to_zint amount <= Z.neg balance_diff), ctxt)
   in
   (* Collect diffs from operations *)
-  Ticket_operations_diff.ticket_diffs_of_operations
-    ~allow_zero_amount_tickets:true
-    ctxt
-    operations
+  Ticket_operations_diff.ticket_diffs_of_operations ctxt operations
   >>=? fun (ticket_op_diffs, ctxt) ->
   (* Update balances for self-contract. *)
   Ticket_token_map.to_list ctxt ticket_diffs >>?= fun (ticket_diffs, ctxt) ->
@@ -243,10 +238,11 @@ let update_ticket_balances ctxt ~self ~ticket_diffs operations =
            ~amount:(Script_int.to_zint total_amount))
       >>?= fun () ->
       List.fold_left_e
-        (fun (acc, ctxt) (token, amount) ->
+        (fun (acc, ctxt) (token, (amount : Script_typed_ir.ticket_amount)) ->
           (* Consume some gas for for traversing the list. *)
           Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
-          >|? fun ctxt -> ((token, Script_int.to_zint amount) :: acc, ctxt))
+          >|? fun ctxt ->
+          ((token, Script_int.(to_zint (amount :> n num))) :: acc, ctxt))
         ([], ctxt)
         destinations
       >>?= fun (destinations, ctxt) ->

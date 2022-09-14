@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A module for handling ticket-tokens. A ticket-token represents the
-    combination of a ticketer (creator of a ticket) and the content. That is,
-    a ticket comprises a ticket-token and an amount.
-  *)
+open Script_int
 
-(** A type for representing existentially quantified ticket-tokens. A
-    ticket-token consists of a pair of ticketer and contents. *)
-type ex_token =
-  | Ex_token : {
-      ticketer : Alpha_context.Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+(* A type for ticket amount values to ensure positivity *)
+type t = private n num
 
-(** [token_and_amount_of_ex_ticket ex_ticket] returns the token and amount of
-    the given ticket [ex_ticket]. *)
-val token_and_amount_of_ex_ticket :
-  Ticket_scanner.ex_ticket -> ex_token * Script_typed_ir.ticket_amount
+val encoding : t Data_encoding.t
+
+(* Converts a natural number to a ticket amount value unless the input is zero *)
+val of_n : n num -> t option
+
+(* Converts a integral number to a ticket amount value unless the input is not positive *)
+val of_z : z num -> t option
+
+val of_zint : Z.t -> t option
+
+val add : t -> t -> t
+
+(* Subtract among ticket amount values unless the resultant amount is not positive *)
+val sub : t -> t -> t option
+
+val one : t

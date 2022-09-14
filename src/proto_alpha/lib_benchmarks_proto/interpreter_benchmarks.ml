@@ -2848,7 +2848,7 @@ module Registration_section = struct
             Alpha_context.Contract.Implicit
               Environment.Signature.Public_key_hash.zero;
           contents = ();
-          amount = zero;
+          amount = Ticket_amount.one;
         }
       in
       benchmark_with_fixed_stack
@@ -2868,7 +2868,13 @@ module Registration_section = struct
           in
           fun () ->
             let half_amount = Samplers.Random_value.value nat rng_state in
+            let half_amount = Script_int.add_n half_amount Script_int.one_n in
             let amount = Script_int.add_n half_amount half_amount in
+            let amount =
+              (* this is safe because half_amount > 0 *)
+              WithExceptions.Option.get ~loc:__LOC__
+              @@ Ticket_amount.of_n amount
+            in
             let ticket = Samplers.Random_value.value (ticket unit) rng_state in
             let ticket = {ticket with amount} in
             Ex_stack_and_kinstr
@@ -2903,7 +2909,7 @@ module Registration_section = struct
               {
                 ticket with
                 contents = Script_string.empty;
-                amount = Script_int.zero_n;
+                amount = Ticket_amount.one;
               }
             in
             Ex_stack_and_kinstr
@@ -2925,7 +2931,13 @@ module Registration_section = struct
             let ticket =
               Samplers.Random_value.value (ticket string) rng_state
             in
-            let alt_amount = Samplers.Random_value.value nat rng_state in
+            let alt_amount =
+              let amount = Samplers.Random_value.value nat rng_state in
+              let open Ticket_amount in
+              match of_n amount with
+              | Some amount -> add amount one
+              | None -> one
+            in
             let ticket' = {ticket with amount = alt_amount} in
             Ex_stack_and_kinstr
               {

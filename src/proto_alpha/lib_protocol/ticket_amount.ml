@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A module for handling ticket-tokens. A ticket-token represents the
-    combination of a ticketer (creator of a ticket) and the content. That is,
-    a ticket comprises a ticket-token and an amount.
-  *)
+open Script_int
 
-(** A type for representing existentially quantified ticket-tokens. A
-    ticket-token consists of a pair of ticketer and contents. *)
-type ex_token =
-  | Ex_token : {
-      ticketer : Alpha_context.Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+type t = n num
 
-(** [token_and_amount_of_ex_ticket ex_ticket] returns the token and amount of
-    the given ticket [ex_ticket]. *)
-val token_and_amount_of_ex_ticket :
-  Ticket_scanner.ex_ticket -> ex_token * Script_typed_ir.ticket_amount
+let of_n n =
+  if Compare.Int.(Script_int.(compare n zero_n) > 0) then Some (n : t) else None
+
+let of_z z = Option.bind (is_nat z) of_n
+
+let of_zint z = of_z @@ of_zint z
+
+let add = add_n
+
+let sub a b = of_z @@ sub a b
+
+let one = one_n
+
+let encoding =
+  let open Data_encoding in
+  conv_with_guard
+    to_zint
+    (fun n -> Option.value_e ~error:"expecting positive number" @@ of_zint n)
+    n

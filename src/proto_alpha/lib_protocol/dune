@@ -118,6 +118,8 @@
   Liquidity_baking_repr
   Block_header_repr
   Destination_repr
+  Script_int
+  Ticket_amount
   Operation_repr
   Manager_repr
   Commitment_repr
@@ -189,7 +191,6 @@
   Dal_slot_storage
   Alpha_context
   Script_string
-  Script_int
   Script_timestamp
   Tx_rollup_l2_storage_sig
   Tx_rollup_l2_context_sig
@@ -377,6 +378,8 @@
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -449,7 +452,6 @@
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
@@ -617,6 +619,8 @@
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -689,7 +693,6 @@
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
@@ -862,6 +865,8 @@
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -934,7 +939,6 @@
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml

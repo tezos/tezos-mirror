@@ -2304,11 +2304,11 @@ This process can happen without the need to interact with a centralized NFT cont
 simplifying the code.
 
 - ``TICKET``: Create a ticket with the given content and amount. The ticketer is the address
-  of `SELF`.
+  of `SELF`. The resulting value is ``NONE`` if the amount is zero.
 
 ::
 
-   :: 'a : nat : 'S -> ticket 'a : 'S
+   :: 'a : nat : 'S -> option ticket 'a : 'S
 
 Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over it).
 
@@ -2322,7 +2322,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
   same content and ticketer as the original, but with the new provided amounts.
   (This can be used to easily implement UTXOs.)
   Return None iff the ticket's original amount is not equal to the sum of the
-  provided amounts.
+  provided amounts, or one of the provided amounts is zero.
 
 ::
 

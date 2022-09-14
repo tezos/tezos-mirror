@@ -17,6 +17,7 @@ code {
                  PUSH nat 10;
                  PUSH unit Unit;
                  TICKET;
+                 ASSERT_SOME;
 
                  PAIR ;
 

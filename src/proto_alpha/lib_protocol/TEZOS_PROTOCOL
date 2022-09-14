@@ -92,6 +92,8 @@
         "Liquidity_baking_repr",
         "Block_header_repr",
         "Destination_repr",
+        "Script_int",
+        "Ticket_amount",
         "Operation_repr",
         "Manager_repr",
         "Commitment_repr",
@@ -173,7 +175,6 @@
 
         "Alpha_context",
         "Script_string",
-        "Script_int",
         "Script_timestamp",
 
         "Tx_rollup_l2_storage_sig",

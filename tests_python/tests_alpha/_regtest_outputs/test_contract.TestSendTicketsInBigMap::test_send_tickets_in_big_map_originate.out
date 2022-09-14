@@ -1,8 +1,8 @@
 tests_alpha/test_contract.py::TestSendTicketsInBigMap::test_send_tickets_in_big_map_originate
 
 Node is bootstrapped.
-Estimated gas: 1479.953 units (will add 100 for safety)
-Estimated storage: 551 bytes added (will add 20 for safety)
+Estimated gas: 1485.567 units (will add 100 for safety)
+Estimated storage: 577 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000682
+    Fee to the baker: ꜩ0.000709
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1580
-    Storage limit: 571 bytes
+    Gas limit: 1586
+    Storage limit: 597 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000682
-      payload fees(the block proposer) ....... +ꜩ0.000682
+      [CONTRACT_HASH] ... -ꜩ0.000709
+      payload fees(the block proposer) ....... +ꜩ0.000709
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ200
@@ -50,6 +50,7 @@ This sequence of operations was run:
                               PUSH nat 1 ;
                               PUSH string "BLUE" ;
                               TICKET ;
+                              ASSERT_SOME ;
                               DIG 3 ;
                               SWAP ;
                               SOME ;
@@ -72,12 +73,12 @@ This sequence of operations was run:
         This origination was successfully applied
         Originated contracts:
           [CONTRACT_HASH]
-        Storage size: 294 bytes
-        Paid storage size diff: 294 bytes
-        Consumed gas: 1479.953
+        Storage size: 320 bytes
+        Paid storage size diff: 320 bytes
+        Consumed gas: 1485.567
         Balance updates:
-          [CONTRACT_HASH] ... -ꜩ0.0735
-          storage fees ........................... +ꜩ0.0735
+          [CONTRACT_HASH] ... -ꜩ0.08
+          storage fees ........................... +ꜩ0.08
           [CONTRACT_HASH] ... -ꜩ0.06425
           storage fees ........................... +ꜩ0.06425
           [CONTRACT_HASH] ... -ꜩ200

@@ -167,7 +167,9 @@ module Script_timelock : sig
   val get_plaintext_size : chest -> int
 end
 
-type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
+type ticket_amount = Ticket_amount.t
+
+type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : ticket_amount}
 
 type empty_cell = EmptyCell
 
@@ -1060,6 +1062,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('t, 'a * ('b * 's), 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | ITicket :
+      Script.location
+      * 'a comparable_ty option
+      * ('a ticket option, 's, 'r, 'f) kinstr
+      -> ('a, n num * 's, 'r, 'f) kinstr
+  | ITicket_deprecated :
       Script.location * 'a comparable_ty option * ('a ticket, 's, 'r, 'f) kinstr
       -> ('a, n num * 's, 'r, 'f) kinstr
   | IRead_ticket :

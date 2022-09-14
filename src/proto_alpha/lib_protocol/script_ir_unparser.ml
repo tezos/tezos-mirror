@@ -544,7 +544,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
           ~stack_depth
           mode
           t
-          (addr, (contents, amount))
+          (addr, (contents, (amount :> Script_int.n Script_int.num)))
     | Set_t (t, _), set ->
         List.fold_left_es
           (fun (l, ctxt) item ->

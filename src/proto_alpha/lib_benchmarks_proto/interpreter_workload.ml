@@ -1417,15 +1417,16 @@ let extract_ir_sized_step :
   | IComb_get (_, n, _, _), _ -> Instructions.comb_get (Size.of_int n)
   | IComb_set (_, n, _, _), _ -> Instructions.comb_set (Size.of_int n)
   | IDup_n (_, n, _, _), _ -> Instructions.dupn (Size.of_int n)
-  | ITicket (_, _, _), _ -> Instructions.ticket
+  | ITicket (_, _, _), _ | ITicket_deprecated (_, _, _), _ ->
+      Instructions.ticket
   | IRead_ticket (_, _, _), _ -> Instructions.read_ticket
   | ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _)) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
   | IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _) ->
       let size1 = Size.size_of_comparable_value cmp_ty ticket1.contents in
       let size2 = Size.size_of_comparable_value cmp_ty ticket2.contents in
-      let tez1 = Size.integer ticket1.amount in
-      let tez2 = Size.integer ticket2.amount in
+      let tez1 = Size.integer (ticket1.amount :> Script_int.n Script_int.num) in
+      let tez2 = Size.integer (ticket2.amount :> Script_int.n Script_int.num) in
       Instructions.join_tickets size1 size2 tez1 tez2
   | IHalt _, _ -> Instructions.halt
   | ILog _, _ -> Instructions.log

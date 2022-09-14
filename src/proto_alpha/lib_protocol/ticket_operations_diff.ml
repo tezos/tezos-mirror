@@ -33,7 +33,7 @@ type ticket_transfer = {
 type ticket_token_diff = {
   ticket_token : Ticket_token.ex_token;
   total_amount : Script_int.n Script_int.num;
-  destinations : (Destination.t * Script_int.n Script_int.num) list;
+  destinations : (Destination.t * Ticket_amount.t) list;
 }
 
 type error += Failed_to_get_script of Contract.t | Contract_not_originated
@@ -115,7 +115,7 @@ module Ticket_token_map = struct
         - The internal contract-indexed map cannot be empty.
 
    *)
-  let add ctxt ~ticket_token ~destination ~amount map =
+  let add ctxt ~ticket_token ~destination ~(amount : Ticket_amount.t) map =
     Ticket_token_map.update
       ctxt
       ticket_token
@@ -129,12 +129,15 @@ module Ticket_token_map = struct
             (* Update the inner contract map *)
             let update ctxt prev_amt_opt =
               match prev_amt_opt with
-              | Some prev_amount ->
+              | Some (prev_amount : Ticket_amount.t) ->
                   Gas.consume
                     ctxt
-                    (Ticket_costs.add_int_cost prev_amount amount)
+                    Script_int.(
+                      Ticket_costs.add_int_cost
+                        (prev_amount :> n num)
+                        (amount :> n num))
                   >|? fun ctxt ->
-                  (Some (Script_int.add_n prev_amount amount), ctxt)
+                  (Some (Ticket_amount.add prev_amount amount), ctxt)
               | None -> ok (Some amount, ctxt)
             in
             Destination_map.update ctxt destination update destination_map
@@ -142,36 +145,24 @@ module Ticket_token_map = struct
       map
 end
 
-let tickets_of_transaction ctxt ~allow_zero_amount_tickets ~destination
-    ~parameters_ty ~parameters =
+let tickets_of_transaction ctxt ~destination ~parameters_ty ~parameters =
   Ticket_scanner.type_has_tickets ctxt parameters_ty
   >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value
-    ~include_lazy:true
-    ~allow_zero_amount_tickets
-    ctxt
-    has_tickets
-    parameters
+  Ticket_scanner.tickets_of_value ~include_lazy:true ctxt has_tickets parameters
   >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
-let tickets_of_origination ctxt ~allow_zero_amount_tickets ~preorigination
-    ~storage_type ~storage =
+let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   (* Extract any tickets from the storage. Note that if the type of the contract
      storage does not contain tickets, storage is not scanned. *)
   Ticket_scanner.type_has_tickets ctxt storage_type
   >>?= fun (has_tickets, ctxt) ->
-  Ticket_scanner.tickets_of_value
-    ctxt
-    ~include_lazy:true
-    ~allow_zero_amount_tickets
-    has_tickets
-    storage
+  Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
   >|=? fun (tickets, ctxt) ->
   let destination = Destination.Contract (Originated preorigination) in
   (Some {tickets; destination}, ctxt)
 
-let tickets_of_operation ctxt ~allow_zero_amount_tickets
+let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
   | Transaction_to_implicit _ -> return (None, ctxt)
@@ -187,7 +178,6 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
       } ->
       tickets_of_transaction
         ctxt
-        ~allow_zero_amount_tickets
         ~destination:(Destination.Contract (Originated destination))
         ~parameters_ty
         ~parameters
@@ -212,10 +202,8 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         unparsed_parameters = _;
       } ->
       (* Note that zero-amount tickets to a rollup is not permitted. *)
-      let allow_zero_amount_tickets = false in
       tickets_of_transaction
         ctxt
-        ~allow_zero_amount_tickets
         ~destination:(Destination.Sc_rollup destination)
         ~parameters_ty
         ~parameters
@@ -229,12 +217,7 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
         storage_type;
         storage;
       } ->
-      tickets_of_origination
-        ctxt
-        ~allow_zero_amount_tickets
-        ~preorigination
-        ~storage_type
-        ~storage
+      tickets_of_origination ctxt ~preorigination ~storage_type ~storage
   | Delegation _ | Event _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
@@ -247,11 +230,10 @@ let add_transfer_to_token_map ctxt token_map {destination; tickets} =
     (token_map, ctxt)
     tickets
 
-let ticket_token_map_of_operations ctxt ~allow_zero_amount_tickets ops =
+let ticket_token_map_of_operations ctxt ops =
   List.fold_left_es
     (fun (token_map, ctxt) op ->
-      tickets_of_operation ctxt ~allow_zero_amount_tickets op
-      >>=? fun (res, ctxt) ->
+      tickets_of_operation ctxt op >>=? fun (res, ctxt) ->
       match res with
       | Some ticket_trans ->
           add_transfer_to_token_map ctxt token_map ticket_trans
@@ -260,9 +242,8 @@ let ticket_token_map_of_operations ctxt ~allow_zero_amount_tickets ops =
     ops
 
 (** Traverses a list of operations and scans for tickets. *)
-let ticket_diffs_of_operations ctxt ~allow_zero_amount_tickets operations =
-  ticket_token_map_of_operations ctxt ~allow_zero_amount_tickets operations
-  >>=? fun (token_map, ctxt) ->
+let ticket_diffs_of_operations ctxt operations =
+  ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
   Ticket_token_map.fold
     ctxt
     (fun ctxt acc ticket_token destination_map ->
@@ -270,9 +251,13 @@ let ticket_diffs_of_operations ctxt ~allow_zero_amount_tickets operations =
          ticket-token. *)
       Destination_map.fold
         ctxt
-        (fun ctxt total_amount _destination amount ->
-          Gas.consume ctxt (Ticket_costs.add_int_cost total_amount amount)
-          >|? fun ctxt -> (Script_int.add_n total_amount amount, ctxt))
+        (fun ctxt total_amount _destination (amount : Ticket_amount.t) ->
+          Gas.consume
+            ctxt
+            Script_int.(
+              Ticket_costs.add_int_cost total_amount (amount :> n num))
+          >|? fun ctxt ->
+          (Script_int.(add_n total_amount (amount :> n num)), ctxt))
         Script_int.zero_n
         destination_map
       >>? fun (total_amount, ctxt) ->

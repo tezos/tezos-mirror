@@ -204,6 +204,7 @@ let test_add_strict () =
                 PUSH nat 1;
                 PUSH string "Red";
                 TICKET;
+                ASSERT_SOME;
                 CONS;
                 NIL operation ;
                 PAIR } }
@@ -258,6 +259,7 @@ let test_add_remove () =
                        PUSH nat 1 ;
                        PUSH string "Red" ;
                        TICKET ;
+                       ASSERT_SOME ;
                        CONS ;
                        NIL operation ;
                        PAIR }
@@ -322,6 +324,7 @@ let test_add_to_big_map () =
                             PUSH nat 1 ;
                             PUSH string "Red" ;
                             TICKET ;
+                            ASSERT_SOME ;
                             SOME ;
                             DUP 3 ;
                             GET_AND_UPDATE ;
@@ -381,6 +384,7 @@ let test_swap_big_map () =
                            PUSH nat 1 ;
                            PUSH string "Red" ;
                            TICKET ;
+                           ASSERT_SOME ;
                            SOME ;
                            DIG 3 ;
                            GET_AND_UPDATE ;
@@ -482,6 +486,7 @@ let test_send_tickets () =
                        PUSH nat 1 ;
                        PUSH string "Red" ;
                        TICKET ;
+                       ASSERT_SOME ;
                        TRANSFER_TOKENS ;
                        PUSH unit Unit ;
                        NIL operation ;
@@ -532,6 +537,7 @@ let test_send_and_store_zero_amount_tickets () =
                       DIG 2 ;
                       PUSH string "Red" ;
                       TICKET ;
+                      ASSERT_SOME ;
                       TRANSFER_TOKENS ;
                       PUSH unit Unit ;
                       NIL operation ;
@@ -616,15 +622,14 @@ let test_send_and_store_zero_amount_tickets () =
            "%store")
   in
   let token_red = string_token ~ticketer:ticket_minter "Red" in
-  (* Mint and send a ticket with amount 0 to [ticket_store_1]. After the
-     transaction:
+  (* Mint and send a ticket with amount 0 to [ticket_store_1], which fails.
+     After the transaction:
 
      [ticket_store_1]:
-       [
-         (TM, "Red", 0)
-       ]
+       [ ]
   *)
-  let* block = mint_and_send_to_storer_1 block 0 in
+  let*! result = mint_and_send_to_storer_1 block 0 in
+  assert (Result.is_error result) ;
   let* () =
     assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
   in
@@ -634,7 +639,6 @@ let test_send_and_store_zero_amount_tickets () =
      [ticket_store_1]:
        [
          (TM, "Red", 10)
-         (TM, "Red",  0)
        ]
   *)
   let* block = mint_and_send_to_storer_1 block 10 in
@@ -645,9 +649,7 @@ let test_send_and_store_zero_amount_tickets () =
      ticket (TM, "Red", 10). After the transaction:
 
      ticket_store_1:
-       [
-         (TM, "Red",  0)
-       ]
+       [ ]
      ticket_store_2:
        [
          (TM, "Red", 10)
@@ -660,18 +662,19 @@ let test_send_and_store_zero_amount_tickets () =
   let* () =
     assert_token_balance ~loc:__LOC__ block token_red ticket_store_2 (Some 10)
   in
-  (* Send the top of [ticket_store_1]'s stack to [ticket_store_2]. That is the
-     ticket (TM, "Red", 0). Now, [ticket_store_2] holds both tickets.
+  (* Send the top of [ticket_store_1]'s stack to [ticket_store_2].
+     However, this fails because [ticket_store_1]'s stack is empty.
+     Now, [ticket_store_2] holds both tickets.
 
      ticket_store_1:
        [ ]
      [ticket_store_2]:
       [
         (TM, "Red", 10)
-        (TM, "Red",  0)
       ]
   *)
-  let* block = send_from_store_1_to_store_2 block in
+  let*! result = send_from_store_1_to_store_2 block in
+  assert (Result.is_error result) ;
   let* () =
     assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
   in
@@ -688,7 +691,6 @@ let test_send_and_store_zero_amount_tickets () =
      [ticket_store_2]:
       [
         (TM, "Red", 10)
-        (TM, "Red",  0)
       ]
   *)
   let* block = mint_and_send_to_storer_1 block 5 in
@@ -705,7 +707,6 @@ let test_send_and_store_zero_amount_tickets () =
       [
         (TM, "Red",  5)
         (TM, "Red", 10)
-        (TM, "Red",  0)
       ]
   *)
   let* block = send_from_store_1_to_store_2 block in
@@ -754,6 +755,7 @@ let test_send_tickets_in_big_map () =
                        PUSH nat 1 ;
                        DIG 3 ;
                        TICKET ;
+                       ASSERT_SOME ;
                        SOME ;
                        DIG 2 ;
                        GET_AND_UPDATE ;
@@ -861,6 +863,7 @@ let test_modify_big_map () =
                        PUSH nat 1 ;
                        DIG 3 ;
                        TICKET ;
+                       ASSERT_SOME ;
                        SOME ;
                        DIG 2 ;
                        GET_AND_UPDATE ;
@@ -962,6 +965,7 @@ let test_send_tickets_in_big_map_and_drop () =
                    PUSH nat 1 ;
                    PUSH string "Red" ;
                    TICKET ;
+                   ASSERT_SOME ;
                    SOME ;
                    PUSH int 1 ;
                    GET_AND_UPDATE ;
@@ -1019,6 +1023,7 @@ let test_create_contract_with_ticket () =
                    UNPAIR ;
                    UNPAIR ;
                    TICKET ;
+                   ASSERT_SOME ;
                    PUSH mutez 0 ;
                    DIG 2 ;
                    SOME ;
@@ -1070,10 +1075,11 @@ let test_join_tickets () =
             code { CDR ;
                    IF_NONE
                      { PUSH nat 1 ; PUSH string "Red" ;
-                       TICKET ; SOME ; NIL operation ; PAIR }
+                       TICKET ; ASSERT_SOME ; SOME ; NIL operation ; PAIR }
                      { PUSH nat 1 ;
                        PUSH string "Red" ;
                        TICKET ;
+                       ASSERT_SOME ;
                        PAIR ;
                        JOIN_TICKETS ;
                        NIL operation ;
@@ -1141,7 +1147,7 @@ let ticket_builder =
               DUP @manager 2; SENDER; ASSERT_CMPEQ;
 
               UNPAIR;
-              SWAP; UNIT; TICKET;
+              SWAP; UNIT; TICKET; ASSERT_SOME;
               PUSH mutez 0; SWAP; TRANSFER_TOKENS;
               NIL operation; SWAP; CONS
             };
@@ -1220,18 +1226,33 @@ let ticket_wallet =
             READ_TICKET;
             GET @total_amount 4;
             DUP @amount 5;
-            SWAP; SUB; ISNAT; ASSERT_SOME @remaining_amount;
+            SWAP; SUB;
+            DUP; EQ;
+            IF
+              {
+                # Drop @remaining_amount because it is zero
+                DROP;
+                # Drop @amount because this is now irrelevant
+                DIG 3; DROP;
+                # Drop @ticketer because we are not storing any ticket in this wallet
+                DIG 3; DROP;
+                # Bring the big map to the stack top since the ticket entry is already striked out
+                DUG 3
+              }
+              {
+                ISNAT; ASSERT_SOME @remaining_amount;
 
-            # Split the ticket
-            DIG 4; PAIR; SWAP; SPLIT_TICKET;
-            ASSERT_SOME; UNPAIR @to_send @to_keep;
+                # Split the ticket
+                DIG 4; PAIR; SWAP; SPLIT_TICKET;
+                ASSERT_SOME; UNPAIR @to_send @to_keep;
 
-            # Store the ticket to keep
-            DUG 5;
-            SOME;
-            DIG 3;
-            GET_AND_UPDATE;
-            ASSERT_NONE;
+                # Store the ticket to keep
+                DUG 5;
+                SOME;
+                DIG 3;
+                GET_AND_UPDATE;
+                ASSERT_NONE;
+              };
             DIG 2; PAIR;
 
             # Send the ticket
@@ -1409,6 +1430,7 @@ let test_ticket_storage () =
                       PUSH nat 1 ;
                       PUSH string "Red" ;
                       TICKET ;
+                      ASSERT_SOME ;
                       PAIR ;
                       TRANSFER_TOKENS ;
                       PUSH unit Unit ;
@@ -1532,7 +1554,7 @@ let test_storage_for_create_and_remove_tickets () =
             storage (list (ticket string)) ;
             code { UNPAIR ;
                    IF_LEFT
-                   { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; CONS ; NIL operation ; PAIR }
+                   { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; ASSERT_SOME ; CONS ; NIL operation ; PAIR }
                    { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR } } }
       |}
       ~storage:"{}"
@@ -1556,22 +1578,22 @@ let test_storage_for_create_and_remove_tickets () =
       ~recipient:ticket_manager
       ~parameters:"Unit"
   in
-  (* Initially the used and paid contract storage size is 115. *)
+  (* Initially the used and paid contract storage size is 141. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 115
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 141
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 115
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 141
   in
   (* Add 1000 units of "A" tickets. *)
   let* block = add block 1000 "A" in
   (* After adding one block the new used and paid storage grows to accommodate
-     for the new ticket. The size is 115 + 40 (size of ticket) = 155. *)
+     for the new ticket. The size is 141 + 40 (size of ticket) = 181. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 155
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 181
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 155
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 181
   in
   (* The size of used and paid-for ticket storage is 67 bytes.  (65 for hash
      and 2 for amount). *)
@@ -1581,10 +1603,10 @@ let test_storage_for_create_and_remove_tickets () =
   let* block = add block 1000 "B" in
   (* The new used and paid for contract storage grow to 155 + 40 = 195. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 195
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 221
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
   in
   (* The new used and paid for ticket storage doubles (2 * 67 = 134). *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 134 in
@@ -1594,10 +1616,10 @@ let test_storage_for_create_and_remove_tickets () =
   (* We're back to 115 base-line for the used contract storage and keep 195 for
      paid. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 115
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 141
   in
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
   in
   (* Since the ticket-table is empty it does not take up any space. However,
      we've already paid for 134 bytes. *)
@@ -1605,14 +1627,14 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add one unit of "C" tickets. *)
   let* block = add block 1 "C" in
-  (* The new used storage is 115 + 39 (size of ticket) = 154. The size is 39
+  (* The new used storage is 141 + 39 (size of ticket) = 180. The size is 39
       rather than 40 because it carries a smaller amount payload. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 154
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 180
   in
-  (* We still have paid for 195 contract storage. *)
+  (* We still have paid for 221 contract storage. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
   in
   (* There is one row in the ticket table with size 65 (for the hash) + 1
      (for the amount) = 65 bytes. *)
@@ -1621,13 +1643,13 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add yet another "C" ticket. *)
   let* block = add block 1 "C" in
-  (* The new used storage is 154 + 39 (size of ticket) = 193. *)
+  (* The new used storage is 180 + 39 (size of ticket) = 219. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 193
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 219
   in
-  (* We still have paid for 195 contract storage. *)
+  (* We still have paid for 221 contract storage. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 221
   in
   (* There is still only one row in the ticket table with size 66. *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
@@ -1635,26 +1657,26 @@ let test_storage_for_create_and_remove_tickets () =
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   (* Add a "D" ticket. *)
   let* block = add block 1 "D" in
-  (* The new used storage is 193 + 39 (size of ticket) = 193. *)
+  (* The new used storage is 219 + 39 (size of ticket) = 258. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 232
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 258
   in
-  (* The paid storage also increases to 232. *)
+  (* The paid storage also increases to 258. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 232
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 258
   in
   (* There are now two rows in the ticket table: 2 x 66 = 132 *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 132 in
   (* And we've still paid for 134 bytes. *)
   let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
   let* block = add block 1 "E" in
-  (* The new used storage is 232 + 39 (size of ticket) = 193. *)
+  (* The new used storage is 258 + 39 (size of ticket) = 297. *)
   let* () =
-    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 271
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 297
   in
-  (* The paid storage also increases to 271. *)
+  (* The paid storage also increases to 297. *)
   let* () =
-    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 271
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 297
   in
   (* There are now three rows in the ticket table: 3 x 66 = 198. *)
   let* () = assert_used_ticket_storage ~loc:__LOC__ block 198 in

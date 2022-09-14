@@ -2310,7 +2310,7 @@ Type ``'a`` must be comparable (the ``COMPARE`` primitive must be defined over i
   same content and ticketer as the original, but with the new provided amounts.
   (This can be used to easily implement UTXOs.)
   Return None iff the ticket's original amount is not equal to the sum of the
-  provided amounts.
+  provided amounts, or one of the provided amounts is zero.
 
 ::
 

@@ -32,7 +32,7 @@ code
         DUP @manager 2; SENDER; ASSERT_CMPEQ;
 
         UNPAIR;
-        SWAP; UNIT; TICKET;
+        SWAP; UNIT; TICKET; ASSERT_SOME;
         PUSH mutez 0; SWAP; TRANSFER_TOKENS;
         NIL operation; SWAP; CONS
       };

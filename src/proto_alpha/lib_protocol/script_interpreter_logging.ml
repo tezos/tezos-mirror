@@ -1545,13 +1545,22 @@ let kinstr_split :
              reconstruct = (fun k -> IDup_n (loc, n, p, k));
            }
   | ITicket (loc, cty, k), Item_t (_, Item_t (_, s)) ->
-      ticket_t dummy (assert_some cty) >|? fun t ->
+      ticket_t dummy (assert_some cty) >>? option_t loc >|? fun t ->
       let s = Item_t (t, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
           reconstruct = (fun k -> ITicket (loc, cty, k));
+        }
+  | ITicket_deprecated (loc, cty, k), Item_t (_, Item_t (_, s)) ->
+      ticket_t dummy (assert_some cty) >|? fun t ->
+      let s = Item_t (t, s) in
+      Ex_split_kinstr
+        {
+          cont_init_stack = s;
+          continuation = k;
+          reconstruct = (fun k -> ITicket_deprecated (loc, cty, k));
         }
   | IRead_ticket (loc, a, k), s ->
       pair_t dummy (assert_some a) nat_t >>? fun (Ty_ex_c p) ->

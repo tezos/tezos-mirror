@@ -1185,15 +1185,28 @@ let test_zero_amount_ticket () =
     ]
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
-  assert_fails
-    ~loc:__LOC__
-    ~error:Ticket_scanner.Forbidden_zero_ticket_quantity
-    (execute_outbox_message_without_proof_validation
-       incr
-       rollup
-       ~cemented_commitment
-       ~source
-       output)
+  let*! result =
+    execute_outbox_message_without_proof_validation
+      incr
+      rollup
+      ~cemented_commitment
+      ~source
+      output
+  in
+  match result with
+  | Error e ->
+      if
+        Option.is_some
+        @@ List.find
+             (function
+               | Environment.Ecoproto_error
+                   Script_tc_errors.Forbidden_zero_ticket_quantity ->
+                   true
+               | _ -> false)
+             e
+      then return_unit
+      else Stdlib.failwith "Expected failure"
+  | Ok _ -> Stdlib.failwith "Expected failure"
 
 (* Check that executing an outbox message fails when the inclusion proof in
    invalid. *)

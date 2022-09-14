@@ -34,7 +34,7 @@ code
         # Mint the token
         PUSH @amount nat 1;
         DUP @counter 4;
-        TICKET;
+        TICKET; ASSERT_SOME; # This is safe because the amount is not zero
 
         # Send it
         PUSH mutez 0; SWAP; TRANSFER_TOKENS;

@@ -792,7 +792,7 @@ val transfer_ticket :
   contents:string ->
   ty:string ->
   ticketer:Contract.t ->
-  amount:Z.t ->
+  amount:Ticket_amount.t ->
   destination:Contract.t ->
   entrypoint:Entrypoint.t ->
   unit ->

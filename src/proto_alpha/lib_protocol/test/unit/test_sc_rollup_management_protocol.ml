@@ -72,7 +72,10 @@ let check_encode_decode_outbox_message ctxt message =
 
 let string_ticket ticketer contents amount =
   let open WithExceptions in
-  let amount = Script_int.abs @@ Script_int.of_int amount in
+  let amount =
+    Option.get ~loc:__LOC__ @@ Ticket_amount.of_n @@ Script_int.abs
+    @@ Script_int.of_int amount
+  in
   let ticketer = Result.get_ok ~loc:__LOC__ (Contract.of_b58check ticketer) in
   let contents =
     Result.get_ok ~loc:__LOC__ (Script_string.of_string contents)
@@ -202,7 +205,7 @@ let add_or_clear =
       storage (list (ticket string)) ;
       code { UNPAIR ;
             IF_LEFT
-            { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; CONS ; NIL operation ; PAIR }
+            { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; ASSERT_SOME ; CONS ; NIL operation ; PAIR }
             { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR } } }
   |}
 

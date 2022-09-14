@@ -633,6 +633,7 @@ module Script : sig
     | I_SHA3
     | I_PAIRING_CHECK
     | I_TICKET
+    | I_TICKET_DEPRECATED
     | I_READ_TICKET
     | I_SPLIT_TICKET
     | I_JOIN_TICKETS
@@ -4215,7 +4216,7 @@ and _ manager_operation =
       contents : Script.lazy_expr;
       ty : Script.lazy_expr;
       ticketer : Contract.t;
-      amount : Z.t;
+      amount : Ticket_amount.t;
       destination : Contract.t;
       entrypoint : Entrypoint.t;
     }

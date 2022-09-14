@@ -52,7 +52,7 @@ let token_and_amount ctxt ex_ticket =
   Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
   >|? fun ctxt ->
   let token, amount = Ticket_token.token_and_amount_of_ex_ticket ex_ticket in
-  ((token, Script_int.to_zint amount), ctxt)
+  ((token, Script_int.(to_zint (amount :> n num))), ctxt)
 
 (** Extracts the ticket-token and amount from an ex_ticket value and returns
   the opposite of the amount. This is used to account for removal of tickets inside
@@ -81,7 +81,6 @@ let collect_token_diffs_of_node ctxt has_tickets node ~get_token_and_amount acc
     (* It's currently not possible to have nested lazy structures, but this is
        for future proofing. *)
     ~include_lazy:true
-    ~allow_zero_amount_tickets:true
     has_tickets
     (Micheline.root node)
   >>=? fun (ex_tickets, ctxt) ->

@@ -350,7 +350,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IUncomb (_, n, _, _) -> Interp_costs.uncomb n
   | IComb_get (_, n, _, _) -> Interp_costs.comb_get n
   | IComb_set (_, n, _, _) -> Interp_costs.comb_set n
-  | ITicket _ -> Interp_costs.ticket
+  | ITicket _ | ITicket_deprecated _ -> Interp_costs.ticket
   | IRead_ticket _ -> Interp_costs.read_ticket
   | IOpen_chest _ ->
       let _chest_key = accu and chest, (time, _) = stack in

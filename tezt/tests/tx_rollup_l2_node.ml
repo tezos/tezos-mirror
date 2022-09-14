@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Tx_rollup_node
-   Invocation:   dune exec tezt/tests/main.exe -- --file tx_rollup_node.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file tx_rollup_l2_node.ml
    Subject:      Various test scenarios for the Tx rollup node
 *)
 
@@ -846,6 +846,13 @@ let get_ticket_hash_from_deposit (d : Tx_rollup_node.Inbox.message) : string =
 let get_ticket_hash_from_deposit_json inbox =
   JSON.(inbox |=> 0 |-> "message" |-> "deposit" |-> "ticket_hash" |> as_string)
 
+let choose_deposit_contract_by_protocol ~protocol =
+  match protocol with
+  | Protocol.Alpha ->
+      "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+  | _ ->
+      "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz"
+
 (* Checks that the a ticket can be transfered from the L1 to the rollup. *)
 let test_ticket_deposit_from_l1_to_l2 =
   Protocol.register_test
@@ -872,7 +879,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           ~alias:"rollup_deposit"
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
@@ -1039,7 +1046,7 @@ let test_l2_to_l2_transaction =
           ~alias:"rollup_deposit"
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client
@@ -1241,14 +1248,14 @@ let get_ticket_hash_from_op op =
 
 (** Originate a contract and make a deposit for [dest] and optionally
     for a list of destination in [dests]. *)
-let make_deposit ~source ~tx_rollup_hash ~tx_node ~client ?(dests = [])
-    ~tickets_amount dest =
+let make_deposit ~protocol ~source ~tx_rollup_hash ~tx_node ~client
+    ?(dests = []) ~tickets_amount dest =
   let* contract_id =
     Client.originate_contract
       ~alias:"rollup_deposit"
       ~amount:Tez.zero
       ~src:source
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+      ~prg:(choose_deposit_contract_by_protocol ~protocol)
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
@@ -1332,6 +1339,7 @@ let test_batcher ~test_persistence =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -1582,6 +1590,7 @@ let test_reorganization =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -1701,6 +1710,7 @@ let test_l2_proof_rpc_position =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -1905,6 +1915,7 @@ let test_reject_bad_commitment =
       let pkh1_str = bls_key1.aggregate_public_key_hash in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2015,6 +2026,7 @@ let test_committer =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* tzlevel, _ =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2135,6 +2147,7 @@ let test_tickets_context =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* _level, contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2268,6 +2281,7 @@ let test_round_trip ~title ?before_init ~originator ~operator ~batch_signer
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* _level, deposit_contract =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2482,6 +2496,7 @@ let test_accuser =
   let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
   let* _level, _deposit_contract =
     make_deposit
+      ~protocol
       ~source:Constant.bootstrap2.public_key_hash
       ~tx_rollup_hash
       ~tx_node
@@ -2610,6 +2625,7 @@ let test_transfer_command =
       let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2677,6 +2693,7 @@ let test_withdraw_command =
       let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let* _level, _contract_id =
         make_deposit
+          ~protocol
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
@@ -2753,6 +2770,7 @@ let test_catch_up =
   let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
   let* tzlevel, _deposit_contract =
     make_deposit
+      ~protocol
       ~source:Constant.bootstrap2.public_key_hash
       ~tx_rollup_hash
       ~tx_node
@@ -2831,7 +2849,7 @@ let test_origination_deposit_same_block =
           ~alias:"rollup_deposit"
           ~amount:Tez.zero
           ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~prg:(choose_deposit_contract_by_protocol ~protocol)
           ~init:"Unit"
           ~burn_cap:Tez.(of_int 1)
           client

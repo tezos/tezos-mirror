@@ -470,11 +470,13 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   Option.value_e
     ~error:
       (Error_monad.trace_of_error Tx_rollup_invalid_transaction_ticket_amount)
-    (Option.bind (Script_int.to_int64 ticket_amount) Tx_rollup_l2_qty.of_int64)
+    (Option.bind
+       (Script_int.to_int64 (ticket_amount :> Script_int.n Script_int.num))
+       Tx_rollup_l2_qty.of_int64)
   >>?= fun ticket_amount ->
   error_when
     Tx_rollup_l2_qty.(ticket_amount <= zero)
-    Ticket_scanner.Forbidden_zero_ticket_quantity
+    Script_tc_errors.Forbidden_zero_ticket_quantity
   >>?= fun () ->
   let deposit, message_size =
     Tx_rollup_message.make_deposit
@@ -820,7 +822,7 @@ let apply_manager_operation :
              Tx_rollup_reveal.{contents; ty; ticketer; amount; claimer} ->
           error_when
             Tx_rollup_l2_qty.(amount <= zero)
-            Ticket_scanner.Forbidden_zero_ticket_quantity
+            Script_tc_errors.Forbidden_zero_ticket_quantity
           >>?= fun () ->
           Tx_rollup_ticket.parse_ticket
             ~consume_deserialization_gas
@@ -860,7 +862,13 @@ let apply_manager_operation :
           ( Tx_rollup_withdraw.
               {claimer; amount; ticket_hash = tx_rollup_ticket_hash},
             ticket_token ) =
-        let amount = Tx_rollup_l2_qty.to_z amount in
+        Tx_rollup_l2_qty.to_z amount
+        |> Ticket_amount.of_zint
+        |> Option.value_e
+             ~error:
+               (Error_monad.trace_of_error
+                  Script_tc_errors.Forbidden_zero_ticket_quantity)
+        >>?= fun amount ->
         Ticket_balance_key.of_ex_token
           ctxt
           ~owner:(Contract (Contract.Implicit claimer))
@@ -889,12 +897,6 @@ let apply_manager_operation :
       return (ctxt, result, [])
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
     -> (
-      (* The encoding ensures that the amount is in a natural number. Here is
-         mainly to check that it is non-zero.*)
-      error_when
-        Compare.Z.(amount <= Z.zero)
-        Ticket_scanner.Forbidden_zero_ticket_quantity
-      >>?= fun () ->
       match destination with
       | Implicit _ -> fail Cannot_transfer_ticket_to_implicit
       | Originated destination_hash ->

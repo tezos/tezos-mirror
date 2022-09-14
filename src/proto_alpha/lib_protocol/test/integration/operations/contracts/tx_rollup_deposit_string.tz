@@ -14,6 +14,7 @@ code {
                  PUSH nat 10;
                  SWAP;
                  TICKET;
+                 ASSERT_SOME;
                  PAIR;
 
                  # amount for transfering
