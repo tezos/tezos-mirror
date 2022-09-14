@@ -230,6 +230,15 @@ val show_history_mode : history_mode -> string
 (** Run [tezos-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
+(** Run [tezos-node config reset].
+
+    Contrary to [config_init], this does not automatically adds
+    arguments that were passed to [create], only the [--data-dir]. *)
+val config_reset : t -> string list -> unit Lwt.t
+
+(** Run [tezos-node config show]. Returns the node configuration. *)
+val config_show : t -> JSON.t Lwt.t
+
 module Config_file : sig
   (** Node configuration files. *)
 
