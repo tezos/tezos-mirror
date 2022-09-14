@@ -151,6 +151,11 @@ doc-publish:
 	cd ${CI_PROJECT_DIR} ; \
 		./scripts/ci/doc_publish.sh
 
+.PHONY: opam-release
+opam-release:
+	cd ${CI_PROJECT_DIR} ; \
+		./scripts/ci/opam-release.sh
+
 .PHONY: gitlab-release
 gitlab-release:
 	cd ${CI_PROJECT_DIR} ; \
