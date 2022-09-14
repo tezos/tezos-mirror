@@ -30,6 +30,9 @@
 
 val length : 'a Encoding.t -> 'a -> int
 
+val length_res :
+  'a Encoding.t -> 'a -> (int, Binary_error_types.write_error) result
+
 val fixed_length : 'a Encoding.t -> int option
 
 val maximum_length : 'a Encoding.t -> int option

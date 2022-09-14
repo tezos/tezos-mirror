@@ -134,6 +134,11 @@ let rec length : type x. x Encoding.t -> x -> int =
       length
   | Delayed f -> length (f ()) value
 
+let length_res e x =
+  match length e x with
+  | v -> Ok v
+  | exception Binary_error_types.Write_error e -> Error e
+
 let ( let* ) = Option.bind
 
 let rec maximum_length : type a. a Encoding.t -> int option =
