@@ -133,3 +133,11 @@ let encoding =
         (function Unknown_error exn -> Some exn | _ -> None)
         (fun exn -> Unknown_error exn);
     ]
+
+let link_error kind ~module_name ~item_name =
+  match kind with
+  | `Item ->
+      Invalid_state
+        (Format.sprintf "Unexpected import: %s.%s" module_name item_name)
+  | `Module ->
+      Invalid_state (Format.sprintf "Unexpected module import: %s" module_name)

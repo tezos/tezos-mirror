@@ -203,13 +203,18 @@ let _alternate_write_debug =
           Lwt.return (durable, [])
       | _ -> raise Bad_input)
 
-let lookup name =
+let lookup_opt name =
   match name with
-  | "read_input" -> ExternFunc (HostFunc (read_input_type, read_input_name))
+  | "read_input" ->
+      Some (ExternFunc (HostFunc (read_input_type, read_input_name)))
   | "write_output" ->
-      ExternFunc (HostFunc (write_output_type, write_output_name))
-  | "write_debug" -> ExternFunc (HostFunc (write_debug_type, write_debug_name))
-  | _ -> raise Not_found
+      Some (ExternFunc (HostFunc (write_output_type, write_output_name)))
+  | "write_debug" ->
+      Some (ExternFunc (HostFunc (write_debug_type, write_debug_name)))
+  | _ -> None
+
+let lookup name =
+  match lookup_opt name with Some f -> f | None -> raise Not_found
 
 let register_host_funcs registry =
   List.fold_left

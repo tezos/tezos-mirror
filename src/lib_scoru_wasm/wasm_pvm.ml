@@ -35,6 +35,11 @@ module Wasm = Tezos_webassembly_interpreter
 
 type tick_state =
   | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
+  | Link of {
+      ast_module : Wasm.Ast.module_;
+      externs : Wasm.Instance.extern Wasm.Instance.Vector.t;
+      imports_offset : int32;
+    }
   | Init of {
       self : Wasm.Instance.module_key;
       ast_module : Tezos_webassembly_interpreter.Ast.module_;
@@ -87,6 +92,24 @@ struct
             Parsing.Decode.encoding
             (function Decode m -> Some m | _ -> None)
             (fun m -> Decode m);
+          case
+            "link"
+            (tup3
+               ~flatten:true
+               (scope ["ast_module"]
+               @@ Parsing.(no_region_encoding Module.module_encoding))
+               (scope
+                  ["externs"]
+                  (int32_lazy_vector
+                     (value [] Data_encoding.int32)
+                     Wasm_encoding.extern_encoding))
+               (value ["imports_offset"] Data_encoding.int32))
+            (function
+              | Link {ast_module; externs; imports_offset} ->
+                  Some (ast_module, externs, imports_offset)
+              | _ -> None)
+            (fun (ast_module, externs, imports_offset) ->
+              Link {ast_module; externs; imports_offset});
           case
             "init"
             (tup3
@@ -180,18 +203,55 @@ struct
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 
+    let link_finished (ast : Wasm.Ast.module_) offset =
+      offset >= Wasm.Ast.Vector.num_elements ast.it.imports
+
     let unsafe_next_tick_state {module_reg; buffers; durable; tick_state; _} =
       let open Lwt_syntax in
       match tick_state with
       | Decode {module_kont = MKStop ast_module; _} ->
-          let self = Wasm.Instance.Module_key wasm_main_module_name in
-          (* The module instance is registered in [self] that contains the
-             module registry, why we can ignore the result here. *)
-          Lwt.return (durable, Init {self; ast_module; init_kont = IK_Start})
+          Lwt.return
+            ( durable,
+              Link
+                {
+                  ast_module;
+                  externs = Wasm.Instance.Vector.empty ();
+                  imports_offset = 0l;
+                } )
       | Decode m ->
           let* kernel = Durable.find_value_exn durable kernel_key in
           let+ m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
           (durable, Decode m)
+      | Link {ast_module; externs; imports_offset}
+        when link_finished ast_module imports_offset ->
+          let self = Wasm.Instance.Module_key wasm_main_module_name in
+          (* The module instance is registered in [self] that contains the
+             module registry, why we can ignore the result here. *)
+          Lwt.return
+            (durable, Init {self; ast_module; init_kont = IK_Start externs})
+      | Link {ast_module; externs; imports_offset} -> (
+          let+ {it = {module_name; item_name; _}; _} =
+            Wasm.Ast.Vector.get imports_offset ast_module.it.imports
+          in
+          match (module_name, Host_funcs.lookup_opt item_name) with
+          | "rollup_safe_core", Some extern ->
+              let externs, _ = Wasm.Ast.Vector.append extern externs in
+              ( durable,
+                Link
+                  {
+                    ast_module;
+                    externs;
+                    imports_offset = Int32.succ imports_offset;
+                  } )
+          | "rollup_safe_core", None ->
+              ( durable,
+                Stuck (Wasm_pvm_errors.link_error `Item ~module_name ~item_name)
+              )
+          | _, _ ->
+              ( durable,
+                Stuck
+                  (Wasm_pvm_errors.link_error `Module ~module_name ~item_name)
+              ))
       | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
@@ -226,29 +286,6 @@ struct
                     (Invalid_state "Invalid_module: no `main` function exported")
                 ))
       | Init {self; ast_module; init_kont} ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3786
-             Tickify linking, which implies taking care of Utf8 decoding *)
-          let* imports =
-            Lazy_containers.Lazy_vector.Int32Vector.to_list
-              ast_module.it.imports
-          in
-          let externs =
-            List.fold_left
-              (fun v (im : Wasm.Ast.import) ->
-                let Wasm.Ast.{module_name; item_name; _} = im.it in
-                match module_name with
-                | "rollup_safe_core" ->
-                    (* Host functions *)
-                    let extern = Host_funcs.lookup item_name in
-                    let v, _ =
-                      Lazy_containers.Lazy_vector.Int32Vector.append extern v
-                    in
-                    v
-                | e -> raise (Invalid_argument Format.(sprintf "linking: %s" e)))
-              (Lazy_containers.Lazy_vector.Int32Vector.empty ())
-              imports
-          in
-          (* End of the linking phase *)
           let* init_kont =
             Wasm.Eval.init_step
               ~check_module_exports:Exports_memory_0
@@ -257,7 +294,6 @@ struct
               buffers
               host_funcs
               ast_module
-              externs
               init_kont
           in
           Lwt.return (durable, Init {self; ast_module; init_kont})
@@ -278,6 +314,8 @@ struct
           | `Interpreter error -> (
               match pvm_state.tick_state with
               | Decode _ -> Wasm_pvm_errors.Decode_error error
+              (* TODO: add Link_error *)
+              | Link _ -> Init_error error
               | Init _ -> Init_error error
               | Eval _ -> Eval_error error
               | Stuck _ -> Unknown_error error.raw_exception)
@@ -421,6 +459,8 @@ struct
         | Decode _ ->
             Lwt.return
               (Stuck (Invalid_state "No input required during decoding"))
+        | Link _ ->
+            Lwt.return (Stuck (Invalid_state "No input required during link"))
         | Init _ ->
             Lwt.return
               (Stuck (Invalid_state "No input required during initialization"))

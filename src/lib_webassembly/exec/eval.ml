@@ -1849,7 +1849,7 @@ let create_elem_step ~module_reg buffers inst :
 type exports_acc = {exports : extern NameMap.t; exports_memory_0 : bool}
 
 type init_kont =
-  | IK_Start
+  | IK_Start of extern Vector.t
   | IK_Add_import of (extern, import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (type_, func_type) map_kont
   | IK_Aggregate :
@@ -1949,8 +1949,8 @@ type memory_export_rules = Exports_memory_0 | No_memory_export_rules
 exception Missing_memory_0_export
 
 let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
-    buffers host_funcs (m : module_) (exts : extern Vector.t) = function
-  | IK_Start ->
+    buffers host_funcs (m : module_) = function
+  | IK_Start exts ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
       Lwt.return
@@ -2094,16 +2094,7 @@ let init ~module_reg ~self buffers host_funcs (m : module_) (exts : extern list)
   let rec go = function
     | IK_Stop inst -> Lwt.return inst
     | kont ->
-        let* kont =
-          init_step
-            ~module_reg
-            ~self
-            buffers
-            host_funcs
-            m
-            (Vector.of_list exts)
-            kont
-        in
+        let* kont = init_step ~module_reg ~self buffers host_funcs m kont in
         go kont
   in
-  go IK_Start
+  go (IK_Start (Vector.of_list exts))
