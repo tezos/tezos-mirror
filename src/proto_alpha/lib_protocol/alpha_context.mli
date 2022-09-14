@@ -2928,11 +2928,13 @@ module Sc_rollup : sig
 
     type t = Internal of internal_inbox_message | External of string
 
-    type serialized = private string
+    type serialized
 
     val encoding : t Data_encoding.t
 
     val unsafe_of_string : string -> serialized
+
+    val unsafe_to_string : serialized -> string
 
     val serialize : t -> serialized tzresult
 
@@ -3135,9 +3137,11 @@ module Sc_rollup : sig
 
       type t = Atomic_transaction_batch of {transactions : transaction list}
 
-      type serialized = private string
+      type serialized
 
       val unsafe_of_string : string -> serialized
+
+      val unsafe_to_string : serialized -> string
 
       val deserialize : serialized -> t tzresult
 

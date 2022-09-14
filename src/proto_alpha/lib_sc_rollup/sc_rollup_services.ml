@@ -186,7 +186,7 @@ module Global = struct
            Z.to_int64 o.message_index)
     |+ field "serialized_outbox_message" RPC_arg.string "" (fun o ->
            match Outbox.Message.serialize o.message with
-           | Ok message -> (message :> string)
+           | Ok message -> Outbox.Message.unsafe_to_string message
            | Error e -> invalid_message e)
     |> seal
 
