@@ -1287,8 +1287,8 @@ module Manager = struct
       ~description:
         (Format.asprintf
            "Gas limit is too low to cover the initial cost of manager \
-            operations: at least %a gas required."
-           Gas.pp_cost
+            operations: a minimum of %a gas units is required."
+           Gas.pp_cost_as_gas
            Michelson_v1_gas.Cost_of.manager_operation)
       Data_encoding.empty
       (function Insufficient_gas_for_manager -> Some () | _ -> None)

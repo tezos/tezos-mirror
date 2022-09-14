@@ -422,6 +422,8 @@ module Gas : sig
 
   val pp_cost : Format.formatter -> cost -> unit
 
+  val pp_cost_as_gas : Format.formatter -> cost -> unit
+
   type error += Operation_quota_exceeded (* `Temporary *)
 
   (** [consume ctxt cost] subtracts [cost] to the current operation

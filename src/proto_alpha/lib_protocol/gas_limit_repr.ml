@@ -32,7 +32,9 @@ type integral_tag
 module S = Saturation_repr
 
 (* 1 gas unit *)
-let scaling_factor = S.mul_safe_of_int_exn 1000
+let scaling_factor = 1000
+
+let mul_scaling_factor = S.mul_safe_of_int_exn scaling_factor
 
 module Arith = struct
   type 'a t = S.may_saturate S.t
@@ -41,7 +43,7 @@ module Arith = struct
 
   type integral = integral_tag t
 
-  let scaling_factor = scaling_factor
+  let mul_scaling_factor = mul_scaling_factor
 
   let sub = S.sub
 
@@ -82,7 +84,7 @@ module Arith = struct
       match of_int_opt i with
       | None -> fatally_saturated_int i
       | Some i' ->
-          let r = scale_fast scaling_factor i' in
+          let r = scale_fast mul_scaling_factor i' in
           if r = saturated then fatally_saturated_int i else r)
 
   let integral_exn z =
@@ -90,19 +92,19 @@ module Arith = struct
     | i -> integral_of_int_exn i
     | exception Z.Overflow -> fatally_saturated_z z
 
-  let integral_to_z (i : integral) : Z.t = S.(to_z (ediv i scaling_factor))
+  let integral_to_z (i : integral) : Z.t = S.(to_z (ediv i mul_scaling_factor))
 
   let ceil x =
-    let r = S.erem x scaling_factor in
-    if r = zero then x else add x (sub scaling_factor r)
+    let r = S.erem x mul_scaling_factor in
+    if r = zero then x else add x (sub mul_scaling_factor r)
 
-  let floor x = sub x (S.erem x scaling_factor)
+  let floor x = sub x (S.erem x mul_scaling_factor)
 
   let fp x = x
 
   let pp fmtr fp =
-    let q = S.(ediv fp scaling_factor |> to_int) in
-    let r = S.(erem fp scaling_factor |> to_int) in
+    let q = S.(ediv fp mul_scaling_factor |> to_int) in
+    let r = S.(erem fp mul_scaling_factor |> to_int) in
     if Compare.Int.(r = 0) then Format.fprintf fmtr "%d" q
     else Format.fprintf fmtr "%d.%0*d" q decimals r
 
@@ -157,27 +159,30 @@ let cost_encoding = S.z_encoding
 
 let pp_cost fmt z = S.pp fmt z
 
+let pp_cost_as_gas fmt z =
+  Format.pp_print_int fmt (S.to_int (Arith.ceil z) / scaling_factor)
+
 (* 2 units of gas *)
 let allocation_weight =
-  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 2)) |> S.mul_safe_exn
+  S.(mul_fast mul_scaling_factor (S.mul_safe_of_int_exn 2)) |> S.mul_safe_exn
 
-let step_weight = scaling_factor
+let step_weight = mul_scaling_factor
 
 (* 100 units of gas *)
 let read_base_weight =
-  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 100)) |> S.mul_safe_exn
+  S.(mul_fast mul_scaling_factor (S.mul_safe_of_int_exn 100)) |> S.mul_safe_exn
 
 (* 160 units of gas *)
 let write_base_weight =
-  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 160)) |> S.mul_safe_exn
+  S.(mul_fast mul_scaling_factor (S.mul_safe_of_int_exn 160)) |> S.mul_safe_exn
 
 (* 10 units of gas *)
 let byte_read_weight =
-  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 10)) |> S.mul_safe_exn
+  S.(mul_fast mul_scaling_factor (S.mul_safe_of_int_exn 10)) |> S.mul_safe_exn
 
 (* 15 units of gas *)
 let byte_written_weight =
-  S.(mul_fast scaling_factor (S.mul_safe_of_int_exn 15)) |> S.mul_safe_exn
+  S.(mul_fast mul_scaling_factor (S.mul_safe_of_int_exn 15)) |> S.mul_safe_exn
 
 let cost_to_milligas (cost : cost) : Arith.fp = cost
 
