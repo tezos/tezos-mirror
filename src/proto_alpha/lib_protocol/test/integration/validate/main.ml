@@ -48,5 +48,6 @@ let () =
         Test_batched_manager_operation_validation.fee_tests );
       ( "Flags: feature flag checks",
         Test_manager_operation_validation.flags_tests );
+      ("Mempool", Test_mempool.tests);
     ]
   |> Lwt_main.run
