@@ -103,6 +103,9 @@ val nil_es : ('a list, 'trace) result Lwt.t
 (** [cons x xs] is [x :: xs] *)
 val cons : 'a -> 'a list -> 'a list
 
+(** [is_empty xs] is [true] iff [xs] is [[]] *)
+val is_empty : 'a list -> bool
+
 (** {3 Safe wrappers}
 
     This part of the module simply shadows some functions from {!Stdlib.List}
@@ -899,6 +902,7 @@ val filter_map_es :
 (** [filter_map_p] is a variant of {!filter_map_s} where the promises are evaluated concurrently. *)
 val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+(** [concat_map f xs] is [concat (map f xs)] but more efficient. *)
 val concat_map : ('a -> 'b list) -> 'a list -> 'b list
 
 (** [concat_map_s] is an Lwt-aware variant of {!concat_map}. *)
@@ -1221,6 +1225,16 @@ val combine_drop : 'a list -> 'b list -> ('a * 'b) list
       two lists have the same length. *)
 val combine_with_leftovers :
     'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
+
+(** {3 Product} *)
+
+(** [product xs ys] is the cartesian product of [xs] and [ys].
+
+    In other words [product xs ys] is a list containing all the pairs [(x, y)]
+    where [x] is an element of [xs] and [y] is an element of [ys].
+
+    The order of the elements in the returned list is unspecified. *)
+val product : 'a list -> 'b list -> ('a * 'b) list
 
   (** {3 Comparison and equality}
 
