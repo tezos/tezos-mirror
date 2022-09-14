@@ -50,6 +50,18 @@ let handle_slot ctxt store (_, commitment) trim () =
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
 
+let handle_stored_slot_headers ctxt (_, block_hash) () () =
+  let open Lwt_result_syntax in
+  let*? {plugin = (module Plugin); slot_header_store; _} =
+    Node_context.get_ready ctxt
+  in
+  let*! shs =
+    Slot_headers_store.list_secondary_keys_with_values
+      slot_header_store
+      ~primary_key:block_hash
+  in
+  return @@ shs
+
 let handle_slot_pages ctxt store (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
@@ -57,6 +69,12 @@ let handle_slot_pages ctxt store (_, commitment) () () =
 
 let handle_shard store ((_, commitment), shard) () () =
   Slot_manager.get_shard store commitment shard
+
+let register_stored_slot_headers ctxt dir =
+  RPC_directory.register
+    dir
+    (Services.stored_slot_headers ())
+    (handle_stored_slot_headers ctxt)
 
 let register_split_slot ctxt store dir =
   RPC_directory.register0
@@ -78,6 +96,7 @@ let register_shard store dir =
 
 let register ctxt store =
   RPC_directory.empty
+  |> register_stored_slot_headers ctxt
   |> register_split_slot ctxt store
   |> register_show_slot ctxt store
   |> register_shard store
