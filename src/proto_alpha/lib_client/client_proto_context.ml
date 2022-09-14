@@ -1131,6 +1131,7 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
         withdraw_list_hash = previous_withdraw_list_hash;
       }
   in
+  let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
   let contents :
       Kind.tx_rollup_rejection Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager

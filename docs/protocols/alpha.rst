@@ -302,6 +302,10 @@ Minor Changes
 
 - Add used and paid storage space services/commands. (MR :gl:`!6178`)
 
+- The encoding of the proof argument of the transaction rollup’s
+  rejection operation is now opaque, to avoid exposing unnecessary
+  details about their implementation. (MR :gl:`!6318`)
+
 Internal
 --------
 

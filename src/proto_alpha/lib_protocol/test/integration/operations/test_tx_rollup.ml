@@ -2516,6 +2516,62 @@ module Rejection = struct
     in
     make_and_sign_transaction ~signers transaction
 
+  (** Test that undecodable proofs are rejected by the protocol. *)
+  let test_undecodable_proof () =
+    let sk, pk, addr = gen_l2_account () in
+    init_with_deposit addr
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
+    hash_tree_from_store store >>= fun l2_context_hash ->
+    (* Create a transfer from [pk] to a new address *)
+    let _, _, addr2 = gen_l2_account () in
+    let message, batch_bytes =
+      make_message_transfer
+        ~signers:[sk]
+        [(bls_pk pk, None, [(addr2, ticket_hash, 1L)])]
+    in
+    let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
+    let message_path = single_message_path message_hash in
+    Op.tx_rollup_submit_batch (B b) account tx_rollup batch_bytes
+    >>=? fun operation ->
+    add_operation b operation >>=? fun b ->
+    (* Make a commitment for the submitted transfer *)
+    let level = Tx_rollup_level.(succ root) in
+    make_incomplete_commitment_for_batch (B b) level tx_rollup []
+    >>=? fun (commitment, _) ->
+    Op.tx_rollup_commit (B b) account tx_rollup commitment >>=? fun operation ->
+    add_operation b operation >>=? fun b ->
+    (* Now we produce an invalid serialized proof that cannot be
+       decoded by the protocol. *)
+    let proof =
+      Tx_rollup_l2_proof.Internal_for_tests.of_bytes @@ Bytes.make 1_000 'c'
+    in
+    let message_position = 0 in
+    let message_result_hash, message_result_path =
+      message_result_hash_and_path commitment ~message_position
+    in
+    Op.tx_rollup_raw_reject
+      (B b)
+      account
+      tx_rollup
+      level
+      message
+      ~gas_limit:Max
+      ~message_position
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof
+      ~previous_message_result:(message_result l2_context_hash [])
+      ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
+    >>=? fun operation ->
+    Incremental.begin_construction b >>=? fun i ->
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Tx_rollup_errors.Proof_undecodable)
+      i
+      operation
+    >>=? fun _i -> return_unit
+
   (** Test that we can produce a simple but valid proof. *)
   let test_valid_proof_on_invalid_commitment () =
     let sk, pk, addr = gen_l2_account () in
@@ -3618,6 +3674,7 @@ module Rejection = struct
         "regression test empty_l2_context_hash"
         `Quick
         test_empty_l2_context_hash;
+      Tztest.tztest "unencodable proofs fail" `Quick test_undecodable_proof;
       Tztest.tztest
         "reject invalid commitment"
         `Quick

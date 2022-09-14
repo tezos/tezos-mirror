@@ -27,3 +27,21 @@
 type t = Context.Proof.stream Context.Proof.t
 
 let encoding = Context.Proof_encoding.V2.Tree2.stream_proof_encoding
+
+type serialized = string
+
+let length = String.length
+
+let serialized_encoding =
+  let open Data_encoding in
+  (* Deal with unprintable string *)
+  let json = conv Bytes.of_string Bytes.to_string bytes in
+  splitted ~json ~binary:string
+
+let proof_of_serialized_opt = Data_encoding.Binary.of_string_opt encoding
+
+let serialize_proof_exn = Data_encoding.Binary.to_string_exn encoding
+
+module Internal_for_tests = struct
+  let of_bytes = Bytes.to_string
+end

@@ -2275,6 +2275,7 @@ module Tx_rollup_errors : sig
           [ `Valid_path of Tx_rollup_commitment.Merkle.h * int
           | `Hash of Tx_rollup_message_result_hash.t ];
       }
+    | Proof_undecodable
     | Proof_failed_to_reject
     | Proof_produced_rejected_state
     | Proof_invalid_before of {
@@ -4272,7 +4273,7 @@ and _ manager_operation =
       message_result_path : Tx_rollup_commitment.Merkle.path;
       previous_message_result : Tx_rollup_message_result.t;
       previous_message_result_path : Tx_rollup_commitment.Merkle.path;
-      proof : Tx_rollup_l2_proof.t;
+      proof : Tx_rollup_l2_proof.serialized;
     }
       -> Kind.tx_rollup_rejection manager_operation
   | Tx_rollup_dispatch_tickets : {

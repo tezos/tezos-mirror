@@ -124,11 +124,8 @@ let verify_l2_proof proof parameters message =
 
     Note that if the proof is incorrect this function fails and the commit
     can not be rejected. *)
-let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
-    message =
-  let proof_length =
-    Data_encoding.Binary.length Tx_rollup_l2_proof.encoding proof
-  in
+let compute_proof_after_hash ~proof_length ~max_proof_size ctxt parameters
+    agreed (proof : Tx_rollup_l2_proof.t) message =
   let message_length =
     Data_encoding.Binary.length Tx_rollup_message.encoding message
   in
@@ -180,12 +177,13 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
       (* Finally, the proof verification leads to an internal Irmin error *)
       fail Proof_failed_to_reject
 
-let verify_proof ctxt parameters message proof
+let verify_proof ctxt parameters message proof ~proof_length
     ~(agreed : Tx_rollup_message_result.t) ~rejected ~max_proof_size =
   compute_proof_after_hash
     ctxt
     parameters
     agreed.context_hash
+    ~proof_length
     ~max_proof_size
     proof
     message

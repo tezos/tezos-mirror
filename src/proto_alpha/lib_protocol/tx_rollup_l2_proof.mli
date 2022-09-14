@@ -28,3 +28,20 @@
 type t = Context.Proof.stream Context.Proof.t
 
 val encoding : t Data_encoding.t
+
+(** A compact binary representation of the proofs. *)
+type serialized = private string
+
+val length : serialized -> int
+
+val serialized_encoding : serialized Data_encoding.t
+
+val proof_of_serialized_opt : serialized -> t option
+
+val serialize_proof_exn : t -> serialized
+
+module Internal_for_tests : sig
+  (** [of_bytes] can be used to generate invalid serialized proofs,
+      that cannot be turned into valid proofs. *)
+  val of_bytes : bytes -> serialized
+end

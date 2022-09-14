@@ -214,19 +214,21 @@ let build_rejection state ~(reject_commitment : Tx_rollup_commitment.Full.t)
   let+ proof, _ =
     Prover_apply.apply_message previous_context l2_parameters message
   in
-  Tx_rollup_rejection
-    {
-      tx_rollup = state.rollup_info.rollup_id;
-      level = block.commitment.level;
-      message;
-      message_position = position;
-      message_path;
-      message_result_hash;
-      message_result_path;
-      previous_message_result;
-      previous_message_result_path;
-      proof;
-    }
+  let serialized = Tx_rollup_l2_proof.serialize_proof_exn proof in
+  ( proof,
+    Tx_rollup_rejection
+      {
+        tx_rollup = state.rollup_info.rollup_id;
+        level = block.commitment.level;
+        message;
+        message_position = position;
+        message_path;
+        message_result_hash;
+        message_result_path;
+        previous_message_result;
+        previous_message_result_path;
+        proof = serialized;
+      } )
 
 let reject_bad_commitment ~source (state : State.t)
     (commitment : Tx_rollup_commitment.Full.t) =
@@ -237,7 +239,7 @@ let reject_bad_commitment ~source (state : State.t)
   | `Reject (position, block) ->
       (* This commitment is bad, because of message result at [position], we
          should inject a rejection *)
-      let* rejection_operation =
+      let* _, rejection_operation =
         build_rejection state block ~reject_commitment:commitment ~position
       in
       Injector.add_pending_operation ~source rejection_operation

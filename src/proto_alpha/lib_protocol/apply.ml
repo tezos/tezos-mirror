@@ -1195,7 +1195,7 @@ let apply_manager_operation :
         message_result_path;
         previous_message_result;
         previous_message_result_path;
-      } ->
+      } -> (
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       (* Check [level] *)
       Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
@@ -1241,52 +1241,57 @@ let apply_manager_operation :
               Constants.tx_rollup_max_withdrawals_per_batch ctxt;
           }
       in
-      Tx_rollup_l2_verifier.verify_proof
-        ctxt
-        parameters
-        message
-        proof
-        ~agreed:previous_message_result
-        ~rejected:message_result_hash
-        ~max_proof_size:(Constants.tx_rollup_rejection_max_proof_size ctxt)
-      >>=? fun ctxt ->
-      (* Proof is correct, removing *)
-      Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
-      >>=? fun (ctxt, state) ->
-      (* Bond slashing, and removing *)
-      Tx_rollup_commitment.slash_bond ctxt tx_rollup commitment.committer
-      >>=? fun (ctxt, slashed) ->
-      (if slashed then
-       let committer = Contract.Implicit commitment.committer in
-       let bid = Bond_id.Tx_rollup_bond_id tx_rollup in
-       Token.balance ctxt (`Frozen_bonds (committer, bid))
-       >>=? fun (ctxt, burn) ->
-       Tez.(burn /? 2L) >>?= fun reward ->
-       Token.transfer
-         ctxt
-         (`Frozen_bonds (committer, bid))
-         `Tx_rollup_rejection_punishments
-         burn
-       >>=? fun (ctxt, burn_update) ->
-       Token.transfer
-         ctxt
-         `Tx_rollup_rejection_rewards
-         (`Contract source_contract)
-         reward
-       >>=? fun (ctxt, reward_update) ->
-       return (ctxt, burn_update @ reward_update)
-      else return (ctxt, []))
-      >>=? fun (ctxt, balance_updates) ->
-      (* Update state and conclude *)
-      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
-      let result =
-        Tx_rollup_rejection_result
-          {
-            consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
-            balance_updates;
-          }
-      in
-      return (ctxt, result, [])
+      let proof_length = Tx_rollup_l2_proof.length proof in
+      match Tx_rollup_l2_proof.proof_of_serialized_opt proof with
+      | Some proof ->
+          Tx_rollup_l2_verifier.verify_proof
+            ctxt
+            parameters
+            message
+            proof
+            ~proof_length
+            ~agreed:previous_message_result
+            ~rejected:message_result_hash
+            ~max_proof_size:(Constants.tx_rollup_rejection_max_proof_size ctxt)
+          >>=? fun ctxt ->
+          (* Proof is correct, removing *)
+          Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
+          >>=? fun (ctxt, state) ->
+          (* Bond slashing, and removing *)
+          Tx_rollup_commitment.slash_bond ctxt tx_rollup commitment.committer
+          >>=? fun (ctxt, slashed) ->
+          (if slashed then
+           let committer = Contract.Implicit commitment.committer in
+           let bid = Bond_id.Tx_rollup_bond_id tx_rollup in
+           Token.balance ctxt (`Frozen_bonds (committer, bid))
+           >>=? fun (ctxt, burn) ->
+           Tez.(burn /? 2L) >>?= fun reward ->
+           Token.transfer
+             ctxt
+             (`Frozen_bonds (committer, bid))
+             `Tx_rollup_rejection_punishments
+             burn
+           >>=? fun (ctxt, burn_update) ->
+           Token.transfer
+             ctxt
+             `Tx_rollup_rejection_rewards
+             (`Contract source_contract)
+             reward
+           >>=? fun (ctxt, reward_update) ->
+           return (ctxt, burn_update @ reward_update)
+          else return (ctxt, []))
+          >>=? fun (ctxt, balance_updates) ->
+          (* Update state and conclude *)
+          Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
+          let result =
+            Tx_rollup_rejection_result
+              {
+                consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt;
+                balance_updates;
+              }
+          in
+          return (ctxt, result, [])
+      | None -> fail Tx_rollup_errors.Proof_undecodable)
   | Dal_publish_slot_header {slot} ->
       Dal_apply.apply_publish_slot_header ctxt slot >>?= fun ctxt ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in

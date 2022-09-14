@@ -112,13 +112,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.01072
+    Fee to the baker: ꜩ0.010724
     Expected counter: 4
     Gas limit: 52217
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.01072
-      payload fees(the block proposer) ....... +ꜩ0.01072
+      [PUBLIC_KEY_HASH] ... -ꜩ0.010724
+      payload fees(the block proposer) ....... +ꜩ0.010724
     Transaction rollup rejection:
       Address: [TX_ROLLUP_HASH]
       From: [PUBLIC_KEY_HASH]

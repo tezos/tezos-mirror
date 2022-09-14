@@ -87,6 +87,7 @@ type error +=
         | `Hash of Tx_rollup_message_result_hash_repr.t ];
     }
   | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+  | Proof_undecodable
   | Proof_failed_to_reject
   | Proof_produced_rejected_state
   | Proof_invalid_before of {agreed : Context_hash.t; provided : Context_hash.t}
@@ -620,6 +621,14 @@ let () =
       | _ -> None)
     (fun (payload_size, limit) ->
       Ticket_payload_size_limit_exceeded {payload_size; limit}) ;
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_proof_undecodable"
+    ~title:"Could not decode the proof"
+    ~description:"The proof submitted as argument could not be decoded"
+    empty
+    (function Proof_undecodable -> Some () | _ -> None)
+    (fun () -> Proof_undecodable) ;
   (* Proof_failed_to_reject *)
   register_error_kind
     `Temporary

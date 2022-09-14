@@ -771,11 +771,12 @@ let transfer_ticket ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
 
-let tx_rollup_reject ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
-    (message : Tx_rollup_message.t) ~(message_position : int)
-    ~(message_path : Tx_rollup_inbox.Merkle.path) ~message_result_hash
-    ~message_result_path ~(proof : Tx_rollup_l2_proof.t)
+let tx_rollup_raw_reject ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ctxt (source : Contract.t) (tx_rollup : Tx_rollup.t)
+    (level : Tx_rollup_level.t) (message : Tx_rollup_message.t)
+    ~(message_position : int) ~(message_path : Tx_rollup_inbox.Merkle.path)
+    ~message_result_hash ~message_result_path
+    ~(proof : Tx_rollup_l2_proof.serialized)
     ~(previous_message_result : Tx_rollup_message_result.t)
     ~previous_message_result_path =
   manager_operation
@@ -802,6 +803,33 @@ let tx_rollup_reject ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let tx_rollup_reject ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
+    (message : Tx_rollup_message.t) ~(message_position : int)
+    ~(message_path : Tx_rollup_inbox.Merkle.path) ~message_result_hash
+    ~message_result_path ~(proof : Tx_rollup_l2_proof.t)
+    ~(previous_message_result : Tx_rollup_message_result.t)
+    ~previous_message_result_path =
+  let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
+  tx_rollup_raw_reject
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ctxt
+    source
+    tx_rollup
+    level
+    message
+    ~message_position
+    ~message_path
+    ~message_result_hash
+    ~message_result_path
+    ~proof
+    ~previous_message_result
+    ~previous_message_result_path
 
 let originated_sc_rollup op =
   let packed = Operation.hash_packed op in

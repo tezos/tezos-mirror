@@ -404,7 +404,7 @@ and _ manager_operation =
       message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       previous_message_result : Tx_rollup_message_result_repr.t;
       previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      proof : Tx_rollup_l2_proof.t;
+      proof : Tx_rollup_l2_proof.serialized;
     }
       -> Kind.tx_rollup_rejection manager_operation
   | Tx_rollup_dispatch_tickets : {
@@ -925,7 +925,7 @@ module Encoding = struct
               (req
                  "previous_message_result_path"
                  Tx_rollup_commitment_repr.Merkle.path_encoding)
-              (req "proof" Tx_rollup_l2_proof.encoding);
+              (req "proof" Tx_rollup_l2_proof.serialized_encoding);
           select =
             (function
             | Manager (Tx_rollup_rejection _ as op) -> Some op | _ -> None);
