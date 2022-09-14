@@ -118,7 +118,8 @@ type _ ty =
   | Mu_matching : 'a ty -> 'a list ty
   | Mu_bigmatching : 'a ty * 'b ty -> ('a option * 'b) list ty
   | Mu_obj : 'a ty * 'b ty -> ('a, 'b) recursion_test_type ty
-  | Check_size : 'a ty -> 'a ty
+  | Check_size : (int * 'a ty) -> 'a ty
+  | Dynamic_and_check_size : (int * 'a ty) -> 'a ty
   | StringEnum : int ty
   | Add_padding : 'a ty * int -> 'a ty
   | CompactMake : 'a compactty -> 'a ty
@@ -213,7 +214,9 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Mu_bigmatching (tya, tyb) ->
       Crowbar.pp ppf "mu_bigmatching(%a,%a)" pp_ty tya pp_ty tyb
   | Mu_obj (tya, tyb) -> Crowbar.pp ppf "mu_obj(%a,%a)" pp_ty tya pp_ty tyb
-  | Check_size ty -> Crowbar.pp ppf "check_size(%a)" pp_ty ty
+  | Check_size (n, ty) -> Crowbar.pp ppf "check_size(%d,%a)" n pp_ty ty
+  | Dynamic_and_check_size (n, ty) ->
+      Crowbar.pp ppf "dynamic_and_check_size(%d,%a)" n pp_ty ty
   | StringEnum -> Crowbar.pp ppf "string_enum"
   | Add_padding (ty, n) -> Crowbar.pp ppf "add_padding(%a)(%d)" pp_ty ty n
   | CompactMake cty -> Crowbar.pp ppf "compact_make(%a)" pp_cty cty
@@ -381,7 +384,9 @@ let any_ty_fix g =
             AnyTy (Mu_bigmatching (ty_a, ty_b)));
         map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
             AnyTy (Mu_obj (ty_a, ty_b)));
-        map [g] (fun (AnyTy ty) -> AnyTy (Check_size ty));
+        map [uint30; g] (fun n (AnyTy ty) -> AnyTy (Check_size (n, ty)));
+        map [uint30; g] (fun n (AnyTy ty) ->
+            AnyTy (Dynamic_and_check_size (n, ty)));
         map
           [g; range ~min:1 10]
           (fun (AnyTy ty) n -> AnyTy (Add_padding (ty, n)));
@@ -1265,16 +1270,32 @@ let full_mu_obj : type a b. a full -> b full -> (a, b) recursion_test_type full
         ot
   end)
 
-let full_check_size : type a. a full -> a full =
- fun full ->
+let full_check_size : type a. int -> a full -> a full =
+ fun maxsize full ->
   let module Full = (val full) in
   match Data_encoding.Binary.maximum_length Full.encoding with
   | None -> Crowbar.bad_test ()
   | Some size ->
+      let size = max maxsize size in
       (module struct
         include Full
 
         let encoding = Data_encoding.check_size size Full.encoding
+      end)
+
+let full_dyn_and_check_size : type a. int -> a full -> a full =
+ fun size full ->
+  let module Full = (val full) in
+  match Data_encoding.Binary.maximum_length Full.encoding with
+  | None -> Crowbar.bad_test ()
+  | Some inner_size ->
+      let size = max size inner_size in
+      (module struct
+        include Full
+
+        let encoding =
+          Data_encoding.dynamic_size
+            (Data_encoding.check_size size Full.encoding)
       end)
 
 let full_string_enum : int full =
@@ -2058,7 +2079,8 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Mu_bigmatching (tya, tyb) ->
       full_mu_bigmatching (full_of_ty tya) (full_of_ty tyb)
   | Mu_obj (tya, tyb) -> full_mu_obj (full_of_ty tya) (full_of_ty tyb)
-  | Check_size ty -> full_check_size (full_of_ty ty)
+  | Check_size (n, ty) -> full_check_size n (full_of_ty ty)
+  | Dynamic_and_check_size (n, ty) -> full_dyn_and_check_size n (full_of_ty ty)
   | StringEnum -> full_string_enum
   | Add_padding (ty, n) -> full_add_padding (full_of_ty ty) n
   | CompactMake cty -> full_make_compact (compactfull_of_compactty cty)
