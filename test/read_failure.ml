@@ -308,4 +308,28 @@ let tests =
           ~expected:array_too_long
           (array ~max_length:1 int8)
           (Bytes.of_string "\x00\x00\x00\x02\x2a\x2a") );
+      ( "list_n.truncated",
+        `Quick,
+        binary
+          ~expected:not_enough_data
+          (list_with_length `N ~max_length:2 int8)
+          (Bytes.of_string "\x02\x2a") );
+      ( "list_n.too_long",
+        `Quick,
+        binary
+          ~expected:list_too_long
+          (list_with_length `N ~max_length:1 int8)
+          (Bytes.of_string "\x02\x2a\x2a") );
+      ( "array_n.truncated",
+        `Quick,
+        binary
+          ~expected:not_enough_data
+          (array_with_length `N ~max_length:2 int8)
+          (Bytes.of_string "\x02\x2a") );
+      ( "array_n.too_long",
+        `Quick,
+        binary
+          ~expected:array_too_long
+          (array_with_length `N ~max_length:1 int8)
+          (Bytes.of_string "\x02\x2a\x2a") );
     ]

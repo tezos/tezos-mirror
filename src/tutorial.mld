@@ -995,6 +995,40 @@ element is exceeded.
 [array] parametric type. It is represented the same as a list. The optional
 parameter [?max_length] has the same effect.
 
+[list_with_length : [`N | `Uint8 | `Uint16 | `Uint30] -> 'a encoding -> 'a list encoding]
+(dynamic) is a combinator for the [list] parametric type. In binary it is
+represented as a length header followed by the concatenation of the
+representation of all the elements of the list.
+
+Note that the length header indicates the length of the list (i.e., the number
+of elements it holds) rather than the size of the representation (the number of
+bytes it takes to represent).
+
+The length header size is represented differently depending on the first
+parameter of the combinator:
+{ul {- [`N]: the length is represented by [uint_like_n],
+}{- [`Uint8]: the length is represented by a [uint8],
+}{- [`Uint16]: the length is represented by a [uint16],
+}{- [`Uint30]: the length is represented by a positive [int31].
+}}
+
+Remember that, out of concern for compatibility with 32-bit architectures, in
+case of [uint_like_n]/[`N], the length cannot exceed the maximum value of
+[uint30]/[int31].
+
+The [?max_length] parameter has the same effect as with [list]. If the
+[?max_length] parameter is set, it must be less than or equal to the maximum
+value the length encoding can represent: otherwise an exception is raised. E.g.,
+[list_with_length ~max_length:2000 `Uint8] raises an exception because
+[2000] is greater than the maximum uint8 value (255).
+
+In JSON, it is represented the same as with the [list] encoding: as an Array
+literal.
+
+[array_with_length : [`N | `Uint8 | `Uint16 | `Uint30] -> 'a encoding -> 'a array encoding]
+(dynamic) is a combinator for the [array] parametric type. It is represented as
+[list_with_length]. The optional [?max_length] parameter has the same effect.
+
 {2 Sizing variants of existing combinators}
 
 Some combinators are specialised for certain sizes of inputs. We list them here.

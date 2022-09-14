@@ -189,7 +189,7 @@ module Encoding : sig
       maximum value in the range, and the de/serialisation process fails before
       attempting any conversion if the size is exceeded.
 
-      @raise [Invalid_argument] if [max_value < 0] or
+      @raise Invalid_argument if [max_value < 0] or
       [max_value > (1 lsl 30) - 1] *)
   val uint_like_n : ?max_value:int -> unit -> int encoding
 
@@ -212,11 +212,11 @@ module Encoding : sig
       encoding's range, and the de/serialisation process fails before attempting
       any conversion if the size is exceeded.
 
-      @raise [Invalid_argument] if [max_value < min_value]
+      @raise Invalid_argument if [max_value < min_value]
 
-      @raise [Invalid_argument] if [max_value > (1 lsl 30) - 1]
+      @raise Invalid_argument if [max_value > (1 lsl 30) - 1]
 
-      @raise [Invalid_argument] if [min_value] < -(1 lsl 30)] *)
+      @raise Invalid_argument if [min_value < -(1 lsl 30)] *)
   val int_like_z : ?min_value:int -> ?max_value:int -> unit -> int encoding
 
   (** Encoding of floating point number
@@ -277,7 +277,7 @@ module Encoding : sig
   (** Array combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-       prefixed its length in bytes
+       prefixed its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -286,10 +286,30 @@ module Encoding : sig
       @raise Invalid_argument if the inner encoding is variable. *)
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
+  (** Array combinator.
+      - encoded as an array in JSON
+      - encoded as the concatenation of its length (number of elements) and all
+        the element in binary
+
+      @param kind ([[`N | `Uint8 | `Uint16 | `Uint30]]) controls the
+      representation of the length: {!uint_like_n}, {!uint8}, {!uint16}, or
+      {!int31} (but only positive values).
+
+      @param [max_length]
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
+
+      @raise Invalid_argument if the inner encoding is variable. *)
+  val array_with_length :
+    ?max_length:int ->
+    [`N | `Uint8 | `Uint16 | `Uint30] ->
+    'a encoding ->
+    'a array encoding
+
   (** List combinator.
       - encoded as an array in JSON
       - encoded as the concatenation of all the element in binary
-       prefixed its length in bytes
+        prefixed its size in bytes
 
       @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
@@ -297,6 +317,27 @@ module Encoding : sig
 
       @raise Invalid_argument if the inner encoding is variable. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
+
+  (** List combinator.
+      - encoded as an array in JSON
+      - encoded as the concatenation of its length (number of elements) and all
+        the element in binary
+
+      @param kind ([[`N | `Uint8 | `Uint16 | `Uint30]]) controls the
+      representation of the length: {!uint_like_n}, {!uint8}, {!uint16}, or
+      {!int31} (but only positive values).
+
+
+      @param [max_length]
+      If [max_length] is passed and the encoding of elements has fixed
+      size, a {!check_size} is automatically added for earlier rejection.
+
+      @raise Invalid_argument if the inner encoding is variable. *)
+  val list_with_length :
+    ?max_length:int ->
+    [`N | `Uint8 | `Uint16 | `Uint30] ->
+    'a encoding ->
+    'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
 

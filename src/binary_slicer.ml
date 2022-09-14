@@ -266,7 +266,7 @@ let rec read_rec :
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum !!"ranged float" state
   | String_enum (_, arr) -> Atom.string_enum arr !!"enum" state
-  | Array {length_limit; elts = e} ->
+  | Array {length_limit; length_encoding = None; elts = e} ->
       let l =
         match length_limit with
         | No_limit -> read_list Array_too_long max_int e ?name state
@@ -275,11 +275,46 @@ let rec read_rec :
         | Exactly exact_length -> read_fixed_list exact_length e ?name state
       in
       Array.of_list l
-  | List {length_limit; elts = e} -> (
+  | Array
+      {
+        length_limit = At_most max_length;
+        length_encoding = Some length_encoding;
+        elts = e;
+      } ->
+      let len =
+        try read_rec ~name:"array_length" length_encoding state
+        with Binary_error_types.Read_error (Invalid_int _) ->
+          raise Array_too_long
+      in
+      if len > max_length then raise Array_too_long ;
+      let l = read_fixed_list len e ?name state in
+      Array.of_list l
+  | Array
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
+  | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit -> read_list List_too_long max_int e ?name state
       | At_most max_length -> read_list List_too_long max_length e ?name state
       | Exactly exact_length -> read_fixed_list exact_length e ?name state)
+  | List
+      {
+        length_limit = At_most max_length;
+        length_encoding = Some length_encoding;
+        elts = e;
+      } ->
+      let len =
+        try read_rec ~name:"list_length" length_encoding state
+        with Binary_error_types.Read_error (Invalid_int _) ->
+          raise List_too_long
+      in
+      if len > max_length then raise List_too_long ;
+      read_fixed_list len e ?name state
+  | List
+      {length_limit = Exactly _ | No_limit; length_encoding = Some _; elts = _}
+    ->
+      assert false
   | Obj (Req {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Dft {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Opt {kind = `Dynamic; encoding = e; name; _}) ->

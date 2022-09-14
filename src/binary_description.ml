@@ -339,12 +339,35 @@ let describe (type x) (encoding : x Encoding.t) =
     | Splitted {encoding; _} ->
         fields ref_name recursives references encoding.encoding
     | Delayed func -> fields ref_name recursives references (func ()).encoding
-    | List {length_limit = len; elts = {encoding; _}} ->
+    | List {length_limit = len; length_encoding = None; elts = {encoding; _}} ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
-    | Array {length_limit = len; elts = {encoding; _}} ->
+    | List {length_limit = len; length_encoding = Some le; elts = {encoding; _}}
+      ->
+        let layout_elements, refs =
+          layout None recursives references encoding
+        in
+        let layout_length, refs = layout None recursives refs le.encoding in
+        ( [
+            Anonymous_field (classify_desc le.encoding, layout_length);
+            Anonymous_field (`Variable, Seq (layout_elements, len));
+          ],
+          refs )
+    | Array {length_limit = len; length_encoding = None; elts = {encoding; _}}
+      ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
+    | Array
+        {length_limit = len; length_encoding = Some le; elts = {encoding; _}} ->
+        let layout_elements, refs =
+          layout None recursives references encoding
+        in
+        let layout_length, refs = layout None recursives refs le.encoding in
+        ( [
+            Anonymous_field (classify_desc le.encoding, layout_length);
+            Anonymous_field (`Variable, Seq (layout_elements, len));
+          ],
+          refs )
     | Bytes (kind, _) ->
         ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
     | String (kind, _) ->
@@ -472,12 +495,23 @@ let describe (type x) (encoding : x Encoding.t) =
           add_reference name (Int_enum {size; cases}) references
         in
         (Enum (size, name), references)
-    | Array {length_limit = len; elts = data} ->
+    | Array {length_limit = _; length_encoding = Some _; elts = _} as encoding
+      ->
+        let name = may_new_reference ref_name in
+        let fields, references = fields None recursives references encoding in
+        UF.add uf {title = name; description = None} ;
+        (Ref name, add_reference name (obj fields) references)
+    | Array {length_limit = len; length_encoding = None; elts = data} ->
         let descr, references =
           layout None recursives references data.encoding
         in
         (Seq (descr, len), references)
-    | List {length_limit = len; elts = data} ->
+    | List {length_limit = _; length_encoding = Some _; elts = _} as encoding ->
+        let name = may_new_reference ref_name in
+        let fields, references = fields None recursives references encoding in
+        UF.add uf {title = name; description = None} ;
+        (Ref name, add_reference name (obj fields) references)
+    | List {length_limit = len; length_encoding = None; elts = data} ->
         let layout, references =
           layout None recursives references data.encoding
         in
