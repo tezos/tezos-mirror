@@ -422,6 +422,13 @@ let should_boot_computation_kernel () =
   let*! index = Context_binary.init "/tmp" in
   let context = Context_binary.empty index in
   let*! s = Prover.initial_state context in
+  (* sets a reasonable nb-of-tick limit to limit test running time *)
+  let*! s =
+    Tree.add
+      s
+      ["pvm"; "max_nb_ticks"]
+      (Data_encoding.Binary.to_bytes_exn Data_encoding.n (Z.of_int 50_000))
+  in
   let*! s = Prover.install_boot_sector s boot_sector in
   (* installing the boot kernel *)
   let* s = checked_eval ~loc:__LOC__ context s in

@@ -50,6 +50,8 @@ type t =
       (** Invalid state of the PVM (waiting for input during the parsing for example). *)
   | Unknown_error of raw_exception
       (** Wraps unexpected exceptions raised by the interpreter. *)
+  | Too_many_ticks
+      (** The maximum number of ticks was reached before the end of current top level call *)
 
 (* [link_error kind ~module_name ~item_name] returns the link error for a given
    [module_name] and [item_name], and the kind of error (whether an unkown
