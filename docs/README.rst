@@ -1,6 +1,6 @@
-***************************
-The documentation subsystem
-***************************
+***********
+Documenting
+***********
 
 The documentation is available online at `tezos.gitlab.io <http://tezos.gitlab.io/>`_,
 and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezos/tezos>`_.

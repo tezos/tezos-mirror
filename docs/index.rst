@@ -13,35 +13,46 @@ To start browsing, either follow one of the guided paths below, or directly pick
 
 .. image:: images/tezos_meta.jpg
       :width: 400px
+      :height: 230px
       :target: tezos_project_
+      :alt: What is Tezos
 .. image:: images/getting_started.png
       :width: 400px
+      :height: 230px
       :target: getting_started_
-
+      :alt: Getting started
 .. image:: images/tezos_xtz.jpg
       :width: 400px
+      :height: 230px
       :target: tezos_users_
+      :alt: Using Octez
 .. image:: images/octopus.png
       :width: 400px
+      :height: 230px
       :target: understanding_tezos_
-
+      :alt: Understanding
 .. image:: images/smart_contract.png
       :width: 400px
+      :height: 230px
       :target: tezos_devs_
+      :alt: Building on Tezos
 .. image:: images/solving_puzzle.jpg
       :width: 400px
+      :height: 230px
       :target: octez_devs_
+      :alt: Contributing
 
 .. _tezos_project:
 
-The Tezos Project
------------------
+The Tezos blockchain
+--------------------
 
 Tezos is a distributed consensus platform with meta-consensus
 capability. Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
-The website https://tezos.com/ contains more information about the project.
+
+`Tezos.com <https://tezos.com/>`_ contains more information on Tezos overall.
 
 .. _octez:
 
@@ -126,7 +137,7 @@ These tutorials explain how to :doc:`get the latest implementation of Octez <int
 Using Tezos/Octez
 ~~~~~~~~~~~~~~~~~
 
-If you already installed Octez and can participate to the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
+If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
 These pages:
 
 - present the key concepts and mechanisms for setting up Octez, including :doc:`user/setup-client`, :doc:`user/setup-node`, and so on;
@@ -168,7 +179,7 @@ Contributing to Octez
 
 The main focus of this technical documentation website is on resources for core developers, that is, contributors to the Tezos platform, and in particular to its Octez implementation.
 
-Core developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Developer`` section, including:
+Core developers can find a rich set of explanations, tutorials, and howtos, mainly in the ``Core Developer`` section, including:
 
 - a tutorial on the various forms of contributing (:doc:`developer/contributing`), and guidelines such as :doc:`developer/guidelines`
 - programming tutorials covering various libraries and frameworks specific to the Octez OCaml implementation, such as using :doc:`developer/gadt`, using :doc:`developer/error_monad`, using :doc:`developer/clic`, :doc:`developer/event_logging_framework`, etc.
@@ -260,36 +271,27 @@ Enjoy learning about Octez and Tezos, how to use them, build on top of them, or 
    :caption: Developer doc:
 
    developer/rpc
-   developer/encodings
-   developer/data_encoding
-   developer/merkle-proof-encoding-formats
-   developer/gadt
-   developer/error_monad
-   developer/clic
    developer/michelson_anti_patterns
-   developer/michelson_instructions
-   developer/entering_alpha
-   developer/protocol_release_checklist
-   developer/howto-freeze-protocols
-   developer/protocol_environment_upgrade
-   developer/event_logging_framework
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Core Developer doc:
+
+   developer/contributing_index
+   developer/programming
    developer/testing_index
-   developer/profiling
-   developer/snoop
-   developer/contributing
-   developer/merge_team
-   developer/guidelines
-   developer/repository_scope
-   developer/time_measurement_ppx
-   developer/openmetrics
+   developer/maintaining
    README
+   developer/tools
+   developer/encodings
+   developer/merkle-proof-encoding-formats
+   developer/openmetrics
 
 .. toctree::
    :maxdepth: 2
    :caption: Protocols:
 
    protocols/naming
-   protocols/013_jakarta
    protocols/014_kathmandu
    protocols/015_lima
    protocols/016_mumbai

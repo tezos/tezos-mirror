@@ -7,6 +7,12 @@ The following pages describe the formerly Tezos protocols in reverse chronologic
 
    There are no pages describing the initial protocol (Genesis) and a couple of subsequent protocols.
 
+
+.. toctree::
+   :maxdepth: 2
+
+   013_jakarta.rst
+
 .. toctree::
    :maxdepth: 2
 
