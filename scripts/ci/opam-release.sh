@@ -5,6 +5,13 @@ set -e
 ci_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 script_dir="$(dirname "$ci_dir")"
 
+opam_repository_fork="git@github.com:tezos/opam-repository"
+opam_dir="opam-repository"
+
+log () {
+    echo '\e[1m'"$1"'\e[0m'
+}
+
 # shellcheck source=./scripts/ci/release.sh
 . "$ci_dir/release.sh"
 
@@ -12,11 +19,27 @@ script_dir="$(dirname "$ci_dir")"
 mkdir -p "$HOME/.ssh"
 cp "$TEZOS_GITHUB_OPAM_REPOSITORY_MACHINE_USER_PRIVATE_SSH_KEY" "$HOME/.ssh/id_rsa"
 cat "$GITHUB_SSH_HOST_KEYS" >> "$HOME/.ssh/known_hosts"
-chmod 600 "$HOME/known_hosts"
-chmod 600 "$HOME/id_rsa"
+chmod 600 "$HOME/.ssh/known_hosts"
+chmod 600 "$HOME/.ssh/id_rsa"
 chmod 700 "$HOME/.ssh"
+log "Done setting up credentials."
 
 # call opam-release.sh with the correct arguments
 "$script_dir/opam-release.sh" \
   "$opam_release_tag" \
-  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_package_name.tar.gz"
+  "https://gitlab.com/tezos/tezos/-/archive/$CI_COMMIT_TAG/$gitlab_package_name.tar.gz" \
+  "$opam_dir"
+
+# Matches the corresponding variable in /scripts/opam-release.sh.
+branch_name="octez-$opam_release_tag"
+
+log "While we're here, update master on the fork..."
+cd "$opam_dir"
+git remote add github "$opam_repository_fork"
+git push github master:master
+
+log "Pushing $branch_name to $opam_repository_fork..."
+git push --force-with-lease github "${branch_name}:${branch_name}"
+
+log "Create the pull request at:"
+log "https://github.com/ocaml/opam-repository/compare/master...tezos:opam-repository:${branch_name}"
