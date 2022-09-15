@@ -126,12 +126,6 @@ sanity-ci: gitlab-take-ownership
 	${MAKE} -C ${CI_PROJECT_DIR}/manifest check
 	${CI_PROJECT_DIR}/scripts/lint.sh --check-gitlab-ci-yml
 
-.PHONY: docker-hadolint
-docker-hadolint:
-	cd ${CI_PROJECT_DIR} ; \
-		hadolint build.Dockerfile ; \
-		hadolint Dockerfile
-
 ifndef TEZOS_WITHOUT_OPAM
 .PHONY: opam-prepare
 opam-prepare:

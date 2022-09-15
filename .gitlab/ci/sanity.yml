@@ -14,4 +14,5 @@ docker:hadolint:
   image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   script:
-    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci docker-hadolint
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile
