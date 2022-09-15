@@ -15,6 +15,7 @@
 
 <body>
     <script type="text/javascript" src="./js/populate_sort_data.js"></script>
+    <script type="text/javascript" src="./js/local_config.js"></script>
 
     <h1> Adress Endorsement reception delays </h1>
     <form>
@@ -35,8 +36,6 @@
     </form>
     <script>
         var dict_data = {};
-        const server_adress = "http://kathmandunet.kaml.fr:8880/";
-        
         function main() {
             try {
                 $('#submit_').mouseup(async function (e) {

@@ -479,6 +479,16 @@ let callback rights db_pool _connection request body =
                         match subpath with
                         | [] | [_] ->
                             Cohttp_lwt_unix.Server.respond_not_found ~uri ()
+                        | [_; "visualization"; "js"; "local_config.js"] ->
+                            let body = "const server_adress = \"../\";" in
+                            Cohttp_lwt_unix.Server.respond_string
+                              ~headers:
+                                (Cohttp.Header.init_with
+                                   "content-type"
+                                   "text/javascript; charset=UTF-8")
+                              ~status:`OK
+                              ~body
+                              ()
                         | _ :: pre :: subpath -> (
                             if pre <> "visualization" then
                               Cohttp_lwt_unix.Server.respond_not_found ~uri ()
