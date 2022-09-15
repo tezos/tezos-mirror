@@ -36,6 +36,8 @@ module Header = struct
 
   let pp ppf commitment =
     Format.fprintf ppf "%s" (Dal.Commitment.to_b58check commitment)
+
+  let zero = Dal.Commitment.zero
 end
 
 module Index = struct
@@ -75,6 +77,15 @@ let slot_equal ({published_level; index; header} : t) s2 =
   Raw_level_repr.equal published_level s2.published_level
   && Index.equal index s2.index
   && Header.equal header s2.header
+
+let zero_slot =
+  {
+    (* We don't expect to have any published slot at level
+       Raw_level_repr.root. *)
+    published_level = Raw_level_repr.root;
+    index = Index.zero;
+    header = Header.zero;
+  }
 
 module Slot_index = Index
 
@@ -241,7 +252,7 @@ module Slots_history = struct
 
     type history = (content, ptr) Skip_list.cell
 
-    type t = history option
+    type t = history
 
     let history_encoding =
       Skip_list.encoding Pointer_hash.encoding slot_encoding
@@ -249,11 +260,11 @@ module Slots_history = struct
     let equal_history : history -> history -> bool =
       Skip_list.equal Pointer_hash.equal slot_equal
 
-    let encoding = Data_encoding.option history_encoding
+    let encoding = history_encoding
 
-    let equal : t -> t -> bool = Option.equal equal_history
+    let equal : t -> t -> bool = equal_history
 
-    let genesis : t = None
+    let genesis : t = Skip_list.genesis (zero_slot : slot)
 
     let hash_skip_list_cell cell =
       let current_slot = Skip_list.content cell in
@@ -290,17 +301,18 @@ module Slots_history = struct
 
     let add_confirmed_slot (t, cache) slot =
       let open Tzresult_syntax in
-      match t with
-      | None -> return (Some (Skip_list.genesis slot), cache)
-      | Some t ->
-          let content = slot in
-          let prev_cell_ptr = hash_skip_list_cell t in
-          let* cache = History_cache.remember prev_cell_ptr t cache in
-          return
-            ( Skip_list.next ~prev_cell:t ~prev_cell_ptr content |> Option.some,
-              cache )
+      let* () =
+        error_when
+          Raw_level_repr.(slot.published_level <= zero_slot.published_level)
+          (failwith
+             "No slot is supposed to be published at level \
+              'Raw_level_repr.root'")
+      in
+      let prev_cell_ptr = hash_skip_list_cell t in
+      let* cache = History_cache.remember prev_cell_ptr t cache in
+      return (Skip_list.next ~prev_cell:t ~prev_cell_ptr slot, cache)
 
-    let add_confirmed_slots t cache slots =
+    let add_confirmed_slots (t : t) cache slots =
       List.fold_left_e add_confirmed_slot (t, cache) slots
 
     let add_confirmed_slots_no_cache =
