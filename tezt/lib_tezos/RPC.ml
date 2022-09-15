@@ -544,6 +544,108 @@ let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
     ["chains"; chain; "blocks"; block; "context"; "big_maps"; id]
     Fun.id
 
+let get_chain_block_context_contracts ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "contracts"] Fun.id
+
+let get_chain_block_context_contract ?(chain = "main") ?(block = "head") ~id ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "context"; "contracts"; id] Fun.id
+
+let get_chain_block_context_contract_balance ?(chain = "main") ?(block = "head")
+    ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "balance"]
+    Fun.id
+
+let get_chain_block_context_contract_frozen_bonds ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "frozen_bonds";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_balance_and_frozen_bonds ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "balance_and_frozen_bonds";
+    ]
+    Fun.id
+
+let post_chain_block_context_contract_big_map_get ?(chain = "main")
+    ?(block = "head") ~id ~data () =
+  make
+    ~data
+    POST
+    [
+      "chains"; chain; "blocks"; block; "context"; "contracts"; id; "big_map_get";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_counter ?(chain = "main") ?(block = "head")
+    ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "counter"]
+    Fun.id
+
+let get_chain_block_context_contract_delegate ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "delegate"]
+    Fun.id
+
+let get_chain_block_context_contract_entrypoints ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains"; chain; "blocks"; block; "context"; "contracts"; id; "entrypoints";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_manager_key ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains"; chain; "blocks"; block; "context"; "contracts"; id; "manager_key";
+    ]
+    Fun.id
+
+let get_chain_block_context_contract_script ?(chain = "main") ?(block = "head")
+    ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "script"]
+    Fun.id
+
+let get_chain_block_context_contract_storage ?(chain = "main") ?(block = "head")
+    ~id () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "storage"]
+    Fun.id
+
 let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
 

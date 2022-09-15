@@ -138,12 +138,13 @@ let replacement_op = {default_op with fee = replacement_fee}
 
 (* Auxiliary function to get the current counter *)
 let get_counter ?(contract = default_source) client =
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:contract.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:contract.Account.public_key_hash
+         ()
   in
-  Lwt.return @@ JSON.as_int counter
+  Lwt.return @@ JSON.as_int counter_json
 
 (* Auxiliary function that constructs a batch transfer of the given size *)
 let mk_batch client op_data size =

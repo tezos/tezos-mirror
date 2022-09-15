@@ -588,6 +588,109 @@ val get_chain_block_context_big_maps :
   unit ->
   JSON.t t
 
+(** {2 Contracts RPC module} *)
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contracts :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/balance]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_balance :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/frozen_bonds]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_frozen_bonds :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/balance_and_frozen_bonds]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_balance_and_frozen_bonds :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [POST /chains/[chain]/blocks/[block]/context/contracts/[id]/big_map_get]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_context_contract_big_map_get :
+  ?chain:string ->
+  ?block:string ->
+  id:string ->
+  data:Ezjsonm.value ->
+  unit ->
+  JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/counter]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_counter :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/delegate]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_delegate :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/entrypoints]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_entrypoints :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/manager_key]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_manager_key :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/script]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_script :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
+(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/storage]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_storage :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)

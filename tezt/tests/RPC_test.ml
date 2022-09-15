@@ -145,27 +145,42 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides ?nodes_args
 (* Test the contracts RPC. *)
 let test_contracts _test_mode_tag _protocol ?endpoint client =
   let test_implicit_contract contract_id =
-    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
-    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
-    let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract ~id:contract_id ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
+    in
     let*! _ =
-      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     unit
   in
-  let*! _contracts = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* _contracts =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
-  let*! _ =
-    RPC.Contracts.get_delegate ?endpoint ~hooks ~contract_id:bootstrap client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_delegate ~id:bootstrap ()
   in
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
-  let*! _ =
-    RPC.Contracts.get ?endpoint ~hooks ~contract_id:unallocated_implicit client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract ~id:unallocated_implicit ()
   in
   Log.info "Test non-delegated implicit contract" ;
   let simple_implicit = "simple" in
@@ -187,20 +202,19 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     Lwt_list.iter_s
       (fun rpc ->
         let*? process =
-          rpc
-            ?endpoint
-            ?hooks:(Some hooks)
-            ?chain:None
-            ?block:None
-            ~contract_id:simple_implicit_key.public_key_hash
-            client
+          RPC.Client.spawn ?endpoint ~hooks client
+          @@ rpc
+               ?chain:None
+               ?block:None
+               ~id:simple_implicit_key.public_key_hash
+               ()
         in
         Process.check ~expect_failure:true process)
       [
-        RPC.Contracts.get_delegate;
-        RPC.Contracts.get_entrypoints;
-        RPC.Contracts.get_script;
-        RPC.Contracts.get_storage;
+        RPC.get_chain_block_context_contract_delegate;
+        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_script;
+        RPC.get_chain_block_context_contract_storage;
       ]
   in
   Log.info "Test delegated implicit contract" ;
@@ -222,60 +236,72 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
   in
   let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
-  let*! _ =
-    RPC.Contracts.get_delegate
-      ?endpoint
-      ~hooks
-      ~contract_id:delegated_implicit_key.public_key_hash
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contract_delegate
+         ~id:delegated_implicit_key.public_key_hash
+         ()
   in
   let* () =
     Lwt_list.iter_s
       (fun rpc ->
         let*? process =
-          rpc
-            ?endpoint
-            ?hooks:(Some hooks)
-            ?chain:None
-            ?block:None
-            ~contract_id:delegated_implicit_key.public_key_hash
-            client
+          RPC.Client.spawn ?endpoint ~hooks client
+          @@ rpc
+               ?chain:None
+               ?block:None
+               ~id:delegated_implicit_key.public_key_hash
+               ()
         in
         Process.check ~expect_failure:true process)
       [
-        RPC.Contracts.get_entrypoints;
-        RPC.Contracts.get_script;
-        RPC.Contracts.get_storage;
+        RPC.get_chain_block_context_contract_entrypoints;
+        RPC.get_chain_block_context_contract_script;
+        RPC.get_chain_block_context_contract_storage;
       ]
   in
   let test_originated_contract contract_id =
-    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
-    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract ~id:contract_id ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_balance ~id:contract_id ()
+    in
     let*? process =
-      RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_counter ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
     let*? process =
-      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
+      RPC.Client.spawn ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_manager_key ~id:contract_id ()
     in
     let* () = Process.check ~expect_failure:true process in
     let big_map_key =
       Ezjsonm.value_from_string
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
-    let*! _ =
-      RPC.Contracts.big_map_get
-        ?endpoint
-        ~hooks
-        ~contract_id
-        ~data:big_map_key
-        client
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.post_chain_block_context_contract_big_map_get
+           ~id:contract_id
+           ~data:big_map_key
+           ()
     in
-    let*! _ =
-      RPC.Contracts.get_entrypoints ?endpoint ~hooks ~contract_id client
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_entrypoints ~id:contract_id ()
     in
-    let*! _ = RPC.Contracts.get_script ?endpoint ~hooks ~contract_id client in
-    let*! _ = RPC.Contracts.get_storage ?endpoint ~hooks ~contract_id client in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
+    in
+    let* _ =
+      RPC.Client.call ?endpoint ~hooks client
+      @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
+    in
     unit
   in
   (* A smart contract without any big map or entrypoints *)
@@ -311,25 +337,23 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
       "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" } \
        }"
   in
-  let*! _ =
-    RPC.Contracts.big_map_get
-      ?endpoint
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:unique_big_map_key
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.post_chain_block_context_contract_big_map_get
+         ~id:originated_contract_advanced
+         ~data:unique_big_map_key
+         ()
   in
   let duplicate_big_map_key =
     Ezjsonm.value_from_string
       "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
   in
-  let*! _ =
-    RPC.Contracts.big_map_get
-      ?endpoint
-      ~hooks
-      ~contract_id:originated_contract_advanced
-      ~data:duplicate_big_map_key
-      client
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.post_chain_block_context_contract_big_map_get
+         ~id:originated_contract_advanced
+         ~data:duplicate_big_map_key
+         ()
   in
   unit
 
@@ -564,7 +588,10 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
   unit
 
 let get_contracts ?endpoint client =
-  let*! _ = RPC.Contracts.get_all ?endpoint ~hooks client in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
 
   Lwt.return contracts
@@ -757,22 +784,24 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
        to record them. *)
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.Account.public_key_hash
+         ()
   in
-  let counter = JSON.as_int counter in
+  let counter = JSON.as_int counter_json in
   (* Branch_refused op: counter_in_the_past *)
   let* _ =
     Operation.Manager.(inject ~force:true [make ~counter @@ transfer ()] client)
   in
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap2.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap2.Account.public_key_hash
+         ()
   in
-  let counter = JSON.as_int counter in
+  let counter = JSON.as_int counter_json in
   (* Branch_delayed op: counter_in_the_future *)
   let* _ =
     Operation.Manager.(
