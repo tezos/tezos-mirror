@@ -44,23 +44,34 @@ struct
   open Parameters
   include Skip_list_repr.Make (Parameters)
 
+  (* This represents cells of skip lists whose content are even
+     numbers from {!val:initial_value} and increase 2 by 2. *)
   type t = {size : int; cells : (int * (int, int) cell) list}
 
-  let rec deref list i = List.assoc ~equal:Compare.Int.equal i list.cells
+  let deref list i = List.assoc ~equal:Compare.Int.equal i list.cells
 
-  and show_cell cell =
+  (* Must be an even number. See {!val:succ}. *)
+  let initial_value = 10
+
+  (* Since the list was initialised once/computed once, we can get
+     back its content from its index directly. *)
+  let content_from_index ~default list i =
+    match deref list i with None -> default | Some x -> content x
+
+  let show_cell cell =
     Printf.sprintf
-      "{ back_pointers = %s }"
+      "{ content = %d; back_pointers = %s }"
+      (content cell)
       (back_pointers cell |> List.map string_of_int |> String.concat " ")
 
-  and show_cells cells =
+  let show_cells cells =
     String.concat
       "; "
       (List.map
          (fun (i, cell) -> Printf.sprintf "%d:%s" i (show_cell cell))
          cells)
 
-  and show_list list =
+  let show_list list =
     Printf.sprintf
       "basis: %d, size: %d, cells = %s"
       basis
@@ -72,21 +83,24 @@ struct
   let head list =
     match List.hd list.cells with None -> assert false | Some h -> h
 
-  let zero = {size = 1; cells = [(0, genesis 0)]}
+  let zero = {size = 1; cells = [(0, genesis initial_value)]}
 
   let succ list =
     let prev_cell_ptr, prev_cell = head list in
-    let cell = next ~prev_cell ~prev_cell_ptr (2 * list.size) in
+    (* Content of cells are only even numbers so that searching odd numbers will always fail. *)
+    let cell =
+      next ~prev_cell ~prev_cell_ptr ((2 * list.size) + initial_value)
+    in
     {size = list.size + 1; cells = (list.size, cell) :: list.cells}
 
   let back_path list start stop =
     back_path ~deref:(deref list) ~cell_ptr:start ~target_index:stop
 
-  let search list start stop =
+  let search list start target_content =
     Lwt_main.run
       (search
          ~deref:(deref list)
-         ~compare:(fun x -> Lwt.return Compare.Int.(compare x stop))
+         ~compare:(fun x -> Lwt.return Compare.Int.(compare x target_content))
          ~cell_ptr:start)
 
   let valid_back_path list start stop path =
@@ -160,7 +174,7 @@ struct
     let rec aux j =
       if i <= j then return ()
       else
-        let t = (2 * j) + 1 in
+        let t = content_from_index ~default:(-1) l j + 1 in
         (match search l i t with
         | None -> return ()
         | Some _path ->
@@ -225,7 +239,9 @@ let test_skip_list_nat_check_path_with_search (basis, i, j) =
   let module M = TestNat (struct
     let basis = basis
   end) in
-  M.check_path i j (fun l i j -> M.search l i (j * 2))
+  M.check_path i j (fun l i j ->
+      let target = M.content_from_index ~default:(-1) l j in
+      M.search l i target)
 
 let test_skip_list_nat_check_invalid_path_with_search (basis, i) =
   let module M = TestNat (struct
