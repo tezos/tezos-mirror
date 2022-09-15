@@ -30,23 +30,18 @@ At every block in the chain, a small amount of tez is minted and credited to the
 
 So the credits to the CPMM contract can be accounted for by indexers, they are included in block metadata as a balance update with a new constructor for ``update_origin``, ``Subsidy``.
 
-As a safety precaution, the subsidy expires automatically at a given
-level called the liquidity baking sunset level. The sunset level can
-be renewed periodically by protocol amendment.
-
 .. _toggle_alpha:
 
 Toggle vote
 ~~~~~~~~~~~
 
-In addition to the sunset mechanism, the subsidy can be paused by a
-mechanism called the Liquidity Baking Toggle Vote. At every block, the
-baker producing the block includes a flag that requests ending the
-subsidy or on the contrary continuing or restarting it. The context
-maintains an exponential moving average of that flag. The baker has
-three options for this flag: ``Off`` to request ending the subsidy,
-``On`` to request continuing or restarting the subsidy, and ``Pass``
-to abstain.
+The subsidy can be paused by a mechanism called the Liquidity Baking
+Toggle Vote. At every block, the baker producing the block includes
+a flag that requests ending the subsidy or on the contrary continuing
+or restarting it. The context maintains an exponential moving average
+of that flag. The baker has three options for this flag: ``Off`` to
+request ending the subsidy, ``On`` to request continuing or restarting
+the subsidy, and ``Pass`` to abstain.
 
 ``e[n+1] = e[n]`` if the flag is set to ``Pass``.
 ``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``Off``.

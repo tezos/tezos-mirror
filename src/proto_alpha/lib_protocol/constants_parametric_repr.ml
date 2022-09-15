@@ -152,7 +152,6 @@ type t = {
   quorum_max : int32;
   min_proposal_quorum : int32;
   liquidity_baking_subsidy : Tez_repr.t;
-  liquidity_baking_sunset_level : int32;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -348,7 +347,6 @@ let encoding =
           ( ( c.quorum_max,
               c.min_proposal_quorum,
               c.liquidity_baking_subsidy,
-              c.liquidity_baking_sunset_level,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -388,7 +386,6 @@ let encoding =
              ( ( quorum_max,
                  min_proposal_quorum,
                  liquidity_baking_subsidy,
-                 liquidity_baking_sunset_level,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -429,7 +426,6 @@ let encoding =
         quorum_max;
         min_proposal_quorum;
         liquidity_baking_subsidy;
-        liquidity_baking_sunset_level;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
@@ -479,11 +475,10 @@ let encoding =
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj10
+             (obj9
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
                 (req "liquidity_baking_subsidy" Tez_repr.encoding)
-                (req "liquidity_baking_sunset_level" int32)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)

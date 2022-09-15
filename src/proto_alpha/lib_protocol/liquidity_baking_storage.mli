@@ -32,7 +32,6 @@ val get_cpmm_address : Raw_context.t -> Contract_hash.t tzresult Lwt.t
     [toggle_vote]. Then the callback function [f] is called if the following
     conditions are met:
     - the updated EMA is below the threshold,
-    - the current level is below the sunset level,
     - the CPMM contract exists.
 
     The role of the callback function [f] is to send the subsidy to the CPMM,

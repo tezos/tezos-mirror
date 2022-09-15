@@ -845,7 +845,6 @@ module Constants : sig
       quorum_max : int32;
       min_proposal_quorum : int32;
       liquidity_baking_subsidy : Tez.t;
-      liquidity_baking_sunset_level : int32;
       liquidity_baking_toggle_ema_threshold : int32;
       max_operations_time_to_live : int;
       minimal_block_delay : Period.t;
@@ -933,8 +932,6 @@ module Constants : sig
   val min_proposal_quorum : context -> int32
 
   val liquidity_baking_subsidy : context -> Tez.t
-
-  val liquidity_baking_sunset_level : context -> int32
 
   val liquidity_baking_toggle_ema_threshold : context -> int32
 

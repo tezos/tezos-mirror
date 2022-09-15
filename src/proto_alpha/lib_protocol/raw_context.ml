@@ -1045,7 +1045,6 @@ let prepare_first_block ~level ~timestamp ctxt =
             quorum_max = c.quorum_max;
             min_proposal_quorum = c.min_proposal_quorum;
             liquidity_baking_subsidy = c.liquidity_baking_subsidy;
-            liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
             liquidity_baking_toggle_ema_threshold =
               c.liquidity_baking_toggle_ema_threshold;
             minimal_block_delay = c.minimal_block_delay;

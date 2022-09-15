@@ -118,9 +118,6 @@ let constants_mainnet =
     min_proposal_quorum = 5_00l;
     (* liquidity_baking_subsidy is 1/16th of maximum total rewards for a block *)
     liquidity_baking_subsidy (* 2_500_000 mutez *);
-    (* level after protocol activation when liquidity baking shuts off:
-         about 6 months after first activation on mainnet *)
-    liquidity_baking_sunset_level = 3_063_809l;
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
@@ -281,7 +278,6 @@ let constants_sandbox =
     cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.of_int (-1);
     vdf_difficulty = 50_000L;
-    liquidity_baking_sunset_level = 128l;
     liquidity_baking_subsidy;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
@@ -318,7 +314,6 @@ let constants_test =
     cycles_per_voting_period = 2l;
     proof_of_work_threshold = Int64.of_int (-1);
     vdf_difficulty = 50_000L;
-    liquidity_baking_sunset_level = 4096l;
     liquidity_baking_subsidy;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
