@@ -75,6 +75,7 @@ type request =
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
+  | Context_garbage_collection of {context_hash : Context_hash.t}
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -112,6 +113,12 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
+  | Context_garbage_collection {context_hash} ->
+      Format.fprintf
+        ppf
+        "garbage collecting context below %a"
+        Context_hash.pp
+        context_hash
   | Reconfigure_event_logging _ ->
       Format.fprintf ppf "reconfigure event logging"
 
@@ -339,6 +346,17 @@ let case_precheck tag =
           hash;
         })
 
+let case_context_gc tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"context_gc"
+    (obj1 (req "context_hash" Context_hash.encoding))
+    (function
+      | Context_garbage_collection {context_hash} -> Some context_hash
+      | _ -> None)
+    (fun context_hash -> Context_garbage_collection {context_hash})
+
 let request_encoding =
   let open Data_encoding in
   union
@@ -384,6 +402,7 @@ let request_encoding =
         (fun c -> Reconfigure_event_logging c);
       case_preapply (Tag 7);
       case_precheck (Tag 8);
+      case_context_gc (Tag 9);
     ]
 
 let send pin encoding data =

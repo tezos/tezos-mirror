@@ -106,6 +106,11 @@ val precheck_block :
   Operation.t trace trace ->
   unit tzresult Lwt.t
 
+(** [context_garbage_collection context_index context_hash] removes
+    contexts that are below [context_hash] in the context tree. *)
+val context_garbage_collection :
+  t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)

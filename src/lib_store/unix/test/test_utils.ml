@@ -182,9 +182,18 @@ let dummy_patch_context ctxt =
   let*? {context; _} = Environment.wrap_tzresult res in
   return context
 
+let register_gc store =
+  let open Lwt_result_syntax in
+  let chain_store = Store.main_chain_store store in
+  let gc ch =
+    let*! () = Context_ops.gc (Store.context_index store) ch in
+    return_unit
+  in
+  Store.Chain.register_gc_callback chain_store gc
+
 let wrap_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.Archive) ?(allow_testchains = true)
-    ?(keep_dir = false) k _ () : unit Lwt.t =
+    ?(keep_dir = false) ?(with_gc = true) k _ () : unit Lwt.t =
   let open Lwt_result_syntax in
   let prefix_dir = "tezos_indexed_store_test_" in
   let run f =
@@ -209,6 +218,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
+        if with_gc then register_gc store ;
         protect
           ~on_error:(fun err ->
             let*! pp_store = Store.make_pp_store store in
@@ -244,16 +254,16 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
       Lwt.fail Alcotest.Test_error
   | Ok r -> Lwt.return r
 
-let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir (name, f)
-    =
+let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir ?with_gc
+    (name, f) =
   test_case
     name
     speed
-    (wrap_store_init ?patch_context ?history_mode ?keep_dir f)
+    (wrap_store_init ?patch_context ?history_mode ?keep_dir ?with_gc f)
 
 let wrap_simple_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.default) ?(allow_testchains = true)
-    ?(keep_dir = false) k _ () : unit Lwt.t =
+    ?(keep_dir = false) ?(with_gc = true) k _ () : unit Lwt.t =
   let open Lwt_result_syntax in
   let prefix_dir = "tezos_indexed_store_test_" in
   let run f =
@@ -277,6 +287,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
+        if with_gc then register_gc store ;
         protect
           ~on_error:(fun err ->
             let*! () = Store.close_store store in
@@ -304,11 +315,11 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
   | Ok () -> Lwt.return_unit
 
 let wrap_simple_store_init_test ?history_mode ?(speed = `Quick) ?patch_context
-    ?keep_dir (name, f) =
+    ?keep_dir ?with_gc (name, f) =
   test_case
     name
     speed
-    (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir f)
+    (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir ?with_gc f)
 
 let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
     ?(constants = default_protocol_constants) ?(context = Context_hash.zero)
@@ -745,12 +756,12 @@ module Example_tree = struct
 
   let vblock tbl k = Nametbl.find tbl k
 
-  let wrap_test ?keep_dir ?history_mode (name, g) =
+  let wrap_test ?keep_dir ?history_mode ?with_gc (name, g) =
     let open Lwt_result_syntax in
     let f _ store =
       let chain_store = Store.main_chain_store store in
       let* tbl = build_example_tree store in
       g chain_store tbl
     in
-    wrap_test ?keep_dir ?history_mode (name, f)
+    wrap_test ?keep_dir ?history_mode ?with_gc (name, f)
 end

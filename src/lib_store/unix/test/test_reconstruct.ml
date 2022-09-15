@@ -165,6 +165,7 @@ let make_tests_bootstrapped speed patch_context =
         ~patch_context
         ~history_mode
         ~keep_dir:false
+        ~with_gc:true
         ( descr,
           fun data_dir store ->
             test_from_bootstrapped
@@ -318,6 +319,7 @@ let make_tests_snapshoted speed patch_context =
         ~patch_context
         ~history_mode
         ~keep_dir:false
+        ~with_gc:true
         ( descr,
           fun data_dir store ->
             test_from_snapshot

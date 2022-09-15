@@ -198,6 +198,15 @@ let commit ~time ?message (context : Environment_context.t) =
   | Context t ->
       err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
+let gc context_index context_hash =
+  match context_index with
+  | Disk_index index -> Context.gc index context_hash
+  | Memory_index index -> Tezos_context_memory.Context.gc index context_hash
+
+let sync = function
+  | Disk_index index -> Context.sync index
+  | Memory_index index -> Tezos_context_memory.Context.sync index
+
 let commit_test_chain_genesis (context : Environment_context.t) block_header =
   match context with
   | Context {kind = Shell_context.Context; ctxt; _} ->

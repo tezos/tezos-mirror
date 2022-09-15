@@ -2469,6 +2469,9 @@ module Chain = struct
       protocol_hash
       (Protocol_hash.Map.add next_protocol_hash dir map) ;
     Lwt.return_unit
+
+  let register_gc_callback chain_store callback =
+    Block_store.register_gc_callback chain_store.block_store callback
 end
 
 module Protocol = struct
@@ -2659,29 +2662,41 @@ let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
   let chain_dir_path = Naming.dir_path chain_dir in
   (* FIXME should be checked with the store's consistency check
      (along with load_chain_state checks) *)
-  if Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path then
-    load_store
-      ?history_mode
-      ?block_cache_limit
-      store_dir
-      ~context_index
-      ~genesis
-      ~chain_id
-      ~allow_testchains
-      ~readonly
-      ()
-  else
-    (* Fresh store *)
-    let* genesis_context = commit_genesis ~chain_id in
-    create_store
-      ?block_cache_limit
-      store_dir
-      ~context_index:(Context_ops.Disk_index context_index)
-      ~chain_id
-      ~genesis
-      ~genesis_context
-      ?history_mode
-      ~allow_testchains
+  let* store =
+    if Sys.file_exists chain_dir_path && Sys.is_directory chain_dir_path then
+      load_store
+        ?history_mode
+        ?block_cache_limit
+        store_dir
+        ~context_index
+        ~genesis
+        ~chain_id
+        ~allow_testchains
+        ~readonly
+        ()
+    else
+      (* Fresh store *)
+      let* genesis_context = commit_genesis ~chain_id in
+      create_store
+        ?block_cache_limit
+        store_dir
+        ~context_index:(Context_ops.Disk_index context_index)
+        ~chain_id
+        ~genesis
+        ~genesis_context
+        ?history_mode
+        ~allow_testchains
+  in
+  let main_chain_store = main_chain_store store in
+  (* Emit a warning if context GC is not allowed. *)
+  let*! () =
+    if
+      (not (Chain.history_mode main_chain_store = Archive))
+      && not (Context.is_gc_allowed context_index)
+    then Store_events.(emit context_gc_is_not_allowed) ()
+    else Lwt.return_unit
+  in
+  return store
 
 let close_store global_store =
   let open Lwt_syntax in

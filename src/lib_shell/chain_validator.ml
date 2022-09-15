@@ -426,6 +426,31 @@ let may_flush_or_update_prevalidator parameters event prevalidator chain_db
           live_blocks
           live_operations
 
+let register_garbage_collect_callback w =
+  let nv = Worker.state w in
+  let chain_store = nv.parameters.chain_store in
+  let index = Store.(context_index (Chain.global_store chain_store)) in
+  let gc context_hash =
+    Block_validator.context_garbage_collection
+      nv.parameters.block_validator
+      index
+      context_hash
+  in
+  Store.Chain.register_gc_callback nv.parameters.chain_store gc
+
+let may_synchronise_context synchronisation_state chain_store =
+  if
+    not
+      (Synchronisation_heuristic.Bootstrapping.is_bootstrapped
+         synchronisation_state)
+  then
+    (* If the node is bootstrapping, we make sure that the
+       context is synchronized. *)
+    let store = Store.Chain.global_store chain_store in
+    let context_index = Store.context_index store in
+    Context_ops.sync context_index
+  else Lwt.return_unit
+
 let on_validation_request w peer start_testchain active_chains spawn_child block
     =
   let open Lwt_result_syntax in
@@ -472,6 +497,9 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
               chain_store
               ~head:block
           else return_unit
+        in
+        let*! () =
+          may_synchronise_context nv.synchronisation_state chain_store
         in
         let+ () =
           may_flush_or_update_prevalidator
@@ -839,6 +867,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
   in
   let* w = Worker.launch table chain_id parameters (module Handlers) in
   Chain_id.Table.add active_chains (Store.Chain.chain_id chain_store) w ;
+  register_garbage_collect_callback w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
   return w
 

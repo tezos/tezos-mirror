@@ -57,6 +57,19 @@ Node
 *  Added support for ``--strict`` mode in the replay command: it causes the
    command to be less permissive.
 
+- Added garbage collection for the context part of the storage
+  backend.  It is activated by default for all nodes running with a
+  full or rolling history mode.
+
+- **Breaking change**: The node context storage format was
+  upgraded. To this end, a new storage version was introduced: 2.0
+  (previously 1.0). Backward compatibility is preserved: upgrading
+  from 1.0 to 2.0 is done automatically by the node the first time you
+  run it. This upgrade is instantaneous. However, be careful that
+  there is no forward compatibility: previous versions of Octez will
+  refuse to run on a data directory which was running with this
+  storage version.
+
 Client
 ------
 
