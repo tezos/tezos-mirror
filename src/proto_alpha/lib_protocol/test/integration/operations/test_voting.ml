@@ -1393,22 +1393,6 @@ let test_proposals_contain_duplicate () =
     block
     __LOC__
 
-(** Test that a Proposals operation fails when its proposal list is
-    longer than the [max_proposals_per_delegate] protocol constant. *)
-let test_operation_has_too_many_proposals () =
-  let open Lwt_result_syntax in
-  let* block, proposer = context_init1 () in
-  assert (Array.length protos >= Constants.max_proposals_per_delegate + 1) ;
-  let proposals =
-    List.map (Array.get protos) (0 -- Constants.max_proposals_per_delegate)
-  in
-  assert_validate_proposals_fails
-    ~expected_error:too_many_proposals
-    ~proposer
-    ~proposals
-    block
-    __LOC__
-
 (** Test that a Proposals operation fails when it would make the total
     count of proposals submitted by the proposer exceed the
     [max_proposals_per_delegate] protocol constant. *)
@@ -1646,6 +1630,19 @@ let observe_proposals pre_state post_state op caller_loc =
         weight_post
         (Int64.add weight_pre source_power))
     proposals
+
+let test_too_many_proposals_in_one_operation () =
+  let open Lwt_result_syntax in
+  let* b0, proposer0 = context_init1 () in
+  let protos = Array.to_list protos in
+  let* _ =
+    try
+      let* _ = Op.proposals (B b0) proposer0 protos in
+      failwith
+        "Encoding of proposals operation with too many proposal should fail"
+    with Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
+  in
+  return_unit
 
 (* Bake blocks with various valid Proposals operations, and observe
    that their effects are correctly applied. *)
@@ -2047,9 +2044,9 @@ let tests =
       `Quick
       test_proposals_contain_duplicate;
     Tztest.tztest
-      "Operation has too many proposals"
+      "Too many proposals (over one operation)"
       `Quick
-      test_operation_has_too_many_proposals;
+      test_too_many_proposals_in_one_operation;
     Tztest.tztest
       "Too many proposals (over two operations)"
       `Quick

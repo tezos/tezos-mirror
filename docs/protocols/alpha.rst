@@ -269,6 +269,11 @@ Minor Changes
 - New function `compare_operations` which defines a total ordering
   relation. (MR :gl:`!6092`)
 
+- Removed conflict between proposals/ballots operations and testnet
+  dictator proposals. Ballots and proposals become noops
+  when applying the block after a testnet dictator enacted a protocol
+  change. (MR :gl:`!6313`)
+
 Internal
 --------
 

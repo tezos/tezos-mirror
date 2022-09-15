@@ -585,6 +585,10 @@ let record_non_consensus_operation_hash =
 
 let non_consensus_operations = Raw_context.non_consensus_operations
 
+let record_dictator_proposal_seen = Raw_context.record_dictator_proposal_seen
+
+let dictator_proposal_seen = Raw_context.dictator_proposal_seen
+
 let activate = Raw_context.activate
 
 let reset_internal_nonce = Raw_context.reset_internal_nonce

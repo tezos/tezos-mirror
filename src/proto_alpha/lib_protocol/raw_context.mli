@@ -242,6 +242,12 @@ type consensus_pk = {
 
 val consensus_pk_encoding : consensus_pk Data_encoding.t
 
+(** Record that the dictator already voted in this block. *)
+val record_dictator_proposal_seen : t -> t
+
+(** Checks whether the dictator voted in this block. *)
+val dictator_proposal_seen : t -> bool
+
 (** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
     sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
 val init_sampler_for_cycle :

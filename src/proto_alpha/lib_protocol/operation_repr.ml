@@ -1509,7 +1509,11 @@ module Encoding = struct
           obj3
             (req "source" Signature.Public_key_hash.encoding)
             (req "period" int32)
-            (req "proposals" (list Protocol_hash.encoding));
+            (req
+               "proposals"
+               (list
+                  ~max_length:Constants_repr.max_proposals_per_delegate
+                  Protocol_hash.encoding));
         select =
           (function Contents (Proposals _ as op) -> Some op | _ -> None);
         proj =
