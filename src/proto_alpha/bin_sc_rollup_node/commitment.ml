@@ -45,7 +45,9 @@ open Protocol
 open Alpha_context
 
 module type Mutable_level_store =
-  Store_utils.Mutable_value with type value = Raw_level.t
+  Store_sigs.Mutable_value
+    with type value = Raw_level.t
+     and type store = Store.t
 
 (* We persist the number of ticks to be included in the
    next commitment on disk, in a map that is indexed by
@@ -53,25 +55,35 @@ module type Mutable_level_store =
    these counters when the wrong branch is tracked by the rollup
    node, as only finalized heads are processed to build commitments.
 *)
-module Number_of_ticks = Store_utils.Make_append_only_map (struct
-  let path = ["commitments"; "in_progress"; "number_of_ticks"]
+module Number_of_ticks :
+  Store_sigs.Map
+    with type store = Store.t
+     and type key = Raw_level.t
+     and type value = Z.t =
+  Store.Make_append_only_map
+    (struct
+      let path = ["commitments"; "in_progress"; "number_of_ticks"]
 
-  (* We only access the number of ticks for either the
-     current or previous level being processed by the
-     commitment module. Therefore, by keeping the
-     last two entries in memory, we ensure that
-     the information about ticks is always recovered
-     from the main memory. *)
-  let keep_last_n_entries_in_memory = 2
+      (* We only access the number of ticks for either the
+         current or previous level being processed by the
+         commitment module. Therefore, by keeping the
+         last two entries in memory, we ensure that
+         the information about ticks is always recovered
+         from the main memory. *)
+      let keep_last_n_entries_in_memory = Some 2
+    end)
+    (struct
+      type key = Raw_level.t
 
-  type key = Raw_level.t
+      let to_path_representation key = Int32.to_string @@ Raw_level.to_int32 key
+    end)
+    (struct
+      type value = Z.t
 
-  let string_of_key l = Int32.to_string @@ Raw_level.to_int32 l
+      let name = "ticks"
 
-  type value = Z.t
-
-  let value_encoding = Data_encoding.z
-end)
+      let encoding = Data_encoding.z
+    end)
 
 let sc_rollup_commitment_period node_ctxt =
   Int32.of_int

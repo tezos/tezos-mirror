@@ -24,10 +24,21 @@
 (*****************************************************************************)
 
 open Protocol
+include Store_sigs
 include Store_utils
 
 (** Aggregated collection of messages from the L1 inbox *)
 open Alpha_context
+
+module IStore = Irmin_store.Make (struct
+  let name = "Tezos smart-contract rollup node"
+end)
+
+include Store_utils.Make (IStore)
+
+let close = IStore.close
+
+let load = IStore.load
 
 type state_info = {
   num_messages : Z.t;
@@ -36,33 +47,37 @@ type state_info = {
 }
 
 (** Extraneous state information for the PVM *)
-module StateInfo = Make_append_only_map (struct
-  let path = ["state_info"]
+module StateInfo =
+  Make_append_only_map
+    (struct
+      let path = ["state_info"]
 
-  let keep_last_n_entries_in_memory = 6000
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = state_info
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "state_info"
 
-  type value = state_info
-
-  let value_encoding =
-    let open Data_encoding in
-    conv
-      (fun {num_messages; num_ticks; initial_tick} ->
-        (num_messages, num_ticks, initial_tick))
-      (fun (num_messages, num_ticks, initial_tick) ->
-        {num_messages; num_ticks; initial_tick})
-      (obj3
-         (req "num_messages" Data_encoding.z)
-         (req "num_ticks" Data_encoding.z)
-         (req "initial_tick" Sc_rollup.Tick.encoding))
-end)
+      let encoding =
+        let open Data_encoding in
+        conv
+          (fun {num_messages; num_ticks; initial_tick} ->
+            (num_messages, num_ticks, initial_tick))
+          (fun (num_messages, num_ticks, initial_tick) ->
+            {num_messages; num_ticks; initial_tick})
+          (obj3
+             (req "num_messages" Data_encoding.z)
+             (req "num_ticks" Data_encoding.z)
+             (req "initial_tick" Sc_rollup.Tick.encoding))
+    end)
 
 module StateHistoryRepr = struct
-  let path = ["state_history"]
-
   type event = {
     tick : Sc_rollup.Tick.t;
     block_hash : Block_hash.t;
@@ -87,7 +102,9 @@ module StateHistoryRepr = struct
          (req "predecessor_hash" Block_hash.encoding)
          (req "level" Raw_level.encoding))
 
-  let value_encoding =
+  let name = "state_history"
+
+  let encoding =
     let open Data_encoding in
     conv
       TickMap.bindings
@@ -96,7 +113,14 @@ module StateHistoryRepr = struct
 end
 
 module StateHistory = struct
-  include Make_mutable_value (StateHistoryRepr)
+  include
+    Make_mutable_value
+      (struct
+        let path = ["state_history"]
+
+        let keep_last_n_entries_in_memory = None
+      end)
+      (StateHistoryRepr)
 
   let insert store event =
     let open Lwt_result_syntax in
@@ -124,178 +148,282 @@ module StateHistory = struct
 end
 
 (** Unaggregated messages per block *)
-module Messages = Make_append_only_map (struct
-  let path = ["messages"]
+module Messages =
+  Make_append_only_map
+    (struct
+      let path = ["messages"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Sc_rollup.Inbox_message.t list
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "messages"
 
-  type value = Sc_rollup.Inbox_message.t list
-
-  let value_encoding =
-    Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
-end)
+      let encoding =
+        Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
+    end)
 
 (** Inbox state for each block *)
-module Inboxes = Make_append_only_map (struct
-  let path = ["inboxes"]
+module Inboxes =
+  Make_append_only_map
+    (struct
+      let path = ["inboxes"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Sc_rollup.Inbox.t
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "inbox"
 
-  type value = Sc_rollup.Inbox.t
-
-  let value_encoding = Sc_rollup.Inbox.encoding
-end)
+      let encoding = Sc_rollup.Inbox.encoding
+    end)
 
 (** Message history for the inbox at a given block *)
-module Histories = Make_append_only_map (struct
-  let path = ["histories"]
+module Histories =
+  Make_append_only_map
+    (struct
+      let path = ["histories"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Sc_rollup.Inbox.History.t
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "inbox_history"
 
-  type value = Sc_rollup.Inbox.History.t
+      let encoding = Sc_rollup.Inbox.History.encoding
+    end)
 
-  let value_encoding = Sc_rollup.Inbox.History.encoding
-end)
+module Commitments =
+  Make_append_only_map
+    (struct
+      let path = ["commitments"; "computed"]
 
-module Commitments = Make_append_only_map (struct
-  let path = ["commitments"; "computed"]
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Raw_level.t
 
-  let keep_last_n_entries_in_memory = 10
+      let to_path_representation key = Int32.to_string @@ Raw_level.to_int32 key
+    end)
+    (struct
+      type value = Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
 
-  type key = Raw_level.t
+      let name = "commitment_with_hash"
 
-  let string_of_key l = Int32.to_string @@ Raw_level.to_int32 l
+      let encoding =
+        Data_encoding.(
+          obj2
+            (req "commitment" Sc_rollup.Commitment.encoding)
+            (req "hash" Sc_rollup.Commitment.Hash.encoding))
+    end)
 
-  type value = Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t
+module Last_stored_commitment_level =
+  Make_mutable_value
+    (struct
+      let path = ["commitments"; "last_stored_level"]
 
-  let value_encoding =
-    Data_encoding.(
-      obj2
-        (req "commitment" Sc_rollup.Commitment.encoding)
-        (req "hash" Sc_rollup.Commitment.Hash.encoding))
-end)
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type value = Raw_level.t
 
-module Last_stored_commitment_level = Make_mutable_value (struct
-  let path = ["commitments"; "last_stored_level"]
+      let name = "raw_level"
 
-  type value = Raw_level.t
+      let encoding = Raw_level.encoding
+    end)
 
-  let value_encoding = Raw_level.encoding
-end)
+module Last_published_commitment_level =
+  Make_mutable_value
+    (struct
+      let path = ["commitments"; "last_published_level"]
 
-module Last_published_commitment_level = Make_mutable_value (struct
-  let path = ["commitments"; "last_published_level"]
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type value = Raw_level.t
 
-  type value = Raw_level.t
+      let name = "raw_level"
 
-  let value_encoding = Raw_level.encoding
-end)
+      let encoding = Raw_level.encoding
+    end)
 
-module Last_cemented_commitment_level = Make_mutable_value (struct
-  let path = ["commitments"; "last_cemented_commitment"; "level"]
+module Last_cemented_commitment_level =
+  Make_mutable_value
+    (struct
+      let path = ["commitments"; "last_cemented_commitment"; "level"]
 
-  type value = Raw_level.t
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type value = Raw_level.t
 
-  let value_encoding = Raw_level.encoding
-end)
+      let name = "raw_level"
 
-module Last_cemented_commitment_hash = Make_mutable_value (struct
-  let path = ["commitments"; "last_cemented_commitment"; "hash"]
+      let encoding = Raw_level.encoding
+    end)
 
-  type value = Sc_rollup.Commitment.Hash.t
+module Last_cemented_commitment_hash =
+  Make_mutable_value
+    (struct
+      let path = ["commitments"; "last_cemented_commitment"; "hash"]
 
-  let value_encoding = Sc_rollup.Commitment.Hash.encoding
-end)
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type value = Sc_rollup.Commitment.Hash.t
 
-module Commitments_published_at_level = Make_updatable_map (struct
-  let path = ["commitments"; "published_at_level"]
+      let name = "commitment_hash"
 
-  let keep_last_n_entries_in_memory = 10
+      let encoding = Sc_rollup.Commitment.Hash.encoding
+    end)
 
-  type key = Sc_rollup.Commitment.Hash.t
+module Commitments_published_at_level =
+  Make_updatable_map
+    (struct
+      let path = ["commitments"; "published_at_level"]
 
-  let string_of_key = Sc_rollup.Commitment.Hash.to_b58check
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Sc_rollup.Commitment.Hash.t
 
-  type value = Raw_level.t
+      let to_path_representation = Sc_rollup.Commitment.Hash.to_b58check
+    end)
+    (struct
+      type value = Raw_level.t
 
-  let value_encoding = Raw_level.encoding
-end)
+      let name = "raw_level"
+
+      let encoding = Raw_level.encoding
+    end)
 
 (* Slot subscriptions per block hash, saved as a list of
    `Dal.Slot_index.t`, which is a bounded integer between `0` and `255`
    included. *)
-module Dal_slot_subscriptions = Make_append_only_map (struct
-  let path = ["dal"; "slot_subscriptions"]
+module Dal_slot_subscriptions =
+  Make_append_only_map
+    (struct
+      let path = ["dal"; "slot_subscriptions"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Dal.Slot_index.t list
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "slot_indexes"
 
-  type value = Dal.Slot_index.t list
+      let encoding = Data_encoding.list Dal.Slot_index.encoding
+    end)
 
-  let value_encoding = Data_encoding.list Dal.Slot_index.encoding
-end)
+module Contexts =
+  Make_append_only_map
+    (struct
+      let path = ["contexts"]
 
-module Contexts = Make_append_only_map (struct
-  let path = ["contexts"]
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  let keep_last_n_entries_in_memory = 10
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Context.hash
 
-  type key = Block_hash.t
+      let name = "context"
 
-  let string_of_key = Block_hash.to_b58check
+      let encoding = Context.hash_encoding
+    end)
 
-  type value = Context.hash
-
-  let value_encoding = Context.hash_encoding
-end)
-
-(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3715
-   Adding a new slot index requires reading up to 256 MB of data. *)
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`
    to `Dal.Slot.t`. The encoding function converts this
    list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slot_pages = Make_nested_map (struct
-  let path = ["dal"; "slot_pages"]
+module Dal_slot_pages =
+  Make_nested_map
+    (struct
+      let path = ["dal"; "slot_pages"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Dal.Slot_index.t * Dal.Page.Index.t
 
-  let string_of_key = Block_hash.to_b58check
+      let encoding =
+        Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page.Index.encoding)
 
-  type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
+      let compare (i1, p1) (i2, p2) =
+        Compare.or_else (Dal.Slot_index.compare i1 i2) (fun () ->
+            Dal.Page.Index.compare p1 p2)
 
-  let compare_secondary_keys (i1, p1) (i2, p2) =
-    Compare.or_else (Dal.Slot_index.compare i1 i2) (fun () ->
-        Dal.Page.Index.compare p1 p2)
+      let name = "slot_index"
+    end)
+    (struct
+      type value = Dal.Page.content option
 
-  type value = Dal.Page.content option
+      let encoding = Data_encoding.option Dal.Page.content_encoding
 
-  let secondary_key_encoding =
-    Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page.Index.encoding)
+      let name = "slot_pages"
+    end)
 
-  let secondary_key_name = "slot_index"
+module Dal_slots_headers =
+  Make_nested_map
+    (struct
+      let path = ["dal"; "slot_headers"]
 
-  let value_encoding = Data_encoding.option Dal.Page.content_encoding
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+         This value is currently not used, but required by the module type. *)
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  let value_name = "slot_pages"
-end)
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Dal.Slot_index.t
+
+      let encoding = Dal.Slot_index.encoding
+
+      let compare = Dal.Slot_index.compare
+
+      let name = "slot_index"
+    end)
+    (struct
+      type value = Dal.Slot.Header.t
+
+      let name = "slot_header"
+
+      let encoding = Dal.Slot.Header.encoding
+    end)
 
 (* Published slot headers per block hash, stored as a list of bindings from
    `Dal_slot_index.t` to `Dal.Slot.t`. The encoding function converts this
@@ -303,60 +431,47 @@ end)
    refers to the block where slots headers have been confirmed, not
    the block where they have been published.
 *)
-module Dal_slots_headers = Make_nested_map (struct
-  let path = ["dal"; "slot_headers"]
-
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-     This value is currently not used, but required by the module type. *)
-  let keep_last_n_entries_in_memory = 10
-
-  type key = Block_hash.t
-
-  let string_of_key = Block_hash.to_b58check
-
-  type secondary_key = Dal.Slot_index.t
-
-  let compare_secondary_keys = Dal.Slot_index.compare
-
-  type value = Dal.Slot.Header.t
-
-  let secondary_key_encoding = Dal.Slot_index.encoding
-
-  let secondary_key_name = "slot_index"
-
-  let value_encoding = Dal.Slot.Header.encoding
-
-  let value_name = "slot_header"
-end)
 
 (** Confirmed DAL slots history. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_history = Make_append_only_map (struct
-  let path = ["dal"; "confirmed_slots_history"]
+module Dal_confirmed_slots_history =
+  Make_append_only_map
+    (struct
+      let path = ["dal"; "confirmed_slots_history"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Dal.Slots_history.t
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "dal_slot_histories"
 
-  type value = Dal.Slots_history.t
-
-  let value_encoding = Dal.Slots_history.encoding
-end)
+      let encoding = Dal.Slots_history.encoding
+    end)
 
 (** Confirmed DAL slots histories cache. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)
-module Dal_confirmed_slots_histories = Make_append_only_map (struct
-  let path = ["dal"; "confirmed_slots_histories_cache"]
+module Dal_confirmed_slots_histories =
+  Make_append_only_map
+    (struct
+      let path = ["dal"; "confirmed_slots_histories_cache"]
 
-  let keep_last_n_entries_in_memory = 10
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type value = Dal.Slots_history.History_cache.t
 
-  let string_of_key = Block_hash.to_b58check
+      let name = "dal_slot_history_cache"
 
-  type value = Dal.Slots_history.History_cache.t
-
-  let value_encoding = Dal.Slots_history.History_cache.encoding
-end)
+      let encoding = Dal.Slots_history.History_cache.encoding
+    end)

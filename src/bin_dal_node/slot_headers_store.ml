@@ -24,33 +24,49 @@
 (*****************************************************************************)
 
 include Store_utils
+module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
+
+module IStore = Irmin_store.Make (struct
+  let name = "Tezos Data Availability Layer node"
+end)
+
+module Store = Store_utils.Make (IStore)
+
+type t = Store.t
+
+let load = IStore.load
 
 (* Published slot headers per block hash,
    stored as a list of bindings from `Dal_slot_index.t`
    to `Dal.Slot.t`. The encoding function converts this
    list into a `Dal.Slot_index.t`-indexed map. *)
-include Make_nested_map (struct
-  let path = ["dal"; "slot_headers"]
+include
+  Store.Make_nested_map
+    (struct
+      let path = ["dal"; "slot_headers"]
 
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-     This value is currently not used, but required by the module type. *)
-  let keep_last_n_entries_in_memory = 10
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+         This value is currently not used, but required by the module type. *)
+      let keep_last_n_entries_in_memory = Some 10
+    end)
+    (struct
+      type key = Block_hash.t
 
-  type key = Block_hash.t
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = int
 
-  let string_of_key = Block_hash.to_b58check
+      let compare = Int.compare
 
-  type secondary_key = int
+      let encoding = Data_encoding.uint8
 
-  let compare_secondary_keys = Int.compare
+      let name = "slot index"
+    end)
+    (struct
+      type value = Cryptobox.commitment
 
-  type value = Cryptobox.commitment
+      let name = "slots_metadata"
 
-  let secondary_key_encoding = Data_encoding.int31
-
-  let secondary_key_name = "slot_index"
-
-  let value_encoding = Cryptobox.Commitment.encoding
-
-  let value_name = "slots_metadata"
-end)
+      let encoding = Cryptobox.Commitment.encoding
+    end)
