@@ -2988,7 +2988,7 @@ let test_refutation_reward_and_punishment protocols =
    and stores this integer in its state. Then, the test executes a
    rollup operation that produces a call to this contract. Finally,
    the test triggers this call and we check that the L1 contract has
-   been correctly executed by observing its local store.
+   been correctly executed by observing its local storage.
 
    The input depends on the PVM.
 *)
