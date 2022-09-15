@@ -29,6 +29,7 @@ type interpreter_error = {raw_exception : string; explanation : string option}
 
 type t =
   | Decode_error of interpreter_error
+  | Link_error of string
   | Init_error of interpreter_error
   | Eval_error of interpreter_error
   | Invalid_state of string
@@ -110,26 +111,40 @@ let encoding =
         (fun err -> Decode_error err);
       case
         (Tag 1)
+        ~title:"Link_error"
+        (obj1 (req "link" string))
+        (function Link_error err -> Some err | _ -> None)
+        (fun err -> Link_error err);
+      case
+        (Tag 2)
         ~title:"Init_error"
         (interpreter_error_encoding "init")
         (function Init_error err -> Some err | _ -> None)
         (fun err -> Init_error err);
       case
-        (Tag 2)
+        (Tag 3)
         ~title:"Eval_error"
         (interpreter_error_encoding "eval")
         (function Eval_error err -> Some err | _ -> None)
         (fun err -> Eval_error err);
       case
-        (Tag 3)
+        (Tag 4)
         ~title:"Invalid_state"
         (obj1 (req "invalid_state" string))
         (function Invalid_state msg -> Some msg | _ -> None)
         (fun msg -> Invalid_state msg);
       case
-        (Tag 4)
+        (Tag 5)
         ~title:"Unknown_error"
         (obj1 (req "unknown_error" string))
         (function Unknown_error exn -> Some exn | _ -> None)
         (fun exn -> Unknown_error exn);
     ]
+
+let link_error kind ~module_name ~item_name =
+  match kind with
+  | `Item ->
+      Link_error
+        (Format.sprintf "Unexpected import: %s.%s" module_name item_name)
+  | `Module ->
+      Link_error (Format.sprintf "Unexpected module import: %s" module_name)

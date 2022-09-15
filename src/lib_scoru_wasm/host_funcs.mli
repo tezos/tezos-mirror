@@ -31,6 +31,12 @@ val lookup :
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern
 
+(** [lookup_opt name] is exactly [lookup name] but returns an option instead of
+    raising `Not_found`. *)
+val lookup_opt :
+  Tezos_webassembly_interpreter.Ast.name ->
+  Tezos_webassembly_interpreter.Instance.extern option
+
 (** [register_host_funcs] registers all the PVMs host functions into a WASM
     interpreter's registry, using the names expected by {!lookup}.
 

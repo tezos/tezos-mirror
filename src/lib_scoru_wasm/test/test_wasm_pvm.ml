@@ -58,6 +58,7 @@ let check_error expected_kind expected_reason error =
   | Some `Decode, Wasm_pvm_errors.Decode_error {explanation; _} ->
       check_reason explanation
   | Some `Init, Init_error {explanation; _} -> check_reason explanation
+  | Some `Link, Link_error explanation -> check_reason (Some explanation)
   | Some `Eval, Eval_error {explanation; _} -> check_reason explanation
   | Some `Invalid_state, Invalid_state explanation ->
       check_reason (Some explanation)

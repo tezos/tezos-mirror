@@ -125,8 +125,68 @@ let test_module_name_size () =
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"
 
+let test_imports () =
+  let open Lwt_result_syntax in
+  let build_module module_name item_name =
+    Format.sprintf
+      {|
+        (module
+          (import "%s" "%s"
+            (func $%s (param i32 i32 i32 i32 i32) (result i32)))
+          (memory 1)
+          (export "mem"(memory 0))
+          (func (export "kernel_next")
+            (unreachable)
+          )
+        )
+      |}
+      module_name
+      item_name
+      item_name
+  in
+  let bad_module_name = "external_module" in
+  let bad_item_name = "f" in
+  let*! bad_module_tree =
+    initial_tree (build_module bad_module_name bad_item_name)
+  in
+  let* stuck = eval_until_stuck bad_module_tree in
+  let* () =
+    let expected_error =
+      Wasm_pvm_errors.link_error
+        `Module
+        ~module_name:bad_module_name
+        ~item_name:bad_item_name
+    in
+    if stuck = expected_error then return_unit
+    else failwith "Unexpected stuck state!"
+  in
+  let good_module_name = "rollup_safe_core" in
+  let*! bad_host_func_tree =
+    initial_tree (build_module good_module_name bad_item_name)
+  in
+  let* stuck = eval_until_stuck bad_host_func_tree in
+  let* () =
+    let expected_error =
+      Wasm_pvm_errors.link_error
+        `Item
+        ~module_name:good_module_name
+        ~item_name:bad_item_name
+    in
+    if stuck = expected_error then return_unit
+    else failwith "Unexpected stuck state!"
+  in
+  let good_item_name = "read_input" in
+  let*! good_module_tree =
+    initial_tree (build_module good_module_name good_item_name)
+  in
+  let* stuck = eval_until_stuck good_module_tree in
+  match stuck with
+  | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
+  | _ -> failwith "Unexpected stuck state!"
+
 let tests =
   [
     tztest "init requires memory 0 export" `Quick test_memory0_export;
     tztest "names are limited to 512 bytes" `Quick test_module_name_size;
+    tztest "imports only PVM host functions" `Quick test_imports;
   ]

@@ -162,6 +162,10 @@ let error_state_gen =
     in
     Wasm_pvm_errors.Decode_error error
   in
+  let link_error =
+    let+ error = string in
+    Wasm_pvm_errors.Link_error error
+  in
   let init_error =
     let+ exn = exn_gen in
     let error =
@@ -184,7 +188,15 @@ let error_state_gen =
     let+ err = string in
     Wasm_pvm_errors.Invalid_state err
   in
-  oneof [decode_error; init_error; eval_error; invalid_state; unknown_error]
+  oneof
+    [
+      decode_error;
+      link_error;
+      init_error;
+      eval_error;
+      invalid_state;
+      unknown_error;
+    ]
 
 let pp_interpreter_error out Wasm_pvm_errors.{raw_exception; explanation} =
   Format.fprintf
@@ -198,6 +210,8 @@ let pp_error_state out = function
       Format.fprintf out "@[<hv 2>Eval_error %a@]" pp_interpreter_error error
   | Wasm_pvm_errors.Decode_error error ->
       Format.fprintf out "@[<hv 2>Decode_error %a@]" pp_interpreter_error error
+  | Wasm_pvm_errors.Link_error error ->
+      Format.fprintf out "@[<hv 2>Link_error %s@]" error
   | Wasm_pvm_errors.Init_error error ->
       Format.fprintf out "@[<hv 2>Init_error %a@]" pp_interpreter_error error
   | Wasm_pvm_errors.Invalid_state err ->
@@ -217,6 +231,7 @@ let error_state_check state state' =
   | Init_error error, Init_error error'
   | Eval_error error, Eval_error error' ->
       Lwt.return_ok (check_interpreter_error error error')
+  | Link_error err, Link_error err'
   | Invalid_state err, Invalid_state err'
   | Unknown_error err, Unknown_error err' ->
       Lwt.return_ok (err = err')

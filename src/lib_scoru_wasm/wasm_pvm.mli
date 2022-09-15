@@ -25,6 +25,13 @@
 
 type tick_state =
   | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
+  | Link of {
+      ast_module : Tezos_webassembly_interpreter.Ast.module_;
+      externs :
+        Tezos_webassembly_interpreter.Instance.extern
+        Tezos_webassembly_interpreter.Instance.Vector.t;
+      imports_offset : int32;
+    }
   | Init of {
       self : Tezos_webassembly_interpreter.Instance.module_key;
       ast_module : Tezos_webassembly_interpreter.Ast.module_;

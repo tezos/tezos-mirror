@@ -184,9 +184,9 @@ let init_kont_encoding ~host_funcs =
   @@ [
        case
          "IK_Start"
-         (value_option [] Data_encoding.unit)
-         (function IK_Start -> Some None | _ -> None)
-         (function _ -> IK_Start);
+         (scope ["externs"] (lazy_vec_encoding Wasm_encoding.extern_encoding))
+         (function IK_Start exts -> Some exts | _ -> None)
+         (fun exts -> IK_Start exts);
        case
          "IK_Add_import"
          (fold_right2_kont_encoding

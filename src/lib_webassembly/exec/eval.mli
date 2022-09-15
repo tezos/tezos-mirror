@@ -183,7 +183,7 @@ type create_elem_kont = (eval_const_kont, Ast.const, ref_) tick_map_kont
 type exports_acc = {exports : extern NameMap.t; exports_memory_0 : bool}
 
 type init_kont =
-  | IK_Start  (** Very first tick of the [init] function *)
+  | IK_Start of extern Vector.t  (** Very first tick of the [init] function *)
   | IK_Add_import of (extern, Ast.import, module_inst) fold_right2_kont
   | IK_Type of module_inst * (Ast.type_, Types.func_type) map_kont
   | IK_Aggregate :
@@ -225,7 +225,6 @@ val init_step :
   buffers ->
   Host_funcs.registry ->
   Ast.module_ ->
-  extern Vector.t ->
   init_kont ->
   init_kont Lwt.t
 

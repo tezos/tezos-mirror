@@ -40,6 +40,8 @@ type interpreter_error = {
 type t =
   | Decode_error of interpreter_error
       (** Wraps exceptions raised during parsing. *)
+  | Link_error of explanation
+      (** Errors or possible raw exceptions raised during linking. *)
   | Init_error of interpreter_error
       (** Wraps exceptions raised during initialization. *)
   | Eval_error of interpreter_error
@@ -48,6 +50,12 @@ type t =
       (** Invalid state of the PVM (waiting for input during the parsing for example). *)
   | Unknown_error of raw_exception
       (** Wraps unexpected exceptions raised by the interpreter. *)
+
+(* [link_error kind ~module_name ~item_name] returns the link error for a given
+   [module_name] and [item_name], and the kind of error (whether an unkown
+   module or item). *)
+val link_error :
+  [`Item | `Module] -> module_name:string -> item_name:string -> t
 
 (** [extract_interpreter_error exn] returns the source of the exception (either
     a known interpreter error or an unknown one) and its encodable representation. *)
