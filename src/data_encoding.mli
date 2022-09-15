@@ -895,14 +895,24 @@ let expr_encoding =
 
   module Bounded : sig
     (** Encoding of a string whose length does not exceed the specified length.
-        The size field uses the smallest integer that can accommodate the
+
+        If [length_kind] is set, then it is used to encode the length of the
+        string in a header. If [length_kind] is omitted then the length field
+        uses the smallest fixed-width integer that can accommodate the
         maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
         longer strings, etc.
 
         Attempting to construct a string with a length that is too long causes
-        an [Invalid_argument] exception. *)
+        an [Invalid_argument] exception.
+
+        @raise Invalid_argument if [length_kind] is set but it cannot accommodate
+        the specified bound. E.g.,
+        [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+
+        @raise Invalid_argument if [length_kind] is unset and the specified
+        bound is larger than 2^30. *)
     val string' :
-      ?length_kind:Binary_size.length ->
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
       string_json_repr ->
       int ->
       string encoding
@@ -912,7 +922,7 @@ let expr_encoding =
 
     (** See {!string'} above. *)
     val bytes' :
-      ?length_kind:Binary_size.length ->
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
       string_json_repr ->
       int ->
       Bytes.t encoding
