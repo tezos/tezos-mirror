@@ -863,8 +863,8 @@ module Make (Context : P) :
 
   let get_outbox state =
     let open Lwt_syntax in
-    let* entries = (result_of ~default:[] @@ Output.entries) state in
-    return @@ List.map snd entries
+    let+ entries = result_of ~default:[] Output.entries state in
+    List.map snd entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
