@@ -118,7 +118,9 @@ let extract_anomalies path level infos =
   else
     let anomalies =
       List.fold_left
-        (fun acc Data.Delegate_operations.{delegate; delegate_alias; operations} ->
+        (fun acc
+             Data.Delegate_operations.
+               {delegate; delegate_alias; endorsing_power = _; operations} ->
           List.fold_left
             (fun acc
                  Data.Delegate_operations.
@@ -224,7 +226,8 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; delegate_alias; operations} as delegate_ops) ->
+             {delegate; delegate_alias; endorsing_power; operations} as
+             delegate_ops) ->
         match
           List.partition
             (fun op ->
@@ -237,6 +240,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
                 {
                   delegate;
                   delegate_alias;
+                  endorsing_power;
                   operations =
                     add_to_operations
                       block_hash
@@ -260,6 +264,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
             {
               delegate;
               delegate_alias = Wallet.alias_of_pkh aliases delegate;
+              endorsing_power = 0;
               operations =
                 [
                   {
@@ -406,7 +411,8 @@ let dump_received cctxt path ?unaccurate level received_ops =
           List.fold_left
             (fun (acc, missing)
                  Data.Delegate_operations.(
-                   {delegate; delegate_alias; operations} as delegate_ops) ->
+                   {delegate; delegate_alias; endorsing_power; operations} as
+                   delegate_ops) ->
               match
                 List.partition
                   (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
@@ -418,6 +424,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                       {
                         delegate;
                         delegate_alias;
+                        endorsing_power;
                         operations = merge_operations operations new_operations;
                       }
                     :: acc,
@@ -438,6 +445,7 @@ let dump_received cctxt path ?unaccurate level received_ops =
                        {
                          delegate;
                          delegate_alias = Wallet.alias_of_pkh aliases delegate;
+                         endorsing_power = 0;
                          operations =
                            List.rev_map
                              (fun Consensus_ops.

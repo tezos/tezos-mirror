@@ -37,7 +37,8 @@ let to_received_ops ctx endpoint auth level data =
   (*fake operation hash*)
   let received_ops =
     List.map
-      (fun Data.Delegate_operations.{delegate; delegate_alias = _; operations} ->
+      (fun Data.Delegate_operations.
+             {delegate; delegate_alias = _; endorsing_power = _; operations} ->
         ( delegate,
           List.filter_map
             (fun Data.Delegate_operations.
@@ -86,7 +87,9 @@ let block_map_append x e m =
 
 let included_ops_map level data =
   List.fold_left
-    (fun acc Data.Delegate_operations.{delegate; delegate_alias = _; operations} ->
+    (fun acc
+         Data.Delegate_operations.
+           {delegate; delegate_alias = _; endorsing_power = _; operations} ->
       List.fold_left
         (fun acc
              Data.Delegate_operations.

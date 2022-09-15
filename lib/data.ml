@@ -52,6 +52,7 @@ module Delegate_operations = struct
   type t = {
     delegate : Signature.public_key_hash;
     delegate_alias : string option;
+    endorsing_power : int;
     operations : operation list;
   }
 
@@ -61,11 +62,13 @@ module Delegate_operations = struct
       (fun _ -> assert false)
       (fun (delegate, delegate_alias, reception_time, errors, block_inclusion) ->
         match (reception_time, block_inclusion) with
-        | (None, []) -> {delegate; delegate_alias; operations = []}
+        | (None, []) ->
+            {delegate; delegate_alias; endorsing_power = 0; operations = []}
         | (_, _) ->
             {
               delegate;
               delegate_alias;
+              endorsing_power = 0;
               operations =
                 [
                   {
@@ -87,13 +90,14 @@ module Delegate_operations = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; delegate_alias; operations} ->
-        (delegate, delegate_alias, operations))
-      (fun (delegate, delegate_alias, operations) ->
-        {delegate; delegate_alias; operations})
-      (obj3
+      (fun {delegate; delegate_alias; endorsing_power; operations} ->
+        (delegate, delegate_alias, endorsing_power, operations))
+      (fun (delegate, delegate_alias, endorsing_power, operations) ->
+        {delegate; delegate_alias; endorsing_power; operations})
+      (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
+         (dft "endorsing_power" int16 0)
          (dft "operations" (list operation_encoding) []))
 
   let encoding =

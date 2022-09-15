@@ -116,29 +116,35 @@ let select_ops db_pool level =
   *)
   let q_missing =
     Caqti_request.Infix.(
-      Caqti_type.(tup2 int32 int32) ->* Caqti_type.(tup2 string (option string)))
-      "SELECT hex(d.address), d.alias FROM endorsing_rights e, delegates d ON \
-       e.delegate = d.id WHERE e.level = ? AND e.delegate NOT IN (SELECT \
-       o.endorser FROM operations o WHERE o.level = ?)"
+      Caqti_type.(tup2 int32 int32)
+      ->* Caqti_type.(tup3 string (option string) int))
+      "SELECT hex(d.address), d.alias, e.endorsing_power FROM endorsing_rights \
+       e, delegates d ON e.delegate = d.id WHERE e.level = ? AND e.delegate \
+       NOT IN (SELECT o.endorser FROM operations o WHERE o.level = ?)"
   in
-  let parse_missing_row (address_hex, alias) =
+  let parse_missing_row (address_hex, alias, power) =
     ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
-      alias )
+      alias,
+      power )
   in
   let q_included =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
-            tup2 (tup3 string (option string) int) (tup2 (option int32) string)))
-      "SELECT hex(d.address), d.alias, o.endorsement, o.round, hex(b.hash) \
-       FROM operations o, operations_inclusion i, blocks b, delegates d ON \
-       i.operation = o.id AND i.block = b.id AND o.endorser = d.id WHERE \
-       o.level = ?"
+            tup2
+              (tup3 string (option string) int)
+              (tup3 int (option int32) string)))
+      "SELECT hex(d.address), d.alias, e.endorsing_power, o.endorsement, \
+       o.round, hex(b.hash) FROM operations o, endorsing_rights e, \
+       operations_inclusion i, blocks b, delegates d ON i.operation = o.id AND \
+       i.block = b.id AND o.endorser = d.id AND e.delegate = d.id WHERE \
+       o.level = ? AND e.level = ?"
   in
   let parse_included_row
-      ((address_hex, alias, endorsement), (round, block_hash_hex)) =
+      ((address_hex, alias, power), (endorsement, round, block_hash_hex)) =
     ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
       alias,
+      power,
       (match endorsement with
       | 0 -> Consensus_ops.Preendorsement
       | 1 -> Consensus_ops.Endorsement
@@ -148,20 +154,22 @@ let select_ops db_pool level =
   in
   let q_received =
     Caqti_request.Infix.(
-      Caqti_type.int32
+      Caqti_type.(tup2 int32 int32)
       ->* Caqti_type.(
             tup2
-              (tup3 string (option string) ptime)
+              (tup4 string (option string) int ptime)
               (tup3 (option string) int (option int32))))
-      "SELECT hex(d.address), d.alias, r.timestamp, iif(r.errors IS NULL, \
-       NULL, hex(r.errors)), o.endorsement, o.round FROM operations o, \
-       operations_reception r, delegates d ON r.operation = o.id AND \
-       o.endorser = d.id WHERE o.level = ?"
+      "SELECT hex(d.address), d.alias, e.endorsing_power, r.timestamp, \
+       iif(r.errors IS NULL, NULL, hex(r.errors)), o.endorsement, o.round FROM \
+       operations o, endorsing_rights e, operations_reception r, delegates d \
+       ON r.operation = o.id AND o.endorser = d.id AND e.delegate = d.id WHERE \
+       o.level = ? AND e.level = ?"
   in
   let parse_received_row
-      ((address_hex, alias, timestamp), (errors, endorsement, round)) =
+      ((address_hex, alias, power, timestamp), (errors, endorsement, round)) =
     ( `Hex address_hex |> Tezos_crypto.Signature.Public_key_hash.of_hex_exn,
       alias,
+      power,
       timestamp,
       errors
       |> Option.map (fun x -> `Hex x)
@@ -178,13 +186,15 @@ let select_ops db_pool level =
   in
   let module Ops = Tezos_crypto.Signature.Public_key_hash.Map in
   let cb_missing r info =
-    let (delegate, alias) = parse_missing_row r in
-    Ops.add delegate (alias, Pkh_ops.empty) info
+    let (delegate, alias, power) = parse_missing_row r in
+    Ops.add delegate (alias, power, Pkh_ops.empty) info
   in
   let cb_included r info =
-    let (delegate, alias, kind, round, block_hash) = parse_included_row r in
+    let (delegate, alias, power, kind, round, block_hash) =
+      parse_included_row r
+    in
     match Ops.find_opt delegate info with
-    | Some (alias, ops) ->
+    | Some (alias, power, ops) ->
         let op_key = Op_key.{kind; round} in
         let op =
           match Pkh_ops.find_opt op_key ops with
@@ -193,20 +203,20 @@ let select_ops db_pool level =
           | None -> {included = [block_hash]; received = []}
         in
         let ops' = Pkh_ops.add op_key op ops in
-        Ops.add delegate (alias, ops') info
+        Ops.add delegate (alias, power, ops') info
     | None ->
         let op_key = Op_key.{kind; round} in
         let op_info = {included = [block_hash]; received = []} in
         let ops = Pkh_ops.singleton op_key op_info in
-        Ops.add delegate (alias, ops) info
+        Ops.add delegate (alias, power, ops) info
   in
   let cb_received r info =
-    let (delegate, alias, reception_time, errors, kind, round) =
+    let (delegate, alias, power, reception_time, errors, kind, round) =
       parse_received_row r
     in
     let received_info = {reception_time; errors} in
     match Ops.find_opt delegate info with
-    | Some (alias, ops) ->
+    | Some (alias, power, ops) ->
         let op_key = Op_key.{kind; round} in
         let op =
           match Pkh_ops.find_opt op_key ops with
@@ -215,12 +225,12 @@ let select_ops db_pool level =
           | None -> {included = []; received = [received_info]}
         in
         let ops' = Pkh_ops.add op_key op ops in
-        Ops.add delegate (alias, ops') info
+        Ops.add delegate (alias, power, ops') info
     | None ->
         let op_key = Op_key.{kind; round} in
         let op_info = {included = []; received = [received_info]} in
         let ops = Pkh_ops.singleton op_key op_info in
-        Ops.add delegate (alias, ops) info
+        Ops.add delegate (alias, power, ops) info
   in
   let* out =
     Caqti_lwt.Pool.use
@@ -231,12 +241,12 @@ let select_ops db_pool level =
   let* out =
     Caqti_lwt.Pool.use
       (fun (module Db : Caqti_lwt.CONNECTION) ->
-        Db.fold q_included cb_included level out)
+        Db.fold q_included cb_included (level, level) out)
       db_pool
   in
   Caqti_lwt.Pool.use
     (fun (module Db : Caqti_lwt.CONNECTION) ->
-      Db.fold q_received cb_received level out)
+      Db.fold q_received cb_received (level, level) out)
     db_pool
 
 let translate_ops info =
@@ -266,9 +276,14 @@ let translate_ops info =
       (Pkh_ops.bindings pkh_ops)
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (alias, pkh_ops) acc ->
+    (fun pkh (alias, power, pkh_ops) acc ->
       Data.Delegate_operations.
-        {delegate = pkh; delegate_alias = alias; operations = translate pkh_ops}
+        {
+          delegate = pkh;
+          delegate_alias = alias;
+          endorsing_power = power;
+          operations = translate pkh_ops;
+        }
       :: acc)
     info
     []
@@ -297,7 +312,8 @@ let anomalies level ops =
       []
   in
   Tezos_crypto.Signature.Public_key_hash.Map.fold
-    (fun pkh (alias, pkh_ops) acc -> extract_anomalies pkh alias pkh_ops @ acc)
+    (fun pkh (alias, _power, pkh_ops) acc ->
+      extract_anomalies pkh alias pkh_ops @ acc)
     ops
     []
 
