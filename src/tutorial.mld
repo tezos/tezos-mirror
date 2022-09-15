@@ -939,6 +939,12 @@ Note that for backwards compatibility reason, the original [string] and [bytes]
 encoding have not been modified and this encoding has an apostrophe in the name:
 [string'].
 
+The optional parameter [?length_kind] allows you to control the representation
+of the size-header of the string. Note that the size header imposes a limit on
+the size of the string. E.g., [`Uint8] will only be able to support strings
+up to 255 bytes long. Also note that for internal consistency and compatibility
+with 32-bit machines, [`N] is actually limited in range to 2^30.
+
 [bytes' : string_json_repr -> bytes encoding] (dynamic) is a combinator for
 the [bytes] type. In binary it is represented like a [bytes]. In JSON, it's
 representation depends on the [string_json_repr] parameter: with [Plain] it is
@@ -950,6 +956,12 @@ are intended to be blobs.
 Note that for backwards compatibility reason, the original [string] and [bytes]
 encoding have not been modified and this encoding has an apostrophe in the name:
 [bytes'].
+
+The optional parameter [?length_kind] allows you to control the representation
+of the size-header of the string. Note that the size header imposes a limit on
+the size of the string. E.g., [`Uint8] will only be able to support strings
+up to 255 bytes long. Also note that for internal consistency and compatibility
+with 32-bit machines, [`N] is actually limited in range to 2^30.
 
 {2 Simple combinators}
 
@@ -1469,6 +1481,16 @@ header to a given encoding. Note that the size header is always added,
 regardless of the sizing category of the argument encoding. E.g.,
 [dynamic_size (dynamic_size uint8)] will occupy 9 bytes in binary.
 
+The optional parameter [?kind] lets you decide the binary representation of the
+size header.
+{ul {- [`Uint30] (the default) represents it on four bytes and allows sizes up to
+2^30 bytes.
+}{- [`Uint16] represents it on two bytes and allows sizes up to 2^16 bytes.
+}{- [`Uint8] represents it on one byte and allows sizes up to 2^8 bytes.
+}{- [`N] represents it on a variable number of bytes (as per the [n] encoding)
+and allows sizes up to 2^30 bytes.
+}}
+
 If you are using this combinator in a programmatic setting, you may want to
 apply it selectively depending on the result of [classify]:
 
@@ -1674,6 +1696,14 @@ automatically shave some unneeded bytes from the size header. In general, the
 [Bounded] variants of a given combinator are more compact than the plain
 variant.
 
+You can also be weary of integer sizes. Prefer smaller integer sizes where
+possible. And even if an integer-like type is not guaranteed to always fit
+within a smaller integer representation, you can use [uint_like_n] and
+[int_like_z] which occupy less bytes on small values but more space on bigger values.
+
+If you need to find exact cut-off points for various integer ranges for various
+encodings, you can check the code in [misc/eval_numsizes.ml].
+
 You can also reduce the size of the size headers of lists if you know that they
 will fit within a small enough space. To that end, you can replace a [list]
 combinator (which introduces a full [`Uint30] four bytes size header) with a
@@ -1683,13 +1713,9 @@ tailored call to [dynamic_size] followed by a [Variable.list].
 dynamic_size ~kind:`Uint16 (Variable.list …)
 ]}
 
-You can also be weary of integer sizes. Prefer smaller integer sizes where
-possible. And even if an integer-like type is not guaranteed to always fit
-within a smaller integer representation, you can use [uint_like_n] and
-[int_like_z] which occupy less bytes on small values but more space on bigger values.
-
-If you need to find exact cut-off points for various integer ranges for various
-encodings, you can check the code in [misc/eval_numsizes.ml].
+You can use [~kind:`N] to use the variable-size encoding for the size. It is
+more compact on smaller sizes but less compact on larger ones. See [uint_like_n]
+for details.
 
 Finally, you should be careful not to add unnecessary [dynamic_size]. If you are
 unsure whether you need one in a specific place, you can use the [classify]

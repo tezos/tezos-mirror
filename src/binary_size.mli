@@ -68,7 +68,7 @@ type length = [`N | unsigned_integer] [@@deriving hash]
 
 val integer_to_size : [< integer] -> int
 
-val length_to_max_size : [< length ] -> int
+val length_to_max_size : [< length] -> int
 
 val min_int : [< integer | `N] -> int
 

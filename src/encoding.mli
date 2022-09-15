@@ -242,11 +242,13 @@ val bool : bool encoding
 
 val string : string encoding
 
-val string' : ?length_kind:Binary_size.length -> string_json_repr -> string encoding
+val string' :
+  ?length_kind:Binary_size.length -> string_json_repr -> string encoding
 
 val bytes : Bytes.t encoding
 
-val bytes' : ?length_kind:Binary_size.length -> string_json_repr -> Bytes.t encoding
+val bytes' :
+  ?length_kind:Binary_size.length -> string_json_repr -> Bytes.t encoding
 
 val float : float encoding
 

@@ -77,14 +77,18 @@ module Encoding = struct
         | Some kind -> Binary_size.max_int kind
       in
       if length > max_length then
-        raise (Invalid_argument "Data_encoding.Encoding.Bounded.string': length bound is greater than maximum length allowed in size header.");
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.string': length bound is greater \
+              than maximum length allowed in size header.") ;
       raw_splitted
         ~binary:
           (let kind =
-            match length_kind with
-            | None -> (Binary_size.unsigned_range_to_size length :>
-            Binary_size.length)
-            | Some kind -> kind
+             match length_kind with
+             | None ->
+                 (Binary_size.unsigned_range_to_size length
+                   :> Binary_size.length)
+             | Some kind -> kind
            in
            dynamic_size ~kind (check_size length Variable.string))
         ~json:
@@ -109,14 +113,18 @@ module Encoding = struct
         | Some kind -> Binary_size.max_int kind
       in
       if length > max_length then
-        raise (Invalid_argument "Data_encoding.Encoding.Bounded.string': length bound is greater than maximum length allowed in size header.");
+        raise
+          (Invalid_argument
+             "Data_encoding.Encoding.Bounded.string': length bound is greater \
+              than maximum length allowed in size header.") ;
       raw_splitted
         ~binary:
           (let kind =
-            match length_kind with
-            | None -> (Binary_size.unsigned_range_to_size length :>
-            Binary_size.length)
-            | Some kind -> kind
+             match length_kind with
+             | None ->
+                 (Binary_size.unsigned_range_to_size length
+                   :> Binary_size.length)
+             | Some kind -> kind
            in
            dynamic_size ~kind (check_size length Variable.bytes))
         ~json:

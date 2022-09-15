@@ -238,10 +238,16 @@ module Encoding : sig
         [length_kind] parameter (default [`Uint30]).
       - in JSON when [string_json_repr = Plain], encoded as a string
       - in JSON when [string_json_repr = Hex],  encoded via hex. *)
-  val string' : ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] -> string_json_repr -> string encoding
+  val string' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    string encoding
 
   (** Encoding of arbitrary bytes. See [string'] *)
-  val bytes' : ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] -> string_json_repr -> Bytes.t encoding
+  val bytes' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    Bytes.t encoding
 
   (** same as [string' Plain] *)
   val string : string encoding
@@ -895,13 +901,21 @@ let expr_encoding =
 
         Attempting to construct a string with a length that is too long causes
         an [Invalid_argument] exception. *)
-    val string' : ?length_kind:Binary_size.length -> string_json_repr -> int -> string encoding
+    val string' :
+      ?length_kind:Binary_size.length ->
+      string_json_repr ->
+      int ->
+      string encoding
 
     (** Same as [string' Plain] *)
     val string : int -> string encoding
 
     (** See {!string'} above. *)
-    val bytes' : ?length_kind:Binary_size.length -> string_json_repr -> int -> Bytes.t encoding
+    val bytes' :
+      ?length_kind:Binary_size.length ->
+      string_json_repr ->
+      int ->
+      Bytes.t encoding
 
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
@@ -912,9 +926,7 @@ let expr_encoding =
       Typically used to combine two variable encodings in a same
       objects or tuple, or to use a variable encoding in an array or a list. *)
   val dynamic_size :
-    ?kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
-    'a encoding ->
-    'a encoding
+    ?kind:[`N | `Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
       of a value will not be allowed to exceed [size] bytes. The reader
