@@ -167,7 +167,10 @@ let test_contracts _test_mode_tag _protocol ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contracts ()
   in
-  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
+  let* contracts =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegates ()
+  in
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
@@ -361,30 +364,41 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
   let bootstrap = List.hd contracts in
-  let* _ = RPC.Delegates.get ?endpoint ~hooks ~pkh:bootstrap client in
   let* _ =
-    RPC.Delegates.get_full_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint client ~hooks
+    @@ RPC.get_chain_block_context_delegate bootstrap
   in
   let* _ =
-    RPC.Delegates.get_frozen_deposits ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_full_balance bootstrap
   in
   let* _ =
-    RPC.Delegates.get_deactivated ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_frozen_deposits bootstrap
   in
   let* _ =
-    RPC.Delegates.get_delegated_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_deactivated bootstrap
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_delegated_balance bootstrap
   in
   let* _ =
-    RPC.Delegates.get_grace_period ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_delegated_contracts bootstrap
   in
   let* _ =
-    RPC.Delegates.get_staking_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_grace_period bootstrap
   in
   let* _ =
-    RPC.Delegates.get_voting_power ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_staking_balance bootstrap
+  in
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_voting_power bootstrap
   in
 
   unit
@@ -393,35 +407,54 @@ let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
   let bootstrap = List.hd contracts in
-  let* _ = RPC.Delegates.get ?endpoint ~hooks ~pkh:bootstrap client in
-  let* _ = RPC.Delegates.get_balance ?endpoint ~hooks ~pkh:bootstrap client in
   let* _ =
-    RPC.Delegates.get_frozen_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle
-      ?endpoint
-      ~hooks
-      ~pkh:bootstrap
-      client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_balance bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_staking_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_frozen_balance bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_delegated_contracts ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_frozen_balance_by_cycle bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_delegated_balance ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_staking_balance bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_deactivated ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_delegated_contracts bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_grace_period ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_delegated_balance bootstrap
   in
+
   let* _ =
-    RPC.Delegates.get_voting_power ?endpoint ~hooks ~pkh:bootstrap client
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_deactivated bootstrap
+  in
+
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_grace_period bootstrap
+  in
+
+  let* _ =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegate_voting_power bootstrap
   in
 
   unit
@@ -432,73 +465,45 @@ let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
 
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
-  let* _ =
-    RPC.Delegates.spawn_get ?endpoint ~hooks ~pkh:unregistered_baker client
-    |> Process.check ~expect_failure:true
+  let check_failure rpc =
+    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    Process.check ~expect_failure:true process
   in
-  let* _ =
-    RPC.Delegates.spawn_get_full_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure @@ RPC.get_chain_block_context_delegate unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_frozen_deposits
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_full_balance unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_deactivated
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_frozen_deposits unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_delegated_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_deactivated unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_delegated_contracts
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_delegated_balance unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_grace_period
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_delegated_contracts
+         unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_staking_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_grace_period unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_voting_power
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_staking_balance unregistered_baker
+  in
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_voting_power unregistered_baker
   in
   unit
 
@@ -509,81 +514,52 @@ let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unregistered_baker contracts) ;
 
-  let* _ =
-    RPC.Delegates.spawn_get ?endpoint ~hooks ~pkh:unregistered_baker client
-    |> Process.check ~expect_failure:true
+  let check_failure rpc =
+    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    Process.check ~expect_failure:true process
   in
-  let* _ =
-    RPC.Delegates.spawn_get_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+
+  let* () =
+    check_failure @@ RPC.get_chain_block_context_delegate unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_deactivated
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_balance unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_delegated_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_deactivated unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_delegated_contracts
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_delegated_balance unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_frozen_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_delegated_contracts
+         unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_frozen_balance_by_cycle
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_frozen_balance unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_grace_period
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_frozen_balance_by_cycle
+         unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_staking_balance
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_grace_period unregistered_baker
   in
-  let* _ =
-    RPC.Delegates.spawn_get_voting_power
-      ?endpoint
-      ~hooks
-      ~pkh:unregistered_baker
-      client
-    |> Process.check ~expect_failure:true
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_staking_balance unregistered_baker
+  in
+  let* () =
+    check_failure
+    @@ RPC.get_chain_block_context_delegate_voting_power unregistered_baker
   in
   unit
 
@@ -592,7 +568,10 @@ let get_contracts ?endpoint client =
     RPC.Client.call ?endpoint ~hooks client
     @@ RPC.get_chain_block_context_contracts ()
   in
-  let* contracts = RPC.Delegates.get_all ?endpoint ~hooks client in
+  let* contracts =
+    RPC.Client.call ?endpoint ~hooks client
+    @@ RPC.get_chain_block_context_delegates ()
+  in
 
   Lwt.return contracts
 

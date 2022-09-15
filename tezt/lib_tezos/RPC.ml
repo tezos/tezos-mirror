@@ -745,4 +745,247 @@ let get_chain_block_context_sc_rollup_staker_staked_on_commitment
     ]
     Fun.id
 
+let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "delegates"]
+    (fun contracts -> JSON.as_list contracts |> List.map JSON.as_string)
+
+let get_chain_block_context_delegate ?(chain = "main") ?(block = "head") pkh =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh]
+    Fun.id
+
+let get_chain_block_context_delegate_current_frozen_deposits ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "current_frozen_deposits";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_deactivated ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "deactivated";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_delegated_balance ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "delegated_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_delegated_contracts ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "delegated_contracts";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "frozen_deposits";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_frozen_deposits_limit ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "frozen_deposits_limit";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_full_balance ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "full_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_grace_period ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "grace_period";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "participation";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "frozen_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_frozen_balance_by_cycle ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "frozen_balance_by_cycle";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_staking_balance ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "staking_balance";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_balance ?(chain = "main") ?(block = "head")
+    pkh =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "balance"]
+    Fun.id
+
+let get_chain_block_context_delegate_voting_info ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "voting_info";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_voting_power ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "voting_power";
+    ]
+    Fun.id
+
 let make = RPC_core.make
