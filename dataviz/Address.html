@@ -20,11 +20,11 @@
     <h1> Adress Endorsement reception delays </h1>
     <form>
         <div>
-            <label for="selectedLevel_begin">First bloc:</label>
+            <label for="selectedLevel_begin">First block:</label>
             <input name="level_" id="selectedLevel_begin" type="number" value="179000" />
             <span id='tick_begin'></span>
             <br>
-            <label for="selectedLevel_end">Last bloc:</label>
+            <label for="selectedLevel_end">Last block:</label>
             <input name="level_" id="selectedLevel_end" type="number" value="179020" />
             <span id='tick_end'></span>
             <br>
@@ -44,11 +44,11 @@
                     adresse = document.getElementById('adress_').value;
 
                     let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
-                        let t_valide=delegate_delays_distribution_of_operations(dict_data, adresse);
+                        let t_valide=delegate_delays_distribution_of_operations(dict_data, adresse,true);
                         console.log(t_valide);
-                        let ope_observation = classify_operations(dict_data, adresse);
+                        let ope_observation = classify_operations(dict_data, adresse,true);
                         console.log("ope_observation",ope_observation);
-                        let result = get_info_block(dict_data);
+                        let result = get_info_block(dict_data,true);
                         let t_baker=result[1]
                         chart_consensus_operation_specific_address(t_valide);
                         chart_time_mean_deviation(t_valide);
