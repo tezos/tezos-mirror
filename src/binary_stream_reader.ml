@@ -193,35 +193,47 @@ module Atom = struct
       read_z (Buffer.create 100) first_value 7 state k
     else k (Z.of_int first_value, state)
 
-  let uint30_like_n resume state k =
+  let with_limit ~limit whole read state k =
     let old_allowed_bytes = state.allowed_bytes in
-    let limit = size.max_size_of_uint30_like_n in
     let limit =
       match state.allowed_bytes with
       | None -> limit
       | Some current_limit -> min current_limit limit
     in
+    (match state.remaining_bytes with
+    | Some remaining when whole && limit < remaining ->
+        raise_read_error Size_limit_exceeded
+    | Some _ | None -> ()) ;
     let state = {state with allowed_bytes = Some limit} in
-    n resume state @@ fun (v, state) ->
+    read state @@ fun (v, state) ->
+    let allowed_bytes =
+      match old_allowed_bytes with
+      | None -> None
+      | Some old_limit ->
+          let remaining =
+            match state.allowed_bytes with
+            | None -> assert false
+            | Some remaining -> remaining
+          in
+          let read = limit - remaining in
+          Some (old_limit - read)
+    in
+    k (v, {state with allowed_bytes})
+
+  let uint30_like_n resume state k =
+    with_limit
+      ~limit:Binary_size.max_size_of_uint30_like_n
+      false
+      (n resume)
+      state
+    @@ fun (v, state) ->
     if Z.compare v (Z.of_int (Binary_size.max_int `N)) > 0 then
       let min = 0 and max = Binary_size.max_int `N in
       let v = Binary_size.max_int `Uint30 in
       raise_read_error (Invalid_int {min; v; max})
     else
-      let allowed_bytes =
-        match old_allowed_bytes with
-        | None -> None
-        | Some old_limit ->
-            let remaining =
-              match state.allowed_bytes with
-              | None -> assert false
-              | Some remaining -> remaining
-            in
-            let read = limit - remaining in
-            Some (old_limit - read)
-      in
       let v = Z.to_int v in
-      k (v, {state with allowed_bytes})
+      k (v, state)
 
   let z resume state k =
     uint8 resume state @@ fun (first, state) ->
@@ -413,31 +425,12 @@ let rec read_rec :
       if state.remaining_bytes <> Some 0 then Error Extra_bytes
       else k (v, {state with remaining_bytes = remaining})
   | Check_size {limit; encoding = e} ->
-      let old_allowed_bytes = state.allowed_bytes in
-      let limit =
-        match state.allowed_bytes with
-        | None -> limit
-        | Some current_limit -> min current_limit limit
-      in
-      (match state.remaining_bytes with
-      | Some remaining when whole && limit < remaining ->
-          raise_read_error Size_limit_exceeded
-      | Some _ | None -> ()) ;
-      let state = {state with allowed_bytes = Some limit} in
-      read_rec whole e state @@ fun (v, state) ->
-      let allowed_bytes =
-        match old_allowed_bytes with
-        | None -> None
-        | Some old_limit ->
-            let remaining =
-              match state.allowed_bytes with
-              | None -> assert false
-              | Some remaining -> remaining
-            in
-            let read = limit - remaining in
-            Some (old_limit - read)
-      in
-      k (v, {state with allowed_bytes})
+      Atom.with_limit
+        ~limit
+        whole
+        (fun state k -> read_rec whole e state k)
+        state
+        k
   | Describe {encoding = e; _} -> read_rec whole e state k
   | Splitted {encoding = e; _} -> read_rec whole e state k
   | Mu {fix; _} ->
