@@ -38,6 +38,9 @@ module Wasm = Wasm_pvm.Make (Test_encodings_util.Tree)
 (* Kernel failing at `kernel_next` invocation. *)
 let unreachable_kernel = "unreachable"
 
+(* Kernel writing `"hello"` to debug output. *)
+let test_write_debug_kernel = "test-write-debug"
+
 (** [check_error kind reason error] checks a Wasm PVM error [error] is of a
     given [kind] with a possible [reason].
 
@@ -149,6 +152,23 @@ let should_boot_unreachable_kernel ~max_steps kernel =
       state_after_second_message) ;
   return_unit
 
+let should_run_debug_kernel kernel =
+  let open Lwt_syntax in
+  let* tree = initial_boot_sector_from_kernel kernel in
+  (* Make the first ticks of the WASM PVM (parsing of origination
+     message, parsing and init of the kernel), to switch it to
+     “Input_requested” mode. *)
+  let* tree = eval_until_input_requested tree in
+  (* Feeding it with one input *)
+  let* tree = set_input_step "test" 0 tree in
+  (* running until waiting for input *)
+  let* tree = eval_until_input_requested tree in
+  let+ state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  (* The kernel should not fail. *)
+  assert (not @@ is_stuck state_after_first_message)
+
 let test_with_kernel kernel test () =
   let open Lwt_result_syntax in
   let open Tezt.Base in
@@ -185,4 +205,8 @@ let tests =
       (test_with_kernel
          unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
+    tztest
+      "Test write_debug kernel"
+      `Quick
+      (test_with_kernel test_write_debug_kernel should_run_debug_kernel);
   ]
