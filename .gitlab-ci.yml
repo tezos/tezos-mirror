@@ -37,6 +37,8 @@ stages:
   - test_coverage
   - packaging
   - doc
+  - prepare_release
+  - publish_release_gitlab
   - publish_release
   - manual
 

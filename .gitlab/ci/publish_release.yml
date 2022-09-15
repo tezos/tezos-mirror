@@ -4,7 +4,7 @@ gitlab:release:
     - .rules_template__release_tag
   # https://gitlab.com/tezos/docker-images/ci-release
   image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.1.0"
-  stage: publish_release
+  stage: publish_release_gitlab
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false
   dependencies:
@@ -37,7 +37,7 @@ docker:merge_manifests:
     - .rules_template__master_and_releases
     - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
-  stage: publish_release
+  stage: prepare_release
   script:
     - ./scripts/ci/docker_merge_manifests.sh
 
