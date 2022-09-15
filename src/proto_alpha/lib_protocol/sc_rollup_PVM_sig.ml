@@ -89,7 +89,7 @@ let reveal_data_encoding =
     case
       ~title:"raw data"
       (Tag 0)
-      string
+      (check_size Constants_repr.sc_rollup_message_size_limit string)
       (function RawData m -> Some m)
       (fun m -> RawData m)
   in
