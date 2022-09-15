@@ -1488,7 +1488,9 @@ size header.
 }{- [`Uint16] represents it on two bytes and allows sizes up to 2^16 bytes.
 }{- [`Uint8] represents it on one byte and allows sizes up to 2^8 bytes.
 }{- [`N] represents it on a variable number of bytes (as per the [n] encoding)
-and allows sizes up to 2^30 bytes.
+and allows sizes up to 2^30 bytes. Note that during serialisation, this
+combinator can be more computationally expensive because the size-header is
+dynamically-sized.
 }}
 
 If you are using this combinator in a programmatic setting, you may want to
