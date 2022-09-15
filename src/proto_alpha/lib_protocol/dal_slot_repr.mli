@@ -50,6 +50,8 @@ module Header : sig
   type t = Dal.commitment
 
   val encoding : t Data_encoding.t
+
+  val zero : t
 end
 
 (** An `Index.t` is a possible value for a slot index. We assume this value
@@ -84,12 +86,14 @@ module Index : sig
   val equal : t -> t -> bool
 end
 
-type header = Header.t
-
 (** For Layer-1, a slot is described by the level at which it is published,
     the slot's index (in the list of slots), and the slot's header
     (KATE commitment hash). *)
-type t = {published_level : Raw_level_repr.t; index : Index.t; header : header}
+type t = {
+  published_level : Raw_level_repr.t;
+  index : Index.t;
+  header : Header.t;
+}
 
 type slot = t
 
@@ -131,8 +135,6 @@ end
 
 (** The encoding ensures the slot is always a non-negative number. *)
 val encoding : t Data_encoding.t
-
-val zero : header
 
 val pp : Format.formatter -> t -> unit
 

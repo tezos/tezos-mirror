@@ -109,6 +109,8 @@ module Dal = struct
     include Dal_slot_repr.Page
   end
 
+  module Slot_header = Dal_slot_repr.Header
+
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
