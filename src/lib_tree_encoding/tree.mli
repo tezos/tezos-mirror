@@ -50,6 +50,8 @@ module type S = sig
   val find : tree -> key -> value option Lwt.t
 
   val find_tree : tree -> key -> tree option Lwt.t
+
+  val length : tree -> key -> int Lwt.t
 end
 
 type 'tree backend = (module S with type tree = 'tree)
@@ -67,6 +69,8 @@ val add_tree : 'tree backend -> 'tree -> key -> 'tree -> 'tree Lwt.t
 val find : 'tree backend -> 'tree -> key -> value option Lwt.t
 
 val find_tree : 'tree backend -> 'tree -> key -> 'tree option Lwt.t
+
+val length : 'tree backend -> 'tree -> key -> int Lwt.t
 
 (** A [wrapped_tree] allows modifications to the underlying tree, without
     affecting the tree that it was decoded from. *)

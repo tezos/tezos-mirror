@@ -49,10 +49,10 @@ type key = string list
 
 (* A key is bounded to 250 bytes, including the implicit '/durable' prefix.
    Additionally, values are implicitly appended with '_'. **)
-let max_prefix_key_length = 250 - String.length "/durable" - String.length "/_"
+let max_key_length = 250 - String.length "/durable" - String.length "/_"
 
 let key_of_string_exn s =
-  if String.length s > max_prefix_key_length then raise (Invalid_key s) ;
+  if String.length s > max_key_length then raise (Invalid_key s) ;
   let key =
     match String.split '/' s with
     | "" :: tl -> tl (* Must start with '/' *)
@@ -96,3 +96,9 @@ let find_value_exn tree key =
   match opt with
   | None -> raise Not_found
   | Some subtree -> Runner.decode E.chunked_byte_vector subtree
+
+let count_subtrees tree key =
+  let open Lwt.Syntax in
+  let* opt = T.find_tree tree @@ to_value_key key in
+  let+ len = T.length tree key in
+  if Option.is_none opt then len else len - 1
