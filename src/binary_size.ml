@@ -49,6 +49,9 @@ let int64 = 8
 
 let float = 8
 
+(* this is checked via an assert in binary_length *)
+let max_size_of_uint30_like_n = 5
+
 type tag_size = [`Uint8 | `Uint16] [@@deriving hash]
 
 let tag_size = function `Uint8 -> uint8 | `Uint16 -> uint16
@@ -80,7 +83,7 @@ let integer_to_size = function
   | `Uint8 -> uint8
 
 let length_to_max_size = function
-  | `N -> 5 (* see assertion check in binary_length *)
+  | `N -> max_size_of_uint30_like_n
   | `Uint30 -> uint30
   | `Uint16 -> uint16
   | `Uint8 -> uint8

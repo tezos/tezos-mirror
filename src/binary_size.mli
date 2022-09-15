@@ -54,6 +54,8 @@ val int64 : int
 
 val float : int
 
+val max_size_of_uint30_like_n : int
+
 type tag_size = [`Uint8 | `Uint16] [@@deriving hash]
 
 val tag_size : tag_size -> int

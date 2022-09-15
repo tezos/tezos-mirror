@@ -145,7 +145,7 @@ module Atom = struct
 
   let uint30_like_n state =
     let old_allowed_bytes = state.allowed_bytes in
-    let limit = 5 (* at most 5 bytes to represent uint30-like-n *) in
+    let limit = Binary_size.max_size_of_uint30_like_n in
     let limit =
       match state.allowed_bytes with
       | None -> limit

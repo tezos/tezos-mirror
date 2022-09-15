@@ -32,7 +32,11 @@ let fixed_length e =
 
 let n_length = Encoding.n_length
 
-let () = if n_length (Z.of_int (Binary_size.max_int `N)) <> 5 then assert false
+let () =
+  if
+    n_length (Z.of_int (Binary_size.max_int `N))
+    <> Binary_size.max_size_of_uint30_like_n
+  then assert false
 
 let z_length = Encoding.z_length
 
