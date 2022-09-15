@@ -1002,8 +1002,9 @@ module Make (Context : P) :
     let is_letter d =
       Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
     in
-    let is_identifier_char d =
-      is_digit d || is_letter d || Compare.Char.(d = '%')
+    let is_identifier_char = function
+      | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' | '%' -> true
+      | _ -> false
     in
     let* parser_state = Parser_state.get in
     match parser_state with
