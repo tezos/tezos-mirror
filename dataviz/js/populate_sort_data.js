@@ -56,7 +56,7 @@ function get_info_block(dict_data, msec = false) {
                 if (msec == false) {
                     if (("reception_time" in element) && ("timestamp" in element)) t_delay_block[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
                 } else {
-                    if (("reception_time" in element) && ("timestamp" in element)) t_delai_block[round] = (new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds() * 1000) + new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getMilliseconds();
+                    if (("reception_time" in element) && ("timestamp" in element)) t_delay_block[round] = (new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds() * 1000) + new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getMilliseconds();
                 }
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
                 if (round > max_round) {
