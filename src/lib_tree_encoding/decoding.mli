@@ -128,7 +128,8 @@ val case_lwt : 'tag -> 'b t -> ('b -> 'a Lwt.t) -> ('tag, 'a) case
 
     If an insufficient list of cases are provided, the resulting encoder may
     fail with a [No_tag_matched] error when [run].  *)
-val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
+val tagged_union :
+  ?default:(unit -> 'a) -> 'tag t -> ('tag, 'a) case list -> 'a t
 
 (** [wrapped_tree] returns the [Tree.wrapped_tree] located at the prefix tree
     under which it is called.

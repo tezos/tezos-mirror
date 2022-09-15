@@ -200,7 +200,7 @@ let tagged_union ?default decode_tag cases =
           (function
             | Key_not_found _ as exn -> (
                 match default with
-                | Some default -> return default
+                | Some default -> return (default ())
                 | None -> raise exn)
             | exn -> raise exn));
   }
