@@ -44,7 +44,7 @@ const populate_v0 = function (server, beg, end, directories, dict_data) {
     return dict_data
 }
 
-function get_info_bloc(dict_data) {
+function get_info_bloc(dict_data, msec = false) {
     let t_delai_bloc = {};
     let max_round = 0;
     let t_baker = {}
@@ -53,7 +53,11 @@ function get_info_bloc(dict_data) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
-                if (("reception_time" in element) && ("timestamp" in element)) t_delai_bloc[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
+                if (msec == false) {
+                    if (("reception_time" in element) && ("timestamp" in element)) t_delai_bloc[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
+                } else {
+                    if (("reception_time" in element) && ("timestamp" in element)) t_delai_bloc[round] = (new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds()*1000)+new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getMilliseconds();
+                }
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
                 if (round > max_round) {
                     max_round = round
@@ -63,9 +67,9 @@ function get_info_bloc(dict_data) {
     });
     return [t_delai_bloc, t_baker, max_round]
 }
-function delegate_delays_distribution_of_operations(dict_data, delegate) {
+function delegate_delays_distribution_of_operations(dict_data, delegate, msec = false) {
     let t_valide = []
-    let complete_delays = delays_distribution_of_operations(dict_data)
+    let complete_delays = delays_distribution_of_operations(dict_data, msec)
     let delays_endorsement = complete_delays[1]
     let delays_pre_endorsement = complete_delays[0]
     Object.entries(dict_data).forEach(([va, v]) => {
@@ -84,20 +88,27 @@ function delegate_delays_distribution_of_operations(dict_data, delegate) {
                         let round_cib = 0;
                         if ("round" in operation) round_cib = operation["round"];
                         if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
-                            let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                            let delay
+                            if (msec == false) {
+                                delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                            } else {
+                                delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds()*1000)+new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+                            }
+
                             if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
                                 let t_op_pre_valide_i = delays_pre_endorsement[va][round_cib]
+                                console.log(t_op_pre_valide_i)
                                 t_op_pre_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
                                 let position_of_delegate = 1 + t_op_pre_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_pre_valide_i)).toPrecision(3)
-                                t_valide.push({ "type": "preendo", "bloc": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valide_i).toPrecision(3) })
+                                let deviation_from_mean = (delay - average(t_op_pre_valide_i)).toPrecision(6)
+                                t_valide.push({ "type": "preendo", "bloc": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valide_i)})
                             }
                             else if ((va in delays_endorsement) && (round_cib in delays_endorsement[va])) {
                                 let t_op_valide_i = delays_endorsement[va][round_cib]
                                 t_op_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
                                 let position_of_delegate = 1 + t_op_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_valide_i)).toPrecision(3)
-                                t_valide.push({ "type": "endo", "bloc": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valide_i).toPrecision(3) })
+                                let deviation_from_mean = (delay - average(t_op_valide_i)).toPrecision(6)
+                                t_valide.push({ "type": "endo", "bloc": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valide_i) })
                             }
                         }
                     })
@@ -107,7 +118,7 @@ function delegate_delays_distribution_of_operations(dict_data, delegate) {
     return t_valide
 }
 
-function delays_distribution_of_operations(dict_data) {
+function delays_distribution_of_operations(dict_data, msec = false) {
     let t_op_valide = {};
     let t_op_pre_valide = {};
     Object.entries(dict_data).forEach(([va, v]) => {
@@ -130,7 +141,12 @@ function delays_distribution_of_operations(dict_data) {
                     let round_cib = 0;
                     if ("round" in operation) round_cib = operation["round"];
                     if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
-                        let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                        let delay
+                        if (msec == false) {
+                            delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                        } else {
+                            delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds()*1000)+new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+                        }
                         if (("kind" in operation)) {
                             t_op_pre_valide_i[round_cib].push(delay);
                         }
@@ -146,7 +162,7 @@ function delays_distribution_of_operations(dict_data) {
     return [t_op_pre_valide, t_op_valide]
 }
 
-function classify_operations(dict_data, delegate = "") {
+function classify_operations(dict_data, delegate = "", msec = false) {
     let operations_logs = {};
     Object.entries(dict_data).forEach(([height, v]) => {
         console.log(height);
@@ -166,7 +182,13 @@ function classify_operations(dict_data, delegate = "") {
                             if ("round" in operation) round_cib = operation["round"];
                             //Valide
                             if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
-                                let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                                let delay;
+                                if (msec == false) {
+                                    delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
+                                } else {
+                                    delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds()*1000)+new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
+
+                                }
                                 if (("kind" in operation)) {
                                     if (delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["pre_approbations"]["valide"].push(baker_ops["delegate"]);
@@ -1018,7 +1040,7 @@ function chart_consensus_operation_specific_address(data) {
                 .attr("y", -5)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "start")
-                .text("↑ Delays between operations receipt time and candidate block timestamps (seconds)");
+                .text("↑ Delays between operations receipt time and candidate block timestamps (ms)");
 
             svgg.append("text")
                 .attr("x", width + margin.right - 120)
@@ -1084,7 +1106,7 @@ function chart_time_mean_deviation(data) {
                 .domain(d3.extent(data, d => d.bloc))
                 .range([0, width]);
             svgg.append("g")
-                .attr("transform", "translate(0," + height/2 + ")")
+                .attr("transform", "translate(0," + height / 2 + ")")
                 .call(d3.axisBottom(x).ticks(5));
 
             // Add Y axis
@@ -1157,11 +1179,11 @@ function chart_time_mean_deviation(data) {
                 .attr("y", -5)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "start")
-                .text("↑ deviation from the mean of all operation reception times for this block (seconds)");
+                .text("↑ deviation from the mean of all operation reception times for this block (ms)");
 
             svgg.append("text")
                 .attr("x", width + margin.right - 120)
-                .attr("y", height/2)
+                .attr("y", height / 2)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
                 .text(" # Bloc →");
