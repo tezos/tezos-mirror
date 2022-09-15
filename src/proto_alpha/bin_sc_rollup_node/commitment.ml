@@ -45,7 +45,7 @@ open Protocol
 open Alpha_context
 
 module type Mutable_level_store =
-  Store.Mutable_value with type value = Raw_level.t
+  Store_utils.Mutable_value with type value = Raw_level.t
 
 (* We persist the number of ticks to be included in the
    next commitment on disk, in a map that is indexed by
@@ -53,7 +53,7 @@ module type Mutable_level_store =
    these counters when the wrong branch is tracked by the rollup
    node, as only finalized heads are processed to build commitments.
 *)
-module Number_of_ticks = Store.Make_append_only_map (struct
+module Number_of_ticks = Store_utils.Make_append_only_map (struct
   let path = ["commitments"; "in_progress"; "number_of_ticks"]
 
   (* We only access the number of ticks for either the
