@@ -56,8 +56,7 @@
                         }
 
                     });
-
-                }              
+                }               
                 $('form').keyup(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {

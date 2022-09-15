@@ -1195,7 +1195,7 @@ function chart_time_mean_deviation(data) {
                 .attr("text-anchor", "end")
                 .text("Type:");
 
-        } catch (e) { console.log(e) }
+        } catch (e) { console.log(e); }
     }
     else {
         alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc \n No Graph. \nIt can be due to:\n - not producing any valid operations")
