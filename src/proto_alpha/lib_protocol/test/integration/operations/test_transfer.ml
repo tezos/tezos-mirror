@@ -673,6 +673,163 @@ let transfer_to_itself_with_no_such_entrypoint () =
   Incremental.add_operation ~expect_apply_failure i transaction >>= fun _res ->
   return ()
 
+(** A module with a type that tracks a block's predecessor. *)
+module State = struct
+  type t = {predecessor : Block.t option; current : Block.t}
+
+  let init () =
+    let open Lwt_result_syntax in
+    let+ block, b1 = Context.init1 () in
+    ({predecessor = None; current = block}, b1)
+
+  (** Applies an operation to a state and returns the resulting state. *)
+  let apply ~baker ~operation ~state =
+    let block = state.current in
+    let open Lwt_result_syntax in
+    let open Incremental in
+    let* inc = begin_construction ~policy:Block.(By_account baker) block in
+    let* inc = add_operation inc operation in
+    let* inc =
+      match state.predecessor with
+      | None -> return inc
+      | Some predecessor ->
+          (* Include all endorsements. *)
+          let* endorsers = Context.get_endorsers (B block) in
+          List.fold_left_es
+            (fun inc {Plugin.RPC.Validators.delegate; slots; _} ->
+              let* endorsement =
+                Op.endorsement
+                  ~delegate:(delegate, slots)
+                  ~endorsed_block:block
+                  (B predecessor)
+                  ()
+              in
+              add_operation inc (Operation.pack endorsement))
+            inc
+            endorsers
+    in
+    let+ next = finalize_block inc in
+    {predecessor = Some block; current = next}
+
+  let current {current; _} = current
+
+  (** Originates a contract with a [script] and an initial [credit] and
+      [storage]. *)
+  let contract_originate ~baker ~(state : t) ~script ~credit ~storage ~source =
+    let open Lwt_result_syntax in
+    let block = current state in
+    let code = Expr.from_string script in
+    let script =
+      Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+    in
+    let* op, dst =
+      Op.contract_origination_hash
+        (B block)
+        source
+        ~fee:Tez.zero
+        ~script
+        ~credit
+    in
+    let+ state = apply ~operation:op ~state ~baker in
+    (state, dst)
+
+  (** Runs a transaction from a [source] to a [destination]. *)
+  let transfer ?force_reveal ?parameters ~baker ~state ~source ~destination
+      amount =
+    let open Lwt_result_syntax in
+    let block = current state in
+    let* operation =
+      Op.transaction
+        ?force_reveal
+        ?parameters
+        ~fee:Tez.zero
+        (B block)
+        source
+        destination
+        amount
+    in
+    apply ~operation ~state ~baker
+end
+
+(** The script of a contract that transfers its balance to the caller, and
+    stores the parameter of the call. *)
+let script =
+  {| { parameter string ;
+     storage string ;
+       code {
+         CAR ;
+         SOURCE ;
+         CONTRACT unit ;
+         ASSERT_SOME ;
+         BALANCE ;
+         UNIT ;
+         TRANSFER_TOKENS ;
+         NIL operation ;
+         SWAP ;
+         CONS ;
+         PAIR }
+} |}
+
+(** The tested scenarios are the following :
+
+    - originate a contract with the above [script] and no initial balance,
+    call it from an account short of sufficient funds to cover storage fees,
+    and check that this indeed fails.
+
+    - originate a contract with the above [script] and sufficient balance to
+    cover storage fees of a subsequent call, call the originated contract from
+    an account short of sufficient funds to cover storage fees, as expected,
+    this succeeds since the caller receives the originated contract's initial
+    balance. *)
+let test_storage_fees_and_internal_operation () =
+  let open Lwt_result_syntax in
+  let* initial_state, b1 = State.init () in
+  let null_string = Expr.from_string "\"\"" in
+  let caller = Account.new_account () in
+  (* Initialize a caller account. *)
+  let* initial_state =
+    State.transfer
+      ~state:initial_state
+      ~baker:(Context.Contract.pkh b1)
+      ~source:b1
+      ~destination:(Contract.Implicit caller.pkh)
+      Tez.one_mutez
+  in
+  (* [originate_and_call] first, originates a contract with an empty string as
+     initial storage, and an initial credit of [initial_amount]. And then, calls
+     the originated contract from [caller] with a parameter that allocates
+     additional storage. *)
+  let originate_and_call ~initial_state ~initial_amount =
+    let* state, contract_hash =
+      State.contract_originate
+        ~state:initial_state
+        ~baker:(Context.Contract.pkh b1)
+        ~script
+        ~source:b1
+        ~credit:initial_amount
+        ~storage:null_string
+    in
+    let random_string = Expr.from_string "\"Abracadabra\"" in
+    State.transfer
+      ~force_reveal:true
+      ~parameters:(Alpha_context.Script.lazy_expr random_string)
+      ~state
+      ~baker:(Context.Contract.pkh b1)
+      ~source:(Contract.Implicit caller.pkh)
+      ~destination:(Contract.Originated contract_hash)
+      Tez.zero
+  in
+  (* Ensure failure when the initial balance of the originated contract is not
+     sufficient to pay storage fees. *)
+  let*! res = originate_and_call ~initial_state ~initial_amount:Tez.one_mutez in
+  let* () =
+    Assert.proto_error_with_info ~loc:__LOC__ res "Cannot pay storage fee"
+  in
+  (* Ensure success when the initial balance of the originated contract is
+     sufficient to pay storage fees. *)
+  let+ _ = originate_and_call ~initial_state ~initial_amount:Tez.one_cent in
+  ()
+
 let tests =
   [
     (* single transfer *)
@@ -776,4 +933,8 @@ let tests =
       "no such entrypoint"
       `Quick
       transfer_to_itself_with_no_such_entrypoint;
+    Tztest.tztest
+      "storage fees after contract call and allocation"
+      `Quick
+      test_storage_fees_and_internal_operation;
   ]

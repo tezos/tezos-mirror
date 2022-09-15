@@ -9,7 +9,8 @@
   tezos-protocol-013-PtJakart
   tezos-client-013-PtJakart
   tezos-013-PtJakart-test-helpers
-  tezos-base-test-helpers)
+  tezos-base-test-helpers
+  tezos-protocol-plugin-013-PtJakart)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -17,7 +18,8 @@
   -open Tezos_protocol_013_PtJakart
   -open Tezos_client_013_PtJakart
   -open Tezos_013_PtJakart_test_helpers
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_013_PtJakart))
 
 (rule
  (alias runtest)
