@@ -46,12 +46,13 @@
 
                     let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
                         let t_valide=delegate_delays_distribution_of_operations(dict_data, adresse);
+                        console.log(t_valide);
                         let ope_observation = classify_operations(dict_data, adresse);
                         console.log("ope_observation",ope_observation);
                         let result = get_info_bloc(dict_data);
                         let t_baker=result[1]
                         chart_consensus_operation_specific_address(t_valide);
-
+                        chart_time_mean_deviation(t_valide);
                         resume_obs(ope_observation,t_baker, adresse)
                     })
 
@@ -67,4 +68,5 @@
 
     </script>
     <div id="dataviz"></div>
+    <div id="ecart_moyenne"></div>
     <div id="resume"></div>

@@ -21,7 +21,7 @@
         <label for="selectedLevel">Level</label>
         <tr>
             <td rowspan="2">
-                <input name="level" id="selectedLevel" type="number" value="179000" />
+                <input name="level" id="selectedLevel" type="number" />
             </td>
             <td>
                 <input id="plus" type="button" value=" Next " onclick="this.form.level.value++;">
@@ -36,7 +36,7 @@
 
         function main() {
             try {
-                const params = new Proxy(new URLSearchParams(window.location.search), {
+                const params = new Proxy(new URLSearchParams(window.location.search), { // to input parameters in URL
                     get: (searchParams, prop) => searchParams.get(prop),
                 });
                 // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
