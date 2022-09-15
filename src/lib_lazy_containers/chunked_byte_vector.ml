@@ -99,9 +99,9 @@ type t = {mutable length : int64; chunks : Chunk.t Vector.t}
 
 let def_get_chunk _ = Lwt.return (Chunk.alloc ())
 
-let create ?origin ?(get_chunk = def_get_chunk) length =
+let create ?origin ?get_chunk length =
   let chunks =
-    Vector.create ?origin ~produce_value:get_chunk (Chunk.num_needed length)
+    Vector.create ?origin ?produce_value:get_chunk (Chunk.num_needed length)
   in
   {length; chunks}
 
@@ -148,7 +148,10 @@ let store_byte vector address byte =
   let open Lwt.Syntax in
   if Int64.compare address vector.length >= 0 then raise Bounds ;
   let+ chunk = get_chunk (Chunk.index address) vector in
-  Array1_64.set chunk (Chunk.offset address) byte
+  Array1_64.set chunk (Chunk.offset address) byte ;
+  (* This is necessary because [get_chunk] might provide a default
+     value without loading any data. *)
+  Vector.set (Chunk.index address) chunk vector.chunks
 
 let store_bytes vector address bytes =
   List.init (Bytes.length bytes) (fun i ->
