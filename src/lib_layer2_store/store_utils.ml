@@ -54,33 +54,90 @@ let info message =
   in
   Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
 
+(** Module type respresenting a [Mutable_value] that is persisted on store. *)
 module type Mutable_value = sig
+  (** the type of the values that will be persisted. *)
   type value
 
+  (** [path_key] is the path that is used to locate the variable in the backend
+      storage. *)
   val path_key : path
 
+  (** [set store value] persists [value] on [store] at the path specified by
+      [path_key] *)
   val set : t -> value -> unit Lwt.t
 
+  (** [get store] retrievs the value persisted at location [path_key] in the
+      store. If no value is persisted at the location indicated by [path_key],
+      an error is thrown. *)
   val get : t -> value Lwt.t
 
+  (** [find store] retrievs the value persisted at location [path_key] in the
+      store, and returns it as an optional value.  If no value is persisted at
+      the location indicated by [path_key], [None] is returned *)
   val find : t -> value option Lwt.t
 end
 
+(** The module [KeyValue] specifies information about how maps should be
+    persisted on disk. *)
 module type KeyValue = sig
+  (** [path] is used to identify where a map is persisted on disk.  *)
   val path : path
 
+  (** [keep_last_n_entries_in_memory] specifies how many entries for a
+      map should be cached in memory. It is currently not used. *)
   val keep_last_n_entries_in_memory : int
 
+  (** [key] is the type used for keys of maps persisted on disk. *)
   type key
 
+  (** [string_of_key key] constructs the location where an individual [value]
+      from the map is persisted on disk.  *)
   val string_of_key : key -> string
 
+  (** [value] is the type of values that are going to be persisted on disk. *)
   type value
 
+  (** [value_encoding] determines how a [value] should be encoded/decoded
+      when being persisted to or retrieved from disk. *)
   val value_encoding : value Data_encoding.t
 end
 
+(** Generic module type for maps to be persisted on disk. *)
+module type Map = sig
+  (** The type of keys persisted by the map. *)
+  type key
+
+  (** The type of values persisted by the map. *)
+  type value
+
+  (** [mem store key] checks whether there is a binding of the map for key [key]
+      in [store]. *)
+  val mem : t -> key -> bool Lwt.t
+
+  (** [get store key] retrieves from [store] the value associated with [key] in
+      the map. It raises an error if such a value does not exist. *)
+  val get : t -> key -> value Lwt.t
+
+  (** [find store key] retrieves from [store] the value associated with [key]
+      in the map. If the value exists it is returned as an optional value.
+      Otherwise, [None] is returned. *)
+  val find : t -> key -> value option Lwt.t
+
+  (** [find_with_default ~on_default store key] retrieves from [store] the
+      value associated with [key]
+      in the map. If the value exists it is returned as is. Otherwise,
+      [on_default] is returned.*)
+  val find_with_default : t -> key -> on_default:(unit -> value) -> value Lwt.t
+
+  val add : t -> key -> value -> unit Lwt.t
+end
+
 module Make_map (P : KeyValue) = struct
+  type key = P.key
+
+  type value = P.value
+
   (* Ignored for now. *)
   let _ = P.keep_last_n_entries_in_memory
 
@@ -109,6 +166,10 @@ module Make_map (P : KeyValue) = struct
     Option.value_f value ~default:on_default
 end
 
+(** [Make_updatable_map(P)] constructs a [Map] which can be persisted on store,
+    using the information provided by [P] for stroing keys and values. The
+    resulting map allows to update the contents of an existing value for a key.
+*)
 module Make_updatable_map (P : KeyValue) = struct
   include Make_map (P)
 
@@ -120,6 +181,10 @@ module Make_updatable_map (P : KeyValue) = struct
     IStore.set_exn ~info store (make_key key) encoded_value
 end
 
+(** [Make_append_only_map(P)] constructs a [Map] which can be persisted on
+    store, using the information provided by [P] for stroing keys and values.
+    The resulting map prevents updating the value for a key to a differet one.
+*)
 module Make_append_only_map (P : KeyValue) = struct
   include Make_map (P)
 
@@ -146,6 +211,9 @@ module Make_append_only_map (P : KeyValue) = struct
         else return_unit
 end
 
+(** [Make_mutable_value(P)] constructs a [Mutable_value] for persisting mutable
+    values on disk. The type of values to be stored as well as how these are
+    encoded into disk are specified by the functor argument [P]. *)
 module Make_mutable_value (P : sig
   val path : path
 
@@ -179,57 +247,130 @@ struct
     decode_value value
 end
 
-(* A nested map is a (IStore) updatable map whose values are themselves
-   maps constructed via the `Map.Make` functor, encoded in the Irmin
-   store as lists of bindings. The module returned by the
-   `Make_nested_map` functor implement some utility functions on top of
-   Make_nested_map, to provide functionalities for  iterating over the
-   bindings of the store value.
-   It also shadows the get, add and mem operations of updatable_maps,
-   to allow updating and retrieveing only one binding from the value of the
-   store. The keys of the IStore updatable map are referred to
-   as primary keys. The keys of the values of the updatable
-   map are referred to as secondary keys.
+(** [Nested_map] is a map where values are indexed by both a primary and
+    secondary key. It allows more flexibility over a map whose keys are
+    tupls of the form `(primary_key, secondary_key)`. In particular, it
+    provides functions to retrieve all the bindings in a map that share the
+    same primary_key.
 *)
-module Make_nested_map (K : sig
-  type key
+module type Nested_map = sig
+  (** [primary_key] is the type of primary keys for the [Nested_map]. *)
+  type primary_key
 
-  val string_of_key : key -> string
-
-  val path : string list
-
-  val keep_last_n_entries_in_memory : int
-
+  (** [secondary_key] is the type of secondary keys for the [Nested_map]. *)
   type secondary_key
 
-  val secondary_key_name : string
-
-  val value_name : string
-
-  val compare_secondary_keys : secondary_key -> secondary_key -> int
-
+  (** [value] is the type of values that are going to be persisted on disk,
+      indexed by primary and secondary key. *)
   type value
 
+  (** [mem store ~primary_key ~secondary_key] returns whether there is a
+      value for the nested map persisted on [store] for the nested map,
+      indexed by [primary_key] and then by [secondary_key]. *)
+  val mem :
+    t -> primary_key:primary_key -> secondary_key:secondary_key -> bool Lwt.t
+
+  (** [get store ~primary_key ~secondary_key] retrieves from [store] the value
+      of the nested map associated with [primary_key] and [secondary_key], if
+      any. If such a value does not exist, it raises an error. *)
+  val get :
+    t -> primary_key:primary_key -> secondary_key:secondary_key -> value Lwt.t
+
+  (** [list secondary_keys store ~primary_key] retrieves from [store] the list
+      of bindings of the nested map that share the same [~primary_key]. For
+      each of these bindings, both the secondary_key and value are returned. *)
+  val list_secondary_keys_with_values :
+    t -> primary_key:primary_key -> (secondary_key * value) list Lwt.t
+
+  (** [list_secondary_keys store ~primary_key] retrieves from [store]
+      the list of secondary_keys for which a value indexed by both
+      [primary_key] and secondary key is persisted on disk. *)
+  val list_secondary_keys :
+    t -> primary_key:primary_key -> secondary_key list Lwt.t
+
+  (** [list_values store ~primary_key] retrieves from [store] the list of
+      values for which a binding with primary key [primary_key] and
+      arbitrary secondary key exists. *)
+  val list_values : t -> primary_key:primary_key -> value list Lwt.t
+
+  val add :
+    t ->
+    primary_key:primary_key ->
+    secondary_key:secondary_key ->
+    value ->
+    unit Lwt.t
+end
+
+(** [DoubleKeyValue] provides information about how a [Nested_map] is persisted
+    on disk. *)
+module type DoubleKeyValue = sig
+  (** [key] is the type of the primary key. *)
+  type key
+
+  (** [string_of_key key] converts [key] into a string. *)
+  val string_of_key : key -> string
+
+  (** [path] specifies the location where a [Nested_map] is persisted. *)
+  val path : string list
+
+  (** [keep_last_ne_entries_in_memory] specifies how many entries in a
+      [Nested_map] should be retained in memory. It is currently not used. *)
+  val keep_last_n_entries_in_memory : int
+
+  (** [value] is the type of values of a [Nested_map] to be persisted on
+      disk. *)
+  type value
+
+  (** [value_name] is a string identifying the type of a [value]. *)
+  val value_name : string
+
+  (** The type of the [secodary_key]. *)
+  type secondary_key
+
+  (** [secondary_key_name] is a string identifying the type of
+      [secondary_key]. *)
+  val secondary_key_name : string
+
+  (** [compare_secondary_key key1 key2] compares two secondary keys. *)
+  val compare_secondary_keys : secondary_key -> secondary_key -> int
+
+  (** [secondary_key_encoding] is an encoding specifying how secondary keys
+      should be persisted on disk. *)
   val secondary_key_encoding : secondary_key Data_encoding.t
 
+  (** [value_encoding] is an encoding specifying how values are persisted on
+      disk. *)
   val value_encoding : value Data_encoding.t
-end) =
-struct
+end
+
+(** [Make_nested_map(K)] build a [Nested_map] using the information provided
+    in [K] to persist keys and values. The result is a [Nested_map]  which
+    wraps an [Updatable map] whose keys have type [K.key], and whose values
+    are [K.value] valued in-memory maps indexed by [K.secondary_key]. *)
+module Make_nested_map (K : DoubleKeyValue) = struct
+  type primary_key = K.key
+
+  type secondary_key = K.secondary_key
+
+  type value = K.value
+
   module Secondary_key_map = Map.Make (struct
     type t = K.secondary_key
 
     let compare = K.compare_secondary_keys
   end)
 
-  include Make_updatable_map (struct
-    include K
+  module Map_as_value = struct
+    type key = K.key
 
     type value = K.value Secondary_key_map.t
 
-    (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3732
-       Use data encodings for maps once they are available in the
-       `Data_encoding` library.
-    *)
+    let path = K.path
+
+    let keep_last_n_entries_in_memory = K.keep_last_n_entries_in_memory
+
+    let string_of_key = K.string_of_key
+
     let value_encoding =
       Data_encoding.conv
         (fun dal_slots_map -> Secondary_key_map.bindings dal_slots_map)
@@ -240,12 +381,14 @@ struct
           @@ obj2
                (req K.secondary_key_name K.secondary_key_encoding)
                (req K.value_name K.value_encoding))
-  end)
+  end
+
+  module M = Make_updatable_map (Map_as_value)
 
   (* Return the bindings associated with a primary key. *)
   let list_secondary_keys_with_values store ~primary_key =
     let open Lwt_syntax in
-    let+ slots_map = find store primary_key in
+    let+ slots_map = M.find store primary_key in
     Option.fold ~none:[] ~some:Secondary_key_map.bindings slots_map
 
   (* Check whether the updatable store contains an entry
@@ -253,10 +396,10 @@ struct
      binding whose key is ~secondary_key. *)
   let mem store ~primary_key ~secondary_key =
     let open Lwt_syntax in
-    let* primary_key_binding_exists = mem store primary_key in
+    let* primary_key_binding_exists = M.mem store primary_key in
     if not primary_key_binding_exists then return false
     else
-      let+ secondary_key_map = get store primary_key in
+      let+ secondary_key_map = M.get store primary_key in
       Secondary_key_map.mem secondary_key secondary_key_map
 
   (* unsafe call. The existence of a value for
@@ -264,7 +407,7 @@ struct
      checked before invoking this function. *)
   let get store ~primary_key ~secondary_key =
     let open Lwt_syntax in
-    let+ secondary_key_map = get store primary_key in
+    let+ secondary_key_map = M.get store primary_key in
     match Secondary_key_map.find secondary_key secondary_key_map with
     | None ->
         (* value for primary and secondary key does not exist *)
@@ -294,7 +437,7 @@ struct
      value `value`.*)
   let add store ~primary_key ~secondary_key value =
     let open Lwt_syntax in
-    let* value_map = find store primary_key in
+    let* value_map = M.find store primary_key in
     let value_map = Option.value ~default:Secondary_key_map.empty value_map in
     let value_can_be_added =
       match Secondary_key_map.find secondary_key value_map with
@@ -307,7 +450,7 @@ struct
     in
     if value_can_be_added then
       let updated_map = Secondary_key_map.add secondary_key value value_map in
-      add store primary_key updated_map
+      M.add store primary_key updated_map
     else
       Stdlib.failwith
         (Printf.sprintf
