@@ -65,7 +65,7 @@ let () =
     `Permanent
     ~id:"sc_rollup_arith_invalid_claim_about_outbox"
     ~title:msg
-    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
     ~description:msg
     unit
     (function Arith_invalid_claim_about_outbox -> Some () | _ -> None)
