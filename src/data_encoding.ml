@@ -70,12 +70,23 @@ module Encoding = struct
     raw_splitted ~json ~binary
 
   module Bounded = struct
-    let string' json_repr length =
+    let string' ?length_kind json_repr length =
+      let max_length =
+        match length_kind with
+        | None -> Binary_size.max_int `Uint30 (* biggest that's allowed *)
+        | Some kind -> Binary_size.max_int kind
+      in
+      if length > max_length then
+        raise (Invalid_argument "Data_encoding.Encoding.Bounded.string': length bound is greater than maximum length allowed in size header.");
       raw_splitted
         ~binary:
-          (let kind = Binary_size.unsigned_range_to_size length in
-           check_size (length + Binary_size.integer_to_size kind)
-           @@ dynamic_size ~kind:(kind :> Binary_size.length) Variable.string)
+          (let kind =
+            match length_kind with
+            | None -> (Binary_size.unsigned_range_to_size length :>
+            Binary_size.length)
+            | Some kind -> kind
+           in
+           dynamic_size ~kind (check_size length Variable.string))
         ~json:
           (let open Json_encoding in
           conv
@@ -91,12 +102,23 @@ module Encoding = struct
 
     let string length = string' Plain length
 
-    let bytes' json_repr length =
+    let bytes' ?length_kind json_repr length =
+      let max_length =
+        match length_kind with
+        | None -> Binary_size.max_int `Uint30 (* biggest that's allowed *)
+        | Some kind -> Binary_size.max_int kind
+      in
+      if length > max_length then
+        raise (Invalid_argument "Data_encoding.Encoding.Bounded.string': length bound is greater than maximum length allowed in size header.");
       raw_splitted
         ~binary:
-          (let kind = Binary_size.unsigned_range_to_size length in
-           check_size (length + Binary_size.integer_to_size kind)
-           @@ dynamic_size ~kind:(kind :> Binary_size.length) Variable.bytes)
+          (let kind =
+            match length_kind with
+            | None -> (Binary_size.unsigned_range_to_size length :>
+            Binary_size.length)
+            | Some kind -> kind
+           in
+           dynamic_size ~kind (check_size length Variable.bytes))
         ~json:
           (let open Json_encoding in
           conv

@@ -566,11 +566,11 @@ let z = make @@ Z
 
 let float = make @@ Float
 
-let string' json_repr = dynamic_size (Variable.string' json_repr)
+let string' ?length_kind json_repr = dynamic_size ?kind:length_kind (Variable.string' json_repr)
 
 let string = string' Plain
 
-let bytes' json_repr = dynamic_size (Variable.bytes' json_repr)
+let bytes' ?length_kind json_repr = dynamic_size ?kind:length_kind (Variable.bytes' json_repr)
 
 let bytes = bytes' Hex
 

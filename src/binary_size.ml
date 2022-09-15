@@ -79,6 +79,12 @@ let integer_to_size = function
   | `Uint16 -> uint16
   | `Uint8 -> uint8
 
+let length_to_max_size = function
+  | `N -> 5 (* see assertion check in binary_length *)
+  | `Uint30 -> uint30
+  | `Uint16 -> uint16
+  | `Uint8 -> uint8
+
 let max_int = function
   | `N | `Uint30 | `Int31 -> (1 lsl 30) - 1
   | `Int16 -> (1 lsl 15) - 1

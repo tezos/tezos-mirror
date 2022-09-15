@@ -234,13 +234,14 @@ module Encoding : sig
 
   (** Encoding of a string
       - In binary, encoded as a byte sequence prefixed by the length
-        of the string
+        of the string. The length is represented as specified by the
+        [length_kind] parameter (default [`Uint30]).
       - in JSON when [string_json_repr = Plain], encoded as a string
       - in JSON when [string_json_repr = Hex],  encoded via hex. *)
-  val string' : string_json_repr -> string encoding
+  val string' : ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] -> string_json_repr -> string encoding
 
   (** Encoding of arbitrary bytes. See [string'] *)
-  val bytes' : string_json_repr -> Bytes.t encoding
+  val bytes' : ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] -> string_json_repr -> Bytes.t encoding
 
   (** same as [string' Plain] *)
   val string : string encoding
@@ -894,13 +895,13 @@ let expr_encoding =
 
         Attempting to construct a string with a length that is too long causes
         an [Invalid_argument] exception. *)
-    val string' : string_json_repr -> int -> string encoding
+    val string' : ?length_kind:Binary_size.length -> string_json_repr -> int -> string encoding
 
     (** Same as [string' Plain] *)
     val string : int -> string encoding
 
     (** See {!string'} above. *)
-    val bytes' : string_json_repr -> int -> Bytes.t encoding
+    val bytes' : ?length_kind:Binary_size.length -> string_json_repr -> int -> Bytes.t encoding
 
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding

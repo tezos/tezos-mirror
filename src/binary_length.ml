@@ -32,6 +32,8 @@ let fixed_length e =
 
 let n_length = Encoding.n_length
 
+let () = if n_length (Z.of_int (Binary_size.max_int `N)) <> 5 then assert false
+
 let z_length = Encoding.z_length
 
 let rec length : type x. x Encoding.t -> x -> int =
