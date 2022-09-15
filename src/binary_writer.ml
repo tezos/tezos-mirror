@@ -333,7 +333,7 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
               value
           in
           write_with_limit
-            (Binary_length.n_length (Z.of_int (Binary_size.max_int `N)))
+            (Binary_length.n_length (Z.of_int size))
             n
             state
             (Z.of_int size) ;
