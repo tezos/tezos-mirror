@@ -78,7 +78,7 @@ let input_proof_encoding =
     case
       ~title:"reveal proof"
       (Tag 1)
-      string
+      (check_size Constants_repr.sc_rollup_message_size_limit string)
       (function Reveal_proof s -> Some s | _ -> None)
       (fun s -> Reveal_proof s)
   in
@@ -162,8 +162,7 @@ let valid snapshot commit_level ~pvm_name proof =
           (Raw_level_repr.(level = l) && Z.(equal message_counter n))
           "Level and index of inbox proof are not equal to the one expected in \
            input request."
-    | ( Some (Reveal_proof data),
-        Needs_reveal (RevealRawData expected_hash) ) ->
+    | Some (Reveal_proof data), Needs_reveal (RevealRawData expected_hash) ->
         let data_hash = Sc_rollup_PVM_sig.Input_hash.hash_string [data] in
         check
           (Sc_rollup_PVM_sig.Input_hash.equal data_hash expected_hash)
