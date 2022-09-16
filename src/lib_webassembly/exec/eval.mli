@@ -203,8 +203,8 @@ type init_kont =
       * (Ast.data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
   | IK_Join_admin of module_inst * admin_instr join_kont
-  | IK_Eval of module_inst * config
-  | IK_Stop of module_inst
+  | IK_Eval of config
+  | IK_Stop
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
 

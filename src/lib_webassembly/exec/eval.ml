@@ -1869,8 +1869,8 @@ type init_kont =
       * (data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
   | IK_Join_admin of module_inst * admin_instr join_kont
-  | IK_Eval of module_inst * config
-  | IK_Stop of module_inst
+  | IK_Eval of config
+  | IK_Stop
 
 let section_next_init_kont :
     type kont a b.
@@ -2073,26 +2073,25 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
   | IK_Join_admin (inst0, tick) -> (
       match join_completed tick with
       | Some res ->
-          Lwt.return
-            (IK_Eval (inst0, config host_funcs self (Vector.empty ()) res))
+          Lwt.return (IK_Eval (config host_funcs self (Vector.empty ()) res))
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))
-  | IK_Eval (inst, {step_kont = SK_Result _; _}) ->
+  | IK_Eval {step_kont = SK_Result _; _} ->
       (* No more admin instr, which means that we have returned from
          the _start function. *)
-      Lwt.return (IK_Stop inst)
-  | IK_Eval (_, {step_kont = SK_Trapped {it = msg; at}; _}) -> Trap.error at msg
-  | IK_Eval (inst, config) ->
+      Lwt.return IK_Stop
+  | IK_Eval {step_kont = SK_Trapped {it = msg; at}; _} -> Trap.error at msg
+  | IK_Eval config ->
       let+ _, config = step module_reg config buffers in
-      IK_Eval (inst, config)
-  | IK_Stop _ -> raise (Init_step_error Init_step)
+      IK_Eval config
+  | IK_Stop -> raise (Init_step_error Init_step)
 
 let init ~module_reg ~self buffers host_funcs (m : module_) (exts : extern list)
     : module_inst Lwt.t =
   let open Lwt.Syntax in
   let rec go = function
-    | IK_Stop inst -> Lwt.return inst
+    | IK_Stop -> resolve_module_ref module_reg self
     | kont ->
         let* kont = init_step ~module_reg ~self buffers host_funcs m kont in
         go kont

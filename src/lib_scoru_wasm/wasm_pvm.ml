@@ -296,7 +296,7 @@ struct
                 (Stuck
                    (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
           )
-      | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
+      | Init {self; ast_module = _; init_kont = IK_Stop} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
           in
