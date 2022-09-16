@@ -954,8 +954,7 @@ module Make (Context : P) :
     let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
     m
 
-  let reveal_reveal data =
-    reveal_reveal_monadic data |> ticked |> state_of
+  let reveal_reveal data = reveal_reveal_monadic data |> ticked |> state_of
 
   let set_input_monadic input =
     match input with
@@ -1153,10 +1152,12 @@ module Make (Context : P) :
         if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
         then
           let hash = String.sub x 5 (len - 5) in
-          let hash = PS.Input_hash.of_b58check_exn hash in
-          let* () = Required_reveal.set (Some hash) in
-          let* () = Status.set Waiting_for_reveal in
-          return ()
+          match PS.Input_hash.of_b58check_opt hash with
+          | None -> stop_evaluating false
+          | Some hash ->
+              let* () = Required_reveal.set (Some hash) in
+              let* () = Status.set Waiting_for_reveal in
+              return ()
         else
           let* v = Stack.top in
           match v with
@@ -1214,8 +1215,7 @@ module Make (Context : P) :
           | None | Some (PS.Reveal_revelation _) ->
               state_of
                 (internal_error
-                   "Invalid set_input: expecting inbox message, got a \
-                    reveal.")
+                   "Invalid set_input: expecting inbox message, got a reveal.")
                 state)
       | PS.Needs_reveal _hash -> (
           match input_given with
