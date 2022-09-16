@@ -76,16 +76,21 @@ let delegate_ops_encoding =
          Signature.Public_key_hash.encoding
          (list received_operation_encoding)))
 
-type block_op = {op : operation; delegate : Signature.public_key_hash}
+type block_op = {
+  op : operation;
+  delegate : Signature.public_key_hash;
+  power : int;
+}
 
 let block_op_encoding =
   let open Data_encoding in
   conv
-    (fun {op; delegate} -> (op, delegate))
-    (fun (op, delegate) -> {op; delegate})
-    (obj2
+    (fun {op; delegate; power} -> (op, delegate, power))
+    (fun (op, delegate, power) -> {op; delegate; power})
+    (obj3
        (req "operation" operation_encoding)
-       (req "delegate" Signature.Public_key_hash.encoding))
+       (req "delegate" Signature.Public_key_hash.encoding)
+       (req "endorsing_power" int16))
 
 type right = {
   address : Signature.Public_key_hash.t;

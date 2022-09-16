@@ -160,13 +160,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                   contents =
                     Single_result
                       (Tezos_raw_protocol_006_PsCARTHA.Apply_results
-                       .Endorsement_result {delegate; _});
+                       .Endorsement_result {delegate; slots; _});
                 }) ->
               Some
                 Consensus_ops.
                   {
                     op = {hash; round = None; kind = Consensus_ops.Endorsement};
                     delegate;
+                    power = List.length slots;
                   }
           | _ -> None)
         ops

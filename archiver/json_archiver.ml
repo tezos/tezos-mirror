@@ -264,7 +264,7 @@ let add_inclusion_in_block aliases block_hash validators delegate_operations =
             {
               delegate;
               delegate_alias = Wallet.alias_of_pkh aliases delegate;
-              endorsing_power = 0;
+              endorsing_power = op.Consensus_ops.power;
               operations =
                 [
                   {

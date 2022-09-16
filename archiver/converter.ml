@@ -89,7 +89,7 @@ let included_ops_map level data =
   List.fold_left
     (fun acc
          Data.Delegate_operations.
-           {delegate; delegate_alias = _; endorsing_power = _; operations} ->
+           {delegate; delegate_alias = _; endorsing_power; operations} ->
       List.fold_left
         (fun acc
              Data.Delegate_operations.
@@ -99,7 +99,12 @@ let included_ops_map level data =
               let fake_hash = fake_hash level round delegate kind in
               block_map_append
                 block
-                Consensus_ops.{op = {kind; round; hash = fake_hash}; delegate}
+                Consensus_ops.
+                  {
+                    op = {kind; round; hash = fake_hash};
+                    delegate;
+                    power = endorsing_power;
+                  }
                 acc)
             acc
             block_inclusion)

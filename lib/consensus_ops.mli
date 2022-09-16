@@ -47,7 +47,11 @@ type delegate_ops = (Signature.Public_key_hash.t * received_operation list) list
 
 val delegate_ops_encoding : delegate_ops Data_encoding.t
 
-type block_op = {op : operation; delegate : Signature.public_key_hash}
+type block_op = {
+  op : operation;
+  delegate : Signature.public_key_hash;
+  power : int;
+}
 
 val block_op_encoding : block_op Data_encoding.encoding
 

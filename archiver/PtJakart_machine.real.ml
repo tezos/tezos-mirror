@@ -210,7 +210,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               {
                 contents =
                   Single_result
-                    (Protocol.Apply_results.Preendorsement_result {delegate; _});
+                    (Protocol.Apply_results.Preendorsement_result
+                      {delegate; preendorsement_power; _});
               }) ->
             Consensus_ops.
               {
@@ -221,6 +222,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     kind = Consensus_ops.Preendorsement;
                   };
                 delegate;
+                power = preendorsement_power;
               }
             :: acc
         | Receipt
@@ -228,7 +230,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               {
                 contents =
                   Single_result
-                    (Protocol.Apply_results.Endorsement_result {delegate; _});
+                    (Protocol.Apply_results.Endorsement_result
+                      {delegate; endorsement_power; _});
               }) ->
             Consensus_ops.
               {
@@ -239,6 +242,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     kind = Consensus_ops.Endorsement;
                   };
                 delegate;
+                power = endorsement_power;
               }
             :: acc
         | _ -> acc)
