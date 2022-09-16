@@ -540,7 +540,12 @@ val get_chain_block_context_constants_errors :
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_baking_rights :
-  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?delegate:string ->
+  ?level:int ->
+  unit ->
+  JSON.t t
 
 type level = {
   level : int;

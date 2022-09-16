@@ -494,10 +494,13 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     Fun.id
 
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
-    ?delegate () =
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    ?delegate ?level () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "level" Int.to_string level
+  in
   make
-    ?query_string
+    ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
     Fun.id
