@@ -1,9 +1,13 @@
+type available_memories =
+  | No_memories_during_init
+  | Available_memories of Instance.memory_inst Instance.Vector.t
+
 type host_func =
   | Host_func of
       (Input_buffer.t ->
       Output_buffer.t ->
       Durable_storage.t ->
-      Instance.memory_inst Instance.Vector.t ->
+      available_memories ->
       Values.value list ->
       (Durable_storage.t * Values.value list) Lwt.t)
 [@@ocaml.unboxed]

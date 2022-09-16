@@ -249,6 +249,7 @@ val invoke :
   (Durable_storage.t * value list) Lwt.t (* raises Trap *)
 
 val step :
+  ?init:bool ->
   ?durable:Durable_storage.t ->
   module_reg ->
   config ->
