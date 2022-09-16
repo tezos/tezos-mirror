@@ -485,6 +485,29 @@ module Flags : sig
   val disabled_warnings_to_string : int list -> string
 end
 
+module Ctypes : sig
+  type description = {instance : string; functor_ : string}
+
+  (** Dune Ctypes stanza description *)
+  type t = {
+    external_library_name : string;
+        (** Base name of the shared object or library archive that you want to
+            link against *)
+    include_header : string;  (** Header file to include *)
+    extra_search_dir : string;
+        (** The C compiler and linker will look in this directory to find header
+            files and libraries. *)
+    type_description : description;
+        (** Module information for the type stub descriptions *)
+    function_description : description;
+        (** Module information for the function stub descriptions *)
+    generated_types : string;
+        (** Module in which the generated stub types are placed *)
+    generated_entry_point : string;
+        (* Output module name of the final generated stub module *)
+  }
+end
+
 (** Preprocessors. *)
 type preprocessor
 
@@ -666,6 +689,7 @@ type 'a maker =
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
   ?foreign_stubs:Dune.foreign_stubs ->
+  ?ctypes:Ctypes.t ->
   ?implements:target ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
