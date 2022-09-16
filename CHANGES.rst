@@ -53,7 +53,6 @@ Node
   ``validating_new_branch.v0`` at top-level and contains a ``section`` field
   with ``validator`` and ``peer``.
 
-
 *  Added support for ``--strict`` mode in the replay command: it causes the
    command to be less permissive.
 
@@ -69,6 +68,9 @@ Node
   there is no forward compatibility: previous versions of Octez will
   refuse to run on a data directory which was running with this
   storage version.
+
+- The ``config`` and ``identity`` node commands no longer try to
+  update the data directory version (``version.json``).
 
 Client
 ------

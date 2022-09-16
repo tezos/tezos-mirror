@@ -189,7 +189,7 @@ module Term = struct
         else Lwt_utils_unix.remove_dir data_dir
       in
       let* () = Node_config_file.write args.config_file node_config in
-      let* () = Node_data_version.ensure_data_dir ~bare:true data_dir in
+      let* () = Node_data_version.ensure_data_dir ~mode:Is_bare data_dir in
       (* Lock only on snapshot import *)
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () ->
