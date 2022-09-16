@@ -397,47 +397,6 @@ module Block_validator = struct
     }
 end
 
-module Proto_plugin = struct
-  module type PROTOMETRICS = sig
-    val hash : Protocol_hash.t
-
-    val update_metrics :
-      protocol_metadata:bytes ->
-      Fitness.t ->
-      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
-      unit Lwt.t
-  end
-
-  module UndefinedProtoMetrics (P : sig
-    val hash : Protocol_hash.t
-  end) =
-  struct
-    let hash = P.hash
-
-    let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
-  end
-
-  let proto_metrics_table : (module PROTOMETRICS) Protocol_hash.Table.t =
-    Protocol_hash.Table.create 5
-
-  let register_plugin (module ProtoMetrics : PROTOMETRICS) =
-    Protocol_hash.Table.replace
-      proto_metrics_table
-      ProtoMetrics.hash
-      (module ProtoMetrics)
-
-  let find_plugin = Protocol_hash.Table.find proto_metrics_table
-
-  let safe_get_prevalidator_proto_metrics hash =
-    match find_plugin hash with
-    | Some proto_metrics -> Lwt.return proto_metrics
-    | None ->
-        let module ProtoMetrics = UndefinedProtoMetrics (struct
-          let hash = hash
-        end) in
-        Lwt.return (module ProtoMetrics : PROTOMETRICS)
-end
-
 module Chain_validator = struct
   open Prometheus
 

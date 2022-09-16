@@ -33,8 +33,8 @@ module RPC = struct
   include Plugin.RPC
 end
 
-module MetricsPlugin = struct
-  include Metrics_plugin
+module Metrics = struct
+  include Metrics
 
   let hash = Registerer.Registered.hash
 end
@@ -43,4 +43,4 @@ let () = Shell_plugin.register_filter (module Filter)
 
 let () = Shell_plugin.register_rpc (module RPC)
 
-let () = Shell_metrics.Proto_plugin.register_plugin (module MetricsPlugin)
+let () = Shell_plugin.register_metrics (module Metrics)
