@@ -517,6 +517,17 @@ let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
     ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
   return ()
 
+let init_dal_node protocol =
+  let* node, client =
+    let* parameter_file = Rollup.Dal.Parameters.parameter_file protocol in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    Client.init_with_protocol `Client ~parameter_file ~protocol ~nodes_args ()
+  in
+  let dal_node = Dal_node.create ~node () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.run dal_node in
+  return (node, client, dal_node)
+
 let test_dal_node_slot_management =
   Protocol.register_test
     ~__FILE__
@@ -524,13 +535,7 @@ let test_dal_node_slot_management =
     ~tags:["dal"; "dal_node"]
     ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
-  let* node, _client =
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    Client.init_with_protocol `Client ~protocol ~nodes_args ()
-  in
-  let dal_node = Dal_node.create ~node () in
-  let* _dir = Dal_node.init_config dal_node in
-  let* () = Dal_node.run dal_node in
+  let* _node, _client, dal_node = init_dal_node protocol in
   let slot_content = "test" in
   let* slot_header =
     RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_content)
@@ -546,6 +551,15 @@ let test_dal_node_slot_management =
   assert (slot_content = received_slot_content) ;
   return ()
 
+let publish_and_store_slot node client dal_node source index content =
+  let* slot_header = RPC.call dal_node (Rollup.Dal.RPC.split_slot content) in
+  let header =
+    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
+    |> mandatory "The b58check-encoded slot header is not valid"
+  in
+  let* _ = publish_slot ~source ~fee:1_200 ~index ~header node client in
+  return (index, slot_header)
+
 let test_dal_node_slots_headers_tracking =
   Protocol.register_test
     ~__FILE__
@@ -553,29 +567,11 @@ let test_dal_node_slots_headers_tracking =
     ~tags:["dal"; "dal_node"]
     ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
-  let* node, client =
-    let base = Either.right (protocol, None) in
-    let* parameter_file =
-      Protocol.write_parameter_file ~base (dal_enable_param (Some true))
-    in
-    let nodes_args = Node.[Synchronisation_threshold 0] in
-    Client.init_with_protocol `Client ~parameter_file ~protocol ~nodes_args ()
-  in
-  let dal_node = Dal_node.create ~node () in
-  let* _dir = Dal_node.init_config dal_node in
-  let* () = Dal_node.run dal_node in
-  let publish_slot source index content =
-    let* slot_header = RPC.call dal_node (Rollup.Dal.RPC.split_slot content) in
-    let header =
-      Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
-      |> mandatory "The b58check-encoded slot header is not valid"
-    in
-    let* _ = publish_slot ~source ~fee:1_200 ~index ~header node client in
-    return (index, slot_header)
-  in
-  let* slot0 = publish_slot Constant.bootstrap1 0 "test0" in
-  let* slot1 = publish_slot Constant.bootstrap2 1 "test1" in
-  let* slot2 = publish_slot Constant.bootstrap3 4 "test4" in
+  let* node, client, dal_node = init_dal_node protocol in
+  let publish = publish_and_store_slot node client dal_node in
+  let* slot0 = publish Constant.bootstrap1 0 "test0" in
+  let* slot1 = publish Constant.bootstrap2 1 "test1" in
+  let* slot2 = publish Constant.bootstrap3 4 "test4" in
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
   let* block = RPC.call node (RPC.get_chain_block_hash ()) in
