@@ -171,22 +171,32 @@ module Global = struct
               e))
     in
     query (fun outbox_level message_index serialized_outbox_message ->
-        let outbox_level = Raw_level.of_int32_exn outbox_level in
-        let message_index = Z.of_int64 message_index in
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        let outbox_level =
+          req "outbox_level" Raw_level.of_int32_exn outbox_level
+        in
+        let message_index = req "message_index" Z.of_int64 message_index in
         let message =
-          Outbox.Message.(
-            unsafe_of_string serialized_outbox_message |> deserialize)
+          req
+            "serialized_outbox_message"
+            (fun s -> Outbox.Message.(unsafe_of_string s |> deserialize))
+            serialized_outbox_message
         in
         match message with
         | Error e -> invalid_message e
         | Ok message -> {outbox_level; message_index; message})
-    |+ field "outbox_level" RPC_arg.int32 0l (fun o ->
-           Raw_level.to_int32 o.outbox_level)
-    |+ field "message_index" RPC_arg.int64 0L (fun o ->
-           Z.to_int64 o.message_index)
-    |+ field "serialized_outbox_message" RPC_arg.string "" (fun o ->
+    |+ opt_field "outbox_level" RPC_arg.int32 (fun o ->
+           Some (Raw_level.to_int32 o.outbox_level))
+    |+ opt_field "message_index" RPC_arg.int64 (fun o ->
+           Some (Z.to_int64 o.message_index))
+    |+ opt_field "serialized_outbox_message" RPC_arg.string (fun o ->
            match Outbox.Message.serialize o.message with
-           | Ok message -> Outbox.Message.unsafe_to_string message
+           | Ok message -> Some (Outbox.Message.unsafe_to_string message)
            | Error e -> invalid_message e)
     |> seal
 
