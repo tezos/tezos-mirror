@@ -2794,18 +2794,21 @@ module Dal : sig
     val equal : t -> t -> bool
   end
 
+  (** This module re-exports definitions from {!Dal_slot_repr.Header}. *)
+  module Slot_header : sig
+    type t = Dal.commitment
+
+    val zero : t
+  end
+
   (** This module re-exports definitions from {!Dal_slot_repr},
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
-    type header = Dal.commitment
-
     type t = {
       published_level : Raw_level.t;
       index : Slot_index.t;
-      header : header;
+      header : Slot_header.t;
     }
-
-    val zero : header
 
     val encoding : t Data_encoding.t
 
