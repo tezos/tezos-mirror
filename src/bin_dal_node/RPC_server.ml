@@ -109,15 +109,17 @@ let start configuration dir =
   let host = Ipaddr.V6.to_string rpc_addr in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.default rpc_addr in
+  let server =
+    RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
+  in
   Lwt.catch
     (fun () ->
-      let* server =
+      let* () =
         RPC_server.launch
-          ~media_types:Media_type.all_media_types
           ~host
-          ~acl
+          server
+          ~callback:(RPC_server.resto_callback server)
           node
-          dir
       in
       return_ok server)
     fail_with_exn

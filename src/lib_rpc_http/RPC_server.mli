@@ -30,17 +30,30 @@ type cors = {allowed_headers : string list; allowed_origins : string list}
 (** A handle on the server worker. *)
 type server
 
-(** Promise a running RPC server.*)
-val launch :
-  ?host:string ->
+type callback =
+  Cohttp_lwt_unix.Server.conn ->
+  Cohttp.Request.t ->
+  Cohttp_lwt.Body.t ->
+  Cohttp_lwt_unix.Server.response_action Lwt.t
+
+val resto_callback : server -> callback
+
+(** Initializes a RPC server *)
+val init_server :
   ?cors:cors ->
   ?agent:string ->
   ?acl:Resto_acl.Acl.t ->
-  ?middleware:Resto_cohttp_server.Server.middleware ->
   media_types:Media_type.t list ->
-  Conduit_lwt_unix.server ->
   unit RPC_directory.t ->
-  server Lwt.t
+  server
+
+(** Promise [server].*)
+val launch :
+  ?host:string ->
+  server ->
+  ?callback:callback ->
+  Conduit_lwt_unix.server ->
+  unit Lwt.t
 
 (** Kill an RPC server. *)
 val shutdown : server -> unit Lwt.t

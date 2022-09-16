@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides a middleware that is used by the proxy server to
+(** This module provides middlewares that is used by the RPC servers to
     forward unsupported RPCs to a full node. *)
 
-(** A Resto middleware that rewrites any queries that the proxy server cannot
+(** A Resto middleware that transform any callback to an other
+    that rewrites queries that the proxy server cannot
     handle and forwards them to the full node at the given [Uri.t]. *)
 val proxy_server_query_forwarder :
-  Uri.t -> Resto_cohttp_server.Server.middleware
+  Uri.t -> RPC_server.callback -> RPC_server.callback

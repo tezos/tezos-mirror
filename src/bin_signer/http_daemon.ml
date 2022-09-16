@@ -52,17 +52,20 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           return_some hashes
         else return_none)
   in
+  let server =
+    RPC_server.init_server ~media_types:Media_type.all_media_types dir
+  in
   Lwt.catch
     (fun () ->
       List.map
         (fun host ->
           let*! () = Events.(emit listening) host in
-          let*! _server =
+          let*! () =
             RPC_server.launch
               ~host:(Ipaddr.V6.to_string host)
+              server
+              ~callback:(RPC_server.resto_callback server)
               mode
-              dir
-              ~media_types:Media_type.all_media_types
           in
           Lwt_utils.never_ending ())
         hosts
