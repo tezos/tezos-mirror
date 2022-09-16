@@ -75,3 +75,6 @@ val ( - ) : t -> t -> t
     "123.4356" will parse, while
     "1.24723953794217492" won't, because it's too precise. *)
 val parse_floating : string -> t
+
+(** The tez {!Check.typ} *)
+val typ : t Check.typ

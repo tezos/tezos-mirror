@@ -363,14 +363,16 @@ let test_update_consensus_key =
   in
   Log.info "The manager account has been drained..." ;
   let* b = Client.get_balance_for ~account:Constant.bootstrap4.alias client in
-  Check.((Tez.to_mutez b = 0) int) ~error_msg:"Manager balance is not empty" ;
+  Check.((b = Tez.zero) Tez.typ) ~error_msg:"Manager balance is not empty" ;
   let* new_balance = Client.get_balance_for ~account:destination.alias client in
-  Check.((Tez.to_mutez old_balance < Tez.to_mutez new_balance) int)
+  Check.(old_balance < new_balance)
+    Tez.typ
     ~error_msg:"Destination account has not been credited" ;
   let* new_balance5 =
     Client.get_balance_for ~account:Constant.bootstrap5.alias client
   in
-  Check.((Tez.to_mutez new_balance5 = Tez.to_mutez old_balance5) int)
+  Check.(new_balance5 = old_balance5)
+    Tez.typ
     ~error_msg:"Manager operation was included" ;
 
   Log.info
@@ -406,13 +408,16 @@ let test_update_consensus_key =
     Client.get_balance_for ~account:Constant.bootstrap5.alias client
   in
   let* new_balance = Client.get_balance_for ~account:destination.alias client in
-  Check.((Tez.to_mutez old_balance = Tez.to_mutez new_balance) int)
+  Check.(old_balance = new_balance)
+    Tez.typ
     ~error_msg:"Drain operation was included (destination balance changed)" ;
-  Check.((Tez.to_mutez old_balance3 > 0) int)
+  Check.(old_balance3 > Tez.zero)
+    Tez.typ
     ~error_msg:
       "Drain operation was included (delegate balance changed: old %L versus \
        new %R)" ;
-  Check.((Tez.to_mutez old_balance5 < Tez.to_mutez new_balance5) int)
+  Check.(old_balance5 < new_balance5)
+    Tez.typ
     ~error_msg:"Destination account has not been credited" ;
 
   unit
