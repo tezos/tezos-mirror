@@ -1301,6 +1301,12 @@ let register_global_constant ?wait ?burn_cap ~src ~value client =
         client_output
   | Some hash -> return hash
 
+let spawn_hash_script ?hooks ~script client =
+  spawn_command ?hooks client ["hash"; "script"; script]
+
+let hash_script ?hooks ~script client =
+  spawn_hash_script ?hooks ~script client |> Process.check_and_read_stdout
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd

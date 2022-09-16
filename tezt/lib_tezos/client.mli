@@ -1047,6 +1047,13 @@ val hash_data :
 val spawn_hash_data :
   ?hooks:Process.hooks -> data:string -> typ:string -> t -> Process.t
 
+(** Run [tezos-client hash script ..]*)
+val hash_script : ?hooks:Process_hooks.t -> script:string -> t -> string Lwt.t
+
+(** Same as [hash_script], but do not wait for the process to exit. *)
+val spawn_hash_script :
+  ?hooks:Process_hooks.t -> script:string -> t -> Process.t
+
 (** Run [tezos-client normalize data .. of type ...]*)
 val normalize_data :
   ?mode:normalize_mode ->
