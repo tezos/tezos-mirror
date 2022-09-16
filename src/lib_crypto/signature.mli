@@ -28,12 +28,6 @@
 (** Cryptographic signatures are versioned to expose different versions to
     different protocols, depending on the support.  *)
 
-(** [V0] supports Ed25519, Secp256k1, and P256. *)
-module V0 = Signature_v0
-
-(** [V1] supports Ed25519, Secp256k1, P256 and BLS. *)
-module V1 = Signature_v1
-
 (** The type of conversion modules from one version to another. *)
 module type CONV = sig
   module V_from : S.COMMON_SIGNATURE
@@ -49,11 +43,53 @@ module type CONV = sig
   val signature : V_from.t -> V_to.t
 end
 
+(** The type of {e partial} conversion modules from one version to another. *)
+module type CONV_OPT = sig
+  module V_from : S.COMMON_SIGNATURE
+
+  module V_to : S.COMMON_SIGNATURE
+
+  val public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t option
+
+  val public_key : V_from.Public_key.t -> V_to.Public_key.t option
+
+  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
+
+  val signature : V_from.t -> V_to.t option
+end
+
 (** The module [V_latest] is to be used by the shell and points to the latest
     available version of signatures. *)
-module V_latest : module type of V1
+module V_latest : module type of Signature_v1
+
+(** [V0] supports Ed25519, Secp256k1, and P256. *)
+module V0 : sig
+  include module type of Signature_v0
+
+  (** Converting from signatures of {!V_latest} to {!V0}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v0
+end
+
+(** [V1] supports Ed25519, Secp256k1, P256. It is a copy of {!V0} without type
+    equalities. *)
+module V1 : sig
+  include module type of Signature_v1
+
+  (** Converting from signatures of {!V_latest} to {!V1}. *)
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v1
+end
 
 include module type of V_latest
+
+(** Converting from signatures of {!V_latest} to {!V_latest}. This module
+    implements conversions which are the identity, so total, but we keep the
+    signature as {!CONV_OPT} for compatibility with {!V0.Of_V_latest} and
+    {!V1.Of_V_latest} and to ease snapshotting. *)
+module Of_V_latest :
+  CONV_OPT with module V_from := V_latest and module V_to := V_latest
 
 (** Converting from signatures of {!V0} to {!V_latest}. *)
 module Of_V0 : CONV with module V_from := V0 and module V_to := V_latest

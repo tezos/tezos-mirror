@@ -25,9 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module V0 = Signature_v0
-module V1 = Signature_v1
-
 module type CONV = sig
   module V_from : S.COMMON_SIGNATURE
 
@@ -42,18 +39,78 @@ module type CONV = sig
   val signature : V_from.t -> V_to.t
 end
 
-module V_latest = struct
-  include V1
+module type CONV_OPT = sig
+  module V_from : S.COMMON_SIGNATURE
 
-  module Of_V1 : CONV with module V_from := V1 and module V_to := V1 = struct
-    let public_key_hash x = x
+  module V_to : S.COMMON_SIGNATURE
 
-    let public_key x = x
+  val public_key_hash :
+    V_from.Public_key_hash.t -> V_to.Public_key_hash.t option
 
-    let secret_key x = x
+  val public_key : V_from.Public_key.t -> V_to.Public_key.t option
 
-    let signature x = x
+  val secret_key : V_from.Secret_key.t -> V_to.Secret_key.t option
+
+  val signature : V_from.t -> V_to.t option
+end
+
+module V_latest = Signature_v1
+
+module V0 = struct
+  include Signature_v0
+
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v0 =
+  struct
+    let public_key_hash : V_latest.Public_key_hash.t -> Public_key_hash.t option
+        = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+
+    let public_key : V_latest.Public_key.t -> Public_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+
+    let secret_key : V_latest.Secret_key.t -> Secret_key.t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+
+    let signature : V_latest.t -> t option = function
+      | V_latest.Ed25519 k -> Some (Ed25519 k)
+      | V_latest.Secp256k1 k -> Some (Secp256k1 k)
+      | V_latest.P256 k -> Some (P256 k)
+      | V_latest.Unknown k -> Some (Unknown k)
+  end
+end
+
+module V1 = struct
+  include Signature_v1
+
+  module Of_V_latest :
+    CONV_OPT with module V_from := V_latest and module V_to := Signature_v1 =
+  struct
+    let public_key_hash = Option.some
+
+    let public_key = Option.some
+
+    let secret_key = Option.some
+
+    let signature = Option.some
   end
 end
 
 include V_latest
+module Of_V_latest = V1.Of_V_latest
+
+module Of_V1 : CONV with module V_from := V1 and module V_to := V1 = struct
+  let public_key_hash = Fun.id
+
+  let public_key = Fun.id
+
+  let secret_key = Fun.id
+
+  let signature = Fun.id
+end
