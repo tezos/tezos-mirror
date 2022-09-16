@@ -3484,13 +3484,15 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
+    type reveal_proof = RawDataProof of string
+
     type input_proof =
       | Inbox_proof of {
           level : Raw_level.t;
           message_counter : Z.t;
           proof : Inbox.serialized_proof;
         }
-      | Reveal_proof of string
+      | Reveal_proof of reveal_proof
 
     type t = {pvm_step : wrapped_proof; input_proof : input_proof option}
 

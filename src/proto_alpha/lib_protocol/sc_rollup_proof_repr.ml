@@ -49,13 +49,31 @@ let () =
     (function Sc_rollup_invalid_serialized_inbox_proof -> Some () | _ -> None)
     (fun () -> Sc_rollup_invalid_serialized_inbox_proof)
 
+type reveal_proof = RawDataProof of string
+
+let reveal_proof_encoding =
+  let open Data_encoding in
+  let case_raw_data =
+    case
+      ~title:"raw data proof"
+      (Tag 0)
+      (obj2
+         (req "reveal_proof_kind" (constant "raw_data_proof"))
+         (req
+            "raw_data"
+            (check_size Constants_repr.sc_rollup_message_size_limit string)))
+      (function RawDataProof s -> Some ((), s))
+      (fun ((), s) -> RawDataProof s)
+  in
+  union [case_raw_data]
+
 type input_proof =
   | Inbox_proof of {
       level : Raw_level_repr.t;
       message_counter : Z.t;
       proof : Sc_rollup_inbox_repr.serialized_proof;
     }
-  | Reveal_proof of string
+  | Reveal_proof of reveal_proof
 
 let input_proof_encoding =
   let open Data_encoding in
@@ -80,10 +98,8 @@ let input_proof_encoding =
       ~title:"reveal proof"
       (Tag 1)
       (obj2
-         (req "input_proof_kind" (constant "postulate_proof"))
-         (req
-            "postulate_proof"
-            (check_size Constants_repr.sc_rollup_message_size_limit string)))
+         (req "input_proof_kind" (constant "reveal_proof"))
+         (req "reveal_proof" reveal_proof_encoding))
       (function Reveal_proof s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_proof s)
   in
@@ -149,7 +165,7 @@ let valid snapshot commit_level ~pvm_name proof =
           check_inbox_proof snapshot proof (level, Z.succ message_counter)
         in
         Option.map (fun i -> Sc_rollup_PVM_sig.Inbox_message i) inbox_message
-    | Some (Reveal_proof data) ->
+    | Some (Reveal_proof (RawDataProof data)) ->
         return_some (Sc_rollup_PVM_sig.Reveal_revelation (RawData data))
   in
   let input = Option.bind input (cut_at_level commit_level) in
@@ -167,7 +183,8 @@ let valid snapshot commit_level ~pvm_name proof =
           (Raw_level_repr.(level = l) && Z.(equal message_counter n))
           "Level and index of inbox proof are not equal to the one expected in \
            input request."
-    | Some (Reveal_proof data), Needs_reveal (RevealRawData expected_hash) ->
+    | ( Some (Reveal_proof (RawDataProof data)),
+        Needs_reveal (RevealRawData expected_hash) ) ->
         let data_hash = Sc_rollup_PVM_sig.Input_hash.hash_string [data] in
         check
           (Sc_rollup_PVM_sig.Input_hash.equal data_hash expected_hash)
@@ -253,7 +270,7 @@ let produce pvm_and_state commit_level =
         | None -> proof_error "No reveal"
         | Some data ->
             return
-              ( Some (Reveal_proof data),
+              ( Some (Reveal_proof (RawDataProof data)),
                 Some (Sc_rollup_PVM_sig.Reveal_revelation (RawData data)) ))
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in

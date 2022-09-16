@@ -45,6 +45,12 @@
 
 open Sc_rollup_repr
 
+(** The proof that a reveal is valid. *)
+type reveal_proof =
+  | RawDataProof of string
+      (** The existence of reveal for a given hash when the
+          [input_requested] is the [Needs_for_reveal]. *)
+
 (** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
     game.
@@ -60,8 +66,7 @@ open Sc_rollup_repr
       after a given location; this must match up with [pvm_step]
       to give a valid refutation proof ; or
 
-    - a proof of the existence of reveal for a given hash when
-      the [input_requested] is the [Needs_reveal].
+    - a proof of a reveal satisfiability.
 *)
 
 type input_proof =
@@ -70,7 +75,7 @@ type input_proof =
       message_counter : Z.t;
       proof : Sc_rollup_inbox_repr.serialized_proof;
     }
-  | Reveal_proof of string
+  | Reveal_proof of reveal_proof
 
 type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
 
