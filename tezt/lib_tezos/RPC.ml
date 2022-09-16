@@ -840,7 +840,7 @@ let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
       pkh;
       "frozen_deposits";
     ]
-    Fun.id
+    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
 
 let get_chain_block_context_delegate_frozen_deposits_limit ?(chain = "main")
     ?(block = "head") pkh =
