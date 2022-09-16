@@ -140,10 +140,7 @@ module Events = struct
      at the same level as main node (the baker only bakes on main node
      in these tests). *)
   let wait_sync nodes =
-    let* {level; _} =
-      RPC.Client.call nodes.main.client
-      @@ RPC.get_chain_block_helper_current_level ()
-    in
+    let level = Node.get_level nodes.main.node in
     Node.wait_for_level nodes.observer.node level
 end
 

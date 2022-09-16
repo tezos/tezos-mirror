@@ -52,9 +52,7 @@ module Helpers = struct
     unit
 
   let bake_and_wait_block node client =
-    let* {level; _} =
-      RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
+    let level = Node.get_level node in
     let* () =
       Client.bake_for ~context_path:(Node.data_dir node // "context") client
     in

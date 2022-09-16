@@ -119,12 +119,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
-  let endpoint = Client.(Node node) in
-  let* client = Client.init ~endpoint () in
-  let* {level; _} =
-    RPC.Client.call ~endpoint client
-    @@ RPC.get_chain_block_helper_current_level ()
-  in
+  let level = Node.get_level node in
   let* () = Node.terminate node in
   Log.info "Updating node config with user_activated_upgrade" ;
   let migration_level = level + 1 in
