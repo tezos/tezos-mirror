@@ -46,5 +46,30 @@ let make_transform_callback forwarding_endpoint callback conn req body =
                overriding) ))
   else Lwt.return answer
 
+let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
+  let open Lwt_result_syntax in
+  let do_call () = callback conn req body in
+  let cohttp_meth = Cohttp.Request.meth req in
+  let uri = Cohttp.Request.uri req in
+  let path = Uri.path uri in
+  let decoded = Resto.Utils.decode_split_path path in
+  let*! description =
+    let* resto_meth =
+      match cohttp_meth with
+      | #Resto.meth as meth -> Lwt.return_ok meth
+      | _ -> Lwt.return_error @@ `Method_not_allowed []
+    in
+    let* uri_desc = RPC_directory.lookup_uri_desc dir () resto_meth decoded in
+    Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
+  in
+  match description with
+  | Ok (uri, meth) ->
+      (* We update the metric only if the URI can succesfully
+         be matched in the directory tree. *)
+      update_metrics uri meth do_call
+  | Error _ ->
+      (* Otherwise, the call must be done anyway. *)
+      do_call ()
+
 let proxy_server_query_forwarder forwarding_endpoint =
   make_transform_callback forwarding_endpoint

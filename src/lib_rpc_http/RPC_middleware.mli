@@ -26,8 +26,20 @@
 (** This module provides middlewares that is used by the RPC servers to
     forward unsupported RPCs to a full node. *)
 
-(** A Resto middleware that transform any callback to an other
+(** A Resto middleware that transforms any callback to an other
     that rewrites queries that the proxy server cannot
     handle and forwards them to the full node at the given [Uri.t]. *)
 val proxy_server_query_forwarder :
   Uri.t -> RPC_server.callback -> RPC_server.callback
+
+(** A Resto middleware that transforms any server callback to an other
+    that handles RPC metrics *)
+val rpc_metrics_transform_callback :
+  update_metrics:
+    (string ->
+    string ->
+    (unit -> Cohttp_lwt_unix.Server.response_action Lwt.t) ->
+    Cohttp_lwt_unix.Server.response_action Lwt.t) ->
+  unit RPC_directory.t ->
+  RPC_server.callback ->
+  RPC_server.callback
