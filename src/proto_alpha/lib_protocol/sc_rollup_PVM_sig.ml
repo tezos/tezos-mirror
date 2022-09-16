@@ -65,9 +65,7 @@ type inbox_message = {
 
 type reveal_data = RawData of string
 
-type input =
-  | Inbox_message of inbox_message
-  | Reveal_revelation of reveal_data
+type input = Inbox_message of inbox_message | Reveal_revelation of reveal_data
 
 (** [inbox_message_encoding] encoding value for {!inbox_message}. *)
 let inbox_message_encoding =
@@ -89,9 +87,13 @@ let reveal_data_encoding =
     case
       ~title:"raw data"
       (Tag 0)
-      (check_size Constants_repr.sc_rollup_message_size_limit string)
-      (function RawData m -> Some m)
-      (fun m -> RawData m)
+      (obj2
+         (req "reveal_data_kind" (constant "raw_data"))
+         (req
+            "raw_data"
+            (check_size Constants_repr.sc_rollup_message_size_limit string)))
+      (function RawData m -> Some ((), m))
+      (fun ((), m) -> RawData m)
   in
   union [case_raw_data]
 
@@ -101,16 +103,20 @@ let input_encoding =
     case
       ~title:"inbox msg"
       (Tag 0)
-      inbox_message_encoding
-      (function Inbox_message m -> Some m | _ -> None)
-      (fun m -> Inbox_message m)
+      (obj2
+         (req "input_kind" (constant "inbox_message"))
+         (req "inbox_message" inbox_message_encoding))
+      (function Inbox_message m -> Some ((), m) | _ -> None)
+      (fun ((), m) -> Inbox_message m)
   and case_reveal_revelation =
     case
       ~title:"reveal"
       (Tag 1)
-      reveal_data_encoding
-      (function Reveal_revelation d -> Some d | _ -> None)
-      (fun d -> Reveal_revelation d)
+      (obj2
+         (req "input_kind" (constant "reveal_revelation"))
+         (req "reveal_data" reveal_data_encoding))
+      (function Reveal_revelation d -> Some ((), d) | _ -> None)
+      (fun ((), d) -> Reveal_revelation d)
   in
   union [case_inbox_message; case_reveal_revelation]
 
@@ -129,8 +135,8 @@ let input_equal a b =
   match (a, b) with
   | Inbox_message a, Inbox_message b -> inbox_message_equal a b
   | Reveal_revelation a, Reveal_revelation b -> reveal_data_equal a b
-  | Inbox_message _, Reveal_revelation _
-  | Reveal_revelation _, Inbox_message _ ->
+  | Inbox_message _, Reveal_revelation _ | Reveal_revelation _, Inbox_message _
+    ->
       false
 
 module Input_hash =
