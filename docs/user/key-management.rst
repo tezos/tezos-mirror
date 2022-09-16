@@ -298,7 +298,7 @@ However, it is also possible to register as a delegate and immediately set the c
 
    tezos-client register key <mgr> as delegate with consensus key <key>
 
-There can be multiple pending updates: it is possile to have multiple pending consensus keys for multiple future cycles.
+There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
 A subsequent update within the same cycle takes precedences over the initial one.
 
 Baking With a Consensus Key
