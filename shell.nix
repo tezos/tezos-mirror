@@ -112,19 +112,11 @@ let
 
       # Tweak the dependencies.
       (final: prev: {
-        conf-rust = prev.conf-rust.overrideAttrs (old: {
+        conf-rust-2021 = prev.conf-rust.overrideAttrs (old: {
           propagatedNativeBuildInputs =
             (old.propagatedNativeBuildInputs or [ ])
             ++
-            # Need Rust compiler - already fixed in upstream opam-repository
-            [ pkgs.rustc ];
-        });
-
-        tezos-rust-libs = prev.tezos-rust-libs.overrideAttrs (old: {
-          propagatedNativeBuildInputs =
-            (old.propagatedNativeBuildInputs or [ ])
-            ++
-            # Missing libiconv dependency
+            # Upstream conf-rust* packages don't request libiconv
             [ pkgs.libiconv ];
         });
       })
