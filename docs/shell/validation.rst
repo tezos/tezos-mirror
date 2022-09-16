@@ -78,6 +78,8 @@ communicating with each other via message passing. Workers are spawned
 and killed dynamically, according to connected peers, incoming blocks
 to validate, and active (test)chains.
 
+.. _chain_validator:
+
 A *chain validator* worker is launched by the validator for each
 *chain* that it considers alive. Each chain validator is responsible for
 handling blocks that belong to this chain, and select the best head for
@@ -86,6 +88,8 @@ starts at the genesis, a second one when there is an active test
 chain. Forking a chain is decided from within the economic protocol.  In
 protocol Alpha, this is only used to try new protocols before self
 amending the main chain.
+
+.. _peer_validator:
 
 The chain validator spawns one *peer validator* worker per connected
 peer. The set of peer validators is updated, grown, or shrunk on the fly, according to the
@@ -122,6 +126,8 @@ Each of these three peer validator tasks (head increment, bootstrap
 pipeline, or multipass) will interact with the distributed DB to get
 the data they need (block headers and operations). When they have
 everything needed for a block, they will call the *block validator*.
+
+.. _block_validator:
 
 The *block validator* validates blocks (currently in sequence),
 assuming that all the necessary data have already been retrieved from
