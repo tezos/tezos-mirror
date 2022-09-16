@@ -1165,6 +1165,39 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
+(** Same as [run_tzip4_view] but does not wait for the process to exit. *)
+val spawn_run_tzip4_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  entrypoint:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client run tzip4 view .. on contract .. with input .. ] 
+    
+    Returns the value returned by a view as a string.
+
+    Fails if the view or the contract does not exist. If [input] is [None],
+    it runs [tezos-client run tzip4 view .. on contract ..]. *)
+val run_tzip4_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  entrypoint:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  string Lwt.t
+
 (** Same as [run_view] but does not wait for the process to exit. *)
 val spawn_run_view :
   ?hooks:Process.hooks ->
