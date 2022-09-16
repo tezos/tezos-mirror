@@ -145,7 +145,7 @@ let split_and_store cb_constants store slot =
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Cryptobox.Commitment.encoding slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let* share =
     Lwt.catch
       (fun () ->
