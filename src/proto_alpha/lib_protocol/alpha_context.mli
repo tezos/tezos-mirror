@@ -2928,11 +2928,13 @@ module Sc_rollup : sig
 
     type t = Internal of internal_inbox_message | External of string
 
-    type serialized = private string
+    type serialized
 
     val encoding : t Data_encoding.t
 
     val unsafe_of_string : string -> serialized
+
+    val unsafe_to_string : serialized -> string
 
     val serialize : t -> serialized tzresult
 
@@ -3135,15 +3137,15 @@ module Sc_rollup : sig
 
       type t = Atomic_transaction_batch of {transactions : transaction list}
 
-      type serialized = private string
+      type serialized
+
+      val unsafe_of_string : string -> serialized
+
+      val unsafe_to_string : serialized -> string
 
       val deserialize : serialized -> t tzresult
 
-      (** This module discloses definitions that are only useful for tests and
-          must not be used otherwise. *)
-      module Internal_for_tests : sig
-        val serialize : t -> serialized tzresult
-      end
+      val serialize : t -> serialized tzresult
     end
 
     val record_applied_message :
@@ -3159,6 +3161,8 @@ module Sc_rollup : sig
     message_index : Z.t;
     message : Outbox.Message.t;
   }
+
+  val output_encoding : output Data_encoding.t
 
   module PVM : sig
     type boot_sector = string
@@ -3291,6 +3295,8 @@ module Sc_rollup : sig
       type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
       val get_status : state -> status Lwt.t
+
+      val get_outbox : state -> output list Lwt.t
     end
 
     val reference_initial_state_hash : State_hash.t
@@ -3341,6 +3347,8 @@ module Sc_rollup : sig
       type status = Computing | Waiting_for_input_message
 
       val get_status : state -> status Lwt.t
+
+      val get_outbox : state -> output list Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t

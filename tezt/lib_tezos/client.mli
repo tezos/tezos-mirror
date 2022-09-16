@@ -1383,6 +1383,21 @@ module Sc_rollup : sig
     src:string ->
     t ->
     unit Runnable.process
+
+  (** Run [tezos-client execute outbox message of sc rollup <rollup> from <src>
+      for commitment hash <hash> and output proof <proof>]. *)
+  val execute_outbox_message :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?fee:Tez.t ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    commitment_hash:string ->
+    proof:string ->
+    t ->
+    unit Runnable.process
 end
 
 (** {2 High-Level Functions} *)

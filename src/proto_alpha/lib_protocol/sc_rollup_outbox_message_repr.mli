@@ -56,8 +56,14 @@ type serialized = private string
     typed values. *)
 val deserialize : serialized -> t tzresult
 
-(** Module containing functions exposed so they can be used in tests. *)
-module Internal_for_tests : sig
-  (** [serialize msg] serializes the given outbox message [msg]. *)
-  val serialize : t -> serialized tzresult
-end
+(** [serialize msg] serializes the given outbox message [msg]. *)
+val serialize : t -> serialized tzresult
+
+(** [unsafe_of_string s] builds a serialized value out of a string.
+    You must understand the invariants of [serialized] to do so. *)
+val unsafe_of_string : string -> serialized
+
+(** [unsafe_to_string s] builds a string out of a serialized value.
+    You must understand the invariants of [serialized] to manipulate
+    the resulting string. *)
+val unsafe_to_string : serialized -> string

@@ -53,6 +53,44 @@ let reference_initial_state_hash =
   State_hash.of_b58check_exn
     "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
 
+type error +=
+  | Arith_proof_production_failed
+  | Arith_output_proof_production_failed
+  | Arith_invalid_claim_about_outbox
+
+let () =
+  let open Data_encoding in
+  let msg = "Invalid claim about outbox" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_invalid_claim_about_outbox"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
+    ~description:msg
+    unit
+    (function Arith_invalid_claim_about_outbox -> Some () | _ -> None)
+    (fun () -> Arith_invalid_claim_about_outbox) ;
+  let msg = "Output proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_output_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_output_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_output_proof_production_failed) ;
+  let msg = "Proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_proof_production_failed)
+
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
 
@@ -91,6 +129,8 @@ module type S = sig
   type status = Halted | Waiting_for_input_message | Parsing | Evaluating
 
   val get_status : state -> status Lwt.t
+
+  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   type instruction =
     | IPush : int -> instruction
@@ -365,6 +405,8 @@ module Make (Context : P) :
 
       let set k v = set_value (key k) P.encoding v
 
+      let entries = children [P.name] P.encoding
+
       let mapped_to k v state =
         let open Lwt_syntax in
         let* state', _ = Monad.(run (set k v) state) in
@@ -374,7 +416,7 @@ module Make (Context : P) :
 
       let pp =
         let open Monad.Syntax in
-        let* l = children [P.name] P.encoding in
+        let* l = entries in
         let pp_elem fmt (key, value) =
           Format.fprintf fmt "@[%s : %a@]" key P.pp value
         in
@@ -819,6 +861,11 @@ module Make (Context : P) :
 
   let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
 
+  let get_outbox state =
+    let open Lwt_syntax in
+    let+ entries = result_of ~default:[] Output.entries state in
+    List.map snd entries
+
   let get_code = result_of ~default:[] @@ Code.to_list
 
   let get_parsing_result = result_of ~default:None @@ Parsing_result.get
@@ -952,7 +999,13 @@ module Make (Context : P) :
       return ()
     in
     let is_digit d = Compare.Char.(d >= '0' && d <= '9') in
-    let is_letter d = Compare.Char.(d >= 'a' && d <= 'z') in
+    let is_letter d =
+      Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
+    in
+    let is_identifier_char = function
+      | '0' .. '9' | 'a' .. 'z' | 'A' .. 'Z' | '%' -> true
+      | _ -> false
+    in
     let* parser_state = Parser_state.get in
     match parser_state with
     | ParseInt -> (
@@ -974,7 +1027,7 @@ module Make (Context : P) :
     | ParseVar -> (
         let* char = current_char in
         match char with
-        | Some d when is_letter d -> next_char
+        | Some d when is_identifier_char d -> next_char
         | Some '+' ->
             let* () = produce_var in
             let* () = produce_add in
@@ -1005,7 +1058,7 @@ module Make (Context : P) :
         | None -> stop_parsing true
         | _ -> stop_parsing false)
 
-  let output v =
+  let output (destination, entrypoint) v =
     let open Monad.Syntax in
     let open Sc_rollup_outbox_message_repr in
     let* counter = Output_counter.get in
@@ -1013,8 +1066,6 @@ module Make (Context : P) :
     let unparsed_parameters =
       Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
-    let destination = Contract_hash.zero in
-    let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
     let message = Atomic_transaction_batch {transactions = [transaction]} in
     let* outbox_level = Current_level.get in
@@ -1022,6 +1073,32 @@ module Make (Context : P) :
       Sc_rollup_PVM_sig.{outbox_level; message_index = counter; message}
     in
     Output.set (Z.to_string counter) output
+
+  let identifies_target_contract x =
+    let open Option_syntax in
+    match Contract_hash.of_b58check_opt x with
+    | None ->
+        if Compare.String.(x = "out") then
+          return (Contract_hash.zero, Entrypoint_repr.default)
+        else fail
+    | Some _ -> (
+        match String.split_on_char '%' x with
+        | destination :: entrypoint ->
+            let* destination = Contract_hash.of_b58check_opt destination in
+            let* entrypoint =
+              match entrypoint with
+              | [] -> return Entrypoint_repr.default
+              | _ ->
+                  let* entrypoint =
+                    Non_empty_string.of_string (String.concat "" entrypoint)
+                  in
+                  let* entrypoint =
+                    Entrypoint_repr.of_annot_lax_opt entrypoint
+                  in
+                  return entrypoint
+            in
+            return (destination, entrypoint)
+        | [] -> fail)
 
   let evaluate =
     let open Monad.Syntax in
@@ -1033,8 +1110,10 @@ module Make (Context : P) :
         let* v = Stack.top in
         match v with
         | None -> stop_evaluating false
-        | Some v ->
-            if Compare.String.(x = "out") then output v else Vars.set x v)
+        | Some v -> (
+            match identifies_target_contract x with
+            | Some contract_entrypoint -> output contract_entrypoint v
+            | None -> Vars.set x v))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -1095,8 +1174,6 @@ module Make (Context : P) :
     | None -> return false
     | Some (_, request) ->
         return (PS.input_request_equal request proof.requested)
-
-  type error += Arith_proof_production_failed
 
   let produce_proof context input_given state =
     let open Lwt_tzresult_syntax in
@@ -1169,10 +1246,6 @@ module Make (Context : P) :
     let transition = has_output p.output_proof_output in
     let* result = Context.verify_proof p.output_proof transition in
     match result with None -> return false | Some _ -> return true
-
-  type error += Arith_output_proof_production_failed
-
-  type error += Arith_invalid_claim_about_outbox
 
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in

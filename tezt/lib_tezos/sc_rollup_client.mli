@@ -70,6 +70,43 @@ val state_value : ?hooks:Process.hooks -> t -> key:string -> bytes Lwt.t
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
 
+(** [outbox client] gets the rollup outbox for the current head block. *)
+val outbox : ?hooks:Process.hooks -> t -> string Lwt.t
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+(** [outbox_proof_single] asks the rollup node for a proof that an
+    output of a given [message_index] is available in the outbox at a
+    given [outbox_level] as a latent call to [destination]'s
+    [entrypoint] with the given [parameters]. *)
+val outbox_proof_single :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  ?entrypoint:string ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  destination:string ->
+  parameters:string ->
+  outbox_proof option Lwt.t
+
+type transaction = {
+  destination : string;
+  entrypoint : string option;
+  parameters : string;
+}
+
+(** Same as [outbox_proof_single] except that the claim is about a batch
+    of output transactions. *)
+val outbox_proof_batch :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  transaction list ->
+  outbox_proof option Lwt.t
+
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 

@@ -164,8 +164,7 @@ module Internal_for_tests = struct
     let output_message_internal =
       Sc_rollup.Outbox.Message.Atomic_transaction_batch {transactions}
     in
-    Sc_rollup.Outbox.Message.Internal_for_tests.serialize
-      output_message_internal
+    Sc_rollup.Outbox.Message.serialize output_message_internal
 
   let deserialize_inbox_message = Sc_rollup.Inbox_message.deserialize
 end

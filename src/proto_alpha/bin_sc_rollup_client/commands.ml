@@ -84,6 +84,78 @@ let display_answer (cctxt : #Configuration.sc_client_context) :
       cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
   | _ -> cctxt#error "Unexpected server answer\n%!"
 
+let get_output_proof () =
+  let parse_transactions transactions =
+    let json = Ezjsonm.from_string transactions in
+    let open Ezjsonm in
+    let open Sc_rollup.Outbox.Message in
+    let open Lwt_result_syntax in
+    let transaction json =
+      let destination =
+        find json ["destination"] |> get_string
+        |> Protocol.Contract_hash.of_b58check_exn
+      in
+      let entrypoint =
+        try
+          find json ["entrypoint"] |> get_string
+          |> Entrypoint.of_string_strict_exn
+        with Not_found -> Entrypoint.default
+      in
+      let*? parameters =
+        Tezos_micheline.Micheline_parser.no_parsing_error
+        @@ (find json ["parameters"] |> get_string
+          |> Michelson_v1_parser.parse_expression)
+      in
+      let unparsed_parameters = parameters.expanded in
+      return @@ {destination; entrypoint; unparsed_parameters}
+    in
+    match json with
+    | `A messages ->
+        let* transactions = List.map_es transaction messages in
+        return @@ Atomic_transaction_batch {transactions}
+    | `O _ ->
+        let* transaction = transaction json in
+        return @@ Atomic_transaction_batch {transactions = [transaction]}
+    | _ ->
+        failwith
+          "An outbox message must be either a single transaction or a list of \
+           transactions."
+  in
+
+  command
+    ~desc:"Ask the rollup node for an output proof."
+    no_options
+    (prefixes ["get"; "proof"; "for"; "message"]
+    @@ string ~name:"index" ~desc:"The index of the message in the outbox"
+    @@ prefixes ["of"; "outbox"; "at"; "level"]
+    @@ string
+         ~name:"level"
+         ~desc:"The level of the rollup outbox where the message is available"
+    @@ prefixes ["transferring"]
+    @@ string
+         ~name:"transactions"
+         ~desc:"A JSON description of the transactions"
+    @@ stop)
+    (fun () index level transactions (cctxt : #Configuration.sc_client_context) ->
+      let open Lwt_result_syntax in
+      let* message = parse_transactions transactions in
+      let output =
+        Protocol.Alpha_context.Sc_rollup.
+          {
+            message_index = Z.of_string index;
+            outbox_level = Raw_level.of_int32_exn (Int32.of_string level);
+            message;
+          }
+      in
+      RPC.get_outbox_proof cctxt output >>=? fun (commitment_hash, proof) ->
+      cctxt#message
+        {|@[{ "proof" : "0x%a", "commitment_hash" : "%a"@]}|}
+        Hex.pp
+        (Hex.of_string proof)
+        Protocol.Alpha_context.Sc_rollup.Commitment.Hash.pp
+        commitment_hash
+      >>= fun () -> return_unit)
+
 (** [call_get cctxt raw_url] executes a GET RPC call against the [raw_url]. *)
 let call_get (cctxt : #Configuration.sc_client_context) raw_url =
   let open Lwt_result_syntax in
@@ -155,6 +227,7 @@ let all () =
   [
     get_sc_rollup_addresses_command ();
     get_state_value_command ();
+    get_output_proof ();
     rpc_get_command;
     Keys.generate_keys ();
     Keys.list_keys ();

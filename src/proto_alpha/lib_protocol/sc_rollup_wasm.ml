@@ -93,6 +93,8 @@ module V2_0_0 = struct
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
+
+    val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
@@ -268,6 +270,11 @@ module V2_0_0 = struct
     let is_input_state = result_of is_input_state
 
     let get_status : state -> status Lwt.t = result_of get_status
+
+    let get_outbox _state =
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790 *)
+      let open Lwt_syntax in
+      return []
 
     let set_input_state input =
       let open PS in

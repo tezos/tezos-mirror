@@ -3325,7 +3325,7 @@ let commands_rw () =
            ~name:"output proof"
            ~desc:
              "The output proof containing the outbox level, index and message."
-           Sc_rollup_params.unchecked_payload_parameter
+           bytes_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3356,7 +3356,7 @@ let commands_rw () =
             ~source
             ~rollup
             ~cemented_commitment
-            ~output_proof
+            ~output_proof:(Bytes.to_string output_proof)
             ~src_pk
             ~src_sk
             ~fee_parameter

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -44,6 +45,10 @@ module type S = sig
 
   (** [string_of_status status] returns a string representation of [status]. *)
   val string_of_status : status -> string
+
+  (** [get_outbox state] returns a list of outputs available in the
+      outbox of [state]. *)
+  val get_outbox : state -> Sc_rollup.output list Lwt.t
 
   (** State storage for this PVM. *)
   module State : sig

@@ -72,7 +72,7 @@ let transaction_encoding =
   @@ obj3
        (req "parameters" Script_repr.expr_encoding)
        (req "destination" Contract_repr.originated_encoding)
-       (req "entrypoint" Entrypoint_repr.simple_encoding)
+       Entrypoint_repr.(dft "entrypoint" simple_encoding default)
 
 let encoding =
   let open Data_encoding in
@@ -122,10 +122,12 @@ let deserialize data =
   | Some x -> return x
   | None -> fail Error_decode_outbox_message
 
-module Internal_for_tests = struct
-  let serialize outbox_message =
-    let open Tzresult_syntax in
-    match Data_encoding.Binary.to_string_opt encoding outbox_message with
-    | Some str -> return str
-    | None -> fail Error_encode_outbox_message
-end
+let serialize outbox_message =
+  let open Tzresult_syntax in
+  match Data_encoding.Binary.to_string_opt encoding outbox_message with
+  | Some str -> return str
+  | None -> fail Error_encode_outbox_message
+
+let unsafe_of_string s = s
+
+let unsafe_to_string s = s

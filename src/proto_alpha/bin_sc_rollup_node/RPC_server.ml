@@ -26,6 +26,7 @@
 open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
+open Protocol
 
 let get_head store =
   let open Lwt_result_syntax in
@@ -145,11 +146,21 @@ end
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
   module PVM = PVM
+  module Outbox = Outbox.Make (PVM)
 
-  let get_state (node_ctxt : Node_context.t) =
+  let get_context ?block_hash (node_ctxt : Node_context.t) =
     let open Lwt_result_syntax in
-    let* head = get_head node_ctxt.store in
-    let* ctxt = Node_context.checkout_context node_ctxt head in
+    let* block_hash =
+      match block_hash with
+      | None -> get_head node_ctxt.store
+      | Some block_hash -> return block_hash
+    in
+    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
+    return ctxt
+
+  let get_state ?block_hash (node_ctxt : Node_context.t) =
+    let open Lwt_result_syntax in
+    let* ctxt = get_context ?block_hash node_ctxt in
     let*! state = PVM.State.find ctxt in
     match state with None -> failwith "No state" | Some state -> return state
 
@@ -254,6 +265,29 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.dal_confirmed_slots ())
       (fun () () -> get_dal_confirmed_slots store)
 
+  let register_current_outbox node_ctxt dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.current_outbox ())
+      (fun () () ->
+        let open Lwt_result_syntax in
+        let store = node_ctxt.Node_context.store in
+        let*! lcc_level = Store.Last_cemented_commitment_level.get store in
+        let*! block_hash =
+          Layer1.hash_of_level
+            store
+            (Alpha_context.Raw_level.to_int32 lcc_level)
+        in
+        let* state = get_state ~block_hash node_ctxt in
+        let*! outbox = PVM.get_outbox state in
+        return outbox)
+
+  let register_outbox_proof node_ctxt dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.outbox_proof ())
+      (fun output () -> Outbox.proof_of_output node_ctxt output)
+
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -270,6 +304,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_dal_slot_subscriptions node_ctxt.store
     |> register_dal_slots node_ctxt.store
     |> register_dal_confirmed_slots node_ctxt.store
+    |> register_current_outbox node_ctxt
+    |> register_outbox_proof node_ctxt
 
   let start node_ctxt configuration =
     Common.start configuration (register node_ctxt configuration)
