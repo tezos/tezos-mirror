@@ -150,33 +150,14 @@ let check_successor_period ?level client expected_period =
     ~error_msg:"expected successor_period = %R, got %L" ;
   unit
 
-type level = {
-  level : int;
-  level_position : int;
-  cycle : int;
-  cycle_position : int;
-  expected_commitment : bool;
-}
-
-let level_type : level Check.typ =
+let level_type : RPC.level Check.typ =
   Check.convert
-    (fun {level; level_position; cycle; cycle_position; expected_commitment} ->
+    (fun RPC.{level; level_position; cycle; cycle_position; expected_commitment} ->
       (level, level_position, cycle, cycle_position, expected_commitment))
     Check.(tuple5 int int int int bool)
 
-let decode_level json =
-  let level = JSON.(json |-> "level" |> as_int) in
-  let level_position = JSON.(json |-> "level_position" |> as_int) in
-  let cycle = JSON.(json |-> "cycle" |> as_int) in
-  let cycle_position = JSON.(json |-> "cycle_position" |> as_int) in
-  let expected_commitment = JSON.(json |-> "expected_commitment" |> as_bool) in
-  {level; level_position; cycle; cycle_position; expected_commitment}
-
 let get_current_level client =
-  let* json =
-    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-  in
-  return (decode_level json)
+  RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
 
 let check_current_level client expected_level =
   let* level = get_current_level client in
@@ -427,13 +408,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
        cycle = 7/4 = 1,
        cycle_position = 7 % 4 = 3
     *)
-    {
-      level = 8;
-      level_position = 7;
-      cycle = 1;
-      cycle_position = 3;
-      expected_commitment = true;
-    }
+    RPC.
+      {
+        level = 8;
+        level_position = 7;
+        cycle = 1;
+        cycle_position = 3;
+        expected_commitment = true;
+      }
   in
   let* () = check_current_level client expected_level in
   let* () =
@@ -484,13 +466,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 9/4 = 2
          cycle_position = 9 % 4 = 1
       *)
-      {
-        level = 10;
-        level_position = 9;
-        cycle = 2;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 10;
+          level_position = 9;
+          cycle = 2;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -544,13 +527,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 13/4 = 3
          cycle_position = 13 % 4 = 1
       *)
-      {
-        level = 14;
-        level_position = 13;
-        cycle = 3;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 14;
+          level_position = 13;
+          cycle = 3;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -610,13 +594,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 17/4 = 4
          cycle_position = 17 % 4 = 1
       *)
-      {
-        level = 18;
-        level_position = 17;
-        cycle = 4;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 18;
+          level_position = 17;
+          cycle = 4;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -670,13 +655,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 21/4 = 5
          cycle_position = 21 % 4 = 1
       *)
-      {
-        level = 22;
-        level_position = 21;
-        cycle = 5;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 22;
+          level_position = 21;
+          cycle = 5;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in

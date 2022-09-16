@@ -119,13 +119,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
-  let endpoint = Client.(Node node) in
-  let* client = Client.init ~endpoint () in
-  let* json =
-    RPC.Client.call ~endpoint client
-    @@ RPC.get_chain_block_helper_current_level ()
-  in
-  let level = JSON.(json |-> "level" |> as_int) in
+  let level = Node.get_level node in
   let* () = Node.terminate node in
   Log.info "Updating node config with user_activated_upgrade" ;
   let migration_level = level + 1 in
@@ -159,10 +153,9 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   let last_block_of_cycle =
     JSON.(levels_in_current_cycle |-> "last" |> as_int)
   in
-  let* prev_level =
+  let* {cycle = prev_cycle; _} =
     RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
   in
-  let prev_cycle = JSON.(prev_level |-> "cycle" |> as_int) in
   Log.info "Bake until new cycle" ;
   let* () =
     repeat
@@ -170,10 +163,9 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       (fun () -> bake_with_foundation client)
   in
   let* _until_end_of_cycle = Node.wait_for_level node last_block_of_cycle in
-  let* after_level =
+  let* {cycle = after_cycle; _} =
     RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
   in
-  let after_cycle = JSON.(after_level |-> "cycle" |> as_int) in
   if prev_cycle + 1 <> after_cycle then
     Test.fail
       "The cycle of current level is %d where it was expected to be %d "

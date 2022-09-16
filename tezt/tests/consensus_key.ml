@@ -35,35 +35,15 @@
 let hooks = Tezos_regression.hooks
 
 module Helpers = struct
-  type level = {
-    level : int;
-    level_position : int;
-    cycle : int;
-    cycle_position : int;
-    expected_commitment : bool;
-  }
-
-  let level_type : level Check.typ =
+  let level_type : RPC.level Check.typ =
     Check.convert
-      (fun {level; level_position; cycle; cycle_position; expected_commitment} ->
+      (fun RPC.
+             {level; level_position; cycle; cycle_position; expected_commitment} ->
         (level, level_position, cycle, cycle_position, expected_commitment))
       Check.(tuple5 int int int int bool)
 
-  let decode_level json =
-    let level = JSON.(json |-> "level" |> as_int) in
-    let level_position = JSON.(json |-> "level_position" |> as_int) in
-    let cycle = JSON.(json |-> "cycle" |> as_int) in
-    let cycle_position = JSON.(json |-> "cycle_position" |> as_int) in
-    let expected_commitment =
-      JSON.(json |-> "expected_commitment" |> as_bool)
-    in
-    {level; level_position; cycle; cycle_position; expected_commitment}
-
   let get_current_level client =
-    let* json =
-      RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
-    return (decode_level json)
+    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
 
   let check_current_level client expected_level =
     let* level = get_current_level client in
@@ -72,10 +52,7 @@ module Helpers = struct
     unit
 
   let bake_and_wait_block node client =
-    let* level_json =
-      RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-    in
-    let level = JSON.(level_json |-> "level" |> as_int) in
+    let level = Node.get_level node in
     let* () =
       Client.bake_for ~context_path:(Node.data_dir node // "context") client
     in

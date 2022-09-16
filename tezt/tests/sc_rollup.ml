@@ -438,9 +438,7 @@ let test_rollup_get_genesis_info ~kind =
     (Format.asprintf "%s - get genesis info of a sc rollup" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
-      let* current_level =
-        RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-      in
+      let current_level = Node.get_level node in
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
@@ -452,8 +450,7 @@ let test_rollup_get_genesis_info ~kind =
         (* 1 Block for activating alpha + 1 block for originating the rollup
            the rollup initial level should be 2 *)
         Check.(
-          (JSON.(genesis_info |-> "level" |> as_int)
-          = JSON.as_int (JSON.get "level" current_level) + 1)
+          (JSON.(genesis_info |-> "level" |> as_int) = current_level + 1)
             int
             ~error_msg:"expected value %L, got %R") ;
         return () )
@@ -481,9 +478,8 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
-        let* origination_level =
-          RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
-        in
+        let origination_level = Node.get_level node in
+
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
            from the level of the head node. *)
         let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
@@ -502,9 +498,7 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
         (* The level of the last cemented commitment should correspond to the
            rollup origination level. *)
         Check.(
-          (level = JSON.(origination_level |-> "level" |> as_int))
-            int
-            ~error_msg:"expected value %L, got %R") ;
+          (level = origination_level) int ~error_msg:"expected value %L, got %R") ;
         return () )
         node
         client

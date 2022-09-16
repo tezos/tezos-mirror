@@ -32,11 +32,6 @@
 *)
 
 let init_light ~protocol =
-  let get_current_level () =
-    match protocol with
-    | Protocol.Alpha -> RPC.get_chain_block_helper_current_level ()
-    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
-  in
   (* Note that this code CANNOT be in tezt/lib_tezos/client.ml
      because it uses RPC.*.get_current_level, which depends on client.ml
      already. In other words, putting this code in client.ml would
@@ -58,8 +53,11 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let* level_json = RPC.Client.call ~endpoint client @@ get_current_level () in
-  let level = JSON.(level_json |-> "level" |> as_int) in
+  let level =
+    match protocol with
+    | Protocol.Alpha -> Node.get_level node0
+    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
+  in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in

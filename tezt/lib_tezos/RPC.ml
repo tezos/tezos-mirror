@@ -497,6 +497,14 @@ let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
     Fun.id
 
+type level = {
+  level : int;
+  level_position : int;
+  cycle : int;
+  cycle_position : int;
+  expected_commitment : bool;
+}
+
 let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
     ?(offset = 0) () =
   let query_string = [("offset", string_of_int offset)] in
@@ -504,7 +512,13 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
     ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "current_level"]
-    Fun.id
+  @@ fun json ->
+  let level = JSON.(json |-> "level" |> as_int) in
+  let level_position = JSON.(json |-> "level_position" |> as_int) in
+  let cycle = JSON.(json |-> "cycle" |> as_int) in
+  let cycle_position = JSON.(json |-> "cycle_position" |> as_int) in
+  let expected_commitment = JSON.(json |-> "expected_commitment" |> as_bool) in
+  {level; level_position; cycle; cycle_position; expected_commitment}
 
 let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ?delegate () =
