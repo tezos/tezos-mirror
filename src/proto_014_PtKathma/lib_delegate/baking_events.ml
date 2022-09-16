@@ -717,7 +717,7 @@ module VDF = struct
     declare_1
       ~section
       ~name:"vdf_internal"
-      ~level:Debug
+      ~level:Notice
       ~msg:"{msg}"
       ("msg", Data_encoding.string)
 end
