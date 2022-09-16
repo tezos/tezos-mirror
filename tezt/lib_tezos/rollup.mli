@@ -242,6 +242,11 @@ module Dal : sig
         block hash *)
     val stored_slot_headers :
       string -> (Dal_node.t, (int * string) list) RPC_core.t
+
+    (** [shard ~slot_header ~shard_id] gets a shard from
+        a given slot header and shard id *)
+    val shard :
+      slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox

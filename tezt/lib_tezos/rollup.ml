@@ -564,6 +564,10 @@ module Dal = struct
         (fun json ->
           (json |-> "index" |> as_int, json |-> "slot_header" |> as_string))
         l
+
+    let shard ~slot_header ~shard_id =
+      make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
+      json |> JSON.encode
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox

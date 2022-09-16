@@ -583,6 +583,67 @@ let test_dal_node_slots_headers_tracking =
     ~error_msg:"Published header is different from stored header (%L = %R)" ;
   return ()
 
+let generate_dummy_slot slot_size =
+  String.init slot_size (fun i ->
+      match i mod 3 with 0 -> 'a' | 1 -> 'b' | _ -> 'c')
+
+let test_dal_node_rebuild_from_shards =
+  (* Steps in this integration test:
+     1. Run a dal node
+     2. Generate and publish a full slot, then bake
+     3. Download exactly 1/16 shards from this slot (it would work with more)
+     4. Ensure we can rebuild the original data using the above shards
+  *)
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node shard fetching and slot reconstruction"
+    ~tags:["dal"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let open Tezos_crypto_dal in
+  let* node, client, dal_node = init_dal_node protocol in
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let slot_content = generate_dummy_slot parameters.slot_size in
+  let publish = publish_and_store_slot node client dal_node in
+  let* _slot_index, slot_header = publish Constant.bootstrap1 0 slot_content in
+  let* () = Client.bake_for_and_wait client in
+  let* _level = Node.wait_for_level node 1 in
+  let number_of_shards =
+    (parameters.number_of_shards / parameters.redundancy_factor) - 1
+  in
+  let downloaded_shard_ids =
+    range 0 number_of_shards
+    |> List.map (fun i -> i * parameters.redundancy_factor)
+  in
+  let* shards =
+    Lwt_list.fold_left_s
+      (fun acc shard_id ->
+        let* shard =
+          RPC.call dal_node (Rollup.Dal.RPC.shard ~slot_header ~shard_id)
+        in
+        let shard =
+          match Data_encoding.Json.from_string shard with
+          | Ok s -> s
+          | Error _ -> Test.fail "shard RPC sent invalid json"
+        in
+        let shard =
+          Data_encoding.Json.destruct Cryptobox.shard_encoding shard
+        in
+        return @@ Cryptobox.IntMap.add shard.index shard.share acc)
+      Cryptobox.IntMap.empty
+      downloaded_shard_ids
+  in
+  let cryptobox = Rollup.Dal.make parameters in
+  let reformed_slot =
+    match Cryptobox.polynomial_from_shards cryptobox shards with
+    | Ok p -> Cryptobox.polynomial_to_bytes cryptobox p |> Bytes.to_string
+    | Error _ -> Test.fail "Fail to build polynomial from shards"
+  in
+  Check.(reformed_slot = slot_content)
+    Check.(string)
+    ~error_msg:"Reconstructed slot is different from original slot (%L = %R)" ;
+  return ()
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -787,6 +848,7 @@ let register ~protocols =
   test_slot_management_logic protocols ;
   test_dal_node_slot_management protocols ;
   test_dal_node_slots_headers_tracking protocols ;
+  test_dal_node_rebuild_from_shards protocols ;
   test_dal_node_startup protocols ;
   test_dal_rollup_scenario
     ~dal_enable:true
