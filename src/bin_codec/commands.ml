@@ -48,9 +48,26 @@ let json_parameter =
 
 let bytes_parameter =
   parameter (fun (cctxt : #Client_context.printer) hex ->
+      let hex =
+        if Sys.file_exists hex then (
+          let ic = open_in hex in
+          let len = in_channel_length ic in
+          let contents = really_input_string ic len in
+          close_in ic ;
+          if contents.[String.length contents - 1] = '\n' then
+            String.sub contents 0 (String.length contents - 1)
+          else contents)
+        else hex
+      in
       match Hex.to_bytes (`Hex hex) with
       | Some s -> Lwt.return_ok s
       | None -> cctxt#error "Invalid hex string: %s" hex)
+
+let full_bytes_parameter =
+  param
+    ~name:"hex"
+    ~desc:"Binary encoded data or name of file containing the data"
+    bytes_parameter
 
 let format_arg =
   default_arg
@@ -239,9 +256,7 @@ let commands () =
       no_options
       (prefix "decode"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
-      @@ prefix "from"
-      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop)
+      @@ prefix "from" @@ full_bytes_parameter @@ stop)
       (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
         match
           Data_encoding.Registration.json_of_bytes registered_encoding bytes
@@ -259,8 +274,7 @@ let commands () =
       (prefix "display"
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ prefixes ["from"; "binary"]
-      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop)
+      @@ full_bytes_parameter @@ stop)
       (fun () registered_encoding bytes (cctxt : #Client_context.printer) ->
         let pp_bytes fmt bytes =
           Data_encoding.Registration.binary_pretty_printer
@@ -327,9 +341,7 @@ let commands () =
         "Attempts to slice an hex-encoded binary value with all known \
          encodings."
       no_options
-      (prefix "slice"
-      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
-      @@ stop)
+      (prefix "slice" @@ full_bytes_parameter @@ stop)
       (fun () bytes cctxt ->
         let bytes = Bytes.to_string bytes in
         let all = Data_encoding.Registration.slice_all bytes in
@@ -352,7 +364,10 @@ let commands () =
       ~desc:"Slice an hex-encoded binary value with the specified encoding."
       (args1 format_arg)
       (prefix "slice"
-      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
+      @@ param
+           ~name:"hex"
+           ~desc:"Binary encoded data or name of file containing the data"
+           bytes_parameter
       @@ prefixes ["with"; "encoding"]
       @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
       @@ stop)
