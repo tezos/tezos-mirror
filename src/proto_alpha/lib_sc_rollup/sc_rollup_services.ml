@@ -190,11 +190,19 @@ module Global = struct
            | Error e -> invalid_message e)
     |> seal
 
+  let hex_string =
+    let open Data_encoding in
+    conv Bytes.of_string Bytes.to_string bytes
+
   let outbox_proof () =
     RPC_service.get_service
       ~description:"Generate serialized output proof for some outbox message"
       ~query:outbox_proof_query
-      ~output:Data_encoding.(tup2 Sc_rollup.Commitment.Hash.encoding string)
+      ~output:
+        Data_encoding.(
+          obj2
+            (req "commitment" Sc_rollup.Commitment.Hash.encoding)
+            (req "proof" hex_string))
       (prefix / "proofs" / "outbox")
 end
 
