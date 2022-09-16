@@ -63,24 +63,29 @@ let input_proof_encoding =
     case
       ~title:"inbox proof"
       (Tag 0)
-      (obj3
+      (obj4
+         (req "input_proof_kind" (constant "inbox_proof"))
          (req "level" Raw_level_repr.encoding)
          (req "message_counter" Data_encoding.n)
-         (req "proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
+         (req "serialized_proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
       (function
         | Inbox_proof {level; message_counter; proof} ->
-            Some (level, message_counter, proof)
+            Some ((), level, message_counter, proof)
         | _ -> None)
-      (fun (level, message_counter, proof) ->
+      (fun ((), level, message_counter, proof) ->
         Inbox_proof {level; message_counter; proof})
   in
   let case_reveal_proof =
     case
       ~title:"reveal proof"
       (Tag 1)
-      (check_size Constants_repr.sc_rollup_message_size_limit string)
-      (function Reveal_proof s -> Some s | _ -> None)
-      (fun s -> Reveal_proof s)
+      (obj2
+         (req "input_proof_kind" (constant "postulate_proof"))
+         (req
+            "postulate_proof"
+            (check_size Constants_repr.sc_rollup_message_size_limit string)))
+      (function Reveal_proof s -> Some ((), s) | _ -> None)
+      (fun ((), s) -> Reveal_proof s)
   in
   union [case_inbox_proof; case_reveal_proof]
 
