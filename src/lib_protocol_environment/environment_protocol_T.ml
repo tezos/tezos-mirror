@@ -59,12 +59,14 @@ module V0toV7
             and type quota := quota
             and type validation_result := validation_result
             and type rpc_context := rpc_context
+            and type tztrace := Error_monad.tztrace
             and type 'a tzresult := 'a Error_monad.tzresult) :
   Environment_protocol_T_V7.T
     with type context := Context.t
      and type quota := quota
      and type validation_result := validation_result
      and type rpc_context := rpc_context
+     and type tztrace := Error_monad.tztrace
      and type 'a tzresult := 'a Error_monad.tzresult
      and type block_header_data = E.block_header_data
      and type block_header = E.block_header
@@ -96,6 +98,51 @@ module V0toV7
   type cache_value = Context.Cache.value
 
   let init _chain_id c hd = init c hd
+
+  (* Fake mempool *)
+  module Mempool = struct
+    type t = unit
+
+    type validation_info = unit
+
+    type conflict_handler =
+      existing_operation:Operation_hash.t * operation ->
+      new_operation:Operation_hash.t * operation ->
+      [`Keep | `Replace]
+
+    type operation_conflict =
+      | Operation_conflict of {
+          existing : Operation_hash.t;
+          new_operation : Operation_hash.t;
+        }
+
+    type add_result =
+      | Added
+      | Replaced of {removed : Operation_hash.t}
+      | Unchanged
+
+    type add_error =
+      | Validation_error of error trace
+      | Add_conflict of operation_conflict
+
+    type merge_error =
+      | Incompatible_mempool
+      | Merge_conflict of operation_conflict
+
+    let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ =
+      Lwt.return_ok ((), ())
+
+    let encoding = Data_encoding.unit
+
+    let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+      Lwt.return_ok ((), Unchanged)
+
+    let remove_operation () _ = ()
+
+    let merge ?conflict_handler:_ () () = Ok ()
+
+    let operations () = Operation_hash.Map.empty
+  end
 end
 
 (* [module type PROTOCOL] is protocol signature that the shell can use.
@@ -111,6 +158,7 @@ module type PROTOCOL = sig
        and type quota := quota
        and type validation_result := validation_result
        and type rpc_context := rpc_context
+       and type tztrace := Error_monad.tztrace
        and type 'a tzresult := 'a Error_monad.tzresult
        and type cache_key := Context.Cache.key
        and type cache_value := Context.Cache.value
@@ -127,7 +175,7 @@ module type PROTOCOL = sig
     predecessor_hash:Block_hash.t ->
     cache:Context.source_of_cache ->
     block_header ->
-    (validation_state, tztrace) result Lwt.t
+    validation_state Error_monad.tzresult Lwt.t
 
   val begin_application :
     chain_id:Chain_id.t ->
@@ -155,6 +203,19 @@ module type PROTOCOL = sig
     validation_state ->
     Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
+
+  module Mempool : sig
+    include module type of Mempool
+
+    val init :
+      Context.t ->
+      Chain_id.t ->
+      head_hash:Block_hash.t ->
+      head_header:Block_header.shell_header ->
+      current_timestamp:Time.Protocol.t ->
+      cache:Context.source_of_cache ->
+      (validation_info * t) tzresult Lwt.t
+  end
 end
 
 (*
@@ -170,6 +231,7 @@ module IgnoreCaches
             and type quota := quota
             and type validation_result := validation_result
             and type rpc_context := rpc_context
+            and type tztrace := Error_monad.tztrace
             and type 'a tzresult := 'a Error_monad.tzresult) =
 struct
   include P
@@ -213,4 +275,11 @@ struct
       ()
 
   let finalize_block c shell_header = P.finalize_block c shell_header
+
+  module Mempool = struct
+    include Mempool
+
+    let init ctxt chain_id ~head_hash ~head_header ~current_timestamp ~cache:_ =
+      init ctxt chain_id ~head_hash ~head_header ~current_timestamp
+  end
 end

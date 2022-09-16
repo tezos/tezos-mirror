@@ -1002,6 +1002,7 @@ struct
          and type quota := quota
          and type validation_result := validation_result
          and type rpc_context := rpc_context
+         and type tztrace := Error_monad.tztrace
          and type 'a tzresult := 'a Error_monad.tzresult
   end
 
@@ -1215,6 +1216,49 @@ struct
       wrap_tzresult r
 
     let set_log_message_consumer f = Logging.logging_function := Some f
+
+    module Mempool = struct
+      include Mempool
+
+      type add_error =
+        | Validation_error of Error_monad.shell_tztrace
+        | Add_conflict of operation_conflict
+
+      let add_operation ?check_signature ?conflict_handler info mempool op :
+          (t * add_result, add_error) result Lwt.t =
+        let open Lwt_syntax in
+        let+ r =
+          Mempool.add_operation
+            ?check_signature
+            ?conflict_handler
+            info
+            mempool
+            op
+        in
+        match r with
+        | Ok v -> Ok v
+        | Error (Mempool.Validation_error e) ->
+            Error (Validation_error (wrap_tztrace e))
+        | Error (Mempool.Add_conflict c) -> Error (Add_conflict c)
+
+      let init ctxt chain_id ~head_hash ~head_header ~current_timestamp ~cache =
+        let open Lwt_result_syntax in
+        let* ctxt =
+          load_predecessor_cache
+            ~chain_id
+            ~predecessor_context:ctxt
+            ~predecessor_timestamp:head_header.Block_header.timestamp
+            ~predecessor_level:head_header.Block_header.level
+            ~predecessor_fitness:head_header.Block_header.fitness
+            ~predecessor:head_hash
+            ~timestamp:current_timestamp
+            ~cache
+        in
+        let*! r =
+          init ctxt chain_id ~head_hash ~head_header ~current_timestamp
+        in
+        Lwt.return (wrap_tzresult r)
+    end
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

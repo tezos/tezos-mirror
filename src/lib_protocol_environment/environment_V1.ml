@@ -830,6 +830,7 @@ struct
          and type quota := quota
          and type validation_result := validation_result
          and type rpc_context := rpc_context
+         and type tztrace := Error_monad.tztrace
          and type 'a tzresult := 'a Error_monad.tzresult
   end
 

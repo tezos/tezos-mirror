@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (* Documentation for this interface can be found in
-   module type [PROTOCOL] of [sigs/v3/updater.mli]. *)
+   module type [PROTOCOL] of [sigs/v7/updater.mli]. *)
 
 module type T = sig
   type context
@@ -35,6 +35,8 @@ module type T = sig
   type validation_result
 
   type rpc_context
+
+  type tztrace
 
   type 'a tzresult
 
@@ -139,4 +141,59 @@ module type T = sig
     predecessor:Block_hash.t ->
     timestamp:Time.Protocol.t ->
     (cache_key -> cache_value tzresult Lwt.t) tzresult Lwt.t
+
+  module Mempool : sig
+    type t
+
+    type validation_info
+
+    type conflict_handler =
+      existing_operation:Operation_hash.t * operation ->
+      new_operation:Operation_hash.t * operation ->
+      [`Keep | `Replace]
+
+    type operation_conflict =
+      | Operation_conflict of {
+          existing : Operation_hash.t;
+          new_operation : Operation_hash.t;
+        }
+
+    type add_result =
+      | Added
+      | Replaced of {removed : Operation_hash.t}
+      | Unchanged
+
+    type add_error =
+      | Validation_error of tztrace
+      | Add_conflict of operation_conflict
+
+    type merge_error =
+      | Incompatible_mempool
+      | Merge_conflict of operation_conflict
+
+    val init :
+      context ->
+      Chain_id.t ->
+      head_hash:Block_hash.t ->
+      head_header:Block_header.shell_header ->
+      current_timestamp:Time.Protocol.t ->
+      (validation_info * t) tzresult Lwt.t
+
+    val encoding : t Data_encoding.t
+
+    val add_operation :
+      ?check_signature:bool ->
+      ?conflict_handler:conflict_handler ->
+      validation_info ->
+      t ->
+      Operation_hash.t * operation ->
+      (t * add_result, add_error) result Lwt.t
+
+    val remove_operation : t -> Operation_hash.t -> t
+
+    val merge :
+      ?conflict_handler:conflict_handler -> t -> t -> (t, merge_error) result
+
+    val operations : t -> operation Operation_hash.Map.t
+  end
 end

@@ -34,6 +34,10 @@ module type T = sig
     include P
   end
 
+  module Mempool : sig
+    include module type of P.Mempool
+  end
+
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
 end

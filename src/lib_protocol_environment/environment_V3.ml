@@ -1173,6 +1173,51 @@ struct
 
     let acceptable_pass op =
       match acceptable_passes op with [n] -> Some n | _ -> None
+
+    (* Fake mempool *)
+    module Mempool = struct
+      type t = unit
+
+      type validation_info = unit
+
+      type conflict_handler =
+        existing_operation:Operation_hash.t * operation ->
+        new_operation:Operation_hash.t * operation ->
+        [`Keep | `Replace]
+
+      type operation_conflict =
+        | Operation_conflict of {
+            existing : Operation_hash.t;
+            new_operation : Operation_hash.t;
+          }
+
+      type add_result =
+        | Added
+        | Replaced of {removed : Operation_hash.t}
+        | Unchanged
+
+      type add_error =
+        | Validation_error of error trace
+        | Add_conflict of operation_conflict
+
+      type merge_error =
+        | Incompatible_mempool
+        | Merge_conflict of operation_conflict
+
+      let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ ~cache:_ =
+        Lwt.return_ok ((), ())
+
+      let encoding = Data_encoding.unit
+
+      let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+        Lwt.return_ok ((), Unchanged)
+
+      let remove_operation () _ = ()
+
+      let merge ?conflict_handler:_ () () = Ok ()
+
+      let operations () = Operation_hash.Map.empty
+    end
   end
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
