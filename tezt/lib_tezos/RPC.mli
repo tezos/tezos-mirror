@@ -773,7 +773,7 @@ val get_chain_block_context_delegate_deactivated :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_frozen_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_balance_by_cycle]
 

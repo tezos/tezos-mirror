@@ -920,7 +920,7 @@ let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
       pkh;
       "frozen_balance";
     ]
-    Fun.id
+    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
 
 let get_chain_block_context_delegate_frozen_balance_by_cycle ?(chain = "main")
     ?(block = "head") pkh =
