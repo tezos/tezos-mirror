@@ -733,7 +733,7 @@ let frame_encoding =
        (scope ["module"] module_key_encoding)
        (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding)))
 
-let rec admin_instr'_encoding () =
+let admin_instr'_encoding =
   let open Eval in
   tagged_union
     string_tag
@@ -865,13 +865,8 @@ let rec admin_instr'_encoding () =
         (fun (idx, d, s, n, case) -> Memory_copy_meta (idx, d, s, n, case));
     ]
 
-and admin_instr_encoding () =
-  conv
-    Source.(at no_region)
-    Source.(fun x -> x.it)
-    (delayed admin_instr'_encoding)
-
-let admin_instr_encoding = admin_instr_encoding ()
+let admin_instr_encoding =
+  conv Source.(at no_region) Source.(fun x -> x.it) admin_instr'_encoding
 
 let input_buffer_message_encoding =
   conv_lwt
