@@ -237,7 +237,35 @@ module Slots_history = struct
     let basis = 2
   end
 
-  module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
+  type error += Add_element_in_slots_skip_list_violates_ordering
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"Dal_slot_repr.add_element_in_slots_skip_list_violates_ordering"
+      ~title:"Add an element in slots skip list that violates ordering"
+      ~description:
+        "Attempting to add an element on top of the Dal confirmed slots skip \
+         list that violates the ordering."
+      Data_encoding.unit
+      (function
+        | Add_element_in_slots_skip_list_violates_ordering -> Some ()
+        | _ -> None)
+      (fun () -> Add_element_in_slots_skip_list_violates_ordering)
+
+  module Skip_list = struct
+    include Skip_list_repr.Make (Skip_list_parameters)
+
+    let next ~compare ~prev_cell ~prev_cell_ptr elt =
+      let open Tzresult_syntax in
+      let c = compare elt (content prev_cell) in
+      let* () =
+        error_when
+          Compare.Int.(c <= 0)
+          Add_element_in_slots_skip_list_violates_ordering
+      in
+      return @@ next ~prev_cell ~prev_cell_ptr elt
+  end
 
   module V1 = struct
     (* The content of a cell is the hash of all the slot headers
@@ -299,18 +327,18 @@ module Slots_history = struct
           let equal = equal_history
         end)
 
-    let add_confirmed_slot (t, cache) slot =
-      let open Tzresult_syntax in
-      let* () =
-        error_when
-          Raw_level_repr.(slot.published_level <= zero.published_level)
-          (failwith
-             "No slot is supposed to be published at level \
-              'Raw_level_repr.root'")
+    let add_confirmed_slot =
+      let compare (s1 : slot) s2 =
+        Raw_level_repr.compare s1.published_level s2.published_level
       in
-      let prev_cell_ptr = hash_skip_list_cell t in
-      let* cache = History_cache.remember prev_cell_ptr t cache in
-      return (Skip_list.next ~prev_cell:t ~prev_cell_ptr slot, cache)
+      fun (t, cache) slot ->
+        let open Tzresult_syntax in
+        let prev_cell_ptr = hash_skip_list_cell t in
+        let* cache = History_cache.remember prev_cell_ptr t cache in
+        let* new_cell =
+          Skip_list.next ~compare ~prev_cell:t ~prev_cell_ptr slot
+        in
+        return (new_cell, cache)
 
     let add_confirmed_slots (t : t) cache slots =
       List.fold_left_e add_confirmed_slot (t, cache) slots
