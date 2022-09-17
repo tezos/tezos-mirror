@@ -119,7 +119,7 @@ let notify_head =
     ~section
     ~name:"notify_head"
     ~msg:"notify_head from {peer_id}"
-    ~level:Info
+    ~level:Debug
     ~pp1:P2p_peer.Id.pp
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -128,7 +128,7 @@ let notify_branch =
     ~section
     ~name:"notify_branch"
     ~msg:"notify branch from {peer_id}"
-    ~level:Notice
+    ~level:Info
     ~pp1:P2p_peer.Id.pp
     ("peer_id", P2p_peer.Id.encoding)
 
