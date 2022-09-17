@@ -219,6 +219,7 @@ exception Missing_memory_0_export
     @raise Invalid_argument if called with [IK_Stop]. There is no
     transition from the terminal state. *)
 val init_step :
+  filter_exports:bool ->
   ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
   self:module_key ->

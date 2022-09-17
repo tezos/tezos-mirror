@@ -332,6 +332,7 @@ struct
       | Init {self; ast_module; init_kont} ->
           let* init_kont =
             Wasm.Eval.init_step
+              ~filter_exports:true
               ~check_module_exports:Exports_memory_0
               ~module_reg
               ~self

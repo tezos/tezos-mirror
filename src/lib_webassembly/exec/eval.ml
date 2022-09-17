@@ -1948,8 +1948,8 @@ type memory_export_rules = Exports_memory_0 | No_memory_export_rules
 
 exception Missing_memory_0_export
 
-let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
-    buffers host_funcs (m : module_) = function
+let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
+    ~module_reg ~self buffers host_funcs (m : module_) = function
   | IK_Start exts ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
@@ -2011,8 +2011,13 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
       let+ tick =
         fold_left_s_step tick (fun acc export ->
             let+ k, v = create_export inst0 export in
+            let is_func = function ExternFunc _ -> true | _ -> false in
+            let exports =
+              let filter = filter_exports && not (is_func v) in
+              if filter then acc.exports else NameMap.set k v acc.exports
+            in
             {
-              exports = NameMap.set k v acc.exports;
+              exports;
               exports_memory_0 =
                 acc.exports_memory_0 || is_memory_0_export export;
             })
@@ -2093,7 +2098,16 @@ let init ~module_reg ~self buffers host_funcs (m : module_) (exts : extern list)
   let rec go = function
     | IK_Stop -> resolve_module_ref module_reg self
     | kont ->
-        let* kont = init_step ~module_reg ~self buffers host_funcs m kont in
+        let* kont =
+          init_step
+            ~filter_exports:false
+            ~module_reg
+            ~self
+            buffers
+            host_funcs
+            m
+            kont
+        in
         go kont
   in
   go (IK_Start (Vector.of_list exts))
