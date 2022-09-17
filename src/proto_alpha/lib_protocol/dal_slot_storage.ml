@@ -33,10 +33,11 @@ let finalize_current_slots ctxt =
   | _ :: _ -> Storage.Dal.Slot_headers.add ctxt current_level.level slots
 
 let compute_available_slots ctxt seen_slots =
+  let open Dal_slot_repr in
   let fold_available_slots (rev_slots, available_slots) slot =
-    if Raw_context.Dal.is_slot_available ctxt slot.Dal_slot_repr.index then
+    if Raw_context.Dal.is_slot_available ctxt slot.id.index then
       ( slot :: rev_slots,
-        Dal_endorsement_repr.commit available_slots slot.Dal_slot_repr.index )
+        Dal_endorsement_repr.commit available_slots slot.id.index )
     else (rev_slots, available_slots)
   in
   List.fold_left

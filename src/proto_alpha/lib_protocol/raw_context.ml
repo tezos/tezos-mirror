@@ -1562,7 +1562,7 @@ module Dal = struct
            %d. Found: %a."
           length
           Dal_slot_repr.Index.pp
-          slot.Dal_slot_repr.index)
+          slot.Dal_slot_repr.id.index)
       Data_encoding.(
         obj2 (req "length" int31) (req "slot" Dal_slot_repr.encoding))
       (function
