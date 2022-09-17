@@ -253,7 +253,7 @@ let pp_frame out frame =
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"
     key
     (pp_vector Values.pp_value)
-    (Lazy_containers.Lazy_vector.Int32Vector.of_list (List.map ( ! ) locals))
+    (Lazy_containers.Lazy_vector.Int32Vector.of_list locals)
 
 let rec pp_admin_instr' out instr =
   let open Eval in
@@ -356,18 +356,14 @@ let rec pp_admin_instr' out instr =
 
 and pp_admin_instr out instr = pp_admin_instr' out instr.Source.it
 
-let pp_label out
-    Eval.{label_arity; label_frame_specs; label_break; label_code = vs, es} =
+let pp_label out Eval.{label_arity; label_break; label_code = vs, es} =
   Format.fprintf
     out
     "@[<v 2>{label_arity = %a;@;\
-     label_frame_specs = %a;@;\
      label_break = %a;@;\
      instructions = %a; values = %a}@]"
     (pp_opt (fun out x -> Format.fprintf out "%ld" x))
     label_arity
-    pp_frame
-    label_frame_specs
     (pp_opt Ast.pp_instr)
     label_break
     (pp_vector pp_admin_instr)
@@ -461,7 +457,7 @@ let pp_invoke_step_kont out = function
         inst
         Ast.pp_func
         func
-        (pp_map_kont Types.pp_value_type (fun out x -> Values.pp_value out !x))
+        (pp_map_kont Types.pp_value_type Values.pp_value)
         locals_kont
   | Inv_prepare_args
       {arity; vs; instructions; inst = Module_key inst; func; locals; args_kont}
@@ -484,9 +480,9 @@ let pp_invoke_step_kont out = function
         inst
         Ast.pp_func
         func
-        (pp_vector (fun out x -> Values.pp_value out !x))
+        (pp_vector Values.pp_value)
         locals
-        (pp_map_kont Values.pp_value (fun out x -> Values.pp_value out !x))
+        (pp_map_kont Values.pp_value Values.pp_value)
         args_kont
   | Inv_concat
       {arity; vs; instructions; inst = Module_key inst; func; concat_kont} ->
@@ -507,7 +503,7 @@ let pp_invoke_step_kont out = function
         inst
         Ast.pp_func
         func
-        (pp_concat_kont (fun out x -> Values.pp_value out !x))
+        (pp_concat_kont Values.pp_value)
         concat_kont
   | Inv_stop {code = vs, es; fresh_frame} ->
       Format.fprintf
