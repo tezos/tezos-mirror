@@ -38,3 +38,6 @@ if [ "$SHA" != "$client_version" ]; then
     exit 1
 fi
 echo "octez-client --version returned the expected commit hash: $SHA"
+
+# Trim the dune cache, if used.
+dune cache trim --size=250GB

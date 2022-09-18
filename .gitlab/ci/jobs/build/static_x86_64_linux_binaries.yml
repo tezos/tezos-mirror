@@ -13,3 +13,5 @@ build:static-x86_64-linux-binaries:
   needs: [trigger]
   variables:
     ARCH: "x86_64"
+  tags:
+    - build_dedicated
