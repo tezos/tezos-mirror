@@ -8,6 +8,8 @@ export HOME=$(pwd)
 # Latest v* tag will be used as the version.
 git fetch --tags
 
+echo "Building packages for version: $TEZOS_VERSION"
+
 git clone "$TEZOS_PACKAGING_REPO" tezos-packaging
 cp -R "$TEZOS_BINARIES" tezos-packaging/binaries
 
