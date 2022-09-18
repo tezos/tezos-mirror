@@ -146,7 +146,9 @@ let lazy_mapping to_key enc_value =
       (fun backend bindings prefix tree ->
         List.fold_left_s
           (fun tree (k, v) ->
+            let open Lwt_syntax in
             let key = append_key prefix (to_key k) in
+            let* tree = Tree.remove backend tree (key []) in
             enc_value.encode backend v key tree)
           tree
           bindings);
