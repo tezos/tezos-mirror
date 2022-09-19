@@ -91,9 +91,9 @@ let reveal_data_encoding =
          (req "reveal_data_kind" (constant "raw_data"))
          (req
             "raw_data"
-            (check_size Constants_repr.sc_rollup_message_size_limit string)))
-      (function RawData m -> Some ((), m))
-      (fun ((), m) -> RawData m)
+            (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
+      (function RawData m -> Some ((), Bytes.of_string m))
+      (fun ((), m) -> RawData (Bytes.to_string m))
   in
   union [case_raw_data]
 

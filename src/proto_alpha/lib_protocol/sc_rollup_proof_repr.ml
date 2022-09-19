@@ -61,9 +61,9 @@ let reveal_proof_encoding =
          (req "reveal_proof_kind" (constant "raw_data_proof"))
          (req
             "raw_data"
-            (check_size Constants_repr.sc_rollup_message_size_limit string)))
-      (function RawDataProof s -> Some ((), s))
-      (fun ((), s) -> RawDataProof s)
+            (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
+      (function RawDataProof s -> Some ((), Bytes.of_string s))
+      (fun ((), s) -> RawDataProof (Bytes.to_string s))
   in
   union [case_raw_data]
 
