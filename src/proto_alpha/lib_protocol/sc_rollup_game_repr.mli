@@ -378,7 +378,7 @@ val reason_encoding : reason Data_encoding.t
 
 (** The game result. *)
 type game_result =
-  | Loser of (reason * Staker.t)  (** One player lost. *)
+  | Loser of {reason : reason; loser : Staker.t}  (** One player lost. *)
   | Draw  (** The game ended in a draw *)
 
 val pp_game_result : Format.formatter -> game_result -> unit
@@ -399,38 +399,17 @@ val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status Data_encoding.t
 
-(** The game's outcome can end with [Some loser] and the
-    reason for the game ending. It can also end with no loser, sign
-    of a draw.
-
-    This type uses [Alice] or [Bob] to refer to the players
-    without knowing which stakers they are---so it cannot identify an
-    actual staker who should be punished without the associated game
-    index.
-*)
-type outcome = {loser : player option; reason : reason}
-
-val pp_outcome : Format.formatter -> outcome -> unit
-
-val outcome_encoding : outcome Data_encoding.t
-
-(** Transform an {!outcome} into a {!game_result}.
-    - If there is a loser in the [outcome], it creates a [Loser] kind of game
-      result.
-    - If there is no loser, it creates a [Draw] kind of game result
-*)
-val game_result_from_outcome : stakers:Index.t -> outcome -> game_result
-
 (** Decide the loser of the game, if it exists. *)
 val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
-(** Applies the move [refutation] to the game. Checks the move is
-    valid and returns an [Invalid_move] outcome if not.
+(** Applies the move [refutation] to the game. Returns the game {!status}
+    after applying the move.
 
     In the case of the game continuing, this swaps the current
-    player and updates the [dissection]. In the case of a [Proof]
-    being provided this returns an [outcome]. *)
-val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+    player and returns a [Ongoing] status. Otherwise, it returns a
+    [Ended <game_result>] status.
+*)
+val play : stakers:Index.t -> t -> refutation -> (game_result, t) Either.t Lwt.t
 
 (** A type that represents the number of blocks left for players to play. Each
     player has her timeout value. `timeout` is expressed in the number of

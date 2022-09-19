@@ -250,7 +250,7 @@ module Make (Interpreter : Interpreter.S) :
   let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    let* outcome =
+    let* game_result =
       Plugin.RPC.Sc_rollup.timeout_reached
         cctxt
         (cctxt#chain, head_block)
@@ -259,14 +259,11 @@ module Make (Interpreter : Interpreter.S) :
         ()
     in
     let open Sc_rollup.Game in
-    let index = Index.make (fst players) (snd players) in
-    let node_player = node_role ~self index in
-    match outcome with
-    | None -> return_false
-    | Some {loser = Some loser; _} ->
-        let is_it_me = player_equal node_player loser in
+    match game_result with
+    | Some (Loser {loser; _}) ->
+        let is_it_me = Signature.Public_key_hash.(self = loser) in
         return (not is_it_me)
-    | Some {loser = None; _} -> return_true
+    | _ -> return_false
 
   let play head_block node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in

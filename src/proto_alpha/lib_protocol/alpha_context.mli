@@ -3575,7 +3575,7 @@ module Sc_rollup : sig
 
     val reason_encoding : reason Data_encoding.t
 
-    type game_result = Loser of (reason * Staker.t) | Draw
+    type game_result = Loser of {reason : reason; loser : Staker.t} | Draw
 
     val pp_game_result : Format.formatter -> game_result -> unit
 
@@ -3586,12 +3586,6 @@ module Sc_rollup : sig
     val pp_status : Format.formatter -> status -> unit
 
     val status_encoding : status Data_encoding.t
-
-    type outcome = {loser : player option; reason : reason}
-
-    val pp_outcome : Format.formatter -> outcome -> unit
-
-    val outcome_encoding : outcome Data_encoding.t
 
     val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
@@ -3605,7 +3599,8 @@ module Sc_rollup : sig
       default_number_of_sections:int ->
       t
 
-    val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+    val play :
+      stakers:Index.t -> t -> refutation -> (game_result, t) Either.t Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
 
@@ -3683,19 +3678,22 @@ module Sc_rollup : sig
       player:Staker.t ->
       opponent:Staker.t ->
       Game.refutation ->
-      (Game.outcome option * context) tzresult Lwt.t
+      (Game.game_result option * context) tzresult Lwt.t
 
     val get_timeout :
       context -> t -> Game.Index.t -> (Game.timeout * context) tzresult Lwt.t
 
     val timeout :
-      context -> t -> Game.Index.t -> (Game.outcome * context) tzresult Lwt.t
-
-    val apply_outcome :
       context ->
       t ->
       Game.Index.t ->
-      Game.outcome ->
+      (Game.game_result * context) tzresult Lwt.t
+
+    val apply_game_result :
+      context ->
+      t ->
+      Game.Index.t ->
+      Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
   end
 

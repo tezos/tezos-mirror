@@ -1667,7 +1667,7 @@ let test_timeout () =
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr timeout in
   let expected_game_status : Sc_rollup.Game.status =
-    Ended (Loser (Timeout, pkh2))
+    Ended (Loser {reason = Timeout; loser = pkh2})
   in
   assert_timeout_result ~game_status:expected_game_status incr
 
@@ -1834,9 +1834,12 @@ let test_dissection_during_final_move () =
   let expected_game_status : Sc_rollup.Game.status =
     Ended
       (Loser
-         ( Invalid_move
-             (Proof_invalid "Final move has started, unexpected dissection"),
-           p2_pkh ))
+         {
+           reason =
+             Invalid_move
+               (Proof_invalid "Final move has started, unexpected dissection");
+           loser = p2_pkh;
+         })
   in
   assert_refute_result ~game_status:expected_game_status incr
 

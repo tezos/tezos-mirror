@@ -756,13 +756,13 @@ let reason_encoding =
         (fun () -> Timeout);
     ]
 
-type game_result = Loser of (reason * Staker.t) | Draw
+type game_result = Loser of {reason : reason; loser : Staker.t} | Draw
 
 let pp_game_result ppf r =
   let open Format in
   match r with
-  | Loser (reason, player) ->
-      fprintf ppf "%a lost because: %a" Staker.pp player pp_reason reason
+  | Loser {reason; loser} ->
+      fprintf ppf "%a lost because: %a" Staker.pp loser pp_reason reason
   | Draw -> fprintf ppf "Draw"
 
 let game_result_encoding =
@@ -778,8 +778,8 @@ let game_result_encoding =
            (req "reason" reason_encoding)
            (req "player" Staker.encoding))
         (function
-          | Loser (reason, player) -> Some ((), reason, player) | _ -> None)
-        (fun ((), reason, player) -> Loser (reason, player));
+          | Loser {reason; loser} -> Some ((), reason, loser) | _ -> None)
+        (fun ((), reason, loser) -> Loser {reason; loser});
       case
         ~title:"Draw"
         (Tag 1)
@@ -814,34 +814,6 @@ let status_encoding =
         (function Ended r -> Some r | _ -> None)
         (fun r -> Ended r);
     ]
-
-type outcome = {loser : player option; reason : reason}
-
-let pp_outcome ppf outcome =
-  match outcome.loser with
-  | None -> Format.fprintf ppf "Game outcome, no one lost\n"
-  | Some loser ->
-      Format.fprintf
-        ppf
-        "Game outcome: %a - %a has lost.\n"
-        pp_reason
-        outcome.reason
-        pp_player
-        loser
-
-let outcome_encoding =
-  let open Data_encoding in
-  conv
-    (fun {loser; reason} -> (loser, reason))
-    (fun (loser, reason) -> {loser; reason})
-    (obj2 (req "loser" (option player_encoding)) (req "reason" reason_encoding))
-
-let game_result_from_outcome ~stakers {loser; reason} =
-  match loser with
-  | Some loser ->
-      let loser = Index.staker stakers loser in
-      Loser (reason, loser)
-  | None -> Draw
 
 let invalid_move reason =
   let open Lwt_result_syntax in
@@ -1040,8 +1012,12 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-let play game refutation =
+let play ~stakers game refutation =
   let open Lwt_syntax in
+  let mk_loser reason loser =
+    let loser = Index.staker stakers loser in
+    Either.Left (Loser {loser; reason})
+  in
   let* result =
     let open Lwt_result_syntax in
     match (refutation.step, game.game_state) with
@@ -1079,8 +1055,7 @@ let play game refutation =
           validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk
         in
         if player_result then
-          let loser = Some (opponent game.turn) in
-          return (Either.Left {loser; reason = Conflict_resolved})
+          return @@ mk_loser Conflict_resolved (opponent game.turn)
         else
           let new_game_state =
             let agreed_start_chunk = start_chunk in
@@ -1108,13 +1083,12 @@ let play game refutation =
           (* If we play when the final move started, the opponent provided
              a invalid proof. So if the defender manages to provide a valid
              proof, he wins. *)
-          let loser = Some (opponent game.turn) in
-          return (Either.Left {loser; reason = Conflict_resolved})
-        else return (Either.Left {loser = None; reason = Conflict_resolved})
+          return @@ mk_loser Conflict_resolved (opponent game.turn)
+        else return (Either.Left Draw)
   in
   match result with
   | Ok x -> return x
-  | Error reason -> return @@ Either.Left {loser = Some game.turn; reason}
+  | Error reason -> return @@ mk_loser reason game.turn
 
 module Internal_for_tests = struct
   let find_choice = find_choice
