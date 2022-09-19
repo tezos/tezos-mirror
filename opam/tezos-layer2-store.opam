@@ -9,15 +9,14 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
-  "ppx_expect"
   "tezos-base"
-  "tezos-protocol-alpha"
-  "tezos-client-alpha"
-  "tezos-rpc"
+  "irmin-pack" { >= "3.4.0" & < "3.5.0" }
+  "irmin" { >= "3.4.0" & < "3.5.0" }
+  "tezos-context"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: protocol specific library for Layer 2 utils"
+synopsis: "Tezos: layer2 storage utils"

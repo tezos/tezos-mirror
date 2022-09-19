@@ -24,6 +24,7 @@
   tezos_dal_node_services
   tezos-shell-services
   tezos-sc-rollup-013-PtJakart
+  tezos_layer2_store
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -49,4 +50,5 @@
   -open Tezos_rpc
   -open Tezos_shell_services
   -open Tezos_sc_rollup_013_PtJakart
+  -open Tezos_layer2_store
   -open Tezos_injector_013_PtJakart))
