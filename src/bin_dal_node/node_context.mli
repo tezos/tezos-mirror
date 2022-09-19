@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** A [ready_ctx] value contains globally needed informations for a running dal
+    node. It is available when both cryptobox is initialized and dal plugin is
+    loaded. *)
 type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
@@ -30,12 +33,25 @@ type ready_ctxt = {
   slot_header_store : Slot_headers_store.t;
 }
 
+(** The status of the dal node *)
 type status = Ready of ready_ctxt | Starting
 
+(** A [t] value contains both the status and the dal node configuration. It's
+    field are available through accessors *)
 type t
 
+(** [init config] creates a [t] with a status set to [Starting] with a given dal
+    node configuration.*)
 val init : Configuration.t -> t
 
+(** Raised by [set_ready] when the status is already [Ready _] *)
+exception Status_already_ready
+
+(** [set_ready ctxt slot_header_store plugin dal_constants dal_params] updates
+    in place the status value to ready, and initializes the inner [ready_ctxt]
+    value with the given parameters.
+
+    @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
   Slot_headers_store.t ->
@@ -44,8 +60,15 @@ val set_ready :
   Cryptobox.parameters ->
   unit
 
+type error += Node_not_ready
+
+(** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
+    propagates [Node_not_ready] if status is not ready yet. If called multiple
+    times, it replaces current values for [ready_ctxt] with new ones *)
 val get_ready : t -> ready_ctxt tzresult
 
+(** [get_config ctxt] returns the dal node configuration *)
 val get_config : t -> Configuration.t
 
+(** [get_status ctxt] returns the dal node status *)
 val get_status : t -> status
