@@ -113,6 +113,33 @@ Manager operations can be grouped into batches forming a so-called group operati
 
 The list of operations can be obtained with :ref:`this rpc <GET_..--block_id--operations>`.
 
+.. _protocol_constants_alpha:
+
+Protocol constants
+~~~~~~~~~~~~~~~~~~
+
+Protocols are tuned by several *protocol constants*, such as the size of a nonce, or the number of blocks per cycle.
+One can distinguish two kinds of protocol constants:
+
+- *fixed* prototocol constants, such as the size of a nonce, are values wired in the code of a protocol, and can only be changed by protocol amendment (that is, by adopting a new protocol)
+- *parametric* protocol constants, such as the number of blocks per cycle, are values maintained in a read-only data structure that can be instantiated differently, for the same protocol, from one network to another (for instance, test networks move faster).
+
+A first list of protocol constants (both fixed and parametric) in protocol Alpha can be found in the API of module :package-api:`Alpha_context.Constants <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`.
+This modules reexports selected definitions from the following modules:
+
+- module :package-api:`Constants_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/index.html>` (fixed constants)
+- module :package-api:`Constants_storage <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_storage/index.html>` (parametric constants)
+- module :package-api:`Constants.Parametric <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/Parametric/index.html>` (data structure holding parametric constants).
+
+The values of protocol constants (both fixed and parametric) in any given protocol can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
+
+Further documentation of most protocol constants can be found in the subsystems where they conceptually belong.
+See, for example:
+
+- :ref:`proof-of-stake parameters <ps_constants_alpha>`.
+- :ref:`consensus-related parameters <cs_constants_alpha>`
+- :ref:`randomness generation parameters <rg_constants_alpha>`.
+
 See also
 ~~~~~~~~
 
