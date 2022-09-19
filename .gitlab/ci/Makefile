@@ -159,7 +159,7 @@ gitlab-release:
 .PHONY: gitlab-take-ownership
 gitlab-take-ownership:
 	# Note: Only done in Gitlab CI context
-ifndef CI_PROJECT_DIR
+ifdef CI_PROJECT_DIR
 	# FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
-	sudo chown -R $(id -u):$(id -g) ${CI_PROJECT_DIR}
+	sudo chown -R $(shell id -u):$(shell id -g) ${CI_PROJECT_DIR}
 endif
