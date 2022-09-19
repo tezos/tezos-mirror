@@ -102,6 +102,7 @@
 (package (name tezos-injector-013-PtJakart))
 (package (name tezos-injector-014-PtKathma))
 (package (name tezos-injector-alpha))
+(package (name tezos-layer2-store)(allow_empty))
 (package (name tezos-layer2-utils-alpha))
 (package (name tezos-lwt-result-stdlib))
 (package (name tezos-micheline))

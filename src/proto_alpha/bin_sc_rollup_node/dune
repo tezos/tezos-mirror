@@ -25,6 +25,7 @@
   tezos-shell-services
   tezos-sc-rollup-alpha
   tezos-layer2-utils-alpha
+  tezos_layer2_store
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -51,4 +52,5 @@
   -open Tezos_shell_services
   -open Tezos_sc_rollup_alpha
   -open Tezos_layer2_utils_alpha
+  -open Tezos_layer2_store
   -open Tezos_injector_alpha))

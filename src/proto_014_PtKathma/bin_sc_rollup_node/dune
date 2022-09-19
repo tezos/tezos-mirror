@@ -24,6 +24,7 @@
   tezos_dal_node_services
   tezos-shell-services
   tezos-sc-rollup-014-PtKathma
+  tezos_layer2_store
   data-encoding
   irmin-pack
   irmin-pack.unix
@@ -49,4 +50,5 @@
   -open Tezos_rpc
   -open Tezos_shell_services
   -open Tezos_sc_rollup_014_PtKathma
+  -open Tezos_layer2_store
   -open Tezos_injector_014_PtKathma))

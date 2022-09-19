@@ -3047,6 +3047,22 @@ let _octez_embedded_protocol_packer =
     ~linkall:true
     ~modules:["Main_embedded_packer"]
 
+let octez_layer2_store =
+  private_lib
+    "tezos_layer2_store"
+    ~path:"src/lib_layer2_store"
+    ~opam:"tezos-layer2-store"
+    ~synopsis:"Tezos: layer2 storage utils"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        irmin_pack;
+        irmin_pack_unix;
+        irmin;
+        octez_context_encoding;
+      ]
+    ~linkall:true
+
 let octez_dal_node_services =
   private_lib
     "tezos_dal_node_services"
@@ -4485,9 +4501,6 @@ module Protocol = Protocol
             main |> open_;
             client |> if_some |> open_;
             octez_rpc |> open_;
-            irmin_pack;
-            irmin_pack_unix;
-            irmin;
           ]
         ~inline_tests:ppx_expect
         ~linkall:true
@@ -4563,6 +4576,7 @@ module Protocol = Protocol
             octez_shell_services |> open_;
             sc_rollup |> if_some |> open_;
             layer2_utils |> if_some |> open_;
+            octez_layer2_store |> open_;
             data_encoding;
             irmin_pack;
             irmin_pack_unix;

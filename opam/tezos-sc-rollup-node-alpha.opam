@@ -25,6 +25,7 @@ depends: [
   "tezos-shell-services"
   "tezos-sc-rollup-alpha"
   "tezos-layer2-utils-alpha"
+  "tezos-layer2-store"
   "data-encoding" { >= "0.6" & < "0.7" }
   "irmin-pack" { >= "3.4.0" & < "3.5.0" }
   "irmin" { >= "3.4.0" & < "3.5.0" }
