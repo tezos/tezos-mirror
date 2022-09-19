@@ -226,7 +226,7 @@ Dashboards will take your node monitoring to the next level, allowing you to vis
 Grafana
 ~~~~~~~
 
-Dashboards can be created and visualized with `Grafana <https://grafana.com/>`_. Grafana can be installed by following `these instructions <https://grafana.com/docs/grafana/latest/installation/>`_.
+Dashboards can be created and visualized with `Grafana <https://grafana.com/>`_. Grafana can be installed by following `these instructions <https://grafana.com/docs/grafana/latest/>`__.
 
 Once installed and running, you should be able to reach the interface on port ``3000`` (you can change the port on the Grafana config file).
 
