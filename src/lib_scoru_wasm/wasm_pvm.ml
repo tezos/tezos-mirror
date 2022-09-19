@@ -54,6 +54,7 @@ type tick_state =
     }
   | Eval of Wasm.Eval.config
   | Stuck of Wasm_pvm_errors.t
+  | Snapshot
 
 type computation_status = Starting | Restarting | Running | Failing
 
@@ -147,6 +148,11 @@ struct
             (value [] Wasm_pvm_errors.encoding)
             (function Stuck err -> Some err | _ -> None)
             (fun err -> Stuck err);
+          case
+            "snapshot"
+            (value [] Data_encoding.unit)
+            (function Snapshot -> Some () | _ -> None)
+            (fun () -> Snapshot);
         ]
 
     let input_request_encoding =
@@ -228,10 +234,12 @@ struct
     let link_finished (ast : Wasm.Ast.module_) offset =
       offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
-    let is_time_for_restart {current_tick; last_top_level_call; max_nb_ticks; _}
-        =
+    let is_time_for_snapshot
+        {current_tick; last_top_level_call; max_nb_ticks; _} =
       let open Z in
       current_tick - last_top_level_call >= max_nb_ticks - Z.one
+    (* The max number of tick is offsetted by 1, which corresponds to the input
+       tick. *)
 
     let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state)
         =
@@ -241,11 +249,12 @@ struct
       in
       match tick_state with
       | Stuck e -> return ~status:Failing (Stuck e)
+      | Snapshot -> return ~status:Restarting tick_state
       | Eval {step_kont = Wasm.Eval.(SK_Result _); _}
-        when is_time_for_restart pvm_state ->
+        when is_time_for_snapshot pvm_state ->
           (* We have an empty set of admin instructions *)
-          return ~status:Restarting tick_state
-      | _ when is_time_for_restart pvm_state ->
+          return ~status:Running Snapshot
+      | _ when is_time_for_snapshot pvm_state ->
           (* Execution took too many ticks *)
           return ~status:Failing (Stuck Too_many_ticks)
       | Decode {module_kont = MKStop ast_module; _} ->
@@ -372,7 +381,7 @@ struct
               | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
               | Init _ -> Init_error error
               | Eval _ -> Eval_error error
-              | Stuck _ -> Unknown_error error.raw_exception)
+              | Stuck _ | Snapshot -> Unknown_error error.raw_exception)
           | `Unknown raw_exception -> Unknown_error raw_exception
         in
         Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
@@ -482,7 +491,7 @@ struct
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* tick_state =
         match pvm_state.tick_state with
-        | Eval _ ->
+        | Snapshot ->
             let+ () =
               Wasm.Input_buffer.(
                 enqueue
@@ -496,9 +505,8 @@ struct
                     payload = String.to_bytes message;
                   })
             in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3608
-               The goal is to (1) clean-up correctly the PVM state,
-               and (2) to read a complete inbox. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
+               The goal is to read a complete inbox. *)
             (* Go back to decoding *)
             Decode
               (Tezos_webassembly_interpreter.Decode.initial_decode_kont
@@ -511,6 +519,9 @@ struct
         | Init _ ->
             Lwt.return
               (Stuck (Invalid_state "No input required during initialization"))
+        | Eval _ ->
+            Lwt.return
+              (Stuck (Invalid_state "No input required during evaluation"))
         | Stuck _ -> Lwt.return pvm_state.tick_state
       in
       (* See {{Note tick state clean-up}} *)

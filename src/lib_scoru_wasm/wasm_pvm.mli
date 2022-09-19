@@ -40,6 +40,7 @@ type tick_state =
     }
   | Eval of Tezos_webassembly_interpreter.Eval.config
   | Stuck of Wasm_pvm_errors.t
+  | Snapshot
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 
