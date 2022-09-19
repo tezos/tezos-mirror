@@ -444,10 +444,20 @@ module Make (Rollup : PARAMETERS) = struct
         }
       ops
 
-  (** Simulate the injection of [operations]. See {!inject_operations} for the
-    specification of [must_succeed]. *)
-  let simulate_operations ~must_succeed state (operations : L1_operation.t list)
-      =
+  (** Returns the first half of the list [ops] if there is more than two
+      elements, or [None] otherwise.  *)
+  let keep_half ops =
+    let total = List.length ops in
+    if total <= 1 then None else Some (List.take_n (total / 2) ops)
+
+  (** [simulate_operations ~must_succeed state operations] simulates the
+      injection of [operations] and returns a triple [(op, ops, results)] where
+      [op] is the packed operation with the adjusted limits, [ops] is the prefix
+      of [operations] which was considered (because it did not exceed the
+      quotas) and [results] are the results of the simulation. See
+      {!inject_operations} for the specification of [must_succeed]. *)
+  let rec simulate_operations ~must_succeed state
+      (operations : L1_operation.t list) =
     let open Lwt_result_syntax in
     let open Annotated_manager_operation in
     let force =
@@ -465,7 +475,7 @@ module Make (Rollup : PARAMETERS) = struct
     let fee_parameter =
       fee_parameter_of_operations state.rollup_node_state operations
     in
-    let operations =
+    let annotated_operations =
       List.map
         (fun {L1_operation.manager_operation = Manager operation; _} ->
           Annotated_manager_operation
@@ -477,9 +487,9 @@ module Make (Rollup : PARAMETERS) = struct
         operations
     in
     let (Manager_list annot_op) =
-      Annotated_manager_operation.manager_of_list operations
+      Annotated_manager_operation.manager_of_list annotated_operations
     in
-    let* _, op, _, result =
+    let*! simulation_result =
       Injection.inject_manager_operation
         state.cctxt
         ~simulation:true (* Only simulation here *)
@@ -497,10 +507,34 @@ module Make (Rollup : PARAMETERS) = struct
         ~fee_parameter
         annot_op
     in
-    return (op, Apply_results.Contents_result_list result)
+    match simulation_result with
+    | Error trace ->
+        let exceeds_quota =
+          TzTrace.fold
+            (fun exceeds -> function
+              | Environment.Ecoproto_error
+                  (Gas.Block_quota_exceeded | Gas.Operation_quota_exceeded) ->
+                  true
+              | _ -> exceeds)
+            false
+            trace
+        in
+        if exceeds_quota then
+          (* We perform a dichotomy by injecting the first half of the
+             operations (we are not looking to maximize the number of operations
+             injected because of the cost of simulation). Only the operations
+             which are actually injected will be removed from the queue so the
+             other half will be reconsidered later. *)
+          match keep_half operations with
+          | None -> fail trace
+          | Some operations ->
+              simulate_operations ~must_succeed state operations
+        else fail trace
+    | Ok (_, op, _, result) ->
+        return (op, operations, Apply_results.Contents_result_list result)
 
-  let inject_on_node state {shell; protocol_data = Operation_data {contents; _}}
-      =
+  let inject_on_node state ~nb
+      {shell; protocol_data = Operation_data {contents; _}} =
     let open Lwt_result_syntax in
     let unsigned_op = (shell, Contents_list contents) in
     let unsigned_op_bytes =
@@ -524,7 +558,7 @@ module Make (Rollup : PARAMETERS) = struct
       ~chain:state.cctxt#chain
       op_bytes
     >>=? fun oph ->
-    let*! () = Event.(emit1 injected) state oph in
+    let*! () = Event.(emit2 injected) state nb oph in
     return oph
 
   (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
@@ -538,8 +572,9 @@ module Make (Rollup : PARAMETERS) = struct
   let rec inject_operations ~must_succeed state
       (operations : L1_operation.t list) =
     let open Lwt_result_syntax in
-    let* packed_op, result =
-      simulate_operations ~must_succeed state operations
+    let* packed_op, operations, result =
+      trace (Step_failed "simulation")
+      @@ simulate_operations ~must_succeed state operations
     in
     let results = Apply_results.to_list result in
     let failure = ref false in
@@ -584,7 +619,10 @@ module Make (Rollup : PARAMETERS) = struct
       inject_operations ~must_succeed state operations
     else
       (* Inject on node for real *)
-      let+ oph = inject_on_node state packed_op in
+      let+ oph =
+        trace (Step_failed "injection")
+        @@ inject_on_node ~nb:(List.length operations) state packed_op
+      in
       (oph, operations)
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
@@ -878,7 +916,8 @@ module Make (Rollup : PARAMETERS) = struct
 
     let on_launch _w signer
         Types.{cctxt; data_dir; rollup_node_state; strategy; tags} =
-      init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags
+      trace (Step_failed "initialization")
+      @@ init_injector cctxt ~data_dir rollup_node_state ~signer strategy tags
 
     let on_error (type a b) w st (r : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =

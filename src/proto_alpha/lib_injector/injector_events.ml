@@ -164,10 +164,11 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ~pp2:Environment.Error_monad.pp_trace
 
   let injected =
-    declare_1
+    declare_2
       ~name:"injected"
-      ~msg:"Injected in {oph}"
+      ~msg:"Injected {nb} operations in {oph}"
       ~level:Notice
+      ("nb", Data_encoding.int31)
       ("oph", Operation_hash.encoding)
 
   let add_pending =
