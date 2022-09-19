@@ -75,3 +75,7 @@ let () =
   Registration.register (def "ground.bool" ~description:"Boolean values" bool) ;
   Registration.register
     (def "ground.float" ~description:"Floating point numbers" float)
+
+let () =
+  Registration.register
+    (def "ground.json" ~description:"JSON values" Data_encoding.json)
