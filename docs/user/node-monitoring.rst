@@ -134,10 +134,10 @@ Once installed, you need to add the scraping job to the configuration file.
 ::
 
    - job_name: 'tezos-exporter'
-	  scrape_interval: interval s
-    metrics_path: "/metrics"
-    static_configs:
-		- targets: ['addr:port']
+     scrape_interval: interval s
+     metrics_path: "/metrics"
+     static_configs:
+       - targets: ['addr:port']
 
 Prometheus is a service, so you need to start it. Note that Prometheus can also scrape metrics from several nodes!
 
