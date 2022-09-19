@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,28 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Lib_scoru_wasm
-    Invocation:   dune runtest src/lib_scoru_wasm/
-    Subject:      Tests for the tezos-scoru-wasm library
-*)
+open Tztest
+open Wasm_utils
+module Context = Tezos_context_memory.Context_binary
 
-let () =
-  Alcotest_lwt.run
-    "test lib scoru wasm"
-    [
-      ("Input", Test_input.tests);
-      ("Output", Test_output.tests);
-      ("Set/get", Test_get_set.tests);
-      ("Durable storage", Test_durable_storage.tests);
-      ("AST Generators", Test_ast_generators.tests);
-      ("WASM Encodings", Test_wasm_encoding.tests);
-      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
-      ("Parser Encodings", Test_parser_encoding.tests);
-      ("WASM PVM", Test_wasm_pvm.tests);
-      ("Module Initialisation", Test_init.tests);
-      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
-      ("Hash correspondence", Test_hash_consistency.tests);
-    ]
-  |> Lwt_main.run
+(* Test that one N-ticks executions(^1) and N one-tick executions(^2)
+   are equivalent.
+
+   (^1): Executing in one decoding-encoding loop N ticks.
+   (^2): Executing one decoding-encoding loop per ticks. *)
+let test_execution_correspondance skip count () =
+  Test_wasm_pvm.test_with_kernel
+    "unreachable"
+    (fun kernel ->
+      let open Lwt_syntax in
+      let* tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
+      let* tree =
+        if skip = 0L then Lwt.return tree
+        else Wasm.Internal_for_tests.compute_step_many ~max_steps:skip tree
+      in
+      let rec explore tree' n =
+        let* tree_ref =
+          Wasm.Internal_for_tests.compute_step_many ~max_steps:n tree
+        in
+        let* tree' = Wasm.compute_step tree' in
+        assert (
+          Context_hash.(Context.Tree.hash tree_ref = Context.Tree.hash tree')) ;
+        if n < count then explore tree' (Int64.succ n) else return_unit
+      in
+      explore tree 1L)
+    ()
+
+let tests =
+  [
+    tztest
+      "Executions correspondence (ticks 0 to 1,000)"
+      `Quick
+      (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
+      (test_execution_correspondance 0L 1_000L);
+    tztest
+      "Executions correspondence (ticks 10,000 to 11,000)"
+      `Quick
+      (* Parsing is way slower, so we limit ourselves to 1,000 ticks. *)
+      (test_execution_correspondance 10_000L 1_000L);
+    tztest
+      "Executions correspondence (ticks 20,000 to 25,000)"
+      `Quick
+      (test_execution_correspondance 20_000L 5_000L);
+    tztest
+      "Executions correspondence (ticks 30,000 to 35,000)"
+      `Quick
+      (test_execution_correspondance 30_000L 5_000L);
+  ]
