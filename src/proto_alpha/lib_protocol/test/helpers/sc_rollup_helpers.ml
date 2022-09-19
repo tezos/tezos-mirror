@@ -88,8 +88,7 @@ module Arith_pvm :
      and type state = In_memory_context.tree
      and type proof =
       Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t
-      Sc_rollup.ArithPVM.proof =
+      Tezos_context_memory.Context.Proof.t =
   Sc_rollup.ArithPVM.Make (In_memory_context)
 
 module Wasm_pvm :
@@ -98,8 +97,7 @@ module Wasm_pvm :
      and type state = In_memory_context.tree
      and type proof =
       Tezos_context_memory.Context.Proof.tree
-      Tezos_context_memory.Context.Proof.t
-      Sc_rollup.Wasm_2_0_0PVM.proof =
+      Tezos_context_memory.Context.Proof.t =
   Sc_rollup.Wasm_2_0_0PVM.Make (In_memory_context)
 
 let origination_proof ~boot_sector = function
@@ -147,10 +145,7 @@ let genesis_commitment ~boot_sector ~origination_level = function
       let context = Tezos_context_memory.make_empty_context () in
       let* proof = Arith_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash =
-        WithExceptions.Option.get ~loc:__LOC__
-        @@ Arith_pvm.proof_stop_state None proof
-      in
+      let genesis_state_hash = Arith_pvm.proof_stop_state proof in
       return
         Sc_rollup.Commitment.(
           genesis_commitment ~origination_level ~genesis_state_hash)
@@ -159,10 +154,7 @@ let genesis_commitment ~boot_sector ~origination_level = function
       let context = Tezos_context_memory.make_empty_context () in
       let* proof = Wasm_pvm.produce_origination_proof context boot_sector in
       let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
-      let genesis_state_hash =
-        WithExceptions.Option.get ~loc:__LOC__
-        @@ Wasm_pvm.proof_stop_state None proof
-      in
+      let genesis_state_hash = Wasm_pvm.proof_stop_state proof in
       return
         Sc_rollup.Commitment.(
           genesis_commitment ~origination_level ~genesis_state_hash)

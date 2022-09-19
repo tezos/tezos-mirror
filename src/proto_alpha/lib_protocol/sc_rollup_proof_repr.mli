@@ -45,6 +45,12 @@
 
 open Sc_rollup_repr
 
+type inbox_proof = {
+  level : Raw_level_repr.t;
+  message_counter : Z.t;
+  proof : Sc_rollup_inbox_repr.serialized_proof;
+}
+
 (** A PVM proof [pvm_step] is combined with an [inbox] proof to provide
     the proof necessary to validate a single step in the refutation
     game.
@@ -57,10 +63,7 @@ open Sc_rollup_repr
     In the case that input is involved, [inbox] is a proof of the next
     message available from the inbox after a given location; this must
     match up with [pvm_step] to give a valid refutation proof. *)
-type t = {
-  pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.serialized_proof option;
-}
+type t = {pvm_step : Sc_rollups.wrapped_proof; inbox : inbox_proof option}
 
 type error += Sc_rollup_proof_check of string
 
@@ -78,7 +81,7 @@ val start : t -> State_hash.t
 (** The state hash of the machine after the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val stop : Sc_rollup_PVM_sig.input option -> t -> State_hash.t option
+val stop : t -> State_hash.t
 
 (** Check the validity of a proof.
 
@@ -94,14 +97,16 @@ val stop : Sc_rollup_PVM_sig.input option -> t -> State_hash.t option
       - the [pvm_name], used to check that the proof given has the right
       PVM kind.
 
-    It also returns the optional input executed during the proof.
+    It also returns the optional input executed during the proof and the
+    input_request for the state at the beginning of the proof.
 *)
 val valid :
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  (bool * Sc_rollup_PVM_sig.input option) tzresult Lwt.t
+  (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
+  Lwt.t
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S

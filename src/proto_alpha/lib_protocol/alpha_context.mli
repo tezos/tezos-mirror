@@ -3188,9 +3188,7 @@ module Sc_rollup : sig
 
       val proof_start_state : proof -> hash
 
-      val proof_stop_state : input option -> proof -> hash option
-
-      val proof_input_requested : proof -> input_request
+      val proof_stop_state : proof -> hash
 
       val state_hash : state -> hash Lwt.t
 
@@ -3204,7 +3202,7 @@ module Sc_rollup : sig
 
       val eval : state -> state Lwt.t
 
-      val verify_proof : input option -> proof -> bool Lwt.t
+      val verify_proof : input option -> proof -> input_request tzresult Lwt.t
 
       val produce_proof :
         context -> input option -> state -> proof tzresult Lwt.t
@@ -3281,14 +3279,12 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {tree_proof : 'a; requested : input_request}
-
     module Make (C : P) : sig
       include
         PVM.S
           with type context = C.Tree.t
            and type state = C.tree
-           and type proof = C.proof proof
+           and type proof = C.proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -3305,7 +3301,7 @@ module Sc_rollup : sig
       PVM.S
         with type context = Context.t
          and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t proof
+         and type proof = Context.Proof.tree Context.Proof.t
   end
 
   module Wasm_2_0_0PVM : sig
@@ -3333,14 +3329,12 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    type 'a proof = {tree_proof : 'a; requested : input_request}
-
     module Make (C : P) : sig
       include
         PVM.S
           with type context = C.Tree.t
            and type state = C.tree
-           and type proof = C.proof proof
+           and type proof = C.proof
 
       val get_tick : state -> Tick.t Lwt.t
 
@@ -3358,7 +3352,7 @@ module Sc_rollup : sig
       PVM.S
         with type context = Context.t
          and type state = Context.tree
-         and type proof = Context.Proof.tree Context.Proof.t proof
+         and type proof = Context.Proof.tree Context.Proof.t
 
     val reference_initial_state_hash : State_hash.t
   end
@@ -3438,7 +3432,13 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type t = {pvm_step : wrapped_proof; inbox : Inbox.serialized_proof option}
+    type inbox_proof = {
+      level : Raw_level.t;
+      message_counter : Z.t;
+      proof : Inbox.serialized_proof;
+    }
+
+    type t = {pvm_step : wrapped_proof; inbox : inbox_proof option}
 
     module type PVM_with_context_and_state = sig
       include PVM.S
@@ -3465,7 +3465,7 @@ module Sc_rollup : sig
       Raw_level.t ->
       pvm_name:string ->
       t ->
-      (bool * input option) tzresult Lwt.t
+      (input option * input_request) tzresult Lwt.t
 
     val produce :
       (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t

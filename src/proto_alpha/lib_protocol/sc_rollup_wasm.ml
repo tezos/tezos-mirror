@@ -97,45 +97,24 @@ module V2_0_0 = struct
     val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
-
-     The tree proof contains enough information to derive given and requested.
-     Get rid of the duplication by writing the projection functions and
-     removing the [given] and [requested] fields.
-  *)
-  type 'a proof = {tree_proof : 'a; requested : PS.input_request}
-
-  let proof_encoding e =
-    let open Data_encoding in
-    conv
-      (fun {tree_proof; requested} -> (tree_proof, requested))
-      (fun (tree_proof, requested) -> {tree_proof; requested})
-      (obj2 (req "tree_proof" e) (req "requested" PS.input_request_encoding))
-
   module Make (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
-       and type proof = Context.proof proof = struct
+       and type proof = Context.proof = struct
     module Tree = Context.Tree
 
     type context = Context.Tree.t
 
     type hash = State_hash.t
 
-    type nonrec proof = Context.proof proof
+    type proof = Context.proof
 
-    let proof_input_requested p = p.requested
+    let proof_encoding = Context.proof_encoding
 
-    let proof_encoding = proof_encoding Context.proof_encoding
+    let proof_start_state proof = Context.proof_before proof
 
-    let proof_start_state p = Context.proof_before p.tree_proof
-
-    let proof_stop_state input_given p =
-      match (input_given, p.requested) with
-      | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
-      | None, _ -> None
-      | _ -> Some (Context.proof_after p.tree_proof)
+    let proof_stop_state proof = Context.proof_after proof
 
     let name = "wasm_2_0_0"
 
@@ -316,15 +295,14 @@ module V2_0_0 = struct
       in
       return (state, request)
 
+    type error += WASM_proof_verification_failed
+
     let verify_proof input_given proof =
-      let open Lwt_syntax in
-      let* result =
-        Context.verify_proof proof.tree_proof (step_transition input_given)
-      in
+      let open Lwt_tzresult_syntax in
+      let*! result = Context.verify_proof proof (step_transition input_given) in
       match result with
-      | None -> return false
-      | Some (_, request) ->
-          return (PS.input_request_equal request proof.requested)
+      | None -> fail WASM_proof_verification_failed
+      | Some (_state, request) -> return request
 
     type error += WASM_proof_production_failed
 
@@ -334,16 +312,16 @@ module V2_0_0 = struct
         Context.produce_proof context state (step_transition input_given)
       in
       match result with
-      | Some (tree_proof, requested) -> return {tree_proof; requested}
+      | Some (tree_proof, _requested) -> return tree_proof
       | None -> fail WASM_proof_production_failed
 
     let verify_origination_proof proof boot_sector =
       let open Lwt_syntax in
-      let before = Context.proof_before proof.tree_proof in
+      let before = Context.proof_before proof in
       if State_hash.(before <> reference_initial_state_hash) then return false
       else
         let* result =
-          Context.verify_proof proof.tree_proof (fun state ->
+          Context.verify_proof proof (fun state ->
               let* state = install_boot_sector state boot_sector in
               return (state, ()))
         in
@@ -359,8 +337,7 @@ module V2_0_0 = struct
             return (state, ()))
       in
       match result with
-      | Some (tree_proof, ()) ->
-          return {tree_proof; requested = No_input_required}
+      | Some (tree_proof, ()) -> return tree_proof
       | None -> fail WASM_proof_production_failed
 
     type output_proof = {
