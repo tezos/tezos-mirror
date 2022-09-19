@@ -87,3 +87,49 @@ let rec eval_until_init tree =
   | _ ->
       let* tree = Wasm.compute_step tree in
       eval_until_init tree
+
+let pp_state fmt state =
+  let pp_s s = Format.fprintf fmt "%s" s in
+  match state with
+  | Wasm_pvm.Decode _ -> pp_s "Decode"
+  | Eval _ -> pp_s "Eval"
+  | Stuck e ->
+      Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e
+  | Init _ -> pp_s "Init"
+  | Snapshot -> pp_s "Snapshot"
+  | Link _ -> pp_s "Link"
+
+(** [check_error kind reason error] checks a Wasm PVM error [error] is of a
+    given [kind] with a possible [reason].
+
+    - If [kind] is [None], returns true.
+
+    - If [reason] is [None], it simply check the given kind, otherwise it
+    actually check the reason in the error. *)
+let check_error expected_kind expected_reason error =
+  let check_reason actual_reason =
+    match expected_reason with
+    | None -> true
+    | _ -> expected_reason = actual_reason
+  in
+  match (expected_kind, error) with
+  | Some `Decode, Wasm_pvm_errors.Decode_error {explanation; _} ->
+      check_reason explanation
+  | Some `Init, Init_error {explanation; _} -> check_reason explanation
+  | Some `Link, Link_error explanation -> check_reason (Some explanation)
+  | Some `Eval, Eval_error {explanation; _} -> check_reason explanation
+  | Some `Invalid_state, Invalid_state explanation ->
+      check_reason (Some explanation)
+  (* Unknown_error encapsulate a raw exception produced by `Printexc.to_string`.
+     It depends on the backend, if there are registered printers or not, it is
+     not safe to rely on its string representation. *)
+  | Some `Unknown, Unknown_error _ -> true
+  | Some `Too_many_ticks, Too_many_ticks -> true
+  (* The expected step doesn't corresponds to the actual stuck step. *)
+  | Some _, _ -> false
+  (* No check to do, we simply assume the PVM is in a stuck state. *)
+  | None, _ -> true
+
+let is_stuck ?step ?reason = function
+  | Wasm_pvm.Stuck err -> check_error step reason err
+  | _ -> false
