@@ -218,6 +218,9 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
   let* block_metadata = RPC.(call node @@ get_chain_block_metadata ()) in
   if block_metadata.dal_slot_availability <> None then
     Test.fail "Did not expect to find \"dal_slot_availibility\"" ;
+  let* bytes = RPC_legacy.raw_bytes client in
+  if not JSON.(bytes |-> "dal" |> is_null) then
+    Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
 let publish_slot ~source ?fee ~index ~message parameters cryptobox node client =
@@ -231,6 +234,7 @@ let publish_slot ~source ?fee ~index ~message parameters cryptobox node client =
       client)
 
 let slot_availability ~signer availability client =
+  (* FIXME/DAL: fetch the constant from protocol parameters. *)
   let default_size = 256 in
   let endorsement = Array.make default_size false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
@@ -276,6 +280,31 @@ let check_manager_operation_status result expected_status oph =
   Check.(expected_status = status)
     status_typ
     ~error_msg:(prefix_msg ^ " Expected: %L. Got: %R.")
+
+let check_dal_raw_context node =
+  let* dal_raw_json =
+    RPC.call node @@ RPC.get_chain_block_context_raw_json ~path:["dal"] ()
+  in
+  if JSON.is_null dal_raw_json then
+    Test.fail "Expected the context to contain information under /dal key."
+  else
+    let json_to_string j =
+      JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
+    in
+    let* confirmed_slots_opt =
+      RPC.call node (RPC.get_chain_block_context_dal_confirmed_slots_history ())
+    in
+    if JSON.is_null confirmed_slots_opt then
+      Test.fail
+        "confirmed_slots_history RPC is not expected to return None if DAL is \
+         enabled" ;
+    let confirmed_slots = json_to_string confirmed_slots_opt in
+    let confirmed_slots_from_ctxt =
+      json_to_string @@ JSON.(dal_raw_json |-> "slots_history")
+    in
+    if not (String.equal confirmed_slots confirmed_slots_from_ctxt) then
+      Test.fail "Confirmed slots history mismatch." ;
+    unit
 
 let test_slot_management_logic =
   Protocol.register_test
@@ -380,21 +409,7 @@ let test_slot_management_logic =
     (dal_slot_availability.(1) = true)
       bool
       ~error_msg:"Expected slot 1 to be available") ;
-  let* bytes = RPC_legacy.raw_bytes client in
-  let dal_keys = ["slots_history"] in
-  match JSON.(bytes |-> "dal" |> as_object_opt) with
-  | None ->
-      Test.fail
-        "Expected the context to contain information about the DAL (%a)."
-        Format.(pp_print_list (fun fmt -> fprintf fmt "%s"))
-        dal_keys
-  | Some l ->
-      List.iter
-        (fun (k, _) ->
-          if not @@ List.mem k dal_keys then
-            Test.fail "Unexpected entry %s in context/DAL" k)
-        l ;
-      unit
+  check_dal_raw_context node
 
 (* Tests for integration between Dal and Scoru *)
 let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node

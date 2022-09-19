@@ -2844,6 +2844,10 @@ module Dal : sig
     val add_confirmed_slots :
       t -> History_cache.t -> Slot.t list -> (t * History_cache.t) tzresult
   end
+
+  module Slots_storage : sig
+    val get_slots_history : t -> Slots_history.t tzresult Lwt.t
+  end
 end
 
 (** This module re-exports definitions from {!Dal_errors_repr}. *)
