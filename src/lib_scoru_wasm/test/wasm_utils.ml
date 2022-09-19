@@ -38,7 +38,9 @@ let wat2wasm code =
   let modul = parse_module code in
   Encode.encode modul
 
-let initial_tree ?(max_tick = 100000L) ?(from_binary = false) code =
+let default_max_tick = 100000L
+
+let initial_tree ?(max_tick = default_max_tick) ?(from_binary = false) code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
   let* empty_tree = empty_tree () in

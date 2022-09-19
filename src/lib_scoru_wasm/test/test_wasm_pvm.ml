@@ -262,6 +262,170 @@ let test_with_kernel kernel test () =
   in
   return_unit
 
+(* This function can build snapshotable state out of a tree. It currently
+   assumes it follows a tree resulting from `set_input_step`.*)
+let build_snapshot_wasm_state_from_set_input
+    ?(max_tick = Z.of_int64 default_max_tick) tree =
+  let open Lwt_syntax in
+  (* Only serves to encode the `Snapshot` state. *)
+  let state_encoding =
+    Tree_encoding.(
+      tagged_union
+        (value [] Data_encoding.string)
+        [
+          case
+            "snapshot"
+            (value [] Data_encoding.unit)
+            (function Wasm_pvm.Snapshot -> Some () | _ -> None)
+            (fun () -> Snapshot);
+        ])
+  in
+  (* Serves to encode the `Input_requested` status. *)
+  let input_request_encoding =
+    Tree_encoding.value ~default:true [] Data_encoding.bool
+  in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tree_encoding.scope ["wasm"] state_encoding)
+      Wasm_pvm.Snapshot
+      tree
+  in
+  (* Since we start directly after at an input_step, we need to offset the tick
+     at the next max tick + the snapshot tick. *)
+  let* current_tick =
+    Test_encodings_util.Tree_encoding_runner.decode
+      (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+      tree
+  in
+  let snapshot_tick =
+    Z.(max_tick + current_tick + Z.one)
+    (* Offsetted by one since the snapshot is a tick in itself. *)
+  in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
+      snapshot_tick
+      tree
+  in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+      snapshot_tick
+      tree
+  in
+  (* A snapshot should always be in input state *)
+  Test_encodings_util.Tree_encoding_runner.encode
+    (Tree_encoding.scope ["input"; "consuming"] input_request_encoding)
+    true
+    tree
+
+let test_snapshotable_state () =
+  let open Lwt_result_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 1)
+        (export "mem"(memory 0))
+        (func (export "kernel_next")
+          (nop)
+        )
+      )
+    |}
+  in
+  let*! tree = initial_tree ~from_binary:false module_ in
+  (* First evaluate until the snapshotable state. *)
+  let*! tree = eval_until_input_requested tree in
+  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
+  let* () =
+    match state with
+    | Snapshot -> return_unit
+    | _ ->
+        failwith
+          "Unexpected state at input requested: %a"
+          Wasm_utils.pp_state
+          state
+  in
+  (* The "wasm"/"modules" key should not exist after the snapshot, since it
+     contains the instance of the module after its evaluation. *)
+  let*! wasm_tree_exists =
+    Test_encodings_util.Tree.mem_tree tree ["wasm"; "modules"]
+  in
+  let*! wasm_value_exists =
+    Test_encodings_util.Tree.mem tree ["wasm"; "modules"]
+  in
+  assert (not (wasm_tree_exists || wasm_value_exists)) ;
+  (* Set a new input should go back to decoding *)
+  let*! tree = set_input_step "test" 1 tree in
+  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
+  match state with
+  | Decode _ -> return_unit
+  | _ ->
+      failwith
+        "Unexpected state after set_input_step: %a"
+        Wasm_utils.pp_state
+        state
+
+let test_rebuild_snapshotable_state () =
+  let open Lwt_result_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 1)
+        (export "mem"(memory 0))
+        (func (export "kernel_next")
+          (nop)
+        )
+      )
+    |}
+  in
+  let*! tree = initial_tree ~from_binary:false module_ in
+  let*! tree = eval_until_input_requested tree in
+  let*! tree = set_input_step "test" 0 tree in
+  (* First evaluate until the snapshotable state. *)
+  let*! tree_after_eval = eval_until_input_requested tree in
+  (* From out initial tree, let's rebuild the expected snapshotable state as the
+     Fast Node would do. This works because the kernel doesn't change anything. *)
+  let*! rebuilded_tree = build_snapshot_wasm_state_from_set_input tree in
+
+  (* Remove the "wasm" key from the tree after evaluation, and try to rebuild it
+     as a snapshot. This would take into account any change in the input and
+     output buffers and the durable storage. *)
+  let*! tree_without_wasm = Test_encodings_util.Tree.remove tree ["wasm"] in
+  let*! rebuilded_tree_without_wasm =
+    build_snapshot_wasm_state_from_set_input tree_without_wasm
+  in
+
+  (* Both hash should be exactly the same. *)
+  let hash_tree_after_eval = Test_encodings_util.Tree.hash tree_after_eval in
+  let hash_rebuilded_tree = Test_encodings_util.Tree.hash rebuilded_tree in
+  assert (Context_hash.equal hash_tree_after_eval hash_rebuilded_tree) ;
+
+  (* The hash of the tree rebuilded from the evaluated one without the "wasm"
+     part should also be exactly the same. *)
+  let hash_rebuilded_tree_without_wasm =
+    Test_encodings_util.Tree.hash rebuilded_tree_without_wasm
+  in
+  assert (
+    Context_hash.equal hash_tree_after_eval hash_rebuilded_tree_without_wasm) ;
+
+  (* To be sure, let's try to evaluate a new input from these two, either by the
+     regular tree or the snapshoted one. *)
+  let*! input_step_from_eval = set_input_step "test" 1 tree_after_eval in
+  let*! input_step_from_snapshot = set_input_step "test" 1 rebuilded_tree in
+
+  (* Their hash should still be the same, but the first test should have caught
+     that. *)
+  let hash_input_tree_after_eval =
+    Test_encodings_util.Tree.hash input_step_from_eval
+  in
+  let hash_input_rebuilded_tree =
+    Test_encodings_util.Tree.hash input_step_from_snapshot
+  in
+
+  assert (
+    Context_hash.equal hash_input_tree_after_eval hash_input_rebuilded_tree) ;
+  return_unit
+
 let tests =
   [
     tztest
@@ -300,4 +464,9 @@ let tests =
       "Test store-delete kernel"
       `Quick
       (test_with_kernel test_store_delete_kernel should_run_store_delete_kernel);
+    tztest "Test snapshotable state" `Quick test_snapshotable_state;
+    tztest
+      "Test rebuild snapshotable state"
+      `Quick
+      test_rebuild_snapshotable_state;
   ]
