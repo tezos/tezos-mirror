@@ -39,6 +39,10 @@ let add field pos =
   error_when Compare.Int.(pos < 0) (Invalid_position pos) >>? fun () ->
   ok @@ Z.logor field Z.(shift_left one pos)
 
+let from_list positions = List.fold_left_e add empty positions
+
+let inter = Z.logand
+
 let () =
   let open Data_encoding in
   register_error_kind
