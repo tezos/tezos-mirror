@@ -23,48 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides helper to interact with PVM outboxes. *)
+(** [is_processed store hash] returns [true] if the block with [hash] has
+    already been processed by the daemon. *)
+val is_processed : Store.t -> Block_hash.t -> bool Lwt.t
 
-open Node_context
-open Protocol.Alpha_context
+(** [mark_processed_head store head] remembers that the [head] is processed. The
+    system should not have to come back to it. *)
+val mark_processed_head : Store.t -> Layer1.head -> unit Lwt.t
 
-module Make (PVM : Pvm.S) = struct
-  let get_state_of_lcc node_ctxt =
-    let open Lwt_result_syntax in
-    let*! lcc_level =
-      Store.Last_cemented_commitment_level.get node_ctxt.store
-    in
-    let*! block_hash =
-      Layer1.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    let*! state = PVM.State.find ctxt in
-    return state
+(** [last_processed_head_opt store] returns the last processed head if it
+    exists. *)
+val last_processed_head_opt : Store.t -> Layer1.head option Lwt.t
 
-  let proof_of_output node_ctxt output =
-    let open Lwt_result_syntax in
-    let*! commitment_hash =
-      Store.Last_cemented_commitment_hash.get node_ctxt.store
-    in
-    let* state = get_state_of_lcc node_ctxt in
-    match state with
-    | None ->
-        (*
-           This case should never happen as origination creates an LCC which
-           must have been considered by the rollup node at startup time.
-        *)
-        failwith "Error producing outbox proof (no cemented state in the node)"
-    | Some state -> (
-        let*! proof = PVM.produce_output_proof node_ctxt.context state output in
-        match proof with
-        | Ok proof ->
-            let serialized_proof =
-              Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
-            in
-            return @@ (commitment_hash, serialized_proof)
-        | Error err ->
-            failwith
-              "Error producing outbox proof (%a)"
-              Environment.Error_monad.pp
-              err)
-end
+(** [mark_finalized_head store head] remembers that the [head] is finalized. By
+    construction, every block whose level is smaller than [head]'s is also
+    finalized. *)
+val mark_finalized_head : Store.t -> Layer1.head -> unit Lwt.t
+
+(** [last_finalized_head store] returns the last finalized head if it exists. *)
+val get_finalized_head_opt : Store.t -> Layer1.head option Lwt.t

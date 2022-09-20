@@ -23,48 +23,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides helper to interact with PVM outboxes. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3433
+   Check what the actual value of `reorganization_window_length`
+   should be, and if we want to make it configurable.
+*)
+let reorganization_window_length = 10
 
-open Node_context
-open Protocol.Alpha_context
+module Store = struct
+  module ProcessedHashes = Store_utils.Make_append_only_map (struct
+    let path = ["tezos"; "processed_blocks"]
 
-module Make (PVM : Pvm.S) = struct
-  let get_state_of_lcc node_ctxt =
-    let open Lwt_result_syntax in
-    let*! lcc_level =
-      Store.Last_cemented_commitment_level.get node_ctxt.store
-    in
-    let*! block_hash =
-      Layer1.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    let*! state = PVM.State.find ctxt in
-    return state
+    let keep_last_n_entries_in_memory = reorganization_window_length
 
-  let proof_of_output node_ctxt output =
-    let open Lwt_result_syntax in
-    let*! commitment_hash =
-      Store.Last_cemented_commitment_hash.get node_ctxt.store
-    in
-    let* state = get_state_of_lcc node_ctxt in
-    match state with
-    | None ->
-        (*
-           This case should never happen as origination creates an LCC which
-           must have been considered by the rollup node at startup time.
-        *)
-        failwith "Error producing outbox proof (no cemented state in the node)"
-    | Some state -> (
-        let*! proof = PVM.produce_output_proof node_ctxt.context state output in
-        match proof with
-        | Ok proof ->
-            let serialized_proof =
-              Data_encoding.Binary.to_string_exn PVM.output_proof_encoding proof
-            in
-            return @@ (commitment_hash, serialized_proof)
-        | Error err ->
-            failwith
-              "Error producing outbox proof (%a)"
-              Environment.Error_monad.pp
-              err)
+    type key = Block_hash.t
+
+    let string_of_key = Block_hash.to_b58check
+
+    type value = unit
+
+    let value_encoding = Data_encoding.unit
+  end)
+
+  module LastProcessedHead = Store_utils.Make_mutable_value (struct
+    let path = ["tezos"; "processed_head"]
+
+    type value = Layer1.head
+
+    let value_encoding = Layer1.head_encoding
+  end)
+
+  module LastFinalizedHead = Store_utils.Make_mutable_value (struct
+    let path = ["tezos"; "finalized_head"]
+
+    type value = Layer1.head
+
+    let value_encoding = Layer1.head_encoding
+  end)
 end
+
+let mark_processed_head store Layer1.(Head {hash; level} as head) =
+  let open Lwt_syntax in
+  let* () = Store.ProcessedHashes.add store hash () in
+  let* () = Store.Levels.add store level hash in
+  let* () = Layer1_event.setting_new_head hash level in
+  let* () = Layer1_event.new_head_processed hash level in
+  Store.LastProcessedHead.set store head
+
+let is_processed store head = Store.ProcessedHashes.mem store head
+
+let last_processed_head_opt store = Store.LastProcessedHead.find store
+
+let mark_finalized_head store head = Store.LastFinalizedHead.set store head
+
+let get_finalized_head_opt store = Store.LastFinalizedHead.find store

@@ -64,17 +64,15 @@ let fetch_and_save_subscribed_slot_headers
   let*! () = Store.Dal_slot_subscriptions.add store head_hash res in
   return_unit
 
-let ancestor_hash ~number_of_levels {Node_context.genesis_info; store; _} head =
+let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
+    =
   let genesis_level = genesis_info.level in
   let rec go number_of_levels (Layer1.Head {hash; level} as head) =
     let open Lwt_option_syntax in
     if level < Raw_level.to_int32 genesis_level then fail
     else if number_of_levels = 0 then return hash
     else
-      let*! pred_hash = Layer1.predecessor store head in
-      let pred_head =
-        Layer1.Head {hash = pred_hash; level = Int32.(pred level)}
-      in
+      let* pred_head = Layer1.get_predecessor_opt l1_ctxt head in
       go (number_of_levels - 1) pred_head
   in
   go number_of_levels head
@@ -316,7 +314,8 @@ module Confirmed_slots_history = struct
     in
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
-  let slots_history_of_hash node_ctxt block_hash =
+  let slots_history_of_hash node_ctxt
+      Layer1.(Head {hash = block_hash; level = block_level}) =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! confirmed_slots_history_opt =
@@ -325,7 +324,6 @@ module Confirmed_slots_history = struct
     match confirmed_slots_history_opt with
     | Some confirmed_dal_slots -> return confirmed_dal_slots
     | None ->
-        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
         let block_level = Raw_level.of_int32_exn block_level in
         if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
           (* We won't find "dal slots history" for blocks before the
@@ -344,7 +342,8 @@ module Confirmed_slots_history = struct
             Raw_level.pp
             block_level
 
-  let slots_history_cache_of_hash node_ctxt block_hash =
+  let slots_history_cache_of_hash node_ctxt
+      Layer1.(Head {hash = block_hash; level = block_level}) =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! confirmed_slots_history_cache_opt =
@@ -353,7 +352,6 @@ module Confirmed_slots_history = struct
     match confirmed_slots_history_cache_opt with
     | Some cache -> return cache
     | None ->
-        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
         let block_level = Raw_level.of_int32_exn block_level in
         if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
           (* We won't find "dal slots history cache" for blocks before the
@@ -386,7 +384,7 @@ module Confirmed_slots_history = struct
             Raw_level.pp
             block_level
 
-  let update (Node_context.{store; _} as node_ctxt)
+  let update (Node_context.{store; l1_ctxt; _} as node_ctxt)
       Layer1.(Head {hash = head_hash; _} as head) confirmation_info =
     let open Lwt_result_syntax in
     let* slots_to_save =
@@ -399,7 +397,7 @@ module Confirmed_slots_history = struct
           Slot_index.compare a b)
         slots_to_save
     in
-    let*! pred = Layer1.predecessor store head in
+    let* pred = Layer1.get_predecessor l1_ctxt head in
     let* slots_history = slots_history_of_hash node_ctxt pred in
     let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
     let*? slots_history, slots_cache =

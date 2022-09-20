@@ -45,13 +45,14 @@ module State = struct
 
   let add_history = Store.Histories.add
 
-  (** [inbox_of_hash node_ctxt store block_hash] returns the latest
-      inbox at the given [block_hash]. This function always returns
+  (** [inbox_of_head node_ctxt store block] returns the latest
+      inbox at the given [block]. This function always returns
       [Some inbox] for all levels after the rollup genesis even when
-      no messages has been issued at this specific [block_hash]. In
+      no messages has been issued at this specific [block]. In
       this case, the inbox is the same as the one found in the level
       when the latest message has been inserted. *)
-  let inbox_of_hash node_ctxt block_hash =
+  let inbox_of_head node_ctxt
+      Layer1.(Head {hash = block_hash; level = block_level}) =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! possible_inbox = Store.Inboxes.find node_ctxt.store block_hash in
@@ -61,9 +62,8 @@ module State = struct
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
-        let block_level = Raw_level.of_int32_exn block_level in
-        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+        let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+        if block_level <= genesis_level then
           let*! inbox =
             Context.Inbox.empty
               node_ctxt.context
@@ -73,14 +73,14 @@ module State = struct
           return inbox
         else
           failwith
-            "The inbox for block hash %a (level = %a) is missing."
+            "The inbox for block hash %a (level = %ld) is missing."
             Block_hash.pp
             block_hash
-            Raw_level.pp
             block_level
     | Some inbox -> return inbox
 
-  let history_of_hash node_ctxt block_hash =
+  let history_of_head node_ctxt
+      Layer1.(Head {hash = block_hash; level = block_level}) =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! res = Store.Histories.find node_ctxt.store block_hash in
@@ -91,9 +91,8 @@ module State = struct
            Fortunately this case will only ever be called once when dealing with
            the rollup origination block. After that we would always find an
            inbox. *)
-        let*! block_level = Layer1.level_of_hash node_ctxt.store block_hash in
-        let block_level = Raw_level.of_int32_exn block_level in
-        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
+        let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+        if block_level <= genesis_level then
           return @@ Sc_rollup.Inbox.History.empty ~capacity:60000L
         else
           failwith
@@ -178,16 +177,18 @@ let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
           to chain reorganization.
 
       *)
-      let*! predecessor = Layer1.predecessor node_ctxt.store head in
-      let* inbox = State.inbox_of_hash node_ctxt predecessor in
-      let* history = State.history_of_hash node_ctxt predecessor in
+      let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
+      let* inbox = State.inbox_of_head node_ctxt predecessor in
+      let* history = State.history_of_head node_ctxt predecessor in
       let* ctxt =
         if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
         then
           (* This is before we have interpreted the boot sector, so we start
              with an empty context in genesis *)
           return (Context.empty node_ctxt.context)
-        else Node_context.checkout_context node_ctxt predecessor
+        else
+          let Layer1.(Head {hash = predecessor; _}) = predecessor in
+          Node_context.checkout_context node_ctxt predecessor
       in
       let*! messages_tree = Context.MessageTrees.find ctxt in
       let* history, inbox, ctxt =
@@ -226,8 +227,14 @@ let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
       let*! () = State.add_history node_ctxt.store head_hash history in
       return ctxt
 
-let inbox_of_hash = State.inbox_of_hash
+let inbox_of_hash node_ctxt hash =
+  let open Lwt_result_syntax in
+  let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
+  State.inbox_of_head node_ctxt Layer1.(Head {hash; level})
 
-let history_of_hash = State.history_of_hash
+let history_of_hash node_ctxt hash =
+  let open Lwt_result_syntax in
+  let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
+  State.history_of_head node_ctxt Layer1.(Head {hash; level})
 
 let start () = Inbox_event.starting ()
