@@ -37,11 +37,11 @@ let hooks = Tezos_regression.hooks
    They should be moved to a common submodule. *)
 let make_int_parameter name = function
   | None -> []
-  | Some value -> [(name, Some (`Float (float value)))]
+  | Some value -> [(name, `Float (float value))]
 
 let make_bool_parameter name = function
   | None -> []
-  | Some value -> [(name, Some (`Bool value))]
+  | Some value -> [(name, `Bool value)]
 
 let test ~__FILE__ ?(tags = []) title f =
   let tags = "dal" :: tags in
@@ -62,7 +62,7 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
     @ make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
-    @ [(["sc_rollup_enable"], Some (`Bool true))]
+    @ [(["sc_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in

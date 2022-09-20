@@ -131,8 +131,8 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
       ~base:(Either.right (protocol, Some protocol_constants))
       (if lift_protocol_limits then
        [
-         (["hard_gas_limit_per_block"], Some {|"2147483647"|});
-         (["hard_gas_limit_per_operation"], Some {|"2147483647"|});
+         (["hard_gas_limit_per_block"], `String "2147483647");
+         (["hard_gas_limit_per_operation"], `String "2147483647");
        ]
       else [])
   in

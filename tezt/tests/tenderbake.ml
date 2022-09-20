@@ -41,7 +41,7 @@ let baker = Constant.bootstrap5.alias
 let default_overrides =
   [
     (* ensure that blocks must be endorsed *)
-    (["consensus_threshold"], Some (`Float 6.));
+    (["consensus_threshold"], `Float 6.);
   ]
 
 let init ?(overrides = default_overrides) protocol =

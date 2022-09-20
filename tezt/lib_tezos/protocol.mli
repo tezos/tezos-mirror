@@ -88,9 +88,9 @@ val encoding_prefix : t -> string
 (** Values to override in protocol parameters.
 
     They are pairs of JSON paths and optional values that can be used
-    to override or remove (when the value is [None]) the default parameters
+    to override or remove (when the value is [`None]) the default parameters
     when activating a protocol. *)
-type parameter_overrides = (string list * JSON.u option) list
+type parameter_overrides = (string list * [`None | JSON.u]) list
 
 (** Write a protocol parameter file.
 

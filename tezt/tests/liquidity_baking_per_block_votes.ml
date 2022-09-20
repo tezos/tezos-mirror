@@ -117,8 +117,8 @@ let test_all_per_block_votes =
 
   let parameters =
     [
-      (["minimal_block_delay"], Some (`String "2"));
-      (["delay_increment_per_round"], Some (`String "1"));
+      (["minimal_block_delay"], `String "2");
+      (["delay_increment_per_round"], `String "1");
     ]
   in
   let* parameter_file =

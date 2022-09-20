@@ -76,9 +76,9 @@ let test_update_consensus_key =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
     [
-      (["blocks_per_cycle"], Some (`Float (float blocks_per_cycle)));
-      (["nonce_revelation_threshold"], Some (`Float 2.));
-      (["preserved_cycles"], Some (`Float (float preserved_cycles)));
+      (["blocks_per_cycle"], `Float (float blocks_per_cycle));
+      (["nonce_revelation_threshold"], `Float 2.);
+      (["preserved_cycles"], `Float (float preserved_cycles));
     ]
   in
   let* parameter_file =
@@ -534,9 +534,9 @@ let register title test =
     (* we update paramaters for faster testing: no need to wait
        5 cycles for the consensus key to activate. *)
     [
-      (["blocks_per_cycle"], Some (`Float (float blocks_per_cycle)));
-      (["nonce_revelation_threshold"], Some (`Float 2.));
-      (["preserved_cycles"], Some (`Float (float preserved_cycles)));
+      (["blocks_per_cycle"], `Float (float blocks_per_cycle));
+      (["nonce_revelation_threshold"], `Float 2.);
+      (["preserved_cycles"], `Float (float preserved_cycles));
     ]
   in
   let* parameter_file =

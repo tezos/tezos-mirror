@@ -776,8 +776,8 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
   @@ fun () ->
   let parameters =
     [
-      (["blocks_per_cycle"], Some (`Float 8.));
-      (["cycles_per_voting_period"], Some (`Float 1.));
+      (["blocks_per_cycle"], `Float 8.);
+      (["cycles_per_voting_period"], `Float 1.);
     ]
   in
   let* parameter_file =

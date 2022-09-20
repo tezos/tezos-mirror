@@ -504,10 +504,9 @@ let wrong_branch_operation_dismissal =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, None))
       [
-        (["consensus_threshold"], Some (`Float 1.));
-        ( ["minimal_block_delay"],
-          Some (`String (string_of_int minimal_block_delay)) );
-        (["delay_increment_per_round"], Some (`String "1"));
+        (["consensus_threshold"], `Float 1.);
+        (["minimal_block_delay"], `String (string_of_int minimal_block_delay));
+        (["delay_increment_per_round"], `String "1");
       ]
   in
   let* () =
@@ -649,7 +648,7 @@ let test_operation_pool_ordering
       ~overrides:
         [
           ( ["hard_gas_limit_per_block"],
-            Some (`String (string_of_int (expected_n_ops * gas_limit))) );
+            `String (string_of_int (expected_n_ops * gas_limit)) );
         ]
       protocol
   in
