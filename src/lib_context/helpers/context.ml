@@ -181,6 +181,15 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
               (fun v -> `Value v);
           ])
 
+  (** [unshallow t] is the tree equivalent to [t] but with all subtrees evaluated,
+    i.e. without "reference" nodes.
+    This is done by calling `of_raw . to_raw`, which is *not* the identity function.
+    TODO: find a more efficient way to do the same, maybe with `fold` *)
+  let unshallow t =
+    let open Lwt_syntax in
+    let* r = to_raw t in
+    return (of_raw r)
+
   type repo = Store.repo
 
   let make_repo =

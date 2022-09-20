@@ -51,6 +51,8 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
 
   val of_raw : raw -> DB.tree
 
+  val unshallow : DB.tree -> DB.tree Lwt.t
+
   type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]
 
   type repo = DB.repo
