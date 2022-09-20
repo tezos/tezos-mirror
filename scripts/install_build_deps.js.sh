@@ -64,5 +64,10 @@ nvm use --delete-prefix "$NODE_VERSION"
 echo "Check versions"
 node --version
 
-npm install
-
+# [npm ci] is like [npm install] but will fail if [package.json] and
+# [package-lock.json] disagree. It also removes any pre-existing [node_modules] install.
+if [ -z "${CI_PROJECT_DIR}" ] ; then
+    npm install ;
+else
+    npm ci ;
+fi

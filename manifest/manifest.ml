@@ -2435,8 +2435,7 @@ let generate_package_json_file () =
   write "package.json" @@ fun fmt ->
   Format.fprintf
     fmt
-    {|
-{
+    {|{
   "DO NOT EDIT": "This file was automatically generated, edit file manifest/main.ml instead",
   "private": true,
   "type": "commonjs",
