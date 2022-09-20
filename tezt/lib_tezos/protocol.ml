@@ -77,7 +77,7 @@ let baker proto = "./tezos-baker-" ^ daemon_name proto
 
 let encoding_prefix = daemon_name
 
-type parameter_overrides = (string list * string option) list
+type parameter_overrides = (string list * JSON.u option) list
 
 let write_parameter_file :
     ?additional_bootstrap_accounts:(Account.key * int option) list ->
@@ -98,9 +98,7 @@ let write_parameter_file :
   in
   let parameters =
     List.fold_left
-      (fun acc (path, value) ->
-        let parsed_value = Option.map Ezjsonm.value_from_string value in
-        Ezjsonm.update acc path parsed_value)
+      (fun acc (path, value) -> Ezjsonm.update acc path value)
       original_parameters
       parameter_overrides
   in

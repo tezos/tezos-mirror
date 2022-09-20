@@ -196,7 +196,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
       ~base:(Either.Right (protocol, None))
       [
         ( ["max_operations_time_to_live"],
-          Some (string_of_int max_operations_ttl) );
+          Some (`Float (float max_operations_ttl)) );
       ]
   in
   let* () = Client.activate_protocol ~protocol client ~parameter_file in

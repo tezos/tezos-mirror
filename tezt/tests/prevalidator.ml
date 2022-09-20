@@ -3516,7 +3516,7 @@ let injecting_old_operation_fails =
       ~base:(Either.Right (protocol, None))
       [
         ( ["max_operations_time_to_live"],
-          Some (string_of_int max_operations_ttl) );
+          Some (`Float (float max_operations_ttl)) );
       ]
   in
   let* () =

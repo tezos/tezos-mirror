@@ -490,14 +490,14 @@ module Tx_rollup = struct
 
     let parameter_file ?(parameters = default) protocol =
       let args =
-        [(["tx_rollup_enable"], Some "true")]
+        [(["tx_rollup_enable"], Some (`Bool true))]
         @ [
             ( ["tx_rollup_finality_period"],
-              Some (string_of_int parameters.finality_period) );
+              Some (`Float (float parameters.finality_period)) );
           ]
         @ [
             ( ["tx_rollup_withdraw_period"],
-              Some (string_of_int parameters.withdraw_period) );
+              Some (`Float (float parameters.withdraw_period)) );
           ]
       in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
@@ -514,7 +514,7 @@ module Dal = struct
     }
 
     let parameter_file protocol =
-      let args = [(["dal_parametric"; "feature_enable"], Some "true")] in
+      let args = [(["dal_parametric"; "feature_enable"], Some (`Bool true))] in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
 
     let from_client client =
