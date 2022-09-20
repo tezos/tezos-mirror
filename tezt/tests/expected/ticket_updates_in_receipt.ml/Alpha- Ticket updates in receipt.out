@@ -1,7 +1,7 @@
 
 ./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '(Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")'
 Node is bootstrapped.
-Estimated gas: 10481.100 units (will add 100 for safety)
+Estimated gas: 10501.742 units (will add 100 for safety)
 Estimated storage: 475 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.001397
+    Fee to the baker: ꜩ0.001399
     Expected counter: 1
-    Gas limit: 10582
+    Gas limit: 10602
     Storage limit: 495 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.001397
-      payload fees(the block proposer) ....... +ꜩ0.001397
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001399
+      payload fees(the block proposer) ....... +ꜩ0.001399
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -26,12 +26,12 @@ This sequence of operations was run:
       Parameter: (Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "red" 1) ;
-          Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "green" 1) ;
-          Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "green" 1) }
-      Storage size: 395 bytes
+        { Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "red" 1) ;
+          Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "green" 1) ;
+          Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "green" 1) }
+      Storage size: 525 bytes
       Paid storage size diff: 325 bytes
-      Consumed gas: 3987.585
+      Consumed gas: 4008.141
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.08125
         storage fees ........................... +ꜩ0.08125
@@ -51,12 +51,12 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
-          Parameter: (Pair (Pair (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1))
-                                 (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+          Parameter: (Pair (Pair (Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "blue" 1))
+                                 (Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "blue" 1)))
                            0x015570d4b9f049e3b1bebbc7b6ffc8b3fcd0efe35100)
           This transaction was successfully applied
           Updated storage:
-            (Some (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+            (Some (Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "blue" 1)))
           Storage size: 169 bytes
           Paid storage size diff: 108 bytes
           Consumed gas: 3709.242
@@ -73,10 +73,10 @@ This sequence of operations was run:
           Amount: ꜩ0
           From: [CONTRACT_HASH]
           To: [CONTRACT_HASH]
-          Parameter: (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1))
+          Parameter: (Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "blue" 1))
           This transaction was successfully applied
           Updated storage:
-            (Some (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+            (Some (Pair 0x01088d22fbc8e921d29e92506312d5d031036a35d400 (Pair "blue" 1)))
           Storage size: 88 bytes
           Paid storage size diff: 42 bytes
           Consumed gas: 2785.606
