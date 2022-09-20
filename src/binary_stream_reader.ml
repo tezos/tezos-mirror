@@ -266,11 +266,11 @@ let rec read_rec :
   | Float -> Atom.float resume state k
   | Bytes (`Fixed n, _) -> Atom.fixed_length_bytes n resume state k
   | Bytes (`Variable, _) ->
-      let size = remaining_bytes state in
+      let size = remaining_bytes_for_variable_encoding state in
       Atom.fixed_length_bytes size resume state k
   | String (`Fixed n, _) -> Atom.fixed_length_string n resume state k
   | String (`Variable, _) ->
-      let size = remaining_bytes state in
+      let size = remaining_bytes_for_variable_encoding state in
       Atom.fixed_length_string size resume state k
   | Padded (e, n) ->
       read_rec false e state @@ fun (v, state) ->
@@ -283,11 +283,11 @@ let rec read_rec :
   | Array {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
       | No_limit ->
-          read_list Array_too_long max_int e state @@ fun (l, state) ->
+          read_variable_list Array_too_long max_int e state @@ fun (l, state) ->
           k (Array.of_list l, state)
       | At_most max_length ->
-          read_list Array_too_long max_length e state @@ fun (l, state) ->
-          k (Array.of_list l, state)
+          read_variable_list Array_too_long max_length e state
+          @@ fun (l, state) -> k (Array.of_list l, state)
       | Exactly exact_length ->
           read_fixed_list exact_length e state @@ fun (l, state) ->
           k (Array.of_list l, state))
@@ -306,8 +306,9 @@ let rec read_rec :
       assert false
   | List {length_limit; length_encoding = None; elts = e} -> (
       match length_limit with
-      | No_limit -> read_list List_too_long max_int e state k
-      | At_most max_length -> read_list List_too_long max_length e state k
+      | No_limit -> read_variable_list List_too_long max_int e state k
+      | At_most max_length ->
+          read_variable_list List_too_long max_length e state k
       | Exactly exact_length -> read_fixed_list exact_length e state k)
   | List
       {
@@ -329,7 +330,7 @@ let rec read_rec :
       if not present then k (None, state)
       else read_rec whole e state @@ fun (v, state) -> k (Some v, state)
   | Obj (Opt {kind = `Variable; encoding = e; _}) ->
-      let size = remaining_bytes state in
+      let size = remaining_bytes_for_variable_encoding state in
       if size = 0 then k (None, state)
       else read_rec whole e state @@ fun (v, state) -> k (Some v, state)
   | Objs {kind = `Fixed sz; left; right} ->
@@ -413,7 +414,7 @@ let rec read_rec :
       let e = f () in
       read_rec whole e state k
 
-and remaining_bytes {remaining_bytes; _} =
+and remaining_bytes_for_variable_encoding {remaining_bytes; _} =
   match remaining_bytes with
   | None ->
       (* This function should only be called with a variable encoding,
@@ -429,7 +430,7 @@ and read_variable_pair :
     ((left * right) * state -> ret status) ->
     ret status =
  fun e1 e2 state k ->
-  let size = remaining_bytes state in
+  let size = remaining_bytes_for_variable_encoding state in
   match (Encoding.classify e1, Encoding.classify e2) with
   | (`Dynamic | `Fixed _), `Variable ->
       read_rec false e1 state @@ fun (left, state) ->
@@ -450,7 +451,7 @@ and read_variable_pair :
       (* Should be rejected by [Encoding.Kind.combine] *)
       assert false
 
-and read_list :
+and read_variable_list :
     type a ret.
     read_error ->
     int ->
@@ -460,7 +461,7 @@ and read_list :
     ret status =
  fun error max_length e state k ->
   let rec loop state acc max_length =
-    let size = remaining_bytes state in
+    let size = remaining_bytes_for_variable_encoding state in
     if size = 0 then k (List.rev acc, state)
     else if max_length = 0 then raise_read_error error
     else
