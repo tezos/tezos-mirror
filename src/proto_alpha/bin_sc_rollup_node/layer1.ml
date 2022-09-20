@@ -96,7 +96,7 @@ module State = struct
   let reorganization_window_length = 10
 
   module Store = struct
-    module Blocks = Store.Make_append_only_map (struct
+    module Blocks = Store_utils.Make_append_only_map (struct
       let path = ["tezos"; "blocks"]
 
       let keep_last_n_entries_in_memory = reorganization_window_length
@@ -110,7 +110,7 @@ module State = struct
       let value_encoding = block_encoding
     end)
 
-    module Head = Store.Make_mutable_value (struct
+    module Head = Store_utils.Make_mutable_value (struct
       let path = ["tezos"; "head"]
 
       type value = head
@@ -118,7 +118,7 @@ module State = struct
       let value_encoding = head_encoding
     end)
 
-    module Levels = Store.Make_updatable_map (struct
+    module Levels = Store_utils.Make_updatable_map (struct
       let path = ["tezos"; "levels"]
 
       let keep_last_n_entries_in_memory = reorganization_window_length
@@ -132,7 +132,7 @@ module State = struct
       let value_encoding = Block_hash.encoding
     end)
 
-    module ProcessedHashes = Store.Make_append_only_map (struct
+    module ProcessedHashes = Store_utils.Make_append_only_map (struct
       let path = ["tezos"; "processed_blocks"]
 
       let keep_last_n_entries_in_memory = reorganization_window_length
@@ -146,7 +146,7 @@ module State = struct
       let value_encoding = Data_encoding.unit
     end)
 
-    module LastProcessedHead = Store.Make_mutable_value (struct
+    module LastProcessedHead = Store_utils.Make_mutable_value (struct
       let path = ["tezos"; "processed_head"]
 
       type value = head
@@ -154,7 +154,7 @@ module State = struct
       let value_encoding = head_encoding
     end)
 
-    module Heads_seen_but_not_finalized = Store.Make_mutable_value (struct
+    module Heads_seen_but_not_finalized = Store_utils.Make_mutable_value (struct
       let path = ["heads"; "not_finalized"]
 
       type value = head list

@@ -388,7 +388,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = message "Closing store@." in
-    let* () = Store.close store in
+    let* () = Store_utils.close store in
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
@@ -475,7 +475,7 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
       configuration.sc_rollup_node_operators
   in
   let*! store =
-    Store.load Configuration.(default_storage_dir configuration.data_dir)
+    Store_utils.load Configuration.(default_storage_dir configuration.data_dir)
   in
   let*! context = Context.load configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in

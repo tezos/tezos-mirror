@@ -23,13 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3471
-   Use indexed file for append-only instead of Irmin. *)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3739
-   Refactor the store file to have functors in their own
-   separate module, and return errors within the Error monad. *)
-
 open Protocol
 include Store_utils
 
