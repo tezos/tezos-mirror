@@ -50,7 +50,7 @@ let test_increase_paid_storage =
   let* () = Client.bake_for_and_wait client in
   let payer = Constant.bootstrap2.alias in
   let* result =
-    Client.increase_paid_storage ~contract ~amount:"1000" ~payer client
+    Client.increase_paid_storage ~contract ~amount:1000 ~payer client
   in
   Regression.capture result ;
   unit

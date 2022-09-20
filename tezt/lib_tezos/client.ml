@@ -996,7 +996,7 @@ let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
         "of";
         contract;
         "by";
-        amount;
+        string_of_int amount;
         "bytes";
         "from";
         payer;

@@ -798,7 +798,7 @@ val increase_paid_storage :
   ?endpoint:endpoint ->
   ?wait:string ->
   contract:string ->
-  amount:string ->
+  amount:int ->
   payer:string ->
   t ->
   string Lwt.t
