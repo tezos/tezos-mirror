@@ -8,7 +8,9 @@
   tezos-base
   tezos-shell-services
   tezos-test-helpers
-  qcheck-core)
+  qcheck-core
+  tezos-context.memory
+  alcotest-lwt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)

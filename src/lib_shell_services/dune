@@ -11,7 +11,8 @@
   tezos-base
   tezos-p2p-services
   tezos-version
-  tezos-context.sigs)
+  tezos-context.sigs
+  tezos-context.merkle_proof_encoding)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
