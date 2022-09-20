@@ -81,7 +81,7 @@ integration-test-prepare-migration-test: gitlab-take-ownership
 .PHONY: integration-test-snapshot-alpha-and-link
 integration-test-snapshot-alpha-and-link: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
-		$(MAKE) tezos-protocol-compiler && \
+		$(MAKE) octez-protocol-compiler && \
 		./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next && \
 		$(MAKE) && \
 		dune build src/proto_"${new_proto_version}"_*/
