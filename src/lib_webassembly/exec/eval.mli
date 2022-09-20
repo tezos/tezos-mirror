@@ -36,7 +36,7 @@ type init_state =
     initialization. *)
 exception Init_step_error of init_state
 
-type frame = {inst : module_key; locals : value ref Vector.t}
+type frame = {inst : module_key; mutable locals : value Vector.t}
 
 type admin_instr = admin_instr' Source.phrase
 
@@ -59,7 +59,6 @@ type code = value Vector.t * admin_instr Vector.t
 
 type label = {
   label_arity : int32 option;
-  label_frame_specs : frame;
   label_break : Ast.instr option;
   label_code : code;
 }
@@ -88,7 +87,7 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
-      locals_kont : (Types.value_type, value ref) map_kont;
+      locals_kont : (Types.value_type, value) map_kont;
     }
   | Inv_prepare_args of {
       arity : int32;
@@ -96,8 +95,8 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
-      locals : value ref Vector.t;
-      args_kont : (value, value ref) map_kont;
+      locals : value Vector.t;
+      args_kont : (value, value) map_kont;
     }
   | Inv_concat of {
       arity : int32;
@@ -105,7 +104,7 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : Ast.func;
-      concat_kont : value ref concat_kont;
+      concat_kont : value concat_kont;
     }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
 
@@ -203,8 +202,8 @@ type init_kont =
       * (Ast.data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
   | IK_Join_admin of module_inst * admin_instr join_kont
-  | IK_Eval of module_inst * config
-  | IK_Stop of module_inst
+  | IK_Eval of config
+  | IK_Stop
       (** Witness that there is no more tick to execute to complete
           the [init] process. *)
 
@@ -219,6 +218,7 @@ exception Missing_memory_0_export
     @raise Invalid_argument if called with [IK_Stop]. There is no
     transition from the terminal state. *)
 val init_step :
+  filter_exports:bool ->
   ?check_module_exports:memory_export_rules ->
   module_reg:module_reg ->
   self:module_key ->

@@ -314,15 +314,12 @@ let init_kont_encoding ~host_funcs =
         (function m, admin -> IK_Join_admin (m, admin));
       case
         "IK_Eval"
-        (tup2
-           ~flatten:true
-           (scope ["module"] Wasm_encoding.module_instance_encoding)
-           (scope ["config"] (Wasm_encoding.config_encoding ~host_funcs)))
-        (function IK_Eval (m, config) -> Some (m, config) | _ -> None)
-        (function m, config -> IK_Eval (m, config));
+        (scope ["config"] (Wasm_encoding.config_encoding ~host_funcs))
+        (function IK_Eval config -> Some config | _ -> None)
+        (function config -> IK_Eval config);
       case
         "IK_Stop"
-        Wasm_encoding.module_instance_encoding
-        (function IK_Stop m -> Some m | _ -> None)
-        (function m -> IK_Stop m);
+        (value [] Data_encoding.empty)
+        (function IK_Stop -> Some () | _ -> None)
+        (function () -> IK_Stop);
     ]

@@ -303,7 +303,7 @@ let value_option key encoding =
 
 let option enc =
   tagged_union
-    ~default:None
+    ~default:(fun () -> None)
     (value [] Data_encoding.string)
     [
       case "Some" enc Fun.id Option.some;

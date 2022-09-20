@@ -80,7 +80,14 @@ val scope : key -> 'a t -> 'a t
 
 (** [lazy_mapping to_key enc] returns a key-value list encoder that
     encodes values from a given key-value list using the key-mapping function
-    [to_key] and the provided encoder [enc] for the values. *)
+    [to_key] and the provided encoder [enc] for the values.
+
+    {b Warning:} Before encoding a value [v] under key [k],
+    [lazy_mapping] first removes any previous value stored under
+    [k]. In practice, it means nested [lazy_mapping] are not safe. The
+    necessary safe-guard is to use [lazy_mapping] in conjunction with
+    {!with_subtree}, which allows to retain more information about
+    the original tree if need be. *)
 val lazy_mapping : ('k -> key) -> 'v t -> ('k * 'v) list t
 
 (** [case tag enc f] return a partial encoder that represents a case in a

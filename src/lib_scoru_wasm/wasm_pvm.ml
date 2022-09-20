@@ -92,10 +92,10 @@ struct
     let tick_state_encoding =
       let open Tree_encoding in
       tagged_union
-        ~default:
-          (Decode
-             (Tezos_webassembly_interpreter.Decode.initial_decode_kont
-                ~name:wasm_main_module_name))
+        ~default:(fun () ->
+          Decode
+            (Tezos_webassembly_interpreter.Decode.initial_decode_kont
+               ~name:wasm_main_module_name))
         (value [] Data_encoding.string)
         [
           case
@@ -296,7 +296,7 @@ struct
                 (Stuck
                    (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
           )
-      | Init {self; ast_module = _; init_kont = IK_Stop _module_inst} -> (
+      | Init {self; ast_module = _; init_kont = IK_Stop} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
           in
@@ -332,6 +332,7 @@ struct
       | Init {self; ast_module; init_kont} ->
           let* init_kont =
             Wasm.Eval.init_step
+              ~filter_exports:true
               ~check_module_exports:Exports_memory_0
               ~module_reg
               ~self

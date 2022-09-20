@@ -230,7 +230,8 @@ val case_lwt :
 
     The [default] labeled argument can be provided to have a
     fallback in case the value is missing from the tree. *)
-val tagged_union : ?default:'a -> 'tag t -> ('tag, 'a) case list -> 'a t
+val tagged_union :
+  ?default:(unit -> 'a) -> 'tag t -> ('tag, 'a) case list -> 'a t
 
 (** [option enc] lifts the given encoding [enc] to one that can encode
     optional values. *)

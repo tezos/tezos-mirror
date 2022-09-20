@@ -731,9 +731,9 @@ let frame_encoding =
     (tup2
        ~flatten:true
        (scope ["module"] module_key_encoding)
-       (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding)))
+       (lazy_vector_encoding "locals" value_encoding))
 
-let rec admin_instr'_encoding () =
+let admin_instr'_encoding =
   let open Eval in
   tagged_union
     string_tag
@@ -865,13 +865,8 @@ let rec admin_instr'_encoding () =
         (fun (idx, d, s, n, case) -> Memory_copy_meta (idx, d, s, n, case));
     ]
 
-and admin_instr_encoding () =
-  conv
-    Source.(at no_region)
-    Source.(fun x -> x.it)
-    (delayed admin_instr'_encoding)
-
-let admin_instr_encoding = admin_instr_encoding ()
+let admin_instr_encoding =
+  conv Source.(at no_region) Source.(fun x -> x.it) admin_instr'_encoding
 
 let input_buffer_message_encoding =
   conv_lwt
@@ -911,14 +906,13 @@ let input_buffer_encoding =
 
 let label_encoding =
   conv
-    (fun (label_arity, label_frame_specs, label_break, vs, es) ->
-      Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)})
-    (fun {label_arity; label_frame_specs; label_break; label_code = vs, es} ->
-      (label_arity, label_frame_specs, label_break, vs, es))
-    (tup5
+    (fun (label_arity, label_break, vs, es) ->
+      Eval.{label_arity; label_break; label_code = (vs, es)})
+    (fun {label_arity; label_break; label_code = vs, es} ->
+      (label_arity, label_break, vs, es))
+    (tup4
        ~flatten:true
        (value_option ["arity"] Data_encoding.int32)
-       (scope ["frame"] frame_encoding)
        (scope ["label_break"] (option instruction_encoding))
        (scope ["values"] values_encoding)
        (lazy_vector_encoding "instructions" admin_instr_encoding))
@@ -1024,7 +1018,7 @@ let invoke_step_kont_encoding =
                  (lazy_vector_encoding
                     "x"
                     (value [] Interpreter_encodings.Types.value_type_encoding))
-                 (lazy_vector_encoding "y" (conv ref ( ! ) @@ value_encoding)))))
+                 (lazy_vector_encoding "y" value_encoding))))
         (function
           | Eval.Inv_prepare_locals
               {arity; args; vs; instructions; inst; func; locals_kont} ->
@@ -1042,12 +1036,12 @@ let invoke_step_kont_encoding =
            (lazy_vector_encoding "instructions" admin_instr_encoding)
            (scope ["inst"] module_key_encoding)
            (scope ["func"] func_encoding)
-           (lazy_vector_encoding "locals" (conv ref ( ! ) @@ value_encoding))
+           (lazy_vector_encoding "locals" value_encoding)
            (scope
               ["kont"]
               (map_kont_encoding
                  (lazy_vector_encoding "1" value_encoding)
-                 (lazy_vector_encoding "2" (conv ref ( ! ) @@ value_encoding)))))
+                 (lazy_vector_encoding "2" value_encoding))))
         (function
           | Eval.Inv_prepare_args
               {arity; vs; instructions; inst; func; locals; args_kont} ->
@@ -1067,8 +1061,7 @@ let invoke_step_kont_encoding =
            (scope ["func"] func_encoding)
            (scope
               ["kont"]
-              (concat_kont_encoding
-                 (lazy_vector_encoding "2" (conv ref ( ! ) @@ value_encoding)))))
+              (concat_kont_encoding (lazy_vector_encoding "2" value_encoding))))
         (function
           | Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
             ->

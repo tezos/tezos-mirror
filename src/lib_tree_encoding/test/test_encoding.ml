@@ -190,7 +190,7 @@ let test_tagged_union () =
 
 let test_tagged_union_default () =
   let open Lwt_result_syntax in
-  let enc = contact_enc ~default:No_address () in
+  let enc = contact_enc ~default:(fun () -> No_address) () in
   let*! empty_tree = empty_tree () in
   let* () = assert_value empty_tree enc No_address in
   let* () = assert_round_trip enc No_address Stdlib.( = ) in

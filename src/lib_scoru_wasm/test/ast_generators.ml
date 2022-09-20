@@ -516,7 +516,7 @@ let module_gen ?module_reg () =
 
 let frame_gen ~module_reg =
   let* inst, _ = module_key_and_instance_gen ~module_reg () in
-  let+ locals = small_vector_gen (map ref value_gen) in
+  let+ locals = small_vector_gen value_gen in
   Eval.{inst; locals}
 
 let rec admin_instr'_gen ~module_reg =
@@ -661,11 +661,10 @@ let output_buffer_gen =
 
 let label_gen ~module_reg =
   let* label_arity = option (Int32.of_int <$> small_nat) in
-  let* label_frame_specs = frame_gen ~module_reg in
   let* label_break = option instr_gen in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
   let+ vs = small_vector_gen value_gen in
-  Eval.{label_arity; label_frame_specs; label_break; label_code = (vs, es)}
+  Eval.{label_arity; label_break; label_code = (vs, es)}
 
 let label_stack_gen ~module_reg =
   let* label = label_gen ~module_reg in
@@ -735,7 +734,7 @@ let inv_prepare_locals_gen ~module_reg =
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
   let* func = ast_func_gen in
-  let+ locals_kont = map_kont_gen value_type_gen (ref <$> value_gen) in
+  let+ locals_kont = map_kont_gen value_type_gen value_gen in
   Eval.Inv_prepare_locals
     {arity; args; vs; instructions; inst; func; locals_kont}
 
@@ -746,8 +745,8 @@ let inv_prepare_args_gen ~module_reg =
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
   let* func = ast_func_gen in
-  let* locals = small_vector_gen (ref <$> value_gen) in
-  let+ args_kont = map_kont_gen value_gen (ref <$> value_gen) in
+  let* locals = small_vector_gen value_gen in
+  let+ args_kont = map_kont_gen value_gen value_gen in
   Eval.Inv_prepare_args {arity; vs; instructions; inst; func; locals; args_kont}
 
 let inv_concat_gen ~module_reg =
@@ -757,7 +756,7 @@ let inv_concat_gen ~module_reg =
   let* module_name = string_printable in
   let inst = Instance.Module_key module_name in
   let* func = ast_func_gen in
-  let+ concat_kont = concat_kont_gen (ref <$> value_gen) in
+  let+ concat_kont = concat_kont_gen value_gen in
   Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
 
 let inv_stop_gen ~module_reg =

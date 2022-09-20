@@ -134,7 +134,7 @@ let numeric_error at = function
 
 (* Administrative Expressions & Configurations *)
 
-type frame = {inst : module_key; locals : value ref Vector.t}
+type frame = {inst : module_key; mutable locals : value Vector.t}
 
 type admin_instr = admin_instr' phrase
 
@@ -301,7 +301,6 @@ type code = value Vector.t * admin_instr Vector.t
 
 type label = {
   label_arity : int32 option;
-  label_frame_specs : frame;
   label_break : instr option;
   label_code : code;
 }
@@ -332,7 +331,7 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
-      locals_kont : (value_type, value ref) map_kont;
+      locals_kont : (value_type, value) map_kont;
     }
   | Inv_prepare_args of {
       arity : int32;
@@ -340,8 +339,8 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
-      locals : value ref Vector.t;
-      args_kont : (value, value ref) map_kont;
+      locals : value Vector.t;
+      args_kont : (value, value) map_kont;
     }
   | Inv_concat of {
       arity : int32;
@@ -349,7 +348,7 @@ type invoke_step_kont =
       instructions : admin_instr Vector.t;
       inst : module_key;
       func : func;
-      concat_kont : value ref concat_kont;
+      concat_kont : value concat_kont;
     }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
 
@@ -394,12 +393,7 @@ let config host_funcs ?frame_arity inst vs es =
   let frame = frame inst (Vector.empty ()) in
   let label_kont =
     label_kont
-      {
-        label_arity = frame_arity;
-        label_frame_specs = frame;
-        label_code = (vs, es);
-        label_break = None;
-      }
+      {label_arity = frame_arity; label_code = (vs, es); label_break = None}
   in
   let frame_stack =
     {frame_arity; frame_specs = frame; frame_label_kont = label_kont}
@@ -538,9 +532,7 @@ let invoke_step ?(durable = Durable_storage.empty) (module_reg : module_reg) c
             } )
   | Inv_prepare_locals {arity; args; vs; instructions; inst; func; locals_kont}
     ->
-      let+ locals_kont =
-        map_step locals_kont (fun x -> ref (default_value x))
-      in
+      let+ locals_kont = map_step locals_kont default_value in
       ( durable,
         Inv_prepare_locals
           {arity; args; vs; instructions; inst; func; locals_kont} )
@@ -558,7 +550,7 @@ let invoke_step ?(durable = Durable_storage.empty) (module_reg : module_reg) c
               concat_kont = concat_kont args_kont.destination locals;
             } )
   | Inv_prepare_args tick ->
-      let+ args_kont = map_rev_step tick.args_kont ref in
+      let+ args_kont = map_rev_step tick.args_kont Fun.id in
       (durable, Inv_prepare_args {tick with args_kont})
   | Inv_concat
       {
@@ -585,7 +577,6 @@ let invoke_step ?(durable = Durable_storage.empty) (module_reg : module_reg) c
                       label_kont
                         {
                           label_arity = Some n2;
-                          label_frame_specs = frame';
                           label_break = None;
                           label_code =
                             ( Vector.empty (),
@@ -660,7 +651,8 @@ let vec_v128 = function Vec (V128 v) -> Some v | _ -> None
     state of the label stack [label, stack] for a given [frame], by
     executing the WASM instruction [e] on top of the admin instr
     stack [es] and value stack [vs]. *)
-let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
+let step_instr module_reg frame label vs at e' es_rst stack :
+    'a label_kont Lwt.t =
   let label_kont_with_code vs es' =
     Label_stack
       ({label with label_code = (vs, Vector.prepend_list es' es_rst)}, stack)
@@ -669,8 +661,6 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
   let return_label_kont_with_code vs es' =
     Lwt.return (label_kont_with_code vs es')
   in
-
-  let frame = label.label_frame_specs in
 
   match e' with
   | Unreachable ->
@@ -687,7 +677,6 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
           label_arity = Some n2;
           label_break = None;
           label_code = (args, Vector.singleton (From_block (es', 0l) @@ at));
-          label_frame_specs = frame;
         }
       in
       Label_stack
@@ -702,7 +691,6 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
           label_arity = Some n1;
           label_break = Some (e' @@ at);
           label_code = (args, Vector.singleton (From_block (es', 0l) @@ at));
-          label_frame_specs = frame;
         }
       in
       Label_stack
@@ -759,18 +747,16 @@ let step_instr module_reg label vs at e' es_rst stack : 'a label_kont Lwt.t =
         []
   | LocalGet x ->
       let+ r = local frame x in
-      label_kont_with_code (Vector.cons !r vs) []
+      label_kont_with_code (Vector.cons r vs) []
   | LocalSet x ->
       (* v :: vs' *)
-      let* v, vs' = vector_pop_map vs Option.some at in
-      let+ r = local frame x in
-      r := v ;
+      let+ v, vs' = vector_pop_map vs Option.some at in
+      frame.locals <- Vector.set x.it v frame.locals ;
       label_kont_with_code vs' []
   | LocalTee x ->
       (* v :: vs' *)
-      let* v, vs' = vector_pop_map vs Option.some at in
-      let+ r = local frame x in
-      r := v ;
+      let+ v, vs' = vector_pop_map vs Option.some at in
+      frame.locals <- Vector.set x.it v frame.locals ;
       label_kont_with_code (Vector.cons v vs') []
   | GlobalGet x ->
       let* inst = resolve_module_ref module_reg frame.inst in
@@ -1296,14 +1282,15 @@ let label_step :
   match label_kont with
   | LS_Push_frame _ | LS_Modify_top _ -> assert false
   | LS_Start (Label_stack (label, stack)) ->
-      let frame = label.label_frame_specs in
       let vs, es = label.label_code in
       if 0l < Vector.num_elements es then
         let* e, es = Vector.pop es in
         let+ kont =
           match e.it with
           | Plain e' ->
-              let+ kont = step_instr module_reg label vs e.at e' es stack in
+              let+ kont =
+                step_instr module_reg frame label vs e.at e' es stack
+              in
               LS_Modify_top kont
           | From_block (Block_label b, i) ->
               let* inst = resolve_module_ref module_reg frame.inst in
@@ -1423,6 +1410,11 @@ let label_step :
       in
       (durable, LS_Craft_frame (label, istep))
 
+(** [dup_frame frame] copies [frame], such as the two copies do not
+    share mutable fields. *)
+let dup_frame {frame_arity; frame_specs = {inst; locals}; frame_label_kont} =
+  {frame_arity; frame_specs = {inst; locals}; frame_label_kont}
+
 let frame_step durable module_reg c buffers = function
   | SK_Result _ | SK_Trapped _ -> assert false
   | SK_Start (frame, stack) ->
@@ -1435,6 +1427,22 @@ let frame_step durable module_reg c buffers = function
               Lwt.return (SK_Result vs0)
             else
               let+ frame', stack = Vector.pop stack in
+              (*
+
+                 Duplicating the frame to make sure modifying [frame']
+                 does not modify the contents of [stack].
+
+                 More precisely, the scenario we want to avoid is a 1
+                 N-tick execution where [frame'] is modified, which
+                 modifies the local copy of [frame'] in the in-memory
+                 map of the lazy vector [stack], due to mutability.
+
+                 Because of how [tree-encoding] works at the moment,
+                 such a scenario would lead to a diverging context
+                 hash between 1 N-tick and N 1-ticks executions.
+
+               *)
+              let frame' = dup_frame frame' in
               let label, lstack =
                 match frame'.frame_label_kont with
                 | Label_stack (label, lstack) -> (label, lstack)
@@ -1869,8 +1877,8 @@ type init_kont =
       * (data_segment, admin_instr) map_concat_kont
       * admin_instr Vector.t
   | IK_Join_admin of module_inst * admin_instr join_kont
-  | IK_Eval of module_inst * config
-  | IK_Stop of module_inst
+  | IK_Eval of config
+  | IK_Stop
 
 let section_next_init_kont :
     type kont a b.
@@ -1948,8 +1956,8 @@ type memory_export_rules = Exports_memory_0 | No_memory_export_rules
 
 exception Missing_memory_0_export
 
-let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
-    buffers host_funcs (m : module_) = function
+let init_step ~filter_exports ?(check_module_exports = No_memory_export_rules)
+    ~module_reg ~self buffers host_funcs (m : module_) = function
   | IK_Start exts ->
       (* Initialize as empty module. *)
       update_module_ref module_reg self empty_module_inst ;
@@ -2011,8 +2019,13 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
       let+ tick =
         fold_left_s_step tick (fun acc export ->
             let+ k, v = create_export inst0 export in
+            let is_func = function ExternFunc _ -> true | _ -> false in
+            let exports =
+              let filter = filter_exports && not (is_func v) in
+              if filter then acc.exports else NameMap.set k v acc.exports
+            in
             {
-              exports = NameMap.set k v acc.exports;
+              exports;
               exports_memory_0 =
                 acc.exports_memory_0 || is_memory_0_export export;
             })
@@ -2073,28 +2086,36 @@ let init_step ?(check_module_exports = No_memory_export_rules) ~module_reg ~self
   | IK_Join_admin (inst0, tick) -> (
       match join_completed tick with
       | Some res ->
-          Lwt.return
-            (IK_Eval (inst0, config host_funcs self (Vector.empty ()) res))
+          Lwt.return (IK_Eval (config host_funcs self (Vector.empty ()) res))
       | None ->
           let+ tick = join_step tick in
           IK_Join_admin (inst0, tick))
-  | IK_Eval (inst, {step_kont = SK_Result _; _}) ->
+  | IK_Eval {step_kont = SK_Result _; _} ->
       (* No more admin instr, which means that we have returned from
          the _start function. *)
-      Lwt.return (IK_Stop inst)
-  | IK_Eval (_, {step_kont = SK_Trapped {it = msg; at}; _}) -> Trap.error at msg
-  | IK_Eval (inst, config) ->
+      Lwt.return IK_Stop
+  | IK_Eval {step_kont = SK_Trapped {it = msg; at}; _} -> Trap.error at msg
+  | IK_Eval config ->
       let+ _, config = step module_reg config buffers in
-      IK_Eval (inst, config)
-  | IK_Stop _ -> raise (Init_step_error Init_step)
+      IK_Eval config
+  | IK_Stop -> raise (Init_step_error Init_step)
 
 let init ~module_reg ~self buffers host_funcs (m : module_) (exts : extern list)
     : module_inst Lwt.t =
   let open Lwt.Syntax in
   let rec go = function
-    | IK_Stop inst -> Lwt.return inst
+    | IK_Stop -> resolve_module_ref module_reg self
     | kont ->
-        let* kont = init_step ~module_reg ~self buffers host_funcs m kont in
+        let* kont =
+          init_step
+            ~filter_exports:false
+            ~module_reg
+            ~self
+            buffers
+            host_funcs
+            m
+            kont
+        in
         go kont
   in
   go (IK_Start (Vector.of_list exts))
