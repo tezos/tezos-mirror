@@ -877,8 +877,8 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
   let open Lwt_result_syntax in
   let*! res =
     Validate.validate_operation
+      ~check_signature:(nb_successful_prechecks <= 0)
       validation_state.validity_state
-      ~should_check_signature:(nb_successful_prechecks <= 0)
       oph
       operation
   in

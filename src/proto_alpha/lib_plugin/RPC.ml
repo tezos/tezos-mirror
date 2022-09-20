@@ -852,8 +852,8 @@ module Scripts = struct
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
     Validate.validate_operation
+      ~check_signature:false
       validity_state
-      ~should_check_signature:false
       oph
       packed_operation
     >>=? fun _validate_operation_state ->
