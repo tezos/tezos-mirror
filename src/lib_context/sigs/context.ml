@@ -469,6 +469,51 @@ module Proof_types = struct
     after : kinded_hash;
     state : 'a;
   }
+
+  let rec tree_eq t1 t2 =
+    let rec inode_tree_eq it1 it2 =
+      match (it1, it2) with
+      | Blinded_inode h1, Blinded_inode h2 -> h1 = h2
+      | Inode_values l1, Inode_values l2 ->
+          List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+      | Inode_tree i1, Inode_tree i2 ->
+          i1.length = i2.length
+          && List.equal
+               (fun (idx1, itree1) (idx2, itree2) ->
+                 idx1 = idx2 && inode_tree_eq itree1 itree2)
+               i1.proofs
+               i2.proofs
+      | Inode_extender i1, Inode_extender i2 ->
+          i1.length = i2.length
+          && List.equal ( = ) i1.segment i2.segment
+          && inode_tree_eq i1.proof i2.proof
+      | _ -> false
+    in
+    match (t1, t2) with
+    | Value v1, Value v2 -> v1 = v2
+    | Blinded_value h1, Blinded_value h2 -> h1 = h2
+    | Node l1, Node l2 ->
+        List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+    | Blinded_node h1, Blinded_node h2 -> h1 = h2
+    | Inode i1, Inode i2 ->
+        i1.length = i2.length
+        && List.equal
+             (fun (idx1, itree1) (idx2, itree2) ->
+               idx1 = idx2 && inode_tree_eq itree1 itree2)
+             i1.proofs
+             i2.proofs
+    | Extender i1, Extender i2 ->
+        i1.length = i2.length
+        && List.equal ( = ) i1.segment i2.segment
+        && inode_tree_eq i1.proof i2.proof
+    | _ -> false
+
+  let tree_proof_eq p1 p2 =
+    p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
+    && tree_eq p1.state p2.state
+
+  let proof_hash_eq p1 p2 =
+    p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
 end
 
 module type PROOF = sig
