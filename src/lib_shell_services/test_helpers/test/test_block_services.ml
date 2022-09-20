@@ -34,24 +34,15 @@ open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
-open Tezos_context_sigs.Context.Proof_types
+open Tezos_context_sigs.Context.Proof_types.Internal_for_tests
 
-let raw_context_eq_tests =
+let merkle_proof_eq_tests =
   qcheck_eq_tests
-    ~eq:raw_context_eq
-    ~gen:raw_context_gen
-    ~eq_name:"raw_context_eq"
-
-let merkle_tree_eq_tests =
-  qcheck_eq_tests
-    ~eq:merkle_tree_eq
-    ~gen:merkle_tree_gen
-    ~eq_name:"merkle_tree_eq"
+    ~eq:(fun (a, _, _) (b, _, _) -> tree_proof_eq a b)
+    ~gen:merkle_proof_gen
+    ~eq_name:"merkle_proof_eq"
 
 let () =
   Alcotest.run
     "Block_services"
-    [
-      ("raw_context_eq", qcheck_wrap raw_context_eq_tests);
-      ("merkle_tree_eq", qcheck_wrap merkle_tree_eq_tests);
-    ]
+    [("merkle_proof_eq", qcheck_wrap merkle_proof_eq_tests)]

@@ -191,7 +191,7 @@ module Consensus = struct
 
   let mk_rogue_tree (mproof : Proof.tree Proof.t) (seed : int list) :
       (Proof.tree Proof.t, string) result =
-    let tree_proof_eq = Proof.tree_proof_eq in
+    let tree_proof_eq = Proof.Internal_for_tests.tree_proof_eq in
     let rec gen_rec ~rand attempts_left =
       if attempts_left = 0 then Error "mk_rogue_tree: giving up"
       else

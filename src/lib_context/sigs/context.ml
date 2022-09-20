@@ -224,24 +224,7 @@ module Proof_types = struct
   (** The type of Merkle tree used by the light mode *)
   and merkle_tree = merkle_node String.Map.t
 
-  let rec pp_merkle_node ppf = function
-    | Hash (k, h) ->
-        let k_str = match k with Contents -> "Contents" | Node -> "Node" in
-        Format.fprintf ppf "Hash(%s, %s)" k_str h
-    | Data raw_context ->
-        Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
-    | Continue tree -> Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
-
-  and pp_merkle_tree ppf mtree =
-    let pairs = String.Map.bindings mtree in
-    Format.fprintf
-      ppf
-      "{@[<v 1>@,%a@]@,}"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
-           Format.fprintf ppf "\"%s\": %a" s pp_merkle_node t))
-      pairs
-
-  and pp_raw_context ppf = function
+  let rec pp_raw_context ppf = function
     | Cut -> Format.fprintf ppf "..."
     | Key v -> Hex.pp ppf (Hex.of_bytes v)
     | Dir l ->
@@ -251,29 +234,6 @@ module Proof_types = struct
           (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
                Format.fprintf ppf "%s : %a" s pp_raw_context t))
           (String.Map.bindings l)
-
-  let rec merkle_node_eq n1 n2 =
-    match (n1, n2) with
-    | Hash (mhk1, s1), Hash (mhk2, s2) -> mhk1 = mhk2 && String.equal s1 s2
-    | Data rc1, Data rc2 -> raw_context_eq rc1 rc2
-    | Continue mtree1, Continue mtree2 -> merkle_tree_eq mtree1 mtree2
-    | _ -> false
-
-  (** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
-      that is, have the same constructors; and the constructor's content
-      are recursively equal *)
-  and merkle_tree_eq mtree1 mtree2 =
-    String.Map.equal merkle_node_eq mtree1 mtree2
-
-  (** [raw_context_eq rc1 rc2] tests whether [rc1] and [rc2] are equal,
-      that is, have the same constructors; and the constructor's content
-      are recursively equal *)
-  and raw_context_eq rc1 rc2 =
-    match (rc1, rc2) with
-    | Key bytes1, Key bytes2 -> Bytes.equal bytes1 bytes2
-    | Dir dir1, Dir dir2 -> String.Map.(equal raw_context_eq dir1 dir2)
-    | Cut, Cut -> true
-    | _ -> false
 
   (** Proofs are compact representations of trees which can be shared
       between peers.
@@ -470,47 +430,49 @@ module Proof_types = struct
     state : 'a;
   }
 
-  let rec tree_eq t1 t2 =
-    let rec inode_tree_eq it1 it2 =
-      match (it1, it2) with
-      | Blinded_inode h1, Blinded_inode h2 -> h1 = h2
-      | Inode_values l1, Inode_values l2 ->
+  module Internal_for_tests = struct
+    let rec tree_eq t1 t2 =
+      let rec inode_tree_eq it1 it2 =
+        match (it1, it2) with
+        | Blinded_inode h1, Blinded_inode h2 -> h1 = h2
+        | Inode_values l1, Inode_values l2 ->
+            List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+        | Inode_tree i1, Inode_tree i2 ->
+            i1.length = i2.length
+            && List.equal
+                 (fun (idx1, itree1) (idx2, itree2) ->
+                   idx1 = idx2 && inode_tree_eq itree1 itree2)
+                 i1.proofs
+                 i2.proofs
+        | Inode_extender i1, Inode_extender i2 ->
+            i1.length = i2.length
+            && List.equal ( = ) i1.segment i2.segment
+            && inode_tree_eq i1.proof i2.proof
+        | _ -> false
+      in
+      match (t1, t2) with
+      | Value v1, Value v2 -> v1 = v2
+      | Blinded_value h1, Blinded_value h2 -> h1 = h2
+      | Node l1, Node l2 ->
           List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
-      | Inode_tree i1, Inode_tree i2 ->
+      | Blinded_node h1, Blinded_node h2 -> h1 = h2
+      | Inode i1, Inode i2 ->
           i1.length = i2.length
           && List.equal
                (fun (idx1, itree1) (idx2, itree2) ->
                  idx1 = idx2 && inode_tree_eq itree1 itree2)
                i1.proofs
                i2.proofs
-      | Inode_extender i1, Inode_extender i2 ->
+      | Extender i1, Extender i2 ->
           i1.length = i2.length
           && List.equal ( = ) i1.segment i2.segment
           && inode_tree_eq i1.proof i2.proof
       | _ -> false
-    in
-    match (t1, t2) with
-    | Value v1, Value v2 -> v1 = v2
-    | Blinded_value h1, Blinded_value h2 -> h1 = h2
-    | Node l1, Node l2 ->
-        List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
-    | Blinded_node h1, Blinded_node h2 -> h1 = h2
-    | Inode i1, Inode i2 ->
-        i1.length = i2.length
-        && List.equal
-             (fun (idx1, itree1) (idx2, itree2) ->
-               idx1 = idx2 && inode_tree_eq itree1 itree2)
-             i1.proofs
-             i2.proofs
-    | Extender i1, Extender i2 ->
-        i1.length = i2.length
-        && List.equal ( = ) i1.segment i2.segment
-        && inode_tree_eq i1.proof i2.proof
-    | _ -> false
 
-  let tree_proof_eq p1 p2 =
-    p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
-    && tree_eq p1.state p2.state
+    let tree_proof_eq p1 p2 =
+      p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
+      && tree_eq p1.state p2.state
+  end
 
   let proof_hash_eq p1 p2 =
     p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
