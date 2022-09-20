@@ -663,7 +663,7 @@ let generate_dal_publish_slot_header random_state :
     let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
     let index = Alpha_context.Dal.Slot_index.zero in
     let header = Alpha_context.Dal.Slot_header.zero in
-    let slot = Alpha_context.Dal.Slot.{published_level; index; header} in
+    let slot = Alpha_context.Dal.Slot.{id = {published_level; index}; header} in
     Dal_publish_slot_header {slot}
   in
   generate_manager random_state gen_dal_publish

@@ -62,7 +62,7 @@ let apply_data_availability ctxt data_availability ~endorser =
   Dal.Endorsement.record_available_shards ctxt data_availability shards
   |> return
 
-let validate_publish_slot_header ctxt Dal.Slot.{index; _} =
+let validate_publish_slot_header ctxt Dal.Slot.{id = {index; _}; _} =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Tzresult_syntax in
   let open Constants in

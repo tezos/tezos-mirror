@@ -2804,11 +2804,9 @@ module Dal : sig
   (** This module re-exports definitions from {!Dal_slot_repr},
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
-    type t = {
-      published_level : Raw_level.t;
-      index : Slot_index.t;
-      header : Slot_header.t;
-    }
+    type id = {published_level : Raw_level.t; index : Slot_index.t}
+
+    type t = {id : id; header : Slot_header.t}
 
     val encoding : t Data_encoding.t
 

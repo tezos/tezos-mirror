@@ -89,11 +89,9 @@ end
 (** For Layer-1, a slot is described by the level at which it is published,
     the slot's index (in the list of slots), and the slot's header
     (KATE commitment hash). *)
-type t = {
-  published_level : Raw_level_repr.t;
-  index : Index.t;
-  header : Header.t;
-}
+type id = {published_level : Raw_level_repr.t; index : Index.t}
+
+type t = {id : id; header : Header.t}
 
 type slot = t
 

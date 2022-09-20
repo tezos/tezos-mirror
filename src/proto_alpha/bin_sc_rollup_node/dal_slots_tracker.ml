@@ -168,7 +168,7 @@ let confirmed_slots node_ctxt (Layer1.Head {hash; _} as head) =
 
 let save_confirmed_slot_headers node_ctxt hash slots_to_save =
   List.iter_s
-    (fun ({Dal.Slot.index; _} as slot) ->
+    (fun (Dal.Slot.{id = {index; _}; _} as slot) ->
       Store.Dal_confirmed_slots.add
         node_ctxt.Node_context.store
         ~primary_key:hash
@@ -262,7 +262,8 @@ module Confirmed_slots_history = struct
     let slots_to_save =
       let open Dal in
       List.fast_sort
-        (fun {Slot.index = a; _} {Slot.index = b; _} -> Slot_index.compare a b)
+        (fun Slot.{id = {index = a; _}; _} {id = {index = b; _}; _} ->
+          Slot_index.compare a b)
         slots_to_save
     in
     let*! pred = Layer1.predecessor store head in
