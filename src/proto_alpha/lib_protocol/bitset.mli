@@ -44,6 +44,13 @@ val mem : t -> int -> bool tzresult
     This functions returns [Invalid_input i] if [i] is negative. *)
 val add : t -> int -> t tzresult
 
+(** [from_list positions] folds [add] over the [positions] starting from [empty]. *)
+val from_list : int list -> t tzresult
+
+(** [inter field_l field_r] returns [field] which is result of the
+   logical "and" bit-wise from [field_l] and [field_r]. *)
+val inter : t -> t -> t
+
 (** [occupied_size_in_bits bitset] returns the current number of bits
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
