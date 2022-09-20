@@ -44,25 +44,6 @@ let ignore = {encode = (fun _backend _val _key tree -> Lwt.return tree)}
 
 let run backend {encode} value tree = encode backend value Fun.id tree
 
-let with_subtree get_subtree {encode} =
-  {
-    encode =
-      (fun backend value prefix input_tree ->
-        let open Lwt.Syntax in
-        match get_subtree value with
-        | Some tree ->
-            let* input_tree = Tree.remove backend input_tree (prefix []) in
-            let* input_tree =
-              Tree.add_tree
-                backend
-                input_tree
-                (prefix [])
-                (Tree.select backend tree)
-            in
-            encode backend value prefix input_tree
-        | None -> encode backend value prefix input_tree);
-  }
-
 let lwt {encode} =
   {
     encode =
@@ -143,10 +124,20 @@ let scope key {encode} =
 let lazy_mapping to_key enc_value =
   {
     encode =
-      (fun backend bindings prefix tree ->
+      (fun backend (origin, bindings) prefix tree ->
+        let open Lwt_syntax in
+        let* tree =
+          match origin with
+          | Some origin ->
+              Tree.add_tree
+                backend
+                tree
+                (prefix [])
+                (Tree.select backend origin)
+          | None -> return tree
+        in
         List.fold_left_s
           (fun tree (k, v) ->
-            let open Lwt_syntax in
             let key = append_key prefix (to_key k) in
             let* tree = Tree.remove backend tree (key []) in
             enc_value.encode backend v key tree)
