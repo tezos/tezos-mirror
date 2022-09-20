@@ -92,22 +92,32 @@ module Event = struct
   let section = ["node"; "main"]
 
   let cleaning_up_after_failure =
-    Internal_event.Simple.declare_1
+    declare_1
       ~section
       ~name:"cleaning_up_after_failure"
       ~msg:"cleaning up directory \"{directory}\" after failure."
-      ~level:Internal_event.Notice
+      ~level:Notice
       ("directory", Data_encoding.string)
 
   let export_unspecified_hash =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"export_unspecified_hash"
       ~msg:
         "There is no block hash specified with the `--block` option. Using the \
          last checkpoint as the default value"
-      ~level:Internal_event.Notice
+      ~level:Notice
       ()
+
+  let overriding_config_file_arg =
+    declare_1
+      ~section
+      ~name:"overriding_config_file_arg"
+      ~msg:
+        "the data directory from the --config-file argument was overridden by \
+         the given --data-dir path: {path}"
+      ~level:Warning
+      ("path", Data_encoding.string)
 end
 
 module Term = struct
@@ -166,10 +176,23 @@ module Term = struct
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let data_dir =
-        Option.value
-          args.Node_shared_arg.data_dir
-          ~default:Node_config_file.default_data_dir
+      let* config_file = Node_shared_arg.read_config_file args in
+      let* data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match args.Node_shared_arg.data_dir with
+        | Some data_dir ->
+            let*! () =
+              if
+                not
+                  (String.equal
+                     config_file.data_dir
+                     Node_config_file.default_data_dir)
+              then Event.(emit overriding_config_file_arg) data_dir
+              else Lwt.return_unit
+            in
+            return data_dir
+        | None -> return config_file.data_dir
       in
       let*! existing_data_dir = Lwt_unix.file_exists data_dir in
       let* node_config = Node_shared_arg.read_and_patch_config_file args in
