@@ -354,6 +354,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         in
         key_to_merkle_tree subtree key
 
+  let merkle_tree_v2 _ _ _ =
+    Base.failwith "merkle_tree_v2 not implemented on memory context"
+
   exception Context_dangling_hash = Tree.Context_dangling_hash
 
   include Tezos_context_helpers.Context.Make_proof (Store) (Conf)

@@ -545,6 +545,18 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
             let*! v = Context_ops.merkle_tree context leaf_kind path in
             return_some v
       else Lwt.fail Not_found) ;
+  register1 S.Context.merkle_tree_v2 (fun (chain_store, block) path query () ->
+      let*! o = Store.Block.context_opt chain_store block in
+      match o with
+      | None -> return_none
+      | Some context ->
+          let holey = Option.value ~default:false query#holey in
+          let leaf_kind =
+            let open Proof in
+            if holey then Hole else Raw_context
+          in
+          let*! v = Context_ops.merkle_tree_v2 context leaf_kind path in
+          return_some v) ;
   (* info *)
   register0 S.info (fun (chain_store, block) q () ->
       let chain_id = Store.Chain.chain_id chain_store in

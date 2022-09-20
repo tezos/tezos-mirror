@@ -27,6 +27,10 @@
 open Data_encoding
 module Proof = Tezos_context_sigs.Context.Proof_types
 
+(* TODO: V2.Tree32 has been chosen arbitrarily ; maybe it's not the best option *)
+module Merkle_proof_encoding =
+  Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
 let metadata_rpc_arg =
@@ -892,7 +896,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
 
-      let merkle_tree_path = RPC_path.(path / "merkle_tree")
+      let merkle_tree_v1_path = RPC_path.(path / "merkle_tree")
+
+      (* The duplication of the ["/merkle_tree"] RPC path is due to MR !5535.
+         This MR introduces a breaking change in the former [merkle_tree] RPC,
+         because it changes the data type it returns.
+         In order to avoid breaking clients that still use the old code,
+         we keep the old RPC at path ["/merkle_tree"], and introduce the new one
+         at path ["/merkle_tree_v2"].
+         Once we are sure that all clients have migrated to the new code, we will
+         1) duplicate the behaviour of ["/merkle_tree_v2"] onto ["/merkle_tree"],
+            and make the clients call ["/merkle_tree"],
+         2) once all clients have applied patch 1), remove ["/merkle_tree_v2"]
+            altogether. *)
+      let merkle_tree_v2_path = RPC_path.(path / "merkle_tree_v2")
 
       let context_path_arg : string RPC_arg.t =
         let name = "context_path" in
@@ -934,8 +951,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         RPC_service.get_service
           ~description:"Returns the merkle tree of a piece of context."
           ~query:merkle_tree_query
-          ~output:Data_encoding.(option merkle_tree_encoding)
-          RPC_path.(merkle_tree_path /:* context_path_arg)
+          ~output:(option merkle_tree_encoding)
+          RPC_path.(merkle_tree_v1_path /:* context_path_arg)
+
+      let merkle_tree_v2 =
+        RPC_service.get_service
+          ~description:"Returns the Irmin merkle tree of a piece of context."
+          ~query:merkle_tree_query
+          ~output:(option Merkle_proof_encoding.tree_proof_encoding)
+          RPC_path.(merkle_tree_v2_path /:* context_path_arg)
     end
 
     let info =
@@ -1517,7 +1541,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ()
 
     let merkle_tree ctxt =
-      let f = make_call1 S.merkle_tree ctxt in
+      let f = make_call1 S.merkle_tree_v2 ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) ?holey path ->
         f
           chain

@@ -709,6 +709,17 @@ module type TEZOS_CONTEXT = sig
   val merkle_tree :
     t -> Proof_types.merkle_leaf_kind -> key -> Proof_types.merkle_tree Lwt.t
 
+  (** [merkle_tree_v2 t leaf_kind key] returns an Irmin Merkle proof for [key] (i.e.
+    a proof that *something* is in the context at [key]).
+    The proof is supposed to be produced by Irmin's [produce_proof], and consumed
+    by Irmin's [verify_proof]. The value embedded in the proof depends on [leaf_kind].
+    If [leaf_kind] is [Block_services.Raw_context], the embeded value is the complete
+    subtree in the context at [key].
+    If [leaf_kind] is [Block_services.Hole], the embedded value is the hash of the
+    subtree described above. *)
+  val merkle_tree_v2 :
+    t -> Proof_types.merkle_leaf_kind -> key -> Proof.tree Proof.t Lwt.t
+
   (** {2 Accessing and Updating Versions} *)
 
   val exists : index -> Context_hash.t -> bool Lwt.t

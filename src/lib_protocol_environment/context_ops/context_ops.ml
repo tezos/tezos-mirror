@@ -234,6 +234,15 @@ let merkle_tree (context : Environment_context.t) leaf_kind path =
   | Context t ->
       err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
 
+let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
+  match context with
+  | Context {kind = Shell_context.Context; ctxt; _} ->
+      Context.merkle_tree_v2 ctxt leaf_kind path
+  | Context {kind = Memory_context.Context; ctxt; _} ->
+      Tezos_context_memory.Context.merkle_tree_v2 ctxt leaf_kind path
+  | Context t ->
+      err_implementation_mismatch ~expected:"shell or memory" ~got:t.impl_name
+
 let commit_genesis context_index ~chain_id ~time ~protocol =
   match context_index with
   | Disk_index index -> Context.commit_genesis index ~chain_id ~time ~protocol

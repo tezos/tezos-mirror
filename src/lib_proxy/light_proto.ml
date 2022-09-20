@@ -25,10 +25,12 @@
 
 (* Module implemented in the protocol *)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 module type PROTO_RPCS = sig
   val merkle_tree :
     Proxy.proxy_getter_input ->
     Tezos_protocol_environment.Proxy_context.M.key ->
-    Tezos_context_sigs.Context.Proof_types.merkle_leaf_kind ->
-    Tezos_context_sigs.Context.Proof_types.merkle_tree option tzresult Lwt.t
+    Proof.merkle_leaf_kind ->
+    Proof.tree Proof.t option tzresult Lwt.t
 end

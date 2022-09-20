@@ -338,7 +338,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?block:block ->
       ?holey:bool ->
       string list ->
-      Proof.merkle_tree option tzresult Lwt.t
+      Proof.tree Proof.t option tzresult Lwt.t
   end
 
   module Helpers : sig
@@ -630,6 +630,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < holey : bool option >,
           unit,
           Proof.merkle_tree option )
+        RPC_service.t
+
+      val merkle_tree_v2 :
+        ( [`GET],
+          prefix,
+          prefix * string list,
+          < holey : bool option >,
+          unit,
+          Proof.tree Proof.t option )
         RPC_service.t
     end
 
