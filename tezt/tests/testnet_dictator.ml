@@ -100,9 +100,9 @@ let init_with_dictator ~chain_id ~protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       [
-        (["blocks_per_cycle"], `Float 4.);
-        (["cycles_per_voting_period"], `Float 1.);
-        (["nonce_revelation_threshold"], `Float 3.);
+        (["blocks_per_cycle"], `Int 4);
+        (["cycles_per_voting_period"], `Int 1);
+        (["nonce_revelation_threshold"], `Int 3);
         (["testnet_dictator"], `String dictator.public_key_hash);
       ]
   in

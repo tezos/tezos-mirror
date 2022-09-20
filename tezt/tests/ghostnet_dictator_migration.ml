@@ -77,14 +77,11 @@ let init chain_id ~from_protocol ~to_protocol =
   let* node = Node.init ?patch_config [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node) () in
   let parameters =
-    [
-      (["blocks_per_cycle"], `Float 4.);
-      (["cycles_per_voting_period"], `Float 2.);
-    ]
+    [(["blocks_per_cycle"], `Int 4); (["cycles_per_voting_period"], `Int 2)]
   in
   let parameters =
     if Protocol.number from_protocol >= 014 then
-      parameters @ [(["nonce_revelation_threshold"], `Float 2.)]
+      parameters @ [(["nonce_revelation_threshold"], `Int 2)]
     else parameters
   in
   let* parameter_file =

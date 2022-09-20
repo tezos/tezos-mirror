@@ -82,7 +82,7 @@ type sc_rollup_constants = {
 
 let make_parameter name = function
   | None -> []
-  | Some value -> [([name], `Float (float value))]
+  | Some value -> [([name], `Int value)]
 
 let regression_test ~executors ~__FILE__ ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in

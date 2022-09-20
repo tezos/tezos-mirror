@@ -152,7 +152,7 @@ let commit_doesnt_exit = "Commitment scc\\w+\\sdoes not exist"
 
 let make_parameter name = function
   | None -> []
-  | Some value -> [([name], `Float (float value))]
+  | Some value -> [([name], `Int value)]
 
 let test ~__FILE__ ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in

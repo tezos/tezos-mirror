@@ -1245,9 +1245,7 @@ let register protocols =
         sub_group
         protocols
     in
-    let consensus_threshold _protocol =
-      [(["consensus_threshold"], `Float 0.)]
-    in
+    let consensus_threshold _protocol = [(["consensus_threshold"], `Int 0)] in
     check_rpc_regression
       "contracts"
       ~test_function:test_contracts
@@ -1265,19 +1263,19 @@ let register protocols =
           (* We need nonce_revelation_threshold < blocks_per_cycle for sanity
              checks *)
           [
-            (["blocks_per_cycle"], `Float 4.);
-            (["cycles_per_voting_period"], `Float 1.);
-            (["nonce_revelation_threshold"], `Float 3.);
+            (["blocks_per_cycle"], `Int 4);
+            (["cycles_per_voting_period"], `Int 1);
+            (["nonce_revelation_threshold"], `Int 3);
           ]
         else if Protocol.number protocol >= 13 then
           [
-            (["blocks_per_cycle"], `Float 4.);
-            (["cycles_per_voting_period"], `Float 1.);
+            (["blocks_per_cycle"], `Int 4);
+            (["cycles_per_voting_period"], `Int 1);
           ]
         else
           [
-            (["blocks_per_cycle"], `Float 4.);
-            (["blocks_per_voting_period"], `Float 4.);
+            (["blocks_per_cycle"], `Int 4);
+            (["blocks_per_voting_period"], `Int 4);
           ]
           @ consensus_threshold protocol) ;
     check_rpc_regression

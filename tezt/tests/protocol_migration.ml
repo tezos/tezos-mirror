@@ -221,7 +221,7 @@ let start_protocol ?consensus_threshold ?round_duration
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       [
-        (["consensus_threshold"], `Float (float consensus_threshold));
+        (["consensus_threshold"], `Int consensus_threshold);
         (["minimal_block_delay"], `String (string_of_int minimal_block_delay));
       ]
   in

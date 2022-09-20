@@ -37,7 +37,7 @@ let hooks = Tezos_regression.hooks
    They should be moved to a common submodule. *)
 let make_int_parameter name = function
   | None -> []
-  | Some value -> [(name, `Float (float value))]
+  | Some value -> [(name, `Int value)]
 
 let make_bool_parameter name = function
   | None -> []

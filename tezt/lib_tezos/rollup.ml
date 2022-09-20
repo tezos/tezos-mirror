@@ -491,14 +491,8 @@ module Tx_rollup = struct
     let parameter_file ?(parameters = default) protocol =
       let args =
         [(["tx_rollup_enable"], `Bool true)]
-        @ [
-            ( ["tx_rollup_finality_period"],
-              `Float (float parameters.finality_period) );
-          ]
-        @ [
-            ( ["tx_rollup_withdraw_period"],
-              `Float (float parameters.withdraw_period) );
-          ]
+        @ [(["tx_rollup_finality_period"], `Int parameters.finality_period)]
+        @ [(["tx_rollup_withdraw_period"], `Int parameters.withdraw_period)]
       in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
   end

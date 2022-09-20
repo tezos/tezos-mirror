@@ -504,7 +504,7 @@ let wrong_branch_operation_dismissal =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, None))
       [
-        (["consensus_threshold"], `Float 1.);
+        (["consensus_threshold"], `Int 1);
         (["minimal_block_delay"], `String (string_of_int minimal_block_delay));
         (["delay_increment_per_round"], `String "1");
       ]
