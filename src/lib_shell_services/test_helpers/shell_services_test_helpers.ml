@@ -108,3 +108,62 @@ let merkle_tree_gen =
     merkle_node_gen
 
 let print_merkle_tree = Format.asprintf "%a" Proof.pp_merkle_tree
+
+module Store = Tezos_context_memory.Context
+
+let empty = Tezos_context_memory.make_empty_context ()
+
+(* Stolen from src/lib_proxy/test/test_fuzzing_light.ml *)
+let irmin_tree_gen =
+  let open QCheck2.Gen in
+  let+ entries =
+    (* we want the list of entries to be nonempty, hence the "+1" *)
+    list_size
+      (map (( + ) 1) small_nat)
+      (pair (small_list (small_string ~gen:char)) small_bytes_gen)
+  in
+  let tree =
+    List.fold_left_s
+      (fun built_tree (path, bytes) -> Store.Tree.add built_tree path bytes)
+      (Store.Tree.empty empty)
+      entries
+    |> Lwt_main.run
+  in
+  (tree, entries)
+
+let ( let** ) = Lwt_syntax.( let* )
+
+let merkle_proof_gen =
+  let open QCheck2.Gen in
+  let* tree, entries = irmin_tree_gen and* root = small_string ~gen:char in
+  let store =
+    (let** store = Store.add_tree empty [root] tree in
+     let** _ = Store.commit ~time:Time.Protocol.epoch store in
+     Lwt.return store)
+    |> Lwt_main.run
+  in
+  match Store.Tree.kinded_key tree with
+  | None ->
+      raise
+        (Invalid_argument
+           "In-memory context.tree has no kinded_key after commit")
+  | Some kinded_key ->
+      let* path = map fst @@ oneofl entries in
+      let proof, _ =
+        Store.produce_tree_proof
+          (Store.index store)
+          kinded_key
+          (let open Lwt_syntax in
+          fun t ->
+            let* _ = Store.Tree.find t path in
+            return (t, ()))
+        |> Lwt_main.run
+      in
+      return (proof, tree, path)
+
+let print_merkle_proof (_, tree, path) =
+  Format.asprintf
+    "<Merkle proof> on tree\n%a\nwith path %s"
+    Store.Tree.pp
+    tree
+    (String.concat ";" path)

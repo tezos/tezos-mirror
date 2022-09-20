@@ -164,6 +164,9 @@ val string_fixed : int -> string QCheck2.Gen.t
 (** [bytes_gen] is a [QCheck2.Gen.t] for [bytes]. *)
 val bytes_gen : bytes QCheck2.Gen.t
 
+(** [small_bytes_gen] is a [QCheck2.Gen.t] for [bytes] of small size. *)
+val small_bytes_gen : bytes QCheck2.Gen.t
+
 (** [bytes_fixed_gen n] is a [QCheck2.Gen.t] for [bytes] of length [n]. *)
 val bytes_fixed_gen : int -> bytes QCheck2.Gen.t
 
