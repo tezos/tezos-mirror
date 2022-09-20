@@ -1051,9 +1051,9 @@ let loser_of_results ~alice_result ~bob_result =
 
 let play ~stakers game refutation =
   let open Lwt_tzresult_syntax in
-  let mk_loser reason loser =
+  let mk_loser loser =
     let loser = Index.staker stakers loser in
-    Either.Left (Loser {loser; reason})
+    Either.Left (Loser {loser; reason = Conflict_resolved})
   in
   match (refutation.step, game.game_state) with
   | Dissection states, Dissecting {dissection; default_number_of_sections} ->
@@ -1088,8 +1088,7 @@ let play ~stakers game refutation =
       let*! player_result =
         validity_first_final_move ~proof ~game ~start_chunk ~stop_chunk
       in
-      if player_result then
-        return @@ mk_loser Conflict_resolved (opponent game.turn)
+      if player_result then return @@ mk_loser (opponent game.turn)
       else
         let new_game_state =
           let agreed_start_chunk = start_chunk in
@@ -1118,7 +1117,7 @@ let play ~stakers game refutation =
         (* If we play when the final move started, the opponent provided
            a invalid proof. So if the defender manages to provide a valid
            proof, he wins. *)
-        return @@ mk_loser Conflict_resolved (opponent game.turn)
+        return @@ mk_loser (opponent game.turn)
       else return (Either.Left Draw)
 
 module Internal_for_tests = struct
