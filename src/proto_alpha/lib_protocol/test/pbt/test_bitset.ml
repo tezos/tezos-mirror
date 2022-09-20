@@ -37,13 +37,8 @@ let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
 
 let gen_storage =
   let open QCheck2.Gen in
-  let* bool_vector = list bool in
-  match
-    List.fold_left_i_e
-      (fun i storage v -> if v then add storage i else Ok storage)
-      empty
-      bool_vector
-  with
+  let* int_vector = list @@ int_bound 64 in
+  match from_list int_vector with
   | Ok v -> return v
   | Error e ->
       Alcotest.failf
@@ -70,6 +65,46 @@ let test_get_set (c, ofs) =
       | Ok res -> res)
     (0 -- 63)
 
+let test_inter (c1, c2) =
+  let c3 = inter c1 c2 in
+  List.for_all
+    (fun ofs ->
+      let res =
+        let open Result_syntax in
+        let* v1 = mem c1 ofs in
+        let* v2 = mem c2 ofs in
+        let* v3 = mem c3 ofs in
+        return ((v1 && v2) = v3)
+      in
+      match res with
+      | Error e ->
+          Alcotest.failf
+            "Unexpected error: %a"
+            Environment.Error_monad.pp_trace
+            e
+      | Ok res -> res)
+    (0 -- 63)
+
+let test_diff (c1, c2) =
+  let c3 = diff c1 c2 in
+  List.for_all
+    (fun ofs ->
+      let res =
+        let open Result_syntax in
+        let* v1 = mem c1 ofs in
+        let* v2 = mem c2 ofs in
+        let* v3 = mem c3 ofs in
+        return ((v1 && not v2) = v3)
+      in
+      match res with
+      | Error e ->
+          Alcotest.failf
+            "Unexpected error: %a"
+            Environment.Error_monad.pp_trace
+            e
+      | Ok res -> res)
+    (0 -- 63)
+
 let () =
   Alcotest.run
     "bits"
@@ -82,5 +117,15 @@ let () =
               ~name:"get set"
               QCheck2.Gen.(pair gen_storage gen_ofs)
               test_get_set;
+            QCheck2.Test.make
+              ~count:10000
+              ~name:"inter"
+              QCheck2.Gen.(pair gen_storage gen_storage)
+              test_inter;
+            QCheck2.Test.make
+              ~count:10000
+              ~name:"diff"
+              QCheck2.Gen.(pair gen_storage gen_storage)
+              test_diff;
           ] );
     ]

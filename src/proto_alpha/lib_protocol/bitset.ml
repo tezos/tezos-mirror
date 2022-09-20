@@ -43,6 +43,8 @@ let from_list positions = List.fold_left_e add empty positions
 
 let inter = Z.logand
 
+let diff b1 b2 = Z.logand b1 (Z.lognot b2)
+
 let () =
   let open Data_encoding in
   register_error_kind
