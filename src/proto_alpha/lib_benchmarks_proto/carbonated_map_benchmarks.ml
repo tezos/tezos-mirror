@@ -121,7 +121,7 @@ module Fold_benchmark : Benchmark.S = struct
     in
     let workload = {size = M.size map} in
     let closure () =
-      ignore @@ M.fold ctxt (fun ctxt _ _ _ -> ok ((), ctxt)) () map
+      ignore @@ M.fold_e ctxt (fun ctxt _ _ _ -> ok ((), ctxt)) () map
     in
     Generator.Plain {workload; closure}
 

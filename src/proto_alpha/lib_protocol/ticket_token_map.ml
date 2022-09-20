@@ -31,7 +31,7 @@ module Ticket_token_map =
     (struct
       type context = Alpha_context.context
 
-      let consume = Alpha_context.Gas.consume
+      let consume = Gas.consume
     end)
     (struct
       type t = Ticket_hash.t
@@ -69,7 +69,7 @@ let update ctxt key f m =
   Ticket_token_map.update ctxt key_hash f m |> Lwt.return
 
 let fold ctxt f =
-  Ticket_token_map.fold ctxt (fun ctxt acc _key_hash (tkn, value) ->
+  Ticket_token_map.fold_e ctxt (fun ctxt acc _key_hash (tkn, value) ->
       f ctxt acc tkn value)
 
 let find ctxt ticket_token map =
@@ -99,7 +99,7 @@ let of_list ctxt ~merge_overlap token_values =
     token_values
 
 let map ctxt f =
-  Ticket_token_map.map ctxt (fun ctxt _key (tkn, value) ->
+  Ticket_token_map.map_e ctxt (fun ctxt _key (tkn, value) ->
       f ctxt tkn value >|? fun (new_value, ctxt) -> ((tkn, new_value), ctxt))
 
 let to_list ctxt map =
@@ -112,3 +112,41 @@ let to_list ctxt map =
 
 let merge ctxt ~merge_overlap =
   Ticket_token_map.merge ctxt ~merge_overlap:(lift_merge_overlap merge_overlap)
+
+let to_ticket_receipt ctxt ~owner ticket_token_map =
+  let open Lwt_result_syntax in
+  Ticket_token_map.fold_es
+    ctxt
+    (fun ctxt acc _ticket_hash (ex_ticket, amount) ->
+      if Z.(equal amount zero) then return (acc, ctxt)
+      else
+        let (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
+          ex_ticket
+        in
+        let loc = Micheline.dummy_location in
+        let* contents, ctxt =
+          Script_ir_unparser.unparse_comparable_data
+            ~loc
+            ctxt
+            Script_ir_unparser.Optimized_legacy
+            contents_type
+            contents
+        in
+        let*? ty_unstripped, ctxt =
+          Script_ir_unparser.unparse_ty ~loc ctxt contents_type
+        in
+        let*? ctxt =
+          Gas.consume ctxt (Script.strip_annotations_cost ty_unstripped)
+        in
+        let ty = Script.strip_annotations ty_unstripped in
+        let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost ty) in
+        let contents_type = Micheline.strip_locations ty in
+        let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost contents) in
+        let contents = Micheline.strip_locations contents in
+        let ticket_token = Ticket_receipt.{ticketer; contents_type; contents} in
+        let update =
+          Ticket_receipt.{ticket_token; updates = [{account = owner; amount}]}
+        in
+        return (update :: acc, ctxt))
+    []
+    ticket_token_map

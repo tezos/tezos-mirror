@@ -130,6 +130,7 @@
   Migration_repr
   Carbonated_map_costs
   Carbonated_map
+  Ticket_receipt_repr
   Raw_context_intf
   Raw_context
   Storage_costs
@@ -390,6 +391,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -631,6 +633,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -877,6 +880,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli

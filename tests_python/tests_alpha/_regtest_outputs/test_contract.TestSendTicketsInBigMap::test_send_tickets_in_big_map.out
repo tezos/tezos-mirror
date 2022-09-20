@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestSendTicketsInBigMap::test_send_tickets_in_big_map
 
 Node is bootstrapped.
-Estimated gas: 100150.481 units (will add 100 for safety)
+Estimated gas: 100150.713 units (will add 100 for safety)
 Estimated storage: 10767 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -130,7 +130,7 @@ This sequence of operations was run:
         Set temp(1)[40] to (Pair 0x019712e28563749c441ac346e7b697488f68059a2300 (Pair "BLUE" 1))
       Storage size: 320 bytes
       Paid storage size diff: 67 bytes
-      Consumed gas: 50529.311
+      Consumed gas: 50529.411
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.01675
         storage fees ........................... +ꜩ0.01675
@@ -147,9 +147,15 @@ This sequence of operations was run:
             Copy temp(1) to map(5)
           Storage size: 10783 bytes
           Paid storage size diff: 10700 bytes
-          Consumed gas: 49621.170
+          Consumed gas: 49621.302
           Balance updates:
             [CONTRACT_HASH] ... -ꜩ2.675
             storage fees ........................... +ꜩ2.675
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "BLUE"
+            Account updates:
+              [CONTRACT_HASH] ... +100
 
 Injected block at minimal timestamp

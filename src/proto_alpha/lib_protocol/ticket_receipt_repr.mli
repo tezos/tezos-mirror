@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** A module for representing the increase/decrease of tickets in the storage.
+    It will be used to display ticket update information in the operation receipt. *)
 
-type ex_token =
-  | Ex_token : {
-      ticketer : Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+(** Represents that [account]'s storage has delta [amount] for a given ticket *)
+type update = {account : Destination_repr.t; amount : Z.t}
 
-let token_and_amount_of_ex_ticket
-    (Ticket_scanner.Ex_ticket
-      (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
-  (Ex_token {ticketer; contents_type; contents}, amount)
+(** A ticket token *)
+type ticket_token = {
+  ticketer : Contract_repr.t;
+  contents_type : Script_repr.expr;
+  contents : Script_repr.expr;
+}
+
+(** List of updates for a [ticket]  *)
+type item = {ticket_token : ticket_token; updates : update list}
+
+(** A list of ticket tokens and their corresponding updates *)
+type t = item list
+
+val item_encoding : item Data_encoding.t
+
+val encoding : t Data_encoding.t

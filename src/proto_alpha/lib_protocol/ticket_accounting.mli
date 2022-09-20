@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
+
 (** [ticket_diffs ctxt ~arg_type_has_tickets ~storage_type_has_tickets arg
        old_storage new_storage lazy_storage_diff] returns a map from
     ticket-tokens to balance-differences that represents the change in balance
@@ -33,16 +35,17 @@
     avoids traversing the lazy part of the storage.
 *)
 val ticket_diffs :
-  Alpha_context.context ->
+  context ->
+  self_contract:Contract.t ->
   arg_type_has_tickets:'arg Ticket_scanner.has_tickets ->
   storage_type_has_tickets:'storage Ticket_scanner.has_tickets ->
   arg:'arg ->
   old_storage:'storage ->
   new_storage:'storage ->
-  lazy_storage_diff:Alpha_context.Lazy_storage.diffs_item list ->
-  (Z.t Ticket_token_map.t * Alpha_context.t) tzresult Lwt.t
+  lazy_storage_diff:Lazy_storage.diffs_item list ->
+  (Z.t Ticket_token_map.t * Ticket_receipt.t * context) tzresult Lwt.t
 
-(** [update_ticket_balances ctxt self ~ticket_diffs operations] updates the
+(** [update_ticket_balances ctxt ~self_contract ~ticket_diffs operations] updates the
     ticket balances according to the [ticket_diffs] map and the set of
     operations. The function also returns the storage size diff resulting from
     updating the ticket-balance table in the context.
@@ -56,8 +59,8 @@ val ticket_diffs :
     ticket-tokens.
 *)
 val update_ticket_balances :
-  Alpha_context.context ->
-  self:Alpha_context.Contract.t ->
+  context ->
+  self_contract:Contract.t ->
   ticket_diffs:Z.t Ticket_token_map.t ->
   Script_typed_ir.packed_internal_operation list ->
-  (Z.t * Alpha_context.t) tzresult Lwt.t
+  (Z.t * context) tzresult Lwt.t

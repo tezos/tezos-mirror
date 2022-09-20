@@ -238,6 +238,8 @@ RPC Changes
 Operation receipts
 ------------------
 
+- Added ``ticket_updates`` field that represents the increase/decrease of tickets in the storage. (MR :gl:`!6267`)
+
 Bug Fixes
 ---------
 

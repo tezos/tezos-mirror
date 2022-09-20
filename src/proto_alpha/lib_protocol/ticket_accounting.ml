@@ -106,7 +106,7 @@ let invalid_ticket_transfer_error
     ~amount =
   Invalid_ticket_transfer {ticketer = Contract.to_b58check ticketer; amount}
 
-let update_ticket_balances_for_self_contract ctxt ~self ticket_diffs =
+let update_ticket_balances_for_self_contract ctxt ~self_contract ticket_diffs =
   List.fold_left_es
     (fun (total_storage_diff, ctxt) (ticket_token, amount) ->
       (* Diff is valid iff either:
@@ -114,7 +114,7 @@ let update_ticket_balances_for_self_contract ctxt ~self ticket_diffs =
          - the ticket-token was created by the [self] contract. *)
       let is_valid_balance_update =
         let (Ticket_token.Ex_token {ticketer; _}) = ticket_token in
-        Compare.Z.(amount <= Z.zero) || Contract.equal ticketer self
+        Compare.Z.(amount <= Z.zero) || Contract.equal ticketer self_contract
       in
       error_unless
         is_valid_balance_update
@@ -124,7 +124,7 @@ let update_ticket_balances_for_self_contract ctxt ~self ticket_diffs =
         ctxt
         ~total_storage_diff
         ticket_token
-        [(Destination.Contract self, amount)])
+        [(Destination.Contract self_contract, amount)])
     (Z.zero, ctxt)
     ticket_diffs
 
@@ -159,13 +159,16 @@ let ticket_diffs_of_lazy_storage_diff ctxt ~storage_type_has_tickets
    - [arg_tickets] the amount I of ticket-tokens contained in the incoming
      arguments.
 
-    Calculating the spending budget:
-     - additions = new_storage_strict + lazy_storage_diff
-     - subtractions = old_storage_strict + arg_tickets
-     - delta = additions - subtractions
+    We calculate the ticket diff as the following:
+    [new_storage_strict] + [lazy_storage_diff] - ([old_storage_strict] + [arg_tickets])
+
+    Additionally, we calculate the ticket receipt as below.
+    We do not subtract the [arg_tickets] since we only want to display the tickets updated in storage for the receipt.
+    [new_storage_strict] + [lazy_storage_diff] - [storage_strict]
  *)
-let ticket_diffs ctxt ~arg_type_has_tickets ~storage_type_has_tickets ~arg
-    ~old_storage ~new_storage ~lazy_storage_diff =
+let ticket_diffs ctxt ~self_contract ~arg_type_has_tickets
+    ~storage_type_has_tickets ~arg ~old_storage ~new_storage ~lazy_storage_diff
+    =
   (* Collect ticket-token balances of the incoming parameters. *)
   ticket_balances_of_value ctxt ~include_lazy:true arg_type_has_tickets arg
   >>=? fun (arg_tickets, ctxt) ->
@@ -186,18 +189,22 @@ let ticket_diffs ctxt ~arg_type_has_tickets ~storage_type_has_tickets ~arg
     storage_type_has_tickets
     new_storage
   >>=? fun (new_storage_strict, ctxt) ->
-  (* Subtractions *)
-  Ticket_token_map.add ctxt old_storage_strict arg_tickets
-  >>?= fun (subtractions, ctxt) ->
-  (* Additions *)
   Ticket_token_map.add ctxt new_storage_strict lazy_storage_diff
   >>?= fun (additions, ctxt) ->
-  Lwt.return (Ticket_token_map.sub ctxt additions subtractions)
+  Ticket_token_map.sub ctxt additions old_storage_strict
+  >>?= fun (total_storage_diff, ctxt) ->
+  Ticket_token_map.sub ctxt total_storage_diff arg_tickets
+  >>?= fun (diff, ctxt) ->
+  Ticket_token_map.to_ticket_receipt
+    ctxt
+    ~owner:Destination.(Contract self_contract)
+    total_storage_diff
+  >>=? fun (ticket_receipt, ctxt) -> return (diff, ticket_receipt, ctxt)
 
-let update_ticket_balances ctxt ~self ~ticket_diffs operations =
+let update_ticket_balances ctxt ~self_contract ~ticket_diffs operations =
   let validate_spending_budget ctxt
       (Ticket_token.Ex_token {ticketer; _} as ticket_token) amount =
-    if Contract.equal ticketer self then
+    if Contract.equal ticketer self_contract then
       (* It's okay to send any amount of ticket-tokens minted by the current
          contract (self). Hence tickets stored by their ticketer are not
          stored in the ticket table and don't need to be updated here. *)
@@ -222,7 +229,7 @@ let update_ticket_balances ctxt ~self ~ticket_diffs operations =
   >>=? fun (ticket_op_diffs, ctxt) ->
   (* Update balances for self-contract. *)
   Ticket_token_map.to_list ctxt ticket_diffs >>?= fun (ticket_diffs, ctxt) ->
-  update_ticket_balances_for_self_contract ctxt ~self ticket_diffs
+  update_ticket_balances_for_self_contract ctxt ~self_contract ticket_diffs
   >>=? fun (total_storage_diff, ctxt) ->
   (* Update balances for operations. *)
   List.fold_left_es

@@ -311,9 +311,10 @@ module Manager_result = struct
         case
           ~title:"To_contract"
           (Tag 0)
-          (obj8
+          (obj9
              (opt "storage" Script.expr_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft "ticket_updates" Ticket_receipt.encoding [])
              (dft "originated_contracts" (list Contract.originated_encoding) [])
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
              (dft "storage_size" z Z.zero)
@@ -326,6 +327,7 @@ module Manager_result = struct
                   storage;
                   lazy_storage_diff;
                   balance_updates;
+                  ticket_receipt;
                   originated_contracts;
                   consumed_gas;
                   storage_size;
@@ -335,6 +337,7 @@ module Manager_result = struct
                 Some
                   ( storage,
                     balance_updates,
+                    ticket_receipt,
                     originated_contracts,
                     consumed_gas,
                     storage_size,
@@ -344,6 +347,7 @@ module Manager_result = struct
             | _ -> None)
           (fun ( storage,
                  balance_updates,
+                 ticket_receipt,
                  originated_contracts,
                  consumed_gas,
                  storage_size,
@@ -355,6 +359,7 @@ module Manager_result = struct
                 storage;
                 lazy_storage_diff;
                 balance_updates;
+                ticket_receipt;
                 originated_contracts;
                 consumed_gas;
                 storage_size;

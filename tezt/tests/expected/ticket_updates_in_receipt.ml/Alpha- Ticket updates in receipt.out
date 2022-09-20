@@ -1,0 +1,92 @@
+
+./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '(Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")'
+Node is bootstrapped.
+Estimated gas: 10481.100 units (will add 100 for safety)
+Estimated storage: 475 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.001397
+    Expected counter: 1
+    Gas limit: 10582
+    Storage limit: 495 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001397
+      payload fees(the block proposer) ....... +ꜩ0.001397
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Parameter: (Pair "[CONTRACT_HASH]" "[CONTRACT_HASH]")
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "red" 1) ;
+          Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "green" 1) ;
+          Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "green" 1) }
+      Storage size: 395 bytes
+      Paid storage size diff: 325 bytes
+      Consumed gas: 3987.585
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.08125
+        storage fees ........................... +ꜩ0.08125
+      Ticket updates:
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "green"
+        Account updates:
+          [CONTRACT_HASH] ... +2
+        Ticketer: [CONTRACT_HASH]
+        Content type: string
+        Content: "red"
+        Account updates:
+          [CONTRACT_HASH] ... +1
+      Internal operations:
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Parameter: (Pair (Pair (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1))
+                                 (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+                           0x015570d4b9f049e3b1bebbc7b6ffc8b3fcd0efe35100)
+          This transaction was successfully applied
+          Updated storage:
+            (Some (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+          Storage size: 169 bytes
+          Paid storage size diff: 108 bytes
+          Consumed gas: 3709.242
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.027
+            storage fees ........................... +ꜩ0.027
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "blue"
+            Account updates:
+              [CONTRACT_HASH] ... +1
+        Internal Transaction:
+          Amount: ꜩ0
+          From: [CONTRACT_HASH]
+          To: [CONTRACT_HASH]
+          Parameter: (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1))
+          This transaction was successfully applied
+          Updated storage:
+            (Some (Pair 0x01313088690ba799685c0c12d680956c2f2cb3278400 (Pair "blue" 1)))
+          Storage size: 88 bytes
+          Paid storage size diff: 42 bytes
+          Consumed gas: 2785.606
+          Balance updates:
+            [PUBLIC_KEY_HASH] ... -ꜩ0.0105
+            storage fees ........................... +ꜩ0.0105
+          Ticket updates:
+            Ticketer: [CONTRACT_HASH]
+            Content type: string
+            Content: "blue"
+            Account updates:
+              [CONTRACT_HASH] ... +1
+

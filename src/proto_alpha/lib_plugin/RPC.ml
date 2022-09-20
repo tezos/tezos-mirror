@@ -1066,6 +1066,7 @@ module Scripts = struct
                      operations;
                      lazy_storage_diff;
                      ticket_diffs = _;
+                     ticket_receipt = _;
                    },
                    _ ) ->
         ( storage,
@@ -1137,6 +1138,7 @@ module Scripts = struct
                        operations;
                        lazy_storage_diff;
                        ticket_diffs = _;
+                       ticket_receipt = _;
                      },
                      _ctxt ),
                    trace ) ->
@@ -1232,6 +1234,7 @@ module Scripts = struct
                      storage = _;
                      lazy_storage_diff = _;
                      ticket_diffs = _;
+                     ticket_receipt = _;
                    },
                    _ctxt ) ->
         Lwt.return
@@ -1335,6 +1338,7 @@ module Scripts = struct
                      storage;
                      lazy_storage_diff = _;
                      ticket_diffs = _;
+                     ticket_receipt = _;
                    },
                    _ctxt ) ->
         View_helpers.extract_value_from_storage storage >>?= fun value ->

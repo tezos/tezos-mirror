@@ -282,11 +282,15 @@ let assert_tx_rollup_feature_enabled ctxt =
 let assert_sc_rollup_feature_enabled ctxt =
   error_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
-let update_script_storage_and_ticket_balances ctxt ~self storage
+let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
-  Contract.update_script_storage ctxt self storage lazy_storage_diff
+  Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
-  Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
+  Ticket_accounting.update_ticket_balances
+    ctxt
+    ~self_contract
+    ~ticket_diffs
+    operations
 
 let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Contract.Delegate.set ctxt source delegate >|=? fun ctxt ->
@@ -311,6 +315,7 @@ let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~before_operation =
         storage = None;
         lazy_storage_diff = None;
         balance_updates;
+        ticket_receipt = [];
         originated_contracts = [];
         consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
         storage_size = Z.zero;
@@ -381,11 +386,12 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                    lazy_storage_diff;
                    operations;
                    ticket_diffs;
+                   ticket_receipt;
                  },
                  ctxt ) ->
       update_script_storage_and_ticket_balances
         ctxt
-        ~self:contract
+        ~self_contract:contract
         storage
         lazy_storage_diff
         ticket_diffs
@@ -413,6 +419,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                 storage = Some storage;
                 lazy_storage_diff;
                 balance_updates;
+                ticket_receipt;
                 originated_contracts;
                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                 storage_size = new_size;
@@ -1481,6 +1488,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               storage = payload.storage;
               lazy_storage_diff = payload.lazy_storage_diff;
               balance_updates;
+              ticket_receipt = payload.ticket_receipt;
               originated_contracts = payload.originated_contracts;
               consumed_gas = payload.consumed_gas;
               storage_size = payload.storage_size;
@@ -2395,6 +2403,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                         lazy_storage_diff;
                         operations;
                         ticket_diffs;
+                        ticket_receipt;
                       },
                       ctxt ) ->
            match operations with
@@ -2405,7 +2414,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                (* update CPMM storage *)
                update_script_storage_and_ticket_balances
                  ctxt
-                 ~self:liquidity_baking_cpmm_contract
+                 ~self_contract:liquidity_baking_cpmm_contract
                  storage
                  lazy_storage_diff
                  ticket_diffs
@@ -2436,6 +2445,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                         storage = Some storage;
                         lazy_storage_diff;
                         balance_updates;
+                        ticket_receipt;
                         (* At this point in application the
                            origination nonce has not been initialized
                            so it's not possible to originate new

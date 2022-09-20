@@ -104,6 +104,7 @@
         "Migration_repr",
         "Carbonated_map_costs",
         "Carbonated_map",
+        "Ticket_receipt_repr",
 
         "Raw_context_intf",
         "Raw_context",

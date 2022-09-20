@@ -128,6 +128,7 @@ type successful_transaction_result =
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
+      ticket_receipt : Ticket_receipt.t;
       originated_contracts : Contract_hash.t list;
       consumed_gas : Gas.Arith.fp;
       storage_size : Z.t;
@@ -220,9 +221,10 @@ module Internal_operation = struct
         case
           ~title:"To_contract"
           (Tag 0)
-          (obj8
+          (obj9
              (opt "storage" Script.expr_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft "ticket_receipt" Ticket_receipt.encoding [])
              (dft "originated_contracts" (list Contract.originated_encoding) [])
              (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
              (dft "storage_size" z Z.zero)
@@ -235,6 +237,7 @@ module Internal_operation = struct
                   storage;
                   lazy_storage_diff;
                   balance_updates;
+                  ticket_receipt;
                   originated_contracts;
                   consumed_gas;
                   storage_size;
@@ -244,6 +247,7 @@ module Internal_operation = struct
                 Some
                   ( storage,
                     balance_updates,
+                    ticket_receipt,
                     originated_contracts,
                     consumed_gas,
                     storage_size,
@@ -253,6 +257,7 @@ module Internal_operation = struct
             | _ -> None)
           (fun ( storage,
                  balance_updates,
+                 ticket_receipt,
                  originated_contracts,
                  consumed_gas,
                  storage_size,
@@ -264,6 +269,7 @@ module Internal_operation = struct
                 storage;
                 lazy_storage_diff;
                 balance_updates;
+                ticket_receipt;
                 originated_contracts;
                 consumed_gas;
                 storage_size;
