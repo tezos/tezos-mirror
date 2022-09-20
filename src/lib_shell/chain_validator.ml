@@ -485,18 +485,17 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
           else Lwt.return_unit
         in
         Lwt_watcher.notify nv.new_head_input block ;
-        let is_branch_switch =
+        let is_head_increment =
           Block_hash.equal head_hash block_header.shell.predecessor
         in
         let event =
-          if is_branch_switch then Head_increment else Branch_switch
+          if is_head_increment then Head_increment else Branch_switch
         in
         let* () =
-          if is_branch_switch then
-            Store.Chain.may_update_ancestor_protocol_level
-              chain_store
-              ~head:block
-          else return_unit
+          when_ (not is_head_increment) (fun () ->
+              Store.Chain.may_update_ancestor_protocol_level
+                chain_store
+                ~head:block)
         in
         let*! () =
           may_synchronise_context nv.synchronisation_state chain_store
