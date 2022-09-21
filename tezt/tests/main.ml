@@ -85,6 +85,7 @@ let register_protocol_migration_tests () =
 let register_protocol_agnostic_tests () =
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
+  Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols:[Alpha] ;
   Baking.register ~protocols ;
   Baking.register_operations_pool ~protocols:[Jakarta; Kathmandu; Alpha] ;
