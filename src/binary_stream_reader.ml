@@ -229,7 +229,8 @@ module Atom = struct
     @@ fun (v, state) ->
     if Z.compare v (Z.of_int (Binary_size.max_int `N)) > 0 then
       let min = 0 and max = Binary_size.max_int `N in
-      let v = Binary_size.max_int `Uint30 in
+      (* we use [min_int] to hint at the overlfow-like issue *)
+      let v = Binary_size.min_int `Uint30 in
       raise_read_error (Invalid_int {min; v; max})
     else
       let v = Z.to_int v in
