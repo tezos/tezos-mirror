@@ -113,6 +113,50 @@ let with_data encoding body f =
           ~body:(Printexc.to_string e)
           ())
 
+let with_caqti_error x f =
+  Lwt.bind x (function
+      | Ok x -> f x
+      | Error e ->
+          let body = Caqti_error.show e in
+          Cohttp_lwt_unix.Server.respond_error ~body ())
+
+let reply_public_json encoding data =
+  let body =
+    Ezjsonm.value_to_string (Data_encoding.Json.construct encoding data)
+  in
+  let headers =
+    Cohttp.Header.init_with "content-type" "application/json; charset=UTF-8"
+  in
+  let headers = Cohttp.Header.add headers "Access-Control-Allow-Origin" "*" in
+  Cohttp_lwt_unix.Server.respond_string ~headers ~status:`OK ~body ()
+
+let one_level_json =
+  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"]
+  |> Re.whole_string |> Re.compile
+
+let anomalies_range =
+  Re.seq
+    [
+      Re.str "/";
+      Re.group (Re.rep1 Re.digit);
+      Re.str "-";
+      Re.group (Re.rep1 Re.digit);
+      Re.str "/anomalies.json";
+    ]
+  |> Re.whole_string |> Re.compile
+
+let level_rights =
+  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"]
+  |> Re.whole_string |> Re.compile
+
+let level_block =
+  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"]
+  |> Re.whole_string |> Re.compile
+
+let level_mempool =
+  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"]
+  |> Re.whole_string |> Re.compile
+
 let get_summary db_pool =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
   let query =
@@ -144,39 +188,17 @@ let get_summary db_pool =
        nb_level_rights
        nb_level_operations)
 
-let with_caqti_error x f =
-  Lwt.bind x (function
-      | Ok x -> f x
-      | Error e ->
-          let body = Caqti_error.show e in
-          Cohttp_lwt_unix.Server.respond_error ~body ())
-
-let one_level_json =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str ".json"]
-  |> Re.whole_string |> Re.compile
-
-let anomalies_range =
-  Re.seq
-    [
-      Re.str "/";
-      Re.group (Re.rep1 Re.digit);
-      Re.str "-";
-      Re.group (Re.rep1 Re.digit);
-      Re.str "/anomalies.json";
-    ]
-  |> Re.whole_string |> Re.compile
-
-let level_rights =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/rights"]
-  |> Re.whole_string |> Re.compile
-
-let level_block =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/block"]
-  |> Re.whole_string |> Re.compile
-
-let level_mempool =
-  Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"]
-  |> Re.whole_string |> Re.compile
+let get_head db_pool =
+  let query =
+    Caqti_request.Infix.(Caqti_type.(unit ->! int32))
+      "SELECT MAX (level) FROM blocks"
+  in
+  with_caqti_error
+    (Caqti_lwt.Pool.use
+       (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find query ())
+       db_pool)
+    (fun head_level ->
+      reply_public_json Data_encoding.(obj1 (req "level" int32)) head_level)
 
 let maybe_create_tables db_pool =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
@@ -403,28 +425,7 @@ let callback rights db_pool _connection request body =
                       with_caqti_error
                         (Exporter.data_at_level db_pool level)
                         (fun data ->
-                          let body =
-                            Ezjsonm.value_to_string
-                              (Data_encoding.Json.construct
-                                 Teztale_lib.Data.encoding
-                                 data)
-                          in
-                          let headers =
-                            Cohttp.Header.init_with
-                              "content-type"
-                              "application/json; charset=UTF-8"
-                          in
-                          let headers =
-                            Cohttp.Header.add
-                              headers
-                              "Access-Control-Allow-Origin"
-                              "*"
-                          in
-                          Cohttp_lwt_unix.Server.respond_string
-                            ~headers
-                            ~status:`OK
-                            ~body
-                            ())
+                          reply_public_json Teztale_lib.Data.encoding data)
                   | `OPTIONS -> options_respond methods
                   | _ -> method_not_allowed_respond methods)
               | None -> (
@@ -464,56 +465,53 @@ let callback rights db_pool _connection request body =
                       | `OPTIONS -> options_respond methods
                       | _ -> method_not_allowed_respond methods)
                   | None -> (
-                      if path = "/" then
-                        with_caqti_error (get_summary db_pool) (fun body ->
-                            Cohttp_lwt_unix.Server.respond_string
-                              ~headers:
-                                (Cohttp.Header.init_with
-                                   "content-type"
-                                   "text/html; charset=UTF-8")
-                              ~status:`OK
-                              ~body
-                              ())
-                      else
-                        let subpath = String.split_on_char '/' path in
-                        match subpath with
-                        | [] | [_] ->
+                      let subpath = String.split_on_char '/' path in
+                      match subpath with
+                      | [] | [_] | [""; ""] | [_; "index.html"] ->
+                          with_caqti_error (get_summary db_pool) (fun body ->
+                              Cohttp_lwt_unix.Server.respond_string
+                                ~headers:
+                                  (Cohttp.Header.init_with
+                                     "content-type"
+                                     "text/html; charset=UTF-8")
+                                ~status:`OK
+                                ~body
+                                ())
+                      | [_; "head.json"] -> get_head db_pool
+                      | [_; "visualization"; "js"; "local_config.js"] ->
+                          let body = "const server_adress = \"../\";" in
+                          Cohttp_lwt_unix.Server.respond_string
+                            ~headers:
+                              (Cohttp.Header.init_with
+                                 "content-type"
+                                 "text/javascript; charset=UTF-8")
+                            ~status:`OK
+                            ~body
+                            ()
+                      | _ :: pre :: subpath -> (
+                          if pre <> "visualization" then
                             Cohttp_lwt_unix.Server.respond_not_found ~uri ()
-                        | [_; "visualization"; "js"; "local_config.js"] ->
-                            let body = "const server_adress = \"../\";" in
-                            Cohttp_lwt_unix.Server.respond_string
-                              ~headers:
-                                (Cohttp.Header.init_with
-                                   "content-type"
-                                   "text/javascript; charset=UTF-8")
-                              ~status:`OK
-                              ~body
-                              ()
-                        | _ :: pre :: subpath -> (
-                            if pre <> "visualization" then
-                              Cohttp_lwt_unix.Server.respond_not_found ~uri ()
-                            else
-                              let (path, subpath) =
-                                match subpath with
-                                | [] | [""] -> ("index.html", ["index.html"])
-                                | _ -> (path, subpath)
-                              in
-                              match
-                                find_in_ocamlres subpath Visualization.root
-                              with
-                              | Some body ->
-                                  Cohttp_lwt_unix.Server.respond_string
-                                    ~headers:
-                                      (Cohttp.Header.init_with
-                                         "content-type"
-                                         (Magic_mime.lookup path))
-                                    ~status:`OK
-                                    ~body
-                                    ()
-                              | None ->
-                                  Cohttp_lwt_unix.Server.respond_not_found
-                                    ~uri
-                                    ()))))))
+                          else
+                            let (path, subpath) =
+                              match subpath with
+                              | [] | [""] -> ("index.html", ["index.html"])
+                              | _ -> (path, subpath)
+                            in
+                            match
+                              find_in_ocamlres subpath Visualization.root
+                            with
+                            | Some body ->
+                                Cohttp_lwt_unix.Server.respond_string
+                                  ~headers:
+                                    (Cohttp.Header.init_with
+                                       "content-type"
+                                       (Magic_mime.lookup path))
+                                  ~status:`OK
+                                  ~body
+                                  ()
+                            | None ->
+                                Cohttp_lwt_unix.Server.respond_not_found ~uri ()
+                          ))))))
 
 (* Must exists somewhere but where ! *)
 let print_location f ((fl, fc), (tl, tc)) =
