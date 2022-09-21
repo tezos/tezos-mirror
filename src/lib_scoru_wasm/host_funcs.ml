@@ -31,13 +31,15 @@ exception Bad_input
 exception Key_too_large of int
 
 let retrieve_memory memories =
-  match Vector.num_elements memories with
-  | 1l -> Vector.get 0l memories
-  | _ ->
-      raise
-        (Eval.Crash
-           ( Source.no_region,
-             "caller module must have exactly 1 memory instance" ))
+  let crash_with msg = raise (Eval.Crash (Source.no_region, msg)) in
+  match memories with
+  | Host_funcs.No_memories_during_init ->
+      crash_with "host functions must not access memory during initialisation"
+  | Host_funcs.Available_memories memories
+    when Vector.num_elements memories = 1l ->
+      Vector.get 0l memories
+  | Host_funcs.Available_memories _ ->
+      crash_with "caller module must have exactly 1 memory instance"
 
 let aux_write_input_in_memory ~input_buffer ~output_buffer ~memory ~rtype_offset
     ~level_offset ~id_offset ~dst ~max_bytes =

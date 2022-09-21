@@ -157,9 +157,45 @@ let test_imports () =
   | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
   | _ -> failwith "Unexpected stuck state!"
 
+let test_host_func_start_restriction () =
+  let open Lwt_result_syntax in
+  let*! state =
+    initial_tree
+      {|
+        (module
+          (import "rollup_safe_core" "write_output"
+            (func $write_output (param i32 i32) (result i32))
+          )
+          (memory 1)
+          (export "mem" (memory 0))
+          (func $foo
+            (call $write_output (i32.const 0) (i32.const 0))
+          )
+          (start $foo)
+          (func (export "kernel_next")
+            (unreachable)
+          )
+        )
+    |}
+  in
+  let* stuck, _ = eval_until_stuck state in
+  match stuck with
+  | Init_error
+      {
+        explanation =
+          Some "host functions must not access memory during initialisation";
+        _;
+      } ->
+      return_unit
+  | _ -> failwith "Unexpected stuck state!"
+
 let tests =
   [
     tztest "init requires memory 0 export" `Quick test_memory0_export;
     tztest "names are limited to 512 bytes" `Quick test_module_name_size;
     tztest "imports only PVM host functions" `Quick test_imports;
+    tztest
+      "host functions are restricted in start"
+      `Quick
+      test_host_func_start_restriction;
   ]
