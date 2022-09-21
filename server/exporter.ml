@@ -299,8 +299,8 @@ let anomalies level ops =
         let problem =
           match (received, included) with
           | ([], []) -> Some Data.Anomaly.Missed
-          | ([], _) -> Some Data.Anomaly.Forgotten
-          | (_, []) -> Some Data.Anomaly.Sequestered
+          | ([], _) -> Some Data.Anomaly.Sequestered
+          | (_, []) -> Some Data.Anomaly.Forgotten
           | _ -> None
         in
         match problem with
