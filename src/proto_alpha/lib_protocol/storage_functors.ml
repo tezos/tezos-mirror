@@ -68,8 +68,11 @@ let decode_len_value key len =
   | Some len -> ok len
 
 module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
-  Raw_context.T with type t = C.t = struct
+  Raw_context.T with type t = C.t and type local_context = C.local_context =
+struct
   type t = C.t
+
+  type local_context = C.local_context
 
   let to_key k = N.name @ k
 
@@ -142,6 +145,10 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
     Storage_description.register_named_subcontext description N.name
 
   let length = C.length
+
+  let with_local_context ctxt k f = C.with_local_context ctxt (to_key k) f
+
+  module Local_context = C.Local_context
 end
 
 module Make_single_data_storage
@@ -662,7 +669,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   Indexed_raw_context
     with type t = C.t
      and type key = I.t
-     and type 'a ipath = 'a I.ipath = struct
+     and type 'a ipath = 'a I.ipath
+     and type local_context = C.local_context = struct
   type t = C.t
 
   type context = t
@@ -670,6 +678,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   type key = I.t
 
   type 'a ipath = 'a I.ipath
+
+  type local_context = C.local_context
 
   let clear t = C.remove t [] >|= fun t -> C.project t
 
@@ -706,8 +716,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let pack = Storage_description.pack I.args
 
-  module Raw_context : Raw_context.T with type t = C.t I.ipath = struct
+  module Raw_context :
+    Raw_context.T
+      with type t = C.t I.ipath
+       and type local_context = C.local_context = struct
     type t = C.t I.ipath
+
+    type local_context = C.local_context
 
     let to_key i k = I.to_path i k
 
@@ -832,7 +847,18 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let length c =
       let t, _i = unpack c in
       C.length t
+
+    let with_local_context c k f =
+      let t, i = unpack c in
+      C.with_local_context t (to_key i k) f >|=? fun (t, res) -> (pack t i, res)
+
+    module Local_context = C.Local_context
   end
+
+  let with_local_context s i f =
+    Raw_context.with_local_context (pack s i) [] f >|=? fun (c, x) ->
+    let s, _ = unpack c in
+    (s, x)
 
   module Make_set (R : REGISTER) (N : NAME) :
     Data_set_storage with type t = t and type elt = key = struct
@@ -886,8 +912,11 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   end
 
   module Make_map (R : REGISTER) (N : NAME) (V : VALUE) :
-    Indexed_data_storage with type t = t and type key = key and type value = V.t =
-  struct
+    Indexed_data_storage_with_local_context
+      with type t = t
+       and type key = key
+       and type value = V.t
+       and type local_context = local_context = struct
     type t = C.t
 
     type context = t
@@ -895,6 +924,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     type key = I.t
 
     type value = V.t
+
+    type nonrec local_context = local_context
 
     include Make_encoder (V)
 
@@ -979,6 +1010,43 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
           find c k)
         (register_named_subcontext description N.name)
         V.encoding
+
+    module Local = struct
+      type context = Raw_context.Local_context.t
+
+      let mem local = Raw_context.Local_context.mem local N.name
+
+      let get local =
+        Raw_context.Local_context.get local N.name >|= fun r ->
+        let key () = Raw_context.Local_context.absolute_key local N.name in
+        r >>? of_bytes ~key
+
+      let find local =
+        Raw_context.Local_context.find local N.name >|= function
+        | None -> Result.return_none
+        | Some b ->
+            let key () = Raw_context.Local_context.absolute_key local N.name in
+            of_bytes ~key b >|? fun v -> Some v
+
+      let init local v =
+        Raw_context.Local_context.init local N.name (to_bytes v)
+
+      let update local v =
+        Raw_context.Local_context.update local N.name (to_bytes v)
+
+      let add local v = Raw_context.Local_context.add local N.name (to_bytes v)
+
+      let add_or_remove local vo =
+        Raw_context.Local_context.add_or_remove
+          local
+          N.name
+          (Option.map to_bytes vo)
+
+      let remove_existing local =
+        Raw_context.Local_context.remove_existing local N.name
+
+      let remove local = Raw_context.Local_context.remove local N.name
+    end
   end
 
   module Make_carbonated_map (R : REGISTER) (N : NAME) (V : VALUE) :
