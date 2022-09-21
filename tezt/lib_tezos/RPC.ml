@@ -132,6 +132,9 @@ let get_chain_block_helper_complete ?(chain = "main") ?(block = "head") prefix =
     ["chains"; chain; "blocks"; block; "helpers"; "complete"; prefix]
     Fun.id
 
+let get_chain_block_helper_round ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "helpers"; "round"] JSON.as_int
+
 let get_chain_block_context_nonce ?(chain = "main") ?(block = "head")
     block_level =
   make
