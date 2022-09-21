@@ -78,3 +78,11 @@ let shard () =
     ~query:RPC_query.empty
     ~output:Cryptobox.shard_encoding
     RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
+
+let monitor_slot_headers () =
+  RPC_service.get_service
+    ~description:"Monitor stored slot headers"
+    ~query:RPC_query.empty
+    ~output:
+      Data_encoding.(obj1 (req "slot_header" Cryptobox.Commitment.encoding))
+    RPC_path.(open_root / "monitor_slot_headers")

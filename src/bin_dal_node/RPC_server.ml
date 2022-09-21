@@ -85,6 +85,12 @@ let handle_shard ctxt ((_, commitment), shard) () () =
     commitment
     shard
 
+let handle_monitor_slot_headers ctxt () () () =
+  let stream, stopper = Store.slot_watcher (Node_context.get_store ctxt) in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let next () = Lwt_stream.get stream in
+  RPC_answer.return_stream {next; shutdown}
+
 let register_stored_slot_headers ctxt dir =
   RPC_directory.register
     dir
@@ -103,11 +109,18 @@ let register_show_slot_pages ctxt dir =
 let register_shard ctxt dir =
   RPC_directory.register dir (Services.shard ()) (handle_shard ctxt)
 
+let register_monitor_slot_headers ctxt dir =
+  RPC_directory.gen_register
+    dir
+    (Services.monitor_slot_headers ())
+    (handle_monitor_slot_headers ctxt)
+
 let register ctxt =
   RPC_directory.empty
   |> register_stored_slot_headers ctxt
   |> register_split_slot ctxt |> register_show_slot ctxt |> register_shard ctxt
   |> register_show_slot_pages ctxt
+  |> register_monitor_slot_headers ctxt
 
 let start configuration dir =
   let open Lwt_syntax in
