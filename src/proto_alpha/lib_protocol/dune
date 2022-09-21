@@ -112,6 +112,7 @@
   Zk_rollup_repr
   Zk_rollup_state_repr
   Zk_rollup_account_repr
+  Zk_rollup_ticket_repr
   Zk_rollup_operation_repr
   Bond_id_repr
   Vote_repr
@@ -189,6 +190,7 @@
   Sc_rollup_stake_storage
   Sc_rollup_refutation_storage
   Sc_rollup_storage
+  Zk_rollup_errors
   Dal_slot_storage
   Alpha_context
   Script_string
@@ -230,6 +232,7 @@
   Ticket_balance_key
   Ticket_lazy_storage_diff
   Tx_rollup_parameters
+  Zk_rollup_parameters
   Ticket_token_map
   Ticket_operations_diff
   Ticket_accounting
@@ -373,6 +376,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
@@ -451,6 +455,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -492,6 +497,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -615,6 +621,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
@@ -693,6 +700,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -734,6 +742,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -862,6 +871,7 @@
   zk_rollup_repr.ml zk_rollup_repr.mli
   zk_rollup_state_repr.ml zk_rollup_state_repr.mli
   zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
   zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
@@ -940,6 +950,7 @@
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
@@ -981,6 +992,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli

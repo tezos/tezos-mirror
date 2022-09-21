@@ -187,6 +187,12 @@ type _ successful_manager_operation_result =
       storage_size : Z.t;
     }
       -> Kind.zk_rollup_origination successful_manager_operation_result
+  | Zk_rollup_publish_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.zk_rollup_publish successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -802,6 +808,28 @@ module Manager_result = struct
         Zk_rollup_origination_result
           {balance_updates; originated_zk_rollup; consumed_gas; storage_size})
 
+  let zk_rollup_publish_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.zk_rollup_publish_case
+      ~encoding:
+        Data_encoding.(
+          obj3
+            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+            (req "size" z))
+      ~select:(function
+        | Successful_manager_result (Zk_rollup_publish_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Zk_rollup_publish_manager_kind
+      ~proj:(function
+        | Zk_rollup_publish_result
+            {balance_updates; consumed_gas; paid_storage_size_diff} ->
+            (balance_updates, consumed_gas, paid_storage_size_diff))
+      ~inj:(fun (balance_updates, consumed_gas, paid_storage_size_diff) ->
+        Zk_rollup_publish_result
+          {balance_updates; consumed_gas; paid_storage_size_diff})
+
   let sc_rollup_originate_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.sc_rollup_originate_case
@@ -1206,6 +1234,9 @@ let equal_manager_kind :
       Kind.Zk_rollup_origination_manager_kind ) ->
       Some Eq
   | Kind.Zk_rollup_origination_manager_kind, _ -> None
+  | Kind.Zk_rollup_publish_manager_kind, Kind.Zk_rollup_publish_manager_kind ->
+      Some Eq
+  | Kind.Zk_rollup_publish_manager_kind, _ -> None
 
 module Encoding = struct
   type 'kind case =
@@ -1876,6 +1907,17 @@ module Encoding = struct
               res ) ->
             Some (op, res)
         | _ -> None)
+
+  let zk_rollup_publish_case =
+    make_manager_case
+      Operation.Encoding.zk_rollup_publish_case
+      Manager_result.zk_rollup_publish_case
+      (function
+        | Contents_and_result
+            ((Manager_operation {operation = Zk_rollup_publish _; _} as op), res)
+          ->
+            Some (op, res)
+        | _ -> None)
 end
 
 let contents_result_encoding =
@@ -1937,6 +1979,7 @@ let contents_result_encoding =
          make sc_rollup_recover_bond_case;
          make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
+         make zk_rollup_publish_case;
        ]
 
 let contents_and_result_encoding =
@@ -2003,6 +2046,7 @@ let contents_and_result_encoding =
          make sc_rollup_recover_bond_case;
          make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
+         make zk_rollup_publish_case;
        ]
 
 type 'kind contents_result_list =
@@ -2884,6 +2928,31 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Zk_rollup_origination _; _}, _ -> None
+  | ( Manager_operation {operation = Zk_rollup_publish _; _},
+      Manager_operation_result
+        {operation_result = Applied (Zk_rollup_publish_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_publish _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Zk_rollup_publish_result _, _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_publish _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Zk_rollup_publish_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Zk_rollup_publish _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Zk_rollup_publish_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Zk_rollup_publish _; _}, _ -> None
 
 let rec kind_equal_list :
     type kind kind2.

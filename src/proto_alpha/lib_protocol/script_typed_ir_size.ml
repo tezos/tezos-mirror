@@ -203,6 +203,8 @@ let contract_size : type t. t typed_contract -> nodes_and_size = function
         (h3w
         +! Sc_rollup.in_memory_size sc_rollup
         +! Entrypoint.in_memory_size entrypoint)
+  | Typed_zk_rollup {arg_ty; zk_rollup} ->
+      ret_adding (ty_size arg_ty) (h2w +! Zk_rollup.in_memory_size zk_rollup)
 
 let sapling_state_size {Sapling.id; diff; memo_size} =
   h3w

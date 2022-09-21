@@ -28,6 +28,9 @@ type error +=
   | Zk_rollup_does_not_exist of Zk_rollup_repr.t
         (** Emitted when trying to perform an operation over a ZK rollup
             that hasn't been initialised. *)
+  | Zk_rollup_invalid_op_code of int
+        (** Emitted when trying to add to the pending list and operation
+            with an invalid op code. *)
 
 (** [originate context static ~init_state] produces an address [a] for
     a ZK rollup storage using the [origination_nonce] from
@@ -42,6 +45,35 @@ val originate :
   Zk_rollup_account_repr.static ->
   init_state:Zk_rollup_state_repr.t ->
   (Raw_context.t * Zk_rollup_repr.t * Z.t) tzresult Lwt.t
+
+(** [add_to_pending context rollup operations] appends to the
+    ZK [rollup]'s pending list a list of L2 [operations].
+    Returns the new context alongside the size of the new operations.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_invalid_op_code op_code] if the [op_code]
+        of one of the [operations] is greater or equal to the
+        number of declared operations for this [rollup].
+      }
+    }
+*)
+val add_to_pending :
+  Raw_context.t ->
+  Zk_rollup_repr.t ->
+  (Zk_rollup_operation_repr.t * Ticket_hash_repr.t option) list ->
+  (Raw_context.t * Z.t) tzresult Lwt.t
+
+(** [assert_exist context rollup] asserts that [rollup] has been initialized.
+    Returns the new context.
+
+    May fail with:
+    {ul
+      {li [Zk_rollup_does_not_exist] if [rollup] is not found.}
+    }
+*)
+val assert_exist :
+  Raw_context.t -> Zk_rollup_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [exists context rollup] returns a boolean representing whether
     [rollup] has been initialized.

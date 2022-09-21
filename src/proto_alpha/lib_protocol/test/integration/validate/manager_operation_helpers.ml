@@ -99,6 +99,7 @@ type manager_operation_kind =
   | K_Sc_rollup_recover_bond
   | K_Dal_publish_slot_header
   | K_Zk_rollup_origination
+  | K_Zk_rollup_publish
 
 (** The requirements for a tested manager operation. *)
 type operation_req = {
@@ -201,6 +202,7 @@ let kind_to_string = function
   | K_Sc_rollup_recover_bond -> "Sc_rollup_recover_bond"
   | K_Dal_publish_slot_header -> "Dal_publish_slot_header"
   | K_Zk_rollup_origination -> "Zk_rollup_origination"
+  | K_Zk_rollup_publish -> "Zk_rollup_publish"
 
 (** {2 Pretty-printers} *)
 let pp_opt pp v =
@@ -1060,6 +1062,27 @@ let mk_zk_rollup_origination (oinfos : operation_req) (infos : infos) =
   in
   return op
 
+let mk_zk_rollup_publish (oinfos : operation_req) (infos : infos) =
+  let open Lwt_result_syntax in
+  let open Zk_rollup.Operation in
+  let* zk_rollup = zk_rollup_of infos.ctxt.zk_rollup in
+  let l2_op =
+    {ZKOperator.Internal_for_tests.false_op with rollup_id = zk_rollup}
+  in
+  let* op =
+    Op.zk_rollup_publish
+      ?fee:oinfos.fee
+      ?gas_limit:oinfos.gas_limit
+      ?counter:oinfos.counter
+      ?storage_limit:oinfos.storage_limit
+      ?force_reveal:oinfos.force_reveal
+      (B infos.ctxt.block)
+      (contract_of infos.accounts.source)
+      ~zk_rollup
+      ~ops:[(l2_op, None)]
+  in
+  return op
+
 (** {2 Helpers for generation of generic check tests by manager operation} *)
 
 (** Generic forge for any kind of manager operation according to
@@ -1096,6 +1119,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Sc_rollup_recover_bond -> mk_sc_rollup_return_bond
     | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
     | K_Zk_rollup_origination -> mk_zk_rollup_origination
+    | K_Zk_rollup_publish -> mk_zk_rollup_publish
   in
   mk_op op_req infos
 
@@ -1442,7 +1466,7 @@ let is_consumer = function
   | K_Sc_rollup_refute | K_Sc_rollup_timeout | K_Sc_rollup_cement
   | K_Sc_rollup_publish | K_Sc_rollup_execute_outbox_message
   | K_Sc_rollup_recover_bond | K_Dal_publish_slot_header
-  | K_Zk_rollup_origination ->
+  | K_Zk_rollup_origination | K_Zk_rollup_publish ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
   | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
@@ -1469,4 +1493,4 @@ let is_disabled flags = function
   | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond ->
       flags.scoru = false
   | K_Dal_publish_slot_header -> flags.dal = false
-  | K_Zk_rollup_origination -> flags.zkru = false
+  | K_Zk_rollup_origination | K_Zk_rollup_publish -> flags.zkru = false

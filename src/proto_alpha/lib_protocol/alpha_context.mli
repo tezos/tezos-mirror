@@ -820,7 +820,11 @@ module Constants : sig
       max_number_of_stored_cemented_commitments : int;
     }
 
-    type zk_rollup = {enable : bool; min_pending_to_process : int}
+    type zk_rollup = {
+      enable : bool;
+      origination_size : int;
+      min_pending_to_process : int;
+    }
 
     type t = {
       preserved_cycles : int;
@@ -1791,8 +1795,6 @@ module Tx_rollup : sig
 
   val encoding : t Data_encoding.t
 
-  val deposit_entrypoint : Entrypoint.t
-
   val originate : context -> (context * t) tzresult Lwt.t
 
   module Set : Set.S with type elt = t
@@ -2351,7 +2353,11 @@ module Zk_rollup : sig
       nb_ops : int;
     }
 
-    type dynamic = {state : State.t}
+    type dynamic = {
+      state : State.t;
+      paid_l2_operations_storage_space : Z.t;
+      used_l2_operations_storage_space : Z.t;
+    }
 
     type t = {static : static; dynamic : dynamic}
 
@@ -2360,9 +2366,11 @@ module Zk_rollup : sig
 
   (** This module re-exports definitions from {!Zk_rollup_operation_repr}. *)
   module Operation : sig
+    type price = {id : Ticket_hash.t; amount : Z.t}
+
     type t = {
       op_code : int;
-      price : Ticket_hash.t * Z.t;
+      price : price;
       l1_dst : Signature.Public_key_hash.t;
       rollup_id : Address.t;
       payload : scalar array;
@@ -2373,11 +2381,19 @@ module Zk_rollup : sig
     val to_scalar_array : t -> scalar array
   end
 
+  module Ticket : sig
+    type t = {contents : Script.expr; ty : Script.expr; ticketer : Contract.t}
+
+    val encoding : t Data_encoding.t
+  end
+
   type pending_list =
     | Empty of {next_index : int64}
     | Pending of {next_index : int64; length : int}
 
   val pending_list_encoding : pending_list Data_encoding.t
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
 
   val originate :
     context ->
@@ -2385,7 +2401,24 @@ module Zk_rollup : sig
     init_state:State.t ->
     (context * Address.t * Z.t) tzresult Lwt.t
 
+  val add_to_pending :
+    context ->
+    Address.t ->
+    (Operation.t * Ticket_hash.t option) list ->
+    (context * Z.t) tzresult Lwt.t
+
+  val assert_exist : context -> t -> context tzresult Lwt.t
+
   val exists : context -> t -> (context * bool) tzresult Lwt.t
+
+  module Errors : sig
+    type error +=
+      | Deposit_as_external
+      | Invalid_deposit_amount
+      | Invalid_deposit_ticket
+      | Wrong_deposit_parameters
+      | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+  end
 
   module Internal_for_tests : sig
     val originated_zk_rollup : Origination_nonce.Internal_for_tests.t -> t
@@ -3730,6 +3763,7 @@ module Destination : sig
     | Contract of Contract.t
     | Tx_rollup of Tx_rollup.t
     | Sc_rollup of Sc_rollup.t
+    | Zk_rollup of Zk_rollup.t
 
   val encoding : t Data_encoding.t
 
@@ -4031,6 +4065,8 @@ module Kind : sig
 
   type zk_rollup_origination = Zk_rollup_origination_kind
 
+  type zk_rollup_publish = Zk_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -4066,6 +4102,7 @@ module Kind : sig
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
+    | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
 
 (** All the definitions below are re-exported from {!Operation_repr}. *)
@@ -4317,6 +4354,11 @@ and _ manager_operation =
       nb_ops : int;
     }
       -> Kind.zk_rollup_origination manager_operation
+  | Zk_rollup_publish : {
+      zk_rollup : Zk_rollup.t;
+      ops : (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list;
+    }
+      -> Kind.zk_rollup_publish manager_operation
 
 and counter = Z.t
 
@@ -4517,6 +4559,8 @@ module Operation : sig
     val zk_rollup_origination_case :
       Kind.zk_rollup_origination Kind.manager case
 
+    val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -4590,6 +4634,8 @@ module Operation : sig
         Kind.sc_rollup_dal_slot_subscribe case
 
       val zk_rollup_origination_case : Kind.zk_rollup_origination case
+
+      val zk_rollup_publish_case : Kind.zk_rollup_publish case
     end
   end
 

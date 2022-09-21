@@ -285,3 +285,7 @@ let zk_rollup_enable c =
 let zk_rollup_min_pending_to_process c =
   let zk_rollup = Raw_context.zk_rollup c in
   zk_rollup.min_pending_to_process
+
+let zk_rollup_origination_size c =
+  let zk_rollup = Raw_context.zk_rollup c in
+  zk_rollup.origination_size

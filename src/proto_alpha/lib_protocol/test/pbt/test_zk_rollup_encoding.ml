@@ -69,7 +69,7 @@ let gen_zkr_account =
   let circuits_info =
     SMap.of_seq (Plonk.Main_protocol.SMap.to_seq Operator.circuits)
   in
-  let+ nb_ops = nat in
+  let* nb_ops = nat in
   let static =
     {
       public_parameters;
@@ -78,7 +78,18 @@ let gen_zkr_account =
       nb_ops;
     }
   in
-  let dynamic = {state} in
+  let* paid_l2_operations_storage_space = nat in
+  let+ used_l2_operations_storage_space =
+    map Z.of_int @@ int_bound paid_l2_operations_storage_space
+  in
+  let dynamic =
+    {
+      state;
+      paid_l2_operations_storage_space =
+        Z.of_int paid_l2_operations_storage_space;
+      used_l2_operations_storage_space;
+    }
+  in
   {static; dynamic}
 
 let gen_ticket_hash =
@@ -97,7 +108,12 @@ let gen_z =
 let gen_l2_op =
   let open Gen in
   let* op_code = nat in
-  let* price = map2 (fun x y -> (x, y)) gen_ticket_hash gen_z in
+  let* price =
+    map2
+      (fun id amount -> Zk_rollup_operation_repr.{id; amount})
+      gen_ticket_hash
+      gen_z
+  in
   let* l1_dst = gen_pkh in
   let* rollup_id = gen_zkr_address in
   let+ payload = array gen_scalar in

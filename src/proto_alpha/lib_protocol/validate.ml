@@ -1952,7 +1952,7 @@ module Manager = struct
       | Dal_publish_slot_header {slot} ->
           let* () = Dal_apply.validate_publish_slot_header vi.ctxt slot in
           return remaining_gas
-      | Zk_rollup_origination _ ->
+      | Zk_rollup_origination _ | Zk_rollup_publish _ ->
           let* () = assert_zk_rollup_feature_enabled vi in
           return remaining_gas
     in

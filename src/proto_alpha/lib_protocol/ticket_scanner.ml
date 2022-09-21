@@ -543,3 +543,20 @@ let tickets_of_node ctxt ~include_lazy has_tickets expr =
         expr
       >>=? fun (value, ctxt) ->
       tickets_of_value ctxt ~include_lazy has_tickets value
+
+let ex_ticket_size ctxt (Ex_ticket (ty, ticket)) =
+  (* type *)
+  Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+  Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt ty
+  >>?= fun (ty', ctxt) ->
+  let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
+  let ty_size = Saturation_repr.to_int ty_size in
+  let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
+  Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
+  (* contents *)
+  let val_nodes, val_size = Script_typed_ir_size.value_size ty ticket in
+  let val_size = Saturation_repr.to_int val_size in
+  let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
+  Gas.consume ctxt val_size_cost >>?= fun ctxt ->
+  (* gas *)
+  return (ty_size + val_size, ctxt)

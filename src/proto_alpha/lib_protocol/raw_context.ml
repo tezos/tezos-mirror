@@ -1016,7 +1016,12 @@ let prepare_first_block ~level ~timestamp ctxt =
           }
       in
       let zk_rollup =
-        Constants_parametric_repr.{enable = false; min_pending_to_process = 10}
+        Constants_parametric_repr.
+          {
+            enable = false;
+            origination_size = 4_000;
+            min_pending_to_process = 10;
+          }
       in
       let constants =
         Constants_parametric_repr.

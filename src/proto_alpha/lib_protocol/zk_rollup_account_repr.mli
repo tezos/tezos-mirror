@@ -45,6 +45,12 @@ type dynamic = {
   state : Zk_rollup_state_repr.t;
       (** Array of scalars representing the state of the rollup
           at a given level. *)
+  paid_l2_operations_storage_space : Z.t;
+      (** Number of bytes for storage of L2 operations that have
+          been already paid for. *)
+  used_l2_operations_storage_space : Z.t;
+      (** Number of bytes for storage of L2 operations that are
+          being used. *)
 }
 
 type t = {static : static; dynamic : dynamic}

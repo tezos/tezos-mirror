@@ -98,6 +98,12 @@ type successful_transaction_result =
       consumed_gas : Gas.Arith.fp;
       inbox_after : Sc_rollup.Inbox.t;
     }
+  | Transaction_to_zk_rollup_result of {
+      ticket_hash : Ticket_hash.t;
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
 
 (** Result of applying an internal origination. *)
 type successful_origination_result = {

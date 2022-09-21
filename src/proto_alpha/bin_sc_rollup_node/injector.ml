@@ -150,7 +150,8 @@ module Parameters :
     | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
     | Dal_publish_slot_header _ | Sc_rollup_originate _
     | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
-    | Sc_rollup_dal_slot_subscribe _ | Zk_rollup_origination _ ->
+    | Sc_rollup_dal_slot_subscribe _ | Zk_rollup_origination _
+    | Zk_rollup_publish _ ->
         (* These operations should never be handled by this injector *)
         assert false
 

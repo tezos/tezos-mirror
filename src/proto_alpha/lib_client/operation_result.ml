@@ -420,6 +420,8 @@ let pp_manager_operation_content (type kind) source ppf
         slot
   | Zk_rollup_origination _ ->
       Format.fprintf ppf "Zk rollup origination:@,From: %a" Contract.pp source
+  | Zk_rollup_publish _ ->
+      Format.fprintf ppf "Zk rollup publish:@,From: %a" Contract.pp source
 
 let pp_balance_updates ppf balance_updates =
   let open Receipt in
@@ -657,6 +659,12 @@ let pp_transaction_result ppf = function
   | Transaction_to_sc_rollup_result {consumed_gas; inbox_after} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_inbox_after ppf inbox_after
+  | Transaction_to_zk_rollup_result
+      {balance_updates; consumed_gas; ticket_hash; paid_storage_size_diff} ->
+      pp_consumed_gas ppf consumed_gas ;
+      pp_balance_updates ppf balance_updates ;
+      Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash ;
+      pp_paid_storage_size_diff ppf paid_storage_size_diff
 
 let pp_operation_result ~operation_name pp_operation_result ppf = function
   | Skipped _ -> Format.fprintf ppf "This operation was skipped."
@@ -848,6 +856,13 @@ let pp_manager_operation_contents_result ppf op_result =
     Format.fprintf ppf "@,Address: %a" Zk_rollup.Address.pp originated_zk_rollup ;
     pp_balance_updates ppf balance_updates
   in
+  let pp_zk_rollup_publish_result
+      (Zk_rollup_publish_result
+        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+    pp_paid_storage_size_diff ppf paid_storage_size_diff ;
+    pp_consumed_gas ppf consumed_gas ;
+    pp_balance_updates ppf balance_updates
+  in
 
   let manager_operation_name (type kind)
       (result : kind successful_manager_operation_result) =
@@ -888,6 +903,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Dal_publish_slot_header_result _ ->
         "data availability slot header publishing"
     | Zk_rollup_origination_result _ -> "zk rollup originate"
+    | Zk_rollup_publish_result _ -> "zk rollup publish"
   in
   let pp_manager_operation_contents_result (type kind) ppf
       (result : kind successful_manager_operation_result) =
@@ -932,6 +948,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Dal_publish_slot_header_result _ as op ->
         pp_dal_publish_slot_header_result op
     | Zk_rollup_origination_result _ as op -> pp_zk_rollup_origination_result op
+    | Zk_rollup_publish_result _ as op -> pp_zk_rollup_publish_result op
   in
   pp_operation_result
     ~operation_name:manager_operation_name

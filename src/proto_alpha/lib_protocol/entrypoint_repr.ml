@@ -157,6 +157,10 @@ let set_delegate = of_string_strict_exn "set_delegate"
 
 let remove_delegate = of_string_strict_exn "remove_delegate"
 
+let deposit = of_string_strict_exn "deposit"
+
+let is_deposit = ( = ) deposit
+
 let is_root = ( = ) root
 
 let to_non_empty_string (name : t) = (name :> Non_empty_string.t)
@@ -207,6 +211,7 @@ let smart_encoding =
       builtin_case 2 do_;
       builtin_case 3 set_delegate;
       builtin_case 4 remove_delegate;
+      builtin_case 5 deposit;
       case
         (Tag 255)
         ~title:"named"

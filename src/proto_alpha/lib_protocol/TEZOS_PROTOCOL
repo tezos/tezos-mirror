@@ -85,6 +85,7 @@
         "Zk_rollup_repr",
         "Zk_rollup_state_repr",
         "Zk_rollup_account_repr",
+        "Zk_rollup_ticket_repr",
         "Zk_rollup_operation_repr",
 
         "Bond_id_repr",
@@ -171,6 +172,7 @@
         "Sc_rollup_stake_storage",
         "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",
+        "Zk_rollup_errors",
 
         "Dal_slot_storage",
 
@@ -217,6 +219,7 @@
         "Ticket_lazy_storage_diff",
 
         "Tx_rollup_parameters",
+        "Zk_rollup_parameters",
 
         "Ticket_token_map",
         "Ticket_operations_diff",

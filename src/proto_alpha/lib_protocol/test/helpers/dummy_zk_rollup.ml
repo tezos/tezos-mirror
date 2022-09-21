@@ -437,12 +437,12 @@ end = struct
         {
           op_code = 0;
           price =
-            (let ticket_hash =
+            (let id =
                Data_encoding.Binary.of_bytes_exn
                  Ticket_hash.encoding
                  dummy_ticket_hash
              in
-             (ticket_hash, Z.zero));
+             {id; amount = Z.zero});
           l1_dst =
             Data_encoding.Binary.of_bytes_exn
               Signature.Public_key_hash.encoding

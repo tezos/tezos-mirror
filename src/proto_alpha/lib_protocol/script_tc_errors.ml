@@ -82,6 +82,12 @@ type error += Tx_rollup_addresses_disabled of Script.location
 
 type error += Sc_rollup_disabled of Script.location
 
+(* Zero Knowledge rollup errors *)
+
+type error += Zk_rollup_disabled of Script.location
+
+type error += Zk_rollup_bad_deposit_parameter of Script.location * Script.expr
+
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
 

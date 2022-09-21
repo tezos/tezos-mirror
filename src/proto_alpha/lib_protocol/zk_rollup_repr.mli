@@ -61,6 +61,10 @@ val pending_list_encoding : pending_list Data_encoding.t
 
 module Index : Storage_description.INDEX with type t = t
 
+(** [in_memory_size zk_rollup] returns the number of bytes a [zk_rollup]
+    address uses in RAM. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
 module Internal_for_tests : sig
   val originated_zk_rollup : Origination_nonce.t -> Address.t
 end

@@ -125,6 +125,8 @@ module Kind = struct
 
   type zk_rollup_origination = Zk_rollup_origination_kind
 
+  type zk_rollup_publish = Zk_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -160,6 +162,7 @@ module Kind = struct
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
+    | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
 
 type 'a consensus_operation_type =
@@ -481,6 +484,11 @@ and _ manager_operation =
       nb_ops : int;
     }
       -> Kind.zk_rollup_origination manager_operation
+  | Zk_rollup_publish : {
+      zk_rollup : Zk_rollup_repr.t;
+      ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
+    }
+      -> Kind.zk_rollup_publish manager_operation
 
 and counter = Z.t
 
@@ -518,6 +526,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_dal_slot_subscribe _ ->
       Kind.Sc_rollup_dal_slot_subscribe_manager_kind
   | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
+  | Zk_rollup_publish _ -> Kind.Zk_rollup_publish_manager_kind
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
@@ -619,6 +628,8 @@ let dal_publish_slot_header_tag = dal_offset + 0
 let zk_rollup_operation_tag_offset = 250
 
 let zk_rollup_operation_create_tag = zk_rollup_operation_tag_offset + 0
+
+let zk_rollup_operation_publish_tag = zk_rollup_operation_tag_offset + 1
 
 module Encoding = struct
   open Data_encoding
@@ -1079,6 +1090,27 @@ module Encoding = struct
             (fun (public_parameters, circuits_info, init_state, nb_ops) ->
               Zk_rollup_origination
                 {public_parameters; circuits_info; init_state; nb_ops});
+        }
+
+    let zk_rollup_publish_case =
+      MCase
+        {
+          tag = zk_rollup_operation_publish_tag;
+          name = "zk_rollup_publish";
+          encoding =
+            obj2
+              (req "zk_rollup" Zk_rollup_repr.Address.encoding)
+              (req "op"
+              @@ Data_encoding.list
+                   (tup2
+                      Zk_rollup_operation_repr.encoding
+                      (option Zk_rollup_ticket_repr.encoding)));
+          select =
+            (function
+            | Manager (Zk_rollup_publish _ as op) -> Some op | _ -> None);
+          proj =
+            (function Zk_rollup_publish {zk_rollup; ops} -> (zk_rollup, ops));
+          inj = (fun (zk_rollup, ops) -> Zk_rollup_publish {zk_rollup; ops});
         }
 
     let string_to_bytes_encoding =
@@ -1738,6 +1770,11 @@ module Encoding = struct
       zk_rollup_operation_create_tag
       Manager_operations.zk_rollup_origination_case
 
+  let zk_rollup_publish_case =
+    make_manager_case
+      zk_rollup_operation_publish_tag
+      Manager_operations.zk_rollup_publish_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1791,6 +1828,7 @@ module Encoding = struct
            make sc_rollup_recover_bond_case;
            make sc_rollup_dal_slot_subscribe_case;
            make zk_rollup_origination_case;
+           make zk_rollup_publish_case;
          ]
 
   let contents_list_encoding =
@@ -2052,6 +2090,8 @@ let equal_manager_operation_kind :
   | Sc_rollup_dal_slot_subscribe _, _ -> None
   | Zk_rollup_origination _, Zk_rollup_origination _ -> Some Eq
   | Zk_rollup_origination _, _ -> None
+  | Zk_rollup_publish _, Zk_rollup_publish _ -> Some Eq
+  | Zk_rollup_publish _, _ -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =

@@ -152,8 +152,6 @@ module Index = struct
   let compare = compare
 end
 
-let deposit_entrypoint = Entrypoint_repr.of_string_strict_exn "deposit"
-
 module Cmp = struct
   type nonrec t = t
 

@@ -430,25 +430,6 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
           in
           (ctxt, result, operations) )
 
-let ex_ticket_size :
-    context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
- fun ctxt (Ex_ticket (ty, ticket)) ->
-  (* type *)
-  Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-  Script_ir_unparser.unparse_ty ~loc:Micheline.dummy_location ctxt ty
-  >>?= fun (ty', ctxt) ->
-  let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
-  let ty_size = Saturation_repr.to_int ty_size in
-  let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
-  Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
-  (* contents *)
-  let val_nodes, val_size = Script_typed_ir_size.value_size ty ticket in
-  let val_size = Saturation_repr.to_int val_size in
-  let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
-  Gas.consume ctxt val_size_cost >>?= fun ctxt ->
-  (* gas *)
-  return (ctxt, ty_size + val_size)
-
 let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
     ~dst_rollup ~since =
   assert_tx_rollup_feature_enabled ctxt >>?= fun () ->
@@ -462,7 +443,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
   let Tx_rollup_parameters.{ex_ticket; l2_destination} =
     Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
   in
-  ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
+  Ticket_scanner.ex_ticket_size ctxt ex_ticket >>=? fun (ticket_size, ctxt) ->
   let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
   fail_when
     Compare.Int.(ticket_size > limit)
@@ -680,6 +661,14 @@ let apply_internal_operation_contents :
           IEvent_result
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
+  | Transaction_to_zk_rollup
+      {destination; unparsed_parameters = _; parameters_ty; parameters} ->
+      Zk_rollup_apply.transaction_to_zk_rollup
+        ~ctxt
+        ~parameters_ty
+        ~parameters
+        ~dst_rollup:destination
+        ~since:ctxt_before_op
   | Origination
       {
         delegate;
@@ -1431,6 +1420,8 @@ let apply_manager_operation :
         ~circuits_info
         ~init_state
         ~nb_ops
+  | Zk_rollup_publish {zk_rollup; ops} ->
+      Zk_rollup_apply.publish ~ctxt_before_op ~ctxt ~zk_rollup ~l2_ops:ops
 
 type success_or_failure = Success of context | Failure
 
@@ -1514,6 +1505,15 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
           storage_limit,
           Transaction_to_tx_rollup_result {payload with balance_updates} )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
+  | Transaction_to_zk_rollup_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_to_zk_rollup_result {payload with balance_updates} )
 
 let burn_origination_storage_fees ctxt
     {
@@ -1664,6 +1664,14 @@ let burn_manager_storage_fees :
         Zk_rollup_origination_result {payload with balance_updates}
       in
       return (ctxt, storage_limit, result)
+  | Zk_rollup_publish_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >|=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      ( ctxt,
+        storage_limit,
+        Zk_rollup_publish_result {payload with balance_updates} )
 
 (** [burn_internal_storage_fees ctxt smopr storage_limit payer] burns the
     storage fees associated to an internal operation result [smopr].

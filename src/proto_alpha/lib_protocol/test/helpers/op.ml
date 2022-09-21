@@ -1005,3 +1005,18 @@ let drain_delegate ctxt ~consensus_key ~delegate ~destination =
   in
   Context.Contract.manager ctxt (Contract.Implicit consensus_key)
   >|=? fun account -> sign account.sk ctxt (Contents_list contents)
+
+let zk_rollup_publish ?force_reveal ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) ~zk_rollup ~ops =
+  manager_operation
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Zk_rollup_publish {zk_rollup; ops})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  sign account.sk ctxt to_sign_op
