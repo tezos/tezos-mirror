@@ -134,10 +134,10 @@ Once installed, you need to add the scraping job to the configuration file.
 ::
 
    - job_name: 'tezos-exporter'
-	  scrape_interval: interval s
-    metrics_path: "/metrics"
-    static_configs:
-		- targets: ['addr:port']
+     scrape_interval: interval s
+     metrics_path: "/metrics"
+     static_configs:
+       - targets: ['addr:port']
 
 Prometheus is a service, so you need to start it. Note that Prometheus can also scrape metrics from several nodes!
 
@@ -226,7 +226,7 @@ Dashboards will take your node monitoring to the next level, allowing you to vis
 Grafana
 ~~~~~~~
 
-Dashboards can be created and visualized with `Grafana <https://grafana.com/>`_. Grafana can be installed by following `these instructions <https://grafana.com/docs/grafana/latest/installation/>`_.
+Dashboards can be created and visualized with `Grafana <https://grafana.com/>`_. Grafana can be installed by following `these instructions <https://grafana.com/docs/grafana/latest/>`__.
 
 Once installed and running, you should be able to reach the interface on port ``3000`` (you can change the port on the Grafana config file).
 

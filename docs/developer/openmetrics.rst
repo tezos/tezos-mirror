@@ -25,6 +25,9 @@ For more information check the openmetrics specification: https://openmetrics.io
 Usage
 -----
 
+In the following, we indicate a typical monitoring setup for core developers.
+For more details on setting up the node for monitoring see :doc:`../user/node-monitoring`.
+
 To instruct the Octez node to produce metrics, the user needs to pass the option
 ``--metrics-addr=<ADDR>:<PORT>``. The port specified on the command line is the port
 where the integrated open metrics server will be available (9932 by default).

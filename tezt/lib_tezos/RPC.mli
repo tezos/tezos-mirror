@@ -45,17 +45,17 @@ include module type of RPC_legacy
 
     - Then the name contains all constant parts of the endpoint path,
       separated by underscores.
-      E.g. [chain_levels_caboose] for [GET /chains/[chain]/levels/caboose].
-      The dynamic part [[chain]] is dropped (it becomes an argument of the function).
+      E.g. [chain_levels_caboose] for [GET /chains/<chain>/levels/caboose].
+      The dynamic part [<chain>] is dropped (it becomes an argument of the function).
 
     - When a word is plural, it becomes singular if the RPC selects one element.
       For instance, [GET /network/connections] becomes [get_network_connections]
       because it returns all elements of the list, but [GET /network/connections/<peer_id>]
       becomes [get_network_connection] because it returns only one connection.
       This allows to differentiate the two RPCs.
-      Another example is [GET /chains/[chain]/blocks/[block]/metadata] which becomes
+      Another example is [GET /chains/<chain>/blocks/<block>/metadata] which becomes
       [get_chain_block_metadata] since it selects one block.
-      Another example is [GET /chains/[chain]/levels/checkpoint] which becomes
+      Another example is [GET /chains/<chain>/levels/checkpoint] which becomes
       [get_chain_level_checkpoint], which illustrates that the selector (here [checkpoint])
       does not need to be dynamic for this rule to apply.
 
@@ -237,12 +237,12 @@ val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
 val post_chain_block_helpers_scripts_run_operation :
   ?chain:string -> ?block:string -> ?async:bool -> JSON.u -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/chain_id]
+(** RPC: [GET /chains/<chain>/chain_id]
 
     Returns the chain ID. *)
 val get_chain_chain_id : ?chain:string -> unit -> string t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]]
+(** RPC: [GET /chains/<chain>/blocks/<block>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
@@ -257,14 +257,14 @@ type block_metadata = {
       (** This field is [None] if and only if the [DAL] feature flag is disabled. *)
 }
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/metadata]
+(** RPC: [GET /chains/<chain>/blocks/<block>/metadata]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_metadata :
   ?chain:string -> ?block:string -> unit -> block_metadata t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/hash]
+(** RPC: [GET /chains/<chain>/blocks/<block>/hash]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -272,13 +272,13 @@ val get_chain_block_metadata :
     Returns the hash. *)
 val get_chain_block_hash : ?chain:string -> ?block:string -> unit -> string t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/header]
+(** RPC: [GET /chains/<chain>/blocks/<block>/header]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_header : ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [PATCH /chains/[chain]] to set ["bootstrapped"]
+(** RPC: [PATCH /chains/<chain>] to set ["bootstrapped"]
 
     Example: to force the chain to be considered bootstrapped,
     use [patch_chain_bootstrapped true]. *)
@@ -288,7 +288,7 @@ type sync_state = Synced | Unsynced | Stuck
 
 type is_bootstrapped = {bootstrapped : bool; sync_state : sync_state}
 
-(** RPC: [GET /chains/[chain]/is_bootstrapped]
+(** RPC: [GET /chains/<chain>/is_bootstrapped]
 
     Returns the value of [sync_state], e.g. ["synced"]. *)
 val get_chain_is_bootstrapped : ?chain:string -> unit -> is_bootstrapped t
@@ -296,17 +296,17 @@ val get_chain_is_bootstrapped : ?chain:string -> unit -> is_bootstrapped t
 (** A level and its hash *)
 type block_descriptor = {block_hash : string; level : int}
 
-(** RPC: [GET /chains/[chain]/levels/checkpoint]
+(** RPC: [GET /chains/<chain>/levels/checkpoint]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_checkpoint : ?chain:string -> unit -> block_descriptor t
 
-(** RPC: [GET /chains/[chain]/levels/savepoint]
+(** RPC: [GET /chains/<chain>/levels/savepoint]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_savepoint : ?chain:string -> unit -> block_descriptor t
 
-(** RPC: [GET /chains/[chain]/levels/caboose]
+(** RPC: [GET /chains/<chain>/levels/caboose]
 
     [chain] defaults to ["main"]. *)
 val get_chain_level_caboose : ?chain:string -> unit -> block_descriptor t
@@ -336,7 +336,7 @@ val get_worker_chain_validator_peers_validators :
 (** RPC: [GET /workers/prevalidators] *)
 val get_workers_prevalidators : JSON.t t
 
-(** RPC: [GET /workers/prevalidators/[chain]]
+(** RPC: [GET /workers/prevalidators/<chain>]
 
       [chain] defaults to ["main"]. *)
 val get_worker_prevalidator : ?chain:string -> unit -> JSON.t t
@@ -370,7 +370,7 @@ val post_injection_block : data:JSON.u -> JSON.t t
 val get_chain_block_header_protocol_data_raw :
   ?chain:string -> ?block:string -> unit -> string t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/header/protocol_data]
+(** RPC: [GET /chains/<chain>/blocks/<block>/header/protocol_data]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -380,7 +380,7 @@ val get_chain_block_header_protocol_data_raw :
 val get_chain_block_header_protocol_data :
   ?chain:string -> ?block:string -> ?offset:int -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/operations]
+(** RPC: [GET /chains/<chain>/blocks/<block>/operations]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -388,11 +388,11 @@ val get_chain_block_header_protocol_data :
 val get_chain_block_operations :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/operations/[validation_pass]] if
+(** RPC: [GET /chains/<chain>/blocks/<block>/operations/<validation_pass>] if
     [operation_offset] is unset
 
     Otherwise,
-    RPC: [GET /chains/[chain]/blocks/[block]/operations/[validation_pass]/[operation_offset]]
+    RPC: [GET /chains/<chain>/blocks/<block>/operations/<validation_pass>/<operation_offset>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -407,7 +407,7 @@ val get_chain_block_operations_validation_pass :
   unit ->
   JSON.t t
 
-(** RPC: [GET /chains/[chain]/mempool/pending_operations]
+(** RPC: [GET /chains/<chain>/mempool/pending_operations]
 
     [chain] defaults to ["main"].
 *)
@@ -422,47 +422,47 @@ val get_chain_mempool_pending_operations :
   unit ->
   JSON.t t
 
-(** RPC: [POST /chains/[chain]/mempool/request_operations]
+(** RPC: [POST /chains/<chain>/mempool/request_operations]
 
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_request_operations :
   ?chain:string -> ?peer:string -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/mempool/ban_operation]
+(** RPC: [POST /chains/<chain>/mempool/ban_operation]
 
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_ban_operation :
   ?chain:string -> data:JSON.u -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/mempool/unban_operation]
+(** RPC: [POST /chains/<chain>/mempool/unban_operation]
 
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_unban_operation :
   ?chain:string -> data:JSON.u -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/mempool/unban_all_operations]
+(** RPC: [POST /chains/<chain>/mempool/unban_all_operations]
 
     [chain] defaults to ["main"].
  *)
 val post_chain_mempool_unban_all_operations : ?chain:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/mempool/filter]
+(** RPC: [GET /chains/<chain>/mempool/filter]
 
     [chain] defaults to ["main"].
 *)
 val get_chain_mempool_filter :
   ?chain:string -> ?include_default:bool -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/mempool/filter]
+(** RPC: [POST /chains/<chain>/mempool/filter]
 
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/preapply/block]
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/preapply/block]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -470,7 +470,7 @@ val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
 val post_chain_block_helpers_preapply_block :
   ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/forge/operations]
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/operations]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -478,7 +478,7 @@ val post_chain_block_helpers_preapply_block :
 val post_chain_block_helpers_forge_operations :
   ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/simulate_operation]
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/simulate_operation]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -486,7 +486,7 @@ val post_chain_block_helpers_forge_operations :
 val post_chain_block_helpers_scripts_simulate_operation :
   ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
 
-(** RPC: [POST /chains/[chain]/blocks/[block]/helpers/scripts/event_address]
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/event_address]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -496,7 +496,7 @@ val post_chain_block_helpers_scripts_event_address :
 
 type ctxt_type = Bytes | Json
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/context/raw/[ctxt_type]/[value_path]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/raw/<ctxt_type>/<value_path>
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -510,7 +510,7 @@ val get_chain_block_context_raw :
   unit ->
   JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/context/constants]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/constants]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -518,7 +518,7 @@ val get_chain_block_context_raw :
 val get_chain_block_context_constants :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/context/constants/errors]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/constants/errors]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -526,7 +526,7 @@ val get_chain_block_context_constants :
 val get_chain_block_context_constants_errors :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/helpers/baking_rights]
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/baking_rights]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -542,7 +542,7 @@ type level = {
   expected_commitment : bool;
 }
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/helpers/current_level]
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/current_level]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -551,7 +551,7 @@ type level = {
 val get_chain_block_helper_current_level :
   ?chain:string -> ?block:string -> ?offset:int -> unit -> level t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/helpers/endorsing_rights]
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/endorsing_rights]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -559,7 +559,7 @@ val get_chain_block_helper_current_level :
 val get_chain_block_helper_endorsing_rights :
   ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/helpers/levels_in_current_cycle]
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/levels_in_current_cycle]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -569,7 +569,7 @@ val get_chain_block_helper_levels_in_current_cycle :
 
 (** {2 Big maps RPC module} *)
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/context/big_maps/[id]/[key_hash]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/big_maps/<id>/<key_hash>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -582,7 +582,7 @@ val get_chain_block_context_big_map :
   unit ->
   JSON.t t
 
-(** RPC: [GET /chains/[chain]/blocks/[block]/context/big_maps/[id]?offset=[offset]&length=[length]
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/big_maps/<id>?offset=<offset>&length=<length>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -598,7 +598,7 @@ val get_chain_block_context_big_maps :
 
 (** {2 Contracts RPC module} *)
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -606,7 +606,7 @@ val get_chain_block_context_big_maps :
 val get_chain_block_context_contracts :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -614,7 +614,7 @@ val get_chain_block_context_contracts :
 val get_chain_block_context_contract :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/balance]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/balance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -622,7 +622,7 @@ val get_chain_block_context_contract :
 val get_chain_block_context_contract_balance :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/frozen_bonds]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/frozen_bonds]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -630,7 +630,7 @@ val get_chain_block_context_contract_balance :
 val get_chain_block_context_contract_frozen_bonds :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/balance_and_frozen_bonds]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/balance_and_frozen_bonds]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -638,7 +638,7 @@ val get_chain_block_context_contract_frozen_bonds :
 val get_chain_block_context_contract_balance_and_frozen_bonds :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [POST /chains/[chain]/blocks/[block]/context/contracts/[id]/big_map_get]
+(** RPC [POST /chains/<chain>/blocks/<block>/context/contracts/<id>/big_map_get]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -651,7 +651,7 @@ val post_chain_block_context_contract_big_map_get :
   unit ->
   JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/counter]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/counter]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -659,7 +659,7 @@ val post_chain_block_context_contract_big_map_get :
 val get_chain_block_context_contract_counter :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/delegate]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/delegate]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -667,7 +667,7 @@ val get_chain_block_context_contract_counter :
 val get_chain_block_context_contract_delegate :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/entrypoints]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/entrypoints]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -675,7 +675,7 @@ val get_chain_block_context_contract_delegate :
 val get_chain_block_context_contract_entrypoints :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/manager_key]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/manager_key]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -683,7 +683,7 @@ val get_chain_block_context_contract_entrypoints :
 val get_chain_block_context_contract_manager_key :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/script]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/script]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -691,7 +691,7 @@ val get_chain_block_context_contract_manager_key :
 val get_chain_block_context_contract_script :
   ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
 
-(** RPC [GET /chains/[chain]/blocks/[block]/context/contracts/[id]/storage]
+(** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/storage]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"].
@@ -701,27 +701,27 @@ val get_chain_block_context_contract_storage :
 
 (** {2 Smart contract rollup RPC module} *)
 
-(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup] *)
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup] *)
 val get_chain_block_context_sc_rollup :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/inbox] *)
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/inbox] *)
 val get_chain_block_context_sc_rollup_inbox :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
 val get_chain_block_context_sc_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
 val get_chain_block_context_sc_rollup_boot_sector :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/[chain]/blocks/[block]/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
 val get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** Call RPC /chains/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/staker/[staker]/staked_on_commitment *)
+(** Call RPC /chains/<chain>/blocks/<block>/context/sc_rollup/<rollup_hash>/staker/<staker>/staked_on_commitment *)
 val get_chain_block_context_sc_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 

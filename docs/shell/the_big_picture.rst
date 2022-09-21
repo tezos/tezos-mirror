@@ -120,7 +120,7 @@ that are used everywhere for basic operations.
    libraries that we use. We try to use minimal reference
    implementations, with as thin as possible bindings, and
    rely on libraries from the
-   `HACL* project <https://github.com/project-everest/hacl-star>`_,
+   `HACL* project <https://github.com/hacl-star/hacl-star>`_,
    written and verified in the F* programming language, and extracted
    to C.
  - :package:`tezos-micheline` is the concrete syntax used by
@@ -180,7 +180,7 @@ protocol in an alternative environment possible.
 
   - :package:`tezos-protocol-environment` contains the protocol
     generic environment, that is the API of the modules that are available to
-    the economic protocol and the exported protocol API. A review of this 
+    the economic protocol and the exported protocol API. A review of this
     sandbox is available :doc:`here <../shell/protocol_environment>`.
     These modules include a stripped-down standard library, and interfaces
     to the crypto APIs, RPC definitions, and a key-value store.

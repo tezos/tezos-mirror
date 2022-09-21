@@ -1,5 +1,23 @@
 #!/bin/bash
 
+usage () {
+    cat >&2 <<!EOF
+usage:
+  $0 [<branch>]
+!EOF
+}
+
+if [ $# -eq 1 ];
+then
+  BRANCH=$1
+elif [ $# -eq 0 ]
+then
+  BRANCH="latest-release"
+else
+  usage
+  exit 1
+fi
+
 set -e
 set -x
 
@@ -84,7 +102,7 @@ poetry --version # should output 1.1.13
 ##
 ## Test installing Octez python development dependencies
 ##
-git clone https://gitlab.com/tezos/tezos.git --depth 1
+git clone https://gitlab.com/tezos/tezos.git --depth 1 --branch "$BRANCH"
 
 # [install octez python dev-dependencies]
 cd tezos
