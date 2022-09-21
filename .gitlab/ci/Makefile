@@ -141,7 +141,6 @@ ifndef TEZOS_WITHOUT_OPAM
 opam-configure:
 	cd ${CI_PROJECT_DIR} && \
 		opam remote add dev-repo ./_opam-repo-for-release  && \
-		opam depext --yes ${package}.dev  && \
 		opam install --yes ${package}.dev && \
 		opam reinstall --yes --with-test ${package}.dev
 endif
