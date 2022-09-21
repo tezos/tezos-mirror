@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,52 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A [ready_ctx] value contains globally needed informations for a running dal
-    node. It is available when both cryptobox is initialized and dal plugin is
-    loaded. *)
-type ready_ctxt = {
-  dal_constants : Cryptobox.t;
-  dal_parameters : Cryptobox.parameters;
-  plugin : (module Dal_plugin.T);
-  slot_header_store : Slot_headers_store.t;
-}
+module type T = sig
+  module Proto : Registered_protocol.T
 
-(** The status of the dal node *)
-type status = Ready of ready_ctxt | Starting
+  val get_constants :
+    Tezos_shell_services.Chain_services.chain ->
+    Tezos_shell_services.Block_services.block ->
+    Client_context.full ->
+    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
 
-(** A [t] value contains both the status and the dal node configuration. It's
-    field are available through accessors *)
-type t
+  val get_published_slot_headers :
+    Tezos_shell_services.Block_services.block ->
+    Client_context.full ->
+    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
+end
 
-(** [init config] creates a [t] with a status set to [Starting] with a given dal
-    node configuration.*)
-val init : Configuration.t -> t
+val register : (module T) -> unit
 
-(** Raised by [set_ready] when the status is already [Ready _] *)
-exception Status_already_ready
-
-(** [set_ready ctxt slot_header_store plugin dal_constants dal_params] updates
-    in place the status value to ready, and initializes the inner [ready_ctxt]
-    value with the given parameters.
-
-    @raise Status_already_ready when the status is already [Ready _] *)
-val set_ready :
-  t ->
-  Slot_headers_store.t ->
-  (module Dal_plugin.T) ->
-  Cryptobox.t ->
-  Cryptobox.parameters ->
-  unit
-
-type error += Node_not_ready
-
-(** [get_ready ctxt] extracts the [ready_ctxt] value from a context [t]. It
-    propagates [Node_not_ready] if status is not ready yet. If called multiple
-    times, it replaces current values for [ready_ctxt] with new ones *)
-val get_ready : t -> ready_ctxt tzresult
-
-(** [get_config ctxt] returns the dal node configuration *)
-val get_config : t -> Configuration.t
-
-(** [get_status ctxt] returns the dal node status *)
-val get_status : t -> status
+val get : Protocol_hash.Table.key -> (module T) option

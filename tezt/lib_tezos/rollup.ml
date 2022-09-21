@@ -555,6 +555,15 @@ module Dal = struct
     let slot_pages slot_header =
       make GET ["slot"; "pages"; slot_header] (fun pages ->
           pages |> JSON.as_list |> List.map JSON.as_string)
+
+    let stored_slot_headers block_hash =
+      make GET ["stored_slot_headers"; block_hash] @@ fun json ->
+      let open JSON in
+      let l = as_list json in
+      List.map
+        (fun json ->
+          (json |-> "index" |> as_int, json |-> "slot_header" |> as_string))
+        l
   end
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox

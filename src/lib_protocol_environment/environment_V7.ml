@@ -101,7 +101,7 @@ module type T = sig
         Tezos_protocol_environment_structs.V7.Plonk.verifier_public_parameters
         * Tezos_protocol_environment_structs.V7.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
-       and type Dal.commitment = Tezos_crypto_dal.Cryptobox.commitment
+       and type Dal.commitment = Tezos_crypto_dal.Cryptobox.Verifier.commitment
 
   type error += Ecoproto_error of Error_monad.error
 

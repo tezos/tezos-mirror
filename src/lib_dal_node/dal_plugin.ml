@@ -31,8 +31,17 @@ module type T = sig
     Tezos_shell_services.Block_services.block ->
     Client_context.full ->
     Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
+
+  val get_published_slot_headers :
+    Tezos_shell_services.Block_services.block ->
+    Client_context.full ->
+    (int * Tezos_crypto_dal.Cryptobox.Verifier.commitment) list tzresult Lwt.t
 end
 
-val register : (module T) -> unit
+let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
 
-val get : Protocol_hash.Table.key -> (module T) option
+let register (module Plugin : T) =
+  assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
+  Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
+
+let get hash = Protocol_hash.Table.find table hash

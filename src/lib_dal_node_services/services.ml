@@ -59,6 +59,18 @@ let slot_pages () =
     ~output:(Data_encoding.list Data_encoding.string)
     RPC_path.(open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
 
+let stored_slot_headers () =
+  RPC_service.get_service
+    ~description:"List slot headers for a given block hash"
+    ~query:RPC_query.empty
+    ~output:
+      Data_encoding.(
+        list
+          (obj2
+             (req "index" int31)
+             (req "slot_header" Cryptobox.Commitment.encoding)))
+    RPC_path.(open_root / "stored_slot_headers" /: Block_hash.rpc_arg)
+
 let shard () =
   let shard_arg = RPC_arg.int in
   RPC_service.get_service

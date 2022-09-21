@@ -4679,6 +4679,7 @@ module Protocol = Protocol
             octez_dal_node_lib |> open_;
             client |> if_some |> open_;
             embedded |> open_;
+            layer2_utils |> if_some |> open_;
             main |> open_;
           ]
         ~inline_tests:ppx_expect
@@ -5588,6 +5589,7 @@ let _octez_dal_node =
          octez_stdlib |> open_;
          octez_dal_node_lib |> open_;
          octez_dal_node_services |> open_;
+         octez_layer2_store |> open_;
          octez_crypto_dal |> open_;
          irmin_pack;
          irmin_pack_unix;

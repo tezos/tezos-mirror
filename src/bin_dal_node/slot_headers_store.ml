@@ -23,20 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type T = sig
-  module Proto : Registered_protocol.T
+include Store_utils
 
-  val get_constants :
-    Tezos_shell_services.Chain_services.chain ->
-    Tezos_shell_services.Block_services.block ->
-    Client_context.full ->
-    Tezos_crypto_dal.Cryptobox.Verifier.parameters tzresult Lwt.t
-end
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+include Make_nested_map (struct
+  let path = ["dal"; "slot_headers"]
 
-let table : (module T) Protocol_hash.Table.t = Protocol_hash.Table.create 5
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+     This value is currently not used, but required by the module type. *)
+  let keep_last_n_entries_in_memory = 10
 
-let register (module Plugin : T) =
-  assert (not (Protocol_hash.Table.mem table Plugin.Proto.hash)) ;
-  Protocol_hash.Table.add table Plugin.Proto.hash (module Plugin)
+  type key = Block_hash.t
 
-let get hash = Protocol_hash.Table.find table hash
+  let string_of_key = Block_hash.to_b58check
+
+  type secondary_key = int
+
+  let compare_secondary_keys = Int.compare
+
+  type value = Cryptobox.commitment
+
+  let secondary_key_encoding = Data_encoding.int31
+
+  let secondary_key_name = "slot_index"
+
+  let value_encoding = Cryptobox.Commitment.encoding
+
+  let value_name = "slots_metadata"
+end)

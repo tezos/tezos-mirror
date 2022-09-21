@@ -44,7 +44,7 @@ class unix_cctxt :
 val make_unix_cctxt : Configuration.t -> cctxt
 
 val get_slot :
-  #cctxt -> ?trim_slot:bool -> Dal.Slot_header.t -> string tzresult Lwt.t
+  #cctxt -> ?trim_slot:bool -> Dal.Slot.Header.t -> string tzresult Lwt.t
 
 val get_shard :
-  #cctxt -> Dal.Slot_header.t -> int -> Cryptobox.shard tzresult Lwt.t
+  #cctxt -> Dal.Slot.Header.t -> int -> Cryptobox.shard tzresult Lwt.t

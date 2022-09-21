@@ -51,6 +51,9 @@ let regression_test ~__FILE__ ?(tags = []) title f =
   let tags = "dal" :: tags in
   Protocol.register_regression_test ~__FILE__ ~title ~tags f
 
+let dal_enable_param dal_enable =
+  make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
+
 let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
   let parameters =
     make_int_parameter
@@ -61,7 +64,7 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
         challenge_window
     (* this will produce the empty list if dal_enable is not passed to the function invocation,
        hence the value from the protocol constants will be used. *)
-    @ make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
+    @ dal_enable_param dal_enable
     @ [(["sc_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
@@ -223,15 +226,18 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let publish_slot ~source ?fee ~index ~message parameters cryptobox node client =
+let publish_slot ~source ?fee ~index ~header node client =
   let level = Node.get_level node in
-  let header =
-    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
-  in
   Operation.Manager.(
     inject
       [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~header]
       client)
+
+let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
+  let header =
+    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
+  in
+  publish_slot ~source ?fee ~index ~header
 
 let slot_availability ~signer availability client =
   (* FIXME/DAL: fetch the constant from protocol parameters. *)
@@ -316,7 +322,7 @@ let test_slot_management_logic =
   setup ~dal_enable:true ~protocol
   @@ fun parameters cryptobox node client _bootstrap ->
   let* (`OpHash oph1) =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap1
       ~fee:1_000
       ~index:0
@@ -327,7 +333,7 @@ let test_slot_management_logic =
       client
   in
   let* (`OpHash oph2) =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap2
       ~fee:1_500
       ~index:1
@@ -338,7 +344,7 @@ let test_slot_management_logic =
       client
   in
   let* (`OpHash oph3) =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap3
       ~fee:2_000
       ~index:0
@@ -349,7 +355,7 @@ let test_slot_management_logic =
       client
   in
   let* (`OpHash oph4) =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap4
       ~fee:1_200
       ~index:1
@@ -496,6 +502,47 @@ let test_dal_node_slot_management =
   assert (slot_content = received_slot_content) ;
   return ()
 
+let test_dal_node_slots_headers_tracking =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node slot headers tracking"
+    ~tags:["dal"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, client =
+    let base = Either.right (protocol, None) in
+    let* parameter_file =
+      Protocol.write_parameter_file ~base (dal_enable_param (Some true))
+    in
+    let nodes_args = Node.[Synchronisation_threshold 0] in
+    Client.init_with_protocol `Client ~parameter_file ~protocol ~nodes_args ()
+  in
+  let dal_node = Dal_node.create ~node () in
+  let* _dir = Dal_node.init_config dal_node in
+  let* () = Dal_node.run dal_node in
+  let publish_slot source index content =
+    let* slot_header = RPC.call dal_node (Rollup.Dal.RPC.split_slot content) in
+    let header =
+      Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
+      |> mandatory "The b58check-encoded slot header is not valid"
+    in
+    let* _ = publish_slot ~source ~fee:1_200 ~index ~header node client in
+    return (index, slot_header)
+  in
+  let* slot0 = publish_slot Constant.bootstrap1 0 "test0" in
+  let* slot1 = publish_slot Constant.bootstrap2 1 "test1" in
+  let* slot2 = publish_slot Constant.bootstrap3 4 "test4" in
+  let* () = Client.bake_for_and_wait client in
+  let* _level = Node.wait_for_level node 1 in
+  let* block = RPC.call node (RPC.get_chain_block_hash ()) in
+  let* slot_headers =
+    RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
+  in
+  Check.([slot0; slot1; slot2] = slot_headers)
+    Check.(list (tuple2 int string))
+    ~error_msg:"Published header is different from stored header (%L = %R)" ;
+  return ()
+
 let test_dal_node_startup =
   Protocol.register_test
     ~__FILE__
@@ -583,7 +630,7 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
     Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
   in
   let* _ =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap1
       ~fee:1_200
       ~index:0
@@ -594,7 +641,7 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
       client
   in
   let* _ =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap2
       ~fee:1_200
       ~index:1
@@ -605,7 +652,7 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
       client
   in
   let* _ =
-    publish_slot
+    publish_dummy_slot
       ~source:Constant.bootstrap3
       ~fee:1_200
       ~index:2
@@ -672,6 +719,7 @@ let register ~protocols =
     protocols ;
   test_slot_management_logic protocols ;
   test_dal_node_slot_management protocols ;
+  test_dal_node_slots_headers_tracking protocols ;
   test_dal_node_startup protocols ;
   test_dal_scenario
     ~dal_enable:true

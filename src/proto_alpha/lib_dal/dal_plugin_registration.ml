@@ -37,6 +37,27 @@ module Plugin = struct
     return
       Environment.Dal.
         {redundancy_factor; page_size; slot_size; number_of_shards}
+
+  let get_published_slot_headers block ctxt =
+    let open Lwt_result_syntax in
+    let open Protocol.Alpha_context in
+    let cpctxt = new Protocol_client_context.wrap_full ctxt in
+    let* block =
+      Protocol_client_context.Alpha_block_services.info
+        cpctxt
+        ~block
+        ~metadata:`Always
+        ()
+    in
+    let apply_internal acc ~source:_ _op _res = acc in
+    let apply (type kind) acc ~source:_ (op : kind manager_operation) _res =
+      match op with Dal_publish_slot_header {slot} -> slot :: acc | _ -> acc
+    in
+    Layer1_services.(
+      process_manager_operations [] block.operations {apply; apply_internal})
+    |> List.map_es (fun slot ->
+           return
+             (Dal.Slot_index.to_int slot.Dal.Slot.id.index, slot.Dal.Slot.header))
 end
 
-let () = Dal_constants_plugin.register (module Plugin)
+let () = Dal_plugin.register (module Plugin)
