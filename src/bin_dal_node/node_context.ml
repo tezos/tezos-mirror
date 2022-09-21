@@ -29,20 +29,21 @@ type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
   plugin : (module Dal_plugin.T);
-  slot_header_store : Slot_headers_store.t;
 }
 
 type status = Ready of ready_ctxt | Starting
 
-type t = {mutable status : status; config : Configuration.t}
+type t = {
+  mutable status : status;
+  config : Configuration.t;
+  store : Store.node_store;
+}
 
-let init config = {status = Starting; config}
+let init config store = {status = Starting; config; store}
 
-let set_ready ctxt slot_header_store plugin dal_constants dal_parameters =
+let set_ready ctxt plugin dal_constants dal_parameters =
   match ctxt.status with
-  | Starting ->
-      ctxt.status <-
-        Ready {slot_header_store; plugin; dal_constants; dal_parameters}
+  | Starting -> ctxt.status <- Ready {plugin; dal_constants; dal_parameters}
   | Ready _ -> raise Status_already_ready
 
 type error += Node_not_ready
@@ -70,3 +71,5 @@ let get_ready ctxt =
 let get_config ctxt = ctxt.config
 
 let get_status ctxt = ctxt.status
+
+let get_store ctxt = ctxt.store

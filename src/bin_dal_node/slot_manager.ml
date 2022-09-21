@@ -124,7 +124,7 @@ let save store slot_header shards =
       return metadata)
     shards
 
-let split_and_store cb_constants store slot =
+let split_and_store watcher cb_constants store slot =
   let r =
     let open Result_syntax in
     let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
@@ -136,6 +136,7 @@ let split_and_store cb_constants store slot =
   | Ok (polynomial, commitment) ->
       let shards = Cryptobox.shards_from_polynomial cb_constants polynomial in
       let* () = save store commitment shards in
+      Lwt_watcher.notify watcher commitment ;
       let*! () =
         Event.(
           emit stored_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))

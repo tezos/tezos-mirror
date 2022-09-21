@@ -29,6 +29,8 @@
 (* Relative path to store directory from base-dir *)
 let path = "store"
 
+let slot_header_store = "slot_header_store"
+
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
 
@@ -38,10 +40,20 @@ let info message =
 
 let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
+type node_store = {
+  slots_store : t;
+  slot_headers_store : Slot_headers_store.t;
+  slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+}
+
+let slot_watcher {slot_watcher; _} = Lwt_watcher.create_stream slot_watcher
+
 let init config =
   let open Lwt_syntax in
   let dir = Configuration.data_dir_path config path in
+  let* slot_header_store = Slot_headers_store.load dir in
+  let slot_watcher = Lwt_watcher.create_input () in
   let* repo = Repo.v (Irmin_pack.config dir) in
-  let* store = main repo in
+  let* slot_store = main repo in
   let* () = Event.(emit store_is_ready ()) in
-  Lwt.return store
+  Lwt.return {slot_store; slot_watcher; slot_header_store}
