@@ -24,15 +24,9 @@
 (*****************************************************************************)
 
 module type T = sig
-  module P : sig
-    val hash : Protocol_hash.t
+  val hash : Protocol_hash.t
 
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  include module type of struct
-    include P
-  end
+  include Tezos_protocol_environment.PROTOCOL
 
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
@@ -64,10 +58,10 @@ module Register_embedded_V0
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V1
     (Env : Tezos_protocol_environment.V1.T)
@@ -77,10 +71,10 @@ module Register_embedded_V1
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V2
     (Env : Tezos_protocol_environment.V2.T)
@@ -90,11 +84,11 @@ module Register_embedded_V2
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V3
     (Env : Tezos_protocol_environment.V3.T)
@@ -104,11 +98,11 @@ module Register_embedded_V3
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V4
     (Env : Tezos_protocol_environment.V4.T)
@@ -118,11 +112,11 @@ module Register_embedded_V4
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V5
     (Env : Tezos_protocol_environment.V5.T)
@@ -132,11 +126,11 @@ module Register_embedded_V5
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V6
     (Env : Tezos_protocol_environment.V6.T)
@@ -146,11 +140,11 @@ module Register_embedded_V6
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
 
 module Register_embedded_V7
     (Env : Tezos_protocol_environment.V7.T)
@@ -160,8 +154,8 @@ module Register_embedded_V7
       val sources : Protocol.t
     end) :
   T
-    with type P.block_header_data = Proto.block_header_data
-     and type P.operation_data = Proto.operation_data
-     and type P.operation = Proto.operation
-     and type P.operation_receipt = Proto.operation_receipt
-     and type P.validation_state = Proto.validation_state
+    with type block_header_data = Proto.block_header_data
+     and type operation_data = Proto.operation_data
+     and type operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state

@@ -877,6 +877,16 @@ module Revamped = struct
     in
     let* () = check_mempool ~applied:[oph1; oph2] client in
 
+    let signer =
+      if Protocol.number protocol >= 15 then Constant.bootstrap1
+        (* Since protocol 15, the 1M restriction check is done
+           after the validation of the op (and includes the
+           signature checks), therefore we need a valid
+           signature *)
+      else Constant.bootstrap3
+      (* By putting the wrong signature, we also ensure that the
+         signature is checked only after the 1M restriction check. *)
+    in
     log_step
       3
       "Inject another transfer from [source1] with the same fee and a correct \
@@ -887,15 +897,13 @@ module Revamped = struct
     let error =
       rex
         ~opts:[`Dotall]
-        "Fatal error:\n  Command failed: Error while applying operation.*:"
+        "Only one manager operation per manager per block allowed"
     in
-    (* By putting the wrong signature, we also ensure that the
-       signature is checked only after the 1M restriction check. *)
     let* (`OpHash _) =
       Operation.Manager.(
         inject
           ~error
-          ~signer:Constant.bootstrap3
+          ~signer
           [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap4 ()]
           client)
     in
@@ -910,7 +918,7 @@ module Revamped = struct
       Operation.Manager.(
         inject
           ~force:true
-          ~signer:Constant.bootstrap3
+          ~signer
           [make ~source:source1 ~fee @@ transfer ~dest:Constant.bootstrap5 ()]
           client)
     in
@@ -945,6 +953,12 @@ module Revamped = struct
   let wrong_signed_branch_delayed_becomes_refused =
     Protocol.register_test
       ~__FILE__
+      ~supports:
+        (Protocol.Until_protocol
+           14
+           (* Since protocol 15, the 1M restriction check is done
+              after the validation of the op (which includes the
+              signature checks) *))
       ~title:"Reclassify branch_delayed operation with wrong signature"
       ~tags:["mempool"; "wrong"; "signature"]
     @@ fun protocol ->

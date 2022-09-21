@@ -149,3 +149,48 @@ type error += Missing_value_in_cache
 let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
     ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
   return (fun _ -> fail Missing_value_in_cache)
+
+(* Fake mempool *)
+module Mempool = struct
+  type t = unit
+
+  type validation_info = unit
+
+  type conflict_handler =
+    existing_operation:Operation_hash.t * operation ->
+    new_operation:Operation_hash.t * operation ->
+    [`Keep | `Replace]
+
+  type operation_conflict =
+    | Operation_conflict of {
+        existing : Operation_hash.t;
+        new_operation : Operation_hash.t;
+      }
+
+  type add_result =
+    | Added
+    | Replaced of {removed : Operation_hash.t}
+    | Unchanged
+
+  type add_error =
+    | Validation_error of error trace
+    | Add_conflict of operation_conflict
+
+  type merge_error =
+    | Incompatible_mempool
+    | Merge_conflict of operation_conflict
+
+  let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ =
+    Lwt.return_ok ((), ())
+
+  let encoding = Data_encoding.unit
+
+  let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+    Lwt.return_ok ((), Unchanged)
+
+  let remove_operation () _ = ()
+
+  let merge ?conflict_handler:_ () () = Ok ()
+
+  let operations () = Operation_hash.Map.empty
+end

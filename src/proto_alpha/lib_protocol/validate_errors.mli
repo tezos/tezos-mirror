@@ -25,12 +25,20 @@
 
 open Alpha_context
 
+(** type used for conflicting operation. *)
+type operation_conflict =
+  | Operation_conflict of {
+      existing : Operation_hash.t;
+      new_operation : Operation_hash.t;
+    }
+
 (** Errors that may arise while validating a consensus operation. *)
 module Consensus : sig
   type consensus_operation_kind =
     | Preendorsement
     | Endorsement
     | Grandparent_endorsement
+    | Dal_slot_availability
 
   (** Errors for preendorsements and endorsements. *)
   type error +=
@@ -75,9 +83,9 @@ module Consensus : sig
     | Wrong_slot_used_for_consensus_operation of {
         kind : consensus_operation_kind;
       }
-    | Conflicting_consensus_operation of {kind : consensus_operation_kind}
-    | Conflicting_dal_slot_availability of {
-        endorser : Signature.Public_key_hash.t;
+    | Conflicting_consensus_operation of {
+        kind : consensus_operation_kind;
+        conflict : operation_conflict;
       }
 end
 
@@ -97,22 +105,10 @@ module Voting : sig
     | (* Proposals errors *)
         Empty_proposals
     | Proposals_contain_duplicate of {proposal : Protocol_hash.t}
-    | Too_many_proposals
     | Already_proposed of {proposal : Protocol_hash.t}
-    | Conflict_too_many_proposals of {
-        max_allowed : int;
-        count_previous_blocks : int;
-        count_current_block : int;
-        count_operation : int;
-        conflicting_operations : Operation_hash.t list;
-      }
-    | Conflict_already_proposed of {
-        proposal : Protocol_hash.t;
-        conflicting_operation : Operation_hash.t;
-      }
-    | Conflicting_dictator_proposals of Operation_hash.t
+    | Too_many_proposals of {previous_count : int; operation_count : int}
+    | Conflicting_proposals of operation_conflict
     | Testnet_dictator_multiple_proposals
-    | Testnet_dictator_conflicting_operation
     | Proposals_from_unregistered_delegate of Signature.Public_key_hash.t
     | (* Ballot errors *)
         Ballot_for_wrong_proposal of {
@@ -120,8 +116,8 @@ module Voting : sig
         submitted : Protocol_hash.t;
       }
     | Already_submitted_a_ballot
-    | Conflicting_ballot of {conflicting_operation : Operation_hash.t}
     | Ballot_from_unregistered_delegate of Signature.Public_key_hash.t
+    | Conflicting_ballot of operation_conflict
 end
 
 (** Errors that may arise while validating an anonymous operation. *)
@@ -130,7 +126,10 @@ module Anonymous : sig
 
   type error +=
     | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
-    | Conflicting_activation of Ed25519.Public_key_hash.t * Operation_hash.t
+    | Conflicting_activation of {
+        edpkh : Ed25519.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
     | Invalid_denunciation of denunciation_kind
     | Invalid_double_baking_evidence of {
         hash1 : Block_hash.t;
@@ -152,9 +151,7 @@ module Anonymous : sig
       }
     | Conflicting_denunciation of {
         kind : denunciation_kind;
-        delegate : Signature.Public_key_hash.t;
-        level : Level.t;
-        hash : Operation_hash.t;
+        conflict : operation_conflict;
       }
     | Too_early_denunciation of {
         kind : denunciation_kind;
@@ -166,7 +163,8 @@ module Anonymous : sig
         level : Raw_level.t;
         last_cycle : Cycle.t;
       }
-    | Conflicting_nonce_revelation
+    | Conflicting_nonce_revelation of operation_conflict
+    | Conflicting_vdf_revelation of operation_conflict
     | Drain_delegate_on_unregistered_delegate of Signature.Public_key_hash.t
     | Invalid_drain_delegate_inactive_key of {
         delegate : Signature.Public_key_hash.t;
@@ -180,13 +178,19 @@ module Anonymous : sig
         destination : Signature.Public_key_hash.t;
         min_amount : Tez.t;
       }
-    | Conflicting_drain of {delegate : Signature.Public_key_hash.t}
+    | Conflicting_drain_delegate of {
+        delegate : Signature.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
 end
 
 (** Errors that may arise while validating a manager operation. *)
 module Manager : sig
   type error +=
-    | Manager_restriction of Signature.Public_key_hash.t * Operation_hash.t
+    | Manager_restriction of {
+        source : Signature.Public_key_hash.t;
+        conflict : operation_conflict;
+      }
     | Inconsistent_sources
     | Inconsistent_counters
     | Incorrect_reveal_position

@@ -11355,6 +11355,138 @@ module type PROTOCOL = sig
     predecessor:Block_hash.t ->
     timestamp:Time.t ->
     (Context.Cache.key -> Context.Cache.value tzresult Lwt.t) tzresult Lwt.t
+
+  module Mempool : sig
+    (** Mempool type *)
+    type t
+
+    (** Validation info type required to validate and add operations to a
+        mempool. *)
+    type validation_info
+
+    (** Type of the function that may be provided in order to resolve a
+        potential conflict when adding an operation to an existing mempool
+        or when merging two mempools. This handler may be defined as a
+        simple order relation over operations (e.g. prioritize the most
+        profitable operations) or an arbitrary one (e.g. prioritize
+        operations where the source is a specific manager).
+
+        Returning [`Keep] will leave the mempool unchanged and retain the
+        [existing_operation] while returning [`Replace] will remove
+        [existing_operation] and add [new_operation] instead. *)
+    type conflict_handler =
+      existing_operation:Operation_hash.t * operation ->
+      new_operation:Operation_hash.t * operation ->
+      [`Keep | `Replace]
+
+    type operation_conflict =
+      | Operation_conflict of {
+          existing : Operation_hash.t;
+          new_operation : Operation_hash.t;
+        }
+
+    (** Return type when adding an operation to the mempool *)
+    type add_result =
+      | Added
+          (** [Added] means that an operation was successfully added to
+              the mempool without any conflict. *)
+      | Replaced of {removed : Operation_hash.t}
+          (** [Replaced {removed}] means that an operation was
+              successfully added but there was a conflict with the [removed]
+              operation which was removed from the mempool. *)
+      | Unchanged
+          (** [Unchanged] means that there was a conflict with an existing
+              operation which was considered better by the
+              [conflict_handler], therefore the new operation is discarded
+              and the mempool remains unchanged.*)
+
+    (** Error type returned when adding an operation to the mempool fails. *)
+    type add_error =
+      | Validation_error of error trace
+          (** [Validation_error _] means that the operation is invalid. *)
+      | Add_conflict of operation_conflict
+          (** [Add_conflict _] means that an operation conflicts with
+              an existing one. This error will only be obtained when
+              no [conflict_handler] was provided. Moreover,
+              [Validation_error _] takes precedence over [Add_conflict
+              _] which implies that we have the implicit invariant
+              that the operation would be valid if there was no
+              conflict. Therefore, if [add_operation] would have to be
+              called again, it would be redondant to check the
+              operation's signature. *)
+
+    (** Error type returned when the merge of two mempools fails. *)
+    type merge_error =
+      | Incompatible_mempool
+          (** [Incompatible_mempool _] means that the two mempools are not built
+              ontop of the same head and therefore cannot be considered. *)
+      | Merge_conflict of operation_conflict
+          (** [Merge_conflict _] arises when two mempool contains conflicting
+              operations and no [conflict_handler] was provided.*)
+
+    (** Initialize a static [validation_info] and [mempool], required
+        to validate and add operations, and an incremental and
+        serializable {!mempool}. *)
+    val init :
+      Context.t ->
+      Chain_id.t ->
+      head_hash:Block_hash.t ->
+      head_header:Block_header.shell_header ->
+      current_timestamp:Time.t ->
+      (validation_info * t) tzresult Lwt.t
+
+    (** Mempool encoding *)
+    val encoding : t Data_encoding.t
+
+    (** Adds an operation to a [mempool] if and only if it is valid and
+        does not conflict with previously added operation.
+
+        This function checks the validity of an operation and tries to
+        add it to the mempool.
+
+        If a validation error is triggered, the result will be a
+        [Validation_error].  If a conflict with a previous operation
+        exists, the result will be [Add_conflict] is then checked.
+        Important: no [Add_conflict] will be raised if a
+        [conflict_handler] is provided (see [add_result]).
+
+        If no error is raised the operation is potentially added to the
+        [mempool] depending on the [add_result] value. *)
+    val add_operation :
+      ?check_signature:bool ->
+      ?conflict_handler:conflict_handler ->
+      validation_info ->
+      t ->
+      Operation_hash.t * operation ->
+      (t * add_result, add_error) result Lwt.t
+
+    (** [remove_operation mempool oph] removes the operation [oph] from
+        the [mempool]. The [mempool] remains unchanged when [oph] is not
+        present in the [mempool] *)
+    val remove_operation : t -> Operation_hash.t -> t
+
+    (** [merge ?conflict_handler mempool mempool'] merges [mempool']
+        {b into} [mempool].
+
+        Mempools may only be merged if they are compatible: i.e. both have
+        been initialised with the same predecessor block. Otherwise, the
+        [Incompatible_mempool] error is returned.
+
+        Conflicts between operations from the two mempools can
+        occur. Similarly as [add_operation], a [Merge_conflict] error
+        may be raised when no [conflict_handler] is provided.
+
+        [existing_operation] in [conflict_handler ~existing_operation ~new_operation]
+        references operations present in [mempool] while
+        [new_operation] will reference operations present in
+        [mempool']. *)
+    val merge :
+      ?conflict_handler:conflict_handler -> t -> t -> (t, merge_error) result
+
+    (** [operations mempool] returns the map of operations present in
+        [mempool]. *)
+    val operations : t -> operation Operation_hash.Map.t
+  end
 end
 
 (** [activate ctxt ph] activates an economic protocol (given by its

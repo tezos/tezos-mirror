@@ -370,7 +370,7 @@ let unrevealed_key_diagnostic (infos : infos) op =
 
 let test_unrevealed_key kind () =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
+  let* infos = init_ctxt {ctxt_req_default with reveal_accounts = false} in
   let* op =
     select_op
       {(operation_req_default kind) with force_reveal = Some false}

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Mempool = Plugin.Mempool
+
 let string_gen = QCheck2.Gen.small_string ?gen:None
 
 let public_key_hash_gen :

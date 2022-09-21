@@ -91,7 +91,7 @@ Two new operations have been added:
   proposer and the baker.
 
 ::
- 
+
   "proposer_consensus_key": "[PUBLIC_KEY_HASH]",
   "baker_consensus_key": "[PUBLIC_KEY_HASH]",
 
@@ -364,3 +364,9 @@ Internal
 - Rely on the protocol for 1M and precheck all operations. (MR :gl:`!6070`)
 
 - Split the validation from the application of blocks. (MR :gl:`!6152`)
+
+- Expose a new ``Mempool`` mode on the protocol side that offers an
+  API allowing a light validation of operations. This as well as
+  maintaining a commutative set of operations that may also be
+  efficiently merged with another. This enables the implementation of
+  a parallelized shell's mempool. (MR :gl:`!6274`)

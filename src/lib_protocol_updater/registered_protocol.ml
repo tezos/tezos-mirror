@@ -24,15 +24,9 @@
 (*****************************************************************************)
 
 module type T = sig
-  module P : sig
-    val hash : Protocol_hash.t
+  val hash : Protocol_hash.t
 
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  include module type of struct
-    include P
-  end
+  include Tezos_protocol_environment.PROTOCOL
 
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t

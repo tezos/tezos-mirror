@@ -271,8 +271,8 @@ let begin_full_construction ~chain_id ~predecessor_context
   return {validity_state; application_state}
 
 let begin_partial_construction ~chain_id ~predecessor_context
-    ~predecessor_timestamp ~predecessor_level ~predecessor_fitness ~predecessor
-    ~timestamp =
+    ~predecessor_timestamp ~predecessor_level ~predecessor_fitness
+    ~predecessor:_ ~timestamp =
   let open Lwt_tzresult_syntax in
   let open Alpha_context in
   let level = Int32.succ predecessor_level in
@@ -295,13 +295,12 @@ let begin_partial_construction ~chain_id ~predecessor_context
   let*? grandparent_round =
     Alpha_context.Fitness.predecessor_round_from_raw predecessor_fitness
   in
-  let* validity_state =
+  let validity_state =
     Validate.begin_partial_construction
       ctxt
       chain_id
       ~predecessor_level
       ~predecessor_round
-      ~predecessor_hash:predecessor
       ~grandparent_round
   in
   let* application_state =
@@ -352,7 +351,7 @@ let validate_operation validity_state
 let apply_operation (state : validation_state)
     (packed_operation : Alpha_context.packed_operation) =
   let open Lwt_result_syntax in
-  let* validate_state =
+  let* validation_state =
     validate_operation state.validity_state packed_operation
   in
   let operation_hash = Alpha_context.Operation.hash_packed packed_operation in
@@ -363,11 +362,7 @@ let apply_operation (state : validation_state)
       packed_operation
   in
   return
-    ( {
-        validity_state = {state.validity_state with state = validate_state};
-        application_state;
-      },
-      operation_receipt )
+    ({validity_state = validation_state; application_state}, operation_receipt)
 
 let finalize_block state shell_header =
   let open Lwt_result_syntax in
@@ -447,5 +442,41 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
   let level = Int32.succ pred_level in
   Alpha_context.prepare ctxt ~level ~predecessor_timestamp ~timestamp
   >>=? fun (ctxt, _, _) -> return (Apply.value_of_key ctxt)
+
+module Mempool = struct
+  include Mempool_validation
+
+  let init ctxt chain_id ~head_hash ~(head_header : Block_header.shell_header)
+      ~current_timestamp =
+    let open Lwt_tzresult_syntax in
+    let open Alpha_context in
+    let level = Int32.succ head_header.level in
+    let* ctxt, _migration_balance_updates, _migration_operation_results =
+      prepare
+        ~level
+        ~predecessor_timestamp:head_header.timestamp
+        ~timestamp:current_timestamp
+        ctxt
+    in
+    let*? raw_pred_level = Raw_level.of_int32 head_header.level in
+    let head_level = Level.from_raw ctxt raw_pred_level in
+    let* ctxt =
+      init_allowed_consensus_operations
+        ctxt
+        ~endorsement_level:head_level
+        ~preendorsement_level:head_level
+    in
+    let*? fitness = Fitness.from_raw head_header.fitness in
+    let predecessor_round = Fitness.round fitness in
+    let grandparent_round = Fitness.predecessor_round fitness in
+    return
+      (init
+         ctxt
+         chain_id
+         ~predecessor_level:head_level
+         ~predecessor_round
+         ~predecessor_hash:head_hash
+         ~grandparent_round)
+end
 
 (* Vanity nonce: TBD *)

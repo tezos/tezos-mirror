@@ -127,11 +127,11 @@ let apply_operation validation_state operation =
   >>= fun state ->
   match Apply.apply state operation.protocol_data with
   | None ->
-      Error_monad.fail Error.Invalid_operation
+    Error_monad.fail Error.Invalid_operation
   | Some state ->
-      let receipt = Receipt.create "operation applied successfully" in
-      State.update_state context state
-      >>= fun context -> return ({context; fitness}, receipt)
+    let receipt = Receipt.create "operation applied successfully" in
+    State.update_state context state
+    >>= fun context -> return ({context; fitness}, receipt)
 
 let finalize_block validation_state _header  =
   let fitness = validation_state.fitness in
@@ -143,39 +143,39 @@ let finalize_block validation_state _header  =
   >>= fun state ->
   return
     ( {
-        Updater.message;
-        context;
-        fitness;
-        max_operations_ttl = 0;
-        last_allowed_fork_level = 0l;
-      },
+      Updater.message;
+      context;
+      fitness;
+      max_operations_ttl = 0;
+      last_allowed_fork_level = 0l;
+    },
       state )
 
 let decode_json json =
   match Proto_params.from_json json with
   | exception _ ->
-      fail Error.Invalid_protocol_parameters
+    fail Error.Invalid_protocol_parameters
   | proto_params ->
-      return proto_params
+    return proto_params
 
 let get_init_state context : State.t tzresult Lwt.t =
   let protocol_params_key = ["protocol_parameters"] in
   Context.find context protocol_params_key
   >>= (function
-        | None ->
-            return Proto_params.default
-        | Some bytes -> (
+      | None ->
+        return Proto_params.default
+      | Some bytes -> (
           match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
           | None ->
-              fail (Error.Failed_to_parse_parameter bytes)
+            fail (Error.Failed_to_parse_parameter bytes)
           | Some json ->
-              decode_json json ))
+            decode_json json ))
   >>=? function
   | Proto_params.{init_a; init_b} -> (
-    match State.create init_a init_b with
-    | None ->
+      match State.create init_a init_b with
+      | None ->
         fail Error.Invalid_protocol_parameters
-    | Some state ->
+      | Some state ->
         return state )
 
 let init _chain_id context block_header =
@@ -204,3 +204,47 @@ let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
   return (fun _ -> return (Demo 123))
 
 let rpc_services = Services.rpc_services
+
+(* Fake mempool *)
+module Mempool = struct
+  type t = unit
+
+  type validation_info = unit
+
+  type conflict_handler =
+    existing_operation:Operation_hash.t * operation ->
+    new_operation:Operation_hash.t * operation ->
+    [`Keep | `Replace]
+
+  type operation_conflict =
+    | Operation_conflict of {
+        existing : Operation_hash.t;
+        new_operation : Operation_hash.t;
+      }
+
+  type add_result =
+    | Added
+    | Replaced of {removed : Operation_hash.t}
+    | Unchanged
+
+  type add_error =
+    | Validation_error of error trace
+    | Add_conflict of operation_conflict
+
+  type merge_error =
+    | Incompatible_mempool
+    | Merge_conflict of operation_conflict
+
+  let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ = Lwt.return_ok ((), ())
+
+  let encoding = Data_encoding.unit
+
+  let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+    Lwt.return_ok ((), Unchanged)
+
+  let remove_operation () _ = ()
+
+  let merge ?conflict_handler:_ () () = Ok ()
+
+  let operations () = Operation_hash.Map.empty
+end

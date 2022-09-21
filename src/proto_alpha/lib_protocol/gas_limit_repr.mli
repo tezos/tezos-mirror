@@ -60,6 +60,9 @@ val cost_encoding : cost Data_encoding.encoding
 
 val pp_cost : Format.formatter -> cost -> unit
 
+(** Print the gas cost as gas unit *)
+val pp_cost_as_gas : Format.formatter -> cost -> unit
+
 (** Subtracts the cost from the current limit. Returns [None] if the limit
     would fall below [0]. *)
 val raw_consume : Arith.fp -> cost -> Arith.fp option
