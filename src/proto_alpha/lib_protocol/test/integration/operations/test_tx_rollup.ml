@@ -319,15 +319,14 @@ let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 let rng_state = Random.State.make_self_init ()
 
 let gen_l2_account ?rng_state () =
-  (* TODO: when add bls into env6 we could use directly the pkh *)
   let seed =
     Option.map
       (fun rng_state ->
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
       rng_state
   in
-  let _pkh, public_key, secret_key = Bls.generate_key ?seed () in
-  (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
+  let pkh, public_key, secret_key = Bls.generate_key ?seed () in
+  (secret_key, public_key, pkh)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
     of the ticket containing [contents] of type [ty], crafted by [ticketer] and
@@ -2498,10 +2497,7 @@ module Rejection = struct
     let signatures =
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
-    let signature =
-      assert_some
-      @@ Environment.Bls_signature.aggregate_signature_opt signatures
-    in
+    let signature = assert_some @@ Bls.aggregate_signature_opt signatures in
     let batch =
       Tx_rollup_l2_batch.V1.
         {contents = [transaction]; aggregated_signature = signature}

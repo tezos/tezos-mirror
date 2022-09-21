@@ -250,9 +250,7 @@ let unique_ticket_id =
 
 let gen_l2_account rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
-  (secret_key, public_key)
+  Bls.generate_key ~seed ()
 
 let hash_key_exn ctxt ~ticketer ~typ ~contents ~owner =
   let ticketer = Micheline.root @@ Expr.from_string ticketer in
@@ -312,10 +310,8 @@ let input ~rng_state nb_of_couple_addr nb_of_ticket_per_couple =
     | 0 -> acc
     | n ->
         (* Generate random identities *)
-        let sk1, pk1 = gen_l2_account rng_state in
-        let sk2, pk2 = gen_l2_account rng_state in
-        let addr1 = Tx_rollup_l2_address.of_bls_pk pk1 in
-        let addr2 = Tx_rollup_l2_address.of_bls_pk pk2 in
+        let addr1, pk1, sk1 = gen_l2_account rng_state in
+        let addr2, pk2, sk2 = gen_l2_account rng_state in
         (* Pick indexes *)
         let aidx = Int32.of_int !idx_addr in
         let () = incr idx_addr in
@@ -439,8 +435,8 @@ let create_operation ~rng_state input senders =
       index_or_value couple.addr2.index couple.addr2.addr
     else
       (* create new address *)
-      gen_l2_account rng_state |> snd |> Tx_rollup_l2_address.of_bls_pk
-      |> Indexable.from_value
+      let addr, _pk, _sk = gen_l2_account rng_state in
+      Indexable.from_value addr
   in
   let qty =
     let x =

@@ -28,22 +28,12 @@
 open Tx_rollup_l2_storage_sig
 open Tx_rollup_l2_context_sig
 
-let pk_encoding : Bls_signature.pk Data_encoding.t =
-  Data_encoding.(
-    conv_with_guard
-      Bls_signature.pk_to_bytes
-      (fun x ->
-        Option.to_result
-          ~none:"not a valid bls public key"
-          (Bls_signature.pk_of_bytes_opt x))
-      bytes)
-
 let metadata_encoding =
   Data_encoding.(
     conv
       (fun {counter; public_key} -> (counter, public_key))
       (fun (counter, public_key) -> {counter; public_key})
-      (obj2 (req "counter" int64) (req "public_key" pk_encoding)))
+      (obj2 (req "counter" int64) (req "public_key" Bls.Public_key.encoding)))
 
 (** {1 Type-Safe Storage Access and Gas Accounting} *)
 
@@ -190,10 +180,11 @@ struct
       if cond then fail error else return ()
   end
 
-  let bls_verify : (Bls_signature.pk * bytes) list -> signature -> bool m =
+  let bls_verify : (Bls.Public_key.t * bytes) list -> signature -> bool m =
    fun accounts aggregated_signature ->
     let open Syntax in
-    return (Bls_signature.aggregate_verify accounts aggregated_signature)
+    let msgs = List.map (fun (pk, msg) -> (pk, None, msg)) accounts in
+    return (Bls.aggregate_check msgs aggregated_signature)
 
   let unwrap_or : type a. a option -> error -> a S.m =
    fun opt err ->

@@ -71,6 +71,9 @@ module type T = sig
        and type P256.Public_key_hash.t = P256.Public_key_hash.t
        and type P256.Public_key.t = P256.Public_key.t
        and type P256.t = P256.t
+       and type Bls.Public_key_hash.t = Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Bls.Public_key.t
+       and type Bls.t = Bls.t
        and type Signature.public_key_hash = Signature.public_key_hash
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
@@ -91,14 +94,12 @@ module type T = sig
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
-       and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
-       and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
-       and type Bls12_381.Fr.t = Bls12_381.Fr.t
-       and type Plonk.proof = Plonk.Main_protocol.proof
+       and type Bls.Primitive.Fr.t = Bls12_381.Fr.t
+       and type Plonk.proof = Tezos_protocol_environment_structs.V7.Plonk.proof
        and type Plonk.public_parameters =
-        Plonk.Main_protocol.verifier_public_parameters
-        * Plonk.Main_protocol.transcript
+        Tezos_protocol_environment_structs.V7.Plonk.verifier_public_parameters
+        * Tezos_protocol_environment_structs.V7.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.commitment
 

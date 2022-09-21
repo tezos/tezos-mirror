@@ -27,7 +27,7 @@
     manipulation functions *)
 
 (** Scalars are transparently BLS12-381 scalars *)
-type t = Bls12_381.Fr.t
+type t = Bls.Primitive.Fr.t
 
 (** Safe conversion from Z.t.
     If the numerical value is not in the field, modulo reduction

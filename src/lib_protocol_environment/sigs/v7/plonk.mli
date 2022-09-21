@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type scalar := Bls12_381.Fr.t
+type scalar := Bls.Primitive.Fr.t
 
 type public_parameters
 

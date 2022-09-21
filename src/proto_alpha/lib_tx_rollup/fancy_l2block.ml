@@ -102,7 +102,7 @@ let signer_value ctxt signer =
       | Left _ -> assert false)
   | Right Tx_rollup_l2_batch.(L2_addr _) -> return signer
   | Right Tx_rollup_l2_batch.(Bls_pk pk) ->
-      let addr = Tx_rollup_l2_address.of_bls_pk pk in
+      let addr = Bls.Public_key.hash pk in
       return (value (Tx_rollup_l2_batch.L2_addr addr) |> forget)
 
 let transaction_replace_indexes ctxt transaction =

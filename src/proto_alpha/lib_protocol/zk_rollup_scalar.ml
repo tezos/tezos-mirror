@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Bls12_381.Fr.t
+type t = Bls.Primitive.Fr.t
 
 let of_z z =
   (* In case [z] is outside of the field, i.e. Z >= Fr.order,
-     [Bls12_381.Fr.of_z] will apply a modulo reduction to ge
+     [Bls.Primitive.Fr.of_z] will apply a modulo reduction to ge
      t a field element *)
-  Bls12_381.Fr.of_z z
+  Bls.Primitive.Fr.of_z z
 
 let of_bits bs =
   (* The bits are interpreted as a Z integer *)

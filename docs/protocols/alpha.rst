@@ -39,6 +39,9 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 
 - Adapt to Resto 0.10. (MR :gl:`!6085`)
 
+- Introduce a ``Bls`` module to gather both high and low level functions
+  for BLS cryptography. (MR :gl:`!6295`)
+
 Consensus key
 -------------
 

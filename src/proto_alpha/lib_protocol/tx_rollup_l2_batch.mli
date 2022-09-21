@@ -72,7 +72,7 @@ open Tx_rollup_l2_context_sig
     BLS public key or a layer-2 address index, whose metadata in turn
     contains a corresponding BLS public. key *)
 type signer =
-  | Bls_pk of Bls_signature.pk  (** A signer identified by a BLS public key. *)
+  | Bls_pk of Bls.Public_key.t  (** A signer identified by a BLS public key. *)
   | L2_addr of Tx_rollup_l2_address.t
       (** A signer identified by a layer-2 address. Each such adress
           is in turn identified with a BLS public key. *)
@@ -126,7 +126,7 @@ module V1 : sig
 
   type ('signer, 'content) transaction = ('signer, 'content) operation list
 
-  type signature = Bls_signature.signature
+  type signature = Bls.t
 
   type ('signer, 'content) t = {
     contents : ('signer, 'content) transaction list;
@@ -172,7 +172,7 @@ module V1 : sig
       {ul {li [00] means an index fitting on 1 byte.}
           {li [01] means an index fitting on 2 bytes.}
           {li [10] means an index fitting on 4 bytes.}
-          {li [11] means a value of type {!Bls_signature.pk}.}}
+          {li [11] means a value of type {!Bls.Public_key.t}.}}
 
       The [counter] field follows a similar logic,
 

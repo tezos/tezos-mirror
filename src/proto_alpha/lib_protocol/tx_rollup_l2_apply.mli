@@ -56,7 +56,7 @@ type error +=
     }
   | Incorrect_aggregated_signature
   | Unallocated_metadata of int32
-  | Multiple_operations_for_signer of Bls_signature.pk
+  | Multiple_operations_for_signer of Bls.Public_key.t
   | Invalid_transaction_encoding
   | Invalid_batch_encoding
   | Unexpectedly_indexed_ticket

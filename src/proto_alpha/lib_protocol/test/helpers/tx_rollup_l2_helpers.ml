@@ -99,8 +99,8 @@ let rng_state = Random.State.make_self_init ()
 let gen_l1_address ?seed () = Signature.generate_key ~algo:Ed25519 ?seed ()
 
 let gen_l2_address () =
-  let _pkh, public_key, secret_key = Bls.generate_key () in
-  (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
+  let pkh, public_key, secret_key = Bls.generate_key () in
+  (secret_key, public_key, pkh)
 
 (** [make_unit_ticket_key ctxt ticketer l2_address] computes the key hash of
     the unit ticket crafted by [ticketer] and owned by [l2_address]. *)

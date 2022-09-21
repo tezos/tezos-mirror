@@ -304,9 +304,9 @@ let rec value_size :
     | Operation_t -> assert false
     | Chain_id_t -> ret_succ_adding accu chain_id_size
     | Never_t -> ( match x with _ -> .)
-    | Bls12_381_g1_t -> ret_succ_adding accu !!Bls12_381.G1.size_in_memory
-    | Bls12_381_g2_t -> ret_succ_adding accu !!Bls12_381.G2.size_in_memory
-    | Bls12_381_fr_t -> ret_succ_adding accu !!Bls12_381.Fr.size_in_memory
+    | Bls12_381_g1_t -> ret_succ_adding accu !!Bls.Primitive.G1.size_in_memory
+    | Bls12_381_g2_t -> ret_succ_adding accu !!Bls.Primitive.G2.size_in_memory
+    | Bls12_381_fr_t -> ret_succ_adding accu !!Bls.Primitive.Fr.size_in_memory
     | Ticket_t (_, _) -> ret_succ_adding accu (ticket_size x)
     | Chest_key_t -> ret_succ_adding accu (chest_key_size x)
     | Chest_t -> ret_succ_adding accu (chest_size x)

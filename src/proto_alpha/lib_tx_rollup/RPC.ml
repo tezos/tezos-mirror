@@ -408,18 +408,8 @@ module Context_RPC = struct
   type address_metadata = {
     index : Tx_rollup_l2_context_sig.address_index;
     counter : int64;
-    public_key : Environment.Bls_signature.pk;
+    public_key : Bls.Public_key.t;
   }
-
-  let bls_pk_encoding =
-    Data_encoding.(
-      conv_with_guard
-        Environment.Bls_signature.pk_to_bytes
-        (fun x ->
-          Option.to_result
-            ~none:"not a valid bls public key"
-            (Environment.Bls_signature.pk_of_bytes_opt x))
-        bytes)
 
   let address_metadata_encoding =
     Data_encoding.(
@@ -429,7 +419,7 @@ module Context_RPC = struct
       @@ obj3
            (req "index" Tx_rollup_l2_address.Indexable.index_encoding)
            (req "counter" int64)
-           (req "public_key" bls_pk_encoding))
+           (req "public_key" Bls.Public_key.encoding))
 
   let balance =
     RPC_service.get_service
@@ -501,7 +491,7 @@ module Context_RPC = struct
         "Get the BLS public key associated to the given address, or null if \
          the address has not performed any transfer or withdraw on the rollup."
       ~query:RPC_query.empty
-      ~output:(Data_encoding.option bls_pk_encoding)
+      ~output:(Data_encoding.option Bls.Public_key.encoding)
       RPC_path.(path / "addresses" /: Arg.address_indexable / "public_key")
 
   let ticket =

@@ -38,14 +38,6 @@ let rollup_address =
     b58check_size = 37;
   }
 
-let l2_address =
-  {
-    b58check_prefix = "\006\161\166";
-    prefix = "tz4";
-    hash_size = 20;
-    b58check_size = 36;
-  }
-
 let inbox_hash =
   {
     b58check_prefix = "\079\148\196";

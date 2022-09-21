@@ -9139,6 +9139,14 @@ module type SIGNATURE = sig
   val check : ?watermark:watermark -> Public_key.t -> t -> bytes -> bool
 end
 
+module type AGGREGATE_SIGNATURE = sig
+  include SIGNATURE
+
+  val aggregate_check : (Public_key.t * watermark option * bytes) list -> t -> bool
+
+  val aggregate_signature_opt : t list -> t option
+end
+
 module type FIELD = sig
   type t
 
@@ -9320,12 +9328,13 @@ end
 # 84 "v7.in.ml"
 
 
-  module Bls12_381 : sig
-# 1 "v7/bls12_381.mli"
+  module Bls : sig
+# 1 "v7/bls.mli"
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.ch>                      *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -9347,111 +9356,22 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
-module Fr : S.PRIME_FIELD
+(** Tezos - BLS12-381 cryptography *)
 
-module G1 : S.CURVE with type Scalar.t = Fr.t
+include S.AGGREGATE_SIGNATURE with type watermark := bytes
 
-module G2 : S.CURVE with type Scalar.t = Fr.t
+(** Module to access/expose the primitives of BLS12-381 *)
+module Primitive : sig
+  module Fr : S.PRIME_FIELD
 
-val pairing_check : (G1.t * G2.t) list -> bool
+  module G1 : S.CURVE with type Scalar.t = Fr.t
+
+  module G2 : S.CURVE with type Scalar.t = Fr.t
+
+  val pairing_check : (G1.t * G2.t) list -> bool
+end
 end
 # 86 "v7.in.ml"
-
-
-  module Bls_signature : sig
-# 1 "v7/bls_signature.mli"
-(* MIT License
-*
-* Copyright (c) 2020 Danny Willems <be.danny.willems@gmail.com>
-* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE. *)
-
-(** Type of the public keys *)
-type pk
-
-(** The size in bytes of a serialized value [pk] *)
-val pk_size_in_bytes : int
-
-(** Build a value of type [pk] without performing any check on the input.
-    It is safe to use this function when verifying a signature as the
-    signature function verifies if the point is in the prime subgroup. Using
-    [unsafe_pk_of_bytes] removes a verification performed twice when used
-    [pk_of_bytes_exn] or [pk_of_bytes_opt].
-
-    The expected bytes format are the compressed form of a point on G1. *)
-
-val unsafe_pk_of_bytes : Bytes.t -> pk
-
-(** Build a value of type [pk] safely, i.e. the function checks the bytes
-    given in parameters represents a point on the curve and in the prime subgroup.
-    Return [None] if the bytes are not in the correct format or does
-    not represent a point in the prime subgroup.
-
-    The expected bytes format are the compressed form of a point on G1.
-*)
-val pk_of_bytes_opt : Bytes.t -> pk option
-
-(** Returns a bytes representation of a value of type [pk]. The output is the
-    compressed form a the point G1.t the [pk] represents.
-*)
-val pk_to_bytes : pk -> Bytes.t
-
-(** Type of the signatures *)
-type signature
-
-(** The size in bytes of a serialized value [signature] *)
-val signature_size_in_bytes : int
-
-(** Build a value of type {!signature} without performing any check on the
-    input. It is safe to use this function when verifying a signature as the
-    signature function verifies if the point is in the prime subgroup. Using
-    {!unsafe_signature_of_bytes} removes a verification performed twice when
-    using {!signature_of_bytes_exn} or {!signature_of_bytes_opt}.
-
-    The expected bytes format are the compressed form of a point on G2. *)
-val unsafe_signature_of_bytes : Bytes.t -> signature
-
-(** Build a value of type {!signature} safely, i.e. the function checks the
-    bytes given as argument represents a point on the curve and in the
-    prime subgroup. Return [None] if the bytes are not in the correct format
-    or do not represent a point in the prime subgroup.
-
-    The expected bytes format are the compressed form of a point on G2. *)
-val signature_of_bytes_opt : Bytes.t -> signature option
-
-(** Returns a bytes representation of a value of type [signature]. The
-    output is the compressed form of the {!G2.t} point the [signature]
-    represents. *)
-val signature_to_bytes : signature -> Bytes.t
-
-(** [aggregate_signature_opt signatures] aggregates the signatures [signatures], following
-    https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-2.8.
-    Return [None] if [INVALID] is expected in the specification
-*)
-val aggregate_signature_opt : signature list -> signature option
-
-val verify : pk -> Bytes.t -> signature -> bool
-
-val aggregate_verify : (pk * Bytes.t) list -> signature -> bool
-end
-# 88 "v7.in.ml"
 
 
   module Ed25519 : sig
@@ -9485,7 +9405,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 90 "v7.in.ml"
+# 88 "v7.in.ml"
 
 
   module Secp256k1 : sig
@@ -9519,7 +9439,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 92 "v7.in.ml"
+# 90 "v7.in.ml"
 
 
   module P256 : sig
@@ -9553,7 +9473,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 94 "v7.in.ml"
+# 92 "v7.in.ml"
 
 
   module Chain_id : sig
@@ -9585,7 +9505,7 @@ end
 
 include S.HASH
 end
-# 96 "v7.in.ml"
+# 94 "v7.in.ml"
 
 
   module Signature : sig
@@ -9637,7 +9557,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 98 "v7.in.ml"
+# 96 "v7.in.ml"
 
 
   module Block_hash : sig
@@ -9670,7 +9590,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 100 "v7.in.ml"
+# 98 "v7.in.ml"
 
 
   module Operation_hash : sig
@@ -9703,7 +9623,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 102 "v7.in.ml"
+# 100 "v7.in.ml"
 
 
   module Operation_list_hash : sig
@@ -9736,7 +9656,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 104 "v7.in.ml"
+# 102 "v7.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -9769,7 +9689,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 106 "v7.in.ml"
+# 104 "v7.in.ml"
 
 
   module Protocol_hash : sig
@@ -9802,7 +9722,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 108 "v7.in.ml"
+# 106 "v7.in.ml"
 
 
   module Context_hash : sig
@@ -9855,7 +9775,7 @@ end
 
 type version = Version.t
 end
-# 110 "v7.in.ml"
+# 108 "v7.in.ml"
 
 
   module Sapling : sig
@@ -10003,7 +9923,7 @@ module Verification : sig
   val final_check : t -> UTXO.transaction -> string -> bool
 end
 end
-# 112 "v7.in.ml"
+# 110 "v7.in.ml"
 
 
   module Timelock : sig
@@ -10062,7 +9982,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
     Used for gas accounting*)
 val get_plaintext_size : chest -> int
 end
-# 114 "v7.in.ml"
+# 112 "v7.in.ml"
 
 
   module Vdf : sig
@@ -10150,7 +10070,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
     @raise Invalid_argument when inputs are invalid *)
 val verify : discriminant -> challenge -> difficulty -> result -> proof -> bool
 end
-# 116 "v7.in.ml"
+# 114 "v7.in.ml"
 
 
   module Micheline : sig
@@ -10210,7 +10130,7 @@ val annotations : ('l, 'p) node -> string list
 
 val strip_locations : (_, 'p) node -> 'p canonical
 end
-# 118 "v7.in.ml"
+# 116 "v7.in.ml"
 
 
   module Block_header : sig
@@ -10267,7 +10187,7 @@ type t = {shell : shell_header; protocol_data : bytes}
 
 include S.HASHABLE with type t := t and type hash := Block_hash.t
 end
-# 120 "v7.in.ml"
+# 118 "v7.in.ml"
 
 
   module Bounded : sig
@@ -10416,7 +10336,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
 module Uint8 (B : BOUNDS with type ocaml_type := int) :
   S with type ocaml_type := int
 end
-# 122 "v7.in.ml"
+# 120 "v7.in.ml"
 
 
   module Fitness : sig
@@ -10450,7 +10370,7 @@ end
     compared in a lexicographical order (longer list are greater). *)
 include S.T with type t = bytes list
 end
-# 124 "v7.in.ml"
+# 122 "v7.in.ml"
 
 
   module Operation : sig
@@ -10494,7 +10414,7 @@ type t = {shell : shell_header; proto : bytes}
 
 include S.HASHABLE with type t := t and type hash := Operation_hash.t
 end
-# 126 "v7.in.ml"
+# 124 "v7.in.ml"
 
 
   module Context : sig
@@ -11131,7 +11051,7 @@ module Cache :
      and type key = cache_key
      and type value = cache_value
 end
-# 128 "v7.in.ml"
+# 126 "v7.in.ml"
 
 
   module Updater : sig
@@ -11443,7 +11363,7 @@ end
    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
-# 130 "v7.in.ml"
+# 128 "v7.in.ml"
 
 
   module RPC_context : sig
@@ -11598,7 +11518,7 @@ val make_opt_call3 :
   'i ->
   'o option shell_tzresult Lwt.t
 end
-# 132 "v7.in.ml"
+# 130 "v7.in.ml"
 
 
   module Wasm_2_0_0 : sig
@@ -11651,7 +11571,7 @@ module Make
   val get_info : Tree.tree -> info Lwt.t
 end
 end
-# 134 "v7.in.ml"
+# 132 "v7.in.ml"
 
 
   module Plonk : sig
@@ -11681,7 +11601,7 @@ end
 (*                                                                           *)
 (*****************************************************************************)
 
-type scalar := Bls12_381.Fr.t
+type scalar := Bls.Primitive.Fr.t
 
 type public_parameters
 
@@ -11719,7 +11639,7 @@ val verify_multi_circuits :
   proof ->
   bool
 end
-# 136 "v7.in.ml"
+# 134 "v7.in.ml"
 
 
   module Dal : sig
@@ -11827,6 +11747,6 @@ val verify_page :
     [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
   Result.t
 end
-# 138 "v7.in.ml"
+# 136 "v7.in.ml"
 
 end

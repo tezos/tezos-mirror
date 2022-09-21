@@ -134,9 +134,9 @@ module Script_bls = struct
   end
 
   module Fr = struct
-    type t = Fr_tag of Bls12_381.Fr.t [@@ocaml.unboxed]
+    type t = Fr_tag of Bls.Primitive.Fr.t [@@ocaml.unboxed]
 
-    open Bls12_381.Fr
+    open Bls.Primitive.Fr
 
     let add (Fr_tag x) (Fr_tag y) = Fr_tag (add x y)
 
@@ -154,9 +154,9 @@ module Script_bls = struct
   end
 
   module G1 = struct
-    type t = G1_tag of Bls12_381.G1.t [@@ocaml.unboxed]
+    type t = G1_tag of Bls.Primitive.G1.t [@@ocaml.unboxed]
 
-    open Bls12_381.G1
+    open Bls.Primitive.G1
 
     let add (G1_tag x) (G1_tag y) = G1_tag (add x y)
 
@@ -170,9 +170,9 @@ module Script_bls = struct
   end
 
   module G2 = struct
-    type t = G2_tag of Bls12_381.G2.t [@@ocaml.unboxed]
+    type t = G2_tag of Bls.Primitive.G2.t [@@ocaml.unboxed]
 
-    open Bls12_381.G2
+    open Bls.Primitive.G2
 
     let add (G2_tag x) (G2_tag y) = G2_tag (add x y)
 
@@ -187,7 +187,7 @@ module Script_bls = struct
 
   let pairing_check l =
     let l = List.map (fun (G1.G1_tag x, G2.G2_tag y) -> (x, y)) l in
-    Bls12_381.pairing_check l
+    Bls.Primitive.pairing_check l
 end
 
 module Script_timelock = struct

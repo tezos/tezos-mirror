@@ -2329,7 +2329,7 @@ module Zk_rollup : sig
 
   type t = Address.t
 
-  type scalar := Bls12_381.Fr.t
+  type scalar := Bls.Primitive.Fr.t
 
   val to_scalar : t -> scalar
 

@@ -29,17 +29,7 @@ open Tx_rollup_l2_context_sig
 
 let tag_size = `Uint8
 
-let bls_pk_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    Bls_signature.pk_to_bytes
-    (fun x ->
-      match Bls_signature.pk_of_bytes_opt x with
-      | Some x -> ok x
-      | None -> Error "not a BLS public key")
-    (Fixed.bytes Bls_signature.pk_size_in_bytes)
-
-type signer = Bls_pk of Bls_signature.pk | L2_addr of Tx_rollup_l2_address.t
+type signer = Bls_pk of Bls.Public_key.t | L2_addr of Tx_rollup_l2_address.t
 
 module Signer_indexable = Indexable.Make (struct
   type t = signer
@@ -50,10 +40,7 @@ module Signer_indexable = Indexable.Make (struct
 
   let compare x y =
     match (x, y) with
-    | Bls_pk pk1, Bls_pk pk2 ->
-        Bytes.compare
-          (Bls_signature.pk_to_bytes pk1)
-          (Bls_signature.pk_to_bytes pk2)
+    | Bls_pk pk1, Bls_pk pk2 -> Bls.Public_key.compare pk1 pk2
     | L2_addr addr1, L2_addr addr2 -> Tx_rollup_l2_address.compare addr1 addr2
     | L2_addr _, Bls_pk _ -> -1
     | Bls_pk _, L2_addr _ -> 1
@@ -65,7 +52,7 @@ module Signer_indexable = Indexable.Make (struct
         case
           ~title:"bls_pk"
           (Tag 0)
-          bls_pk_encoding
+          Bls.Public_key.encoding
           (function Bls_pk pk -> Some pk | _ -> None)
           (fun pk -> Bls_pk pk);
         case
@@ -98,7 +85,7 @@ module V1 = struct
 
   type ('signer, 'content) transaction = ('signer, 'content) operation list
 
-  type signature = Bls_signature.signature
+  type signature = Bls.t
 
   type ('signer, 'content) t = {
     contents : ('signer, 'content) transaction list;
@@ -188,8 +175,7 @@ module V1 = struct
         (fun (aggregated_signature, contents) ->
           {aggregated_signature; contents})
       @@ obj2
-           (req "aggregated_signature"
-           @@ payload Tx_rollup_l2_context_sig.signature_encoding)
+           (req "aggregated_signature" @@ payload Bls.encoding)
            (req "contents" @@ list ~bits transaction_encoding))
 end
 

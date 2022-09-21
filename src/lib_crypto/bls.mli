@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,3 +33,14 @@ include
      and type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t
+
+(** Module to access/expose the primitives of BLS12-381 *)
+module Primitive : sig
+  module Fr : S.PRIME_FIELD with type t = Bls12_381.Fr.t
+
+  module G1 : S.CURVE with type Scalar.t = Fr.t
+
+  module G2 : S.CURVE with type Scalar.t = Fr.t
+
+  val pairing_check : (G1.t * G2.t) list -> bool
+end
