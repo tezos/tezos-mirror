@@ -158,6 +158,14 @@ val get_chain_block_operation_hash :
 val get_chain_block_helper_complete :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/round]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_helper_round :
+  ?chain:string -> ?block:string -> unit -> int t
+
 (** RPC: [GET /network/peers] *)
 val get_network_peers : (string * JSON.t) list t
 
