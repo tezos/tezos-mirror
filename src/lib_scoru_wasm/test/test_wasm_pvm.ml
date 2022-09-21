@@ -62,6 +62,14 @@ let test_store_has_kernel = "test-store-has"
 *)
 let test_store_list_size_kernel = "test-store-list-size"
 
+(* Kernel checking the behaviour value of store_delete host func.
+
+   This kernel deletes the following paths:
+   - `/durable/one`
+   - `/durable/three/four`
+*)
+let test_store_delete_kernel = "test-store-delete"
+
 (** [check_error kind reason error] checks a Wasm PVM error [error] is of a
     given [kind] with a possible [reason].
 
@@ -242,6 +250,37 @@ let should_run_store_list_size_kernel kernel =
   (* The kernel is now expected to fail, the PVM should be in stuck state. *)
   assert (is_stuck state_after_second_message)
 
+let should_run_store_delete_kernel kernel =
+  let open Lwt_syntax in
+  let open Test_encodings_util in
+  let* tree = initial_tree ~from_binary:true kernel in
+  let* tree = add_value tree ["one"] in
+  let* tree = add_value tree ["one"; "two"] in
+  let* tree = add_value tree ["three"] in
+  let* tree = add_value tree ["three"; "four"] in
+  (* Make the first ticks of the WASM PVM (parsing of origination
+     message, parsing and init of the kernel), to switch it to
+     “Input_requested” mode. *)
+  (* Check that we have all the paths in place. *)
+  let* result = Tree.find_tree tree ["durable"; "one"] in
+  assert (Option.is_some result) ;
+  let* result = Tree.find_tree tree ["durable"; "three"; "four"] in
+  assert (Option.is_some result) ;
+  let* result = Tree.find_tree tree ["durable"; "three"] in
+  assert (Option.is_some result) ;
+  (* Eval until input requested *)
+  let* tree = eval_until_input_requested tree in
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
+  assert (not @@ is_stuck state) ;
+  (* The paths /one & /three/four will have been deleted. *)
+  let* result = Tree.find_tree tree ["durable"; "one"] in
+  assert (Option.is_none result) ;
+  let* result = Tree.find_tree tree ["durable"; "three"; "four"] in
+  assert (Option.is_none result) ;
+  let+ result = Tree.find_tree tree ["durable"; "three"] in
+  assert (Option.is_some result)
+
 let test_with_kernel kernel test () =
   let open Lwt_result_syntax in
   let open Tezt.Base in
@@ -292,4 +331,8 @@ let tests =
       (test_with_kernel
          test_store_list_size_kernel
          should_run_store_list_size_kernel);
+    tztest
+      "Test store-delete kernel"
+      `Quick
+      (test_with_kernel test_store_delete_kernel should_run_store_delete_kernel);
   ]

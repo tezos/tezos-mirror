@@ -221,6 +221,87 @@ let test_store_list_size () =
   assert (result = Values.[Num (I64 (I64.of_int_s 2))]) ;
   Lwt.return_ok ()
 
+(* Test checking that [store_delete key] deletes the subtree at [key] from the
+   durable storage. *)
+let test_store_delete () =
+  let open Lwt_syntax in
+  let* tree = empty_tree () in
+  let value () = Chunked_byte_vector.of_string "a very long value" in
+  (*
+  Store the following tree:
+    /durable/a/short/path/_ = "..."
+    /durable/a/short/path/one/_ = "..."
+    /durable/a/long/path/_ = "..."
+
+  We expect that deleting "/a/short/path" is leaves only "/durable/a/long/path".
+  *)
+  let key = "/a/short/path" in
+  let key_steps = ["a"; "short"; "path"] in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ("durable" :: List.append key_steps ["_"])
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ("durable" :: List.append key_steps ["one"; "_"])
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ["durable"; "a"; "long"; "path"; "_"]
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* durable = wrap_as_durable_storage tree in
+  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
+  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  let src = 20l in
+  let _ = Memory.store_bytes memory src key in
+  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
+  let module_inst = {module_inst with memories} in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+
+  let module_reg = Instance.ModuleMap.create () in
+  let module_key = Instance.Module_key "test" in
+  Instance.update_module_ref module_reg module_key module_inst ;
+  let values =
+    Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
+  in
+  let* durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_delete
+      values
+  in
+  assert (result = []) ;
+  let durable = Durable.of_storage_exn durable in
+  let* value_opt =
+    Durable.find_value durable @@ Durable.key_of_string_exn key
+  in
+  assert (Option.is_none value_opt) ;
+  let* count =
+    Durable.count_subtrees durable @@ Durable.key_of_string_exn key
+  in
+  assert (count = 0) ;
+  let* value_opt =
+    Durable.find_value durable @@ Durable.key_of_string_exn "/a/long/path"
+  in
+  assert (Option.is_some value_opt) ;
+  Lwt.return_ok ()
+
 (* Test checking that if [key] has value/subtree, [store_has key] returns
    the correct enum value. *)
 let test_store_has_existing_key () =
@@ -399,6 +480,7 @@ let tests =
     tztest "store_has existing key" `Quick test_store_has_existing_key;
     tztest "store_has key too long key" `Quick test_store_has_key_too_long;
     tztest "store_list_size counts subtrees" `Quick test_store_list_size;
+    tztest "store_delete removes subtree" `Quick test_store_delete;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
