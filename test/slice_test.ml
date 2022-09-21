@@ -122,6 +122,10 @@ let option_enc =
   let open Data_encoding in
   def "option_enc" (option (list (option int31)))
 
+let option_n_enc =
+  let open Data_encoding in
+  def "option_n_enc" (option (list_with_length `N (option int31)))
+
 let option_example1 = Some [Some 5; Some 10; None]
 
 let option_result1 =
@@ -139,11 +143,28 @@ let option_result1 =
     "0";
   ]
 
+let option_n_result1 =
+  [
+    "1";
+    (* tag of Some *)
+    "3";
+    (* list length *)
+    "1";
+    (* tag of Some *)
+    "5";
+    "1";
+    (* tag of Some *)
+    "10";
+    "0";
+  ]
+
 (* tag of None *)
 
 let option_example2 = Some []
 
 let option_result2 = ["1"; (* tag of Some *) "0"]
+
+let option_n_result2 = ["1"; (* tag of Some *) "0"]
 
 (* list length *)
 
@@ -196,9 +217,21 @@ let recursive_enc =
     (mu "t" (fun t_encoding ->
          conv (fun (R r) -> r) (fun r -> R r) (obj1 (req "R" (list t_encoding)))))
 
+let recursive_n_enc =
+  let open! Data_encoding in
+  def
+    "recursive_n_enc"
+    (mu "t" (fun t_encoding ->
+         conv
+           (fun (R r) -> r)
+           (fun r -> R r)
+           (obj1 (req "R" (list_with_length `N t_encoding)))))
+
 let recursive_example = R [R []]
 
 let recursive_result = ["4"; (* list length *) "0"]
+
+let recursive_n_result = ["1"; (* list length *) "0"]
 
 (* list length *)
 
@@ -217,8 +250,10 @@ let () =
   Data_encoding.Registration.register record_enc ;
   Data_encoding.Registration.register union_enc ;
   Data_encoding.Registration.register option_enc ;
+  Data_encoding.Registration.register option_n_enc ;
   Data_encoding.Registration.register parameter_enc ;
   Data_encoding.Registration.register recursive_enc ;
+  Data_encoding.Registration.register recursive_n_enc ;
   Data_encoding.Registration.register qualified_enc
 
 let bin_list = Data_encoding.Binary.to_string_exn list_enc list_example
@@ -235,11 +270,20 @@ let bin_option1 = Data_encoding.Binary.to_string_exn option_enc option_example1
 
 let bin_option2 = Data_encoding.Binary.to_string_exn option_enc option_example2
 
+let bin_option_n_1 =
+  Data_encoding.Binary.to_string_exn option_n_enc option_example1
+
+let bin_option_n_2 =
+  Data_encoding.Binary.to_string_exn option_n_enc option_example2
+
 let bin_parameter =
   Data_encoding.Binary.to_string_exn parameter_enc parameter_example
 
 let bin_recursive =
   Data_encoding.Binary.to_string_exn recursive_enc recursive_example
+
+let bin_recursive_n =
+  Data_encoding.Binary.to_string_exn recursive_n_enc recursive_example
 
 let bin_qualified =
   Data_encoding.Binary.to_string_exn qualified_enc qualified_example
@@ -270,7 +314,7 @@ let slice_test id result expected () =
 let tests =
   [
     ("slice-test-list", `Quick, slice_test "list_enc" bin_list list_result);
-    ( "slice-test-list-n",
+    ( "slice-test-list_n",
       `Quick,
       slice_test "list_n_enc" bin_list_n list_n_result );
     ( "slice-test-record",
@@ -288,12 +332,21 @@ let tests =
     ( "slice-test-option2",
       `Quick,
       slice_test "option_enc" bin_option2 option_result2 );
+    ( "slice-test-option_n_1",
+      `Quick,
+      slice_test "option_n_enc" bin_option_n_1 option_n_result1 );
+    ( "slice-test-option_n_2",
+      `Quick,
+      slice_test "option_n_enc" bin_option_n_2 option_n_result2 );
     ( "slice-test-parameter",
       `Quick,
       slice_test "parameter_enc" bin_parameter parameter_result );
-    ( "slice-test-recursive",
+    ( "slice-test-legacy-recursive",
       `Quick,
       slice_test "recursive_enc" bin_recursive recursive_result );
+    ( "slice-test-recursive_n",
+      `Quick,
+      slice_test "recursive_n_enc" bin_recursive_n recursive_n_result );
     ( "slice-test-qualified",
       `Quick,
       slice_test "qualified_enc" bin_qualified qualified_result );

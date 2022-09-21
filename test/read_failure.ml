@@ -184,14 +184,14 @@ let test_bounded_string_list =
         `Quick,
         stream
           ~expected
-          (dynamic_size (bounded_list ~total ~elements string))
+          (dynamic_size ~kind:`Uint30 (bounded_list ~total ~elements string))
           vbytes );
       ( "bounded_string_list_minimal_stream." ^ name,
         `Quick,
         minimal_stream
           ~expected
           expected_read
-          (dynamic_size (bounded_list ~total ~elements string))
+          (dynamic_size ~kind:`Uint30 (bounded_list ~total ~elements string))
           vbytes );
       ( "bounded_string_list_minimal_stream." ^ name,
         `Quick,
@@ -200,7 +200,9 @@ let test_bounded_string_list =
           expected_read'
           (check_size
              (total + 4)
-             (dynamic_size (Variable.list (check_size elements string))))
+             (dynamic_size
+                ~kind:`Uint30
+                (Variable.list (check_size elements string))))
           vbytes );
     ]
   in
@@ -258,31 +260,31 @@ let tests =
         `Quick,
         binary
           ~expected:not_enough_data
-          (dynamic_size Variable.string)
+          (dynamic_size ~kind:`Uint30 Variable.string)
           (Bytes.of_string "") );
       ( "dynamic_size.partial_size",
         `Quick,
         binary
           ~expected:not_enough_data
-          (dynamic_size Variable.string)
+          (dynamic_size ~kind:`Uint30 Variable.string)
           (Bytes.of_string "\x00\x00") );
       ( "dynamic_size.incomplete_data",
         `Quick,
         binary
           ~expected:not_enough_data
-          (dynamic_size Variable.string)
+          (dynamic_size ~kind:`Uint30 Variable.string)
           (Bytes.of_string "\x00\x00\x00\x04\x00\x00") );
       ( "dynamic_size.outer-garbage",
         `Quick,
         binary
           ~expected:extra_bytes
-          (dynamic_size Variable.string)
+          (dynamic_size ~kind:`Uint30 Variable.string)
           (Bytes.of_string "\x00\x00\x00\x01\x00\x00") );
       ( "dynamic_size.inner-garbage",
         `Quick,
         binary
           ~expected:extra_bytes
-          (dynamic_size uint8)
+          (dynamic_size ~kind:`Uint30 uint8)
           (Bytes.of_string "\x00\x00\x00\x02\x00\x00") );
       ( "list.truncated",
         `Quick,

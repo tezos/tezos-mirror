@@ -193,7 +193,7 @@ let describe (type x) (encoding : x Encoding.t) =
       type x.
       string option ->
       x Encoding.desc ->
-      Binary_size.unsigned_integer option * string option * pdesc =
+      Binary_size.length option * string option * pdesc =
    fun ref_name -> function
     | Conv {encoding; _} -> extract_dynamic ref_name encoding.encoding
     | Describe {id = ref_name; encoding; _} ->
@@ -328,6 +328,13 @@ let describe (type x) (encoding : x Encoding.t) =
     | Dynamic_size {kind; encoding} ->
         let fields, refs =
           fields None recursives references encoding.encoding
+        in
+        let fields, refs =
+          match kind with
+          | `N ->
+              let layout, refs = layout None recursives refs N in
+              ([Binary_schema.Anonymous_field (classify_desc N, layout)], refs)
+          | _ -> (fields, references)
         in
         (Dynamic_size_field (None, List.length fields, kind) :: fields, refs)
     | Check_size {encoding; _} ->
@@ -568,10 +575,15 @@ let describe (type x) (encoding : x Encoding.t) =
         layout (Some name) recursives references encoding.encoding
     | Splitted {encoding; _} ->
         layout ref_name recursives references encoding.encoding
-    | Dynamic_size _ as encoding ->
+    | Dynamic_size e as encoding ->
         let name = may_new_reference ref_name in
         let fields, references = fields None recursives references encoding in
         UF.add uf {title = name; description = None} ;
+        let references =
+          match e.kind with
+          | `N -> add_n_reference uf references
+          | _ -> references
+        in
         (Ref name, add_reference name (obj fields) references)
     | Check_size {encoding; _} ->
         layout ref_name recursives references encoding.encoding

@@ -234,13 +234,20 @@ module Encoding : sig
 
   (** Encoding of a string
       - In binary, encoded as a byte sequence prefixed by the length
-        of the string
+        of the string. The length is represented as specified by the
+        [length_kind] parameter (default [`Uint30]).
       - in JSON when [string_json_repr = Plain], encoded as a string
       - in JSON when [string_json_repr = Hex],  encoded via hex. *)
-  val string' : string_json_repr -> string encoding
+  val string' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    string encoding
 
   (** Encoding of arbitrary bytes. See [string'] *)
-  val bytes' : string_json_repr -> Bytes.t encoding
+  val bytes' :
+    ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+    string_json_repr ->
+    Bytes.t encoding
 
   (** same as [string' Plain] *)
   val string : string encoding
@@ -888,19 +895,37 @@ let expr_encoding =
 
   module Bounded : sig
     (** Encoding of a string whose length does not exceed the specified length.
-        The size field uses the smallest integer that can accommodate the
+
+        If [length_kind] is set, then it is used to encode the length of the
+        string in a header. If [length_kind] is omitted then the length field
+        uses the smallest fixed-width integer that can accommodate the
         maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
         longer strings, etc.
 
         Attempting to construct a string with a length that is too long causes
-        an [Invalid_argument] exception. *)
-    val string' : string_json_repr -> int -> string encoding
+        an [Invalid_argument] exception.
+
+        @raise Invalid_argument if [length_kind] is set but it cannot accommodate
+        the specified bound. E.g.,
+        [Bounded.string' ~length_kind:`Uint8 Hex 1000] raises.
+
+        @raise Invalid_argument if [length_kind] is unset and the specified
+        bound is larger than 2^30. *)
+    val string' :
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+      string_json_repr ->
+      int ->
+      string encoding
 
     (** Same as [string' Plain] *)
     val string : int -> string encoding
 
     (** See {!string'} above. *)
-    val bytes' : string_json_repr -> int -> Bytes.t encoding
+    val bytes' :
+      ?length_kind:[`N | `Uint30 | `Uint16 | `Uint8] ->
+      string_json_repr ->
+      int ->
+      Bytes.t encoding
 
     (** Same as [bytes' Hex] *)
     val bytes : int -> Bytes.t encoding
@@ -911,7 +936,7 @@ let expr_encoding =
       Typically used to combine two variable encodings in a same
       objects or tuple, or to use a variable encoding in an array or a list. *)
   val dynamic_size :
-    ?kind:[`Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
+    ?kind:[`N | `Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
 
   (** [check_size size encoding] ensures that the binary encoding
       of a value will not be allowed to exceed [size] bytes. The reader

@@ -67,6 +67,11 @@ let short_bytes = Crowbar.map [short_string] Bytes.of_string
 
 let short_bytes1 = Crowbar.map [short_string1] Bytes.of_string
 
+type big_length = [`N | `Uint30]
+
+let big_length_gen : big_length Crowbar.gen =
+  Crowbar.(map [bool] (function true -> `N | false -> `Uint30))
+
 (* We need to hide the type parameter of `Encoding.t` to avoid the generator
  * combinator `choose` from complaining about different types. We use first
  * level modules (for now) to encode existentials.
@@ -107,7 +112,7 @@ type _ ty =
   | FixedList : int * 'a ty -> 'a list ty
   | Array : 'a ty -> 'a array ty
   | FixedArray : int * 'a ty -> 'a array ty
-  | Dynamic_size : 'a ty -> 'a ty
+  | Dynamic_size : (big_length * 'a ty) -> 'a ty
   | Tup1 : 'a ty -> 'a ty
   | Tup2 : 'a ty * 'b ty -> ('a * 'b) ty
   | Tup3 : 'a ty * 'b ty * 'c ty -> ('a * 'b * 'c) ty
@@ -199,7 +204,13 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | FixedList (n, ty) -> Crowbar.pp ppf "fixedlist(%d)(%a)" n pp_ty ty
   | Array ty -> Crowbar.pp ppf "array(%a)" pp_ty ty
   | FixedArray (n, ty) -> Crowbar.pp ppf "fixedarray(%d)(%a)" n pp_ty ty
-  | Dynamic_size ty -> Crowbar.pp ppf "dynamic_size(%a)" pp_ty ty
+  | Dynamic_size (big_length, ty) ->
+      Crowbar.pp
+        ppf
+        "dynamic_size(%s,%a)"
+        (match big_length with `N -> "n" | `Uint30 -> "uint30")
+        pp_ty
+        ty
   | Tup1 ty -> Crowbar.pp ppf "tup1(%a)" pp_ty ty
   | Tup2 (tya, tyb) -> Crowbar.pp ppf "tup2(%a,%a)" pp_ty tya pp_ty tyb
   | Tup3 (tya, tyb, tyc) ->
@@ -362,7 +373,8 @@ let any_ty_fix g =
         map [range ~min:1 4; g] (fun n (AnyTy ty) -> AnyTy (FixedList (n, ty)));
         map [g] (fun (AnyTy ty) -> AnyTy (Array ty));
         map [range ~min:1 4; g] (fun n (AnyTy ty) -> AnyTy (FixedArray (n, ty)));
-        map [g] (fun (AnyTy ty) -> AnyTy (Dynamic_size ty));
+        map [big_length_gen; g] (fun big_length (AnyTy ty) ->
+            AnyTy (Dynamic_size (big_length, ty)));
         map [g] (fun (AnyTy ty) -> AnyTy (Tup1 ty));
         map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) -> AnyTy (Tup2 (ty_a, ty_b)));
         map [g] (fun (AnyTy ty_both) -> AnyTy (Tup2 (ty_both, ty_both)));
@@ -840,15 +852,18 @@ let full_fixed_array : type a. int -> a full -> a array full =
       Data_encoding.(Fixed.array fixen (dynamic_if_needed Full.encoding))
   end)
 
-let full_dynamic_size : type a. a full -> a full =
- fun full ->
+let full_dynamic_size : type a. big_length -> a full -> a full =
+ fun big_length full ->
   let module Full = (val full) in
   (module struct
     include Full
 
-    let ty = Dynamic_size ty
+    let ty = Dynamic_size (big_length, ty)
 
-    let encoding = Data_encoding.dynamic_size encoding
+    let encoding =
+      Data_encoding.dynamic_size
+        ~kind:(big_length :> Data_encoding__Binary_size.length)
+        encoding
   end)
 
 let full_tup1 : type a. a full -> a full =
@@ -2061,7 +2076,8 @@ let rec full_of_ty : type a. a ty -> a full = function
   | FixedList (n, ty) -> full_fixed_list n (full_of_ty ty)
   | Array ty -> full_array (full_of_ty ty)
   | FixedArray (n, ty) -> full_fixed_array n (full_of_ty ty)
-  | Dynamic_size ty -> full_dynamic_size (full_of_ty ty)
+  | Dynamic_size (big_length, ty) ->
+      full_dynamic_size big_length (full_of_ty ty)
   | Tup1 ty -> full_tup1 (full_of_ty ty)
   | Tup2 (tya, tyb) -> full_tup2 (full_of_ty tya) (full_of_ty tyb)
   | Tup3 (tya, tyb, tyc) ->

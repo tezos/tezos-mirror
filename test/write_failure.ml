@@ -87,6 +87,31 @@ let test_bounded_string_list =
     test "e" ~total:30 ~elements:10 ["ab"; "c"; "def"; "gh"; "ijk"];
   ]
 
+let string_n =
+  let open Data_encoding in
+  dynamic_size ~kind:`N Variable.string
+
+let test_bounded_string_n_list =
+  let expected = function
+    | Data_encoding__Binary_error_types.Write_error Size_limit_exceeded -> true
+    | _ -> false
+  in
+  let test name ~total ~elements v =
+    ( "bounded_string_list." ^ name,
+      `Quick,
+      binary ~expected (bounded_list ~total ~elements string_n) v )
+  in
+  [
+    test "a" ~total:0 ~elements:0 [""];
+    test "b1" ~total:0 ~elements:1 [""];
+    test "b2" ~total:1 ~elements:0 [""];
+    test "c1" ~total:4 ~elements:1 [""; ""; ""; ""; ""];
+    test "c2" ~total:5 ~elements:0 [""; ""; ""; ""; ""];
+    test "d1" ~total:5 ~elements:2 [""; ""; ""; ""; "a"];
+    test "d2" ~total:6 ~elements:1 [""; ""; ""; ""; "a"];
+    test "e" ~total:15 ~elements:7 ["ab"; "c"; "def"; "gh"; "ijk"];
+  ]
+
 let tests =
   all_ranged_int 100 400 @ all_ranged_int 19000 19254 @ all_ranged_int ~-100 300
   @ all_ranged_int ~-300_000_000 300_000_000
@@ -97,6 +122,6 @@ let tests =
   @ all "bytes.bounded" (Bounded.bytes 4) (Bytes.of_string "turlututu")
   @ all "unknown_case.B" mini_union_enc (B "2")
   @ all "unknown_case.E" mini_union_enc E
-  @ test_bounded_string_list
+  @ test_bounded_string_list @ test_bounded_string_n_list
   @ all "n" n (Z.of_string "-12")
   @ []

@@ -190,6 +190,41 @@ module Atom = struct
       state.slices <- {name; value; pretty_printed} :: state.slices ;
       result
 
+  let with_limit ~limit read name state =
+    let old_allowed_bytes = state.allowed_bytes in
+    let limit =
+      match state.allowed_bytes with
+      | None -> limit
+      | Some current_limit -> min current_limit limit
+    in
+    state.allowed_bytes <- Some limit ;
+    let v = read name state in
+    let allowed_bytes =
+      match old_allowed_bytes with
+      | None -> None
+      | Some old_limit ->
+          let remaining =
+            match state.allowed_bytes with
+            | None -> assert false
+            | Some remaining -> remaining
+          in
+          let read = limit - remaining in
+          Some (old_limit - read)
+    in
+    state.allowed_bytes <- allowed_bytes ;
+    v
+
+  let uint30_like_n name state =
+    let v =
+      with_limit ~limit:Binary_size.max_size_of_uint30_like_n n name state
+    in
+    if Z.compare v (Z.of_int (Binary_size.max_int `N)) > 0 then
+      let min = 0 and max = Binary_size.max_int `N in
+      (* we use [min_int] to hint at the overlfow-like issue *)
+      let v = Binary_size.min_int `Uint30 in
+      raise (Invalid_int {min; v; max})
+    else Z.to_int v
+
   let z name state =
     let initial_offset = state.offset in
     let first = read_byte state in
@@ -369,7 +404,12 @@ let rec read_rec :
       in
       inj (read_rec encoding ?name state)
   | Dynamic_size {kind; encoding = e} ->
-      let sz = Atom.int kind "dynamic length" state in
+      let sz =
+        match kind with
+        | `N -> Atom.uint30_like_n "dynamic length" state
+        | #Binary_size.unsigned_integer as kind ->
+            Atom.int kind "dynamic length" state
+      in
       let remaining = check_remaining_bytes state sz in
       state.remaining_bytes <- sz ;
       ignore (check_allowed_bytes state sz : int option) ;
@@ -378,28 +418,11 @@ let rec read_rec :
       state.remaining_bytes <- remaining ;
       v
   | Check_size {limit; encoding = e} ->
-      let old_allowed_bytes = state.allowed_bytes in
-      let limit =
-        match state.allowed_bytes with
-        | None -> limit
-        | Some current_limit -> min current_limit limit
-      in
-      state.allowed_bytes <- Some limit ;
-      let v = read_rec e ?name state in
-      let allowed_bytes =
-        match old_allowed_bytes with
-        | None -> None
-        | Some old_limit ->
-            let remaining =
-              match state.allowed_bytes with
-              | None -> assert false
-              | Some remaining -> remaining
-            in
-            let read = limit - remaining in
-            Some (old_limit - read)
-      in
-      state.allowed_bytes <- allowed_bytes ;
-      v
+      Atom.with_limit
+        ~limit
+        (fun name state -> read_rec e ?name state)
+        name
+        state
   | Describe {encoding = e; id; _} -> read_rec e ~name:!!id state
   | Splitted {encoding = e; _} -> read_rec e ?name state
   | Mu {fix; name; _} -> read_rec (fix e) ~name:!!name state
