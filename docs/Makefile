@@ -138,8 +138,7 @@ rpc: user/default-acl.json shell/rpc.rst \
 	alpha/rpc.rst
 
 # To be triggered manually when needed
-rpc-protocols:
-	$(NAMED_PROTOS:%=%/rpc.rst)
+rpc-protocols: $(NAMED_PROTOS:%=%/rpc.rst)
 
 p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
