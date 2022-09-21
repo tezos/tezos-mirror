@@ -91,8 +91,10 @@ val encoding_prefix : t -> string
     to override or remove (when the value is [`None]) the default parameters
     when activating a protocol.
 
-    [`Int i] is a short-hand for [`Float (float i)]. *)
-type parameter_overrides = (string list * [`None | `Int of int | JSON.u]) list
+    [`Int i] is a short-hand for [`Float (float i)] and
+    [`String_of_int i] is a short-hand for [`String (string_of_int i)]. *)
+type parameter_overrides =
+  (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
 (** Write a protocol parameter file.
 

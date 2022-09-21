@@ -505,7 +505,7 @@ let wrong_branch_operation_dismissal =
       ~base:(Either.Right (protocol, None))
       [
         (["consensus_threshold"], `Int 1);
-        (["minimal_block_delay"], `String (string_of_int minimal_block_delay));
+        (["minimal_block_delay"], `String_of_int minimal_block_delay);
         (["delay_increment_per_round"], `String "1");
       ]
   in
@@ -648,7 +648,7 @@ let test_operation_pool_ordering
       ~overrides:
         [
           ( ["hard_gas_limit_per_block"],
-            `String (string_of_int (expected_n_ops * gas_limit)) );
+            `String_of_int (expected_n_ops * gas_limit) );
         ]
       protocol
   in

@@ -222,7 +222,7 @@ let start_protocol ?consensus_threshold ?round_duration
       ~base:(Right (protocol, None))
       [
         (["consensus_threshold"], `Int consensus_threshold);
-        (["minimal_block_delay"], `String (string_of_int minimal_block_delay));
+        (["minimal_block_delay"], `String_of_int minimal_block_delay);
       ]
   in
   let bake_for_delay =

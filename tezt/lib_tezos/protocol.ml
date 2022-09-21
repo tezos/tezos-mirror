@@ -77,7 +77,8 @@ let baker proto = "./tezos-baker-" ^ daemon_name proto
 
 let encoding_prefix = daemon_name
 
-type parameter_overrides = (string list * [`None | `Int of int | JSON.u]) list
+type parameter_overrides =
+  (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
 let write_parameter_file :
     ?additional_bootstrap_accounts:(Account.key * int option) list ->
@@ -103,6 +104,7 @@ let write_parameter_file :
           match value with
           | `None -> None
           | `Int i -> Some (`Float (float i))
+          | `String_of_int i -> Some (`String (string_of_int i))
           | #JSON.u as value -> Some value
         in
         Ezjsonm.update acc path value)
