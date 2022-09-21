@@ -221,9 +221,8 @@ let start_protocol ?consensus_threshold ?round_duration
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       [
-        (["consensus_threshold"], Some (string_of_int consensus_threshold));
-        ( ["minimal_block_delay"],
-          Some (Printf.sprintf "\"%d\"" minimal_block_delay) );
+        (["consensus_threshold"], `Int consensus_threshold);
+        (["minimal_block_delay"], `String_of_int minimal_block_delay);
       ]
   in
   let bake_for_delay =

@@ -3514,10 +3514,7 @@ let injecting_old_operation_fails =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.Right (protocol, None))
-      [
-        ( ["max_operations_time_to_live"],
-          Some (string_of_int max_operations_ttl) );
-      ]
+      [(["max_operations_time_to_live"], `Int max_operations_ttl)]
   in
   let* () =
     Client.activate_protocol_and_wait ~protocol ~parameter_file client

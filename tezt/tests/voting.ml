@@ -276,9 +276,9 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
      different cases when checking levels and periods in tests. *)
   let parameters =
     [
-      (["blocks_per_cycle"], Some "4");
-      (["nonce_revelation_threshold"], Some "2");
-      (["cycles_per_voting_period"], Some "1");
+      (["blocks_per_cycle"], `Int 4);
+      (["nonce_revelation_threshold"], `Int 2);
+      (["cycles_per_voting_period"], `Int 1);
     ]
   in
   let* parameter_file =
@@ -1097,9 +1097,8 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     Protocol.write_parameter_file
       ~base:(Right (from_protocol, None))
       [
-        (["blocks_per_cycle"], Some (string_of_int blocks_per_cycle));
-        ( ["blocks_per_voting_period"],
-          Some (string_of_int blocks_per_voting_period) );
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["blocks_per_voting_period"], `Int blocks_per_voting_period);
       ]
   in
 

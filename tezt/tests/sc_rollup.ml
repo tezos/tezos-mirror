@@ -150,9 +150,9 @@ let disputed_commit = "Attempted to cement a disputed commitment"
 
 let commit_doesnt_exit = "Commitment scc\\w+\\sdoes not exist"
 
-let make_parameter name value =
-  Option.map (fun v -> ([name], Option.some @@ Int.to_string v)) value
-  |> Option.to_list
+let make_parameter name = function
+  | None -> []
+  | Some value -> [([name], `Int value)]
 
 let test ~__FILE__ ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in
@@ -167,7 +167,7 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
     make_parameter "sc_rollup_commitment_period_in_blocks" commitment_period
     @ make_parameter "sc_rollup_challenge_window_in_blocks" challenge_window
     @ make_parameter "sc_rollup_timeout_period_in_blocks" timeout
-    @ [(["sc_rollup_enable"], Some "true")]
+    @ [(["sc_rollup_enable"], `Bool true)]
   in
   let base = Either.right (protocol, None) in
   let* parameter_file = Protocol.write_parameter_file ~base parameters in

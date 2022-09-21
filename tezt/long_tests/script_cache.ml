@@ -775,7 +775,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
     ~executors
   @@ fun () ->
   let parameters =
-    [(["blocks_per_cycle"], Some "8"); (["cycles_per_voting_period"], Some "1")]
+    [(["blocks_per_cycle"], `Int 8); (["cycles_per_voting_period"], `Int 1)]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (migrate_from, None)) parameters

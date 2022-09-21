@@ -39,9 +39,7 @@ let transfer_data =
 let baker = Constant.bootstrap5.alias
 
 let default_overrides =
-  [
-    (* ensure that blocks must be endorsed *) (["consensus_threshold"], Some "6");
-  ]
+  [(* ensure that blocks must be endorsed *) (["consensus_threshold"], `Int 6)]
 
 let init ?(overrides = default_overrides) protocol =
   let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
