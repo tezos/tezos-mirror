@@ -1643,3 +1643,113 @@ module Dal = struct
 
   let shards ctxt ~endorser = compute_shards ~index:0 ctxt ~endorser
 end
+
+(* The type for relative context accesses instead from the root. In order for
+   the carbonated storage functions to consume the gas, this has gas infomation
+*)
+type local_context = {
+  tree : tree;
+  path : key;
+  remaining_operation_gas : Gas_limit_repr.Arith.fp;
+  unlimited_operation_gas : bool;
+}
+
+let with_local_context ctxt key f =
+  (find_tree ctxt key >|= function None -> Tree.empty ctxt | Some tree -> tree)
+  >>= fun tree ->
+  let local_ctxt =
+    {
+      tree;
+      path = key;
+      remaining_operation_gas = remaining_operation_gas ctxt;
+      unlimited_operation_gas = unlimited_operation_gas ctxt;
+    }
+  in
+  f local_ctxt >>=? fun (local_ctxt, res) ->
+  add_tree ctxt key local_ctxt.tree >|= fun ctxt ->
+  update_remaining_operation_gas ctxt local_ctxt.remaining_operation_gas
+  |> fun ctxt ->
+  update_unlimited_operation_gas ctxt local_ctxt.unlimited_operation_gas
+  |> fun ctxt -> ok (ctxt, res)
+
+module Local_context : sig
+  include
+    Raw_context_intf.VIEW
+      with type t = local_context
+       and type key := key
+       and type value := value
+       and type tree := tree
+
+  val consume_gas :
+    local_context -> Gas_limit_repr.cost -> local_context tzresult
+
+  val absolute_key : local_context -> key -> key
+end = struct
+  type t = local_context
+
+  let consume_gas local cost =
+    match Gas_limit_repr.raw_consume local.remaining_operation_gas cost with
+    | Some gas_counter -> Ok {local with remaining_operation_gas = gas_counter}
+    | None ->
+        if local.unlimited_operation_gas then ok local
+        else error Operation_quota_exceeded
+
+  let tree local = local.tree
+
+  let update_root_tree local tree = {local with tree}
+
+  let absolute_key local key = local.path @ key
+
+  let find local = Tree.find (tree local)
+
+  let find_tree local = Tree.find_tree (tree local)
+
+  let mem local = Tree.mem (tree local)
+
+  let mem_tree local = Tree.mem_tree (tree local)
+
+  let get local = Tree.get (tree local)
+
+  let get_tree local = Tree.get_tree (tree local)
+
+  let update local key b =
+    Tree.update (tree local) key b >|=? update_root_tree local
+
+  let update_tree local key b =
+    Tree.update_tree (tree local) key b >|=? update_root_tree local
+
+  let init local key b =
+    Tree.init (tree local) key b >|=? update_root_tree local
+
+  let init_tree local key t =
+    Tree.init_tree (tree local) key t >|=? update_root_tree local
+
+  let add local i b = Tree.add (tree local) i b >|= update_root_tree local
+
+  let add_tree local i t =
+    Tree.add_tree (tree local) i t >|= update_root_tree local
+
+  let remove local i = Tree.remove (tree local) i >|= update_root_tree local
+
+  let remove_existing local key =
+    Tree.remove_existing (tree local) key >|=? update_root_tree local
+
+  let remove_existing_tree local key =
+    Tree.remove_existing_tree (tree local) key >|=? update_root_tree local
+
+  let add_or_remove local key vopt =
+    Tree.add_or_remove (tree local) key vopt >|= update_root_tree local
+
+  let add_or_remove_tree local key topt =
+    Tree.add_or_remove_tree (tree local) key topt >|= update_root_tree local
+
+  let fold ?depth local key ~order ~init ~f =
+    Tree.fold ?depth (tree local) key ~order ~init ~f
+
+  let list local ?offset ?length key =
+    Tree.list (tree local) ?offset ?length key
+
+  let config local = Tree.config (tree local)
+
+  let length local i = Tree.length (tree local) i
+end

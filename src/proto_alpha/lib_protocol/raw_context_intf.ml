@@ -559,4 +559,41 @@ module type T = sig
   val check_enough_gas : t -> Gas_limit_repr.cost -> unit tzresult
 
   val description : t Storage_description.t
+
+  (** The type for local context accesses instead from the root. In order for
+      the carbonated storage functions to consume the gas, this has gas
+      infomation *)
+  type local_context
+
+  (**
+     [with_local_context ctxt key f] runs function [f] over the local
+     context at path [key] of the global [ctxt].  Using the local context [f]
+     can perform faster context accesses under [key].
+  *)
+  val with_local_context :
+    t ->
+    key ->
+    (local_context -> (local_context * 'a) tzresult Lwt.t) ->
+    (t * 'a) tzresult Lwt.t
+
+  (** [Local_context] provides functions for local access from a specific
+      directory. *)
+  module Local_context : sig
+    include
+      VIEW
+        with type t = local_context
+         and type tree := tree
+         and type key := key
+         and type value := value
+
+    (** Internally used in {!Storage_functors} to consume gas from
+        within a view. May raise {!Block_quota_exceeded} or
+        {!Operation_quota_exceeded}. *)
+    val consume_gas :
+      local_context -> Gas_limit_repr.cost -> local_context tzresult
+
+    (** Internally used in {!Storage_functors} to retrieve the full key of a
+        partial key relative to the [local_context]. *)
+    val absolute_key : local_context -> key -> key
+  end
 end
