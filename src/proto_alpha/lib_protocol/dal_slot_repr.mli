@@ -123,13 +123,17 @@ module Page : sig
   (** Encoding for page contents. *)
   val content_encoding : content Data_encoding.t
 
-  (** A page is identified by its slots index and by its own index in the list
+  (** A page is identified by its slot id and by its own index in the list
      of pages of the slot. *)
-  type t = {slot_index : slot_index; page_index : Index.t}
+  type t = {slot_id : id; page_index : Index.t}
+
+  type proof = Dal.page_proof
 
   val equal : t -> t -> bool
 
   val encoding : t Data_encoding.t
+
+  val proof_encoding : proof Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
 end
@@ -212,4 +216,79 @@ module Slots_history : sig
 
   (** [equal a b] returns true iff a is equal to b. *)
   val equal : t -> t -> bool
+
+  (** {1 Dal slots/pages proofs} *)
+
+  (** When a SCORU kernel's inputs come from the DAL, they are provided as
+      pages' content for confirmed slots, or None in case the slot doesn't
+      exist or is not confirmed.
+
+      In a refutation game involving an import tick of a Dal page input, a
+      honest user should be able to provide:
+
+      - When the PVM is requesting a page of a confirmed slot: a proof that the
+      slot is confirmed, in addition to needed information to check that the
+      page (whose id and content are given) is part of the slot;
+
+      - When the opponent pretends that the PVM is requesting a page of some
+      unconfirmed slot, but that slot is not published or not confirmed on L1:
+      a proof that the slot (whose id is given via the page's id) cannot be
+      confirmed on L1.
+
+      See the documentation in the ml file for more technical details. *)
+  type proof
+
+  (** Encoding for {!proof}. *)
+  val proof_encoding : proof Data_encoding.t
+
+  (** Pretty-printer for {!proof}. *)
+  val pp_proof : Format.formatter -> proof -> unit
+
+  (** To verify the proof of a page membership in its associated slot, the
+     Cryptobox module needs the following Dal parameters. These are part of the
+     protocol's parameters. See {!Default_parameters.default_dal}. *)
+  type dal_parameters = Dal.parameters = {
+    redundancy_factor : int;
+    page_size : int;
+    slot_size : int;
+    number_of_shards : int;
+  }
+
+  (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
+      produces a proof that either:
+      - there exists a confirmed slot in the skip list that contains
+        the page identified by [page_id] whose data and slot inclusion proof
+        are given by [page_info], or
+      - there cannot exist a confirmed slot in the skip list (whose head is
+        given by [slots_hist]) containing the page identified by [page_id].
+
+      In the first case above, [page_info] should contain the page's content
+      and the proof that the page is part of the (confirmed) slot whose
+      id is given in [page_id]. In the second case, no page content or proof
+      should be provided, as they are not needed to construct a non-confirmation
+      proof.
+
+      [dal_parameters] is used when verifying that/if the page is part of
+      the candidate slot (if any).
+  *)
+  val produce_proof :
+    dal_parameters ->
+    Page.t ->
+    page_info:(Page.content * Page.proof) option ->
+    t ->
+    History_cache.t ->
+    (proof * Page.content option) tzresult Lwt.t
+
+  (** [verify_proof dal_params page_id snapshot proof] verifies that the given
+      [proof] is a valid proof to show that either:
+      - the page identified by [page_id] belongs to a confirmed slot stored in
+      the skip list whose head is [snapshot], or
+      - there is not confirmed slot in the skip list (whose head is) [snapshot]
+      that could contain the page identified by [page_id].
+
+      [dal_parameters] is used when verifying that/if the page is part of
+      the candidate slot (if any).
+  *)
+  val verify_proof :
+    dal_parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
 end
