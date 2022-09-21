@@ -403,6 +403,10 @@ module type Merkelized_operations = sig
       history_proof ->
       history_proof ->
       inclusion_proof option tzresult
+
+    (** Allows to create a dumb {!serialized_proof} from a string, instead
+        of serializing a proof with {!to_serialized_proof}. *)
+    val serialized_proof_of_string : string -> serialized_proof
   end
 end
 

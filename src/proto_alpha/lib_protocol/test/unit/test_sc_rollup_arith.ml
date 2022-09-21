@@ -135,21 +135,10 @@ let test_boot () =
   | No_input_required ->
       failwith "After booting, the machine must be waiting for input."
 
-let make_external_inbox_message str =
-  WithExceptions.Result.get_ok
-    ~loc:__LOC__
-    Sc_rollup_inbox_message_repr.(External str |> serialize)
-
 let test_input_message () =
   let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message "MESSAGE";
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   is_input_state state >>= function
@@ -172,15 +161,8 @@ let go ~max_steps target_status state =
   aux 0 state
 
 let test_parsing_message ~valid (source, expected_code) =
-  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr source in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   go ~max_steps:10000 Evaluating state >>=? fun state ->
@@ -240,15 +222,8 @@ let test_parsing_messages () =
 
 let test_evaluation_message ~valid
     (boot_sector, source, expected_stack, expected_vars) =
-  let open Sc_rollup_PVM_sig in
   boot boot_sector @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr source in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   go ~max_steps:10000 Waiting_for_input_message state >>=? fun state ->
@@ -315,14 +290,11 @@ let test_evaluation_messages () =
 
 let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
-  let open Sc_rollup_PVM_sig in
   boot "" @@ fun ctxt state ->
   let input =
-    {
-      inbox_level = Raw_level_repr.of_int32_exn (Int32.of_int inbox_level);
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
+    Sc_rollup_helpers.make_input_repr
+      ~inbox_level:(Raw_level_repr.of_int32_exn (Int32.of_int inbox_level))
+      source
   in
   let*! state = set_input input state in
   let*! state = eval state in

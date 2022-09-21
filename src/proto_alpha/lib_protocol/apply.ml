@@ -1355,12 +1355,16 @@ let apply_manager_operation :
           start_game ctxt rollup ~player ~opponent >>=? fun ctxt ->
           return (None, ctxt)
       | Some refutation -> game_move ctxt rollup ~player ~opponent refutation)
-      >>=? fun (outcome, ctxt) ->
-      (match outcome with
+      >>=? fun (game_result, ctxt) ->
+      (match game_result with
       | None -> return (Sc_rollup.Game.Ongoing, ctxt, [])
-      | Some o ->
+      | Some game_result ->
           let stakers = Sc_rollup.Game.Index.make source opponent in
-          Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers o)
+          Sc_rollup.Refutation_storage.apply_game_result
+            ctxt
+            rollup
+            stakers
+            game_result)
       >>=? fun (game_status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =
@@ -1369,8 +1373,12 @@ let apply_manager_operation :
       return (ctxt, result, [])
   | Sc_rollup_timeout {rollup; stakers} ->
       Sc_rollup.Refutation_storage.timeout ctxt rollup stakers
-      >>=? fun (outcome, ctxt) ->
-      Sc_rollup.Refutation_storage.apply_outcome ctxt rollup stakers outcome
+      >>=? fun (game_result, ctxt) ->
+      Sc_rollup.Refutation_storage.apply_game_result
+        ctxt
+        rollup
+        stakers
+        game_result
       >>=? fun (game_status, ctxt, balance_updates) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result =

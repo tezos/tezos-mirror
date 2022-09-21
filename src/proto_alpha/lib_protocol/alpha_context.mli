@@ -3075,6 +3075,8 @@ module Sc_rollup : sig
           history_proof ->
           history_proof ->
           inclusion_proof option tzresult
+
+        val serialized_proof_of_string : string -> serialized_proof
       end
     end
 
@@ -3484,13 +3486,28 @@ module Sc_rollup : sig
 
     val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
 
+    val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+
+    type game_state =
+      | Dissecting of {
+          dissection : dissection_chunk list;
+          default_number_of_sections : int;
+        }
+      | Final_move of {
+          agreed_start_chunk : dissection_chunk;
+          refuted_stop_chunk : dissection_chunk;
+        }
+
+    val game_state_encoding : game_state Data_encoding.t
+
+    val game_state_equal : game_state -> game_state -> bool
+
     type t = {
       turn : player;
-      inbox_snapshot : Inbox.history_proof;
+      inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
       level : Raw_level.t;
       pvm_name : string;
-      dissection : dissection_chunk list;
-      default_number_of_sections : int;
+      game_state : game_state;
     }
 
     val pp_dissection : Format.formatter -> dissection_chunk list -> unit
@@ -3540,7 +3557,11 @@ module Sc_rollup : sig
           start_state_hash : State_hash.t option;
           start_proof : State_hash.t;
         }
-      | Proof_stop_state_hash_mismatch of {
+      | Proof_stop_state_hash_failed_to_refute of {
+          stop_state_hash : State_hash.t option;
+          stop_proof : State_hash.t option;
+        }
+      | Proof_stop_state_hash_failed_to_validate of {
           stop_state_hash : State_hash.t option;
           stop_proof : State_hash.t option;
         }
@@ -3554,17 +3575,19 @@ module Sc_rollup : sig
 
     val reason_encoding : reason Data_encoding.t
 
-    type status = Ongoing | Ended of (reason * Staker.t)
+    type game_result = Loser of {reason : reason; loser : Staker.t} | Draw
+
+    val pp_game_result : Format.formatter -> game_result -> unit
+
+    val game_result_encoding : game_result Data_encoding.t
+
+    type status = Ongoing | Ended of game_result
 
     val pp_status : Format.formatter -> status -> unit
 
     val status_encoding : status Data_encoding.t
 
-    type outcome = {loser : player; reason : reason}
-
-    val pp_outcome : Format.formatter -> outcome -> unit
-
-    val outcome_encoding : outcome Data_encoding.t
+    val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
     val initial :
       Inbox.history_proof ->
@@ -3576,7 +3599,8 @@ module Sc_rollup : sig
       default_number_of_sections:int ->
       t
 
-    val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+    val play :
+      stakers:Index.t -> t -> refutation -> (game_result, t) Either.t Lwt.t
 
     type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
 
@@ -3654,19 +3678,22 @@ module Sc_rollup : sig
       player:Staker.t ->
       opponent:Staker.t ->
       Game.refutation ->
-      (Game.outcome option * context) tzresult Lwt.t
+      (Game.game_result option * context) tzresult Lwt.t
 
     val get_timeout :
       context -> t -> Game.Index.t -> (Game.timeout * context) tzresult Lwt.t
 
     val timeout :
-      context -> t -> Game.Index.t -> (Game.outcome * context) tzresult Lwt.t
-
-    val apply_outcome :
       context ->
       t ->
       Game.Index.t ->
-      Game.outcome ->
+      (Game.game_result * context) tzresult Lwt.t
+
+    val apply_game_result :
+      context ->
+      t ->
+      Game.Index.t ->
+      Game.game_result ->
       (Game.status * context * Receipt.balance_updates) tzresult Lwt.t
   end
 

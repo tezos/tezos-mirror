@@ -126,14 +126,35 @@ let gen_tick =
   | None -> assert false
   | Some r -> return r
 
+let gen_dissection_chunk =
+  let open Gen in
+  let* state_hash = opt gen_state_hash in
+  let+ tick = gen_tick in
+  Sc_rollup_game_repr.{state_hash; tick}
+
 let gen_dissection =
   let open Gen in
-  small_list (pair (opt gen_state_hash) gen_tick)
+  small_list gen_dissection_chunk
 
 let gen_rollup =
   let open Gen in
   let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
   return (Sc_rollup_repr.Address.hash_bytes [bytes])
+
+let gen_game_state =
+  let open Sc_rollup_game_repr in
+  let open Gen in
+  let gen_dissecting =
+    let* dissection = gen_dissection in
+    let+ default_number_of_sections = int_range 4 100 in
+    Dissecting {dissection; default_number_of_sections}
+  in
+  let gen_final_move =
+    let* agreed_start_chunk = gen_dissection_chunk in
+    let+ refuted_stop_chunk = gen_dissection_chunk in
+    Final_move {agreed_start_chunk; refuted_stop_chunk}
+  in
+  oneof [gen_dissecting; gen_final_move]
 
 let gen_game =
   let open Gen in
@@ -142,23 +163,8 @@ let gen_game =
   let* rollup = gen_rollup in
   let* inbox_snapshot = gen_inbox_history_proof rollup level in
   let* pvm_name = gen_pvm_name in
-  let* dissection = gen_dissection in
-  let* default_number_of_sections = int_range 4 100 in
-  let dissection =
-    List.map
-      (fun (state_hash, tick) -> Sc_rollup_game_repr.{state_hash; tick})
-      dissection
-  in
-  return
-    Sc_rollup_game_repr.
-      {
-        turn;
-        inbox_snapshot;
-        level;
-        pvm_name;
-        dissection;
-        default_number_of_sections (* should be greater than 3 *);
-      }
+  let* game_state = gen_game_state in
+  return Sc_rollup_game_repr.{turn; inbox_snapshot; level; pvm_name; game_state}
 
 let gen_conflict =
   let open Gen in

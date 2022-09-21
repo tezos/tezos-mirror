@@ -99,7 +99,7 @@ module Make (PVM : Pvm.S) = struct
         return_unit
     | ( Sc_rollup_refute _,
         Sc_rollup_refute_result
-          {game_status = Ended (reason, loser); balance_updates; _} )
+          {game_status = Ended (Loser {reason; loser}); balance_updates; _} )
       when Node_context.is_operator node_ctxt loser ->
         let*? slashed_amount =
           List.fold_left_e

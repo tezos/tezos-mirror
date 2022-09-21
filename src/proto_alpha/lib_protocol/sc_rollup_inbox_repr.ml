@@ -489,6 +489,8 @@ module type Merkelized_operations = sig
       history_proof ->
       history_proof ->
       inclusion_proof option tzresult
+
+    val serialized_proof_of_string : string -> serialized_proof
   end
 end
 
@@ -1192,6 +1194,8 @@ struct
       Skip_list.back_path ~deref ~cell_ptr ~target_index
       |> Option.map (lift_ptr_path deref)
       |> Option.join |> return
+
+    let serialized_proof_of_string x = Bytes.of_string x
   end
 end
 

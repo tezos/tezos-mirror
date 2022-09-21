@@ -54,7 +54,7 @@ type error +=
       | `Both of Signature.public_key_hash * Signature.public_key_hash ]
   | (* `Temporary *)
       Sc_rollup_timeout_level_not_reached of
-      Raw_level_repr.t * Signature.public_key_hash
+      int32 * Signature.public_key_hash
   | (* `Temporary *)
       Sc_rollup_max_number_of_messages_reached_for_commitment_period
   | (* `Permanent *) Sc_rollup_add_zero_messages
@@ -140,25 +140,24 @@ let () =
     ~id:"Sc_rollup_timeout_level_not_reached"
     ~title:"Attempt to timeout game too early"
     ~description
-    ~pp:(fun ppf (timeout, staker) ->
+    ~pp:(fun ppf (blocks_left, staker) ->
       Format.fprintf
         ppf
-        "%s. The player %a has %a left blocks to play."
+        "%s. The player %a has %ld left blocks to play."
         description
         Signature.Public_key_hash.pp_short
         staker
-        Raw_level_repr.pp
-        timeout)
+        blocks_left)
     Data_encoding.(
       obj2
-        (req "level_timeout" Raw_level_repr.encoding)
+        (req "level_timeout" int32)
         (req "staker" Signature.Public_key_hash.encoding))
     (function
-      | Sc_rollup_timeout_level_not_reached (timeout, staker) ->
-          Some (timeout, staker)
+      | Sc_rollup_timeout_level_not_reached (blocks_left, staker) ->
+          Some (blocks_left, staker)
       | _ -> None)
-    (fun (timeout, staker) ->
-      Sc_rollup_timeout_level_not_reached (timeout, staker)) ;
+    (fun (blocks_left, staker) ->
+      Sc_rollup_timeout_level_not_reached (blocks_left, staker)) ;
   let description =
     "Refutation game already started, must play with is_opening_move = false."
   in

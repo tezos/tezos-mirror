@@ -133,7 +133,8 @@ module Make (Interpreter : Interpreter.S) :
     in
     if Result.is_ok res then return proof else assert false
 
-  let new_dissection node_ctxt last_level ok our_view =
+  let new_dissection ~default_number_of_sections node_ctxt last_level ok
+      our_view =
     let state_hash_from_tick tick =
       let open Lwt_result_syntax in
       let* r = Interpreter.state_of_tick node_ctxt tick last_level in
@@ -143,21 +144,18 @@ module Make (Interpreter : Interpreter.S) :
     let start_chunk = {state_hash = Some start_hash; tick = start_tick} in
     let start_hash, start_tick = our_view in
     let our_stop_chunk = {state_hash = start_hash; tick = start_tick} in
-    let Node_context.{protocol_constants; _} = node_ctxt in
-    let default_number_of_sections =
-      protocol_constants.parametric.sc_rollup.number_of_sections_in_dissection
-    in
     Game_helpers.new_dissection
       ~start_chunk
       ~our_stop_chunk
       ~default_number_of_sections
       ~state_hash_from_tick
 
-  (** [generate_from_dissection node_ctxt game] traverses the current
-      [game.dissection] and returns a move which performs a new dissection of
-      the execution trace or provides a refutation proof to serve as the next
-      move of the [game]. *)
-  let generate_next_dissection node_ctxt game =
+  (** [generate_from_dissection ~default_number_of_sections node_ctxt game
+      dissection] traverses the current [dissection] and returns a move which
+      performs a new dissection of the execution trace or provides a refutation
+      proof to serve as the next move of the [game]. *)
+  let generate_next_dissection ~default_number_of_sections node_ctxt game
+      dissection =
     let open Lwt_result_syntax in
     let rec traverse ok = function
       | [] ->
@@ -183,11 +181,13 @@ module Make (Interpreter : Interpreter.S) :
                 traverse (their_hash, tick) dissection
               else return (ok, (Some our_hash, tick)))
     in
-    match game.dissection with
+    match dissection with
     | {state_hash = Some hash; tick} :: dissection ->
         let* ok, ko = traverse (hash, tick) dissection in
         let choice = snd ok in
-        let* dissection = new_dissection node_ctxt game.level ok ko in
+        let* dissection =
+          new_dissection ~default_number_of_sections node_ctxt game.level ok ko
+        in
         let chosen_section_len = Sc_rollup.Tick.distance (snd ko) choice in
         return (choice, chosen_section_len, dissection)
     | [] | {state_hash = None; _} :: _ ->
@@ -216,11 +216,21 @@ module Make (Interpreter : Interpreter.S) :
           let choice = start_tick in
           return {choice; step = Proof proof}
     in
-    let* choice, chosen_section_len, dissection =
-      generate_next_dissection node_ctxt game
-    in
-    if Z.(equal chosen_section_len one) then final_move choice
-    else return {choice; step = Dissection dissection}
+
+    match game.game_state with
+    | Dissecting {dissection; default_number_of_sections} ->
+        let* choice, chosen_section_len, dissection =
+          generate_next_dissection
+            ~default_number_of_sections
+            node_ctxt
+            game
+            dissection
+        in
+        if Z.(equal chosen_section_len one) then final_move choice
+        else return {choice; step = Dissection dissection}
+    | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
+        let choice = agreed_start_chunk.tick in
+        final_move choice
 
   let play_next_move node_ctxt game self opponent =
     let open Lwt_result_syntax in
@@ -240,7 +250,7 @@ module Make (Interpreter : Interpreter.S) :
   let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    let* res =
+    let* game_result =
       Plugin.RPC.Sc_rollup.timeout_reached
         cctxt
         (cctxt#chain, head_block)
@@ -249,12 +259,11 @@ module Make (Interpreter : Interpreter.S) :
         ()
     in
     let open Sc_rollup.Game in
-    let index = Index.make (fst players) (snd players) in
-    let node_player = node_role ~self index in
-    match res with
-    | Some player when not (player_equal node_player player) -> return_true
-    | None -> return_false
-    | Some _myself -> return_false
+    match game_result with
+    | Some (Loser {loser; _}) ->
+        let is_it_me = Signature.Public_key_hash.(self = loser) in
+        return (not is_it_me)
+    | _ -> return_false
 
   let play head_block node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in
