@@ -103,7 +103,7 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
 
 type test = {variant : string; tags : string list; description : string}
 
-let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
+let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* rollup_address =
     Client.Sc_rollup.originate
       ~hooks
@@ -116,6 +116,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   in
   let sc_rollup_node =
     Sc_rollup_node.create
+      ?dal_node
       Operator
       tezos_node
       tezos_client
@@ -126,6 +127,30 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   in
   let* () = Client.bake_for tezos_client in
   f rollup_address sc_rollup_node configuration_filename
+
+let with_dal_node tezos_node f key =
+  let dal_node = Dal_node.create ~node:tezos_node () in
+  let* _dir = Dal_node.init_config dal_node in
+  f key dal_node
+
+let test_scenario_rollup_dal_node ?commitment_period ?challenge_window
+    ?dal_enable {variant; tags; description} scenario =
+  let tags = tags @ [variant] in
+  regression_test
+    ~__FILE__
+    ~tags
+    (Printf.sprintf "%s (%s)" description variant)
+    (fun protocol ->
+      setup ?commitment_period ?challenge_window ~protocol ?dal_enable
+      @@ fun _parameters _cryptobox node client ->
+      with_dal_node node @@ fun key dal_node ->
+      ( with_fresh_rollup ~dal_node
+      @@ fun sc_rollup_address sc_rollup_node _filename ->
+        scenario protocol dal_node sc_rollup_node sc_rollup_address node client
+      )
+        node
+        client
+        key)
 
 let test_scenario ?commitment_period ?challenge_window ?dal_enable
     {variant; tags; description} scenario =
@@ -141,6 +166,15 @@ let test_scenario ?commitment_period ?challenge_window ?dal_enable
         scenario protocol sc_rollup_node sc_rollup_address node client )
         node
         client)
+
+let test_dal_rollup_scenario ?dal_enable variant =
+  test_scenario_rollup_dal_node
+    ?dal_enable
+    {
+      tags = ["dal"; "dal_node"];
+      variant;
+      description = "Testing rollup and Data availability layer node";
+    }
 
 let test_dal_scenario ?dal_enable variant =
   test_scenario
