@@ -173,7 +173,7 @@ Two new operations have been added:
           "first_slot": 0, "endorsing_power": 58,
           "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
 
-MRs: :gl:`!5936`, :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
+MRs: :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
