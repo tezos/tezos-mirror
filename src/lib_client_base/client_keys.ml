@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 type error += Unregistered_key_scheme of string
 
 type error += Wrong_key_scheme of (string * string)

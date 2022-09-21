@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
 open Client_proto_args
 
 let pidfile_arg =

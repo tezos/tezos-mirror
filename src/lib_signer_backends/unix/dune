@@ -10,6 +10,7 @@
   fmt
   tezos-base
   tezos-base.unix
+  tezos-clic
   tezos-stdlib-unix
   tezos-stdlib
   tezos-client-base

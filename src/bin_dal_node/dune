@@ -9,6 +9,7 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-clic
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands
@@ -34,6 +35,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_clic
   -open Tezos_client_base
   -open Tezos_client_base_unix
   -open Tezos_client_commands

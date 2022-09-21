@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 module Sapling_gen_cmd = struct
   let lift_opt f opt_arg state =
     match opt_arg with None -> state | Some arg -> f arg state

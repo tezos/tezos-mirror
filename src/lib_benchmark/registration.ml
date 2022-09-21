@@ -27,7 +27,7 @@ module String_table = String.Hashtbl
 
 let bench_table : Benchmark.t String_table.t = String_table.create 51
 
-let clic_table : unit Clic.command list ref = ref []
+let clic_table : unit Tezos_clic.Clic.command list ref = ref []
 
 let codegen_table : Model.for_codegen String_table.t = String_table.create 51
 

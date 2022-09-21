@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 val delegate_commands : unit -> Protocol_client_context.full Clic.command list
 
 val baker_commands : unit -> Protocol_client_context.full Clic.command list

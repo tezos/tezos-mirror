@@ -9,6 +9,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-clic
   tezos-rpc
   tezos-shell-services
   tezos-sapling

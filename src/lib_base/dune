@@ -13,7 +13,6 @@
   data-encoding
   tezos-error-monad
   tezos-rpc
-  tezos-clic
   tezos-micheline
   tezos-event-logging
   ptime
@@ -31,7 +30,6 @@
   -open Tezos_error_monad
   -open Tezos_error_monad.TzLwtreslib
   -open Tezos_rpc
-  -open Tezos_clic
   -open Tezos_micheline
   -open Tezos_event_logging))
 

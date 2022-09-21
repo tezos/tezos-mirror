@@ -14,7 +14,6 @@ depends: [
   "data-encoding" { >= "0.6" & < "0.7" }
   "tezos-error-monad"
   "tezos-rpc"
-  "tezos-clic"
   "tezos-micheline"
   "tezos-event-logging"
   "ptime" { >= "1.0.0" }

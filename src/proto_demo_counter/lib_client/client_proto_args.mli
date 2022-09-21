@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 val amount_param :
   name:string ->
   desc:string ->

@@ -8,6 +8,7 @@
  (libraries
   tezos-base
   tezos-rpc
+  tezos-clic
   tezos-clic.unix
   tezos-client-base
   tezos-shell-services
@@ -21,6 +22,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_rpc
+  -open Tezos_clic
   -open Tezos_clic_unix
   -open Tezos_client_base
   -open Tezos_shell_services
