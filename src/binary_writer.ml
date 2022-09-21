@@ -326,12 +326,8 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       let initial_offset = state.offset in
       match kind with
       | `N ->
-          let size =
-            (* we limit e in size to trigger size-overflows early *)
-            Binary_length.length
-              (Encoding.check_size (Binary_size.max_int `N) e)
-              value
-          in
+          let size = Binary_length.length e value in
+          if size > Binary_size.max_int `N then raise Size_limit_exceeded ;
           write_with_limit
             (Binary_length.n_length (Z.of_int size))
             n
