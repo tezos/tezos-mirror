@@ -26,6 +26,9 @@
 (** A baker instance *)
 type t
 
+(** See [Daemon.Make.name] *)
+val name : t -> string
+
 (** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
