@@ -34,7 +34,7 @@ module Time = Tezos_base.Time.System
 
 let protocol = Protocol.Alpha
 
-let repeat = 5
+let repeat = Cli.get_int ~default:5 "repeat"
 
 let num_bootstrap_accounts = Array.length Account.Bootstrap.keys
 
