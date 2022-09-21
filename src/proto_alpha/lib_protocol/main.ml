@@ -376,8 +376,7 @@ let value_of_key ~chain_id:_ ~predecessor_context:ctxt ~predecessor_timestamp
 module Mempool = struct
   include Mempool_validation
 
-  let init ctxt chain_id ~head_hash ~(head_header : Block_header.shell_header)
-      ~current_timestamp =
+  let init ctxt chain_id ~head_hash ~(head : Block_header.shell_header) =
     let open Lwt_tzresult_syntax in
     let open Alpha_context in
     let* ( ctxt,
@@ -385,13 +384,14 @@ module Mempool = struct
            _migration_operation_results,
            head_level,
            _head_raw_level ) =
+      (* We use Partial_construction to factorize the [prepare_ctxt]. *)
       prepare_ctxt
         ctxt
         (Partial_construction
-           {predecessor_hash = head_hash; timestamp = current_timestamp})
-        ~predecessor:head_header
+           {predecessor_hash = head_hash; timestamp = head.timestamp})
+        ~predecessor:head
     in
-    let*? fitness = Fitness.from_raw head_header.fitness in
+    let*? fitness = Fitness.from_raw head.fitness in
     let predecessor_round = Fitness.round fitness in
     let grandparent_round = Fitness.predecessor_round fitness in
     return

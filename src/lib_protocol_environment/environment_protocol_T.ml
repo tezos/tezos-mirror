@@ -211,8 +211,7 @@ module V0toV7
       | Incompatible_mempool
       | Merge_conflict of operation_conflict
 
-    let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ =
-      Lwt.return_ok ((), ())
+    let init _ _ ~head_hash:_ ~head:_ = Lwt.return_ok ((), ())
 
     let encoding = Data_encoding.unit
 
@@ -273,8 +272,7 @@ module type PROTOCOL = sig
       Context.t ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.Protocol.t ->
+      head:Block_header.shell_header ->
       cache:Context.source_of_cache ->
       (validation_info * t) tzresult Lwt.t
   end
@@ -312,7 +310,7 @@ struct
   module Mempool = struct
     include Mempool
 
-    let init ctxt chain_id ~head_hash ~head_header ~current_timestamp ~cache:_ =
-      init ctxt chain_id ~head_hash ~head_header ~current_timestamp
+    let init ctxt chain_id ~head_hash ~head ~cache:_ =
+      init ctxt chain_id ~head_hash ~head
   end
 end

@@ -290,7 +290,7 @@ module Mempool = struct
     | Incompatible_mempool
     | Merge_conflict of operation_conflict
 
-  let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ = Lwt.return_ok ((), ())
+  let init _ _ ~head_hash:_ ~head:_  = Lwt.return_ok ((), ())
 
   let encoding = Data_encoding.unit
 

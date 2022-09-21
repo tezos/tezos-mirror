@@ -1199,20 +1199,21 @@ struct
             Error (Validation_error (wrap_tztrace e))
         | Error (Mempool.Add_conflict c) -> Error (Add_conflict c)
 
-      let init ctxt chain_id ~head_hash ~head_header ~current_timestamp ~cache =
+      let init ctxt chain_id ~head_hash ~head ~cache =
         let open Lwt_result_syntax in
         let* ctxt =
           load_predecessor_cache
             ctxt
             chain_id
             (Partial_construction
-               {predecessor_hash = head_hash; timestamp = current_timestamp})
-            head_header
+               {
+                 predecessor_hash = head_hash;
+                 timestamp = head.Block_header.timestamp;
+               })
+            head
             cache
         in
-        let*! r =
-          init ctxt chain_id ~head_hash ~head_header ~current_timestamp
-        in
+        let*! r = init ctxt chain_id ~head_hash ~head in
         Lwt.return (wrap_tzresult r)
     end
   end

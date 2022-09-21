@@ -455,8 +455,7 @@ module type PROTOCOL = sig
       Context.t ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.t ->
+      head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t
 
     (** Mempool encoding *)

@@ -186,8 +186,7 @@ module type T = sig
       context ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.Protocol.t ->
+      head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t
 
     val encoding : t Data_encoding.t

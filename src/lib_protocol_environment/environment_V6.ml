@@ -1319,8 +1319,7 @@ struct
         | Incompatible_mempool
         | Merge_conflict of operation_conflict
 
-      let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ ~cache:_ =
-        Lwt.return_ok ((), ())
+      let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt.return_ok ((), ())
 
       let encoding = Data_encoding.unit
 
