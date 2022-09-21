@@ -279,12 +279,13 @@ let force_decode lexpr =
 
 let force_bytes_cost expr =
   (* Estimating the cost directly from the bytes would be cheaper, but
-           using [serialized_cost] is more accurate. *)
+     using [serialization_cost] is more accurate. *)
   Data_encoding.apply_lazy
-    ~fun_value:(fun v -> serialization_cost (expr_size v))
-    ~fun_bytes:(fun _ -> Gas_limit_repr.free)
-    ~fun_combine:(fun _ _ -> Gas_limit_repr.free)
+    ~fun_value:(fun v -> Some v)
+    ~fun_bytes:(fun _ -> None)
+    ~fun_combine:(fun _ _ -> None)
     expr
+  |> Option.fold ~none:Gas_limit_repr.free ~some:micheline_serialization_cost
 
 let force_bytes expr =
   Error_monad.catch_f
