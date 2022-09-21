@@ -2959,6 +2959,17 @@ module Sc_rollup : sig
     val hash_string : unreachable -> t
   end
 
+  (** See {!Sc_rollup_metadata_repr}. *)
+  module Metadata : sig
+    type t = {address : rollup; origination_level : Raw_level.t}
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+
+    val encoding : t Data_encoding.t
+  end
+
   (** See {!Sc_rollup_inbox_message_repr}. *)
   module Inbox_message : sig
     type internal_inbox_message = {
