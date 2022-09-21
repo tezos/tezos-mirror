@@ -1167,6 +1167,7 @@ struct
 
   let empty context rollup level =
     let open Lwt_syntax in
+    assert (Raw_level_repr.(level <> Raw_level_repr.root)) ;
     let pre_genesis_level = Raw_level_repr.root in
     let* initial_level = new_level_tree context pre_genesis_level in
     let* () = commit_tree context initial_level pre_genesis_level in

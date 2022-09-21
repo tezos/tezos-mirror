@@ -41,8 +41,7 @@ let err x = Exn (Sc_rollup_inbox_test_error x)
 
 let rollup = Sc_rollup_repr.Address.hash_string [""]
 
-let level =
-  Raw_level_repr.of_int32 0l |> function Ok x -> x | _ -> assert false
+let first_level = Raw_level_repr.(succ root)
 
 let create_context () =
   Context.init1 () >>=? fun (block, _contract) -> return block.context
@@ -73,7 +72,7 @@ let populate_inboxes ctxt level history inbox inboxes level_tree
 
 let test_empty () =
   create_context () >>=? fun ctxt ->
-  empty ctxt rollup level >>= fun inbox ->
+  empty ctxt rollup (Raw_level_repr.of_int32_exn 42l) >>= fun inbox ->
   fail_unless
     Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
     (err "An empty inbox should have no available message.")
@@ -81,9 +80,9 @@ let test_empty () =
 let setup_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   create_context () >>=? fun ctxt ->
-  let* inbox = empty ctxt rollup level in
+  let* inbox = empty ctxt rollup first_level in
   let history = History.empty ~capacity:10000L in
-  populate_inboxes ctxt level history inbox [] None list_of_payloads
+  populate_inboxes ctxt first_level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
   match level_tree with
   | None -> fail (err "setup_inbox_with_messages called with no messages")
@@ -283,7 +282,7 @@ let setup_node_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   let* index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
-  let* inbox = empty ctxt rollup level in
+  let* inbox = empty ctxt rollup first_level in
   let history = History.empty ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
@@ -306,7 +305,7 @@ let setup_node_inbox_with_messages list_of_payloads f =
             let level = Raw_level_repr.succ level in
             aux level history inbox' (inbox :: inboxes) (Some level_tree) ps)
   in
-  aux level history inbox [] None list_of_payloads
+  aux first_level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
   match level_tree with
   | None -> fail (err "setup_inbox_with_messages called with no messages")
@@ -335,27 +334,28 @@ let payload_string msg =
 
 let next_input ps l n =
   let ( let* ) = Option.bind in
-  let* level = List.nth ps (level_to_int l) in
-  match List.nth level (Z.to_int n) with
+  let idx = level_to_int l - 1 in
+  let* payloads = List.nth ps idx in
+  match List.nth payloads (Z.to_int n) with
   | Some msg ->
       let payload = payload_string msg in
       Some Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
   | None ->
-      let rec aux l =
-        let* payloads = List.nth ps l in
+      let rec aux idx =
+        let* payloads = List.nth ps idx in
         match List.hd payloads with
         | Some msg ->
             let payload = payload_string msg in
             Some
               Sc_rollup_PVM_sig.
                 {
-                  inbox_level = level_of_int l;
+                  inbox_level = level_of_int (idx + 1);
                   message_counter = Z.zero;
                   payload;
                 }
-        | None -> aux (l + 1)
+        | None -> aux (idx + 1)
       in
-      aux (level_to_int l + 1)
+      aux (idx + 1)
 
 let test_inbox_proof_production (list_of_payloads, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
@@ -476,13 +476,13 @@ let init_inboxes_histories_with_different_capacities
   let mk_history ?(next_index = 0L) ~capacity () =
     let open Lwt_syntax in
     create_context () >>=? fun ctxt ->
-    let* inbox = empty ctxt rollup level in
+    let* inbox = empty ctxt rollup first_level in
     let history =
       Sc_rollup_inbox_repr.History.Internal_for_tests.empty
         ~capacity
         ~next_index
     in
-    populate_inboxes ctxt level history inbox [] None payloads
+    populate_inboxes ctxt first_level history inbox [] None payloads
   in
   (* Here, we have `~capacity:0L`. So no history is kept *)
   mk_history ~capacity:0L () >>=? fun no_history ->
@@ -699,7 +699,7 @@ let tests =
       let* after = list_size small (list_size small bounded_string) in
       let payloads = List.append before (at :: after) in
       let* n = 0 -- (List.length at + 3) in
-      return (payloads, level_of_int level, Z.of_int n))
+      return (payloads, level_of_int (succ level), Z.of_int n))
   in
   let gen_history_params =
     QCheck2.Gen.(

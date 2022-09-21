@@ -309,13 +309,13 @@ let test_staker_injectivity () =
 module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 
 (** Test that sending a invalid serialized inbox proof to
-{Sc_rollup_proof_repr.valid} is rejected. *)
+    {Sc_rollup_proof_repr.valid} is rejected. *)
 let test_invalid_serialized_inbox_proof () =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt = Test_sc_rollup_inbox.create_context () in
   let*! inbox =
-    Sc_rollup.Inbox.empty ctxt Sc_rollup.Address.zero Raw_level.root
+    Sc_rollup.Inbox.empty ctxt Sc_rollup.Address.zero Raw_level.(succ root)
   in
   let snapshot = Sc_rollup.Inbox.take_snapshot inbox in
 

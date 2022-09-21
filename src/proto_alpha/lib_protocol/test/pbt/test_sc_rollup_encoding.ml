@@ -44,9 +44,11 @@ let gen_state_hash =
   let* bytes = bytes_fixed_gen Sc_rollup_repr.State_hash.size in
   return (Sc_rollup_repr.State_hash.of_bytes_exn bytes)
 
-let gen_raw_level =
+let gen_inbox_level =
   let open Gen in
   let* level = map Int32.abs int32 in
+  (* There is no inbox for level [0l]. *)
+  let level = if level = 0l then 1l else level in
   return (Raw_level_repr.of_int32_exn level)
 
 let gen_commitment_hash =
@@ -63,7 +65,7 @@ let gen_number_of_ticks =
 let gen_commitment =
   let open Gen in
   let* compressed_state = gen_state_hash
-  and* inbox_level = gen_raw_level
+  and* inbox_level = gen_inbox_level
   and* predecessor = gen_commitment_hash
   and* number_of_ticks = gen_number_of_ticks in
   return
@@ -107,15 +109,10 @@ let gen_inbox rollup level =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
-let gen_inbox_history_proof rollup level =
+let gen_inbox_history_proof rollup inbox_level =
   let open Gen in
-  let* inbox = gen_inbox rollup level in
+  let* inbox = gen_inbox rollup inbox_level in
   return (Sc_rollup_inbox_repr.take_snapshot inbox)
-
-let gen_raw_level =
-  let open Gen in
-  let* level = small_nat in
-  return @@ Raw_level_repr.of_int32_exn (Int32.of_int level)
 
 let gen_pvm_name = Gen.string_printable
 
@@ -159,12 +156,14 @@ let gen_game_state =
 let gen_game =
   let open Gen in
   let* turn = gen_player in
-  let* level = gen_raw_level in
+  let* inbox_level = gen_inbox_level in
   let* rollup = gen_rollup in
-  let* inbox_snapshot = gen_inbox_history_proof rollup level in
+  let* inbox_snapshot = gen_inbox_history_proof rollup inbox_level in
   let* pvm_name = gen_pvm_name in
   let* game_state = gen_game_state in
-  return Sc_rollup_game_repr.{turn; inbox_snapshot; level; pvm_name; game_state}
+  return
+    Sc_rollup_game_repr.
+      {turn; inbox_snapshot; level = inbox_level; pvm_name; game_state}
 
 let gen_conflict =
   let open Gen in
