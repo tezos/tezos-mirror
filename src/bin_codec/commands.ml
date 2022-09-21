@@ -51,12 +51,16 @@ let bytes_parameter =
       let hex =
         if Sys.file_exists hex then (
           let ic = open_in hex in
-          let len = in_channel_length ic in
-          let contents = really_input_string ic len in
+          let contents =
+            let rec loop acc =
+              match input_line ic with
+              | s -> loop (s :: acc)
+              | exception End_of_file -> String.concat "" (List.rev acc)
+            in
+            loop []
+          in
           close_in ic ;
-          if contents.[String.length contents - 1] = '\n' then
-            String.sub contents 0 (String.length contents - 1)
-          else contents)
+          contents)
         else hex
       in
       match Hex.to_bytes (`Hex hex) with
