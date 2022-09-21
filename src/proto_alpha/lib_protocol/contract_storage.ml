@@ -441,10 +441,15 @@ let delete c contract =
          do not exist). An implicit contract deletion should not cost
          extra gas. *)
       Contract_delegate_storage.unlink c contract >>=? fun c ->
-      Storage.Contract.Spendable_balance.remove_existing c contract
-      >>=? fun c ->
-      Contract_manager_storage.remove_existing c contract >>=? fun c ->
-      Storage.Contract.Counter.remove_existing c contract
+      let update local =
+        Storage.Contract.Spendable_balance.Local.remove_existing local
+        >>=? fun local ->
+        Storage.Contract.Manager.Local.remove_existing local >>=? fun local ->
+        Storage.Contract.Counter.Local.remove_existing local
+      in
+      Storage.Contract.with_local_context c contract (fun local ->
+          update local >|=? fun local -> (local, ()))
+      >|=? fun (c, ()) -> c
 
 let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
