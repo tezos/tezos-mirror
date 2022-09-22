@@ -248,7 +248,7 @@ let wait_for_level ?timeout sc_node level =
       check_event
         ?timeout
         sc_node
-        "sc_rollup_node_layer_1_new_head.v0"
+        "sc_rollup_node_layer_1_new_head_processed.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
 
