@@ -253,7 +253,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let*! ctxt = PVM.State.set ctxt genesis_state in
     return (ctxt, genesis_state)
 
-  let state_of_head node_ctxt ctxt Layer1.(Head {hash; level}) =
+  let state_of_head node_ctxt ctxt Layer1.{hash; level} =
     let open Lwt_result_syntax in
     let genesis_level =
       Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
@@ -268,9 +268,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   (** [transition_pvm node_ctxt predecessor head] runs a PVM at the
       previous state from block [predecessor] by consuming as many messages
       as possible from block [head]. *)
-  let transition_pvm node_ctxt ctxt predecessor (Layer1.Head {hash; level}) =
+  let transition_pvm node_ctxt ctxt predecessor Layer1.{hash; level} =
     let open Lwt_result_syntax in
-    let data_dir = node_ctxt.Node_context.data_dir in
     (* Retrieve the previous PVM state from store. *)
     let pred_level = Int32.pred level |> Raw_level.of_int32_exn in
     let* ctxt, predecessor_state =
@@ -293,7 +292,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
     let*! () =
       let open Store.StateHistoryRepr in
-      let Layer1.(Head {hash = predecessor_hash; _}) = predecessor in
+      let Layer1.{hash = predecessor_hash; _} = predecessor in
       let event =
         {
           tick = initial_tick;
@@ -343,7 +342,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       state_of_head
         node_ctxt
         ctxt
-        Layer1.(Head {hash = predecessor_hash; level = pred_level})
+        Layer1.{hash = predecessor_hash; level = pred_level}
     in
     let metadata = metadata node_ctxt in
     let* state, _counter, _level, _fuel =

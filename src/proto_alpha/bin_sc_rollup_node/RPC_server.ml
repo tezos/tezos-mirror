@@ -31,20 +31,18 @@ open Protocol
 let get_head store =
   let open Lwt_result_syntax in
   let*! head = State.last_processed_head_opt store in
-  match head with
-  | None -> failwith "No head"
-  | Some (Head {hash; _}) -> return hash
+  match head with None -> failwith "No head" | Some {hash; _} -> return hash
 
 let get_head_opt store = State.last_processed_head_opt store
 
 let get_head_hash_opt store =
   let open Lwt_option_syntax in
-  let+ (Head {hash; _}) = State.last_processed_head_opt store in
+  let+ {hash; _} = State.last_processed_head_opt store in
   hash
 
 let get_head_level_opt store =
   let open Lwt_option_syntax in
-  let+ (Head {level; _}) = State.last_processed_head_opt store in
+  let+ {level; _} = State.last_processed_head_opt store in
   level
 
 let get_state_info_exn store =

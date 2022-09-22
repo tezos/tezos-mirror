@@ -26,13 +26,12 @@
 
 type head_state = {head : Layer1.head; finalized : bool; seen_before : bool}
 
-let emit_head_processing_event
-    {head = Head {hash; level}; finalized; seen_before} =
+let emit_head_processing_event {head = {hash; level}; finalized; seen_before} =
   Daemon_event.head_processing hash level finalized seen_before
 
 let emit_heads_not_processed_event head_states =
   Lwt_list.iter_s
-    (fun {head = Head {hash; level}; _} ->
+    (fun {head = {hash; level}; _} ->
       Daemon_event.not_finalized_head hash level)
     head_states
 
@@ -155,7 +154,7 @@ module Make (PVM : Pvm.S) = struct
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt (Layer1.Head {hash; _}) =
+  let process_l1_block_operations ~finalized node_ctxt Layer1.{hash; _} =
     let open Lwt_result_syntax in
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
@@ -177,18 +176,17 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let before_origination (node_ctxt : Node_context.t) Layer1.(Head {level; _}) =
+  let before_origination (node_ctxt : Node_context.t) Layer1.{level; _} =
     let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
     level < origination_level
 
   let rec processed_finalized_block (node_ctxt : Node_context.t)
-      Layer1.(Head {level; _} as block) =
+      Layer1.({level; _} as block) =
     let open Lwt_result_syntax in
     let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
     let already_finalized =
       match last_finalized with
-      | Some Layer1.(Head {level = finalized_level; _}) ->
-          level <= finalized_level
+      | Some Layer1.{level = finalized_level; _} -> level <= finalized_level
       | None -> false
     in
     unless (already_finalized || before_origination node_ctxt block)
@@ -213,8 +211,7 @@ module Make (PVM : Pvm.S) = struct
       let* pred = Layer1.get_predecessor_opt l1_ctxt head in
       nth_predecessor l1_ctxt (n - 1) pred
 
-  let rec process_head (node_ctxt : Node_context.t)
-      Layer1.(Head {hash; _} as head) =
+  let rec process_head (node_ctxt : Node_context.t) Layer1.({hash; _} as head) =
     let open Lwt_result_syntax in
     let*! seen_before = State.is_processed node_ctxt.store hash in
     unless (seen_before || before_origination node_ctxt head) @@ fun () ->
@@ -246,8 +243,8 @@ module Make (PVM : Pvm.S) = struct
   let notify_injector {Node_context.l1_ctxt; _} old_head new_head =
     let open Lwt_result_syntax in
     let open Layer1 in
-    let (Head {hash = new_head; _}) = new_head in
-    let old_head = Option.map (fun (Head {hash; _}) -> hash) old_head in
+    let {hash = new_head; _} = new_head in
+    let old_head = Option.map (fun {hash; _} -> hash) old_head in
     let* head = fetch_tezos_block l1_ctxt new_head in
     let* reorg = get_tezos_reorg_for_new_head l1_ctxt old_head new_head in
     let*! () = Injector.new_tezos_head head reorg in

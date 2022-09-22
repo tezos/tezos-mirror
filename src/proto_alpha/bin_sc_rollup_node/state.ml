@@ -77,7 +77,7 @@ end
 
 let hash_of_level store level = Store.Levels.get store level
 
-let mark_processed_head store Layer1.(Head {hash; level} as head) =
+let mark_processed_head store Layer1.({hash; level} as head) =
   let open Lwt_syntax in
   let* () = Store.ProcessedHashes.add store hash () in
   let* () = Store.Levels.add store level hash in

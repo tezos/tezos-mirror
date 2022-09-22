@@ -84,13 +84,13 @@ let () =
 
 *)
 
-type head = Head of {hash : Block_hash.t; level : int32}
+type head = {hash : Block_hash.t; level : int32}
 
 let head_encoding =
   Data_encoding.(
     conv
-      (fun (Head {hash; level}) -> (hash, level))
-      (fun (hash, level) -> Head {hash; level})
+      (fun {hash; level} -> (hash, level))
+      (fun (hash, level) -> {hash; level})
       (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
 
 module Blocks_cache =
@@ -164,13 +164,13 @@ let get_predecessor =
                 | Some predecessor -> Lwt.return (Some predecessor))
             | _ -> Lwt.return None))
 
-let get_predecessor_opt state (Head {level; hash}) =
+let get_predecessor_opt state {level; hash} =
   let open Lwt_option_syntax in
   let level = Int32.pred level in
   let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
-  Head {level; hash}
+  {level; hash}
 
-let get_predecessor state (Head {hash; _} as head) =
+let get_predecessor state ({hash; _} as head) =
   let open Lwt_result_syntax in
   let*! pred = get_predecessor_opt state head in
   match pred with
@@ -201,7 +201,7 @@ let rec connect ?(count = 0) ~delay cctxt genesis_info store =
       let heads =
         Lwt_stream.map
           (fun (hash, Tezos_base.Block_header.{shell = {level; _}; _}) ->
-            Head {hash; level})
+            {hash; level})
           heads
       in
       return_ok (heads, stopper)

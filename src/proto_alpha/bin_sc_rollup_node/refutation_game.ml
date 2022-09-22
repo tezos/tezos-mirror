@@ -334,7 +334,7 @@ module Make (Interpreter : Interpreter.S) :
         return_unit
     | Error errs -> Lwt.return (Error errs)
 
-  let process (Layer1.Head {hash; _}) node_ctxt =
+  let process Layer1.{hash; _} node_ctxt =
     let head_block = `Hash (hash, 0) in
     let open Lwt_result_syntax in
     let refute_signer = Node_context.get_operator node_ctxt Refute in

@@ -28,7 +28,8 @@
    This module follows the evolution of the layer 1 chain by
    subscribing to the head monitoring RPC offered by the Tezos node.
 *)
-type head = Head of {hash : Block_hash.t; level : int32}
+
+type head = {hash : Block_hash.t; level : int32}
 
 val head_encoding : head Data_encoding.t
 

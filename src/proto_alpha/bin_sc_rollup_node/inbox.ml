@@ -51,8 +51,7 @@ module State = struct
       no messages has been issued at this specific [block]. In
       this case, the inbox is the same as the one found in the level
       when the latest message has been inserted. *)
-  let inbox_of_head node_ctxt
-      Layer1.(Head {hash = block_hash; level = block_level}) =
+  let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! possible_inbox = Store.Inboxes.find node_ctxt.store block_hash in
@@ -79,8 +78,8 @@ module State = struct
             block_level
     | Some inbox -> return inbox
 
-  let history_of_head node_ctxt
-      Layer1.(Head {hash = block_hash; level = block_level}) =
+  let history_of_head node_ctxt Layer1.{hash = block_hash; level = block_level}
+      =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! res = Store.Histories.find node_ctxt.store block_hash in
@@ -160,7 +159,7 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
+let process_head node_ctxt Layer1.({level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
   let*! res = get_messages node_ctxt head_hash in
   match res with
@@ -186,9 +185,7 @@ let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
           (* This is before we have interpreted the boot sector, so we start
              with an empty context in genesis *)
           return (Context.empty node_ctxt.context)
-        else
-          let Layer1.(Head {hash = predecessor; _}) = predecessor in
-          Node_context.checkout_context node_ctxt predecessor
+        else Node_context.checkout_context node_ctxt predecessor.hash
       in
       let*! messages_tree = Context.MessageTrees.find ctxt in
       let* history, inbox, ctxt =
@@ -230,11 +227,11 @@ let process_head node_ctxt Layer1.(Head {level; hash = head_hash} as head) =
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
   let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
-  State.inbox_of_head node_ctxt Layer1.(Head {hash; level})
+  State.inbox_of_head node_ctxt {hash; level}
 
 let history_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
   let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
-  State.history_of_head node_ctxt Layer1.(Head {hash; level})
+  State.history_of_head node_ctxt {hash; level}
 
 let start () = Inbox_event.starting ()

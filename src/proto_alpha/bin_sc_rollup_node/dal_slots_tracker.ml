@@ -58,7 +58,7 @@ let get_slot_subscriptions cctxt head rollup =
    indices to which [rollup] is subscribed to at [head], and stores them. *)
 let fetch_and_save_subscribed_slot_headers
     Node_context.{cctxt; rollup_address; store; _}
-    Layer1.(Head {level; hash = head_hash}) =
+    Layer1.{level; hash = head_hash} =
   let open Lwt_result_syntax in
   let* res = get_slot_subscriptions cctxt (head_hash, level) rollup_address in
   let*! () = Store.Dal_slot_subscriptions.add store head_hash res in
@@ -67,7 +67,7 @@ let fetch_and_save_subscribed_slot_headers
 let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
     =
   let genesis_level = genesis_info.level in
-  let rec go number_of_levels (Layer1.Head {hash; level} as head) =
+  let rec go number_of_levels (Layer1.{hash; level} as head) =
     let open Lwt_option_syntax in
     if level < Raw_level.to_int32 genesis_level then fail
     else if number_of_levels = 0 then return hash
@@ -101,7 +101,7 @@ type confirmations_info = {
     subscribed to in that block, and the list of slot indexes that have
     been confirmed for that block. There is no relationship between
     the confirmed and subscribed slot indexes returned by this function. *)
-let slots_info node_ctxt (Layer1.Head {hash; _} as head) =
+let slots_info node_ctxt (Layer1.{hash; _} as head) =
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3722
      The case for protocol migrations when the lag constant has
      been changed is tricky, especially if the lag is reduced.
@@ -315,7 +315,7 @@ module Confirmed_slots_history = struct
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
   let slots_history_of_hash node_ctxt
-      Layer1.(Head {hash = block_hash; level = block_level}) =
+      Layer1.{hash = block_hash; level = block_level} =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! confirmed_slots_history_opt =
@@ -343,7 +343,7 @@ module Confirmed_slots_history = struct
             block_level
 
   let slots_history_cache_of_hash node_ctxt
-      Layer1.(Head {hash = block_hash; level = block_level}) =
+      Layer1.{hash = block_hash; level = block_level} =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! confirmed_slots_history_cache_opt =
@@ -385,7 +385,7 @@ module Confirmed_slots_history = struct
             block_level
 
   let update (Node_context.{store; l1_ctxt; _} as node_ctxt)
-      Layer1.(Head {hash = head_hash; _} as head) confirmation_info =
+      Layer1.({hash = head_hash; _} as head) confirmation_info =
     let open Lwt_result_syntax in
     let* slots_to_save =
       confirmed_slots_with_headers node_ctxt confirmation_info
@@ -422,7 +422,7 @@ module Confirmed_slots_history = struct
     return ()
 end
 
-let process_head node_ctxt (Layer1.Head {hash = head_hash; _} as head) =
+let process_head node_ctxt (Layer1.{hash = head_hash; _} as head) =
   let open Lwt_result_syntax in
   let* () = fetch_and_save_subscribed_slot_headers node_ctxt head in
   let* confirmation_info = slots_info node_ctxt head in

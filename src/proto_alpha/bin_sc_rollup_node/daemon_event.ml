@@ -125,7 +125,7 @@ let not_finalized_head hash level =
   Simple.(emit not_finalized_head (hash, level))
 
 let processing_heads_iteration old_heads new_heads =
-  let maybe_level = Option.map (fun (Layer1.Head {level; _}) -> level) in
+  let maybe_level = Option.map (fun Layer1.{level; _} -> level) in
   let from_level =
     match maybe_level @@ List.hd old_heads with
     | None -> maybe_level @@ List.hd new_heads
