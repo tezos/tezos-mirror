@@ -2,13 +2,16 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezt)
- (public_name tezt)
+ (name tezt_js)
+ (public_name tezt.js)
+ (optional)
  (libraries
   re
-  lwt.unix
   ezjsonm
+  js_of_ocaml
+  js_of_ocaml-lwt
   tezt.core)
+ (js_of_ocaml)
  (flags
   (:standard)
   -open Tezt_core))

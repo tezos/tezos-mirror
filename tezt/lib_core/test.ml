@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -145,12 +145,12 @@ type test = {
   mutable result : Log.test_result option;
 }
 
-let really_run test =
+type t = test
+
+let really_run ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   test.result <- None ;
-  Lwt_main.run
-  @@
   (* It may happen that the promise of the function resolves successfully
      at the same time as a background promise is rejected or that we
      receive SIGINT. To handle those race conditions, setting the value
@@ -180,7 +180,7 @@ let really_run test =
   in
   Background.start handle_background_exception ;
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
-  let main_temporary_directory = Temp.start () in
+  let main_temporary_directory = temp_start () in
   let* () =
     let run_test () =
       let* () = test.body () in
@@ -213,7 +213,7 @@ let really_run test =
             max 0. (delay -. local_starting_time +. global_starting_time)
           in
           [
-            (let* () = Lwt_unix.sleep remaining_delay in
+            (let* () = sleep remaining_delay in
              fail
                "the set of tests took more than specified global timeout (%gs) \
                 to run"
@@ -225,7 +225,7 @@ let really_run test =
       | None -> []
       | Some delay ->
           [
-            (let* () = Lwt_unix.sleep delay in
+            (let* () = sleep delay in
              fail "test took more than specified timeout (%gs) to run" delay);
           ]
     in
@@ -236,28 +236,23 @@ let really_run test =
           @ test_timeout))
       handle_exception
   in
-  (* Terminate all remaining processes. *)
-  let* () =
-    Lwt.catch Process.clean_up @@ fun exn ->
-    Log.warn "Failed to clean up processes: %s" (Printexc.to_string exn) ;
-    unit
-  in
+  let* () = clean_up () in
   (* Remove temporary files. *)
   let kept_temp =
     try
       match Cli.options.temporary_file_mode with
       | Delete ->
-          Temp.clean_up () ;
+          temp_clean_up () ;
           false
       | Delete_if_successful ->
           if test.result = Some Successful then (
-            Temp.clean_up () ;
+            temp_clean_up () ;
             false)
           else (
-            Temp.stop () ;
+            temp_stop () ;
             true)
       | Keep ->
-          Temp.stop () ;
+          temp_stop () ;
           true
     with exn ->
       Log.warn "Failed to clean up: %s" (Printexc.to_string exn) ;
@@ -280,16 +275,37 @@ let really_run test =
   in
   return test_result
 
-let rec really_run_with_retry remaining_retry_count test =
-  match really_run test with
+let rec really_run_with_retry ~sleep ~clean_up ~temp_start ~temp_stop
+    ~temp_clean_up remaining_retry_count test =
+  let* test_result =
+    really_run ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test
+  in
+  match test_result with
   | Failed _ when remaining_retry_count > 0 ->
       Log.warn
         "%d retry(ies) left for test: %s"
         remaining_retry_count
         test.title ;
       test.session_retries <- test.session_retries + 1 ;
-      really_run_with_retry (remaining_retry_count - 1) test
-  | x -> x
+      really_run_with_retry
+        ~sleep
+        ~clean_up
+        ~temp_start
+        ~temp_stop
+        ~temp_clean_up
+        (remaining_retry_count - 1)
+        test
+  | x -> return x
+
+let run_one ~sleep ~clean_up ~temp_start ~temp_stop ~temp_clean_up test =
+  really_run_with_retry
+    ~sleep
+    ~clean_up
+    ~temp_start
+    ~temp_stop
+    ~temp_clean_up
+    Cli.options.retry
+    test
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
@@ -359,6 +375,8 @@ let map_registered_list f =
   (* By using [list_registered] we ensure the resulting list is
      in order of registration. *)
   List.map f (list_registered ())
+
+let get_test_by_title test_title = String_map.find_opt test_title !registered
 
 let list_tests format =
   match format with
@@ -791,7 +809,7 @@ let register ~__FILE__ ~title ~tags body =
     in
     registered := String_map.add title test !registered
 
-module Scheduler : sig
+module type SCHEDULER = sig
   type request = Run_test of {test_title : string}
 
   type response = Test_result of Log.test_result
@@ -807,236 +825,23 @@ module Scheduler : sig
   val run :
     on_worker_available:(unit -> (request * (response -> unit)) option) ->
     worker_count:int ->
+    (unit -> unit) ->
     unit
 
   val get_current_worker_id : unit -> int option
-end = struct
-  type request = Run_test of {test_title : string}
-
-  type response = Test_result of Log.test_result
-
-  type status = Idle | Working of (response -> unit) | Dead
-
-  type worker = {
-    pid : int;
-    mutable status : status;
-    pipe_to_worker : out_channel;
-    pipe_from_worker : in_channel;
-  }
-
-  let send_request channel request =
-    Marshal.to_channel channel (request : request) [] ;
-    flush channel
-
-  let read_request channel =
-    try Some (Marshal.from_channel channel : request) with End_of_file -> None
-
-  let send_response channel response =
-    Marshal.to_channel channel (response : response) [] ;
-    flush channel
-
-  let read_response channel =
-    try Some (Marshal.from_channel channel : response)
-    with End_of_file -> None
-
-  let internal_worker_error x =
-    Printf.ksprintf
-      (fun s ->
-        Log.error "internal error in worker: %s" s ;
-        exit 1)
-      x
-
-  let internal_scheduler_error x =
-    Printf.ksprintf
-      (fun s ->
-        Log.error "internal error in scheduler: %s" s ;
-        exit 1)
-      x
-
-  let perform_request (Run_test {test_title}) =
-    match String_map.find_opt test_title !registered with
-    | None ->
-        internal_worker_error
-          "scheduler requested to run test %S, but worker doesn't know about \
-           this test"
-          test_title
-    | Some test ->
-        let test_result = really_run_with_retry Cli.options.retry test in
-        Test_result test_result
-
-  let rec worker_listen_loop pipe_from_scheduler pipe_to_scheduler =
-    let request = read_request pipe_from_scheduler in
-    match request with
-    | None ->
-        (* End of file: no more request will come. *)
-        exit 0
-    | Some request ->
-        let response = perform_request request in
-        send_response pipe_to_scheduler response ;
-        worker_listen_loop pipe_from_scheduler pipe_to_scheduler
-
-  let worker_listen pipe_from_scheduler pipe_to_scheduler =
-    try worker_listen_loop pipe_from_scheduler pipe_to_scheduler
-    with exn ->
-      (* Note: if a test fails, its exception is caught and handled by [really_run].
-         So here we have an error of Tezt itself. *)
-      internal_worker_error "%s" (Printexc.to_string exn)
-
-  let next_worker_id = ref 0
-
-  let current_worker_id = ref None
-
-  let spawn_worker () =
-    let worker_id = !next_worker_id in
-    incr next_worker_id ;
-    let pipe_to_worker_exit, pipe_to_worker_entrance = Unix.pipe () in
-    let pipe_from_worker_exit, pipe_from_worker_entrance = Unix.pipe () in
-    let pid = Lwt_unix.fork () in
-    if pid = 0 then (
-      (* This is now a worker process. *)
-      current_worker_id := Some worker_id ;
-      Unix.close pipe_to_worker_entrance ;
-      Unix.close pipe_from_worker_exit ;
-      worker_listen
-        (Unix.in_channel_of_descr pipe_to_worker_exit)
-        (Unix.out_channel_of_descr pipe_from_worker_entrance))
-    else (
-      (* This is the scheduler process. *)
-      Unix.close pipe_to_worker_exit ;
-      Unix.close pipe_from_worker_entrance ;
-      {
-        pid;
-        status = Idle;
-        pipe_to_worker = Unix.out_channel_of_descr pipe_to_worker_entrance;
-        pipe_from_worker = Unix.in_channel_of_descr pipe_from_worker_exit;
-      })
-
-  let kill_worker worker =
-    match worker.status with
-    | Dead -> ()
-    | Idle | Working _ ->
-        worker.status <- Dead ;
-        close_out worker.pipe_to_worker ;
-        close_in worker.pipe_from_worker ;
-        Unix.kill worker.pid Sys.sigterm ;
-        let (_ : int * Unix.process_status) = Unix.waitpid [] worker.pid in
-        ()
-
-  let rec run_single_process ~on_worker_available =
-    match on_worker_available () with
-    | None -> ()
-    | Some (request, on_response) ->
-        let response = perform_request request in
-        on_response response ;
-        run_single_process ~on_worker_available
-
-  let run_multi_process ~on_worker_available ~worker_count =
-    (* Start workers. *)
-    let workers = List.init worker_count (fun _ -> spawn_worker ()) in
-    (* Handle Ctrl+C in the scheduler process.
-       Note: Ctrl+C is also received by workers automatically. *)
-    let received_sigint = ref false in
-    Sys.(set_signal sigint)
-      (Signal_handle
-         (fun _ ->
-           received_sigint := true ;
-           (* If the user presses Ctrl+C again, let the program die immediately. *)
-           Sys.(set_signal sigint) Signal_default)) ;
-    (* Give work to workers until there is no work to give. *)
-    let trigger_worker_available worker =
-      if !received_sigint then kill_worker worker
-      else
-        match on_worker_available () with
-        | None -> kill_worker worker
-        | Some (request, on_response) ->
-            worker.status <- Working on_response ;
-            send_request worker.pipe_to_worker request
-    in
-    let rec loop () =
-      (* Calling [trigger_worker_available] not only gives work to idle workers,
-         it also kills them if we don't need them any more.
-         It also ensures that [file_descriptors_to_read] will only be empty if there
-         are no working workers. *)
-      List.iter
-        (fun worker ->
-          match worker.status with
-          | Dead | Working _ -> ()
-          | Idle -> trigger_worker_available worker)
-        workers ;
-      let file_descriptors_to_read =
-        List.filter_map
-          (fun worker ->
-            match worker.status with
-            | Idle | Dead -> None
-            | Working _ ->
-                Some (Unix.descr_of_in_channel worker.pipe_from_worker))
-          workers
-      in
-      match file_descriptors_to_read with
-      | [] ->
-          (* We maintain the invariant that if there is work to do, at least one
-             worker is [Working] at this particular point.
-             This is enforced by the [List.iter] of [trigger_worker_available] above.
-             So if there is no working worker, we can stop the loop. *)
-          ()
-      | _ :: _ ->
-          let ready, _, _ =
-            (* In case of SIGINT, this returns EINTR. *)
-            try Unix.select file_descriptors_to_read [] [] (-1.)
-            with Unix.Unix_error (EINTR, _, _) -> ([], [], [])
-          in
-          let read_response file_descriptor =
-            match
-              List.find_opt
-                (fun worker ->
-                  match worker.status with
-                  | Idle | Dead -> false
-                  | Working _ ->
-                      Unix.descr_of_in_channel worker.pipe_from_worker
-                      = file_descriptor)
-                workers
-            with
-            | None ->
-                internal_scheduler_error
-                  "received a response from an unknown worker"
-            | Some worker -> (
-                match worker.status with
-                | Idle | Dead ->
-                    (* Please do not consider this error message to be political. *)
-                    internal_scheduler_error
-                      "worker is idle or dead while it should be working"
-                | Working on_response -> (
-                    (* Note: [read_response] is blocking.
-                       We assume that if a worker starts writing something,
-                       it will finish writing almost immediately. *)
-                    let response = read_response worker.pipe_from_worker in
-                    match response with
-                    | None -> internal_scheduler_error "no response from worker"
-                    | Some response ->
-                        on_response response ;
-                        worker.status <- Idle))
-          in
-          List.iter read_response ready ;
-          loop ()
-    in
-    loop ()
-
-  let run ~on_worker_available ~worker_count =
-    if worker_count = 1 then run_single_process ~on_worker_available
-    else
-      try run_multi_process ~on_worker_available ~worker_count
-      with exn -> internal_scheduler_error "%s" (Printexc.to_string exn)
-
-  let get_current_worker_id () = !current_worker_id
 end
 
 (* [iteration] is between 1 and the value of [--loop-count].
    [index] is between 1 and [test_count]. *)
 type test_instance = {iteration : int; index : int}
 
-let current_worker_id = Scheduler.get_current_worker_id
+let current_worker_id_ref = ref (fun () -> None)
 
-let run () =
+let current_worker_id () = !current_worker_id_ref ()
+
+let run_with_scheduler scheduler =
+  let module Scheduler = (val scheduler : SCHEDULER) in
+  current_worker_id_ref := Scheduler.get_current_worker_id ;
   List.iter (fun f -> f ()) !before_test_run_functions ;
   (* Check command-line options. *)
   check_existence "--file" known_files Cli.options.files_to_run ;
@@ -1152,7 +957,8 @@ let run () =
             in
             Some (Scheduler.Run_test {test_title = test.title}, on_response)
       in
-      Scheduler.run ~on_worker_available ~worker_count:Cli.options.job_count ;
+      Scheduler.run ~on_worker_available ~worker_count:Cli.options.job_count
+      @@ fun () ->
       (* Output reports. *)
       Option.iter output_junit Cli.options.junit ;
       Option.iter Record.(output_file (current ())) Cli.options.record ;

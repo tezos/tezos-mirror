@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,15 +26,15 @@
 
 open Base
 
-let capture_output : out_channel option ref = ref None
+let capture_output : (string -> unit) option ref = ref None
 
 (* Capture a string into a regression output. *)
 let capture line =
   match !capture_output with
   | None -> ()
-  | Some channel ->
-      output_string channel line ;
-      output_string channel "\n"
+  | Some output ->
+      output line ;
+      output "\n"
 
 let hooks : Process_hooks.t =
   {
@@ -45,8 +46,14 @@ let hooks : Process_hooks.t =
     on_log = capture;
   }
 
+let run_and_capture_output ~capture (f : unit -> 'a Lwt.t) =
+  capture_output := Some capture ;
+  Lwt.finalize f @@ fun () ->
+  capture_output := None ;
+  unit
+
 (* Run [f] and capture the output of ran processes into the [output_file]. *)
-let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
+let run_and_capture_output_to_file ~output_file (f : unit -> 'a Lwt.t) =
   let rec create_parent filename =
     let parent = Filename.dirname filename in
     if String.length parent < String.length filename then (
@@ -59,11 +66,11 @@ let run_and_capture_output ~output_file (f : unit -> 'a Lwt.t) =
   in
   create_parent output_file ;
   let channel = open_out output_file in
-  capture_output := Option.some channel ;
-  Lwt.finalize f (fun () ->
-      capture_output := None ;
-      close_out channel ;
-      unit)
+  capture_output := Some (output_string channel) ;
+  Lwt.finalize f @@ fun () ->
+  capture_output := None ;
+  close_out channel ;
+  unit
 
 (* Map from output directories to output files.
    Output directories are directories that are supposed to only contain output files.
@@ -123,16 +130,27 @@ let register ~__FILE__ ~title ~tags ?file f =
        --reset-regressions --title %s"
       (Log.quote_shell stored_full_output_file)
       (Log.quote_shell title) ;
-  let capture_f ~full_output_file =
-    run_and_capture_output ~output_file:full_output_file f
-  in
   if Cli.options.reset_regressions then
-    capture_f ~full_output_file:stored_full_output_file
+    run_and_capture_output_to_file ~output_file:stored_full_output_file f
   else
-    (* store the current run into a temp file *)
-    let temp_full_output_file = Temp.file relative_output_file in
-    let* () = capture_f ~full_output_file:temp_full_output_file in
-    let diff = Diff.files stored_full_output_file temp_full_output_file in
+    let* after =
+      let buffer = Buffer.create 512 in
+      let* () = run_and_capture_output ~capture:(Buffer.add_string buffer) f in
+      Buffer.contents buffer |> String.split_on_char '\n' |> Array.of_list
+      |> return
+    in
+    let before =
+      read_file stored_full_output_file
+      |> String.split_on_char '\n' |> Array.of_list
+    in
+    let diff =
+      Diff.arrays
+        ~equal:String.equal
+        ~before:stored_full_output_file
+        ~after:"captured"
+        before
+        after
+    in
     if diff.different then (
       Diff.log (Diff.reduce_context diff) ;
       Test.fail

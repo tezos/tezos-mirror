@@ -10,10 +10,19 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
-  "ocaml" { >= "4.12" }
+  "ocaml" { >= "4.12" & >= "4.12" & >= "4.12" }
   "re" { >= "1.7.2" }
   "lwt" { >= "5.6.0" }
+  "base-unix"
   "ezjsonm" { >= "1.1.0" }
+]
+depopts: [
+  "js_of_ocaml"
+  "js_of_ocaml-lwt"
+]
+conflicts: [
+  "js_of_ocaml" { ! (>= "4.0.0" & < "5.0.0") }
+  "js_of_ocaml-lwt" { ! (>= "4.0.0" & < "5.0.0") }
 ]
 build: [
   ["rm" "-r" "vendors"]

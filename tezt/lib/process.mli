@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** External processes launched by tests. *)
+(** This module is only available in [tezt], not in [tezt.core] and [tezt.js]. *)
 
 (** A process which was {!spawn}ed. *)
 type t

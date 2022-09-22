@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,7 +52,11 @@ let get_fs ?runner () =
 
 let next_name = ref 0
 
-let base_main_dir () = "tezt-" ^ string_of_int (Unix.getpid ())
+let pid = ref 0
+
+let set_pid value = pid := value
+
+let base_main_dir () = "tezt-" ^ string_of_int !pid
 
 (* [add_file], [add_dir] and [add_parent] select the file system to use.*)
 let add_file ?runner file =

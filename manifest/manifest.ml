@@ -1655,23 +1655,52 @@ type release = {version : string; url : Opam.url}
 
 type tezt_target = {
   opam : string;
-  deps : target list;
+  lib_deps : target list;
+  exe_deps : target list;
+  js_deps : target list;
   dep_globs : string list;
   modules : string list;
+  js_compatible : bool option;
+  modes : Dune.mode list option;
+  synopsis : string option;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
-let tezt ~opam ~path ?(deps = []) ?(dep_globs = []) modules =
+let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
+    ?(js_deps = []) ?(dep_globs = []) ?synopsis modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
-  let tezt_target = {opam; deps; dep_globs; modules} in
+  let tezt_target =
+    {
+      opam;
+      lib_deps;
+      exe_deps;
+      js_deps;
+      dep_globs;
+      modules;
+      js_compatible;
+      modes;
+      synopsis;
+    }
+  in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
 
 let register_tezt_targets ~make_tezt_exe =
   let tezt_test_libs = ref [] in
-  let register_path path {opam; deps; dep_globs; modules} =
+  let register_path path
+      {
+        opam;
+        lib_deps;
+        exe_deps;
+        js_deps;
+        dep_globs;
+        modules;
+        js_compatible;
+        modes;
+        synopsis;
+      } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
     in
@@ -1682,38 +1711,57 @@ let register_tezt_targets ~make_tezt_exe =
         (path_with_underscores ^ "_tezt_lib")
         ~path
         ~opam:""
-        ~deps
+        ?js_compatible
+        ~deps:lib_deps
         ~modules
         ~linkall:true
     in
     tezt_test_libs := lib :: !tezt_test_libs ;
-    let exe_name = "main" in
-    let _exe =
-      (* Alias is "runtezt" and not "runtest" to make sure that the test is
-         not run in the CI twice (once with [dune @src/.../runtest] and once
-         with [dune exec tezt/tests/main.exe]). *)
-      Target.test
-        exe_name
-        ~alias:"runtezt"
-        ~path
-        ~opam
-        ~deps:[lib]
-        ~dep_globs
-        ~modules:[exe_name]
-        ~dune:
-          Dune.
-            [
-              targets_rule
-                [exe_name ^ ".ml"]
-                ~action:
-                  [
-                    S "with-stdout-to";
-                    S "%{targets}";
-                    [S "echo"; S "let () = Tezt.Test.run ()"];
-                  ];
-            ]
+    let declare_exe ?js_compatible exe_name modes deps main =
+      let (_ : Target.t option) =
+        Target.test
+          exe_name
+          ~alias:"runtezt"
+          ~path
+          ~opam
+          ?synopsis
+          ?js_compatible
+          ?modes
+          ~deps:(lib :: deps)
+          ~dep_globs
+          ~modules:[exe_name]
+          ~dune:
+            Dune.
+              [
+                targets_rule
+                  [exe_name ^ ".ml"]
+                  ~action:
+                    [
+                      S "with-stdout-to";
+                      S "%{targets}";
+                      [S "echo"; S ("let () = " ^ main ^ ".Test.run ()")];
+                    ];
+              ]
+      in
+      ()
     in
-    ()
+    match modes with
+    | None -> declare_exe "main" None exe_deps "Tezt"
+    | Some modes ->
+        (match
+           List.filter
+             (function Dune.Byte | Native -> true | JS -> false)
+             modes
+         with
+        | [] -> ()
+        | modes -> declare_exe "main" (Some modes) exe_deps "Tezt") ;
+        if List.mem Dune.JS modes then
+          declare_exe
+            "main_js"
+            (Some [JS])
+            js_deps
+            "Tezt_js"
+            ~js_compatible:true
   in
   String_map.iter register_path !tezt_targets_by_path ;
   make_tezt_exe !tezt_test_libs

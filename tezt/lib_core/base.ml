@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +29,6 @@
    do not need a human-readable version. *)
 let () =
   Printexc.register_printer @@ function
-  | Unix.Unix_error (error, _, _) -> Some (Unix.error_message error)
   | Failure error -> Some error
   | Sys_error error -> Some error
   | _ -> None

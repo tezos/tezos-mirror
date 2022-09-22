@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -49,6 +49,17 @@ val file : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 (** Get a temporary file name and create it as a directory. *)
 val dir : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
+(** Set the current process identifier.
+
+    This affects the main temporary directory, e.g. ["/tmp/tezt-1234"]
+    where [1234] is the PID set by [set_pid].
+
+    The default PID if [set_pid] is not called is [0].
+
+    This is automatically called by {!Tezt.Main.run}.
+    This is, however, not called by {!Tezt_js.Main.run}. *)
+val set_pid : int -> unit
+
 (** Allow calls to [file] and [dir] until the next [clean_up] or [stop].
 
     Return the main temporary directory, e.g. ["/tmp/tezt-1234/1"],
@@ -56,7 +67,7 @@ val dir : ?runner:Runner.t -> ?perms:Unix.file_perm -> string -> string
 
     Calls to [file] and [dir] which are made before [start] result in an error.
 
-    Don't call this directly, it is called by {!Test.run}.
+    Do not call this directly, it is called by {!Test.run}.
     This prevents you from creating temporary files accidentally before your test
     actually runs. Indeed, if your test is disabled from the command-line it should
     not create temporary files. By using {!Test.run} you also ensure that {!clean_up}

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -453,18 +453,18 @@ let init ?args () =
       \  - the test must have one of the specified titles;\n\
       \  - the test must have a title matching one of the specified patterns;\n\
       \  - the test must be implemented in one of the specified files.\n\n\
-      \  The tags of a test are given by the ~tags argument of Test.run. To \
-       negate a tag, prefix it with a slash: /\n\n\
-      \  The title of a test is given by the ~title argument of Test.run. It \
-       is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
-       reports. Use --title (respectively --not-title) to select (respectively \
-       unselect) a test by its title on the command-line. You can also select \
-       tests whose title matches one or several Perl regular expressions using \
-       --match.\n\n\
+      \  The tags of a test are given by the ~tags argument of Test.register. \
+       To negate a tag, prefix it with a slash: /\n\n\
+      \  The title of a test is given by the ~title argument of Test.register. \
+       It is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in \
+       the reports. Use --title (respectively --not-title) to select \
+       (respectively unselect) a test by its title on the command-line. You \
+       can also select tests whose title matches one or several Perl regular \
+       expressions using --match.\n\n\
       \  The file in which a test is implemented is specified by the ~__FILE__ \
-       argument of Test.run. In other words, it is the name of the file in \
-       which the test is defined, without directories. Use --file to select a \
-       test by its filename on the command-line.\n\n\
+       argument of Test.register. In other words, it is the name of the file \
+       in which the test is defined, without directories. Use --file to select \
+       a test by its filename on the command-line.\n\n\
       \  For instance:\n\n\
       \    " ^ Sys.argv.(0)
     ^ " node bake /rpc --file bootstrap.ml --file sync.ml\n\n\
