@@ -856,4 +856,12 @@ module Internal_for_tests = struct
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
+
+  let parameters (t : t) =
+    {
+      redundancy_factor = t.redundancy_factor;
+      slot_size = t.slot_size;
+      page_size = t.page_size;
+      number_of_shards = t.number_of_shards;
+    }
 end

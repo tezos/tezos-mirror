@@ -218,4 +218,7 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+
+  (** [parameters t] returns the parameters with which [t] was initialized. *)
+  val parameters : t -> parameters
 end
