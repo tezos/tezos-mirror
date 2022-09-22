@@ -68,7 +68,7 @@ type application_state = validation_state
 
 type mode =
   | Application of block_header
-  | Partial_application of block_header
+  | Partial_validation of block_header
   | Construction of {
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
@@ -81,7 +81,7 @@ type mode =
 
 let mode_str = function
   | Application _ -> "application"
-  | Partial_application _ -> "partial_application"
+  | Partial_validation _ -> "partial_validation"
   | Construction _ -> "construction"
   | Partial_construction _ -> "partial_construction"
 
@@ -141,7 +141,7 @@ let begin_any_construction_mode validation_or_application mode context
 let begin_validation_or_application validation_or_application ctxt _chain_id
     mode ~predecessor =
   match mode with
-  | Application block_header | Partial_application block_header ->
+  | Application block_header | Partial_validation block_header ->
       begin_any_application_mode
         validation_or_application
         mode

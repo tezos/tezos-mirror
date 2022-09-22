@@ -185,7 +185,7 @@ module type PROTOCOL = sig
 
       Note that in protocol versions <= K, where the validation
       functions do not yet exist, the validation of existing blocks is
-      done by trying to apply it using the [Partial_application] mode
+      done by trying to apply it using the [Partial_validation] mode
       below. Therefore, the application of a validated block may still
       fail in these protocols. *)
 
@@ -196,7 +196,7 @@ module type PROTOCOL = sig
   type mode =
     | Application of block_header
         (** Standard validation or application of a preexisting block. *)
-    | Partial_application of block_header
+    | Partial_validation of block_header
         (** Partial validation of a preexisting block. This mode is
             meant to quickly reject obviously invalid alternate
             branches by only performing a subset of checks.
@@ -251,7 +251,7 @@ module type PROTOCOL = sig
 
       [predecessor_context] and [predecessor] are the resulting
       context and shell header of the predecessor block. Exceptionally
-      in {!Partial_application} mode, they may instead come from any
+      in {!Partial_validation} mode, they may instead come from any
       ancestor block that is more recent (i.e. has a greater level)
       than the current head's "last_allowed_fork_level".
 
@@ -261,7 +261,7 @@ module type PROTOCOL = sig
       Note that for protocol versions <= K where [begin_validation]
       does not exist yet, this calls the old [begin_application] by
       necessity. However, in [Application] mode, this calls the old
-      [begin_application] in [Partial_application] mode in order to run
+      [begin_application] in [Partial_validation] mode in order to run
       more quickly. This preserves the behavior of [precheck] in
       [lib_validation/block_validation.ml] for old protocols. It does
       mean that the application of a validated block may fail in these
@@ -299,7 +299,7 @@ module type PROTOCOL = sig
       on the arguments.
 
       In protocol versions > K, calling this function with the
-      {!Partial_application} mode returns an error. *)
+      {!Partial_validation} mode returns an error. *)
   val begin_application :
     Context.t ->
     Chain_id.t ->

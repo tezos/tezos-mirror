@@ -84,7 +84,7 @@ module V0toV7
 
   type mode =
     | Application of block_header
-    | Partial_application of block_header
+    | Partial_validation of block_header
     | Construction of {
         predecessor_hash : Block_hash.t;
         timestamp : Time.Protocol.t;
@@ -98,13 +98,13 @@ module V0toV7
   let begin_validation_or_application validation_or_application ctxt chain_id
       mode ~(predecessor : Block_header.shell_header) =
     match (validation_or_application, mode) with
-    | `Validation, Application block_header
-    | _, Partial_application block_header ->
+    | `Validation, Application block_header | _, Partial_validation block_header
+      ->
         (* For the validation of an existing block, we always use the
            old [begin_partial_application], even in full [Application]
            mode. Indeed, this maintains the behavior of old block
            [precheck] (from [lib_validation/block_validation.ml]), which
-           relied on [Partial_application] mode to quickly assess the
+           relied on [Partial_validation] mode to quickly assess the
            viability of the block. *)
         begin_partial_application
           ~chain_id

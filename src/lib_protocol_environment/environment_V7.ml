@@ -1110,7 +1110,7 @@ struct
       let open Lwt_result_syntax in
       let predecessor_hash, timestamp =
         match mode with
-        | Application block_header | Partial_application block_header ->
+        | Application block_header | Partial_validation block_header ->
             (block_header.shell.predecessor, block_header.shell.timestamp)
         | Construction {predecessor_hash; timestamp; _}
         | Partial_construction {predecessor_hash; timestamp} ->

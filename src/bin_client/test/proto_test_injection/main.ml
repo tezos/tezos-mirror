@@ -96,7 +96,7 @@ end
 
 type mode =
   | Application of block_header
-  | Partial_application of block_header
+  | Partial_validation of block_header
   | Construction of {
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
@@ -118,7 +118,7 @@ let begin_application context _chain_id mode
   let open Lwt_result_syntax in
   let* fitness =
     match mode with
-    | Application block_header | Partial_application block_header ->
+    | Application block_header | Partial_validation block_header ->
         Fitness.to_int64 block_header.shell.fitness
     | Construction _ | Partial_construction _ ->
         let* predecessor_fitness = Fitness.to_int64 predecessor.fitness in

@@ -86,7 +86,7 @@ module type T = sig
 
   type mode =
     | Application of block_header
-    | Partial_application of block_header
+    | Partial_validation of block_header
     | Construction of {
         predecessor_hash : Block_hash.t;
         timestamp : Time.Protocol.t;

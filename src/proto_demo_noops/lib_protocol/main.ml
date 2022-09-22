@@ -72,7 +72,7 @@ type application_state = validation_state
 
 type mode =
   | Application of block_header
-  | Partial_application of block_header
+  | Partial_validation of block_header
   | Construction of {
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
@@ -97,7 +97,7 @@ let begin_validation context _chain_id mode
     ~(predecessor : Block_header.shell_header) =
   let fitness =
     match mode with
-    | Application block_header | Partial_application block_header ->
+    | Application block_header | Partial_validation block_header ->
         block_header.shell.fitness
     | Construction _ | Partial_construction _ ->
         fitness_from_level Int64.(succ (of_int32 predecessor.level))

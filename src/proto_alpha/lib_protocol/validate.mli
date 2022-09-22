@@ -85,7 +85,7 @@ val begin_application :
     block. Indeed, we may not have access to the predecessor context
     when trying to quickly assess a series of blocks in a cousin branch
     (multipass validation). *)
-val begin_partial_application :
+val begin_partial_validation :
   context ->
   Chain_id.t ->
   predecessor_level:Level.t ->

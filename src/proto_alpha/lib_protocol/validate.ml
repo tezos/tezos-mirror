@@ -391,8 +391,8 @@ type application_info = {
     - [Application] is used for the validation of preexisting block.
    Corresponds to [Application] of {!Main.validation_mode}.
 
-    - [Partial_application] is used to partially validate preexisting
-   block. Corresponds to [Partial_application] of
+    - [Partial_validation] is used to partially validate preexisting
+   block. Corresponds to [Partial_validation] of
    {!Main.validation_mode}.
 
     - [Construction] is used for the construction of a new block.
@@ -406,7 +406,7 @@ type application_info = {
    the size of the map {!recfield:managers_seen}. *)
 type mode =
   | Application of application_info
-  | Partial_application of application_info
+  | Partial_validation of application_info
   | Construction of {
       predecessor_round : Round.t;
       predecessor_hash : Block_hash.t;
@@ -785,7 +785,7 @@ module Consensus = struct
     let locked_round_evidence =
       match mode with
       | Mempool -> None
-      | Application _ | Partial_application _ | Construction _ -> (
+      | Application _ | Partial_validation _ | Construction _ -> (
           match block_state.locked_round_evidence with
           | None -> Some (consensus_content.round, voting_power)
           | Some (_stored_round, evidences) ->
@@ -2340,7 +2340,7 @@ module Manager = struct
 
   let may_trace_gas_limit_too_high info =
     match info.mode with
-    | Application _ | Partial_application _ | Construction _ -> fun x -> x
+    | Application _ | Partial_validation _ | Construction _ -> fun x -> x
     | Mempool ->
         (* [Gas.check_limit] will only
            raise a "temporary" error, however when
@@ -2554,7 +2554,7 @@ module Manager = struct
   let may_update_remaining_gas_used mode (block_state : block_state)
       operation_gas_used =
     match mode with
-    | Application _ | Partial_application _ | Construction _ ->
+    | Application _ | Partial_validation _ | Construction _ ->
         let remaining_block_gas =
           Gas.Arith.(sub block_state.remaining_block_gas operation_gas_used)
         in
@@ -2654,7 +2654,7 @@ let begin_any_application ctxt chain_id ~predecessor_level
     }
   in
   let mode =
-    if is_partial then Partial_application application_info
+    if is_partial then Partial_validation application_info
     else Application application_info
   in
   let all_expected_consensus_features =
@@ -2675,7 +2675,7 @@ let begin_any_application ctxt chain_id ~predecessor_level
        all_expected_consensus_features
        ~predecessor_level)
 
-let begin_partial_application ctxt chain_id ~predecessor_level
+let begin_partial_validation ctxt chain_id ~predecessor_level
     ~predecessor_timestamp block_header fitness =
   begin_any_application
     ctxt
@@ -3015,7 +3015,7 @@ let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_tzresult_syntax in
   match vi.mode with
   | Mempool | Construction _ -> return vs
-  | Application _ | Partial_application _ -> (
+  | Application _ | Partial_validation _ -> (
       match (vs.last_op_validation_pass, validation_pass) with
       | None, validation_pass ->
           return {vs with last_op_validation_pass = validation_pass}
@@ -3059,11 +3059,11 @@ let validate_operation ?(check_signature = true)
   let block_state = record_operation block_state oph validation_pass_opt in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
   match (info.mode, validation_pass_opt) with
-  | Partial_application _, Some n
+  | Partial_validation _, Some n
     when Compare.Int.(n <> Operation_repr.consensus_pass) ->
-      (* Do not validate non-consensus operation in [Partial_application] mode *)
+      (* Do not validate non-consensus operation in [Partial_validation] mode *)
       return {info; operation_state; block_state}
-  | Partial_application _, _ | Mempool, _ | Construction _, _ | Application _, _
+  | Partial_validation _, _ | Mempool, _ | Construction _, _ | Application _, _
     -> (
       match operation.protocol_data.contents with
       | Single (Preendorsement _) ->
@@ -3280,7 +3280,7 @@ let finalize_block {info; block_state; _} =
           fitness
       in
       return_unit
-  | Partial_application _ ->
+  | Partial_validation _ ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
         if are_endorsements_required then

@@ -127,7 +127,7 @@ let init_allowed_consensus_operations ctxt ~endorsement_level
     [begin_application] below. *)
 type mode =
   | Application of block_header
-  | Partial_application of block_header
+  | Partial_validation of block_header
   | Construction of {
       predecessor_hash : Block_hash.t;
       timestamp : Time.t;
@@ -143,7 +143,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Alpha_context in
   let level, timestamp =
     match mode with
-    | Application block_header | Partial_application block_header ->
+    | Application block_header | Partial_validation block_header ->
         (block_header.shell.level, block_header.shell.timestamp)
     | Construction {timestamp; _} | Partial_construction {timestamp; _} ->
         (Int32.succ predecessor.level, timestamp)
@@ -161,7 +161,7 @@ let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
      endorsements, which are handled differently). *)
   let preendorsement_level =
     match mode with
-    | Application _ | Partial_application _ | Construction _ ->
+    | Application _ | Partial_validation _ | Construction _ ->
         Level.current ctxt
     | Partial_construction _ -> predecessor_level
   in
@@ -200,9 +200,9 @@ let begin_validation ctxt chain_id mode ~predecessor =
         ~predecessor_timestamp
         block_header
         fitness
-  | Partial_application block_header ->
+  | Partial_validation block_header ->
       let*? fitness = Fitness.from_raw block_header.shell.fitness in
-      Validate.begin_partial_application
+      Validate.begin_partial_validation
         ctxt
         chain_id
         ~predecessor_level
@@ -244,24 +244,24 @@ let validate_operation = Validate.validate_operation
 
 let finalize_validation = Validate.finalize_block
 
-type error += Cannot_apply_in_partial_application
+type error += Cannot_apply_in_partial_validation
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"main.begin_application.cannot_apply_in_partial_application"
-    ~title:"cannot_apply_in_partial_application"
+    ~id:"main.begin_application.cannot_apply_in_partial_validation"
+    ~title:"cannot_apply_in_partial_validation"
     ~description:
-      "Cannot instantiate an application state using the 'Partial_application' \
+      "Cannot instantiate an application state using the 'Partial_validation' \
        mode."
     ~pp:(fun ppf () ->
       Format.fprintf
         ppf
         "Cannot instantiate an application state using the \
-         'Partial_application' mode.")
+         'Partial_validation' mode.")
     Data_encoding.(empty)
-    (function Cannot_apply_in_partial_application -> Some () | _ -> None)
-    (fun () -> Cannot_apply_in_partial_application)
+    (function Cannot_apply_in_partial_validation -> Some () | _ -> None)
+    (fun () -> Cannot_apply_in_partial_validation)
 
 let begin_application ctxt chain_id mode ~predecessor =
   let open Lwt_tzresult_syntax in
@@ -284,7 +284,7 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~migration_operation_results
         ~predecessor_fitness
         block_header
-  | Partial_application _ -> fail Cannot_apply_in_partial_application
+  | Partial_validation _ -> fail Cannot_apply_in_partial_validation
   | Construction {predecessor_hash; timestamp; block_header_data; _} ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
       Apply.begin_full_construction
