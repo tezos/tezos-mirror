@@ -137,7 +137,7 @@ let cut_at_level level (input : Sc_rollup_PVM_sig.input) =
   match input with
   | Inbox_message {inbox_level = input_level; _} ->
       if Raw_level_repr.(level <= input_level) then None else Some input
-  | Sc_rollup_PVM_sig.Reveal_revelation _data -> Some input
+  | Reveal_revelation _data -> Some input
 
 let proof_error reason =
   let open Lwt_tzresult_syntax in
