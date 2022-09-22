@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 open Tezos_webassembly_interpreter
-open Lazy_containers
+open Tezos_lazy_containers
 module V = Instance.Vector
 module M = Instance.NameMap
 module C = Chunked_byte_vector
-open Tree_encoding
+open Tezos_tree_encoding
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3566
 

@@ -37,7 +37,7 @@ open Tezos_scoru_wasm
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
-module Vector = Lazy_containers.Lazy_vector.Int32Vector
+module Vector = Tezos_lazy_containers.Lazy_vector.Int32Vector
 
 let empty_tree () =
   let open Lwt_syntax in
@@ -45,36 +45,37 @@ let empty_tree () =
   let empty_store = Context.empty index in
   return @@ Context.Tree.empty empty_store
 
-type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
 
   let select = function
     | Tree t -> t
-    | _ -> raise Tree_encoding.Incorrect_tree_type
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
   let wrap t = Tree t
 end
 
 module Wasm = Wasm_pvm.Make (Tree)
-module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
+module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (Tree)
 
 let current_tick_encoding =
-  Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
+  Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
 
 let floppy_encoding =
-  Tree_encoding.value
+  Tezos_tree_encoding.value
     ["gather-floppies"; "status"]
     Gather_floppies.internal_status_encoding
 
-let inp_encoding = Tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
+let inp_encoding =
+  Tezos_tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
 (* Replicates the encoding of buffers from [Wasm_pvm] as part of the pvm_state. *)
 let buffers_encoding =
-  Tree_encoding.scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding
+  Tezos_tree_encoding.scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding
 
 let zero =
   WithExceptions.Option.get
@@ -133,7 +134,7 @@ let add_input_info ~inbox_level ~message_counter tree =
   let open Lwt_syntax in
   let* tree =
     Tree_encoding_runner.encode
-      (Tree_encoding.value_option
+      (Tezos_tree_encoding.value_option
          ["wasm"; "input"]
          Wasm_pvm_sig.input_info_encoding)
       (Some (make_inbox_info ~inbox_level ~message_counter))
@@ -168,14 +169,14 @@ let encode_tick_state tree =
   (* Encode the tag. *)
   let* tree =
     Tree_encoding_runner.encode
-      (Tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
+      (Tezos_tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
       "snapshot"
       tree
   in
   (* Encode the value. *)
   let* tree =
     Tree_encoding_runner.encode
-      (Tree_encoding.value ["wasm"; "value"] Data_encoding.unit)
+      (Tezos_tree_encoding.value ["wasm"; "value"] Data_encoding.unit)
       ()
       tree
   in

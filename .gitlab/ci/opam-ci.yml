@@ -3,8 +3,6 @@
 
 # Ignoring package internal-devtools, it only contains tests or private targets
 
-# Ignoring package lazy-containers-tests, it only contains tests or private targets
-
 # Ignoring package octez-dal-node, it only contains tests or private targets
 
 # Ignoring package octez-proxy-server, it only contains tests or private targets
@@ -18,6 +16,8 @@
 # Ignoring package tezos-dal-node-services, it only contains tests or private targets
 
 # Ignoring package tezos-layer2-store, it only contains tests or private targets
+
+# Ignoring package tezos-lazy-containers-tests, it only contains tests or private targets
 
 # Ignoring package tezos-protocol-014-PtKathma-tests, it only contains tests or private targets
 
@@ -37,9 +37,9 @@
 
 # Ignoring package tezos-tps-evaluation, it only contains tests or private targets
 
-# Ignoring package tezt-self-tests, it only contains tests or private targets
+# Ignoring package tezos-tree-encoding-test, it only contains tests or private targets
 
-# Ignoring package tree-encoding-test, it only contains tests or private targets
+# Ignoring package tezt-self-tests, it only contains tests or private targets
 
 .rules_template__trigger_opam_batch_1:
   rules:
@@ -257,13 +257,6 @@
       when: delayed
       start_in: 7 minutes
     - when: never # default
-
-opam:lazy-containers:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_7
-  variables:
-    package: lazy-containers
 
 opam:octez-accuser-014-PtKathma:
   extends:
@@ -1021,6 +1014,13 @@ opam:tezos-layer2-utils-alpha:
   variables:
     package: tezos-layer2-utils-alpha
 
+opam:tezos-lazy-containers:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-lazy-containers
+
 opam:tezos-lwt-result-stdlib:
   extends:
     - .opam_template
@@ -1588,6 +1588,13 @@ opam:tezos-tooling:
   variables:
     package: tezos-tooling
 
+opam:tezos-tree-encoding:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: tezos-tree-encoding
+
 opam:tezos-tx-rollup-014-PtKathma:
   extends:
     - .opam_template
@@ -1664,10 +1671,3 @@ opam:tezt-tezos:
     - .rules_template__trigger_opam_batch_6
   variables:
     package: tezt-tezos
-
-opam:tree-encoding:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tree-encoding

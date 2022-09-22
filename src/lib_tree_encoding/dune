@@ -2,12 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tree_encoding)
- (public_name tree-encoding)
+ (name tezos_tree_encoding)
+ (public_name tezos-tree-encoding)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  lazy-containers
+  tezos-lazy-containers
   tezos-lwt-result-stdlib
   data-encoding)
  (flags

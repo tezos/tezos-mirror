@@ -7,8 +7,8 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tree-encoding
-  lazy-containers
+  tezos-tree-encoding
+  tezos-lazy-containers
   tezos-webassembly-interpreter
   tezos-context.sigs
   tezos-lwt-result-stdlib

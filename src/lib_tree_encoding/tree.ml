@@ -33,9 +33,9 @@ exception Incorrect_tree_type
 module type S = sig
   type tree
 
-  val select : Lazy_containers.Lazy_map.tree -> tree
+  val select : Tezos_lazy_containers.Lazy_map.tree -> tree
 
-  val wrap : tree -> Lazy_containers.Lazy_map.tree
+  val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
 
   val remove : tree -> key -> tree Lwt.t
 
@@ -54,10 +54,12 @@ end
 
 type 'tree backend = (module S with type tree = 'tree)
 
-let select : type tree. tree backend -> Lazy_containers.Lazy_map.tree -> tree =
+let select :
+    type tree. tree backend -> Tezos_lazy_containers.Lazy_map.tree -> tree =
  fun (module T) tree -> T.select tree
 
-let wrap : type tree. tree backend -> tree -> Lazy_containers.Lazy_map.tree =
+let wrap :
+    type tree. tree backend -> tree -> Tezos_lazy_containers.Lazy_map.tree =
  fun (module T) tree -> T.wrap tree
 
 let remove : type tree. tree backend -> tree -> key -> tree Lwt.t =
@@ -83,7 +85,7 @@ let length : type tree. tree backend -> tree -> key -> int Lwt.t =
 
 type wrapped_tree = Wrapped_tree : 'tree * 'tree backend -> wrapped_tree
 
-type Lazy_containers.Lazy_map.tree += Wrapped of wrapped_tree
+type Tezos_lazy_containers.Lazy_map.tree += Wrapped of wrapped_tree
 
 module Wrapped : S with type tree = wrapped_tree = struct
   type tree = wrapped_tree

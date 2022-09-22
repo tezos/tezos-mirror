@@ -1121,7 +1121,7 @@ let octez_base_test_helpers =
 
 let lazy_containers =
   public_lib
-    "lazy-containers"
+    "tezos-lazy-containers"
     ~path:"src/lib_lazy_containers"
     ~synopsis:
       "A collection of lazy containers whose contents is fetched from \
@@ -1132,7 +1132,7 @@ let _lazy_containers_tests =
   test
     "main"
     ~path:"src/lib_lazy_containers/test"
-    ~opam:"lazy-containers-tests"
+    ~opam:"tezos-lazy-containers-tests"
     ~synopsis:"Various tests for the lazy containers library"
     ~dune:Dune.[[S "include_subdirs"; S "no"]]
     ~deps:
@@ -1146,7 +1146,7 @@ let _lazy_containers_tests =
 
 let tree_encoding =
   public_lib
-    "tree-encoding"
+    "tezos-tree-encoding"
     ~path:"src/lib_tree_encoding"
     ~synopsis:
       "A general-purpose library to encode arbitrary data in Merkle trees"
@@ -1688,7 +1688,7 @@ let _tree_encoding_tests =
   test
     "test_tree_encoding"
     ~path:"src/lib_tree_encoding/test"
-    ~opam:"tree-encoding-test"
+    ~opam:"tezos-tree-encoding-test"
     ~synopsis:"Tests for the tree encoding library"
     ~deps:
       [

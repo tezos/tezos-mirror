@@ -32,7 +32,7 @@
 *)
 
 open Tztest
-open Lazy_containers
+open Tezos_lazy_containers
 module Tree_encoding = Test_encoding.Tree_encoding
 module Context = Test_encoding.Context
 module Vector = Lazy_vector.IntVector

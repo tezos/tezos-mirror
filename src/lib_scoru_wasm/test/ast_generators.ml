@@ -24,9 +24,9 @@
 (*****************************************************************************)
 
 open Tezos_webassembly_interpreter
-open Lazy_containers
+open Tezos_lazy_containers
 open QCheck2.Gen
-module Vector = Lazy_containers.Lazy_vector.Int32Vector
+module Vector = Tezos_lazy_containers.Lazy_vector.Int32Vector
 
 let small_vector_gen gen = Vector.of_list <$> small_list gen
 

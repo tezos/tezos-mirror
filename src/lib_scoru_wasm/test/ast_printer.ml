@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lazy_containers
+open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 
 let pp_int32 out n = Format.fprintf out "%ld" n
@@ -246,14 +246,15 @@ let pp_frame out frame =
   let open Eval in
   let (Module_key key) = frame.inst in
   let locals =
-    Lwt_main.run (Lazy_containers.Lazy_vector.Int32Vector.to_list frame.locals)
+    Lwt_main.run
+      (Tezos_lazy_containers.Lazy_vector.Int32Vector.to_list frame.locals)
   in
   Format.fprintf
     out
     "@[<v 2>{module = %s;@;locals = %a;@;}@]"
     key
     (pp_vector Values.pp_value)
-    (Lazy_containers.Lazy_vector.Int32Vector.of_list locals)
+    (Tezos_lazy_containers.Lazy_vector.Int32Vector.of_list locals)
 
 let rec pp_admin_instr' out instr =
   let open Eval in

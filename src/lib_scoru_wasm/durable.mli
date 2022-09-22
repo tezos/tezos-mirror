@@ -36,8 +36,8 @@ exception Not_found
 (** [Durable_storage.t] was empty. *)
 exception Durable_empty
 
-(** [encoding] is a [Tree_encoding] for [t]. *)
-val encoding : t Tree_encoding.t
+(** [encoding] is a [Tezos_tree_encoding] for [t]. *)
+val encoding : t Tezos_tree_encoding.t
 
 val of_storage :
   default:t -> Tezos_webassembly_interpreter.Durable_storage.t -> t
@@ -62,10 +62,12 @@ val key_of_string_exn : string -> key
 
 (** [find_value durable key] optionally looks for the value encoded at [key]
     in [durable]. *)
-val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
+val find_value :
+  t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t option Lwt.t
 
 (** raise @Not_found *)
-val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t
+val find_value_exn :
+  t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
 (** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of 
     the entire subtree at from_key is copied to to_key.*)

@@ -10,8 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tree-encoding"
-  "lazy-containers"
+  "tezos-tree-encoding"
+  "tezos-lazy-containers"
   "tezos-webassembly-interpreter"
   "tezos-context"
   "tezos-lwt-result-stdlib"

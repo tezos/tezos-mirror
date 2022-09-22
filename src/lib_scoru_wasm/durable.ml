@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module T = Tree_encoding.Wrapped
-module Runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
-module E = Tree_encoding
+module T = Tezos_tree_encoding.Wrapped
+module Runner = Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
+module E = Tezos_tree_encoding
 module Storage = Tezos_webassembly_interpreter.Durable_storage
 
 type t = T.tree

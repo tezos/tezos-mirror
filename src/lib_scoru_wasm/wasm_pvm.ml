@@ -71,7 +71,7 @@ type pvm_state = {
   max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
 }
 
-module Make (T : Tree_encoding.TREE) :
+module Make (T : Tezos_tree_encoding.TREE) :
   Gather_floppies.S with type tree = T.tree and type tick_state = tick_state =
 struct
   module Raw = struct
@@ -79,7 +79,7 @@ struct
 
     type nonrec tick_state = tick_state
 
-    module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
+    module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
     module Parsing = Binary_parser_encodings
 
     let host_funcs =
@@ -88,7 +88,7 @@ struct
       registry
 
     let tick_state_encoding =
-      let open Tree_encoding in
+      let open Tezos_tree_encoding in
       tagged_union
         ~default:(fun () ->
           Decode
@@ -154,10 +154,11 @@ struct
         ]
 
     let durable_buffers_encoding =
-      Tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
+      Tezos_tree_encoding.(
+        scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
 
     let pvm_state_encoding =
-      let open Tree_encoding in
+      let open Tezos_tree_encoding in
       conv
         (fun ( last_input_info,
                current_tick,
@@ -309,8 +310,8 @@ struct
                   host_funcs
                   self
                   module_reg
-                  (Lazy_containers.Lazy_vector.Int32Vector.empty ())
-                  (Lazy_containers.Lazy_vector.Int32Vector.singleton
+                  (Tezos_lazy_containers.Lazy_vector.Int32Vector.empty ())
+                  (Tezos_lazy_containers.Lazy_vector.Int32Vector.singleton
                      admin_instr)
               in
               return ~status:Starting (Eval eval_config)
@@ -532,7 +533,7 @@ struct
       (* Encode the input in the tree under [input/level/id]. *)
       let* tree =
         Tree_encoding_runner.encode
-          (Tree_encoding.value ["input"; level; id] Data_encoding.string)
+          (Tezos_tree_encoding.value ["input"; level; id] Data_encoding.string)
           message
           tree
       in

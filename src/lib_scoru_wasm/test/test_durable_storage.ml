@@ -32,13 +32,14 @@
 *)
 
 open Tztest
-open Lazy_containers
+open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 include Test_encodings_util
 open Wasm_utils
 module Wasm = Wasm_pvm.Make (Tree)
-module Wrapped_tree_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
+module Wrapped_tree_runner =
+  Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 
 let equal_chunks c1 c2 =
   let open Lwt.Syntax in

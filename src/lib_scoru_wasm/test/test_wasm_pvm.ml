@@ -145,13 +145,12 @@ let should_run_debug_kernel kernel =
   assert (not @@ is_stuck state_after_first_message)
 
 let add_value tree key_steps =
-  let open Lazy_containers in
+  let open Tezos_lazy_containers in
   let open Test_encodings_util in
   let value = Chunked_byte_vector.of_string "a very long value" in
   Tree_encoding_runner.encode
-    (Tree_encoding.scope
-       ("durable" :: List.append key_steps ["_"])
-       Tree_encoding.chunked_byte_vector)
+    Tezos_tree_encoding.(
+      scope ("durable" :: List.append key_steps ["_"]) chunked_byte_vector)
     value
     tree
 
@@ -269,7 +268,7 @@ let build_snapshot_wasm_state_from_set_input
   let open Lwt_syntax in
   (* Only serves to encode the `Snapshot` state. *)
   let state_encoding =
-    Tree_encoding.(
+    Tezos_tree_encoding.(
       tagged_union
         (value [] Data_encoding.string)
         [
@@ -283,7 +282,7 @@ let build_snapshot_wasm_state_from_set_input
   (* Serves to encode the `Input_requested` status. *)
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
-      (Tree_encoding.scope ["wasm"] state_encoding)
+      (Tezos_tree_encoding.scope ["wasm"] state_encoding)
       Wasm_pvm.Snapshot
       tree
   in
@@ -291,18 +290,18 @@ let build_snapshot_wasm_state_from_set_input
      at the next max tick + the snapshot tick. *)
   let* current_tick =
     Test_encodings_util.Tree_encoding_runner.decode
-      (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+      (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       tree
   in
   let snapshot_tick = Z.(max_tick + current_tick) in
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
-      (Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
+      (Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
       snapshot_tick
       tree
   in
   Test_encodings_util.Tree_encoding_runner.encode
-    (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+    (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
     snapshot_tick
     tree
 

@@ -100,7 +100,7 @@ let reveal_error_to_string exn =
   reveal_error_to_string_raw exn |> truncate_message
 
 let extract_interpreter_error exn =
-  let open Lazy_containers in
+  let open Tezos_lazy_containers in
   let raw_exception = Printexc.to_string exn |> truncate_message in
   match exn with
   (* The locations are removed during encoding, they won't be usable in practice. *)

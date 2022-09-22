@@ -26,7 +26,7 @@
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Test_encodings_util
-open Lazy_containers
+open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 
 let parse_module code =
@@ -145,18 +145,18 @@ let wrap_as_durable_storage tree =
   let open Lwt.Syntax in
   let+ tree =
     Tree_encoding_runner.decode
-      (Tree_encoding.scope ["durable"] Tree_encoding.wrapped_tree)
+      Tezos_tree_encoding.(scope ["durable"] wrapped_tree)
       tree
   in
   Tezos_webassembly_interpreter.Durable_storage.of_tree
-  @@ Tree_encoding.Wrapped.wrap tree
+  @@ Tezos_tree_encoding.Wrapped.wrap tree
 
 let make_durable list_key_vals =
   let open Lwt_syntax in
   let* tree = empty_tree () in
   let* tree =
     Tree_encoding_runner.encode
-      (Tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
+      (Tezos_tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
       true
       tree
   in
@@ -167,7 +167,7 @@ let make_durable list_key_vals =
         let key_steps = String.split_on_char '/' ("durable/" ^ key ^ "/_") in
         let* tree =
           Tree_encoding_runner.encode
-            (Tree_encoding.scope key_steps Tree_encoding.chunked_byte_vector)
+            Tezos_tree_encoding.(scope key_steps chunked_byte_vector)
             (Chunked_byte_vector.of_string value)
             tree
         in
