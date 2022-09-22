@@ -540,7 +540,12 @@ val get_chain_block_context_constants_errors :
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_baking_rights :
-  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?delegate:string ->
+  ?level:int ->
+  unit ->
+  JSON.t t
 
 type level = {
   level : int;
@@ -768,7 +773,7 @@ val get_chain_block_context_delegate_deactivated :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_frozen_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_balance_by_cycle]
 
@@ -796,7 +801,7 @@ val get_chain_block_context_delegate_delegated_contracts :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_frozen_deposits :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/frozen_deposits_limit]
 

@@ -28,6 +28,14 @@ include RPC_legacy
 
 type 'a t = (Node.t, 'a) RPC_core.t
 
+module Query_arg = struct
+  let opt name f = function None -> [] | Some x -> [(name, f x)]
+
+  let opt_bool name b = opt name string_of_bool b
+
+  let switch name b = if b then [(name, "")] else []
+end
+
 let make ?data ?query_string =
   make ?data ?query_string ~get_host:Node.rpc_host ~get_port:Node.rpc_port
 
@@ -187,7 +195,7 @@ let post_injection_operation ?(async = false) data =
   make
     POST
     ["injection"; "operation"]
-    ~query_string:(if async then [("async", "")] else [])
+    ~query_string:(Query_arg.switch "async" async)
     ~data
     Fun.id
 
@@ -195,7 +203,7 @@ let post_private_injection_operation ?(async = false) data =
   make
     POST
     ["private"; "injection"; "operation"]
-    ~query_string:(if async then [("async", "")] else [])
+    ~query_string:(Query_arg.switch "async" async)
     ~data
     Fun.id
 
@@ -204,7 +212,7 @@ let post_chain_block_helpers_scripts_run_operation ?(chain = "main")
   make
     POST
     ["chains"; chain; "blocks"; block; "helpers"; "scripts"; "run_operation"]
-    ~query_string:(if async then [("async", "")] else [])
+    ~query_string:(Query_arg.switch "async" async)
     ~data
     Fun.id
 
@@ -374,19 +382,13 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
 
 let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     ?branch_delayed ?branch_refused ?refused ?outdated () =
-  let query_parameter param param_s =
-    match param with
-    | None -> []
-    | Some true -> [(param_s, "true")]
-    | Some false -> [(param_s, "false")]
-  in
   let query_string =
-    (match version with None -> [] | Some v -> [("version", v)])
-    @ query_parameter applied "applied"
-    @ query_parameter refused "refused"
-    @ query_parameter outdated "outdated"
-    @ query_parameter branch_delayed "branch_delayed"
-    @ query_parameter branch_refused "branch_refused"
+    Query_arg.opt "version" Fun.id version
+    @ Query_arg.opt_bool "applied" applied
+    @ Query_arg.opt_bool "refused" refused
+    @ Query_arg.opt_bool "outdated" outdated
+    @ Query_arg.opt_bool "branch_delayed" branch_delayed
+    @ Query_arg.opt_bool "branch_refused" branch_refused
   in
   make
     ~query_string
@@ -396,7 +398,7 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
 
 let post_chain_mempool_request_operations ?(chain = "main") ?peer () =
   make
-    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
+    ~query_string:(Query_arg.opt "peer_id" Fun.id peer)
     POST
     ["chains"; chain; "mempool"; "request_operations"]
     Fun.id
@@ -492,10 +494,13 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     Fun.id
 
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
-    ?delegate () =
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+    ?delegate ?level () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "level" Int.to_string level
+  in
   make
-    ?query_string
+    ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "baking_rights"]
     Fun.id
@@ -525,9 +530,9 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
 
 let get_chain_block_helper_endorsing_rights ?(chain = "main") ?(block = "head")
     ?delegate () =
-  let query_string = Option.map (fun d -> [("delegate", d)]) delegate in
+  let query_string = Query_arg.opt "delegate" Fun.id delegate in
   make
-    ?query_string
+    ~query_string
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "endorsing_rights"]
     Fun.id
@@ -549,11 +554,8 @@ let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
 let get_chain_block_context_big_maps ?(chain = "main") ?(block = "head") ~id
     ?offset ?length () =
   let query_string =
-    [
-      Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-      Option.map (fun length -> ("length", Int.to_string length)) length;
-    ]
-    |> List.filter_map Fun.id
+    Query_arg.opt "offset" Int.to_string offset
+    @ Query_arg.opt "length" Int.to_string length
   in
   make
     GET
@@ -838,7 +840,7 @@ let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
       pkh;
       "frozen_deposits";
     ]
-    Fun.id
+    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
 
 let get_chain_block_context_delegate_frozen_deposits_limit ?(chain = "main")
     ?(block = "head") pkh =
@@ -918,7 +920,7 @@ let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
       pkh;
       "frozen_balance";
     ]
-    Fun.id
+    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
 
 let get_chain_block_context_delegate_frozen_balance_by_cycle ?(chain = "main")
     ?(block = "head") pkh =
