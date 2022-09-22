@@ -95,6 +95,16 @@ let init_config ?use_unsafe_srs dal_node =
   | None -> failwith "DAL node configuration initialization failed"
   | Some filename -> return filename
 
+module Config_file = struct
+  let filename dal_node = sf "%s/config.json" @@ data_dir dal_node
+
+  let read dal_node = JSON.parse_file (filename dal_node)
+
+  let write dal_node config = JSON.encode_to_file (filename dal_node) config
+
+  let update dal_node update = read dal_node |> update |> write dal_node
+end
+
 let check_event ?timeout ?where dal_node name promise =
   let* result =
     match timeout with
