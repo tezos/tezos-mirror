@@ -292,6 +292,10 @@ module Slots_history : sig
   val verify_proof :
     dal_parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
 
+  type error += Add_element_in_slots_skip_list_violates_ordering
+
+  type error += Dal_proof_error of string
+
   module Internal_for_tests : sig
     val content : t -> slot
   end

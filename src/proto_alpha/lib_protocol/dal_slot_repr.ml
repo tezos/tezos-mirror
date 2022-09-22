@@ -259,6 +259,22 @@ module Slots_history = struct
     let basis = 2
   end
 
+  type error += Add_element_in_slots_skip_list_violates_ordering
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"Dal_slot_repr.add_element_in_slots_skip_list_violates_ordering"
+      ~title:"Add an element in slots skip list that violates ordering"
+      ~description:
+        "Attempting to add an element on top of the Dal confirmed slots skip \
+         list that violates the ordering."
+      Data_encoding.unit
+      (function
+        | Add_element_in_slots_skip_list_violates_ordering -> Some ()
+        | _ -> None)
+      (fun () -> Add_element_in_slots_skip_list_violates_ordering)
+
   module Skip_list = struct
     include Skip_list_repr.Make (Skip_list_parameters)
 
@@ -283,22 +299,6 @@ module Slots_history = struct
     let compare = compare_slot_id
 
     let compare_lwt a b = Lwt.return @@ compare a b
-
-    type error += Add_element_in_slots_skip_list_violates_ordering
-
-    let () =
-      register_error_kind
-        `Temporary
-        ~id:"Dal_slot_repr.add_element_in_slots_skip_list_violates_ordering"
-        ~title:"Add an element in slots skip list that violates ordering"
-        ~description:
-          "Attempting to add an element on top of the Dal confirmed slots skip \
-           list that violates the ordering."
-        Data_encoding.unit
-        (function
-          | Add_element_in_slots_skip_list_violates_ordering -> Some ()
-          | _ -> None)
-        (fun () -> Add_element_in_slots_skip_list_violates_ordering)
 
     let next ~prev_cell ~prev_cell_ptr elt =
       let open Tzresult_syntax in
