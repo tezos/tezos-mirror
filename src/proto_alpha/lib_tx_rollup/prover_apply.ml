@@ -27,8 +27,12 @@ module Prover_apply = Protocol.Tx_rollup_l2_apply.Make (Context.Prover_context)
 
 type proof = Protocol.Tx_rollup_l2_proof.t
 
-let proof_size =
-  Data_encoding.Binary.length Protocol.Tx_rollup_l2_proof.encoding
+let proof_size proof =
+  (* The 4 additional bytes are added by data-encoding when we
+     “re-encode” the proof as raw bytes. We need to take these 4 bytes
+     into account in the unlikely scenario where they are enough to
+     cross the limit. *)
+  4 + Data_encoding.Binary.length Protocol.Tx_rollup_l2_proof.encoding proof
 
 let apply_message ctxt parameters message =
   let open Lwt_result_syntax in

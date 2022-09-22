@@ -33,7 +33,9 @@ val build_rejection :
   reject_commitment:Tx_rollup_commitment.Full.t ->
   L2block.t ->
   position:int ->
-  Kind.tx_rollup_rejection manager_operation tzresult Lwt.t
+  (Protocol.Tx_rollup_l2_proof.t * Kind.tx_rollup_rejection manager_operation)
+  tzresult
+  Lwt.t
 
 (** [reject_bad_commitment ~source state commitment] injects a rejection
     operation with [source] if the [commitment] is rejectable. *)

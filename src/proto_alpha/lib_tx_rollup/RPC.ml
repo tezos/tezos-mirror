@@ -366,7 +366,7 @@ module Block = struct
             (List.compare_length_with block.inbox message_pos < 0)
             (Error.Tx_rollup_invalid_message_position_in_inbox message_pos)
         in
-        let* (Tx_rollup_rejection {proof; _}) =
+        let* proof, _ =
           (* We build a rejection for our commitment because we are only
              interested in the proof *)
           Accuser.build_rejection

@@ -212,7 +212,7 @@ val set_deposits_limit :
   Kind.set_deposits_limit Kind.manager Injection.result tzresult Lwt.t
 
 (** Calls {!Injection.inject_manager_operation}
-    with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Increase_paid_storage} 
+    with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Increase_paid_storage}
     [{amount_in_bytes; destination}] as operation. *)
 val increase_paid_storage :
   #Protocol_client_context.full ->

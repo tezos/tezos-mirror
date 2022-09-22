@@ -587,6 +587,7 @@ let generate_tx_rollup_rejection random_state :
     let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
     let previous_message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
     let message_position = 0 in
+    let proof = Tx_rollup_l2_proof.serialize_proof_exn proof in
     Tx_rollup_rejection
       {
         tx_rollup;

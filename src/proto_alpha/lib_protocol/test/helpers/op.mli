@@ -533,6 +533,31 @@ val transfer_ticket :
   entrypoint:Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
 
+(** [tx_rollup_raw_reject] is a low-level helpers to reject a
+    commitment by providing a serialized proofs (which can be
+    invalid). See {!tx_rollup_reject} if you are interested in a
+    helper that guarantees the submitted proof to be decodable by the
+    protocol. *)
+val tx_rollup_raw_reject :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Tx_rollup_level.t ->
+  Tx_rollup_message.t ->
+  message_position:int ->
+  message_path:Tx_rollup_inbox.Merkle.path ->
+  message_result_hash:Tx_rollup_message_result_hash.t ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
+  proof:Tx_rollup_l2_proof.serialized ->
+  previous_message_result:Tx_rollup_message_result.t ->
+  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
+  Operation.packed tzresult Lwt.t
+
 (** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
     index proof] Rejects a tx rollup commitment.
 
