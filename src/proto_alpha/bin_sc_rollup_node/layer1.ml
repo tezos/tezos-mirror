@@ -84,9 +84,7 @@ let () =
 
 *)
 
-type block_hash = Block_hash.t
-
-type head = Head of {hash : block_hash; level : int32}
+type head = Head of {hash : Block_hash.t; level : int32}
 
 let head_encoding =
   Data_encoding.(
