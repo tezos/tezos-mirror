@@ -265,7 +265,7 @@ let produce pvm_and_state commit_level =
             }
         in
         return (Some inbox_proof, input)
-    | Sc_rollup_PVM_sig.Needs_reveal (RevealRawData h) -> (
+    | Needs_reveal (RevealRawData h) -> (
         match reveal h with
         | None -> proof_error "No reveal"
         | Some data ->
