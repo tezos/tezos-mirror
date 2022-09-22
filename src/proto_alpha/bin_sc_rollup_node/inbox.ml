@@ -31,13 +31,6 @@ open Alpha_context
 
 let lift = Lwt.map Environment.wrap_tzresult
 
-let head_processing_failure e =
-  Format.eprintf
-    "Error during head processing: @[%a@]"
-    Error_monad.(TzTrace.pp_print_top pp)
-    e ;
-  Lwt_exit.exit_and_raise 1
-
 module State = struct
   let add_messages = Store.Messages.add
 
@@ -161,68 +154,61 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
 
 let process_head node_ctxt Layer1.({level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
-  let*! res = get_messages node_ctxt head_hash in
-  match res with
-  | Error e -> head_processing_failure e
-  | Ok messages ->
-      let*! () =
-        Inbox_event.get_messages head_hash level (List.length messages)
-      in
-      let*! () = State.add_messages node_ctxt.store head_hash messages in
-      (*
+  let* messages = get_messages node_ctxt head_hash in
+  let*! () = Inbox_event.get_messages head_hash level (List.length messages) in
+  let*! () = State.add_messages node_ctxt.store head_hash messages in
+  (*
 
           We compute the inbox of this block using the inbox of its
           predecessor. That way, the computation of inboxes is robust
           to chain reorganization.
 
       *)
-      let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
-      let* inbox = State.inbox_of_head node_ctxt predecessor in
-      let* history = State.history_of_head node_ctxt predecessor in
-      let* ctxt =
-        if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-        then
-          (* This is before we have interpreted the boot sector, so we start
-             with an empty context in genesis *)
-          return (Context.empty node_ctxt.context)
-        else Node_context.checkout_context node_ctxt predecessor.hash
-      in
-      let*! messages_tree = Context.MessageTrees.find ctxt in
-      let* history, inbox, ctxt =
-        lift
-        @@ let*? level = Raw_level.of_int32 level in
-           let*? messages =
-             List.map_e Sc_rollup.Inbox_message.serialize messages
-           in
-           if messages = [] then return (history, inbox, ctxt)
-           else
-             let commitment_period =
-               node_ctxt.protocol_constants.parametric.sc_rollup
-                 .commitment_period_in_blocks |> Int32.of_int
-             in
-             let inbox =
-               Sc_rollup.Inbox.refresh_commitment_period
-                 ~commitment_period
-                 ~level
-                 inbox
-             in
-             let* messages_tree, history, inbox =
-               Context.Inbox.add_messages
-                 node_ctxt.context
-                 history
-                 inbox
-                 level
-                 messages
-                 messages_tree
-             in
+  let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
+  let* inbox = State.inbox_of_head node_ctxt predecessor in
+  let* history = State.history_of_head node_ctxt predecessor in
+  let* ctxt =
+    if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
+    then
+      (* This is before we have interpreted the boot sector, so we start
+         with an empty context in genesis *)
+      return (Context.empty node_ctxt.context)
+    else Node_context.checkout_context node_ctxt predecessor.hash
+  in
+  let*! messages_tree = Context.MessageTrees.find ctxt in
+  let* history, inbox, ctxt =
+    lift
+    @@ let*? level = Raw_level.of_int32 level in
+       let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
+       if messages = [] then return (history, inbox, ctxt)
+       else
+         let commitment_period =
+           node_ctxt.protocol_constants.parametric.sc_rollup
+             .commitment_period_in_blocks |> Int32.of_int
+         in
+         let inbox =
+           Sc_rollup.Inbox.refresh_commitment_period
+             ~commitment_period
+             ~level
+             inbox
+         in
+         let* messages_tree, history, inbox =
+           Context.Inbox.add_messages
+             node_ctxt.context
+             history
+             inbox
+             level
+             messages
+             messages_tree
+         in
 
-             let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
-             return (history, inbox, ctxt)
-      in
-      let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-      let*! () = State.add_inbox node_ctxt.store head_hash inbox in
-      let*! () = State.add_history node_ctxt.store head_hash history in
-      return ctxt
+         let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
+         return (history, inbox, ctxt)
+  in
+  let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
+  let*! () = State.add_inbox node_ctxt.store head_hash inbox in
+  let*! () = State.add_history node_ctxt.store head_hash history in
+  return ctxt
 
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
