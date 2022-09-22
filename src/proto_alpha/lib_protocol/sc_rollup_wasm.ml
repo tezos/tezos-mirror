@@ -93,7 +93,10 @@ module V2_0_0 = struct
     val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
     (** PVM status *)
-    type status = Computing | Waiting_for_input_message
+    type status =
+      | Computing
+      | Waiting_for_input_message
+      | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
@@ -133,7 +136,10 @@ module V2_0_0 = struct
 
     type tree = Tree.tree
 
-    type status = Computing | Waiting_for_input_message
+    type status =
+      | Computing
+      | Waiting_for_input_message
+      | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     module State = struct
       type state = tree
@@ -224,6 +230,7 @@ module V2_0_0 = struct
 
     let get_status : status Monad.t =
       let open Monad.Syntax in
+      let open Sc_rollup_PVM_sig in
       let* s = get in
       let* info = lift (WASM_machine.get_info s) in
       return
@@ -231,6 +238,16 @@ module V2_0_0 = struct
       match info.input_request with
       | No_input_required -> Computing
       | Input_required -> Waiting_for_input_message
+      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
+          match
+            Input_hash.of_bytes_opt
+              (Bytes.of_string (Wasm_2_0_0.input_hash_to_string hash))
+          with
+          | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
+          | None ->
+              (* In case of an invalid hash, the rollup is
+                 blocked. Any commitment will be invalid. *)
+              Waiting_for_reveal (Reveal_raw_data Input_hash.zero))
 
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
@@ -254,6 +271,7 @@ module V2_0_0 = struct
           | Some (level, n) -> return (PS.First_after (level, n))
           | None -> return PS.Initial)
       | Computing -> return PS.No_input_required
+      | Waiting_for_reveal reveal -> return (PS.Needs_reveal reveal)
 
     let is_input_state = result_of is_input_state
 
@@ -282,14 +300,11 @@ module V2_0_0 = struct
                  s)
           in
           set s
-      | PS.Reveal _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3754
-
-             The WASM PVM does not produce [Needs_reveal] input
-             requests.  Thus, no [set_input_state] should transmit a
-             [Reveal_revelation].
-          *)
-          assert false
+      | PS.Reveal (PS.Raw_data data) ->
+          let open Monad.Syntax in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step (Bytes.of_string data) s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 

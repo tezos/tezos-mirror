@@ -106,6 +106,13 @@ type invoke_step_kont =
       func : Ast.func;
       concat_kont : value concat_kont;
     }
+  | Inv_reveal_tick of {
+      reveal : Reveal.reveal;
+      base_destination : int32;
+      max_bytes : int32;
+      code : code;
+      revealed_bytes : int32 option;
+    }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
 
 type label_step_kont =
@@ -255,6 +262,15 @@ val step :
   config ->
   buffers ->
   (Durable_storage.t * config) Lwt.t
+
+val is_reveal_tick : config -> Reveal.reveal option
+
+(** [reveal_step module_reg payload config] loads [payload] in the
+    memory of the module whose function is being evaluated with [config].
+
+    This function can only be used when [is_reveal_tick] returns
+    something ({i i.e.}, not [None]). *)
+val reveal_step : module_reg -> bytes -> config -> config Lwt.t
 
 val config :
   Host_funcs.registry ->

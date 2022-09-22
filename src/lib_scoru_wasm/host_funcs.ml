@@ -397,6 +397,22 @@ let store_move =
             to_key_length
       | _ -> raise Bad_input)
 
+(** [reveal_args args] compute the list of arguments type of a host
+    functions resulting in a reveal tick. [args] is the list of types
+    specific to a given host functions, and [reveal_args] appends two
+    int32 which specify the output buffer (base, and length) where the
+    result of the function is to be stored. *)
+let reveal_args args = args @ Types.[NumType I32Type; NumType I32Type]
+
+let reveal_preimage_name = "reveal_preimage"
+
+let reveal_preimage_type =
+  let input_types = reveal_args Types.[NumType I32Type] |> Vector.of_list in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let reveal_preimage = Host_funcs.Reveal_tick Preimage
+
 let lookup_opt name =
   match name with
   | "read_input" ->
@@ -414,6 +430,8 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
   | "store_move" ->
       Some (ExternFunc (HostFunc (store_move_type, store_move_name)))
+  | "reveal_preimage" ->
+      Some (ExternFunc (HostFunc (reveal_preimage_type, reveal_preimage_name)))
   | _ -> None
 
 let lookup name =
@@ -433,6 +451,7 @@ let register_host_funcs registry =
       (store_delete_name, store_delete);
       (store_copy_name, store_copy);
       (store_move_name, store_move);
+      (reveal_preimage_name, reveal_preimage);
     ]
 
 module Internal_for_tests = struct

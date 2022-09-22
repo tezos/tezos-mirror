@@ -106,9 +106,6 @@ module type T = sig
         Tezos_base.Bounded.Non_negative_int32.t
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info
        and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_sig.output_info
-       and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_sig.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_sig.info
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1051,11 +1048,9 @@ struct
       message_index : Z.t;
     }
 
-    type input_request = Tezos_scoru_wasm.Wasm_pvm_sig.input_request =
-      | No_input_required
-      | Input_required
+    type input_request = No_input_required | Input_required
 
-    type info = Tezos_scoru_wasm.Wasm_pvm_sig.info = {
+    type info = {
       current_tick : Z.t;
       last_input_read : input option;
       input_request : input_request;
@@ -1083,7 +1078,19 @@ struct
 
       let get_output output (tree : Tree.tree) = Wasm.get_output output tree
 
-      let get_info (tree : Tree.tree) = Wasm.get_info tree
+      let get_info (tree : Tree.tree) =
+        let open Lwt_syntax in
+        let+ {current_tick; last_input_read; input_request} =
+          Wasm.get_info tree
+        in
+        {
+          current_tick;
+          last_input_read;
+          input_request =
+            (match input_request with
+            | Reveal_required _ | No_input_required -> No_input_required
+            | Input_required -> Input_required);
+        }
     end
   end
 

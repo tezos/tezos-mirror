@@ -350,7 +350,32 @@ type invoke_step_kont =
       func : func;
       concat_kont : value concat_kont;
     }
+  | Inv_reveal_tick of {
+      reveal : Reveal.reveal;
+      base_destination : int32;
+      max_bytes : int32;
+      code : code;
+      revealed_bytes : int32 option;
+    }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+
+let vector_pop_map v f at =
+  if 1l <= Vector.num_elements v then
+    let+ hd, v = Vector.pop v in
+    match f hd with
+    | Some r -> (r, v)
+    | None -> Crash.error at "missing or ill-typed operand on stack"
+  else Crash.error at "missing or ill-typed operand on stack"
+
+let num = function Num n -> Some n | _ -> None
+
+let num_i32 = function Num (I32 i) -> Some i | _ -> None
+
+let ref_ = function Ref r -> Some r | _ -> None
+
+let vec = function Vec v -> Some v | _ -> None
+
+let vec_v128 = function Vec (V128 v) -> Some v | _ -> None
 
 type label_step_kont =
   | LS_Start : ongoing label_kont -> label_step_kont
@@ -494,25 +519,62 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
       | Func.HostFunc (_, global_name) ->
           Lwt.catch
             (fun () ->
-              let (Host_funcs.Host_func f) =
-                Host_funcs.lookup ~global_name c.host_funcs
-              in
-              let* inst = resolve_module_ref c.module_reg frame.inst in
-              let* args = Vector.to_list args in
-              let available_memories =
-                if not init then Host_funcs.Available_memories inst.memories
-                else Host_funcs.No_memories_during_init
-              in
-              let+ durable, res =
-                f
-                  buffers.input
-                  buffers.output
-                  durable
-                  available_memories
-                  (List.rev args)
-              in
-              let vs' = Vector.prepend_list res vs' in
-              (durable, Inv_stop {code = (vs', es); fresh_frame = None}))
+              let host_func = Host_funcs.lookup ~global_name c.host_funcs in
+              match host_func with
+              | Host_func f ->
+                  let* inst = resolve_module_ref c.module_reg frame.inst in
+                  let* args = Vector.to_list args in
+                  let available_memories =
+                    if not init then Host_funcs.Available_memories inst.memories
+                    else Host_funcs.No_memories_during_init
+                  in
+                  let+ durable, res =
+                    f
+                      buffers.input
+                      buffers.output
+                      durable
+                      available_memories
+                      (List.rev args)
+                  in
+                  let vs' = Vector.prepend_list res vs' in
+                  (durable, Inv_stop {code = (vs', es); fresh_frame = None})
+              | Reveal_tick kind ->
+                  (* Reminder: the arguments are put on a stack, and must be
+                     read in reverse order from the function definition. *)
+                  let* max_bytes, args =
+                    vector_pop_map args num_i32 no_region
+                  in
+                  let* base_destination, args =
+                    vector_pop_map args num_i32 no_region
+                  in
+                  let* args, reveal =
+                    match kind with
+                    | Preimage ->
+                        let* offset, args =
+                          vector_pop_map args num_i32 no_region
+                        in
+                        let* inst =
+                          resolve_module_ref c.module_reg frame.inst
+                        in
+                        let* mem = memory inst (0l @@ no_region) in
+                        let+ hash = Memory.load_bytes mem offset 32 in
+                        ( args,
+                          Reveal.(
+                            Reveal_raw_data (input_hash_from_string_exn hash))
+                        )
+                  in
+                  (* TODO: Proper error handling. *)
+                  assert (Vector.num_elements args = 0l) ;
+                  Lwt.return
+                    ( durable,
+                      Inv_reveal_tick
+                        {
+                          reveal;
+                          max_bytes;
+                          base_destination;
+                          code = (vs', es);
+                          revealed_bytes = None;
+                        } ))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -592,6 +654,14 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                         };
                   };
             } )
+  | Inv_reveal_tick {revealed_bytes = None; _} ->
+      (* This is a reveal tick, not an evaluation tick. The PVM should
+         prevent this execution path. *)
+      assert false
+  | Inv_reveal_tick {revealed_bytes = Some revealed_bytes; code; _} ->
+      let vs, es = code in
+      let vs = Vector.cons (Num (I32 revealed_bytes)) vs in
+      Lwt.return (durable, Inv_stop {code = (vs, es); fresh_frame = None})
   | Inv_concat tick ->
       let+ concat_kont = concat_step tick.concat_kont in
       (durable, Inv_concat {tick with concat_kont})
@@ -635,24 +705,6 @@ let elem_oob module_reg frame x i n =
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
-
-let vector_pop_map v f at =
-  if 1l <= Vector.num_elements v then
-    let+ hd, v = Vector.pop v in
-    match f hd with
-    | Some r -> (r, v)
-    | None -> Crash.error at "missing or ill-typed operand on stack"
-  else Crash.error at "missing or ill-typed operand on stack"
-
-let num = function Num n -> Some n | _ -> None
-
-let num_i32 = function Num (I32 i) -> Some i | _ -> None
-
-let ref_ = function Ref r -> Some r | _ -> None
-
-let vec = function Vec v -> Some v | _ -> None
-
-let vec_v128 = function Vec (V128 v) -> Some v | _ -> None
 
 (** [step_instr module_reg label vs at e es stack] returns the new
     state of the label stack [label, stack] for a given [frame], by
@@ -1504,6 +1556,69 @@ let rec eval durable module_reg (c : config) buffers :
   | _ ->
       let* durable, c = step ~init:false ~durable c buffers in
       eval durable module_reg c buffers
+
+let is_reveal_tick = function
+  | {
+      step_kont =
+        SK_Next
+          ( _,
+            _,
+            LS_Craft_frame
+              (_, Inv_reveal_tick {reveal; revealed_bytes = None; _}) );
+      _;
+    } ->
+      Some reveal
+  | _ -> None
+
+let reveal module_reg base_destination max_bytes frame payload =
+  let open Lwt.Syntax in
+  Lwt.catch
+    (fun () ->
+      let* inst = resolve_module_ref module_reg frame.inst in
+      let+ mem = memory inst (0l @@ no_region) in
+      let payload_size = Bytes.length payload in
+      let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
+      let payload = Bytes.sub payload 0 revealed_bytes in
+      let _ =
+        Memory.store_bytes mem base_destination (Bytes.to_string payload)
+      in
+      Int32.of_int revealed_bytes)
+    (fun _exn ->
+      (* TODO: error handling *)
+      assert false)
+
+let reveal_step module_reg payload =
+  let open Lwt.Syntax in
+  function
+  | {
+      step_kont =
+        SK_Next
+          ( frame,
+            top,
+            LS_Craft_frame
+              (label, Inv_reveal_tick ({revealed_bytes = None; _} as inv)) );
+      _;
+    } as config ->
+      let+ bytes_count =
+        reveal
+          module_reg
+          inv.base_destination
+          inv.max_bytes
+          frame.frame_specs
+          payload
+      in
+      {
+        config with
+        step_kont =
+          SK_Next
+            ( frame,
+              top,
+              LS_Craft_frame
+                ( label,
+                  Inv_reveal_tick {inv with revealed_bytes = Some bytes_count}
+                ) );
+      }
+  | _ -> assert false (* TODO: error handling *)
 
 (* Functions & Constants *)
 

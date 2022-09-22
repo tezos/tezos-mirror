@@ -37,10 +37,19 @@ type output_info = {
   message_index : Z.t;  (** The index of the message in the outbox. *)
 }
 
+type input_hash = Tezos_webassembly_interpreter.Reveal.input_hash
+
+let input_hash_to_string =
+  Tezos_webassembly_interpreter.Reveal.input_hash_to_string
+
+type reveal = Tezos_webassembly_interpreter.Reveal.reveal =
+  | Reveal_raw_data of Tezos_webassembly_interpreter.Reveal.input_hash
+
 (** Represents the state of input requests. *)
 type input_request =
   | No_input_required  (** The VM does not expect any input. *)
   | Input_required  (** The VM needs input in order to progress. *)
+  | Reveal_required of reveal
 
 (** Represents the state of the VM. *)
 type info = {
@@ -89,6 +98,13 @@ module type S = sig
       already stuck, this function may raise an exception. Note at this point
       the function raises an exception if the VM is not expecting input. *)
   val set_input_step : input_info -> string -> tree -> tree Lwt.t
+
+  (** [reveal_step reveal_data tree] loads the [reveal_data] in the
+      memory of module of the currently executed function.
+
+      If the VM does not expect any reveal data, this function raises
+      an exception. *)
+  val reveal_step : bytes -> tree -> tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given
       output. The result is meant to be deserialized using

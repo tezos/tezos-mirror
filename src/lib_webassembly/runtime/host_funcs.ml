@@ -2,6 +2,8 @@ type available_memories =
   | No_memories_during_init
   | Available_memories of Instance.memory_inst Instance.Vector.t
 
+type reveal_tick_kind = Preimage
+
 type host_func =
   | Host_func of
       (Input_buffer.t ->
@@ -10,7 +12,7 @@ type host_func =
       available_memories ->
       Values.value list ->
       (Durable_storage.t * Values.value list) Lwt.t)
-[@@ocaml.unboxed]
+  | Reveal_tick of reveal_tick_kind
 
 module Registry = Map.Make (String)
 

@@ -762,6 +762,22 @@ let inv_concat_gen ~module_reg =
   let+ concat_kont = concat_kont_gen value_gen in
   Eval.Inv_concat {arity; vs; instructions; inst; func; concat_kont}
 
+let inv_reveal_tick ~module_reg =
+  let* hash = Reveal.input_hash_from_string_exn <$> string_size (pure 32) in
+  let* base_destination = Int32.of_int <$> small_nat in
+  let* max_bytes = Int32.of_int <$> small_nat in
+  let* vs = small_vector_gen value_gen in
+  let* es = small_vector_gen (admin_instr_gen ~module_reg) in
+  let+ revealed_bytes = option int32 in
+  Eval.Inv_reveal_tick
+    {
+      reveal = Reveal_raw_data hash;
+      base_destination;
+      max_bytes;
+      code = (vs, es);
+      revealed_bytes;
+    }
+
 let inv_stop_gen ~module_reg =
   let* vs = small_vector_gen value_gen in
   let* es = small_vector_gen (admin_instr_gen ~module_reg) in
@@ -775,6 +791,7 @@ let invoke_step_gen ~module_reg =
       inv_prepare_locals_gen ~module_reg;
       inv_prepare_args_gen ~module_reg;
       inv_concat_gen ~module_reg;
+      inv_reveal_tick ~module_reg;
       inv_stop_gen ~module_reg;
     ]
 
