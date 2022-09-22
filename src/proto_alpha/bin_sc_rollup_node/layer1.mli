@@ -61,15 +61,6 @@ val start :
     exponential backoff (capped to 1.5h) . *)
 val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
-(** [hash_of_level store level] returns the current block hash for a
-   given [level]. Raise [Invalid_argument] if [hash] does not belong
-   to [store]. *)
-val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
-
-(** [set_hash_of_level store level hash] saves [hash] for the [level] in the
-    store. *)
-val set_hash_of_level : Store.t -> int32 -> Block_hash.t -> unit Lwt.t
-
 (** [level_of_hash l1_ctxt hash] returns the level for a given block
    [hash]. Raise [Invalid_argument] if [hash] does not belong to
    [store]. *)

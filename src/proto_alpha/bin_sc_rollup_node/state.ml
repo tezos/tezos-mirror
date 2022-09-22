@@ -59,7 +59,23 @@ module Store = struct
 
     let value_encoding = Layer1.head_encoding
   end)
+
+  module Levels = Store_utils.Make_updatable_map (struct
+    let path = ["tezos"; "levels"]
+
+    let keep_last_n_entries_in_memory = reorganization_window_length
+
+    type key = int32
+
+    let string_of_key = Int32.to_string
+
+    type value = Block_hash.t
+
+    let value_encoding = Block_hash.encoding
+  end)
 end
+
+let hash_of_level store level = Store.Levels.get store level
 
 let mark_processed_head store Layer1.(Head {hash; level} as head) =
   let open Lwt_syntax in

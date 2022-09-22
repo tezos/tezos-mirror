@@ -86,7 +86,7 @@ module Make (Interpreter : Interpreter.S) :
   let generate_proof node_ctxt game start_state =
     let open Lwt_result_syntax in
     let*! snapshot_hash =
-      Layer1.hash_of_level
+      State.hash_of_level
         node_ctxt.Node_context.store
         (Int32.pred Raw_level.(to_int32 game.start_level))
     in

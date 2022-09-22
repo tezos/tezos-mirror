@@ -40,5 +40,10 @@ val last_processed_head_opt : Store.t -> Layer1.head option Lwt.t
     finalized. *)
 val mark_finalized_head : Store.t -> Layer1.head -> unit Lwt.t
 
-(** [last_finalized_head store] returns the last finalized head if it exists. *)
+(** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
 val get_finalized_head_opt : Store.t -> Layer1.head option Lwt.t
+
+(** [hash_of_level store level] returns the current block hash for a
+   given [level]. Raise [Invalid_argument] if [hash] does not belong
+   to [store]. *)
+val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t

@@ -331,9 +331,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let store = node_ctxt.Node_context.store in
         let*! lcc_level = Store.Last_cemented_commitment_level.get store in
         let*! block_hash =
-          Layer1.hash_of_level
-            store
-            (Alpha_context.Raw_level.to_int32 lcc_level)
+          State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
         in
         let* state = get_state ~block_hash node_ctxt in
         let*! outbox = PVM.get_outbox state in

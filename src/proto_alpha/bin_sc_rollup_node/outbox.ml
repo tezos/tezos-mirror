@@ -35,7 +35,7 @@ module Make (PVM : Pvm.S) = struct
       Store.Last_cemented_commitment_level.get node_ctxt.store
     in
     let*! block_hash =
-      Layer1.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
+      State.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
     in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in

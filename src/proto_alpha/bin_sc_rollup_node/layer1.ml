@@ -95,26 +95,6 @@ let head_encoding =
       (fun (hash, level) -> Head {hash; level})
       (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
 
-module State = struct
-    module Levels = Store_utils.Make_updatable_map (struct
-      let path = ["tezos"; "levels"]
-
-      let keep_last_n_entries_in_memory = reorganization_window_length
-
-      type key = int32
-
-      let string_of_key = Int32.to_string
-
-      type value = block_hash
-
-      let value_encoding = Block_hash.encoding
-    end)
-
-  let hash_of_level = Store.Levels.get
-
-  let set_hash_of_level = Store.Levels.add
-end
-
 module Blocks_cache =
   Ringo_lwt.Functors.Make_opt
     ((val Ringo.(
@@ -265,10 +245,6 @@ let reconnect configuration l1_ctxt store =
       store
   in
   return {l1_ctxt with heads; stopper}
-
-let hash_of_level = State.hash_of_level
-
-let set_hash_of_level = State.set_hash_of_level
 
 let level_of_hash =
   let max_cached = 1023 in
