@@ -479,7 +479,6 @@ and ifailwith : ifailwith_type =
         let ctxt = update_context gas ctxt in
         trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
         >>=? fun (v, _ctxt) ->
-        let v = Micheline.strip_locations v in
         get_log logger >>=? fun log -> fail (Reject (kloc, v, log)));
   }
 
@@ -2055,14 +2054,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     storage_type
     new_storage
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
-  trace
-    Cannot_serialize_storage
-    ( unparse_data ctxt mode storage_type storage
-    >>=? fun (unparsed_storage, ctxt) ->
-      Lwt.return
-        ( Gas.consume ctxt (Script.strip_locations_cost unparsed_storage)
-        >>? fun ctxt -> ok (Micheline.strip_locations unparsed_storage, ctxt) )
-    )
+  trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
   >>=? fun (unparsed_storage, ctxt) ->
   let op_to_couple op = (op.piop, op.lazy_storage_diff) in
   let operations, op_diffs =

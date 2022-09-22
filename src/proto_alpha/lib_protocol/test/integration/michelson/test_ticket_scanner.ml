@@ -82,11 +82,7 @@ let string_list_of_ex_tickets ctxt tickets =
            contents
     in
     let content =
-      Format.kasprintf
-        Fun.id
-        "%a"
-        Michelson_v1_printer.print_expr
-        (Micheline.strip_locations x)
+      Format.kasprintf Fun.id "%a" Michelson_v1_printer.print_expr x
     in
     let str =
       Format.kasprintf

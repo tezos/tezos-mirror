@@ -344,9 +344,7 @@ let init chain_id ctxt block_header =
       parsed_script.storage_type
       storage
     >|=? fun (storage, ctxt) ->
-    let storage =
-      Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
-    in
+    let storage = Alpha_context.Script.lazy_expr storage in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
   (* The cache must be synced at the end of block validation, so we do

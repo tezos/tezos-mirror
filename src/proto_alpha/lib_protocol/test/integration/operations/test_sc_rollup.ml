@@ -256,9 +256,7 @@ let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
 
 (* Verify that parameters and unparsed parameters match. *)
 let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
-  let show_stripped exp =
-    Expr.to_string @@ Environment.Micheline.strip_locations exp
-  in
+  let show exp = Expr.to_string @@ exp in
   let unparse ctxt parameters =
     wrap
       (Script_ir_translator.unparse_data
@@ -287,8 +285,8 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
   (* Verify that both version match. *)
   Assert.equal_string
     ~loc:__LOC__
-    (show_stripped unparsed_parameters)
-    (show_stripped expected_unparsed_parameters)
+    (show unparsed_parameters)
+    (show expected_unparsed_parameters)
 
 (* Verify that the given list of transactions and transaction operations match.
    Also checks each transaction operation for type mismatches etc. *)

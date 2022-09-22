@@ -701,7 +701,7 @@ module Script : sig
 
   val deserialized_cost : expr -> Gas.cost
 
-  val serialized_cost : bytes -> Gas.cost
+  val micheline_serialization_cost : expr -> Gas.cost
 
   val bytes_node_cost : bytes -> Gas.cost
 

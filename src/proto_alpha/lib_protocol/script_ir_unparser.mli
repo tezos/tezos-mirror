@@ -121,16 +121,15 @@ val unparse_with_data_encoding :
   'a Data_encoding.t ->
   ('loc Script.michelson_node * context, error trace) result Lwt.t
 
-(** [unparse_comparable_data ~loc ctxt unparsing_mode ty v] returns the
+(** [unparse_comparable_data ctxt unparsing_mode ty v] returns the
     Micheline representation of [v] of type [ty], consuming gas from
     [ctxt]. *)
 val unparse_comparable_data :
-  loc:'loc ->
   context ->
   unparsing_mode ->
   'a comparable_ty ->
   'a ->
-  ('loc Script.michelson_node * context) tzresult Lwt.t
+  (Script.expr * context) tzresult Lwt.t
 
 (** [unparse_contract ~loc ctxt unparsin_mode contract] returns a Micheline
     representation of a given contract in a given [unparsing_mode]. Consumes
@@ -181,7 +180,7 @@ module Data_unparser : functor (P : MICHELSON_PARSER) -> sig
     unparsing_mode ->
     ('a, 'ac) ty ->
     'a ->
-    (Script.node * context) tzresult Lwt.t
+    (Script.expr * context) tzresult Lwt.t
 
   (** [unparse_items ctxt ~stack_depth unparsing_mode kty vty assoc] returns the
       Micheline representation of [assoc] (being an association list) with keys
@@ -194,7 +193,7 @@ module Data_unparser : functor (P : MICHELSON_PARSER) -> sig
     'k comparable_ty ->
     ('v, 'vc) ty ->
     ('k * 'v) list ->
-    (Script.node list * context) tzresult Lwt.t
+    (Script.expr list * context) tzresult Lwt.t
 
   (** [unparse_code ctxt ~stack_depth unparsing_mode code] returns [code]
       with [I_PUSH] instructions parsed and unparsed back to make sure that
@@ -205,5 +204,5 @@ module Data_unparser : functor (P : MICHELSON_PARSER) -> sig
     stack_depth:int ->
     unparsing_mode ->
     Script.node ->
-    (Script.node * context, error trace) result Lwt.t
+    (Script.expr * context, error trace) result Lwt.t
 end

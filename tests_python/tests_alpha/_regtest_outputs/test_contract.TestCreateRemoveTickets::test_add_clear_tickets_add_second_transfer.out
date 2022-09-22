@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestCreateRemoveTickets::test_add_clear_tickets_add_second_transfer
 
 Node is bootstrapped.
-Estimated gas: 1657.834 units (will add 100 for safety)
+Estimated gas: 1660.605 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000443
+    Fee to the baker: ꜩ0.000444
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1758
+    Gas limit: 1761
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000443
-      payload fees(the block proposer) ....... +ꜩ0.000443
+      [CONTRACT_HASH] ... -ꜩ0.000444
+      payload fees(the block proposer) ....... +ꜩ0.000444
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -27,9 +27,9 @@ This sequence of operations was run:
       Parameter: (Pair 1 "B")
       This transaction was successfully applied
       Updated storage:
-        { Pair 0x01d15749b3c834ffbb675a2515090953c7dc0f432f00 (Pair "B" 1) }
+        { Pair 0x014e73b620ea35cc976a5ed90625a0fbaa895b289900 (Pair "B" 1) }
       Storage size: 180 bytes
-      Consumed gas: 1657.834
+      Consumed gas: 1660.605
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string

@@ -1362,7 +1362,8 @@ let extract_ir_sized_step :
         Lwt_main.run (Script_ir_translator.unparse_data ctxt Optimized ty v)
       in
       match script_res with
-      | Ok (node, _ctxt) -> Instructions.pack (Size.of_micheline node)
+      | Ok (node, _ctxt) ->
+          Instructions.pack (Size.of_micheline (Micheline.root node))
       | Error _ -> Stdlib.failwith "IPack workload: could not unparse")
   | IUnpack (_, _, _), _ -> Instructions.unpack
   | IBlake2b (_, _), (bytes, _) -> Instructions.blake2b (Size.bytes bytes)

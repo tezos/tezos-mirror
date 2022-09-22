@@ -2,10 +2,10 @@ Node is bootstrapped.
 Estimated gas: 1000 units (will add 0 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'ooaB1EZhB4xGAr4FzEiPuT8CdwFxj5dmAoWYBqCKexohZt24o5K'
+Operation hash is 'opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooaB1EZhB4xGAr4FzEiPuT8CdwFxj5dmAoWYBqCKexohZt24o5K to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
+  tezos-client wait for opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -20,7 +20,7 @@ This sequence of operations was run:
     Increase paid storage:
       Increased size: 1000 bytes
       From: tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
-      To: KT1NveRFUkyV37m2kiKFFn2zsqm1wFmkp4Lk
+      To: KT1H5YzqTpJRQcvW59E8qT1HSq97p5FDuTYa
       This paid storage increase was successfully applied
       Balance updates:
         tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN ... -ꜩ0.25

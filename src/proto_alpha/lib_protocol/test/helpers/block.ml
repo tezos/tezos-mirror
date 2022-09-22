@@ -388,9 +388,7 @@ let initial_alpha_context ?(commitments = []) constants
       parsed_script.storage_type
       storage
     >|=? fun (storage, ctxt) ->
-    let storage =
-      Alpha_context.Script.lazy_expr (Micheline.strip_locations storage)
-    in
+    let storage = Alpha_context.Script.lazy_expr storage in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
   Alpha_context.prepare_first_block

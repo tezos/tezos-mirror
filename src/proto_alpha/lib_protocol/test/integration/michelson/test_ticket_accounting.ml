@@ -58,7 +58,6 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
     let* x, ctxt =
       wrap
       @@ Script_ir_unparser.unparse_comparable_data
-           ~loc:()
            ctxt
            Script_ir_unparser.Readable
            contents_type
@@ -70,7 +69,7 @@ let string_list_of_ex_token_diffs ctxt token_diffs =
         Contract.pp
         ticketer
         Michelson_v1_printer.print_expr
-        (Micheline.strip_locations x)
+        x
         Z.pp_print
         amount
     in
@@ -147,10 +146,9 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
       let* key_hash, ctxt =
         wrap (Script_ir_translator.hash_comparable_data ctxt key_type key)
       in
-      let* key_node, ctxt =
+      let* key, ctxt =
         wrap
           (Script_ir_unparser.unparse_comparable_data
-             ~loc:Micheline.dummy_location
              ctxt
              Script_ir_unparser.Readable
              key_type
@@ -168,10 +166,8 @@ let updates_of_key_values ctxt ~key_type ~value_type key_values =
                    value_type
                    value)
             in
-            let value = Micheline.strip_locations value_node in
-            return (Some value, ctxt)
+            return (Some value_node, ctxt)
       in
-      let key = Micheline.strip_locations key_node in
       return ({Big_map.key; key_hash; value} :: kvs, ctxt))
     key_values
     ([], ctxt)
@@ -416,7 +412,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
             Transaction_to_smart_contract
               {
                 amount = Tez.zero;
-                unparsed_parameters = Micheline.strip_locations params_node;
+                unparsed_parameters = params_node;
                 entrypoint = Entrypoint.default;
                 destination;
                 location = Micheline.dummy_location;

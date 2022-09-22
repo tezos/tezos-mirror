@@ -508,16 +508,14 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
   Script_ir_translator.unparse_data ctxt Optimized storage_type storage
   >>=? fun (storage, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
-  let storage = Script.lazy_expr (Micheline.strip_locations storage) in
+  let storage = Script.lazy_expr storage in
   (* Normalize code to avoid #843 *)
   Script_ir_translator.unparse_code
     ctxt
     Optimized
     (Micheline.root unparsed_code)
   >>=? fun (code, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
-  let code = Script.lazy_expr (Micheline.strip_locations code) in
+  let code = Script.lazy_expr code in
   let script = {Script.code; storage} in
   Contract.raw_originate
     ctxt
