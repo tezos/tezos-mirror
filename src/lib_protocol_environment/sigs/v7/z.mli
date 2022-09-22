@@ -185,13 +185,13 @@ val divexact: t -> t -> t
 
 external divisible: t -> t -> bool = "ml_z_divisible"
 (** [divisible a b] returns [true] if [a] is exactly divisible by [b].
-    Unlike the other division functions, [b = 0] is accepted 
+    Unlike the other division functions, [b = 0] is accepted
     (only 0 is considered divisible by 0).
 *)
 
 external congruent: t -> t -> t -> bool = "ml_z_congruent"
 (** [congruent a b c] returns [true] if [a] is congruent to [b] modulo [c].
-    Unlike the other division functions, [c = 0] is accepted 
+    Unlike the other division functions, [c = 0] is accepted
     (only equal numbers are considered equal congruent 0).
 *)
 
@@ -207,27 +207,27 @@ external congruent: t -> t -> t -> bool = "ml_z_congruent"
 
 val logand: t -> t -> t
 (** Bitwise logical and. *)
-    
+
 val logor: t -> t -> t
 (** Bitwise logical or. *)
-    
+
 val logxor: t -> t -> t
 (** Bitwise logical exclusive or. *)
 
 val lognot: t -> t
-(** Bitwise logical negation. 
+(** Bitwise logical negation.
     The identity [lognot a]=[-a-1] always hold.
  *)
 
 val shift_left: t -> int -> t
-(** Shifts to the left. 
+(** Shifts to the left.
     Equivalent to a multiplication by a power of 2.
     The second argument must be nonnegative.
  *)
 
 val shift_right: t -> int -> t
-(** Shifts to the right. 
-    This is an arithmetic shift, 
+(** Shifts to the right.
+    This is an arithmetic shift,
     equivalent to a division by a power of 2 with rounding towards -oo.
     The second argument must be nonnegative.
  *)
