@@ -52,14 +52,6 @@ type mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
-  | Partial_application of {
-      block_header : Block_header.t;
-      fitness : Fitness.t;
-      payload_producer : Consensus_key.t;
-      block_producer : Consensus_key.t;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-    }
   | Full_construction of {
       predecessor : Block_hash.t;
       payload_producer : Consensus_key.t;
@@ -71,7 +63,6 @@ type mode =
     }
   | Partial_construction of {
       predecessor_level : Raw_level.t;
-      predecessor_round : Round.t;
       predecessor_fitness : Fitness.raw;
     }  (** This mode is mainly intended to be used by a mempool. *)
 
@@ -90,21 +81,6 @@ type application_state = {
     existing block. *)
 val begin_application :
   context ->
-  Chain_id.t ->
-  migration_balance_updates:Receipt.balance_updates ->
-  migration_operation_results:Migration.origination_result list ->
-  predecessor_fitness:Fitness.raw ->
-  Block_header.t ->
-  application_state tzresult Lwt.t
-
-(** Initialize an {!application_state} for the partial application of
-    an existing block. In this mode, an old [ancestor_context] can
-    provided. This [ancestor_context] must be above the
-    [last_allowed_fork_level] of the chain so that consensus
-    operations may be validated. In this mode, only consensus
-    operations will be applied. *)
-val begin_partial_application :
-  ancestor_context:context ->
   Chain_id.t ->
   migration_balance_updates:Receipt.balance_updates ->
   migration_operation_results:Migration.origination_result list ->

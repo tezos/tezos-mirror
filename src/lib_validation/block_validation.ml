@@ -276,7 +276,8 @@ module Make (Proto : Registered_protocol.T) = struct
   }
 
   type preapply_state = {
-    state : Proto.validation_state;
+    validation_state : Proto.validation_state;
+    application_state : Proto.application_state;
     applied :
       (Proto.operation_data preapplied_operation * Proto.operation_receipt) list;
     live_blocks : Block_hash.Set.t;
@@ -415,7 +416,7 @@ module Make (Proto : Registered_protocol.T) = struct
                        block_hash
                        (Unallowed_pass {operation = op_hash; pass; allowed_pass}))
                 in
-                return op))
+                return (op_hash, op)))
       operations
 
   (* FIXME: This code is used by preapply but emitting time
@@ -527,20 +528,21 @@ module Make (Proto : Registered_protocol.T) = struct
       (invalid_block block_hash Economic_protocol_error)
       (let* state =
          (Proto.begin_application
-            ~chain_id
-            ~predecessor_context:context
-            ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-            ~predecessor_fitness:predecessor_block_header.shell.fitness
-            ~cache
-            block_header [@time.duration_lwt application_beginning])
+            context
+            chain_id
+            (Application block_header)
+            ~predecessor:predecessor_block_header.shell
+            ~cache [@time.duration_lwt application_beginning])
        in
        let* state, ops_metadata =
          (List.fold_left_es
             (fun (state, acc) ops ->
               let* state, ops_metadata =
                 List.fold_left_es
-                  (fun (state, acc) op ->
-                    let* state, op_metadata = Proto.apply_operation state op in
+                  (fun (state, acc) (oph, op) ->
+                    let* state, op_metadata =
+                      Proto.apply_operation state oph op
+                    in
                     return (state, op_metadata :: acc))
                   (state, [])
                   ops
@@ -551,7 +553,7 @@ module Make (Proto : Registered_protocol.T) = struct
        in
        let ops_metadata = List.rev ops_metadata in
        let* validation_result, block_data =
-         (Proto.finalize_block
+         (Proto.finalize_application
             state
             (Some block_header.shell) [@time.duration_lwt block_finalization])
        in
@@ -787,15 +789,24 @@ module Make (Proto : Registered_protocol.T) = struct
     else
       let+ r =
         protect (fun () ->
-            Proto.apply_operation
-              pv.state
-              {shell = op.raw.shell; protocol_data = op.protocol_data})
+            let operation : Proto.operation =
+              {shell = op.raw.shell; protocol_data = op.protocol_data}
+            in
+            let open Lwt_result_syntax in
+            let* validation_state =
+              Proto.validate_operation pv.validation_state op.hash operation
+            in
+            let* application_state, receipt =
+              Proto.apply_operation pv.application_state op.hash operation
+            in
+            return (validation_state, application_state, receipt))
       in
       match r with
-      | Ok (state, receipt) -> (
+      | Ok (validation_state, application_state, receipt) -> (
           let pv =
             {
-              state;
+              validation_state;
+              application_state;
               applied = (op, receipt) :: pv.applied;
               live_blocks = pv.live_blocks;
               live_operations =
@@ -884,20 +895,35 @@ module Make (Proto : Registered_protocol.T) = struct
           Lwt_result.ok
           @@ Context_ops.add_predecessor_ops_metadata_hash context hash
     in
-    let* state =
-      Proto.begin_construction
-        ~chain_id
-        ~predecessor_context:context
-        ~predecessor_timestamp:predecessor_shell_header.Block_header.timestamp
-        ~predecessor_fitness:predecessor_shell_header.Block_header.fitness
-        ~predecessor_level:predecessor_shell_header.level
-        ~predecessor:predecessor_hash
-        ~timestamp
-        ~protocol_data
-        ~cache
-        ()
+    let mode =
+      Proto.Construction
+        {predecessor_hash; timestamp; block_header_data = protocol_data}
     in
-    let preapply_state = {state; applied = []; live_blocks; live_operations} in
+    let* validation_state =
+      Proto.begin_validation
+        context
+        chain_id
+        mode
+        ~predecessor:predecessor_shell_header
+        ~cache
+    in
+    let* application_state =
+      Proto.begin_application
+        context
+        chain_id
+        mode
+        ~predecessor:predecessor_shell_header
+        ~cache
+    in
+    let preapply_state =
+      {
+        validation_state;
+        application_state;
+        applied = [];
+        live_blocks;
+        live_operations;
+      }
+    in
     let apply_operation_with_preapply_result preapp t receipts op =
       let open Preapply_result in
       let*! r = preapply_operation t op in
@@ -994,8 +1020,11 @@ module Make (Proto : Registered_protocol.T) = struct
         fitness = [];
       }
     in
+    let* () = Proto.finalize_validation preapply_state.validation_state in
     let* validation_result, block_header_metadata =
-      Proto.finalize_block preapply_state.state (Some shell_header)
+      Proto.finalize_application
+        preapply_state.application_state
+        (Some shell_header)
     in
     let*! validation_result =
       may_patch_protocol
@@ -1101,27 +1130,26 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     let* operations = parse_operations block_hash operations in
     let* state =
-      Proto.begin_partial_application
-        ~chain_id
-        ~ancestor_context:context
-        ~predecessor:predecessor_block_header
-        ~predecessor_hash:predecessor_block_hash
+      Proto.begin_validation
+        context
+        chain_id
+        (Application block_header)
+        ~predecessor:predecessor_block_header.shell
         ~cache
-        block_header
     in
     let* state =
       List.fold_left_es
         (fun state ops ->
           List.fold_left_es
-            (fun state op ->
-              let* state, _op_metadata = Proto.apply_operation state op in
+            (fun state (oph, op) ->
+              let* state = Proto.validate_operation state oph op in
               return state)
             state
             ops)
         state
         operations
     in
-    let* _validation_result, _block_data = Proto.finalize_block state None in
+    let* () = Proto.finalize_validation state in
     return_unit
 
   let precheck chain_id ~(predecessor_block_header : Block_header.t)

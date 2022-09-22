@@ -657,28 +657,54 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         operations) ;
   register0 S.Helpers.Preapply.operations (fun (chain_store, block) () ops ->
       let* ctxt = Store.Block.context chain_store block in
-      let predecessor = Store.Block.hash block in
-      let header = Store.Block.shell_header block in
-      let predecessor_context = ctxt in
-      let* state =
-        Next_proto.begin_construction
-          ~chain_id:(Store.Chain.chain_id chain_store)
-          ~predecessor_context
-          ~predecessor_timestamp:header.timestamp
-          ~predecessor_level:header.level
-          ~predecessor_fitness:header.fitness
-          ~predecessor
-          ~timestamp:(Time.System.to_protocol (Time.System.now ()))
-          ~cache:`Lazy
-          ()
+      let chain_id = Store.Chain.chain_id chain_store in
+      let mode =
+        let predecessor_hash = Store.Block.hash block in
+        let timestamp = Time.System.to_protocol (Time.System.now ()) in
+        Next_proto.Partial_construction {predecessor_hash; timestamp}
       in
-      let* _state, acc =
-        List.fold_left_es
-          (fun (state, acc) op ->
-            let* state, result = Next_proto.apply_operation state op in
-            return (state, (op.protocol_data, result) :: acc))
-          (state, [])
+      let predecessor = Store.Block.shell_header block in
+      let* validation_state =
+        Next_proto.begin_validation ctxt chain_id mode ~predecessor ~cache:`Lazy
+      in
+      let* application_state =
+        Next_proto.begin_application
+          ctxt
+          chain_id
+          mode
+          ~predecessor
+          ~cache:`Lazy
+      in
+      let* hashed_ops =
+        List.map_es
+          (fun op ->
+            match
+              Data_encoding.Binary.to_bytes
+                Next_proto.operation_data_encoding
+                op.Next_proto.protocol_data
+            with
+            | Error _ ->
+                failwith "preapply_operations: cannot deserialize operation"
+            | Ok proto ->
+                let op_t = {Operation.shell = op.shell; proto} in
+                Lwt_result.return (Operation.hash op_t, op))
           ops
+      in
+      let* _validation_state, _application_state, acc =
+        List.fold_left_es
+          (fun (validation_state, application_state, acc) (oph, op) ->
+            let* validation_state =
+              Next_proto.validate_operation validation_state oph op
+            in
+            let* application_state, result =
+              Next_proto.apply_operation application_state oph op
+            in
+            return
+              ( validation_state,
+                application_state,
+                (op.protocol_data, result) :: acc ))
+          (validation_state, application_state, [])
+          hashed_ops
       in
       return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->

@@ -120,8 +120,8 @@ type apply_environment = {
 (** Default size limit for operation metadata *)
 val default_operation_metadata_size_limit : int option
 
-(** [apply env header ops] gets the protocol [P] of the context of the predecessor
-    block and calls successively:
+(** [apply env header ops] gets the protocol [P] of the context of the
+    predecessor block and calls successively:
     1. [P.begin_application]
     2. [P.apply]
     3. [P.finalize_block]
@@ -129,7 +129,9 @@ val default_operation_metadata_size_limit : int option
     If [simulate] is true, the context resulting from the application
     is not committed to disk using `Context.commit`, only the commit
     hash is computed, using `Context.hash`. Set to false by default.
-*)
+
+    Hypothesis: we assume that the given block has already been
+                validated -- E.g. by calling [precheck]. *)
 val apply :
   ?simulate:bool ->
   ?cached_result:apply_result * Tezos_protocol_environment.Context.t ->
@@ -142,8 +144,10 @@ val apply :
 (** [precheck chain_id ~predecessor_block_header
    ~predecessor_block_hash ~predecessor_context ~cache header ops]
    gets the protocol [P] of the context of the predecessor block and
-   calls successively: 1. [P.begin_partial_application] 2. [P.apply]
-   3. [P.finalize_block] *)
+   calls successively:
+   1. [P.begin_validate]
+   2. [P.validate_operation]
+   3. [P.finalize_validation] *)
 val precheck :
   chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->
@@ -175,6 +179,8 @@ val preapply :
   tzresult
   Lwt.t
 
+(** Hypothesis: we assume that the given block has already been
+                validated -- E.g. by calling [precheck]. *)
 val recompute_metadata :
   chain_id:Chain_id.t ->
   predecessor_block_header:Block_header.t ->

@@ -1958,14 +1958,6 @@ type mode =
       predecessor_level : Level.t;
       predecessor_round : Round.t;
     }
-  | Partial_application of {
-      block_header : Block_header.t;
-      fitness : Fitness.t;
-      payload_producer : Consensus_key.t;
-      block_producer : Consensus_key.t;
-      predecessor_level : Level.t;
-      predecessor_round : Round.t;
-    }
   | Full_construction of {
       predecessor : Block_hash.t;
       payload_producer : Consensus_key.t;
@@ -1977,7 +1969,6 @@ type mode =
     }
   | Partial_construction of {
       predecessor_level : Raw_level.t;
-      predecessor_round : Round.t;
       predecessor_fitness : Fitness.raw;
     }
 
@@ -2015,7 +2006,7 @@ let record_preendorsement ctxt (mode : mode) (content : consensus_content) :
         match Consensus.get_preendorsements_quorum_round ctxt with
         | None -> Consensus.set_preendorsements_quorum_round ctxt content.round
         | Some _ -> ctxt)
-    | Partial_application _ | Application _ | Partial_construction _ -> ctxt
+    | Application _ | Partial_construction _ -> ctxt
   in
   match Slot.Map.find content.slot (Consensus.allowed_preendorsements ctxt) with
   | None ->
@@ -2175,7 +2166,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   let mempool_mode =
     match mode with
     | Partial_construction _ -> true
-    | Full_construction _ | Application _ | Partial_application _ -> false
+    | Full_construction _ | Application _ -> false
   in
   match contents_list with
   | Single (Preendorsement consensus_content) ->
@@ -2300,20 +2291,6 @@ let apply_operation application_state operation_hash operation =
         Operation_metadata {contents = result} )
   in
   match application_state.mode with
-  | Partial_application {payload_producer; _} -> (
-      match Operation.acceptable_pass operation with
-      | None ->
-          (* Only occurs with Failing_noop *)
-          fail Validate_errors.Failing_noop_error
-      | Some n ->
-          if
-            (* Multipass validation only considers operations in
-               consensus pass. *)
-            Compare.Int.(n = Operation_repr.consensus_pass)
-          then apply_operation application_state operation ~payload_producer
-          else
-            let op_count = application_state.op_count + 1 in
-            return ({application_state with op_count}, No_operation_metadata))
   | Application {payload_producer; _} ->
       apply_operation application_state operation ~payload_producer
   | Full_construction {payload_producer; _} ->
@@ -2572,59 +2549,6 @@ let begin_application ctxt chain_id ~migration_balance_updates
         @ liquidity_baking_operations_results;
     }
 
-let begin_partial_application ~ancestor_context chain_id
-    ~migration_balance_updates ~migration_operation_results
-    ~(predecessor_fitness : Fitness.raw) (block_header : Block_header.t) =
-  let open Lwt_tzresult_syntax in
-  let*? fitness = Fitness.from_raw block_header.shell.fitness in
-  let level = block_header.shell.level in
-  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
-  let*? predecessor_level = Raw_level.of_int32 (Int32.pred level) in
-  let predecessor_level = Level.(from_raw ancestor_context predecessor_level) in
-  (* Note: we don't have access to the predecessor context. *)
-  let round = Fitness.round fitness in
-  let current_level = Level.current ancestor_context in
-  let* ctxt, _slot, block_producer =
-    Stake_distribution.baking_rights_owner ancestor_context current_level ~round
-  in
-  let* ctxt, _slot, payload_producer =
-    Stake_distribution.baking_rights_owner
-      ctxt
-      current_level
-      ~round:block_header.protocol_data.contents.payload_round
-  in
-  let toggle_vote =
-    block_header.Block_header.protocol_data.contents
-      .liquidity_baking_toggle_vote
-  in
-  let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
-    apply_liquidity_baking_subsidy ctxt ~toggle_vote
-  in
-  let mode =
-    Partial_application
-      {
-        block_header;
-        fitness;
-        predecessor_level;
-        predecessor_round;
-        payload_producer = Consensus_key.pkh payload_producer;
-        block_producer = Consensus_key.pkh block_producer;
-      }
-  in
-  return
-    {
-      mode;
-      chain_id;
-      ctxt;
-      op_count = 0;
-      migration_balance_updates;
-      liquidity_baking_toggle_ema;
-      implicit_operations_results =
-        Apply_results.pack_migration_operation_results
-          migration_operation_results
-        @ liquidity_baking_operations_results;
-    }
-
 let begin_full_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_timestamp ~predecessor_level
     ~predecessor_round ~predecessor ~timestamp
@@ -2684,15 +2608,11 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_level
     ~(predecessor_fitness : Fitness.raw) : application_state tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
-  let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
   let toggle_vote = Liquidity_baking.LB_pass in
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
-  let mode =
-    Partial_construction
-      {predecessor_level; predecessor_round; predecessor_fitness}
-  in
+  let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
     {
       mode;
@@ -2953,25 +2873,5 @@ let finalize_block (application_state : application_state) shell_header_opt =
         finalize_with_commit_message ctxt ~cache_nonce fitness round op_count
       in
       return (result, receipt)
-  | Partial_application {payload_producer; block_producer; fitness; _} ->
-      let* voting_period_info = Voting_period.get_rpc_current_info ctxt in
-      let level_info = Level.current ctxt in
-      let ctxt = finalize ctxt (Fitness.to_raw fitness) in
-      return
-        ( ctxt,
-          Apply_results.
-            {
-              proposer = payload_producer;
-              baker = block_producer;
-              level_info;
-              voting_period_info;
-              nonce_hash = None;
-              consumed_gas = Gas.Arith.zero;
-              deactivated = [];
-              balance_updates = migration_balance_updates;
-              liquidity_baking_toggle_ema;
-              implicit_operations_results;
-              dal_slot_availability = None;
-            } )
 
 let value_of_key ctxt k = Cache.Admin.value_of_key ctxt k

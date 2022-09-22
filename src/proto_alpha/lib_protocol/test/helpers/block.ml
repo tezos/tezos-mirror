@@ -695,50 +695,68 @@ let alpha_context ?commitments ?min_proposal_quorum
 
 (********* Baking *************)
 
-(* Note that by calling this function without [protocol_data], we force the mode
-   to be partial construction (by correspondingly calling [begin_construction]
-   without [protocol_data]). *)
+let begin_validation_and_application ctxt chain_id mode ~predecessor =
+  let open Lwt_result_syntax in
+  let* validation_state = begin_validation ctxt chain_id mode ~predecessor in
+  let* application_state = begin_application ctxt chain_id mode ~predecessor in
+  return (validation_state, application_state)
+
 let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
   Forge.forge_header pred ~operations >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
   let open Environment.Error_monad in
-  Main.begin_application
-    ~chain_id:Chain_id.zero
-    ~predecessor_context:pred.context
-    ~predecessor_fitness:pred.header.shell.fitness
-    ~predecessor_timestamp:pred.header.shell.timestamp
-    header
+  begin_validation_and_application
+    pred.context
+    Chain_id.zero
+    (Application header)
+    ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
 
+(* Note that by calling this function without [protocol_data], we
+   force the mode to be partial construction. *)
 let get_construction_vstate ?(policy = By_round 0) ?timestamp
     ?(protocol_data = None) (pred : t) =
   let open Protocol in
   dispatch_policy policy pred
   >>=? fun (_pkh, _ck, _round, expected_timestamp) ->
   let timestamp = Option.value ~default:expected_timestamp timestamp in
-  Main.begin_construction
-    ~chain_id:Chain_id.zero
-    ~predecessor_context:pred.context
-    ~predecessor_timestamp:pred.header.shell.timestamp
-    ~predecessor_level:pred.header.shell.level
-    ~predecessor_fitness:pred.header.shell.fitness
-    ~predecessor:pred.hash
-    ?protocol_data
-    ~timestamp
-    ()
+  let mode =
+    match protocol_data with
+    | None -> Partial_construction {predecessor_hash = pred.hash; timestamp}
+    | Some block_header_data ->
+        Construction
+          {predecessor_hash = pred.hash; timestamp; block_header_data}
+  in
+  begin_validation_and_application
+    pred.context
+    Chain_id.zero
+    mode
+    ~predecessor:pred.header.shell
   >|= Environment.wrap_tzresult
+
+let validate_and_apply_operation (validation_state, application_state) op =
+  let open Lwt_result_syntax in
+  let oph = Operation.hash_packed op in
+  let* validation_state = validate_operation validation_state oph op in
+  let* application_state, receipt = apply_operation application_state oph op in
+  return ((validation_state, application_state), receipt)
+
+let finalize_validation_and_application (validation_state, application_state)
+    shell_header =
+  let open Lwt_result_syntax in
+  let* () = finalize_validation validation_state in
+  finalize_application application_state shell_header
 
 let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
     header ?(operations = []) pred =
   let open Environment.Error_monad in
   ( (match baking_mode with
     | Application ->
-        Main.begin_application
-          ~chain_id:Chain_id.zero
-          ~predecessor_context:pred.context
-          ~predecessor_fitness:pred.header.shell.fitness
-          ~predecessor_timestamp:pred.header.shell.timestamp
-          header
+        begin_validation_and_application
+          pred.context
+          Chain_id.zero
+          (Application header)
+          ~predecessor:pred.header.shell
         >|= Environment.wrap_tzresult
     | Baking ->
         get_construction_vstate
@@ -760,12 +778,13 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
                     size %d"
                    operation_size
                    Constants_repr.max_operation_data_length))) ;
-        apply_operation vstate op >|= Environment.wrap_tzresult
+        validate_and_apply_operation vstate op >|= Environment.wrap_tzresult
         >|=? fun (state, _result) -> state)
       vstate
       operations
     >>=? fun vstate ->
-    Main.finalize_block vstate (Some header.shell) >|= Environment.wrap_tzresult
+    finalize_validation_and_application vstate (Some header.shell)
+    >|= Environment.wrap_tzresult
     >|=? fun (validation, result) -> (validation.context, result) )
   >|=? fun (context, result) ->
   let hash = Block_header.hash header in

@@ -391,8 +391,8 @@ type application_info = {
     - [Application] is used for the validation of preexisting block.
    Corresponds to [Application] of {!Main.validation_mode}.
 
-    - [Partial_application] is used to partially validate preexisting
-   block. Corresponds to [Partial_application] of
+    - [Partial_validation] is used to partially validate preexisting
+   block. Corresponds to [Partial_validation] of
    {!Main.validation_mode}.
 
     - [Construction] is used for the construction of a new block.
@@ -406,7 +406,7 @@ type application_info = {
    the size of the map {!recfield:managers_seen}. *)
 type mode =
   | Application of application_info
-  | Partial_application of application_info
+  | Partial_validation of application_info
   | Construction of {
       predecessor_round : Round.t;
       predecessor_hash : Block_hash.t;
@@ -501,6 +501,8 @@ let init_block_state vi =
     locked_round_evidence = None;
     endorsement_power = 0;
   }
+
+let get_initial_ctxt {info; _} = info.ctxt
 
 (** Validation of consensus operations (validation pass [0]):
     preendorsement, endorsement, and dal_slot_availability. *)
@@ -706,7 +708,7 @@ module Consensus = struct
       (Slot.Map.find consensus_content.slot slot_map)
       ~error:(trace_of_error (Wrong_slot_used_for_consensus_operation {kind}))
 
-  let check_preendorsement vi ~should_check_signature
+  let check_preendorsement vi ~check_signature
       (operation : Kind.preendorsement operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Preendorsement consensus_content)) =
@@ -736,7 +738,7 @@ module Consensus = struct
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
     let*? () =
-      if should_check_signature then
+      if check_signature then
         Operation.check_signature
           consensus_key.consensus_pk
           vi.chain_id
@@ -783,7 +785,7 @@ module Consensus = struct
     let locked_round_evidence =
       match mode with
       | Mempool -> None
-      | Application _ | Partial_application _ | Construction _ -> (
+      | Application _ | Partial_validation _ | Construction _ -> (
           match block_state.locked_round_evidence with
           | None -> Some (consensus_content.round, voting_power)
           | Some (_stored_round, evidences) ->
@@ -811,10 +813,10 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with preendorsements_seen}}
 
-  (** Validates an endorsement pointing to the grandparent block. This
+  (** Validate an endorsement pointing to the grandparent block. This
       function will only be called in [Partial_construction] mode. *)
-  let check_grandparent_endorsement vi ~should_check_signature expected
-      operation (consensus_content : consensus_content) =
+  let check_grandparent_endorsement vi ~check_signature expected operation
+      (consensus_content : consensus_content) =
     let open Lwt_tzresult_syntax in
     let kind = Grandparent_endorsement in
     let level = Level.from_raw vi.ctxt consensus_content.level in
@@ -825,7 +827,7 @@ module Consensus = struct
       check_consensus_features kind expected consensus_content operation
     in
     let*? () =
-      if should_check_signature then
+      if check_signature then
         Operation.check_signature
           consensus_key.consensus_pk
           vi.chain_id
@@ -894,7 +896,7 @@ module Consensus = struct
   (** Validate an endorsement pointing to the predecessor, aka a
       "normal" endorsement. Only this kind of endorsement may be found
       during block validation or construction. *)
-  let check_normal_endorsement vi ~should_check_signature
+  let check_normal_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Endorsement consensus_content)) =
@@ -921,7 +923,7 @@ module Consensus = struct
       check_frozen_deposits_are_positive vi.ctxt consensus_key.delegate
     in
     let*? () =
-      if should_check_signature then
+      if check_signature then
         Operation.check_signature
           consensus_key.consensus_pk
           vi.chain_id
@@ -966,7 +968,7 @@ module Consensus = struct
     in
     {vs with consensus_state = {vs.consensus_state with endorsements_seen}}
 
-  let check_endorsement vi ~should_check_signature
+  let check_endorsement vi ~check_signature
       (operation : Kind.endorsement operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Endorsement consensus_content)) =
@@ -983,7 +985,7 @@ module Consensus = struct
         let* () =
           check_grandparent_endorsement
             vi
-            ~should_check_signature
+            ~check_signature
             expected_grandparent_endorsement
             operation
             (consensus_content : consensus_content)
@@ -991,7 +993,7 @@ module Consensus = struct
         return Grandparent_endorsement
     | _ ->
         let* voting_power =
-          check_normal_endorsement vi ~should_check_signature operation
+          check_normal_endorsement vi ~check_signature operation
         in
         return (Normal_endorsement voting_power)
 
@@ -1147,15 +1149,13 @@ module Consensus = struct
                them. *)
             check_round kind expected consensus_content)
 
-  let validate_preendorsement ~should_check_signature info operation_state
-      block_state oph (operation : Kind.preendorsement operation) =
+  let validate_preendorsement ~check_signature info operation_state block_state
+      oph (operation : Kind.preendorsement operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Preendorsement consensus_content)) =
       operation.protocol_data.contents
     in
-    let* voting_power =
-      check_preendorsement info ~should_check_signature operation
-    in
+    let* voting_power = check_preendorsement info ~check_signature operation in
     let*? () =
       check_construction_preendorsement_round_consistency
         info
@@ -1178,10 +1178,10 @@ module Consensus = struct
     let operation_state = add_preendorsement operation_state oph operation in
     return {info; operation_state; block_state}
 
-  let validate_endorsement ~should_check_signature info operation_state
-      block_state oph operation =
+  let validate_endorsement ~check_signature info operation_state block_state oph
+      operation =
     let open Lwt_tzresult_syntax in
-    let* kind = check_endorsement info ~should_check_signature operation in
+    let* kind = check_endorsement info ~check_signature operation in
     let*? () =
       check_endorsement_conflict operation_state oph operation
       |> wrap_endorsement_conflict
@@ -1360,8 +1360,8 @@ module Voting = struct
     @return [Error Operation.Missing_signature] or [Error
     Operation.Invalid_signature] if the operation is unsigned or
     incorrectly signed. *)
-  let check_proposals vi ~should_check_signature
-      (operation : Kind.proposals operation) =
+  let check_proposals vi ~check_signature (operation : Kind.proposals operation)
+      =
     let open Lwt_tzresult_syntax in
     let (Single (Proposals {source; period; proposals})) =
       operation.protocol_data.contents
@@ -1382,7 +1382,7 @@ module Voting = struct
         let*? () = check_count ~count_in_ctxt ~proposals_length in
         check_already_proposed vi.ctxt source proposals
     in
-    if should_check_signature then
+    if check_signature then
       (* Retrieving the public key should not fail as it *should* be
          called after checking that the delegate is in the vote
          listings (or is a testnet dictator), which implies that it
@@ -1459,8 +1459,7 @@ module Voting = struct
     @return [Error Operation.Missing_signature] or [Error
     Operation.Invalid_signature] if the operation is unsigned or
     incorrectly signed. *)
-  let check_ballot vi ~should_check_signature
-      (operation : Kind.ballot operation) =
+  let check_ballot vi ~check_signature (operation : Kind.ballot operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Ballot {source; period; proposal; ballot = _})) =
       operation.protocol_data.contents
@@ -1472,7 +1471,7 @@ module Voting = struct
     let* () = check_current_proposal vi.ctxt proposal in
     let* () = check_source_has_not_already_voted vi.ctxt source in
     let* () = check_in_listings vi.ctxt source in
-    when_ should_check_signature (fun () ->
+    when_ check_signature (fun () ->
         (* Retrieving the public key cannot fail. Indeed, we have
            already checked that the delegate is in the vote listings,
            which implies that it is a manager with a revealed key. *)
@@ -1880,7 +1879,7 @@ module Anonymous = struct
     in
     {vs with anonymous_state}
 
-  let check_drain_delegate info ~should_check_signature
+  let check_drain_delegate info ~check_signature
       (operation : Kind.drain_delegate Operation.t) =
     let open Lwt_tzresult_syntax in
     let (Single (Drain_delegate {delegate; destination; consensus_key})) =
@@ -1938,7 +1937,7 @@ module Anonymous = struct
            {delegate; destination; min_amount})
     in
     let*? () =
-      if should_check_signature then
+      if check_signature then
         Operation.check_signature active_pk.consensus_pk info.chain_id operation
       else ok_unit
     in
@@ -2189,7 +2188,7 @@ module Manager = struct
          key. This includes the case where the key ends up not being
          used because the signature check is skipped in
          {!validate_manager_operation} called with
-         [~should_check_signature:false]. Indeed, the mempool may use
+         [~check_signature:false]. Indeed, the mempool may use
          this argument when it has already checked the signature of
          the operation in the past; but if there has been a branch
          reorganization since then, the key might not be revealed in
@@ -2341,7 +2340,7 @@ module Manager = struct
 
   let may_trace_gas_limit_too_high info =
     match info.mode with
-    | Application _ | Partial_application _ | Construction _ -> fun x -> x
+    | Application _ | Partial_validation _ | Construction _ -> fun x -> x
     | Mempool ->
         (* [Gas.check_limit] will only
            raise a "temporary" error, however when
@@ -2480,7 +2479,7 @@ module Manager = struct
         in
         check_contents_list vi batch_state tail remaining_gas
 
-  let check_manager_operation vi ~should_check_signature
+  let check_manager_operation vi ~check_signature
       (operation : _ Kind.manager operation) remaining_block_gas =
     let open Lwt_tzresult_syntax in
     let contents_list = operation.protocol_data.contents in
@@ -2491,7 +2490,7 @@ module Manager = struct
       check_contents_list vi batch_state contents_list remaining_block_gas
     in
     let*? () =
-      if should_check_signature then
+      if check_signature then
         Operation.check_signature source_pk vi.chain_id operation
       else ok_unit
     in
@@ -2555,7 +2554,7 @@ module Manager = struct
   let may_update_remaining_gas_used mode (block_state : block_state)
       operation_gas_used =
     match mode with
-    | Application _ | Partial_application _ | Construction _ ->
+    | Application _ | Partial_validation _ | Construction _ ->
         let remaining_block_gas =
           Gas.Arith.(sub block_state.remaining_block_gas operation_gas_used)
         in
@@ -2575,13 +2574,13 @@ module Manager = struct
     in
     {vs with manager_state = {managers_seen}}
 
-  let validate_manager_operation ~should_check_signature info operation_state
+  let validate_manager_operation ~check_signature info operation_state
       block_state oph operation =
     let open Lwt_tzresult_syntax in
     let* gas_used =
       check_manager_operation
         info
-        ~should_check_signature
+        ~check_signature
         operation
         block_state.remaining_block_gas
     in
@@ -2612,8 +2611,8 @@ let init_validation_state ctxt mode chain_id all_expected_consensus_features
      established by the protocol
    - the size of an operation does not exceed [max_operation_data_length]
 *)
-let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
-    (block_header : Block_header.t) fitness ~is_partial =
+let begin_any_application ctxt chain_id ~predecessor_level
+    ~predecessor_timestamp (block_header : Block_header.t) fitness ~is_partial =
   let open Lwt_tzresult_syntax in
   let predecessor_round = Fitness.predecessor_round fitness in
   let round = Fitness.round fitness in
@@ -2655,7 +2654,7 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
     }
   in
   let mode =
-    if is_partial then Partial_application application_info
+    if is_partial then Partial_validation application_info
     else Application application_info
   in
   let all_expected_consensus_features =
@@ -2676,10 +2675,10 @@ let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
        all_expected_consensus_features
        ~predecessor_level)
 
-let begin_partial_application ~ancestor_context chain_id ~predecessor_level
-    ~predecessor_timestamp (block_header : Block_header.t) fitness =
-  begin_application
-    ancestor_context
+let begin_partial_validation ctxt chain_id ~predecessor_level
+    ~predecessor_timestamp block_header fitness =
+  begin_any_application
+    ctxt
     chain_id
     ~predecessor_level
     ~predecessor_timestamp
@@ -2688,8 +2687,8 @@ let begin_partial_application ~ancestor_context chain_id ~predecessor_level
     ~is_partial:true
 
 let begin_application ctxt chain_id ~predecessor_level ~predecessor_timestamp
-    (block_header : Block_header.t) fitness =
-  begin_application
+    block_header fitness =
+  begin_any_application
     ctxt
     chain_id
     ~predecessor_level
@@ -2795,26 +2794,25 @@ let begin_no_predecessor_info ctxt chain_id =
     all_expected_consensus_features
     ~predecessor_level
 
-let check_operation info ?(should_check_signature = true) (type kind)
+let check_operation ?(check_signature = true) info (type kind)
     (operation : kind operation) : unit tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   match operation.protocol_data.contents with
   | Single (Preendorsement _) ->
       let* (_voting_power : int) =
-        Consensus.check_preendorsement info ~should_check_signature operation
+        Consensus.check_preendorsement info ~check_signature operation
       in
       return_unit
   | Single (Endorsement _) ->
       let* (_kind : Consensus.endorsement_kind) =
-        Consensus.check_endorsement info ~should_check_signature operation
+        Consensus.check_endorsement info ~check_signature operation
       in
       return_unit
   | Single (Dal_slot_availability _) ->
       Consensus.check_dal_slot_availability info operation
   | Single (Proposals _) ->
-      Voting.check_proposals info ~should_check_signature operation
-  | Single (Ballot _) ->
-      Voting.check_ballot info ~should_check_signature operation
+      Voting.check_proposals info ~check_signature operation
+  | Single (Ballot _) -> Voting.check_ballot info ~check_signature operation
   | Single (Activate_account _) ->
       Anonymous.check_activate_account info operation
   | Single (Double_preendorsement_evidence _) ->
@@ -2824,7 +2822,7 @@ let check_operation info ?(should_check_signature = true) (type kind)
   | Single (Double_baking_evidence _) ->
       Anonymous.check_double_baking_evidence info operation
   | Single (Drain_delegate _) ->
-      Anonymous.check_drain_delegate info ~should_check_signature operation
+      Anonymous.check_drain_delegate info ~check_signature operation
   | Single (Seed_nonce_revelation _) ->
       Anonymous.check_seed_nonce_revelation info operation
   | Single (Vdf_revelation _) -> Anonymous.check_vdf_revelation info operation
@@ -2835,7 +2833,7 @@ let check_operation info ?(should_check_signature = true) (type kind)
       let* (_remaining_gas : Gas.Arith.fp) =
         Manager.check_manager_operation
           info
-          ~should_check_signature
+          ~check_signature
           operation
           remaining_gas
       in
@@ -2847,7 +2845,7 @@ let check_operation info ?(should_check_signature = true) (type kind)
       let* (_remaining_gas : Gas.Arith.fp) =
         Manager.check_manager_operation
           info
-          ~should_check_signature
+          ~check_signature
           operation
           remaining_gas
       in
@@ -3017,7 +3015,7 @@ let check_validation_pass_consistency vi vs validation_pass =
   let open Lwt_tzresult_syntax in
   match vi.mode with
   | Mempool | Construction _ -> return vs
-  | Application _ | Partial_application _ -> (
+  | Application _ | Partial_validation _ -> (
       match (vs.last_op_validation_pass, validation_pass) with
       | None, validation_pass ->
           return {vs with last_op_validation_pass = validation_pass}
@@ -3045,8 +3043,9 @@ let record_operation vs ophash validation_pass_opt =
         recorded_operations_rev = ophash :: vs.recorded_operations_rev;
       }
 
-let validate_operation {info; operation_state; block_state}
-    ?(should_check_signature = true) oph (packed_operation : packed_operation) =
+let validate_operation ?(check_signature = true)
+    {info; operation_state; block_state} oph
+    (packed_operation : packed_operation) =
   let open Lwt_tzresult_syntax in
   let {shell; protocol_data = Operation_data protocol_data} =
     packed_operation
@@ -3060,16 +3059,16 @@ let validate_operation {info; operation_state; block_state}
   let block_state = record_operation block_state oph validation_pass_opt in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
   match (info.mode, validation_pass_opt) with
-  | Partial_application _, Some n
+  | Partial_validation _, Some n
     when Compare.Int.(n <> Operation_repr.consensus_pass) ->
-      (* Do not validate non-consensus operation in [Partial_application] mode *)
+      (* Do not validate non-consensus operation in [Partial_validation] mode *)
       return {info; operation_state; block_state}
-  | Partial_application _, _ | Mempool, _ | Construction _, _ | Application _, _
+  | Partial_validation _, _ | Mempool, _ | Construction _, _ | Application _, _
     -> (
       match operation.protocol_data.contents with
       | Single (Preendorsement _) ->
           Consensus.validate_preendorsement
-            ~should_check_signature
+            ~check_signature
             info
             operation_state
             block_state
@@ -3077,7 +3076,7 @@ let validate_operation {info; operation_state; block_state}
             operation
       | Single (Endorsement _) ->
           Consensus.validate_endorsement
-            ~should_check_signature
+            ~check_signature
             info
             operation_state
             block_state
@@ -3096,7 +3095,7 @@ let validate_operation {info; operation_state; block_state}
           return {info; operation_state; block_state}
       | Single (Proposals _) ->
           let open Voting in
-          let* () = check_proposals info ~should_check_signature operation in
+          let* () = check_proposals info ~check_signature operation in
           let*? () =
             check_proposals_conflict operation_state oph operation
             |> wrap_proposals_conflict
@@ -3105,7 +3104,7 @@ let validate_operation {info; operation_state; block_state}
           return {info; operation_state; block_state}
       | Single (Ballot _) ->
           let open Voting in
-          let* () = check_ballot info ~should_check_signature operation in
+          let* () = check_ballot info ~check_signature operation in
           let*? () =
             check_ballot_conflict operation_state oph operation
             |> wrap_ballot_conflict
@@ -3164,9 +3163,7 @@ let validate_operation {info; operation_state; block_state}
           return {info; operation_state; block_state}
       | Single (Drain_delegate _) ->
           let open Anonymous in
-          let* () =
-            check_drain_delegate info ~should_check_signature operation
-          in
+          let* () = check_drain_delegate info ~check_signature operation in
           let*? () =
             check_drain_delegate_conflict operation_state oph operation
             |> wrap_drain_delegate_conflict operation
@@ -3197,7 +3194,7 @@ let validate_operation {info; operation_state; block_state}
           return {info; operation_state; block_state}
       | Single (Manager_operation _) ->
           Manager.validate_manager_operation
-            ~should_check_signature
+            ~check_signature
             info
             operation_state
             block_state
@@ -3205,7 +3202,7 @@ let validate_operation {info; operation_state; block_state}
             operation
       | Cons (Manager_operation _, _) ->
           Manager.validate_manager_operation
-            ~should_check_signature
+            ~check_signature
             info
             operation_state
             block_state
@@ -3283,7 +3280,7 @@ let finalize_block {info; block_state; _} =
           fitness
       in
       return_unit
-  | Partial_application _ ->
+  | Partial_validation _ ->
       let* are_endorsements_required = are_endorsements_required info in
       let*? () =
         if are_endorsements_required then

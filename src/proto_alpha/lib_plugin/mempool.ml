@@ -208,9 +208,18 @@ module ManagerOpWeightSet = Set.Make (struct
   let compare = compare_manager_op_weight
 end)
 
+(** Static information to store in the filter state. *)
+type state_info = {
+  grandparent_level_start : Timestamp.t;
+  round_zero_duration : Period.t;
+  proposal_round : Round.t;
+  alpha_ctxt : Alpha_context.t;
+      (** Protocol context at the initialization of the mempool filter.
+          Note that it never gets updated. *)
+}
+
 type state = {
-  grandparent_level_start : Timestamp.t option;
-  round_zero_duration : Period.t option;
+  state_info : state_info option;
   prechecked_manager_op_count : int;
       (** Number of prechecked manager operations.
           Invariants:
@@ -231,8 +240,7 @@ type state = {
 
 let empty : state =
   {
-    grandparent_level_start = None;
-    round_zero_duration = None;
+    state_info = None;
     prechecked_manager_op_count = 0;
     prechecked_manager_ops = Operation_hash.Map.empty;
     prechecked_op_weights = ManagerOpWeightSet.empty;
@@ -243,7 +251,8 @@ let init config ?(validation_state : validation_state option) ~predecessor () =
   ignore config ;
   (match validation_state with
   | None -> return empty
-  | Some {application_state = {ctxt; _}; _} ->
+  | Some validation_state ->
+      let ctxt = Validate.get_initial_ctxt validation_state in
       let {
         Tezos_base.Block_header.fitness = predecessor_fitness;
         timestamp = predecessor_timestamp;
@@ -267,13 +276,16 @@ let init config ?(validation_state : validation_state option) ~predecessor () =
       >>?= fun proposal_round_offset ->
       Period.(add proposal_level_offset proposal_round_offset)
       >>?= fun proposal_offset ->
-      return
+      let state_info =
         {
-          empty with
           grandparent_level_start =
-            Some Timestamp.(predecessor_timestamp - proposal_offset);
-          round_zero_duration = Some round_zero_duration;
-        })
+            Timestamp.(predecessor_timestamp - proposal_offset);
+          round_zero_duration;
+          proposal_round = predecessor_round;
+          alpha_ctxt = ctxt;
+        }
+      in
+      return {empty with state_info = Some state_info})
   >|= Environment.wrap_tzresult
 
 let manager_prio p = `Low p
@@ -448,7 +460,8 @@ let size_of_operation op =
 let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas op
     =
   let hard_gas_limit_per_block =
-    Constants.hard_gas_limit_per_block validation_state.application_state.ctxt
+    Constants.hard_gas_limit_per_block
+      (Validate.get_initial_ctxt validation_state)
   in
   let max_size = managers_quota.max_size in
   let size = match size with None -> size_of_operation op | Some s -> s in
@@ -757,50 +770,37 @@ let acceptable_op ~config ~round_durations ~round_zero_duration ~proposal_level
        acceptable *)
     acceptable ~drift ~op_earliest_ts ~now_timestamp
 
-let pre_filter_far_future_consensus_ops config
-    ~filter_state:({grandparent_level_start; round_zero_duration; _} : state)
-    ?validation_state_before
+let pre_filter_far_future_consensus_ops config ~filter_state
     ({level = op_level; round = op_round; _} : consensus_content) : bool Lwt.t =
-  match
-    (grandparent_level_start, validation_state_before, round_zero_duration)
-  with
-  | None, _, _ | _, None, _ | _, _, None -> Lwt.return_true
-  | ( Some grandparent_level_start,
-      Some validation_state_before,
-      Some round_zero_duration ) -> (
-      let ctxt : t = validation_state_before.application_state.ctxt in
-      match validation_state_before.application_state.mode with
-      | Application _ | Partial_application _ | Full_construction _ ->
-          assert false
-      (* Prefilter is always applied in mempool mode aka Partial_construction *)
-      | Partial_construction {predecessor_round = proposal_round; _} -> (
-          (let proposal_timestamp = Alpha_context.Timestamp.predecessor ctxt in
-           let now_timestamp = Time.System.now () |> Time.System.to_protocol in
-           let Level.{level; _} = Alpha_context.Level.current ctxt in
-           let proposal_level =
-             match Raw_level.pred level with
-             | None ->
-                 (* mempool level is set to the successor of the
-                    current head *)
-                 assert false
-             | Some proposal_level -> proposal_level
-           in
-           let round_durations = Alpha_context.Constants.round_durations ctxt in
-           Lwt.return
-           @@ acceptable_op
-                ~config
-                ~round_durations
-                ~round_zero_duration
-                ~proposal_level
-                ~proposal_round
-                ~proposal_timestamp
-                ~proposal_predecessor_level_start:grandparent_level_start
-                ~op_level
-                ~op_round
-                ~now_timestamp)
-          >>= function
-          | Ok b -> Lwt.return b
-          | _ -> Lwt.return_false))
+  match filter_state.state_info with
+  | None -> Lwt.return_true
+  | Some state_info -> (
+      (let proposal_timestamp = Timestamp.predecessor state_info.alpha_ctxt in
+       let now_timestamp = Time.System.now () |> Time.System.to_protocol in
+       let Level.{level; _} = Level.current state_info.alpha_ctxt in
+       let proposal_level =
+         match Raw_level.pred level with
+         | None ->
+             (* mempool level is set to the successor of the current head *)
+             assert false
+         | Some proposal_level -> proposal_level
+       in
+       let round_durations = Constants.round_durations state_info.alpha_ctxt in
+       Lwt.return
+       @@ acceptable_op
+            ~config
+            ~round_durations
+            ~round_zero_duration:state_info.round_zero_duration
+            ~proposal_level
+            ~proposal_round:state_info.proposal_round
+            ~proposal_timestamp
+            ~proposal_predecessor_level_start:state_info.grandparent_level_start
+            ~op_level
+            ~op_round
+            ~now_timestamp)
+      >>= function
+      | Ok b -> Lwt.return b
+      | _ -> Lwt.return_false)
 
 (** A quasi infinite amount of "valid" (pre)endorsements could be
       sent by a committee member, one for each possible round number.
@@ -835,11 +835,7 @@ let pre_filter config ~(filter_state : state) ?validation_state_before
       Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
   | Single (Preendorsement consensus_content)
   | Single (Endorsement consensus_content) ->
-      pre_filter_far_future_consensus_ops
-        ~filter_state
-        config
-        ?validation_state_before
-        consensus_content
+      pre_filter_far_future_consensus_ops ~filter_state config consensus_content
       >>= fun keep ->
       if keep then Lwt.return @@ `Passed_prefilter consensus_prio
       else
@@ -877,13 +873,13 @@ let proto_validate_operation validation_state oph ~nb_successful_prechecks
   let open Lwt_result_syntax in
   let*! res =
     Validate.validate_operation
-      validation_state.validity_state
-      ~should_check_signature:(nb_successful_prechecks <= 0)
+      ~check_signature:(nb_successful_prechecks <= 0)
+      validation_state
       oph
       operation
   in
   match res with
-  | Ok validity_state -> return {validation_state with validity_state}
+  | Ok validation_state -> return validation_state
   | Error tztrace ->
       let err = Environment.wrap_tztrace tztrace in
       let error_classification =
@@ -944,10 +940,9 @@ let proto_validate_manager_operation validation_state oph
 (** Remove a manager operation from the protocol's [validation_state]. *)
 let remove_from_validation_state validation_state (Manager_op op) =
   let operation_state =
-    Validate.remove_operation validation_state.validity_state.operation_state op
+    Validate.remove_operation validation_state.Validate.operation_state op
   in
-  let validity_state = {validation_state.validity_state with operation_state} in
-  {validation_state with validity_state}
+  {validation_state with operation_state}
 
 (** Call the protocol validation on a manager operation and handle
     potential conflicts: if either the 1M restriction is triggered or
@@ -1367,11 +1362,14 @@ let rec post_filter_manager :
       | `Refused _ as errs -> errs)
 
 let post_filter config ~(filter_state : state) ~validation_state_before:_
-    ~validation_state_after:
-      ({application_state = {ctxt; _}; _} : validation_state) (_op, receipt) =
+    ~validation_state_after (_op, receipt) =
   match receipt with
   | No_operation_metadata -> assert false (* only for multipass validator *)
   | Operation_metadata {contents} -> (
+      let handle_manager result =
+        let ctxt = Validate.get_initial_ctxt validation_state_after in
+        Lwt.return (post_filter_manager ctxt filter_state result config)
+      in
       match contents with
       | Single_result (Preendorsement_result _)
       | Single_result (Endorsement_result _)
@@ -1387,6 +1385,6 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
       | Single_result Ballot_result ->
           Lwt.return (`Passed_postfilter filter_state)
       | Single_result (Manager_operation_result _) as result ->
-          Lwt.return (post_filter_manager ctxt filter_state result config)
+          handle_manager result
       | Cons_result (Manager_operation_result _, _) as result ->
-          Lwt.return (post_filter_manager ctxt filter_state result config))
+          handle_manager result)

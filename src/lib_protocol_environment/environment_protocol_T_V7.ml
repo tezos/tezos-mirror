@@ -82,41 +82,52 @@ module type T = sig
 
   type validation_state
 
-  val begin_partial_application :
-    chain_id:Chain_id.t ->
-    ancestor_context:context ->
-    predecessor_timestamp:Time.Protocol.t ->
-    predecessor_fitness:Fitness.t ->
-    block_header ->
+  type application_state
+
+  type mode =
+    | Application of block_header
+    | Partial_validation of block_header
+    | Construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+        block_header_data : block_header_data;
+      }
+    | Partial_construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+      }
+
+  val begin_validation :
+    context ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
     validation_state tzresult Lwt.t
+
+  val validate_operation :
+    ?check_signature:bool ->
+    validation_state ->
+    Operation_hash.t ->
+    operation ->
+    validation_state tzresult Lwt.t
+
+  val finalize_validation : validation_state -> unit tzresult Lwt.t
 
   val begin_application :
-    chain_id:Chain_id.t ->
-    predecessor_context:context ->
-    predecessor_timestamp:Time.Protocol.t ->
-    predecessor_fitness:Fitness.t ->
-    block_header ->
-    validation_state tzresult Lwt.t
-
-  val begin_construction :
-    chain_id:Chain_id.t ->
-    predecessor_context:context ->
-    predecessor_timestamp:Time.Protocol.t ->
-    predecessor_level:Int32.t ->
-    predecessor_fitness:Fitness.t ->
-    predecessor:Block_hash.t ->
-    timestamp:Time.Protocol.t ->
-    ?protocol_data:block_header_data ->
-    unit ->
-    validation_state tzresult Lwt.t
+    context ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
+    application_state tzresult Lwt.t
 
   val apply_operation :
-    validation_state ->
+    application_state ->
+    Operation_hash.t ->
     operation ->
-    (validation_state * operation_receipt) tzresult Lwt.t
+    (application_state * operation_receipt) tzresult Lwt.t
 
-  val finalize_block :
-    validation_state ->
+  val finalize_application :
+    application_state ->
     Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
@@ -175,8 +186,7 @@ module type T = sig
       context ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.Protocol.t ->
+      head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t
 
     val encoding : t Data_encoding.t

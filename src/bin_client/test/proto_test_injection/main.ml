@@ -66,7 +66,9 @@ let compare_operations _ _ = 0
 
 let acceptable_pass _ = Some 0
 
-type validation_state = {context : Context.t; fitness : Int64.t}
+type validation_state = unit
+
+type application_state = {context : Context.t; fitness : Int64.t}
 
 module Fitness = struct
   type error += Invalid_fitness
@@ -92,38 +94,48 @@ module Fitness = struct
   let get {fitness; _} = fitness
 end
 
-let begin_application ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_fitness:_ (raw_block : block_header) =
-  Fitness.to_int64 raw_block.shell.fitness >>=? fun fitness ->
+type mode =
+  | Application of block_header
+  | Partial_validation of block_header
+  | Construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+      block_header_data : block_header_data;
+    }
+  | Partial_construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+    }
+
+let begin_validation _ctxt _chain_id _mode ~predecessor:_ = return ()
+
+let validate_operation ?check_signature:_ _validation_state _oph _op = return ()
+
+let finalize_validation _validation_state = return ()
+
+let begin_application context _chain_id mode
+    ~(predecessor : Block_header.shell_header) =
+  let open Lwt_result_syntax in
+  let* fitness =
+    match mode with
+    | Application block_header | Partial_validation block_header ->
+        Fitness.to_int64 block_header.shell.fitness
+    | Construction _ | Partial_construction _ ->
+        let* predecessor_fitness = Fitness.to_int64 predecessor.fitness in
+        return (Int64.succ predecessor_fitness)
+  in
   return {context; fitness}
 
-let begin_partial_application ~chain_id ~ancestor_context ~predecessor_timestamp
-    ~predecessor_fitness raw_block =
-  begin_application
-    ~chain_id
-    ~predecessor_context:ancestor_context
-    ~predecessor_timestamp
-    ~predecessor_fitness
-    raw_block
+let apply_operation application_state _oph _op = return (application_state, ())
 
-let begin_construction ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_level:_
-    ~predecessor_fitness:pred_fitness ~predecessor:_ ~timestamp:_
-    ?protocol_data:_ () =
-  Fitness.to_int64 pred_fitness >>=? fun pred_fitness ->
-  let fitness = Int64.succ pred_fitness in
-  return {context; fitness}
-
-let apply_operation ctxt _ = return (ctxt, ())
-
-let finalize_block ctxt _block_header =
-  let fitness = Fitness.get ctxt in
+let finalize_application application_state _block_header =
+  let fitness = Fitness.get application_state in
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
   return
     ( {
         Updater.message;
-        context = ctxt.context;
+        context = application_state.context;
         fitness;
         max_operations_ttl = 0;
         last_allowed_fork_level = 0l;
@@ -180,8 +192,7 @@ module Mempool = struct
     | Incompatible_mempool
     | Merge_conflict of operation_conflict
 
-  let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ =
-    Lwt.return_ok ((), ())
+  let init _ _ ~head_hash:_ ~head:_ = Lwt.return_ok ((), ())
 
   let encoding = Data_encoding.unit
 

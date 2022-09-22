@@ -194,25 +194,48 @@ module Make (E : MENV) = struct
       E.Protocol.block_header_data_encoding
       E.protocol_data
 
+  let begin_validation_and_application ctxt chain_id mode ~predecessor ~cache =
+    let open Lwt_result_syntax in
+    let* validation_state =
+      E.Protocol.begin_validation ctxt chain_id mode ~predecessor ~cache
+    in
+    let* application_state =
+      E.Protocol.begin_application ctxt chain_id mode ~predecessor ~cache
+    in
+    return (validation_state, application_state)
+
+  let validate_and_apply_operation (validation_state, application_state) oph op
+      =
+    let open Lwt_result_syntax in
+    let* validation_state =
+      E.Protocol.validate_operation validation_state oph op
+    in
+    let* application_state, receipt =
+      E.Protocol.apply_operation application_state oph op
+    in
+    return ((validation_state, application_state), receipt)
+
+  let finalize_validation_and_application (validation_state, application_state)
+      shell_header =
+    let open Lwt_result_syntax in
+    let* () = E.Protocol.finalize_validation validation_state in
+    E.Protocol.finalize_application application_state shell_header
+
   let partial_construction ~cache () =
-    let predecessor = E.rpc_context.block_hash in
-    let header = E.rpc_context.block_header in
+    let predecessor_hash = E.rpc_context.block_hash in
+    let predecessor = E.rpc_context.block_header in
     let predecessor_context = E.rpc_context.context in
     let timestamp = Time.System.to_protocol @@ Tezos_base.Time.System.now () in
-    E.Protocol.begin_construction
-      ~chain_id:E.chain_id
-      ~predecessor_context
-      ~predecessor_timestamp:header.timestamp
-      ~predecessor_level:header.level
-      ~predecessor_fitness:header.fitness
+    begin_validation_and_application
+      predecessor_context
+      E.chain_id
+      (Partial_construction {predecessor_hash; timestamp})
       ~predecessor
-      ~timestamp
       ~cache
-      ()
 
   let full_construction ?timestamp ~protocol_data ~cache () =
-    let predecessor = E.rpc_context.block_hash in
-    let header = E.rpc_context.block_header in
+    let predecessor_hash = E.rpc_context.block_hash in
+    let predecessor = E.rpc_context.block_header in
     let predecessor_context = E.rpc_context.context in
     let timestamp =
       let default () =
@@ -220,17 +243,13 @@ module Make (E : MENV) = struct
       in
       Option.value_f timestamp ~default
     in
-    E.Protocol.begin_construction
-      ~chain_id:E.chain_id
-      ~predecessor_context
-      ~predecessor_timestamp:header.timestamp
-      ~predecessor_level:header.level
-      ~predecessor_fitness:header.fitness
+    begin_validation_and_application
+      predecessor_context
+      E.chain_id
+      (Construction
+         {predecessor_hash; timestamp; block_header_data = protocol_data})
       ~predecessor
-      ~protocol_data
-      ~timestamp
       ~cache
-      ()
 
   let op_data_encoding = E.Protocol.operation_data_encoding
 
@@ -405,7 +424,7 @@ module Make (E : MENV) = struct
                let set = Block_hash.Set.singleton E.rpc_context.block_hash in
                RPC_answer.return set))
 
-  let simulate_operation (validation_state, preapply_result) op =
+  let simulate_operation (state, preapply_result) op =
     let open Lwt_result_syntax in
     match
       Data_encoding.Binary.to_bytes
@@ -416,12 +435,12 @@ module Make (E : MENV) = struct
     | Ok proto -> (
         let op_t = {Operation.shell = op.shell; proto} in
         let hash = Operation.hash op_t in
-        let*! r = E.Protocol.apply_operation validation_state op in
+        let*! r = validate_and_apply_operation state hash op in
         match r with
         | Error e ->
             let open Preapply_result in
             return
-              ( validation_state,
+              ( state,
                 {
                   preapply_result with
                   refused =
@@ -430,10 +449,10 @@ module Make (E : MENV) = struct
                       (op_t, e)
                       preapply_result.refused;
                 } )
-        | Ok (validation_state, _) ->
+        | Ok (state, _) ->
             let open Preapply_result in
             return
-              ( validation_state,
+              ( state,
                 {
                   preapply_result with
                   applied = (hash, op_t) :: preapply_result.applied;
@@ -454,23 +473,21 @@ module Make (E : MENV) = struct
            with_chain ~caller_name:"preapply_block" chain (fun () ->
                let*! r =
                  let timestamp = o#timestamp in
-                 let* validation_state =
+                 let* proto_state =
                    full_construction
                      ~cache:`Lazy
                      ?timestamp:o#timestamp
                      ~protocol_data
                      ()
                  in
-                 let* validation_passes, validation_state, preapply_results =
+                 let* validation_passes, proto_state, preapply_results =
                    List.fold_left_es
-                     (fun ( validation_passes,
-                            validation_state,
-                            validation_result )
+                     (fun (validation_passes, proto_state, validation_result)
                           operations ->
                        let* state, result =
                          List.fold_left_es
                            simulate_operation
-                           (validation_state, Preapply_result.empty)
+                           (proto_state, Preapply_result.empty)
                            operations
                        in
                        let open Preapply_result in
@@ -481,12 +498,13 @@ module Make (E : MENV) = struct
                          ( succ validation_passes,
                            state,
                            p_result :: validation_result ))
-                     (0, validation_state, [])
+                     (0, proto_state, [])
                      operations
                  in
-                 let cache_nonce = Some E.rpc_context.block_header in
                  let* validation_result, _metadata =
-                   E.Protocol.finalize_block validation_state cache_nonce
+                   finalize_validation_and_application
+                     proto_state
+                     (Some E.rpc_context.block_header)
                  in
                  (* Similar to lib_shell.Prevalidation.preapply *)
                  let operations_hash =
@@ -525,6 +543,18 @@ module Make (E : MENV) = struct
                | Error errs -> RPC_answer.fail errs
                | Ok v -> RPC_answer.return v))
 
+  let hash_protocol_operation op =
+    match
+      Data_encoding.Binary.to_bytes
+        E.Protocol.operation_data_encoding
+        op.E.Protocol.protocol_data
+    with
+    | Error _ ->
+        failwith "mockup preapply_operations: cannot deserialize operation"
+    | Ok proto ->
+        let op_t = {Operation.shell = op.shell; proto} in
+        Lwt_result.return (Operation.hash op_t)
+
   let preapply () =
     let open Lwt_result_syntax in
     Directory.prefix
@@ -540,21 +570,24 @@ module Make (E : MENV) = struct
          (fun ((_, chain), _block) () op_list ->
            with_chain ~caller_name:"preapply operations" chain (fun () ->
                let*! outcome =
-                 let* state = partial_construction ~cache:`Lazy () in
-                 let* state, acc =
+                 let* proto_state = partial_construction ~cache:`Lazy () in
+                 let* proto_state, acc =
                    List.fold_left_es
-                     (fun (state, acc) op ->
-                       let* state, result =
-                         E.Protocol.apply_operation state op
+                     (fun (proto_state, acc) op ->
+                       let* oph = hash_protocol_operation op in
+                       let* proto_state, result =
+                         validate_and_apply_operation proto_state oph op
                        in
-                       return (state, (op.protocol_data, result) :: acc))
-                     (state, [])
+                       return (proto_state, (op.protocol_data, result) :: acc))
+                     (proto_state, [])
                      op_list
                  in
                  (* A pre-application should not commit into the
                     protocol caches. For this reason, [cache_nonce]
                     is [None]. *)
-                 let* _ = E.Protocol.finalize_block state None in
+                 let* _ =
+                   finalize_validation_and_application proto_state None
+                 in
                  return (List.rev acc)
                in
                match outcome with
@@ -584,16 +617,16 @@ module Make (E : MENV) = struct
     if List.mem ~equal:equal_op op mempool_operations then return `Equal
     else
       let operations = op :: mempool_operations in
-      let* validation_state = partial_construction ~cache:`Lazy () in
-      let* validation_state, preapply_result =
+      let* proto_state = partial_construction ~cache:`Lazy () in
+      let* proto_state, preapply_result =
         List.fold_left_es
           (fun rstate (shell, protocol_data) ->
             simulate_operation rstate E.Protocol.{shell; protocol_data})
-          (validation_state, Preapply_result.empty)
+          (proto_state, Preapply_result.empty)
           operations
       in
       if Operation_hash.Map.is_empty preapply_result.refused then
-        let* _ = E.Protocol.finalize_block validation_state None in
+        let* _ = finalize_validation_and_application proto_state None in
         return `Applicable
       else return `Refused
 
@@ -654,13 +687,12 @@ module Make (E : MENV) = struct
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
             in
             let*! result =
-              let* state = partial_construction ~cache:`Lazy () in
-              let* state, receipt = E.Protocol.apply_operation state op in
-              (* The following finalization does not have to update protocol
-                 caches because we are not interested in block creation here.
-                 Hence, [cache_nonce] is set to [None]. *)
+              let* proto_state = partial_construction ~cache:`Lazy () in
+              let* proto_state, receipt =
+                validate_and_apply_operation proto_state operation_hash op
+              in
               let* validation_result, _block_header_metadata =
-                E.Protocol.finalize_block state None
+                finalize_validation_and_application proto_state None
               in
               return (validation_result, receipt)
             in
@@ -685,20 +717,22 @@ module Make (E : MENV) = struct
       with
       | None -> assert false
       | Some protocol_data ->
-          let header = E.rpc_context.block_header in
+          let predecessor = E.rpc_context.block_header in
           let predecessor_context = E.rpc_context.context in
-          let* validation_state =
-            E.Protocol.begin_application
-              ~chain_id:E.chain_id
-              ~predecessor_context
-              ~predecessor_timestamp:header.timestamp
-              ~predecessor_fitness:header.fitness
-              {shell = block_header.shell; protocol_data}
+          let mode =
+            E.Protocol.Application {shell = block_header.shell; protocol_data}
+          in
+          let* proto_state =
+            begin_validation_and_application
+              predecessor_context
+              E.chain_id
+              mode
+              ~predecessor
               ~cache:`Lazy
           in
-          let* validation_state, _ =
+          let* proto_state, _ =
             List.fold_left_es
-              (List.fold_left_es (fun (validation_state, results) op ->
+              (List.fold_left_es (fun (proto_state, results) op ->
                    match
                      Data_encoding.Binary.of_bytes
                        op_data_encoding
@@ -706,20 +740,23 @@ module Make (E : MENV) = struct
                    with
                    | Error _ -> failwith "Cannot parse"
                    | Ok operation_data ->
+                       let oph = Operation.hash op in
                        let op =
                          {
                            E.Protocol.shell = op.shell;
                            protocol_data = operation_data;
                          }
                        in
-                       let* validation_state, receipt =
-                         E.Protocol.apply_operation validation_state op
+                       let* proto_state, receipt =
+                         validate_and_apply_operation proto_state oph op
                        in
-                       return (validation_state, receipt :: results)))
-              (validation_state, [])
+                       return (proto_state, receipt :: results)))
+              (proto_state, [])
               operations
           in
-          E.Protocol.finalize_block validation_state (Some block_header.shell)
+          finalize_validation_and_application
+            proto_state
+            (Some block_header.shell)
     in
     Directory.register
       Directory.empty

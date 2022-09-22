@@ -100,9 +100,7 @@ let add_operation ?(check_signature = true)
   let open Lwt_syntax in
   let {shell; protocol_data = Operation_data protocol_data} = packed_op in
   let operation : _ Alpha_context.operation = {shell; protocol_data} in
-  let* validate_result =
-    check_operation info ~should_check_signature:check_signature operation
-  in
+  let* validate_result = check_operation ~check_signature info operation in
   match validate_result with
   | Error err -> Lwt.return_error (Validation_error err)
   | Ok () -> (

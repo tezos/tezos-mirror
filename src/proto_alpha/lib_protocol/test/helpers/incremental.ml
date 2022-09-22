@@ -29,7 +29,7 @@ open Alpha_context
 
 type t = {
   predecessor : Block.t;
-  state : validation_state;
+  state : validation_state * application_state;
   rev_operations : Operation.packed list;
   rev_tickets : operation_receipt list;
   header : Block_header.t;
@@ -44,13 +44,15 @@ let header {header; _} = header
 
 let rev_tickets {rev_tickets; _} = rev_tickets
 
-let validation_state {state; _} = state
+let validation_state {state = vs, _; _} = vs
 
 let level st = st.header.shell.level
 
+let alpha_ctxt {state = _, application_state; _} = application_state.ctxt
+
 let rpc_context st =
   let fitness = (header st).shell.fitness in
-  let result = Alpha_context.finalize st.state.application_state.ctxt fitness in
+  let result = Alpha_context.finalize (alpha_ctxt st) fitness in
   {
     Environment.Updater.block_hash = Block_hash.zero;
     block_header = {st.header.shell with fitness = result.fitness};
@@ -62,14 +64,14 @@ let rpc_ctxt =
     rpc_context
     Plugin.RPC.rpc_services
 
-let alpha_ctxt st = st.state.application_state.ctxt
-
 let set_alpha_ctxt st ctxt =
-  {
-    st with
-    state =
-      {st.state with application_state = {st.state.application_state with ctxt}};
-  }
+  {st with state = (fst st.state, {(snd st.state) with ctxt})}
+
+let begin_validation_and_application ctxt chain_id mode ~predecessor =
+  let open Lwt_result_syntax in
+  let* validation_state = begin_validation ctxt chain_id mode ~predecessor in
+  let* application_state = begin_application ctxt chain_id mode ~predecessor in
+  return (validation_state, application_state)
 
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ?(policy = Block.By_round 0) (predecessor : Block.t) =
@@ -93,9 +95,15 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
       ~payload_round
       ()
   in
-  let protocol_data =
-    if mempool_mode then None
-    else Some {Block_header.contents; signature = Signature.zero}
+  let mode =
+    if mempool_mode then
+      Partial_construction {predecessor_hash = predecessor.hash; timestamp}
+    else
+      let block_header_data =
+        {Block_header.contents; signature = Signature.zero}
+      in
+      Construction
+        {predecessor_hash = predecessor.hash; timestamp; block_header_data}
   in
   let header =
     {
@@ -113,16 +121,11 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
       protocol_data = {contents; signature = Signature.zero};
     }
   in
-  begin_construction
-    ~chain_id:Chain_id.zero
-    ~predecessor_context:predecessor.context
-    ~predecessor_timestamp:predecessor.header.shell.timestamp
-    ~predecessor_fitness:predecessor.header.shell.fitness
-    ~predecessor_level:predecessor.header.shell.level
-    ~predecessor:predecessor.hash
-    ~timestamp
-    ?protocol_data
-    ()
+  begin_validation_and_application
+    predecessor.context
+    Chain_id.zero
+    mode
+    ~predecessor:predecessor.header.shell
   >|= fun state ->
   Environment.wrap_tzresult state >|? fun state ->
   {predecessor; state; rev_operations = []; rev_tickets = []; header; delegate}
@@ -164,68 +167,77 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let apply_operation ?(check_size = true) st op =
-  (if check_size then
-   let operation_size = Data_encoding.Binary.length Operation.encoding op in
-   if operation_size > Constants_repr.max_operation_data_length then
-     raise
-       (invalid_arg
-          (Format.sprintf
-             "The operation size is %d, it exceeds the constant maximum size %d"
-             operation_size
-             Constants_repr.max_operation_data_length))) ;
-  apply_operation st.state op >|= Environment.wrap_tzresult
+let check_operation_size ?(check_size = true) op =
+  if check_size then
+    let operation_size = Data_encoding.Binary.length Operation.encoding op in
+    if operation_size > Constants_repr.max_operation_data_length then
+      raise
+        (invalid_arg
+           (Format.sprintf
+              "The operation size is %d: it exceeds the constant maximum size \
+               %d."
+              operation_size
+              Constants_repr.max_operation_data_length))
 
 let validate_operation ?expect_failure ?check_size st op =
-  apply_operation ?check_size st op >>= fun result ->
-  match (expect_failure, result) with
+  let open Lwt_result_syntax in
+  check_operation_size ?check_size op ;
+  let validation_state, application_state = st.state in
+  let oph = Operation.hash_packed op in
+  let*! res = validate_operation validation_state oph op in
+  match (expect_failure, Environment.wrap_tzresult res) with
   | Some _, Ok _ -> failwith "Error expected while validating operation"
-  | Some f, Error err -> f err >|=? fun () -> st
-  | None, Error err -> failwith "Error %a was not expected" pp_print_trace err
-  | None, Ok (state, (Operation_metadata _ as metadata))
-  | None, Ok (state, (No_operation_metadata as metadata)) ->
-      return
+  | Some f, Error err ->
+      let* () = f err in
+      return st
+  | None, Error err -> fail err
+  | None, Ok validation_state ->
+      return {st with state = (validation_state, application_state)}
+
+let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
+  let open Lwt_result_syntax in
+  let open Apply_results in
+  let* st = validate_operation ?expect_failure ?check_size st op in
+  match expect_failure with
+  | Some _ ->
+      (* The expected failure has already been observed in
+         [validate_operation]. *)
+      return st
+  | None -> (
+      let validation_state, application_state = st.state in
+      let oph = Operation.hash_packed op in
+      let*! res = apply_operation application_state oph op in
+      let*? application_state, metadata = Environment.wrap_tzresult res in
+      let st =
         {
           st with
-          state;
+          state = (validation_state, application_state);
           rev_operations = op :: st.rev_operations;
           rev_tickets = metadata :: st.rev_tickets;
         }
+      in
+      match (expect_apply_failure, metadata) with
+      | None, No_operation_metadata -> return st
+      | None, Operation_metadata result ->
+          let*? () = detect_script_failure result in
+          return st
+      | Some _, No_operation_metadata ->
+          failwith "Error expected while adding operation"
+      | Some f, Operation_metadata result -> (
+          match detect_script_failure result with
+          | Ok _ -> failwith "Error expected while adding operation"
+          | Error err ->
+              let* () = f err in
+              return st))
 
-let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
-  let open Apply_results in
-  apply_operation ?check_size st op >>= fun result ->
-  match (expect_failure, result) with
-  | Some _, Ok _ -> failwith "Error expected while adding operation"
-  | Some f, Error err -> f err >|=? fun () -> st
-  | None, result -> (
-      result >>?= fun result ->
-      match result with
-      | state, (Operation_metadata result as metadata) ->
-          detect_script_failure result |> fun result ->
-          (match expect_apply_failure with
-          | None -> Lwt.return result
-          | Some f -> (
-              match result with
-              | Ok _ -> failwith "Error expected while adding operation"
-              | Error e -> f e))
-          >|=? fun () ->
-          {
-            st with
-            state;
-            rev_operations = op :: st.rev_operations;
-            rev_tickets = metadata :: st.rev_tickets;
-          }
-      | state, (No_operation_metadata as metadata) ->
-          return
-            {
-              st with
-              state;
-              rev_operations = op :: st.rev_operations;
-              rev_tickets = metadata :: st.rev_tickets;
-            })
+let finalize_validation_and_application (validation_state, application_state)
+    shell_header =
+  let open Lwt_result_syntax in
+  let* () = finalize_validation validation_state in
+  finalize_application application_state shell_header
 
 let finalize_block st =
+  let open Lwt_result_syntax in
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute
@@ -238,8 +250,10 @@ let finalize_block st =
       operations_hash;
     }
   in
-  finalize_block st.state (Some shell_header) >|= fun x ->
-  Environment.wrap_tzresult x >|? fun (result, _) ->
+  let*! res =
+    finalize_validation_and_application st.state (Some shell_header)
+  in
+  let*? validation_result, _ = Environment.wrap_tzresult res in
   let operations = List.rev st.rev_operations in
   let operations_hash =
     Operation_list_list_hash.compute
@@ -253,12 +267,12 @@ let finalize_block st =
           st.header.shell with
           level = Int32.succ st.header.shell.level;
           operations_hash;
-          fitness = result.fitness;
+          fitness = validation_result.fitness;
         };
     }
   in
   let hash = Block_header.hash header in
-  {Block.hash; header; operations; context = result.context}
+  return {Block.hash; header; operations; context = validation_result.context}
 
 let assert_validate_operation_fails expect_failure op block =
   let open Lwt_result_syntax in

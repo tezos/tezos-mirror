@@ -34,16 +34,19 @@ module Mock_protocol :
   Tezos_protocol_environment.PROTOCOL
     with type operation_data = unit
      and type operation_receipt = unit
-     and type validation_state = unit = struct
+     and type validation_state = unit
+     and type application_state = unit = struct
   open Tezos_protocol_environment.Internal_for_tests
   include Environment_protocol_T_test.Mock_all_unit
 
-  let begin_construction ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_
-      ~predecessor:_ ~timestamp:_ ?protocol_data:_ ~cache:_ _ =
-    (* We need to override this function (so that it's not [assert false]),
-       because Prevalidation.create calls this function, so we need it
-       to work in all tests below. *)
+  (* We need to override these functions so that they're not [assert
+     false], because the tests below use [Prevalidation.create] which
+     calls them. *)
+
+  let begin_validation _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
+    Lwt_result_syntax.return_unit
+
+  let begin_application _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
     Lwt_result_syntax.return_unit
 end
 
@@ -233,11 +236,12 @@ let test_apply_operation_live_operations ctxt =
   let (module Protocol : Tezos_protocol_environment.PROTOCOL
         with type operation_data = unit
          and type operation_receipt = unit
-         and type validation_state = unit) =
+         and type validation_state = unit
+         and type application_state = unit) =
     (module struct
       include Mock_protocol
 
-      let apply_operation _ _ =
+      let apply_operation _ _ _ =
         Lwt.return
           (if Random.State.bool rand then Ok ((), ())
           else error_with "Operation doesn't apply")
@@ -286,7 +290,7 @@ let test_apply_operation_applied ctxt =
     (module struct
       include Mock_protocol
 
-      let apply_operation _ _ =
+      let apply_operation _ _ _ =
         Lwt.return
           (if Random.State.bool rand then Ok ((), ())
           else error_with "Operation doesn't apply")

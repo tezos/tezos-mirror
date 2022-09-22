@@ -852,21 +852,15 @@ module Scripts = struct
     let oph = Operation.hash_packed packed_operation in
     let validity_state = Validate.begin_no_predecessor_info context chain_id in
     Validate.validate_operation
+      ~check_signature:false
       validity_state
-      ~should_check_signature:false
       oph
       packed_operation
     >>=? fun _validate_operation_state ->
     Raw_level.of_int32 block_header.level >>?= fun predecessor_level ->
-    Alpha_context.Fitness.round_from_raw block_header.fitness
-    >>?= fun predecessor_round ->
     let application_mode =
       Apply.Partial_construction
-        {
-          predecessor_level;
-          predecessor_round;
-          predecessor_fitness = block_header.fitness;
-        }
+        {predecessor_level; predecessor_fitness = block_header.fitness}
     in
     let application_state =
       Apply.

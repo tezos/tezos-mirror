@@ -57,8 +57,11 @@ let test_consensus_operation ?construction_mode ?level ?block_payload_hash ?slot
   | Some (pred, protocol_data) ->
       (* meaning partial construction or full construction mode, depending on
          [protocol_data] *)
-      Block.get_construction_vstate ~protocol_data pred >>=? fun vstate ->
-      apply_operation vstate op >|= Environment.wrap_tzresult >>= assert_error
+      Block.get_construction_vstate ~protocol_data pred
+      >>=? fun (validation_state, _application_state) ->
+      let oph = Operation.hash_packed op in
+      validate_operation validation_state oph op
+      >|= Environment.wrap_tzresult >>= assert_error
 
 let delegate_of_first_slot b =
   let module V = Plugin.RPC.Validators in

@@ -75,11 +75,93 @@ module V0toV7
      and type operation = E.operation
      and type operation_receipt = E.operation_receipt
      and type validation_state = E.validation_state
+     and type application_state = E.validation_state
      and type cache_key = Context.Cache.key
      and type cache_value = Context.Cache.value = struct
   include E
 
-  let finalize_block vs _ = E.finalize_block vs
+  type application_state = validation_state
+
+  type mode =
+    | Application of block_header
+    | Partial_validation of block_header
+    | Construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+        block_header_data : block_header_data;
+      }
+    | Partial_construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+      }
+
+  let begin_validation_or_application validation_or_application ctxt chain_id
+      mode ~(predecessor : Block_header.shell_header) =
+    match (validation_or_application, mode) with
+    | `Validation, Application block_header | _, Partial_validation block_header
+      ->
+        (* For the validation of an existing block, we always use the
+           old [begin_partial_application], even in full [Application]
+           mode. Indeed, this maintains the behavior of old block
+           [precheck] (from [lib_validation/block_validation.ml]), which
+           relied on [Partial_validation] mode to quickly assess the
+           viability of the block. *)
+        begin_partial_application
+          ~chain_id
+          ~ancestor_context:ctxt
+          ~predecessor_timestamp:predecessor.timestamp
+          ~predecessor_fitness:predecessor.fitness
+          block_header
+    | `Application, Application block_header ->
+        begin_application
+          ~chain_id
+          ~predecessor_context:ctxt
+          ~predecessor_timestamp:predecessor.timestamp
+          ~predecessor_fitness:predecessor.fitness
+          block_header
+    | _, Construction {predecessor_hash; timestamp; block_header_data} ->
+        begin_construction
+          ~chain_id
+          ~predecessor_context:ctxt
+          ~predecessor_timestamp:predecessor.timestamp
+          ~predecessor_level:predecessor.level
+          ~predecessor_fitness:predecessor.fitness
+          ~predecessor:predecessor_hash
+          ~timestamp
+          ~protocol_data:block_header_data
+          ()
+    | _, Partial_construction {predecessor_hash; timestamp} ->
+        begin_construction
+          ~chain_id
+          ~predecessor_context:ctxt
+          ~predecessor_timestamp:predecessor.timestamp
+          ~predecessor_level:predecessor.level
+          ~predecessor_fitness:predecessor.fitness
+          ~predecessor:predecessor_hash
+          ~timestamp
+          ()
+
+  let begin_validation = begin_validation_or_application `Validation
+
+  let begin_application = begin_validation_or_application `Application
+
+  let validate_operation ?check_signature:_ validation_state _oph operation =
+    let open Lwt_result_syntax in
+    let* validation_state, _operation_receipt =
+      apply_operation validation_state operation
+    in
+    return validation_state
+
+  let apply_operation application_state _oph operation =
+    apply_operation application_state operation
+
+  let finalize_validation validation_state =
+    let open Lwt_result_syntax in
+    let* _ = finalize_block validation_state in
+    return_unit
+
+  let finalize_application application_state _shell_header =
+    finalize_block application_state
 
   let compare_operations (_, op) (_, op') = compare_operations op op'
 
@@ -129,8 +211,7 @@ module V0toV7
       | Incompatible_mempool
       | Merge_conflict of operation_conflict
 
-    let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ =
-      Lwt.return_ok ((), ())
+    let init _ _ ~head_hash:_ ~head:_ = Lwt.return_ok ((), ())
 
     let encoding = Data_encoding.unit
 
@@ -168,41 +249,21 @@ module type PROTOCOL = sig
 
   val environment_version : Protocol.env_version
 
-  val begin_partial_application :
-    chain_id:Chain_id.t ->
-    ancestor_context:Context.t ->
-    predecessor:Block_header.t ->
-    predecessor_hash:Block_hash.t ->
+  val begin_validation :
+    Context.t ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
     cache:Context.source_of_cache ->
-    block_header ->
     validation_state Error_monad.tzresult Lwt.t
 
   val begin_application :
-    chain_id:Chain_id.t ->
-    predecessor_context:Context.t ->
-    predecessor_timestamp:Time.Protocol.t ->
-    predecessor_fitness:Fitness.t ->
+    Context.t ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
     cache:Context.source_of_cache ->
-    block_header ->
-    validation_state Error_monad.tzresult Lwt.t
-
-  val begin_construction :
-    chain_id:Chain_id.t ->
-    predecessor_context:Context.t ->
-    predecessor_timestamp:Time.Protocol.t ->
-    predecessor_level:Int32.t ->
-    predecessor_fitness:Fitness.t ->
-    predecessor:Block_hash.t ->
-    timestamp:Time.Protocol.t ->
-    ?protocol_data:block_header_data ->
-    cache:Context.source_of_cache ->
-    unit ->
-    validation_state Error_monad.tzresult Lwt.t
-
-  val finalize_block :
-    validation_state ->
-    Block_header.shell_header option ->
-    (validation_result * block_header_metadata) tzresult Lwt.t
+    application_state Error_monad.tzresult Lwt.t
 
   module Mempool : sig
     include module type of Mempool
@@ -211,8 +272,7 @@ module type PROTOCOL = sig
       Context.t ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.Protocol.t ->
+      head:Block_header.shell_header ->
       cache:Context.source_of_cache ->
       (validation_info * t) tzresult Lwt.t
   end
@@ -241,45 +301,16 @@ struct
     let* context = Context.Cache.set_cache_layout context [] in
     init chain_id context header
 
-  let begin_partial_application ~chain_id ~ancestor_context
-      ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
-      (raw_block : block_header) =
-    begin_partial_application
-      ~chain_id
-      ~ancestor_context
-      ~predecessor_timestamp:predecessor.shell.timestamp
-      ~predecessor_fitness:predecessor.shell.fitness
-      raw_block
+  let begin_validation ctxt chain_id mode ~predecessor ~cache:_ =
+    begin_validation ctxt chain_id mode ~predecessor
 
-  let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
-      ~predecessor_fitness ~cache:_ raw_block =
-    begin_application
-      ~chain_id
-      ~predecessor_context
-      ~predecessor_timestamp
-      ~predecessor_fitness
-      raw_block
-
-  let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
-      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
-      ?protocol_data ~cache:_ () =
-    begin_construction
-      ~chain_id
-      ~predecessor_context
-      ~predecessor_timestamp
-      ~predecessor_level
-      ~predecessor_fitness
-      ~predecessor
-      ~timestamp
-      ?protocol_data
-      ()
-
-  let finalize_block c shell_header = P.finalize_block c shell_header
+  let begin_application ctxt chain_id mode ~predecessor ~cache:_ =
+    begin_application ctxt chain_id mode ~predecessor
 
   module Mempool = struct
     include Mempool
 
-    let init ctxt chain_id ~head_hash ~head_header ~current_timestamp ~cache:_ =
-      init ctxt chain_id ~head_hash ~head_header ~current_timestamp
+    let init ctxt chain_id ~head_hash ~head ~cache:_ =
+      init ctxt chain_id ~head_hash ~head
   end
 end

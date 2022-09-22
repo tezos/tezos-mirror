@@ -78,7 +78,6 @@ module type T = sig
 
   val create :
     chain_store ->
-    ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
     live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
@@ -131,7 +130,8 @@ module MakeAbstract
   type chain_store = Chain_store.chain_store
 
   type t = {
-    state : Proto.validation_state;
+    validation_state : validation_state;
+    application_state : Proto.application_state;
     applied : (protocol_operation operation * Proto.operation_receipt) list;
     live_operations : Operation_hash.Set.t;
   }
@@ -172,23 +172,10 @@ module MakeAbstract
       count_successful_prechecks = op.count_successful_prechecks + 1;
     }
 
-  let create chain_store ?protocol_data ~predecessor ~live_operations ~timestamp
-      () =
+  let create chain_store ~predecessor ~live_operations ~timestamp () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
     let open Lwt_result_syntax in
-    let {
-      Block_header.shell =
-        {
-          fitness = predecessor_fitness;
-          timestamp = predecessor_timestamp;
-          level = predecessor_level;
-          _;
-        };
-      _;
-    } =
-      Store.Block.header predecessor
-    in
     let* predecessor_context = Chain_store.context chain_store predecessor in
     let predecessor_hash = Store.Block.hash predecessor in
     let*! predecessor_context =
@@ -197,32 +184,26 @@ module MakeAbstract
         ~predecessor_hash
         timestamp
     in
-    let* protocol_data =
-      match protocol_data with
-      | None -> return_none
-      | Some protocol_data -> (
-          match
-            Data_encoding.Binary.of_bytes_opt
-              Proto.block_header_data_encoding
-              protocol_data
-          with
-          | None -> failwith "Invalid block header"
-          | Some protocol_data -> return_some protocol_data)
-    in
-    let* state =
-      Proto.begin_construction
-        ~chain_id:(Chain_store.chain_id chain_store)
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_fitness
-        ~predecessor_level
-        ~predecessor:predecessor_hash
-        ~timestamp
-        ?protocol_data
+    let chain_id = Chain_store.chain_id chain_store in
+    let mode = Proto.Partial_construction {predecessor_hash; timestamp} in
+    let predecessor = (Store.Block.header predecessor).shell in
+    let* validation_state =
+      Proto.begin_validation
+        predecessor_context
+        chain_id
+        mode
+        ~predecessor
         ~cache:`Lazy
-        ()
     in
-    return {state; applied = []; live_operations}
+    let* application_state =
+      Proto.begin_application
+        predecessor_context
+        chain_id
+        mode
+        ~predecessor
+        ~cache:`Lazy
+    in
+    return {validation_state; application_state; applied = []; live_operations}
 
   let apply_operation pv op =
     let open Lwt_syntax in
@@ -232,12 +213,23 @@ module MakeAbstract
          hence the returned error. *)
       Lwt.return (Outdated [Endorsement_branch_not_live])
     else
-      let+ r = protect (fun () -> Proto.apply_operation pv.state op.protocol) in
+      let+ r =
+        protect (fun () ->
+            let open Lwt_result_syntax in
+            let* validation_state =
+              Proto.validate_operation pv.validation_state op.hash op.protocol
+            in
+            let* application_state, receipt =
+              Proto.apply_operation pv.application_state op.hash op.protocol
+            in
+            return (validation_state, application_state, receipt))
+      in
       match r with
-      | Ok (state, receipt) -> (
+      | Ok (validation_state, application_state, receipt) -> (
           let pv =
             {
-              state;
+              validation_state;
+              application_state;
               applied = (op, receipt) :: pv.applied;
               live_operations =
                 Operation_hash.Set.add op.hash pv.live_operations;
@@ -261,9 +253,9 @@ module MakeAbstract
           | Temporary -> Branch_delayed trace
           | Outdated -> Outdated trace)
 
-  let validation_state {state; _} = state
+  let validation_state {validation_state; _} = validation_state
 
-  let set_validation_state t state = {t with state}
+  let set_validation_state t validation_state = {t with validation_state}
 
   let pp_result ppf =
     let open Format in

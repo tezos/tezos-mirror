@@ -194,24 +194,42 @@ let test_set_gas_limited () =
 
 (*** Tests with blocks ***)
 
+let begin_validation_and_application ctxt chain_id mode ~predecessor =
+  let open Lwt_result_syntax in
+  let* validation_state = begin_validation ctxt chain_id mode ~predecessor in
+  let* application_state = begin_application ctxt chain_id mode ~predecessor in
+  return (validation_state, application_state)
+
+let validate_and_apply_operation (validation_state, application_state) op =
+  let open Lwt_result_syntax in
+  let oph = Alpha_context.Operation.hash_packed op in
+  let* validation_state = validate_operation validation_state oph op in
+  let* application_state, receipt = apply_operation application_state oph op in
+  return ((validation_state, application_state), receipt)
+
+let finalize_validation_and_application (validation_state, application_state)
+    shell_header =
+  let open Lwt_result_syntax in
+  let* () = finalize_validation validation_state in
+  finalize_application application_state shell_header
+
 let apply_with_gas header ?(operations = []) (pred : Block.t) =
   let open Alpha_context in
   (let open Environment.Error_monad in
-  begin_application
-    ~chain_id:Chain_id.zero
-    ~predecessor_context:pred.context
-    ~predecessor_fitness:pred.header.shell.fitness
-    ~predecessor_timestamp:pred.header.shell.timestamp
-    header
+  begin_validation_and_application
+    pred.context
+    Chain_id.zero
+    (Application header)
+    ~predecessor:pred.header.shell
   >>=? fun vstate ->
   List.fold_left_es
     (fun vstate op ->
-      apply_operation vstate op >|=? fun (state, _result) -> state)
+      validate_and_apply_operation vstate op >|=? fun (state, _result) -> state)
     vstate
     operations
   >>=? fun vstate ->
-  finalize_block vstate (Some header.shell) >|=? fun (validation, result) ->
-  (validation.context, result.consumed_gas))
+  finalize_validation_and_application vstate (Some header.shell)
+  >|=? fun (validation, result) -> (validation.context, result.consumed_gas))
   >|= Environment.wrap_tzresult
   >|=? fun (context, consumed_gas) ->
   let hash = Block_header.hash header in

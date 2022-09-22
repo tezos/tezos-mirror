@@ -62,6 +62,11 @@ type validation_state = {
   block_state : block_state;
 }
 
+(** Return the context stored in the state. Note that this is the
+    context at the beginning of the block / mempool: indeed, it is not
+    modified by [validate_operation]. *)
+val get_initial_ctxt : validation_state -> context
+
 (** Initialize the {!info} and {!state} for the validation of an
     existing block (in preparation for its future application). *)
 val begin_application :
@@ -74,9 +79,14 @@ val begin_application :
   validation_state tzresult Lwt.t
 
 (** Initialize the {!info} and {!state} for the partial validation of
-    an existing block. *)
-val begin_partial_application :
-  ancestor_context:context ->
+    an existing block.
+
+    Note that the given context may be based on an ancestor
+    block. Indeed, we may not have access to the predecessor context
+    when trying to quickly assess a series of blocks in a cousin branch
+    (multipass validation). *)
+val begin_partial_validation :
+  context ->
   Chain_id.t ->
   predecessor_level:Level.t ->
   predecessor_timestamp:Time.t ->
@@ -163,7 +173,7 @@ val begin_no_predecessor_info : context -> Chain_id.t -> validation_state
     validation of such an operation must ensure that its application
     will fully succeed.
 
-    @param should_check_signature indicates whether the signature
+    @param check_signature indicates whether the signature
     check should happen. It defaults to [true] because the signature
     needs to be correct for the operation to be valid. This argument
     exists for special cases where it is acceptable to bypass this
@@ -172,14 +182,14 @@ val begin_no_predecessor_info : context -> Chain_id.t -> validation_state
     - The mempool may keep track of operations whose signatures have
       already been checked: if such an operation needs to be validated
       again (typically when the head block changes), then the mempool may
-      call [validate_operation] with [should_check_signature:false].
+      call [validate_operation] with [check_signature:false].
 
     - The [run_operation] RPC provided by the plugin explicitly
       excludes signature checks: see its documentation in
       [lib_plugin/RPC.Scripts.S.run_operation]. *)
 val validate_operation :
+  ?check_signature:bool ->
   validation_state ->
-  ?should_check_signature:bool ->
   Operation_hash.t ->
   packed_operation ->
   validation_state tzresult Lwt.t
@@ -189,7 +199,7 @@ val validate_operation :
 
     Note: Should only be called in mempool mode *)
 val check_operation :
-  info -> ?should_check_signature:bool -> 'kind operation -> unit tzresult Lwt.t
+  ?check_signature:bool -> info -> 'kind operation -> unit tzresult Lwt.t
 
 (** Check that the operation does not conflict with other operations
     already validated and included in the {!operation_conflict_state}

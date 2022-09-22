@@ -31,10 +31,6 @@ type error += Failed_to_checkout_context
 
 type error += Invalid_context
 
-let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
-
-let ( >>=?? ) x k = wrap_error_lwt x >>=? k
-
 let () =
   register_error_kind
     `Permanent
@@ -58,7 +54,7 @@ let () =
 type incremental = {
   predecessor : Baking_state.block_info;
   context : Tezos_protocol_environment.Context.t;
-  state : Protocol.validation_state;
+  state : Protocol.validation_state * Protocol.application_state;
   rev_operations : Operation.packed list;
   header : Tezos_base.Block_header.shell_header;
 }
@@ -80,7 +76,7 @@ let check_context_consistency (abstract_index : Abstract_context_index.t)
           | true -> return_unit
           | false -> fail Invalid_context))
 
-let begin_construction ~timestamp ?protocol_data
+let begin_construction ~timestamp ~protocol_data
     (abstract_index : Abstract_context_index.t) predecessor chain_id =
   protect (fun () ->
       let {Baking_state.shell = pred_shell; hash = pred_hash; _} =
@@ -103,25 +99,55 @@ let begin_construction ~timestamp ?protocol_data
                   Operation_list_list_hash.zero (* fake op hash *);
               }
           in
-          Lifted_protocol.begin_construction
-            ~chain_id
-            ~predecessor_context:context
-            ~predecessor_timestamp:pred_shell.timestamp
-            ~predecessor_fitness:pred_shell.fitness
-            ~predecessor_level:pred_shell.level
-            ~predecessor:pred_hash
-            ?protocol_data
-            ~timestamp
+          let mode =
+            Lifted_protocol.Construction
+              {
+                predecessor_hash = predecessor.hash;
+                timestamp;
+                block_header_data = protocol_data;
+              }
+          in
+          Lifted_protocol.begin_validation
+            context
+            chain_id
+            mode
+            ~predecessor:pred_shell
             ~cache:`Lazy
-            ()
-          >>=? fun state ->
+          >>=? fun validation_state ->
+          Lifted_protocol.begin_application
+            context
+            chain_id
+            mode
+            ~predecessor:pred_shell
+            ~cache:`Lazy
+          >>=? fun application_state ->
+          let state = (validation_state, application_state) in
           return {predecessor; context; state; rev_operations = []; header})
+
+let ( let** ) x k =
+  let open Lwt_result_syntax in
+  let*! x = x in
+  let*? x = Environment.wrap_tzresult x in
+  k x
 
 let add_operation st (op : Operation.packed) =
   protect (fun () ->
-      Protocol.apply_operation st.state op >>=?? fun (state, receipt) ->
+      let validation_state, application_state = st.state in
+      let oph = Operation.hash_packed op in
+      let** validation_state =
+        Protocol.validate_operation validation_state oph op
+      in
+      let** application_state, receipt =
+        Protocol.apply_operation application_state oph op
+      in
+      let state = (validation_state, application_state) in
       return ({st with state; rev_operations = op :: st.rev_operations}, receipt))
 
 let finalize_construction inc =
   protect (fun () ->
-      Protocol.finalize_block inc.state (Some inc.header) >>=?? return)
+      let validation_state, application_state = inc.state in
+      let** () = Protocol.finalize_validation validation_state in
+      let** result =
+        Protocol.finalize_application application_state (Some inc.header)
+      in
+      return result)

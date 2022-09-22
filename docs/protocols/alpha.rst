@@ -42,6 +42,9 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 - Introduce a ``Bls`` module to gather both high and low level functions
   for BLS cryptography. (MR :gl:`!6295`)
 
+- Introduce a new protocol API adapted to pipelined validation.
+  (MR :gl:`!6335`)
+
 Consensus key
 -------------
 

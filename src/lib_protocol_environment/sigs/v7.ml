@@ -2549,13 +2549,13 @@ val divexact: t -> t -> t
 
 external divisible: t -> t -> bool = "ml_z_divisible"
 (** [divisible a b] returns [true] if [a] is exactly divisible by [b].
-    Unlike the other division functions, [b = 0] is accepted 
+    Unlike the other division functions, [b = 0] is accepted
     (only 0 is considered divisible by 0).
 *)
 
 external congruent: t -> t -> t -> bool = "ml_z_congruent"
 (** [congruent a b c] returns [true] if [a] is congruent to [b] modulo [c].
-    Unlike the other division functions, [c = 0] is accepted 
+    Unlike the other division functions, [c = 0] is accepted
     (only equal numbers are considered equal congruent 0).
 *)
 
@@ -2571,27 +2571,27 @@ external congruent: t -> t -> t -> bool = "ml_z_congruent"
 
 val logand: t -> t -> t
 (** Bitwise logical and. *)
-    
+
 val logor: t -> t -> t
 (** Bitwise logical or. *)
-    
+
 val logxor: t -> t -> t
 (** Bitwise logical exclusive or. *)
 
 val lognot: t -> t
-(** Bitwise logical negation. 
+(** Bitwise logical negation.
     The identity [lognot a]=[-a-1] always hold.
  *)
 
 val shift_left: t -> int -> t
-(** Shifts to the left. 
+(** Shifts to the left.
     Equivalent to a multiplication by a power of 2.
     The second argument must be nonnegative.
  *)
 
 val shift_right: t -> int -> t
-(** Shifts to the right. 
-    This is an arithmetic shift, 
+(** Shifts to the right.
+    This is an arithmetic shift,
     equivalent to a division by a power of 2 with rounding towards -oo.
     The second argument must be nonnegative.
  *)
@@ -11090,28 +11090,28 @@ type validation_result = {
       (** The resulting context, it will be used for the next block. *)
   fitness : Fitness.t;
       (** The effective fitness of the block (to be compared with the one
-      'announced' in the block header). *)
+          'announced' in the block header). *)
   message : string option;
       (** An optional informative message, akin to a 'git commit' message,
-      which can be attached to the [context] when it's being commited. *)
+          which can be attached to the [context] when it's being commited. *)
   max_operations_ttl : int;
       (** The "time-to-live" of operations for the next block: any
-      operation whose 'branch' is older than 'ttl' blocks in the past
-      cannot be included in the next block. *)
+          operation whose 'branch' is older than 'ttl' blocks in the past
+          cannot be included in the next block. *)
   last_allowed_fork_level : Int32.t;
       (** The level of the last block for which the node might consider an
-      alternate branch. The shell should consider as invalid any branch
-      whose fork point is older (has a lower level) than the
-      given value. *)
+          alternate branch. The shell should consider as invalid any branch
+          whose fork point is older (has a lower level) than the
+          given value. *)
 }
 
 type quota = {
   max_size : int;
       (** The maximum size (in bytes) of the serialized list of
-      operations. *)
+          operations. *)
   max_op : int option;
       (** The maximum number of operations in a block.
-      [None] means no limit. *)
+          [None] means no limit. *)
 }
 
 type rpc_context = {
@@ -11148,11 +11148,11 @@ module type PROTOCOL = sig
   }
 
   (** Economic protocol-specific side information computed by the
-     protocol during the validation of a block. Should not include
-     information about the evaluation of operations which is handled
-     separately by {!operation_metadata}. To be used as an execution
-     trace by tools (client, indexer). Not necessary for
-     validation. *)
+      protocol during the validation of a block. Should not include
+      information about the evaluation of operations which is handled
+      separately by {!operation_metadata}. To be used as an execution
+      trace by tools (client, indexer). Not necessary for
+      validation. *)
   type block_header_metadata
 
   (** Encoding for economic protocol-specific block metadata. *)
@@ -11162,8 +11162,8 @@ module type PROTOCOL = sig
   type operation_data
 
   (** Economic protocol-specific side information computed by the
-     protocol during the validation of each operation, to be used
-     conjointly with {!block_header_metadata}. *)
+      protocol during the validation of each operation, to be used
+      conjointly with {!block_header_metadata}. *)
   type operation_receipt
 
   (** A fully parsed operation. *)
@@ -11189,144 +11189,224 @@ module type PROTOCOL = sig
   val acceptable_pass : operation -> int option
 
   (** [compare_operations (oph1,op1) (oph2,op2)] defines a total
-     ordering relation on valid operations.
+      ordering relation on valid operations.
 
-     The following requirements must be satisfied: [oph1] is the
-     [Operation.hash.p1], [oph2] is [Operation.hash op2] and that
-     [op1] and [op2] are valid in the same context.
+      The following requirements must be satisfied: [oph1] is the
+      [Operation.hash.p1], [oph2] is [Operation.hash op2] and that
+      [op1] and [op2] are valid in the same context.
 
-     [compare_operations (oph1,op1) (oph2,op2) = 0] happens only if
-     [Operation_hash.compare oph1 oph2 = 0], meaning [op1 = op2] only
-     when [op1] and [op2] are structurally identical.
+      [compare_operations (oph1,op1) (oph2,op2) = 0] happens only if
+      [Operation_hash.compare oph1 oph2 = 0], meaning [op1 = op2] only
+      when [op1] and [op2] are structurally identical.
 
-     Two operations of different validation_passes are compared in the
-     reverse order of their [validation_pass]: the one with the
-     smaller [validation_pass] is compared as being the greater.
+      Two operations of different validation_passes are compared in the
+      reverse order of their [validation_pass]: the one with the
+      smaller [validation_pass] is compared as being the greater.
 
-     When belonging to the same validation_pass, two operations
-     comparison depends on their static parameters. An abstract weight
-     is computed for each operation based on its static parameters.
-     When two operations' weights are compared as equal,
-     [compare_operation (oph1,op1) (oph2,op2)] is
-     [Operation_hash.compare oph1 oph2].
+      When belonging to the same validation_pass, two operations
+      comparison depends on their static parameters. An abstract weight
+      is computed for each operation based on its static parameters.
+      When two operations' weights are compared as equal,
+      [compare_operation (oph1,op1) (oph2,op2)] is
+      [Operation_hash.compare oph1 oph2].
 
-     [compare_operations] can be used as a [compare] component of an
-     {!Stdlib.Map.OrderedType}, or any such collection which relies on
-     a total comparison function. *)
+      [compare_operations] can be used as a [compare] component of an
+      {!Stdlib.Map.OrderedType}, or any such collection which relies on
+      a total comparison function. *)
   val compare_operations :
     Operation_hash.t * operation -> Operation_hash.t * operation -> int
 
-  (** A functional state that is transmitted through the steps of a
-     block validation sequence: it can be created by any of the
-     [begin_x] functions below, and its final value is produced by
-     {!finalize_block}. It must retain the current state of the store,
-     and it can also contain additional information that must be
-     remembered during the validation process. Said extra content must
-     however be immutable: validator or baker implementations are
-     allowed to pause, replay or backtrack throughout validation
-     steps. *)
+  (** {2 Block (and operation) validation and application}
+
+      The following functions may be used when an existing block is
+      received through the network, when a new block is created, or
+      when operations are considered on their own e.g. in a mempool or
+      during an RPC call.
+
+      Validation aims at deciding quickly whether a block or
+      an operation is valid, with minimal computations and without
+      writing anything in the storage. A block is valid if it can be
+      applied without failure. An operation is valid if it can be
+      safely included in a block without causing it to fail.
+
+      The application of an operation updates the {!Context.t} with
+      regards to its semantics (e.g. updating balances after a
+      transaction). The application of a block updates the context
+      with all its operations and some additional global
+      effects. Isolated operations may be applied as part of an RPC
+      call to simulate their effects.
+
+      Blocks and operations must always be validated before they are
+      applied. Indeed, the application assumes their validity as a
+      precondition, meaning that the application of an invalid block
+      might yield incorrect results instead of failing cleanly.
+
+      Note that in protocol versions <= K, where the validation
+      functions do not yet exist, the validation of existing blocks is
+      done by trying to apply it using the [Partial_validation] mode
+      below. Therefore, the application of a validated block may still
+      fail in these protocols. *)
+
+  (** The mode indicates the circumstances in which a block and/or
+      operations are validated or applied, and contains specific
+      information. It must be provided as an argument to
+      [begin_validation] and [begin_application]. *)
+  type mode =
+    | Application of block_header
+        (** Standard validation or application of a preexisting block. *)
+    | Partial_validation of block_header
+        (** Partial validation of a preexisting block. This mode is
+            meant to quickly reject obviously invalid alternate
+            branches by only performing a subset of checks.
+            Therefore, application of blocks or operations makes no
+            sense in this mode: calling [begin_application] with this
+            mode returns an error. *)
+    | Construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.t;
+        block_header_data : block_header_data;
+      }
+        (** Construction of a new block. The main difference with the
+            previous modes is that we cannot provide the block header to the
+            [begin_] functions, since the block does not exist yet. Note that
+            the [begin_] functions may be called in this mode without knowing
+            yet which operations will be included in the future block.
+
+            The provided [block_header_data] is not expected to be the final
+            value of the field of the same type in the {!block_header} of the
+            constructed block. Instead, it should be a protocol-specific,
+            good enough, "prototype" of the final value. E.g. if the
+            {!block_header_data} type for the current economic protocol
+            includes a signature, then the provided [block_header_data]
+            should contain a fake signature (since providing a correct
+            signature is not possible at this stage). *)
+    | Partial_construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.t;
+      }
+        (** Minimal construction of a new virtual block, with the purpose of
+            being able to validate/apply operations of interest. This mode may
+            be used by the mempool (though the [Mempool] module below is better
+            suited for this) or by some RPCs
+            e.g. [preapply/operations]. Calling the [finalize_] functions makes
+            no sense in this mode. *)
+
+  (** A functional state that is transmitted throughout the validation
+      of a block (or during the lifetime of a mempool or RPC). It is
+      created by [begin_validation] below, updated by
+      [validate_operation], and required by [finalize_validation].
+      This state is immutable thus validator or baker implementations
+      are allowed to pause, replay or backtrack throughout validation
+      steps. *)
   type validation_state
 
-  (** [begin_partial_application cid ctxt] checks that a block is
-     well-formed in a given context. This function should run quickly,
-     as its main use is to reject bad blocks from the chain as early
-     as possible. The input [ancestor_context] is expected to result
-     from the application of an ancestor block of the current head
-     with the same economic protocol. Said ancestor block is also
-     required to be more recent (i.e., it has a greater level), than
-     the current head's "last_allowed_fork_level".
+  (** Similar to {!validation_state}, but for the application process. *)
+  type application_state
 
-      The resulting `validation_state` will be used for multi-pass
-     validation. *)
-  val begin_partial_application :
-    chain_id:Chain_id.t ->
-    ancestor_context:Context.t ->
-    predecessor_timestamp:Time.t ->
-    predecessor_fitness:Fitness.t ->
-    block_header ->
+  (** [begin_validation predecessor_context chain_id mode
+      ~predecessor] initializes the {!validation_state} for the
+      validation process of an existing or new block.
+
+      [predecessor_context] and [predecessor] are the resulting
+      context and shell header of the predecessor block. Exceptionally
+      in {!Partial_validation} mode, they may instead come from any
+      ancestor block that is more recent (i.e. has a greater level)
+      than the current head's "last_allowed_fork_level".
+
+      [mode] specifies the circumstances of validation and also
+      carries additional information: see {!mode}.
+
+      Note that for protocol versions <= K where [begin_validation]
+      does not exist yet, this calls the old [begin_application] by
+      necessity. However, in [Application] mode, this calls the old
+      [begin_application] in [Partial_validation] mode in order to run
+      more quickly. This preserves the behavior of [precheck] in
+      [lib_validation/block_validation.ml] for old protocols. It does
+      mean that the application of a validated block may fail in these
+      protocols. *)
+  val begin_validation :
+    Context.t ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
     validation_state tzresult Lwt.t
 
-  (** [begin_application chain_id ... bh] defines the first step in a
-     block validation sequence. It initializes a validation context
-     for validating a block, whose header is [bh]. *)
-  val begin_application :
-    chain_id:Chain_id.t ->
-    predecessor_context:Context.t ->
-    predecessor_timestamp:Time.t ->
-    predecessor_fitness:Fitness.t ->
-    block_header ->
-    validation_state tzresult Lwt.t
+  (** Validate an operation. If successful, return the updated
+      {!validation_state}.
 
-  (** [begin_construction] initializes a validation context for
-     constructing a new block, as opposed to validating an existing
-     block.
-
-     This function can be used in two modes: with and without the
-     optional [protocol_data] argument. With the latter, it is used by
-     bakers to start the process for baking a new block. Without it,
-     is used by the Shell's prevalidator to construct a virtual block,
-     which carries the contents of the pre-applied operations of the
-     mempool.
-
-     When [protocol_data] is provided, it is not expected to be the
-     final value of the field of the same name in the {!block_header}
-     of the block eventually being baked. Instead, it is expected to
-     construct a protocol-specific, good enough, "prototype" of its
-     final value. For instance, if the economic protocol specifies
-     that its block headers include a signature, [protocol_data] must
-     include a (faked) signature.
-
-     Moreover, these prototypes should not be distinguishable after
-     the application of [begin_construction]: the function must
-     produce the exact same context regardless of being passed a
-     prototype, or an "equivalent-but-complete" header. *)
-  val begin_construction :
-    chain_id:Chain_id.t ->
-    predecessor_context:Context.t ->
-    predecessor_timestamp:Time.t ->
-    predecessor_level:Int32.t ->
-    predecessor_fitness:Fitness.t ->
-    predecessor:Block_hash.t ->
-    timestamp:Time.t ->
-    ?protocol_data:block_header_data ->
-    unit ->
-    validation_state tzresult Lwt.t
-
-  (** [apply_operation vs op] applies the input operation [op] on top
-     of the given {!validation_state} [vs]. It must be called after
-     {!begin_application} or {!begin_construction}, and before
-     {!finalize_block}, for each operation in a block. On a successful
-     application, it returns a pair consisting of the resulting
-     [validation_state], and the corresponding [operation_receipt]. *)
-  val apply_operation :
+      [check_signature] indicates whether the signature should be
+      checked. It defaults to [true] because the signature needs to be
+      correct for the operation to be valid. This argument exists for
+      special cases where it is acceptable to bypass this check,
+      e.g. if we know that the operation has already been successfully
+      validated in another context. *)
+  val validate_operation :
+    ?check_signature:bool ->
     validation_state ->
+    Operation_hash.t ->
     operation ->
-    (validation_state * operation_receipt) tzresult Lwt.t
+    validation_state tzresult Lwt.t
 
-  (** [finalize_block vs] finalizes the context resulting from the
-     application of the contents of the block being validated.
+  (** Run final and global checks on the block that must come after
+      the validation of all its operations to establish its
+      validity. *)
+  val finalize_validation : validation_state -> unit tzresult Lwt.t
 
-      If there is no protocol migration, i.e., if the block being
-     applied is not the last block of the current economic protocol, the
-     resulting context can be used in the future as input for the
-     validation of its successor blocks. *)
-  val finalize_block :
-    validation_state ->
+  (** Initialize the {!application_state} for the application process
+      of an existing or new block. See {!begin_validation} for details
+      on the arguments.
+
+      In protocol versions > K, calling this function with the
+      {!Partial_validation} mode returns an error. *)
+  val begin_application :
+    Context.t ->
+    Chain_id.t ->
+    mode ->
+    predecessor:Block_header.shell_header ->
+    application_state tzresult Lwt.t
+
+  (** Apply an operation. If successful, return the updated
+      {!application_state} and the corresponding {!operation_receipt}.
+
+      This should be called for all operations in a block, after
+      {!begin_application} and before
+      {!finalize_application}. Moreover, the operation should have
+      already been validated by {!validate_operation}. *)
+  val apply_operation :
+    application_state ->
+    Operation_hash.t ->
+    operation ->
+    (application_state * operation_receipt) tzresult Lwt.t
+
+  (** Finalize the context resulting from the application of the
+      contents of the block.
+
+      If there is no protocol migration, i.e. if the block being
+      applied is not the last block of the current economic protocol,
+      then the resulting context can be used in the future as input for
+      the validation and application of its successor blocks.
+
+      In {!Construction} mode, the [Block_header.shell_header option]
+      argument must contain a value, which will be used to compute the
+      [cache_nonce]. In other modes, it can as well be [None] since it
+      will not be used. *)
+  val finalize_application :
+    application_state ->
     Block_header.shell_header option ->
     (validation_result * block_header_metadata) tzresult Lwt.t
 
   (** [rpc_services] provides the list of remote procedures exported
-     by this protocol implementation. *)
+      by this protocol implementation. *)
   val rpc_services : rpc_context RPC_directory.t
 
   (** [init chain_id ctxt hd] initializes the context, or upgrades the
-     context after a protocol amendment. This function receives as
-     arguments the [chain_id] of the current chain and the context
-     [ctxt] resulting from the application of the block that triggered
-     the amendment, as well as its header [hd]. This function should
-     fail if the "protocol stitching", i.e., the transition from a
-     valid previous protocol to the one being activated, has not been
-     implemented. *)
+      context after a protocol amendment. This function receives as
+      arguments the [chain_id] of the current chain and the context
+      [ctxt] resulting from the application of the block that triggered
+      the amendment, as well as its header [hd]. This function should
+      fail if the "protocol stitching", i.e., the transition from a
+      valid previous protocol to the one being activated, has not been
+      implemented. *)
   val init :
     Chain_id.t ->
     Context.t ->
@@ -11334,18 +11414,18 @@ module type PROTOCOL = sig
     validation_result tzresult Lwt.t
 
   (** [value_of_key chain_id predecessor_context
-     predecessor_timestamp predecessor_level predecessor_fitness
-     predecessor timestamp] returns a function to build one value of
-     the cache from its key.
+      predecessor_timestamp predecessor_level predecessor_fitness
+      predecessor timestamp] returns a function to build one value of
+      the cache from its key.
 
-     This function is used to restore all or part of the cache, for
-     instance when booting a validator to preheat the cache, or when a
-     reorganization happens. This function should never fail, returned
-     errors are fatal.
+      This function is used to restore all or part of the cache, for
+      instance when booting a validator to preheat the cache, or when a
+      reorganization happens. This function should never fail, returned
+      errors are fatal.
 
-     The generated function is passed to [Context.Cache.load_caches]
-     which will use it either immediately a cache-loading time or
-     on-demand, when a given cached value is accessed. *)
+      The generated function is passed to [Context.Cache.load_caches]
+      which will use it either immediately a cache-loading time or
+      on-demand, when a given cached value is accessed. *)
   val value_of_key :
     chain_id:Chain_id.t ->
     predecessor_context:Context.t ->
@@ -11357,7 +11437,9 @@ module type PROTOCOL = sig
     (Context.Cache.key -> Context.Cache.value tzresult Lwt.t) tzresult Lwt.t
 
   module Mempool : sig
-    (** Mempool type *)
+    (** Mempool type. This immutable functional state keeps track of
+        operations added to the mempool, and allows to detect conflicts
+        between them and a new candidate operation. *)
     type t
 
     (** Validation info type required to validate and add operations to a
@@ -11431,8 +11513,7 @@ module type PROTOCOL = sig
       Context.t ->
       Chain_id.t ->
       head_hash:Block_hash.t ->
-      head_header:Block_header.shell_header ->
-      current_timestamp:Time.t ->
+      head:Block_header.shell_header ->
       (validation_info * t) tzresult Lwt.t
 
     (** Mempool encoding *)
@@ -11490,9 +11571,9 @@ module type PROTOCOL = sig
 end
 
 (** [activate ctxt ph] activates an economic protocol (given by its
-   hash [ph]) from the context [ctxt]. The resulting context is still
-   a context for the current economic protocol, and the migration is
-   not complete until [init] in invoked. *)
+    hash [ph]) from the context [ctxt]. The resulting context is still
+    a context for the current economic protocol, and the migration is
+    not complete until [init] in invoked. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 end
 # 128 "v7.in.ml"

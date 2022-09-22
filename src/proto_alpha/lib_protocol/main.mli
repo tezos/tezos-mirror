@@ -25,9 +25,9 @@
 
 (** Tezos Protocol Implementation - Protocol Signature Instance
 
-    This module is the  entrypoint to the protocol for shells and other
-    embedders.  This signature is an instance of
-    {{!Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL} the
+    This module is the entrypoint to the protocol for shells and other
+    embedders. This signature is an instance of
+    {{!Tezos_protocol_environment_sigs.V7.T.Updater.PROTOCOL} the
     [Updater.PROTOCOL] signature} from the
     {{:https://tezos.gitlab.io/shell/the_big_picture.html#the-economic-protocol-environment-and-compiler}
     Protocol Environment}.
@@ -39,11 +39,6 @@
     For details on how Protocol and Environment interact, see
     {{:https://tezos.gitlab.io/shell/the_big_picture.html} this overview}.
  *)
-
-type validation_state = {
-  validity_state : Validate.validation_state;
-  application_state : Apply.application_state;
-}
 
 type operation_data = Alpha_context.packed_protocol_data
 
@@ -60,4 +55,5 @@ include
      and type operation_data := operation_data
      and type operation_receipt = Apply_results.packed_operation_metadata
      and type operation := operation
-     and type validation_state := validation_state
+     and type validation_state = Validate.validation_state
+     and type application_state = Apply.application_state

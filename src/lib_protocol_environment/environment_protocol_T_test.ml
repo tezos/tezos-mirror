@@ -32,9 +32,8 @@ module Mock_all_unit :
     with type block_header_data = unit
      and type operation_data = unit
      and type operation_receipt = unit
-     and type validation_state = unit = struct
-  type nonrec validation_state = unit
-
+     and type validation_state = unit
+     and type application_state = unit = struct
   type block_header_data = unit
 
   type operation = {
@@ -57,24 +56,36 @@ module Mock_all_unit :
 
   let init _ = assert false
 
-  let rpc_services = RPC_directory.empty
+  type nonrec validation_state = unit
 
-  let finalize_block _ = assert false
+  type nonrec application_state = unit
+
+  type mode =
+    | Application of block_header
+    | Partial_validation of block_header
+    | Construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+        block_header_data : block_header_data;
+      }
+    | Partial_construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+      }
+
+  let begin_validation _ = assert false
+
+  let validate_operation ?check_signature:_ = assert false
+
+  let finalize_validation _ = assert false
+
+  let begin_application _ = assert false
 
   let apply_operation _ = assert false
 
-  let begin_construction ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_
-      ~predecessor:_ ~timestamp:_ ?protocol_data:_ ~cache:_ _ =
-    assert false
+  let finalize_application _ = assert false
 
-  let begin_application ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_fitness:_ ~cache:_ _ =
-    assert false
-
-  let begin_partial_application ~chain_id:_ ~ancestor_context:_ ~predecessor:_
-      ~predecessor_hash:_ ~cache:_ _ =
-    assert false
+  let rpc_services = RPC_directory.empty
 
   let compare_operations _ = assert false
 
@@ -135,8 +146,7 @@ module Mock_all_unit :
       | Incompatible_mempool
       | Merge_conflict of operation_conflict
 
-    let init _ _ ~head_hash:_ ~head_header:_ ~current_timestamp:_ ~cache:_ =
-      Lwt.return_ok ((), ())
+    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt.return_ok ((), ())
 
     let encoding = Data_encoding.unit
 
