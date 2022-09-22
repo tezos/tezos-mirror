@@ -3379,7 +3379,9 @@ module Sc_rollup : sig
         (proof * 'a) option Lwt.t
     end
 
-    module Make (C : P) : sig
+    module type Make_wasm = module type of Wasm_2_0_0.Make
+
+    module Make (Wasm_backend : Make_wasm) (C : P) : sig
       include
         PVM.S
           with type context = C.Tree.t

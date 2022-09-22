@@ -144,7 +144,9 @@ module ScRollup = struct
        and type proof =
         Tezos_context_memory.Context.Proof.tree
         Tezos_context_memory.Context.Proof.t =
-    Sc_rollup.Wasm_2_0_0PVM.Make (In_memory_context)
+    Sc_rollup.Wasm_2_0_0PVM.Make
+      (Environment.Wasm_2_0_0.Make)
+      (In_memory_context)
 
   let origination_proof_exn ~boot_sector kind =
     let aux = function

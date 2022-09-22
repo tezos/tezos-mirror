@@ -55,9 +55,13 @@ module V2_0_0 = struct
   open Sc_rollup_repr
   module PS = Sc_rollup_PVM_sig
 
+  module type TreeS =
+    Context.TREE with type key = string list and type value = bytes
+
+  module type Make_wasm = module type of Wasm_2_0_0.Make
+
   module type P = sig
-    module Tree :
-      Context.TREE with type key = string list and type value = bytes
+    module Tree : TreeS
 
     type tree = Tree.tree
 
@@ -97,7 +101,12 @@ module V2_0_0 = struct
     val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  module Make (Context : P) :
+  (* [Make (Make_backend) (Context)] creates a PVM.
+
+     The Make_backend is a functor that creates the backend of the PVM.
+     The Conext provides the tree and the proof types.
+  *)
+  module Make (Make_backend : Make_wasm) (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
@@ -169,10 +178,10 @@ module V2_0_0 = struct
       end
     end
 
-    module WASM_machine = Wasm_2_0_0.Make (Tree)
-    open State
-
     type state = State.state
+
+    module WASM_machine = Make_backend (Tree)
+    open State
 
     let pp _state =
       Lwt.return @@ fun fmt () -> Format.pp_print_string fmt "<wasm-state>"
@@ -426,38 +435,44 @@ module V2_0_0 = struct
     end
   end
 
-  module Protocol_implementation = Make (struct
-    module Tree = struct
-      include Context.Tree
+  module Protocol_implementation =
+    Make
+      (Wasm_2_0_0.Make)
+      (struct
+        module Tree = struct
+          include Context.Tree
 
-      type tree = Context.tree
+          type tree = Context.tree
 
-      type t = Context.t
+          type t = Context.t
 
-      type key = string list
+          type key = string list
 
-      type value = bytes
-    end
+          type value = bytes
+        end
 
-    type tree = Context.tree
+        type tree = Context.tree
 
-    type proof = Context.Proof.tree Context.Proof.t
+        type proof = Context.Proof.tree Context.Proof.t
 
-    let verify_proof p f =
-      Lwt.map Result.to_option (Context.verify_tree_proof p f)
+        let verify_proof p f =
+          Lwt.map Result.to_option (Context.verify_tree_proof p f)
 
-    let produce_proof _context _state _f =
-      (* Can't produce proof without full context*)
-      Lwt.return None
+        let produce_proof _context _state _f =
+          (* Can't produce proof without full context*)
+          Lwt.return None
 
-    let kinded_hash_to_state_hash = function
-      | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
+        let kinded_hash_to_state_hash = function
+          | `Value hash | `Node hash ->
+              State_hash.context_hash_to_state_hash hash
 
-    let proof_before proof =
-      kinded_hash_to_state_hash proof.Context.Proof.before
+        let proof_before proof =
+          kinded_hash_to_state_hash proof.Context.Proof.before
 
-    let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
+        let proof_after proof =
+          kinded_hash_to_state_hash proof.Context.Proof.after
 
-    let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
-  end)
+        let proof_encoding =
+          Context.Proof_encoding.V2.Tree32.tree_proof_encoding
+      end)
 end
