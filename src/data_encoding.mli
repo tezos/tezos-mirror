@@ -2216,4 +2216,52 @@ module Registration : sig
 
   (** Conversion functions from bytes to JSON. *)
   val json_of_bytes : t -> Bytes.t -> Json.t option
+
+  (** {3 Introspection API}
+
+      The introspection functions below expose some internal representations of
+      the registered [encoding]s. These functions are not for the casual user
+      and are subject to changes from one version of the library to another. *)
+
+  (** A transparent, raw form of a {!register}ed encoding, allowing far greater
+      introspection than a {!t} value. It can be retrieved using
+      {!find_introspectable} or operated upon using {!iter}.
+
+      Note that retrieval and iteration over [introspectable] preserve, but do not present, the
+      type information of the original combinator. In other words,
+      [introspectable] is a
+      non-parametric abstraction over arbitrarily-typed [Encoding.t]. This means that,
+      while it cannot be used in any way that would allow the underlying type parameter
+      to escape, it can be operated upon (e.g. using {!iter}) using functions with
+      locally abstract types ([fun (type a) -> ...]) or explicit polymorphism.
+
+
+      The inclusion of this type is intended almost exclusively for use in
+      specialized external tools rather than by casual users. As this type
+      and its related functions permit introspection into a registered encoding
+      that is otherwise opaque-by-design, it should only be relied
+      upon as a last resort when no other options are available. *)
+  type introspectable = Any : _ Encoding.t -> introspectable
+
+  (** [find_introspectable id] is [Some e'] if [register (def id e)] has been called,
+      in which case [e'] should be [Any e]. Otherwise, it is [None].
+
+      As with the [introspectable] type itself, casual users are
+      discouraged from calling this function; it is designed only for
+      external tools to process raw encodings that cannot be brought
+      into scope except through querying the [Registration] module.
+  *)
+  val find_introspectable : id -> introspectable option
+
+  (** [iter ~id f] is equivalent to calling [Option.iter f (find_introspectable id)].
+      It may be called wherever the result of [find_introspectable id] would otherwise
+      be used only once, as an argument to a function call, and discarded
+      subsequently.
+
+      As with the [introspectable] type itself, casual users are
+      discouraged from calling this function; it is designed only for
+      external tools to process raw encodings that cannot be brought
+      into scope except through querying the [Registration] module.
+  *)
+  val iter : id:string -> (introspectable -> unit) -> unit
 end
