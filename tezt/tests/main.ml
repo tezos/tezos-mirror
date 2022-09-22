@@ -137,6 +137,7 @@ let register_protocol_agnostic_tests () =
   Test_contract_bls12_381.register ~protocols:[Alpha] ;
   Ticket_updates_in_receipt.register ~protocols:[Alpha] ;
   Timelock.register ~protocols ;
+  Tickets.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
   Views.register [Alpha] ;

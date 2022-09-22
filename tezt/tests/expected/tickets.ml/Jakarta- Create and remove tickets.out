@@ -1,0 +1,188 @@
+
+./tezos-client --mode mockup --wait none originate contract add_clear_tickets.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_current_mainnet/add_clear_tickets.tz --init '{}' --burn-cap 1
+Node is bootstrapped.
+Estimated gas: 1427.512 units (will add 100 for safety)
+Estimated storage: 372 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000498
+    Expected counter: 1
+    Gas limit: 1528
+    Storage limit: 392 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000498
+      payload fees(the block proposer) ....... +ꜩ0.000498
+    Origination:
+      From: [PUBLIC_KEY_HASH]
+      Credit: ꜩ200
+      Script:
+        { parameter (or (pair %add nat string) (unit %clear)) ;
+          storage (list (ticket string)) ;
+          code { UNPAIR ;
+                 IF_LEFT
+                   { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; CONS ; NIL operation ; PAIR }
+                   { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR } } }
+        Initial storage: {}
+        No delegate for this contract
+        This origination was successfully applied
+        Originated contracts:
+          [CONTRACT_HASH]
+        Storage size: 115 bytes
+        Paid storage size diff: 115 bytes
+        Consumed gas: 1427.512
+        Balance updates:
+          [PUBLIC_KEY_HASH] ... -ꜩ0.02875
+          storage fees ........................... +ꜩ0.02875
+          [PUBLIC_KEY_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
+          [PUBLIC_KEY_HASH] ... -ꜩ200
+          [CONTRACT_HASH] ... +ꜩ200
+
+New contract [CONTRACT_HASH] originated.
+Contract memorized as add_clear_tickets.tz.
+
+./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "A"'
+Node is bootstrapped.
+Estimated gas: 2575.372 units (will add 100 for safety)
+Estimated storage: 105 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000535
+    Expected counter: 1
+    Gas limit: 2676
+    Storage limit: 125 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000535
+      payload fees(the block proposer) ....... +ꜩ0.000535
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: add
+      Parameter: (Pair 1 "A")
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x017cc48689b532761b262981ee46d8a5065939522a00 (Pair "A" 1) }
+      Storage size: 154 bytes
+      Paid storage size diff: 105 bytes
+      Consumed gas: 2576.227
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.02625
+        storage fees ........................... +ꜩ0.02625
+
+
+./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint clear --arg Unit
+Node is bootstrapped.
+Estimated gas: 2766.153 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000548
+    Expected counter: 2
+    Gas limit: 2867
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000548
+      payload fees(the block proposer) ....... +ꜩ0.000548
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: clear
+      This transaction was successfully applied
+      Updated storage: {}
+      Storage size: 115 bytes
+      Consumed gas: 2767.008
+
+
+./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "B"'
+Node is bootstrapped.
+Estimated gas: 2575.372 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000535
+    Expected counter: 3
+    Gas limit: 2676
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000535
+      payload fees(the block proposer) ....... +ꜩ0.000535
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: add
+      Parameter: (Pair 1 "B")
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x017cc48689b532761b262981ee46d8a5065939522a00 (Pair "B" 1) }
+      Storage size: 154 bytes
+      Consumed gas: 2576.227
+
+
+./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "C"'
+Node is bootstrapped.
+Estimated gas: 3253.393 units (will add 100 for safety)
+Estimated storage: 105 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000603
+    Expected counter: 4
+    Gas limit: 3354
+    Storage limit: 125 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000603
+      payload fees(the block proposer) ....... +ꜩ0.000603
+    Transaction:
+      Amount: ꜩ0
+      From: [PUBLIC_KEY_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: add
+      Parameter: (Pair 1 "C")
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x017cc48689b532761b262981ee46d8a5065939522a00 (Pair "C" 1) ;
+          Pair 0x017cc48689b532761b262981ee46d8a5065939522a00 (Pair "B" 1) }
+      Storage size: 193 bytes
+      Paid storage size diff: 105 bytes
+      Consumed gas: 3254.248
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ0.02625
+        storage fees ........................... +ꜩ0.02625
+
