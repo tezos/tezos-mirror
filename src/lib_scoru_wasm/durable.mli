@@ -72,3 +72,10 @@ val count_subtrees : t -> key -> int Lwt.t
 
 (** [delete durable key] deletes the value at and/or subtrees of [key]. *)
 val delete : t -> key -> t Lwt.t
+
+(** [hash_exn durable key] retrieves the tree hash of the value at the given [key].
+    This is not the same as the hash of the value.
+
+    @raise Not_found when [key] is not found
+*)
+val hash_exn : t -> key -> Context_hash.t Lwt.t

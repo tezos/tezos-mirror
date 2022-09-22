@@ -47,6 +47,8 @@ module type S = sig
 
   val find_tree : tree -> key -> tree option Lwt.t
 
+  val hash : tree -> Context_hash.t
+
   val length : tree -> key -> int Lwt.t
 end
 
@@ -72,6 +74,9 @@ let find : type tree. tree backend -> tree -> key -> value option Lwt.t =
 
 let find_tree : type tree. tree backend -> tree -> key -> tree option Lwt.t =
  fun (module T) tree key -> T.find_tree tree key
+
+let hash : type tree. tree backend -> tree -> Context_hash.t =
+ fun (module T) tree -> T.hash tree
 
 let length : type tree. tree backend -> tree -> key -> int Lwt.t =
  fun (module T) tree key -> T.length tree key
@@ -107,6 +112,8 @@ module Wrapped : S with type tree = wrapped_tree = struct
   let length (Wrapped_tree (t, b)) key = length b t key
 
   let find (Wrapped_tree (t, b)) key = find b t key
+
+  let hash (Wrapped_tree (t, b)) = hash b t
 
   let select = function
     | Wrapped (Wrapped_tree (_, _) as wt) -> wt
