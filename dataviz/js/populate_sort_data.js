@@ -163,19 +163,19 @@ function delays_distribution_of_operations(dict_data, msec = false) {
 }
 
 function delays_distribution_of_operations_w_delegate(dict_data, msec = false) {// instead of returning an array of delays, it returns a dict with delegate address as key and delay as value.
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                t_op_valide_i[round] = {};
-                t_op_pre_valide_i[round] = {}
+                t_op_valid_i[round] = {};
+                t_op_pre_valid_i[round] = {}
 
             })
         }
@@ -192,18 +192,18 @@ function delays_distribution_of_operations_w_delegate(dict_data, msec = false) {
                             delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
                         }
                         if (("kind" in operation)) {
-                            t_op_pre_valide_i[round_cib][baker_ops["delegate"]] = delay;
+                            t_op_pre_valid_i[round_cib][baker_ops["delegate"]] = delay;
                         }
                         else {
-                            t_op_valide_i[round_cib][baker_ops["delegate"]] = delay;
+                            t_op_valid_i[round_cib][baker_ops["delegate"]] = delay;
                         }
                     }
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
-    return [t_op_pre_valide, t_op_valide]
+    return [t_op_pre_valid, t_op_valid]
 }
 
 function get_endorsing_power(dict_data) {
@@ -679,12 +679,12 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .text("Reception times (seconds) →");
 
         // Handmade legend
-        svg.append("circle").attr("cx", width - 170).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
-        svg.append("circle").attr("cx", width - 170).attr("cy", 60).attr("r", 6).style("fill", "#404080")
-        svg.append("text").attr("x", width - 150).attr("y", 30).text("Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-        svg.append("text").attr("x", width - 150).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-        svg.append("circle").attr("cx", width - 170).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
-        svg.append("text").attr("x", width - 150).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("circle").attr("cx", width - 130).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
+        svg.append("circle").attr("cx", width - 130).attr("cy", 60).attr("r", 6).style("fill", "#404080")
+        svg.append("text").attr("x", width - 110).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("text").attr("x", width - 110).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("circle").attr("cx", width - 130).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
+        svg.append("text").attr("x", width - 110).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
 
         //xAxis.call(d3.axisBottom(x).tickSizeOuter(2));
         xAxis.call(d3.axisBottom(x))

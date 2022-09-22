@@ -58,7 +58,19 @@
                         }
 
                     });
-                }               
+                }
+                // parameter from URL         
+                // parameter to URL : https://stackoverflow.com/questions/7097573/is-it-possible-to-update-a-url-link-based-on-user-text-input
+
+                var link = document.getElementById('reflectedlink');
+                var input = document.getElementById('selectedLevel');
+                input.onchange = input.onkeyup = function () {
+                    link.search = "bloc="+ encodeURIComponent(input.value);
+                    link.firstChild.data = link.href;
+                    //window.history.replaceState("", "Endorsement reception delays", link.firstChild.data);
+                };
+
+                // parameter to URL          
                 $('form').keyup(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
