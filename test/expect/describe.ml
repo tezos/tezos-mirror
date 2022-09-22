@@ -41,7 +41,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Float" } } ] },
+                   "data_kind": { "size": 0, "kind": "Fixed" } } ] },
          "fields": [] } |}] ;
   dump Data_encoding.(uint8) ;
   [%expect
@@ -57,7 +57,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "anon",
-                   "data_kind": { "size": 1, "kind": "Float" } } ] },
+                   "data_kind": { "size": 1, "kind": "Fixed" } } ] },
          "fields": [] } |}] ;
   dump Data_encoding.(Fixed.string 12) ;
   [%expect
@@ -73,7 +73,7 @@ let%expect_test _ =
     { "toplevel":
          { "fields":
              [ { "layout": { "kind": "String" }, "kind": "anon",
-                 "data_kind": { "size": 12, "kind": "Float" } } ] },
+                 "data_kind": { "size": 12, "kind": "Fixed" } } ] },
        "fields": [] } |}] ;
   dump
     Data_encoding.(
@@ -103,7 +103,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Float" } } ] },
+                   "data_kind": { "size": 0, "kind": "Fixed" } } ] },
          "fields": [] } |}] ;
   dump Data_encoding.(tup1 (constant "foo")) ;
   [%expect
@@ -125,7 +125,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "anon",
-                   "data_kind": { "size": 1, "kind": "Float" } } ] },
+                   "data_kind": { "size": 1, "kind": "Fixed" } } ] },
          "fields": [] } |}] ;
   let tup2_zero_width =
     Data_encoding.(tup2 (constant "foo") (constant "bar"))
@@ -150,7 +150,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "name": "padding", "layout": { "kind": "Padding" },
-                   "data_kind": { "size": 12, "kind": "Float" }, "kind": "named" } ] },
+                   "data_kind": { "size": 12, "kind": "Fixed" }, "kind": "named" } ] },
          "fields": [] } |}] ;
   dump (Data_encoding.option tup2_zero_width) ;
   [%expect
@@ -187,26 +187,26 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
-                   "data_kind": { "size": 1, "kind": "Float" } } ] },
+                   "data_kind": { "size": 1, "kind": "Fixed" } } ] },
          "fields":
            [ { "description": { "title": "X_0" },
                "encoding":
-                 { "tag_size": "Uint8", "kind": { "size": 1, "kind": "Float" },
+                 { "tag_size": "Uint8", "kind": { "size": 1, "kind": "Fixed" },
                    "cases":
                      [ { "tag": 0,
                          "fields":
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
-                               "data_kind": { "size": 1, "kind": "Float" },
+                               "data_kind": { "size": 1, "kind": "Fixed" },
                                "kind": "named" },
                              { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                               "data_kind": { "size": 0, "kind": "Float" } } ],
+                               "data_kind": { "size": 0, "kind": "Fixed" } } ],
                          "name": "None" },
                        { "tag": 1,
                          "fields":
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
-                               "data_kind": { "size": 1, "kind": "Float" },
+                               "data_kind": { "size": 1, "kind": "Fixed" },
                                "kind": "named" } ], "name": "Some" } ] } } ] } |}] ;
   dump Data_encoding.(obj2 (req "foo" tup2_zero_width) (req "bar" uint8)) ;
   [%expect
@@ -228,9 +228,9 @@ let%expect_test _ =
       { "toplevel":
           { "fields":
               [ { "name": "foo", "layout": { "name": "X_0", "kind": "Ref" },
-                  "data_kind": { "size": 0, "kind": "Float" }, "kind": "named" },
+                  "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" },
                 { "name": "bar", "layout": { "size": "Uint8", "kind": "Int" },
-                  "data_kind": { "size": 1, "kind": "Float" }, "kind": "named" } ] },
+                  "data_kind": { "size": 1, "kind": "Fixed" }, "kind": "named" } ] },
         "fields":
           [ { "description": { "title": "X_0" }, "encoding": { "fields": [] } } ] } |}] ;
   let obj2_zero_width =
@@ -278,26 +278,26 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
-                   "data_kind": { "size": 1, "kind": "Float" } } ] },
+                   "data_kind": { "size": 1, "kind": "Fixed" } } ] },
          "fields":
            [ { "description": { "title": "X_0" },
                "encoding":
-                 { "tag_size": "Uint8", "kind": { "size": 1, "kind": "Float" },
+                 { "tag_size": "Uint8", "kind": { "size": 1, "kind": "Fixed" },
                    "cases":
                      [ { "tag": 0,
                          "fields":
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
-                               "data_kind": { "size": 1, "kind": "Float" },
+                               "data_kind": { "size": 1, "kind": "Fixed" },
                                "kind": "named" },
                              { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                               "data_kind": { "size": 0, "kind": "Float" } } ],
+                               "data_kind": { "size": 0, "kind": "Fixed" } } ],
                          "name": "None" },
                        { "tag": 1,
                          "fields":
                            [ { "name": "Tag",
                                "layout": { "size": "Uint8", "kind": "Int" },
-                               "data_kind": { "size": 1, "kind": "Float" },
+                               "data_kind": { "size": 1, "kind": "Fixed" },
                                "kind": "named" } ], "name": "Some" } ] } } ] } |}] ;
   dump Data_encoding.(tup2 obj2_zero_width string) ;
   [%expect
@@ -328,7 +328,7 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
-                   "data_kind": { "size": 0, "kind": "Float" } },
+                   "data_kind": { "size": 0, "kind": "Fixed" } },
                  { "layout": { "name": "X_1", "kind": "Ref" }, "kind": "anon",
                    "data_kind": { "kind": "Dynamic" } } ] },
          "fields":
@@ -364,11 +364,11 @@ let%expect_test _ =
       { "toplevel":
            { "fields":
                [ { "layout": { "kind": "String" }, "kind": "anon",
-                   "data_kind": { "size": 5, "kind": "Float" } },
+                   "data_kind": { "size": 5, "kind": "Fixed" } },
                  { "layout": { "kind": "Bytes" }, "kind": "anon",
-                   "data_kind": { "size": 10, "kind": "Float" } },
+                   "data_kind": { "size": 10, "kind": "Fixed" } },
                  { "name": "padding", "layout": { "kind": "Padding" },
-                   "data_kind": { "size": 4, "kind": "Float" }, "kind": "named" } ] },
+                   "data_kind": { "size": 4, "kind": "Fixed" }, "kind": "named" } ] },
          "fields": [] } |}] ;
   dump
     Data_encoding.(
@@ -405,10 +405,10 @@ let%expect_test _ =
     { "toplevel":
          { "fields":
              [ { "name": "a", "layout": { "size": "Uint8", "kind": "Int" },
-                 "data_kind": { "size": 1, "kind": "Float" }, "kind": "named" },
+                 "data_kind": { "size": 1, "kind": "Fixed" }, "kind": "named" },
                { "kind": "option_indicator", "name": "b" },
                { "name": "b", "layout": { "size": "Uint16", "kind": "Int" },
-                 "data_kind": { "size": 2, "kind": "Float" }, "kind": "named" },
+                 "data_kind": { "size": 2, "kind": "Fixed" }, "kind": "named" },
                { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
                { "name": "c",
                  "layout":
@@ -462,7 +462,7 @@ let%expect_test _ =
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
-                             "data_kind": { "size": 1, "kind": "Float" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
                            { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
                            { "layout": { "kind": "String" }, "kind": "anon",
@@ -526,17 +526,17 @@ let%expect_test _ =
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
-                             "data_kind": { "size": 1, "kind": "Float" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
-                             "data_kind": { "size": 1, "kind": "Float" } } ],
+                             "data_kind": { "size": 1, "kind": "Fixed" } } ],
                        "name": "l" },
                      { "tag": 255,
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
-                             "data_kind": { "size": 1, "kind": "Float" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
                            { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
                            { "layout": { "kind": "String" }, "kind": "anon",
@@ -614,14 +614,14 @@ let%expect_test _ =
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
-                             "data_kind": { "size": 1, "kind": "Float" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
                            { "layout": { "name": "X_0", "kind": "Ref" },
                              "kind": "anon",
-                             "data_kind": { "size": 0, "kind": "Float" } },
+                             "data_kind": { "size": 0, "kind": "Fixed" } },
                            { "layout": { "size": "Uint8", "kind": "Int" },
                              "kind": "anon",
-                             "data_kind": { "size": 1, "kind": "Float" } },
+                             "data_kind": { "size": 1, "kind": "Fixed" } },
                            { "layout": { "name": "weird-list", "kind": "Ref" },
                              "kind": "anon", "data_kind": { "kind": "Dynamic" } } ],
                        "name": "c" },
@@ -629,10 +629,10 @@ let%expect_test _ =
                        "fields":
                          [ { "name": "Tag",
                              "layout": { "size": "Uint8", "kind": "Int" },
-                             "data_kind": { "size": 1, "kind": "Float" },
+                             "data_kind": { "size": 1, "kind": "Fixed" },
                              "kind": "named" },
                            { "layout": { "kind": "Zero_width" }, "kind": "anon",
-                             "data_kind": { "size": 0, "kind": "Float" } } ],
+                             "data_kind": { "size": 0, "kind": "Fixed" } } ],
                        "name": "s" } ] } } ] } |}] ;
   let obj2_opt_zero =
     Data_encoding.(
@@ -659,9 +659,9 @@ let%expect_test _ =
            { "fields":
                [ { "kind": "option_indicator", "name": "l" },
                  { "name": "l", "layout": { "kind": "Zero_width" },
-                   "data_kind": { "size": 0, "kind": "Float" }, "kind": "named" },
+                   "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" },
                  { "kind": "option_indicator", "name": "r" },
                  { "name": "r", "layout": { "kind": "Zero_width" },
-                   "data_kind": { "size": 0, "kind": "Float" }, "kind": "named" } ] },
+                   "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" } ] },
          "fields": [] } |}] ;
   ()

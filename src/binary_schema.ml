@@ -566,7 +566,7 @@ module Encoding = struct
          (case
             ~title:"Fixed"
             (Tag 2)
-            (obj2 (req "size" int31) (req "kind" (constant "Float")))
+            (obj2 (req "size" int31) (req "kind" (constant "Fixed")))
             (function `Fixed n -> Some (n, ()) | _ -> None)
             (fun (n, _) -> `Fixed n)
          :: kind_enum_cases ())
