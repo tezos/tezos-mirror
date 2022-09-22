@@ -111,6 +111,115 @@ let nodes_measure_levels nodes levels =
   in
   return (Unix.gettimeofday () -. start)
 
+(* Infinite lazy sequences *)
+module Inf = struct
+  (* ['a t] is an lazy, infinite stream of values of type ['a] *)
+  type 'a t = Inf of (unit -> 'a * 'a t)
+
+  let inf f = Inf f
+
+  (* [shuffle xs] is a lazy, infinite stream of non-repeated random
+     values from [xs].
+
+     Successive values are from distinct indices of [xs]. [xs] must contain
+     at least two items. *)
+  let shuffle : 'a list -> 'a t = function
+    | [] | [_] ->
+        raise
+          (Invalid_argument "Inf.shuffle: array must contain at least two items")
+    | xs ->
+        let arr = Array.of_list xs in
+        let len = Array.length arr in
+        let rec next prev =
+          inf @@ fun () ->
+          let nxt = (prev + 1 + Random.int (len - 1)) mod len in
+          (arr.(nxt), next nxt)
+        in
+        inf @@ fun () ->
+        let fst = Random.int len in
+        (arr.(fst), next fst)
+
+  (* [cycle ls] is a lazy, infinite analogue of {!Seq.cycle}.
+
+     [ls] cannot be empty. *)
+  let cycle : 'a list -> 'a t = function
+    | [] -> raise (Invalid_argument "Inf.cycle: list cannot be empty")
+    | y :: ys ->
+        let rec aux = function
+          | [] -> inf @@ fun () -> (y, aux ys)
+          | x :: xs -> inf @@ fun () -> (x, aux xs)
+        in
+        aux (y :: ys)
+
+  (* [next i] is the next element in the infinite sequence [i] *)
+  let next : 'a t -> 'a * 'a t = function Inf f -> f ()
+end
+
+module Sandbox = struct
+  type state = {
+    mutable daemons : (Node.t * Baker.t option * Client.t option) array;
+    mutable delegates : Account.key Inf.t;
+  }
+
+  type handle = int
+
+  let make delegates = {daemons = [||]; delegates}
+
+  let get_delegate (st : state) =
+    let delegate, delegates' = Inf.next st.delegates in
+    st.delegates <- delegates' ;
+    delegate.alias
+
+  let nodes (st : state) =
+    Array.(map (fun (node, _, _) -> node) st.daemons |> to_list)
+
+  let clients (st : state) =
+    Array.to_list st.daemons |> List.filter_map (fun (_, _, client) -> client)
+
+  let bakers (st : state) =
+    Array.to_list st.daemons |> List.filter_map (fun (_, baker, _) -> baker)
+
+  let add_baker_to_node (st : state) (h : handle) =
+    match Array.get st.daemons h with
+    | exception Invalid_argument _ ->
+        raise (Invalid_argument (sf "add_baker_to_node: invalid handle %d" h))
+    | _, Some _, _ ->
+        raise
+          (Invalid_argument
+             (sf "add_baker_to_node: node %d already has a baker" h))
+    | node, _, _ ->
+        let* client = Client.init ~endpoint:(Client.Node node) () in
+        let delegates = [get_delegate st] in
+        let baker = Baker.create ~protocol node client ~delegates in
+        let* () = Baker.run baker in
+        st.daemons.(h) <- (node, Some baker, Some client) ;
+        return (client, baker)
+
+  let add_node (st : state) =
+    let node = Node.create [Synchronisation_threshold 0] in
+    let handle = Array.length st.daemons in
+    Log.info "Creating node #%d (%s)" handle (Node.name node) ;
+    st.daemons <- Array.append st.daemons [|(node, None, None)|] ;
+    return (handle, node)
+
+  let add_node_with_baker (st : state) =
+    let* handle, node = add_node st in
+    let* client, baker = add_baker_to_node st handle in
+    Log.info
+      "Creating baker #%d (%s)"
+      (Array.length st.daemons)
+      (Baker.name baker) ;
+    return (handle, node, client, baker)
+
+  let terminate (st : state) =
+    Lwt_list.iter_p
+      (fun (node, baker_opt, _) ->
+        let* () = Node.terminate node
+        and* () = Option.fold ~none:unit ~some:Baker.terminate baker_opt in
+        unit)
+      (Array.to_list st.daemons)
+end
+
 module Rounds = struct
   let nodes_num = num_bootstrap_accounts
 
@@ -184,32 +293,17 @@ module Rounds = struct
 
     Long_test.measure_and_check_regression_lwt ~repeat time_to_reach_measurement
     @@ fun () ->
-    let daemons = ref [] in
     (* One client to activate the protocol later on *)
-    let* node_hd, activator_client, nodes_tl =
-      let create i =
-        Log.info "Creating node, client, baker triplet #%d" i ;
-        let node = Node.create [Synchronisation_threshold 0] in
-        let* client = Client.init ~endpoint:(Client.Node node) () in
-        let delegates =
-          [Account.Bootstrap.keys.(i mod num_bootstrap_accounts).alias]
-        in
-        let baker = Baker.create ~protocol node client ~delegates in
-        let* () = Baker.run baker in
-        daemons := (node, baker) :: !daemons ;
-        Lwt.return (node, client, baker)
-      in
-      let* node_hd, activator_client, _ = create 0
-      and* nodes_tl =
-        Lwt_list.map_p
-          (fun i ->
-            let* node, _, _ = create i in
-            return node)
-          (range 1 (nodes_num - 1))
-      in
-      return (node_hd, activator_client, nodes_tl)
+    let sandbox =
+      Sandbox.make (Inf.cycle (Array.to_list Account.Bootstrap.keys))
     in
-    let nodes = node_hd :: nodes_tl in
+    let* _, _, activator_client, _ = Sandbox.add_node_with_baker sandbox in
+    let* () =
+      Base.repeat (nodes_num - 1) @@ fun () ->
+      let* _ = Sandbox.add_node_with_baker sandbox in
+      unit
+    in
+    let nodes = Sandbox.nodes sandbox in
 
     (* Topology does not really matter here, as long as there is a path from any
        node to another one; let's use a ring. *)
@@ -240,13 +334,7 @@ module Rounds = struct
       timeout ;
     let* time = nodes_measure_levels nodes (range 2 levels) in
 
-    let* () =
-      Lwt_list.iter_p
-        (fun (node, baker) ->
-          let* () = Baker.terminate baker and* () = Node.terminate node in
-          unit)
-        !daemons
-    in
+    let* () = Sandbox.terminate sandbox in
 
     Lwt.return time
 end
