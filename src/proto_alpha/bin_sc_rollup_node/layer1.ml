@@ -34,12 +34,6 @@ open Injector_common
     ======
 
 *)
-let synchronization_failure e =
-  Format.eprintf
-    "Error during synchronization: @[%a@]"
-    Error_monad.(TzTrace.pp_print_top pp)
-    e ;
-  Lwt_exit.exit_and_raise 1
 
 type error += Cannot_find_block of Block_hash.t
 
@@ -140,39 +134,39 @@ let get_predecessor =
   let module HM = HMF (Block_hash) in
   let cache = HM.create max_cached in
   fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
+    let open Lwt_result_syntax in
     match HM.find_opt cache ancestor with
-    | Some pred -> Lwt.return (Some pred)
+    | Some pred -> return_some pred
     | None -> (
-        Tezos_shell_services.Chain_services.Blocks.list
-          cctxt
-          ~chain
-          ~heads:[ancestor]
-          ~length:max_read
-          ()
-        >>= function
-        | Error e -> synchronization_failure e
-        | Ok blocks -> (
-            match blocks with
-            | [ancestors] -> (
-                List.iter
-                  (fun (h, p) -> HM.replace cache h p)
-                  (predecessors_of_blocks ancestors) ;
-                match HM.find_opt cache ancestor with
-                | None ->
-                    (* We have just updated the cache with that information. *)
-                    assert false
-                | Some predecessor -> Lwt.return (Some predecessor))
-            | _ -> Lwt.return None))
+        let* blocks =
+          Tezos_shell_services.Chain_services.Blocks.list
+            cctxt
+            ~chain
+            ~heads:[ancestor]
+            ~length:max_read
+            ()
+        in
+        match blocks with
+        | [ancestors] -> (
+            List.iter
+              (fun (h, p) -> HM.replace cache h p)
+              (predecessors_of_blocks ancestors) ;
+            match HM.find_opt cache ancestor with
+            | None ->
+                (* We have just updated the cache with that information. *)
+                assert false
+            | Some predecessor -> return_some predecessor)
+        | _ -> return_none)
 
 let get_predecessor_opt state {level; hash} =
-  let open Lwt_option_syntax in
+  let open Lwt_result_syntax in
   let level = Int32.pred level in
   let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
-  {level; hash}
+  Option.map (fun hash -> {level; hash}) hash
 
 let get_predecessor state ({hash; _} as head) =
   let open Lwt_result_syntax in
-  let*! pred = get_predecessor_opt state head in
+  let* pred = get_predecessor_opt state head in
   match pred with
   | None -> tzfail (Cannot_find_predecessor hash)
   | Some pred -> return pred

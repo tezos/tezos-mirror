@@ -68,12 +68,14 @@ let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
     =
   let genesis_level = genesis_info.level in
   let rec go number_of_levels (Layer1.{hash; level} as head) =
-    let open Lwt_option_syntax in
-    if level < Raw_level.to_int32 genesis_level then fail
-    else if number_of_levels = 0 then return hash
+    let open Lwt_result_syntax in
+    if level < Raw_level.to_int32 genesis_level then return_none
+    else if number_of_levels = 0 then return_some hash
     else
       let* pred_head = Layer1.get_predecessor_opt l1_ctxt head in
-      go (number_of_levels - 1) pred_head
+      match pred_head with
+      | None -> return_none
+      | Some pred_head -> go (number_of_levels - 1) pred_head
   in
   go number_of_levels head
 
@@ -119,7 +121,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
      Therefore, we need to check only the slots to which the rollup node
      was subscribed to at level `level - lag`
   *)
-  let*! published_slots_block_hash =
+  let* published_slots_block_hash =
     ancestor_hash ~number_of_levels:lag node_ctxt head
   in
   match published_slots_block_hash with

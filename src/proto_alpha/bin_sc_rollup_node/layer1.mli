@@ -69,7 +69,7 @@ val level_of_hash : t -> Block_hash.t -> int32 tzresult Lwt.t
 
 (** [get_predecessor_opt state head] returns the predecessor, if any, of block
     of [head]. *)
-val get_predecessor_opt : t -> head -> head option Lwt.t
+val get_predecessor_opt : t -> head -> head option tzresult Lwt.t
 
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
 val get_predecessor : t -> head -> head tzresult Lwt.t

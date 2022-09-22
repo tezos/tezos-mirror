@@ -180,7 +180,7 @@ module Make (PVM : Pvm.S) = struct
     in
     unless (already_finalized || before_origination node_ctxt block)
     @@ fun () ->
-    let*! predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt block in
+    let* predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt block in
     let* () =
       Option.iter_es (processed_finalized_block node_ctxt) predecessor
     in
@@ -194,12 +194,14 @@ module Make (PVM : Pvm.S) = struct
     return_unit
 
   let rec nth_predecessor l1_ctxt n head =
-    let open Lwt_option_syntax in
+    let open Lwt_result_syntax in
     assert (n >= 0) ;
-    if n = 0 then return head
+    if n = 0 then return_some head
     else
       let* pred = Layer1.get_predecessor_opt l1_ctxt head in
-      nth_predecessor l1_ctxt (n - 1) pred
+      match pred with
+      | None -> return_none
+      | Some pred -> nth_predecessor l1_ctxt (n - 1) pred
 
   let rec process_head (node_ctxt : Node_context.t)
       Layer1.({hash; level} as head) =
@@ -207,7 +209,7 @@ module Make (PVM : Pvm.S) = struct
     let*! seen_before = State.is_processed node_ctxt.store hash in
     if seen_before || before_origination node_ctxt head then return_nil
     else
-      let*! predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt head in
+      let* predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt head in
       let* processed =
         match predecessor with
         | None -> return_nil
@@ -221,7 +223,7 @@ module Make (PVM : Pvm.S) = struct
       (* Avoid triggering the pvm execution if this has been done before for
          this head. *)
       let* () = Components.Interpreter.process_head node_ctxt ctxt head in
-      let*! finalized_block =
+      let* finalized_block =
         nth_predecessor node_ctxt.l1_ctxt node_ctxt.block_finality_time head
       in
       let* () =
