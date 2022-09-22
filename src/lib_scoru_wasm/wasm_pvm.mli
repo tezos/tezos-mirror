@@ -36,6 +36,7 @@ type tick_state =
       self : Tezos_webassembly_interpreter.Instance.module_key;
       ast_module : Tezos_webassembly_interpreter.Ast.module_;
       init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
+      module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
     }
   | Eval of Tezos_webassembly_interpreter.Eval.config
   | Stuck of Wasm_pvm_errors.t
