@@ -32,6 +32,7 @@ depends: [
   "ringo" { >= "0.9" }
   "ringo-lwt" { >= "0.9" }
   "tezos-injector-alpha"
+  "tezos-scoru-wasm"
 ]
 build: [
   ["rm" "-r" "vendors"]
