@@ -57,11 +57,6 @@ val ignore : 'a t
     [No_tag_matched] exception. *)
 val run : 'tree Tree.backend -> 'a t -> 'a -> 'tree -> 'tree Lwt.t
 
-(** [with_subtree get_subtree enc] will use [get_subtree] to fetch
-    the tree of origin of a value to be encoded with [enc], to place
-    it in the targeted tree before using [enc]. *)
-val with_subtree : ('a -> Lazy_containers.Lazy_map.tree option) -> 'a t -> 'a t
-
 (** [raw key] returns an encoder that encodes raw bytes at the given key. *)
 val raw : key -> bytes t
 
@@ -78,17 +73,17 @@ val value : key -> 'a Data_encoding.t -> 'a t
     branch [key]. *)
 val scope : key -> 'a t -> 'a t
 
-(** [lazy_mapping to_key enc] returns a key-value list encoder that
-    encodes values from a given key-value list using the key-mapping function
-    [to_key] and the provided encoder [enc] for the values.
+(** [lazy_mapping to_key enc] returns a subtree plus key-value list
+    encoder that encodes values from a given key-value list using the
+    key-mapping function [to_key] and the provided encoder [enc] for
+    the values.
 
-    {b Warning:} Before encoding a value [v] under key [k],
-    [lazy_mapping] first removes any previous value stored under
-    [k]. In practice, it means nested [lazy_mapping] are not safe. The
-    necessary safe-guard is to use [lazy_mapping] in conjunction with
-    {!with_subtree}, which allows to retain more information about
-    the original tree if need be. *)
-val lazy_mapping : ('k -> key) -> 'v t -> ('k * 'v) list t
+    During the encoding process, the subtree is added to the target tree
+    under the prefix, before the key-value list is processed. *)
+val lazy_mapping :
+  ('k -> key) ->
+  'v t ->
+  (Lazy_containers.Lazy_map.tree option * ('k * 'v) list) t
 
 (** [case tag enc f] return a partial encoder that represents a case in a
     sum-type. The encoder hides the (existentially bound) type of the
