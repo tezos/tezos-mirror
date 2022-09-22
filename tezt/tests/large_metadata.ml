@@ -30,6 +30,11 @@
    Subject: Test that large operations metadata are not stored.
 *)
 
+(* Some contract calls require a hard-coded gas limit because the simulation is
+   bypassed (because it fails). We pass the maximum gas limit for operations. *)
+
+let gas_limit = 1_040_000
+
 (* Stands for the different values of the metadata query
    string. Not_provided represents the fact that the argument is not
    provided. *)
@@ -162,7 +167,7 @@ let check_default_limit_metadata =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -182,7 +187,7 @@ let check_default_limit_metadata =
   let big_exponent = 24 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -214,7 +219,7 @@ let check_limit_metadata =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -233,7 +238,7 @@ let check_limit_metadata =
   let big_exponent = 14 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -263,7 +268,7 @@ let check_unlimited_metadata =
   let big_exponent = 24 in
   let* () =
     Client.transfer
-      ~gas_limit:1_040_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -295,7 +300,7 @@ let check_metadata_query_string =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -316,7 +321,7 @@ let check_metadata_query_string =
   let big_exponent = 14 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
