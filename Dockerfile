@@ -19,6 +19,8 @@ COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-signer /home/t
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-tx-rollup-* /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-sc-rollup-* /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-codec /home/tezos/bin/
+# Add parameters for active protocols
+COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/parameters /home/tezos/scripts/
 # Add entrypoint scripts
 COPY --chown=tezos:nogroup scripts/docker/entrypoint.* /home/tezos/bin/
 # Add scripts
