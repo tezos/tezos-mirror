@@ -124,11 +124,17 @@ One can distinguish two kinds of protocol constants:
 - *fixed* prototocol constants, such as the size of a nonce, are values wired in the code of a protocol, and can only be changed by protocol amendment (that is, by adopting a new protocol)
 - *parametric* protocol constants, such as the number of blocks per cycle, are values maintained in a read-only data structure that can be instantiated differently, for the same protocol, from one network to another (for instance, test networks move faster).
 
-Fixed protocol constants are defined in the module module :package-api:`Constants_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/index.html>` while parametric constants are defined in the module :package-api:`Constants_parametric_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_parametric_repr/index.html>````
+The *list* of protocol constants can be found in the OCaml APIs:
 
-The values of protocol constants (both fixed and parametric) in any given protocol can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
+- fixed protocol constants are defined in the module :package-api:`Constants_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/index.html>`
+- parametric constants are defined in the module :package-api:`Constants_parametric_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_parametric_repr/index.html>`
 
-Further documentation of most protocol constants can be found in the subsystems where they conceptually belong.
+The *values* of protocol constants in any given protocol can be found using specific RPC calls:
+
+- one RPC for :ref:`all constants <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`
+- one RPC for :ref:`the parametric constants <GET_..--block_id--context--constants--parametric>`.
+
+Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
 See, for example:
 
 - :ref:`proof-of-stake parameters <ps_constants_alpha>`.
