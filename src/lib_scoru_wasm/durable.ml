@@ -104,3 +104,8 @@ let count_subtrees tree key =
   if Option.is_none opt then len else len - 1
 
 let delete tree key = T.remove tree key
+
+let hash_exn tree key =
+  let open Lwt.Syntax in
+  let+ opt = T.find_tree tree (to_value_key key) in
+  match opt with None -> raise Not_found | Some subtree -> T.hash subtree
