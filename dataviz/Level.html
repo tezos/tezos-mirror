@@ -3,6 +3,7 @@
 <html lang="en">
 
 <head>
+    <a id="reflectedlink" href="http://kathmandunet.kaml.fr:8880/visualization/Level.html?">Copy to share ! </a>
     <meta charset="utf-8">
     <title>Endorsement reception delays</title>
     <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
@@ -36,13 +37,14 @@
 
         function main() {
             try {
+                // parameter from URL  
                 const params = new Proxy(new URLSearchParams(window.location.search), { // to input parameters in URL
                     get: (searchParams, prop) => searchParams.get(prop),
                 });
                 // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
                 let bloc_value = parseInt(params.bloc); // "some_value"
                 //console.log()
-                if(bloc_value){
+                if (bloc_value) {
                     let dict_data = populate_v1(server_adress, bloc_value, bloc_value).then(dict_data => {
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
@@ -57,7 +59,19 @@
                         }
 
                     });
-                }               
+                }
+                // parameter from URL         
+                // parameter to URL : https://stackoverflow.com/questions/7097573/is-it-possible-to-update-a-url-link-based-on-user-text-input
+
+                var link = document.getElementById('reflectedlink');
+                var input = document.getElementById('selectedLevel');
+                input.onchange = input.onkeyup = function () {
+                    link.search = "bloc="+ encodeURIComponent(input.value);
+                    link.firstChild.data = link.href;
+                    //window.history.replaceState("", "Endorsement reception delays", link.firstChild.data);
+                };
+
+                // parameter to URL          
                 $('form').keyup(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
