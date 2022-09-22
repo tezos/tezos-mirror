@@ -172,8 +172,58 @@ let test_move_and_read_subtrees () =
   assert_proof_size proof 800 ;
   Lwt.return_ok ()
 
+(* Ensure that copying arbitrary subtrees is safe w.r.t. proof size. *)
+let test_copy_subtrees () =
+  let open Lwt_syntax in
+  let get_proof vec_size =
+    let v = make_vector (fun x -> x) vec_size in
+    let* context, tree = prepare_context () in
+    let vec_encoding =
+      Tree_encoding.(int_lazy_vector int_encoding int_encoding)
+    in
+    let* tree =
+      Tree_encoding.encode
+        (Tree_encoding.scope ["from"; "until"; "one"] vec_encoding)
+        v
+        tree
+    in
+    let* tree =
+      Tree_encoding.encode
+        (Tree_encoding.scope ["from"; "until"; "two"] vec_encoding)
+        v
+        tree
+    in
+    produce_proof context tree (fun tree ->
+        let* v = Tree_encoding.decode Tree_encoding.wrapped_tree tree in
+        let* x = Tree_encoding.Wrapped.length v ["from"; "until"] in
+        assert (x = 2) ;
+        let* y = Tree_encoding.Wrapped.length v ["to"] in
+        assert (y = 0) ;
+        let* s = Tree_encoding.Wrapped.find_tree v ["from"; "until"] in
+        let s = match s with Some s -> s | None -> assert false in
+        let* v' = Tree_encoding.Wrapped.add_tree v ["to"; "gether"] s in
+        let* x = Tree_encoding.Wrapped.length v' ["from"; "until"] in
+        assert (x = 2) ;
+        let* y = Tree_encoding.Wrapped.length v' ["to"] in
+        assert (y = 1) ;
+        let+ tree' = Tree_encoding.encode Tree_encoding.wrapped_tree v' tree in
+        (tree', ()))
+  in
+  let* proof_large_vec = get_proof 10_000 in
+  let* proof_small_vec = get_proof 10 in
+  let plarge_size = proof_size proof_large_vec in
+  let psmall_size = proof_size proof_small_vec in
+
+  (* The proof size should not depend on the size of the tree. *)
+  assert (plarge_size = psmall_size) ;
+  (* This constant has been set by experimenting. It encompasses
+     two paths and a hash. *)
+  assert_proof_size proof_large_vec 200 ;
+  Lwt.return_ok ()
+
 let tests =
   [
     tztest "Move subtrees" `Quick test_move_subtrees;
     tztest "Decode, set, and move subtree" `Quick test_move_and_read_subtrees;
+    tztest "Copy subtrees" `Quick test_copy_subtrees;
   ]
