@@ -291,4 +291,8 @@ module Slots_history : sig
   *)
   val verify_proof :
     dal_parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val content : t -> slot
+  end
 end

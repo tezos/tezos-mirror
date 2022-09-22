@@ -817,6 +817,10 @@ module Slots_history = struct
                   ~dest:next_cell
           in
           return_none
+
+    module Internal_for_tests = struct
+      let content = Skip_list.content
+    end
   end
 
   include V1
