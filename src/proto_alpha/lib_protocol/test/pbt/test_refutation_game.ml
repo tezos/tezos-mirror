@@ -913,7 +913,6 @@ module Arith_test_pvm = struct
      creates the association list (tick, state_hash). *)
   let eval_until_input ~fuel ~our_states start_tick state =
     let open Lwt_syntax in
-    let eval_tick _tick state = eval state in
     let rec go ~our_states fuel (tick : int) state =
       let* input_request = is_input_state state in
       match fuel with
@@ -921,13 +920,24 @@ module Arith_test_pvm = struct
       | None | Some _ -> (
           match input_request with
           | No_input_required ->
-              let* state = eval_tick tick state in
+              let* state = eval state in
               let* state_hash = state_hash state in
               let our_states = (tick, state_hash) :: our_states in
               go ~our_states (consume_fuel fuel) (tick + 1) state
           | _ -> return (state, fuel, tick, our_states))
     in
     go ~our_states fuel start_tick state
+
+  let eval_metadata ~fuel ~our_states tick state ~metadata =
+    let open Lwt_syntax in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let input = Sc_rollup.(Reveal (Metadata metadata)) in
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = succ tick in
+    return (state, fuel, tick, our_states)
 
   let feed_input ~fuel ~our_states ~tick state input =
     let open Lwt_syntax in
@@ -957,14 +967,22 @@ module Arith_test_pvm = struct
       (state, fuel, tick, [])
       inputs
 
-  let eval_levels_and_inputs ?fuel ctxt levels_and_inputs =
+  let eval_levels_and_inputs ~metadata ?fuel ctxt levels_and_inputs =
     let open Lwt_result_syntax in
     let*! state = initial_state ctxt in
     let*! state_hash = state_hash state in
-    let our_states = [(0, state_hash)] in
+    let tick = 0 in
+    let our_states = [(tick, state_hash)] in
+    let tick = succ tick in
+    (* 1. We evaluate the boot sector. *)
     let*! state, fuel, tick, our_states =
-      eval_until_input ~fuel ~our_states 1 state
+      eval_until_input ~fuel ~our_states tick state
     in
+    (* 2. We evaluate the metadata. *)
+    let*! state, fuel, tick, our_states =
+      eval_metadata ~fuel ~our_states tick state ~metadata
+    in
+    (* 3. We evaluate the inbox. *)
     let* state, _fuel, tick, our_states =
       List.fold_left_es
         (fun (state, fuel, tick, our_states) (level, inputs) ->
@@ -1054,6 +1072,7 @@ type player_client = {
     * Inbox.History.t
     * Inbox.t;
   levels_and_inputs : (int * string list) list;
+  metadata : Metadata.t;
 }
 
 let pp_levels_and_inputs ppf levels_and_inputs =
@@ -1070,7 +1089,7 @@ let pp_levels_and_inputs ppf levels_and_inputs =
       levels_and_inputs)
 
 let pp_player_client ppf
-    {player; states; final_tick; inbox = _; levels_and_inputs} =
+    {player; states; final_tick; inbox = _; levels_and_inputs; metadata} =
   Format.fprintf
     ppf
     "@[<v 2>player:@,\
@@ -1079,7 +1098,8 @@ let pp_player_client ppf
      %a@]@,\
      final tick: %a@,\
      @[<v 2>levels and inputs:@,\
-     %a@]@,"
+     %a@]@,\
+     metadata: %a@,"
     pp_player
     player
     (Format.pp_print_list (fun ppf (tick, hash) ->
@@ -1096,6 +1116,8 @@ let pp_player_client ppf
     (* inbox *)
     pp_levels_and_inputs
     levels_and_inputs
+    Sc_rollup.Metadata.pp
+    metadata
 
 module Player_client = struct
   (** Transform inputs to payloads. *)
@@ -1150,13 +1172,16 @@ module Player_client = struct
   (** Generate [our_states] for [levels_and_inputs] based on the strategy.
       It needs [level_min] and [level_max] in case it will need to generate
       new inputs. *)
-  let gen_our_states ctxt strategy ?level_min ?level_max levels_and_inputs =
+  let gen_our_states ~metadata ctxt strategy ?level_min ?level_max
+      levels_and_inputs =
     let open QCheck2.Gen in
     let eval_inputs levels_and_inputs =
       Lwt_main.run
       @@
       let open Lwt_result_syntax in
-      let*! r = Arith_test_pvm.eval_levels_and_inputs ctxt levels_and_inputs in
+      let*! r =
+        Arith_test_pvm.eval_levels_and_inputs ~metadata ctxt levels_and_inputs
+      in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
     match strategy with
@@ -1220,14 +1245,37 @@ module Player_client = struct
         let _state, tick, our_states = eval_inputs new_levels_and_inputs in
         return (tick, our_states, new_levels_and_inputs)
 
+  let gen_raw_level =
+    let open QCheck2.Gen in
+    let* level = map Int32.abs int32 in
+    return (Raw_level.of_int32_exn level)
+
+  let gen_rollup =
+    let open QCheck2.Gen in
+    let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
+    return (Sc_rollup_repr.Address.hash_bytes [bytes])
+
+  let gen_metadata =
+    let open QCheck2.Gen in
+    let* address = gen_rollup in
+    let* origination_level = gen_raw_level in
+    return Metadata.{address; origination_level}
+
   (** [gen ~rollup ~level_min ~level_max player levels_and_inputs] generates
       a {!player_client} based on {!player.strategy}. *)
   let gen ~rollup ~origination_level ~level_min ~level_max player
       levels_and_inputs =
     let open QCheck2.Gen in
     let ctxt = empty_memory_ctxt "foo" in
+    let* metadata =
+      match player.strategy with
+      | Perfect | Lazy | Eager | Keen ->
+          return Sc_rollup.Metadata.{address = rollup; origination_level}
+      | Random -> gen_metadata
+    in
     let* tick, our_states, levels_and_inputs =
       gen_our_states
+        ~metadata
         ctxt
         player.strategy
         ~level_min
@@ -1238,7 +1286,14 @@ module Player_client = struct
       construct_inbox ~origination_level ctxt rollup levels_and_inputs
     in
     return
-      {player; final_tick = tick; states = our_states; inbox; levels_and_inputs}
+      {
+        player;
+        final_tick = tick;
+        states = our_states;
+        inbox;
+        levels_and_inputs;
+        metadata;
+      }
 end
 
 (** [create_commitment ~predecessor ~inbox_level ~our_states] creates
@@ -1289,8 +1344,10 @@ let build_proof ~player_client start_tick (game : Game.t) =
   (* We start a game on a commitment that starts at [Tick.initial], the fuel
      is necessarily [start_tick]. *)
   let fuel = tick_to_int_exn start_tick in
+  let metadata = player_client.metadata in
   let*! r =
     Arith_test_pvm.eval_levels_and_inputs
+      ~metadata
       ~fuel
       (Arith_test_pvm.init_context ())
       player_client.levels_and_inputs
@@ -1313,7 +1370,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
       let inbox = history_proof
     end
   end in
-  let*! proof = Sc_rollup.Proof.produce (module P) game.inbox_level in
+  let*! proof = Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 
 (** [next_move ~number_of_sections ~player_client game] produces
@@ -1563,7 +1620,7 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
         (if p1_start then "p1" else "p2")
         pp_levels_and_inputs
         levels_and_inputs)
-    ~count:300
+    ~count:200
     ~name
     ~gen:(gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy ())
     (fun ( block,

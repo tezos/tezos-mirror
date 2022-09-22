@@ -128,10 +128,9 @@ let test_boot () =
   let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
   is_input_state state >>= function
-  | Initial -> return ()
-  | Needs_reveal _ | First_after _ ->
-      failwith
-        "After booting, the machine should be waiting for the initial input."
+  | Needs_reveal Reveal_metadata -> return ()
+  | Initial | Needs_reveal _ | First_after _ ->
+      failwith "After booting, the machine should be waiting for the metadata."
   | No_input_required ->
       failwith "After booting, the machine must be waiting for input."
 
@@ -211,7 +210,7 @@ let syntactically_valid_messages =
 let syntactically_invalid_messages =
   List.map
     (fun s -> (s, []))
-    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a_"]
+    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a$"]
 
 let test_parsing_messages () =
   List.iter_es (test_parsing_message ~valid:true) syntactically_valid_messages
