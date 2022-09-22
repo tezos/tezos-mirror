@@ -761,6 +761,10 @@ module Event = struct
       ()
 end
 
+let patch_network ?(cfg = Node_config_file.default_config) blockchain_network =
+  let open Lwt_result_syntax in
+  return {cfg with blockchain_network}
+
 let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?(ignore_bootstrap_peers = false) ?(cfg = Node_config_file.default_config)
     args =
@@ -790,7 +794,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     log_output;
     bootstrap_threshold;
     history_mode;
-    network;
+    network = network_arg;
     config_file = _;
     synchronisation_threshold;
     latency;
@@ -812,35 +816,29 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     | None, Some threshold | Some threshold, None -> return_some threshold
     | None, None -> return_none
   in
-  let* network_data =
-    match network with
-    | None -> return None
-    | Some n ->
-        let* x = load_net_config n in
-        return (Some x)
-  in
   (* Overriding the network with [--network] is a bad idea if the configuration
      file already specifies it. Essentially, [--network] tells the node
      "if there is no config file, use this network; otherwise, check that the
      config file uses the network I expect". This behavior can be overridden
      by [may_override_network], which is used when doing [config init]. *)
-  let* () =
-    match network_data with
-    | None -> return_unit
-    | Some net ->
-        if may_override_network then return_unit
-        else if
+  let* cfg =
+    match network_arg with
+    | None -> return cfg
+    | Some network_arg ->
+        let* network_arg = load_net_config network_arg in
+        if
           Distributed_db_version.Name.equal
             cfg.blockchain_network.chain_name
-            net.chain_name
-        then return_unit
+            network_arg.chain_name
+          || may_override_network
+        then patch_network ~cfg network_arg
         else
           tzfail
             (Network_configuration_mismatch
                {
                  configuration_file_chain_name =
                    cfg.blockchain_network.chain_name;
-                 command_line_chain_name = net.chain_name;
+                 command_line_chain_name = network_arg.chain_name;
                })
   in
   (* Update bootstrap peers must take into account the updated config file
@@ -853,10 +851,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
       let cfg_peers =
         match cfg.p2p.bootstrap_peers with
         | Some peers -> peers
-        | None -> (
-            match network_data with
-            | Some net -> net.default_bootstrap_peers
-            | None -> cfg.blockchain_network.default_bootstrap_peers)
+        | None -> cfg.blockchain_network.default_bootstrap_peers
       in
       return (cfg_peers @ peers)
   in
@@ -946,7 +941,6 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     ?log_output
     ?synchronisation_threshold
     ?history_mode
-    ?network:network_data
     ?latency
     cfg
 
