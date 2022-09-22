@@ -52,12 +52,20 @@
                     const range_t = range(+threshold_low, +threshold_high);
 
                     let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
-
+                        /*
                         console.log(dict_data)
                         let t_op_valide_array = delays_distribution_of_operations(dict_data);
                         console.log(t_op_valide_array)
                         const results = SeriesPercIntegration(range_t, t_op_valide_array[0]);
                         console.log(results)
+                        */
+                        let endorsing_power= get_endorsing_power(dict_data)
+                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        console.log("endorsing_power", endorsing_power)
+                        console.log("t_op_valide_dict", t_op_valide_dict)
+                        let results = SeriesPercIntegration_w_endorsing_power(range_t, t_op_valide_dict[0], endorsing_power)
+
+
                         chart_preendorsement_inclusion_based_on_multiple_threshold_time(results)
 
                     });
