@@ -409,7 +409,11 @@ val loser_of_results : alice_result:bool -> bob_result:bool -> player option
     [Ended <game_result>] status.
 *)
 val play :
-  stakers:Index.t -> t -> refutation -> (game_result, t) Either.t tzresult Lwt.t
+  stakers:Index.t ->
+  Sc_rollup_metadata_repr.t ->
+  t ->
+  refutation ->
+  (game_result, t) Either.t tzresult Lwt.t
 
 (** A type that represents the number of blocks left for players to play. Each
     player has her timeout value. `timeout` is expressed in the number of

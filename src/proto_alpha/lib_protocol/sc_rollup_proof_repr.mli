@@ -50,6 +50,7 @@ type reveal_proof =
   | Raw_data_proof of string
       (** The existence of reveal for a given hash when the
           [input_requested] is the [Needs_for_reveal]. *)
+  | Metadata_proof
 
 (** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
@@ -115,6 +116,7 @@ val stop : t -> State_hash.t
     input_request for the state at the beginning of the proof.
 *)
 val valid :
+  metadata:Sc_rollup_metadata_repr.t ->
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   pvm_name:string ->
@@ -144,7 +146,7 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-(** [produce pvm_and_state inbox_context inbox_history commit_level]
+(** [produce ~metadata pvm_and_state inbox_context inbox_history commit_level]
     will construct a full refutation game proof out of the [state] given
     in [pvm_and_state].  It uses the [inbox] if necessary to provide
     input in the proof. If the input is above or at [commit_level] it
@@ -160,6 +162,13 @@ end
 
     This uses the [name] in the [pvm_and_state] module to produce an
     encodable [wrapped_proof] if possible. See the [wrap_proof] function
-    in [Sc_rollups]. *)
+    in [Sc_rollups].
+
+    It also need the [metadata] if it produces a proof for the [Needs_metadata]
+    state.
+*)
 val produce :
-  (module PVM_with_context_and_state) -> Raw_level_repr.t -> t tzresult Lwt.t
+  metadata:Sc_rollup_metadata_repr.t ->
+  (module PVM_with_context_and_state) ->
+  Raw_level_repr.t ->
+  t tzresult Lwt.t

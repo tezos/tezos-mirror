@@ -716,6 +716,7 @@ module Sc_rollup : sig
       Each smart contract rollup is associated to:
 
       - a PVM kind (provided at creation time, read-only)
+      - a metadata (generated at creation time, read-only)
       - a boot sector (provided at creation time, read-only)
       - a parameters type specifying the types of parameters the rollup accepts
       - the L1 block level at which the rollup was created

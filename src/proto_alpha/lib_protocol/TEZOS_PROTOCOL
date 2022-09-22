@@ -171,8 +171,8 @@
         "Sc_rollup_inbox_storage",
         "Sc_rollup_outbox_storage",
         "Sc_rollup_stake_storage",
-        "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",
+        "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
         "Dal_slot_storage",

@@ -63,7 +63,7 @@ type inbox_message = {
   payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
-type reveal_data = Raw_data of string
+type reveal_data = Raw_data of string | Metadata of Sc_rollup_metadata_repr.t
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -92,10 +92,19 @@ let reveal_data_encoding =
          (req
             "raw_data"
             (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
-      (function Raw_data m -> Some ((), Bytes.of_string m))
+      (function Raw_data m -> Some ((), Bytes.of_string m) | _ -> None)
       (fun ((), m) -> Raw_data (Bytes.to_string m))
+  and case_metadata =
+    case
+      ~title:"metadata"
+      (Tag 1)
+      (obj2
+         (req "reveal_data_kind" (constant "metadata"))
+         (req "metadata" Sc_rollup_metadata_repr.encoding))
+      (function Metadata md -> Some ((), md) | _ -> None)
+      (fun ((), md) -> Metadata md)
   in
-  union [case_raw_data]
+  union [case_raw_data; case_metadata]
 
 let input_encoding =
   let open Data_encoding in
@@ -129,13 +138,18 @@ let inbox_message_equal a b =
   && String.equal (payload :> string) (b.payload :> string)
 
 let reveal_data_equal a b =
-  match (a, b) with Raw_data a, Raw_data b -> String.equal a b
+  match (a, b) with
+  | Raw_data a, Raw_data b -> String.equal a b
+  | Raw_data _, _ -> false
+  | Metadata a, Metadata b -> Sc_rollup_metadata_repr.equal a b
+  | Metadata _, _ -> false
 
 let input_equal a b =
   match (a, b) with
   | Inbox_message a, Inbox_message b -> inbox_message_equal a b
+  | Inbox_message _, _ -> false
   | Reveal a, Reveal b -> reveal_data_equal a b
-  | Inbox_message _, Reveal _ | Reveal _, Inbox_message _ -> false
+  | Reveal _, _ -> false
 
 module Input_hash =
   Blake2B.Make
@@ -151,21 +165,28 @@ module Input_hash =
       let size = Some 20
     end)
 
-type reveal = Reveal_raw_data of Input_hash.t
+type reveal = Reveal_raw_data of Input_hash.t | Reveal_metadata
 
 let reveal_encoding =
   let open Data_encoding in
   let case_raw_data =
     case
-      ~title:"RevealRawData"
+      ~title:"Reveal_raw_data"
       (Tag 0)
       (obj2
          (req "reveal_kind" (constant "reveal_raw_data"))
          (req "input_hash" Input_hash.encoding))
-      (function Reveal_raw_data s -> Some ((), s))
+      (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
+  and case_metadata =
+    case
+      ~title:"Reveal_metadata"
+      (Tag 1)
+      (obj1 (req "reveal_kind" (constant "reveal_metadata")))
+      (function Reveal_metadata -> Some () | _ -> None)
+      (fun () -> Reveal_metadata)
   in
-  union [case_raw_data]
+  union [case_raw_data; case_metadata]
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
@@ -176,8 +197,8 @@ let reveal_encoding =
     - [First_after (level, counter)] expects whatever comes next after that
       position in the inbox.
 
-    - [Needs_reveal reveal] if the machine reveals the existence of
-      some data and needs this data to continue its execution.
+    - [Needs_metadata] if the machine needs the metadata to continue
+      its execution.
 *)
 type input_request =
   | No_input_required
@@ -224,7 +245,9 @@ let input_request_encoding =
         (fun ((), p) -> Needs_reveal p);
     ]
 
-let pp_reveal fmt (Reveal_raw_data hash) = Input_hash.pp fmt hash
+let pp_reveal fmt = function
+  | Reveal_raw_data hash -> Input_hash.pp fmt hash
+  | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -246,6 +269,9 @@ let pp_input_request fmt request =
 let reveal_equal p1 p2 =
   match (p1, p2) with
   | Reveal_raw_data h1, Reveal_raw_data h2 -> Input_hash.equal h1 h2
+  | Reveal_raw_data _, _ -> false
+  | Reveal_metadata, Reveal_metadata -> true
+  | Reveal_metadata, _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =
