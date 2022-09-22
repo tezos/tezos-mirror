@@ -27,9 +27,12 @@ let () = assert (v = w)
 Tutorial
 --------
 
-A full tutorial is available in markdown form in `src/tutorial.md` and the
-generated html is hosted on
-<https://nomadic-labs.gitlab.io/data-encoding/data-encoding/Data_encoding/tutorial.html>.
+A full tutorial is available in markdown form in [`src/tutorial.md`](https://gitlab.com/nomadic-labs/data-encoding/-/blob/master/src/tutorial.md).
+
+It is available online on
+[ocaml.org's package documentation](https://ocaml.org/p/data-encoding/0.6/doc/tutorial.html)
+and on
+[data-encoding's own online documentation](https://nomadic-labs.gitlab.io/data-encoding/data-encoding/tutorial.html).
 
 Build and Install
 -----------------
