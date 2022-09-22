@@ -244,6 +244,25 @@ let validate_operation = Validate.validate_operation
 
 let finalize_validation = Validate.finalize_block
 
+type error += Cannot_apply_in_partial_application
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"main.begin_application.cannot_apply_in_partial_application"
+    ~title:"cannot_apply_in_partial_application"
+    ~description:
+      "Cannot instantiate an application state using the 'Partial_application' \
+       mode."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot instantiate an application state using the \
+         'Partial_application' mode.")
+    Data_encoding.(empty)
+    (function Cannot_apply_in_partial_application -> Some () | _ -> None)
+    (fun () -> Cannot_apply_in_partial_application)
+
 let begin_application ctxt chain_id mode ~predecessor =
   let open Lwt_tzresult_syntax in
   let open Alpha_context in
@@ -265,14 +284,7 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~migration_operation_results
         ~predecessor_fitness
         block_header
-  | Partial_application block_header ->
-      Apply.begin_partial_application
-        chain_id
-        ~ancestor_context:ctxt
-        ~migration_balance_updates
-        ~migration_operation_results
-        ~predecessor_fitness
-        block_header
+  | Partial_application _ -> fail Cannot_apply_in_partial_application
   | Construction {predecessor_hash; timestamp; block_header_data; _} ->
       let*? predecessor_round = Fitness.round_from_raw predecessor_fitness in
       Apply.begin_full_construction
