@@ -81,8 +81,6 @@ let mark_processed_head store Layer1.({hash; level} as head) =
   let open Lwt_syntax in
   let* () = Store.ProcessedHashes.add store hash () in
   let* () = Store.Levels.add store level hash in
-  let* () = Layer1_event.setting_new_head hash level in
-  let* () = Layer1_event.new_head_processed hash level in
   Store.LastProcessedHead.set store head
 
 let is_processed store head = Store.ProcessedHashes.mem store head

@@ -24,17 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type head_state = {head : Layer1.head; finalized : bool; seen_before : bool}
-
-let emit_head_processing_event {head = {hash; level}; finalized; seen_before} =
-  Daemon_event.head_processing hash level finalized seen_before
-
-let emit_heads_not_processed_event head_states =
-  Lwt_list.iter_s
-    (fun {head = {hash; level}; _} ->
-      Daemon_event.not_finalized_head hash level)
-    head_states
-
 module Make (PVM : Pvm.S) = struct
   module Components = Components.Make (PVM)
   open Protocol
@@ -181,7 +170,7 @@ module Make (PVM : Pvm.S) = struct
     level < origination_level
 
   let rec processed_finalized_block (node_ctxt : Node_context.t)
-      Layer1.({level; _} as block) =
+      Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
     let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
     let already_finalized =
@@ -195,6 +184,7 @@ module Make (PVM : Pvm.S) = struct
     let* () =
       Option.iter_es (processed_finalized_block node_ctxt) predecessor
     in
+    let*! () = Daemon_event.head_processing hash level ~finalized:true in
     let* () = process_l1_block_operations ~finalized:true node_ctxt block in
     let* () = Components.Commitment.process_head node_ctxt block in
     (* At each block, there may be some refutation related actions to
@@ -211,34 +201,41 @@ module Make (PVM : Pvm.S) = struct
       let* pred = Layer1.get_predecessor_opt l1_ctxt head in
       nth_predecessor l1_ctxt (n - 1) pred
 
-  let rec process_head (node_ctxt : Node_context.t) Layer1.({hash; _} as head) =
+  let rec process_head (node_ctxt : Node_context.t)
+      Layer1.({hash; level} as head) =
     let open Lwt_result_syntax in
     let*! seen_before = State.is_processed node_ctxt.store hash in
-    unless (seen_before || before_origination node_ctxt head) @@ fun () ->
-    let*! predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt head in
-    let* () = Option.iter_es (process_head node_ctxt) predecessor in
-    let*! () = Daemon_event.processing_heads_iteration [] [head] in
-    let* ctxt = Inbox.process_head node_ctxt head in
-    let* () = Dal_slots_tracker.process_head node_ctxt head in
-    let* () = process_l1_block_operations ~finalized:false node_ctxt head in
-    (* Avoid storing and publishing commitments if the head is not final *)
-    (* Avoid triggering the pvm execution if this has been done before for this
-       head *)
-    let* () = Components.Interpreter.process_head node_ctxt ctxt head in
-    let*! finalized_block =
-      nth_predecessor node_ctxt.l1_ctxt node_ctxt.block_finality_time head
-    in
-    let* () =
-      Option.iter_es (processed_finalized_block node_ctxt) finalized_block
-    in
-    let*! () = State.mark_processed_head node_ctxt.store head in
-    (* Publishing a commitment when one is available does not depend on the
-       state of the current head. *)
-    let* () = Components.Commitment.publish_commitment node_ctxt in
-    let* () =
-      Components.Commitment.cement_commitment_if_possible node_ctxt head
-    in
-    return_unit
+    if seen_before || before_origination node_ctxt head then return_nil
+    else
+      let*! predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt head in
+      let* processed =
+        match predecessor with
+        | None -> return_nil
+        | Some predecessor -> process_head node_ctxt predecessor
+      in
+      let*! () = Daemon_event.head_processing hash level ~finalized:false in
+      let* ctxt = Inbox.process_head node_ctxt head in
+      let* () = Dal_slots_tracker.process_head node_ctxt head in
+      let* () = process_l1_block_operations ~finalized:false node_ctxt head in
+      (* Avoid storing and publishing commitments if the head is not final. *)
+      (* Avoid triggering the pvm execution if this has been done before for
+         this head. *)
+      let* () = Components.Interpreter.process_head node_ctxt ctxt head in
+      let*! finalized_block =
+        nth_predecessor node_ctxt.l1_ctxt node_ctxt.block_finality_time head
+      in
+      let* () =
+        Option.iter_es (processed_finalized_block node_ctxt) finalized_block
+      in
+      let*! () = State.mark_processed_head node_ctxt.store head in
+      (* Publishing a commitment when one is available does not depend on the
+         state of the current head. *)
+      let* () = Components.Commitment.publish_commitment node_ctxt in
+      let* () =
+        Components.Commitment.cement_commitment_if_possible node_ctxt head
+      in
+      let*! () = Daemon_event.new_head_processed hash level in
+      return (head :: processed)
 
   let notify_injector {Node_context.l1_ctxt; _} old_head new_head =
     let open Lwt_result_syntax in
@@ -266,8 +263,9 @@ module Make (PVM : Pvm.S) = struct
     let*! old_head =
       State.last_processed_head_opt node_ctxt.Node_context.store
     in
-    let* () = process_head node_ctxt head in
+    let* new_heads = process_head node_ctxt head in
     let* () = notify_injector node_ctxt old_head head in
+    let*! () = Daemon_event.new_heads_processed new_heads in
     let*! () = Injector.inject () in
     return_unit
 

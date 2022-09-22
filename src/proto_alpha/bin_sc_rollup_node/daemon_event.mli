@@ -29,22 +29,18 @@ open Alpha_context
 (** This module defines functions that emit the events used by the smart
     contract rollup node daemon (see {!Daemon}). *)
 
-(** [head_processing hash level finalized seen_before] emits the event that the
+(** [head_processing hash level ~finalized] emits the event that the
     block of the given [hash] and at the given [level] is being processed, and
-    whether it is [finalized] and has been [seen_before]. *)
-val head_processing : Block_hash.t -> int32 -> bool -> bool -> unit Lwt.t
+    whether it is [finalized]. *)
+val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
 
-(** [not_finalized_head hash level] emits the event that the block of the given
-    [hash] and at the given [level] is being processed but has not been
-    finalized yet by the layer 1 consensus algorithm. *)
-val not_finalized_head : Block_hash.t -> int32 -> unit Lwt.t
+(** [new_head_processed hash level] emits the event that the daemon has finished
+    processing the head of the given [hash] and at the given [level]. *)
+val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
 
-(** [processing_heads_iteration old_heads new_heads] emits the event that a new
-    iteration of processing the heads has been triggered, from the level of the
-    oldest head to the level of the most recent head between the [old_heads] and
-    the [new_heads]. *)
-val processing_heads_iteration :
-  Layer1.head list -> Layer1.head list -> unit Lwt.t
+(** [new_heads_processed heads] emits the event that the [heads] were
+    processed. *)
+val new_heads_processed : Layer1.head list -> unit Lwt.t
 
 (** [included_operation ~finalized op result] emits an event that an operation
     for the rollup was included in a block (or finalized). *)

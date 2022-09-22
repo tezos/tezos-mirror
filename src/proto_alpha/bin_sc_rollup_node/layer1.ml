@@ -199,8 +199,9 @@ let rec connect ?(count = 0) ~delay cctxt genesis_info store =
   match res with
   | Ok (heads, stopper) ->
       let heads =
-        Lwt_stream.map
+        Lwt_stream.map_s
           (fun (hash, Tezos_base.Block_header.{shell = {level; _}; _}) ->
+            let+ () = Layer1_event.switched_new_head hash level in
             {hash; level})
           heads
       in

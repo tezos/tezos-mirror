@@ -30,19 +30,6 @@ val starting : unit -> unit Lwt.t
 
 val stopping : unit -> unit Lwt.t
 
-(** [rollback hash level] emits the event that the layer 1 head is rolling back
-    to the block of the given [hash] and at the given [level]. *)
-val rollback : Block_hash.t -> int32 -> unit Lwt.t
-
-(** [setting_new_head hash level] emits the event that the layer 1 head is set
-    to the block of the given [hash] and at the given [level]. *)
-val setting_new_head : Block_hash.t -> int32 -> unit Lwt.t
-
-(** [new_head_processed hash level] emits the event that the layer 1 head of the
-    given [hash] and at the given [level] is finished processing. *)
-val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
-
-(** [reacting_to_reorganization rollbacked_block new_blocks] emits the event
-    that the rollup node is rolling back to the block of hash [rollbacked_block]
-    and will be processing the [new_blocks] due to a layer 1 reorganization. *)
-val reacting_to_reorganization : Block_hash.t -> Block_hash.t list -> unit Lwt.t
+(** [switched_new_head hash level] emits the event that the layer 1 has notified
+    a new head with [hash] at some given [level]. *)
+val switched_new_head : Block_hash.t -> int32 -> unit Lwt.t
