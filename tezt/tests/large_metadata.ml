@@ -263,7 +263,7 @@ let check_unlimited_metadata =
   let big_exponent = 24 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit:1_040_000
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
