@@ -2880,7 +2880,7 @@ let test_interrupt_rollup_node =
   let processing_promise =
     Sc_rollup_node.wait_for
       sc_rollup_node
-      "sc_rollup_daemon_processing_heads.v0"
+      "sc_rollup_daemon_process_head.v0"
       (fun _ -> Some ())
   in
   let* () = bake_levels 15 client in
@@ -2888,7 +2888,7 @@ let test_interrupt_rollup_node =
   let* () = Sc_rollup_node.terminate ~kill:true sc_rollup_node in
   let* () = bake_levels 1 client in
   let* () = Sc_rollup_node.run sc_rollup_node in
-  let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 15 in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
 (* Testing the timeout to record gas consumption in a regression trace and
