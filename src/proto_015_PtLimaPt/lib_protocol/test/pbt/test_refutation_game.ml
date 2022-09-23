@@ -745,7 +745,8 @@ module Dissection = struct
         (* The test is not general enough to support all kind of number of
            sections. *)
         let number_of_sections =
-          Tezos_protocol_015_PtLimaPt_parameters.Default_parameters.constants_mainnet
+          Tezos_protocol_015_PtLimaPt_parameters.Default_parameters
+          .constants_mainnet
             .sc_rollup
             .number_of_sections_in_dissection
         in
