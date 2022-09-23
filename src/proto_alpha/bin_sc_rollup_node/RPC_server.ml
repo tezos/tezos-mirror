@@ -122,7 +122,7 @@ module Common = struct
   let register_current_num_messages store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_num_messages ())
+      Sc_rollup_services.Global.current_num_messages
       (fun () () ->
         let open Lwt_result_syntax in
         let* state_info = get_state_info_exn store in
@@ -131,25 +131,25 @@ module Common = struct
   let register_sc_rollup_address configuration dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.sc_rollup_address ())
+      Sc_rollup_services.Global.sc_rollup_address
       (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
 
   let register_current_tezos_head store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_tezos_head ())
+      Sc_rollup_services.Global.current_tezos_head
       (fun () () -> get_head_hash_opt store >>= return)
 
   let register_current_tezos_level store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_tezos_level ())
+      Sc_rollup_services.Global.current_tezos_level
       (fun () () -> get_head_level_opt store >>= return)
 
   let register_current_inbox node_ctxt dir =
     RPC_directory.opt_register0
       dir
-      (Sc_rollup_services.Global.current_inbox ())
+      Sc_rollup_services.Global.current_inbox
       (fun () () ->
         let open Lwt_result_syntax in
         let*! head = get_head_hash_opt node_ctxt.Node_context.store in
@@ -162,7 +162,7 @@ module Common = struct
   let register_current_ticks store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_ticks ())
+      Sc_rollup_services.Global.current_ticks
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state_info_exn store in
@@ -228,7 +228,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_total_ticks node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_total_ticks ())
+      Sc_rollup_services.Global.current_total_ticks
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state node_ctxt in
@@ -238,7 +238,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_state_hash node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_state_hash ())
+      Sc_rollup_services.Global.current_state_hash
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state node_ctxt in
@@ -248,7 +248,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_state_value node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Local.current_state_value ())
+      Sc_rollup_services.Local.current_state_value
       (fun {key} () ->
         let open Lwt_result_syntax in
         let* state = get_state node_ctxt in
@@ -263,7 +263,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_last_stored_commitment store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.last_stored_commitment ())
+      Sc_rollup_services.Global.last_stored_commitment
       (fun () () ->
         let open Lwt_result_syntax in
         let*! commitment_with_hash =
@@ -278,7 +278,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_last_published_commitment store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Local.last_published_commitment ())
+      Sc_rollup_services.Local.last_published_commitment
       (fun () () ->
         let open Lwt_result_syntax in
         let*! result =
@@ -301,7 +301,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_current_status node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_status ())
+      Sc_rollup_services.Global.current_status
       (fun () () ->
         let open Lwt_result_syntax in
         let* state = get_state node_ctxt in
@@ -311,19 +311,19 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_dal_slot_subscriptions store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.dal_slot_subscriptions ())
+      Sc_rollup_services.Global.dal_slot_subscriptions
       (fun () () -> get_dal_slot_subscriptions_exn store)
 
   let register_dal_slots store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.dal_slots ())
+      Sc_rollup_services.Global.dal_slots
       (fun () () -> get_dal_slots store)
 
   let register_current_outbox node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.current_outbox ())
+      Sc_rollup_services.Global.current_outbox
       (fun () () ->
         let open Lwt_result_syntax in
         let store = node_ctxt.Node_context.store in
@@ -338,19 +338,19 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let register_outbox_proof node_ctxt dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.outbox_proof ())
+      Sc_rollup_services.Global.outbox_proof
       (fun output () -> Outbox.proof_of_output node_ctxt output)
 
   let register_dal_slot_pages store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.dal_slot_pages ())
+      Sc_rollup_services.Global.dal_slot_pages
       (fun () () -> get_dal_slot_pages store)
 
   let register_dal_slot_page store dir =
     RPC_directory.register0
       dir
-      (Sc_rollup_services.Global.dal_slot_page ())
+      Sc_rollup_services.Global.dal_slot_page
       (fun {index; page} () -> get_dal_slot_page store index page)
 
   let register (node_ctxt : Node_context.t) configuration =

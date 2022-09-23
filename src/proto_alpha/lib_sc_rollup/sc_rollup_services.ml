@@ -61,91 +61,91 @@ module Global = struct
 
   let prefix = root / "global"
 
-  let sc_rollup_address () =
+  let sc_rollup_address =
     RPC_service.get_service
       ~description:"Smart-contract rollup address"
       ~query:RPC_query.empty
       ~output:Sc_rollup.Address.encoding
       (prefix / "sc_rollup_address")
 
-  let current_tezos_head () =
+  let current_tezos_head =
     RPC_service.get_service
       ~description:"Tezos head known to the smart-contract rollup node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Block_hash.encoding)
       (prefix / "tezos_head")
 
-  let current_tezos_level () =
+  let current_tezos_level =
     RPC_service.get_service
       ~description:"Tezos level known to the smart-contract rollup node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Data_encoding.int32)
       (prefix / "tezos_level")
 
-  let current_inbox () =
+  let current_inbox =
     RPC_service.get_service
       ~description:"Current inbox"
       ~query:RPC_query.empty
       ~output:Sc_rollup.Inbox.encoding
       (prefix / "inbox")
 
-  let current_ticks () =
+  let current_ticks =
     RPC_service.get_service
       ~description:"Current number of ticks for current level"
       ~query:RPC_query.empty
       ~output:Data_encoding.z
       (prefix / "ticks")
 
-  let current_total_ticks () =
+  let current_total_ticks =
     RPC_service.get_service
       ~description:"Current total number of ticks"
       ~query:RPC_query.empty
       ~output:Sc_rollup.Tick.encoding
       (prefix / "total_ticks")
 
-  let current_num_messages () =
+  let current_num_messages =
     RPC_service.get_service
       ~description:"Current number of messages"
       ~query:RPC_query.empty
       ~output:Data_encoding.z
       (prefix / "current_num_messages")
 
-  let current_state_hash () =
+  let current_state_hash =
     RPC_service.get_service
       ~description:"Current state hash"
       ~query:RPC_query.empty
       ~output:Sc_rollup.State_hash.encoding
       (prefix / "state_hash")
 
-  let last_stored_commitment () =
+  let last_stored_commitment =
     RPC_service.get_service
       ~description:"Last commitment computed by the node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option commitment_with_hash_and_level_encoding)
       (prefix / "last_stored_commitment")
 
-  let current_status () =
+  let current_status =
     RPC_service.get_service
       ~description:"Current PVM status"
       ~query:RPC_query.empty
       ~output:Data_encoding.string
       (prefix / "status")
 
-  let current_outbox () =
+  let current_outbox =
     RPC_service.get_service
       ~description:"Current outbox"
       ~query:RPC_query.empty
       ~output:Data_encoding.(list Sc_rollup.output_encoding)
       (prefix / "outbox")
 
-  let dal_slot_subscriptions () =
+  let dal_slot_subscriptions =
     RPC_service.get_service
       ~description:"Current data availability layer slot subscriptions"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list Dal.Slot_index.encoding)
       (prefix / "dal" / "slot_subscriptions")
 
-  let dal_slots () =
+  let dal_slots =
     RPC_service.get_service
       ~description:"Data availability slots for a given block hash"
       ~query:RPC_query.empty
@@ -197,7 +197,7 @@ module Global = struct
     let open Data_encoding in
     conv Bytes.of_string Bytes.to_string bytes
 
-  let outbox_proof () =
+  let outbox_proof =
     RPC_service.get_service
       ~description:"Generate serialized output proof for some outbox message"
       ~query:outbox_proof_query
@@ -208,7 +208,7 @@ module Global = struct
             (req "proof" hex_string))
       (prefix / "proofs" / "outbox")
 
-  let dal_slot_pages () =
+  let dal_slot_pages =
     RPC_service.get_service
       ~description:
         "Data availability downloaded slot pages for a given block hash"
@@ -248,7 +248,7 @@ module Global = struct
     |+ opt_field "slot_page" RPC_arg.int (fun q -> Some q.page)
     |> seal
 
-  let dal_slot_page () =
+  let dal_slot_page =
     RPC_service.get_service
       ~description:
         "Data availability downloaded slot pages for a given block hash"
@@ -274,7 +274,7 @@ module Local = struct
      As a consequence, the results returned by the endpoint below
      in the rollup node will be different.
   *)
-  let last_published_commitment () =
+  let last_published_commitment =
     RPC_service.get_service
       ~description:"Last commitment published by the node"
       ~query:RPC_query.empty
@@ -289,10 +289,10 @@ module Local = struct
     |+ field "key" RPC_arg.string "" (fun t -> t.key)
     |> seal
 
-  let current_state_value () =
+  let current_state_value =
     RPC_service.get_service
       ~description:"Current state value"
       ~query:state_value_query
       ~output:Data_encoding.bytes
-      RPC_path.(open_root / "state")
+      RPC_path.(root / "state")
 end
