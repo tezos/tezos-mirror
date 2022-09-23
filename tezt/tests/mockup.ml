@@ -677,6 +677,46 @@ let test_create_mockup_already_initialized =
   in
   unit
 
+(* Tests [tezos-client create mockup]s [--protocols-constants]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_constants =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom protocol constants."
+    ~tags:["mockup"; "client"; "mockup_protocol_constants"]
+  @@ fun protocol ->
+  let iter = Fun.flip Lwt_list.iter_s in
+  (* [chain_id] is the string to pass for field [chain_id]. It's
+     impossible to guess values of [chain_id], these ones have been *
+     obtained by looking at the output of [compute chain id from
+     seed]. *)
+  iter
+    [
+      "NetXcqTGZX74DxG";
+      "NetXaFDF7xZQCpR";
+      "NetXkKbtqncJcAz";
+      "NetXjjE5cZUeWPy";
+      "NetXi7C1pyLhQNe";
+    ]
+  @@ fun chain_id ->
+  (* initial_timestamp is an ISO-8601 formatted date string *)
+  iter ["2020-07-21T17:11:10+02:00"; "1970-01-01T00:00:00Z"]
+  @@ fun initial_timestamp ->
+  let parameter_file = Temp.file "tezos-custom-constants.json" in
+  let json_fields =
+    [
+      ("hard_gas_limit_per_operation", `String "400000");
+      ("chain_id", `String chain_id);
+      ("initial_timestamp", `String initial_timestamp);
+    ]
+  in
+  let json_data : JSON.u = `O json_fields in
+  JSON.encode_to_file_u parameter_file json_data ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~parameter_file client in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -691,7 +731,8 @@ let register ~protocols =
   test_storage_from_file protocols ;
   test_create_mockup_dir_exists_nonempty protocols ;
   test_retrieve_addresses protocols ;
-  test_create_mockup_already_initialized protocols
+  test_create_mockup_already_initialized protocols ;
+  test_create_mockup_custom_constants protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
