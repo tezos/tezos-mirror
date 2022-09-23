@@ -273,7 +273,7 @@ module V2_0_0 = struct
                  s)
           in
           set s
-      | PS.Reveal_revelation _ ->
+      | PS.Reveal _ ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3754
 
              The WASM PVM does not produce [Needs_reveal] input

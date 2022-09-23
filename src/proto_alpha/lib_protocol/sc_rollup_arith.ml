@@ -959,7 +959,7 @@ module Make (Context : P) :
   let set_input_monadic input =
     match input with
     | PS.Inbox_message m -> set_inbox_message_monadic m
-    | PS.Reveal_revelation s -> reveal_reveal_monadic s
+    | PS.Reveal s -> reveal_reveal_monadic s
 
   let set_input input = set_input_monadic input |> ticked |> state_of
 
@@ -1212,14 +1212,14 @@ module Make (Context : P) :
           match input_given with
           | Some (PS.Inbox_message _ as input_given) ->
               set_input input_given state
-          | None | Some (PS.Reveal_revelation _) ->
+          | None | Some (PS.Reveal _) ->
               state_of
                 (internal_error
                    "Invalid set_input: expecting inbox message, got a reveal.")
                 state)
       | PS.Needs_reveal _hash -> (
           match input_given with
-          | Some (PS.Reveal_revelation data) -> reveal_reveal data state
+          | Some (PS.Reveal data) -> reveal_reveal data state
           | None | Some (PS.Inbox_message _) ->
               state_of
                 (internal_error

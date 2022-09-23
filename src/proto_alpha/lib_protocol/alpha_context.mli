@@ -2983,9 +2983,7 @@ module Sc_rollup : sig
 
   type reveal_data = RawData of string
 
-  type input =
-    | Inbox_message of inbox_message
-    | Reveal_revelation of reveal_data
+  type input = Inbox_message of inbox_message | Reveal of reveal_data
 
   val input_equal : input -> input -> bool
 

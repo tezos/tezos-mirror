@@ -106,7 +106,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                   tzfail (Sc_rollup_node_errors.Cannot_retrieve_reveal hash)
               | Some data ->
                   let*! next_state =
-                    PVM.set_input (Reveal_revelation (RawData data)) state
+                    PVM.set_input (Reveal (RawData data)) state
                   in
                   go (consume_fuel fuel) (tick + 1) failing_ticks next_state)
           | _ -> return (state, fuel, tick, failing_ticks))

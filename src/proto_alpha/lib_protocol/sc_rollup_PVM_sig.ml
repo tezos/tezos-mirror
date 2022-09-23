@@ -65,7 +65,7 @@ type inbox_message = {
 
 type reveal_data = RawData of string
 
-type input = Inbox_message of inbox_message | Reveal_revelation of reveal_data
+type input = Inbox_message of inbox_message | Reveal of reveal_data
 
 (** [inbox_message_encoding] encoding value for {!inbox_message}. *)
 let inbox_message_encoding =
@@ -115,8 +115,8 @@ let input_encoding =
       (obj2
          (req "input_kind" (constant "reveal_revelation"))
          (req "reveal_data" reveal_data_encoding))
-      (function Reveal_revelation d -> Some ((), d) | _ -> None)
-      (fun ((), d) -> Reveal_revelation d)
+      (function Reveal d -> Some ((), d) | _ -> None)
+      (fun ((), d) -> Reveal d)
   in
   union [case_inbox_message; case_reveal_revelation]
 
@@ -134,10 +134,8 @@ let reveal_data_equal a b =
 let input_equal a b =
   match (a, b) with
   | Inbox_message a, Inbox_message b -> inbox_message_equal a b
-  | Reveal_revelation a, Reveal_revelation b -> reveal_data_equal a b
-  | Inbox_message _, Reveal_revelation _ | Reveal_revelation _, Inbox_message _
-    ->
-      false
+  | Reveal a, Reveal b -> reveal_data_equal a b
+  | Inbox_message _, Reveal _ | Reveal _, Inbox_message _ -> false
 
 module Input_hash =
   Blake2B.Make
