@@ -820,6 +820,12 @@ module Slots_history = struct
 
     module Internal_for_tests = struct
       let content = Skip_list.content
+
+      let proof_statement_is proof expected =
+        match (expected, proof) with
+        | `Confirmed, Page_confirmed _ | `Unconfirmed, Page_unconfirmed _ ->
+            true
+        | _ -> false
     end
   end
 

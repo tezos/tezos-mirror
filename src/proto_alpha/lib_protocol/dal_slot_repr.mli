@@ -301,5 +301,6 @@ module Slots_history : sig
   module Internal_for_tests : sig
     val content : t -> slot
 
+    val proof_statement_is : proof -> [`Confirmed | `Unconfirmed] -> bool
   end
 end
