@@ -26,23 +26,6 @@ _PC_FLAG = "protocol-constants"
 
 
 @pytest.mark.client
-def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir is a non empty directory which is NOT a mockup
-    directory. The call must fail.
-    """
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        # Make the directory not empty
-        with open(os.path.join(base_dir, "whatever"), "w") as handle:
-            handle.write("")
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, check=False
-        ).create_mockup_result
-        assert res == CreateMockupResult.DIR_NOT_EMPTY
-
-
-@pytest.mark.client
 def test_retrieve_addresses(mockup_client: Client):
     """Retrieves known addresses of a fresh mockup.
     The call must succeed.

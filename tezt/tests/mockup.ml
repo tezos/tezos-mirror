@@ -622,6 +622,25 @@ let test_list_mockup_protocols () =
   if protocols = [] then Test.fail "List of mockup protocols must be non-empty" ;
   unit
 
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is a non empty directory which is NOT a mockup
+   directory. The call must fail. *)
+let test_create_mockup_dir_exists_nonempty =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup in existing base dir"
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let base_dir = Temp.dir "mockup_dir" in
+  Base.write_file ~contents:"" (base_dir ^ "/" ^ "whatever") ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is not empty, please specify a fresh base directory")
+  in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -633,7 +652,8 @@ let register ~protocols =
   test_rpc_header_shell protocols ;
   test_origination_from_unrevealed_fees protocols ;
   test_multiple_transfers protocols ;
-  test_storage_from_file protocols
+  test_storage_from_file protocols ;
+  test_create_mockup_dir_exists_nonempty protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
