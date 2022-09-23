@@ -27,11 +27,11 @@
 /src/lib_benchmark           @lrand
 /src/lib_context             @smelc
 /src/lib_error_monad         @raphael-proust
-/src/lib_mockup              @richard.bonichon @smelc
-/src/lib_mockup_proxy        @richard.bonichon @smelc
+/src/lib_mockup              @smelc
+/src/lib_mockup_proxy        @smelc
 /src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment @raphael-proust
-/src/lib_proxy               @richard.bonichon @smelc
+/src/lib_proxy               @smelc
 /src/lib_proxy_server_config @smelc
 /src/lib_rpc*                @smelc @raphael-proust
 /src/lib_shell_benchmarks    @lrand
@@ -80,20 +80,18 @@
 # @pirbo = Pierre Boutillier
 # @rafoo_ = Raphaël Cauderlier
 # @raphael-proust = Raphaël Proust
-# @richard.bonichon = Richard Bonichon
 # @romain.nl = Romain
 # @Saroupille = François Thiré
 # @smelc = Clément Hurlin
 # @smondet = Seb Mondet
 # @sribaroud = Sylvain R.
-# @sventimir = Sventimir
 # @tomjack = Tom Jack
 # @vbotbol = vbot
 # @vch9 = Valentin Chaboche
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @andrea.cerone @arvidnl @bsall @camlspotter @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @richard.bonichon @romain.nl @Saroupille @smelc @smondet @sribaroud @sventimir @tomjack @vbotbol @vch9 @vect0r @yrg
+* @andrea.cerone @arvidnl @bsall @camlspotter @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #
