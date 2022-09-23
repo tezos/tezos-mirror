@@ -63,7 +63,7 @@ let test_rpc_header_shell =
 let transfer_data =
   (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
-let test_balances_after_transfer giver amount receiver =
+let check_balances_after_transfer giver amount receiver =
   let giver_balance_before, giver_balance_after = giver in
   let receiver_balance_before, receiver_balance_after = receiver in
   if not Tez.(giver_balance_after < giver_balance_before - amount) then
@@ -109,7 +109,7 @@ let test_transfer =
   let* receiver_balance_after =
     Client.get_balance_for ~account:receiver client
   in
-  test_balances_after_transfer
+  check_balances_after_transfer
     (giver_balance_before, giver_balance_after)
     amount
     (receiver_balance_before, receiver_balance_after) ;
@@ -455,7 +455,7 @@ let test_migration_transfer ?migration_spec () =
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
       in
-      test_balances_after_transfer
+      check_balances_after_transfer
         (giver_balance_before, giver_balance_after)
         amount
         (receiver_balance_before, receiver_balance_after) ;
