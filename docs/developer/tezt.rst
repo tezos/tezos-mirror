@@ -213,7 +213,7 @@ Let's review what our basic test in the previous section does.
 Regression Tests
 ----------------
 
-This form of testing is used to prevent unintended changes to existing
+Regression tests are used to prevent unintended changes to existing
 functionality by ensuring that the software behaves the same way as it did
 before introduced changes.
 
@@ -232,6 +232,11 @@ introduced, the output of regression test must be (re-)generated. This can be
 done with the ``--reset-regressions`` option, e.g.::
 
     dune exec tezt/tests/main.exe regression -- --reset-regressions
+
+Regression tests are registered with ``Regression.register`` instead of
+``Test.register``. Use ``Regression.capture`` or ``Regression.hooks`` to
+capture output that you want to be stable. Regression tests can be used
+both in unit tests and integration tests.
 
 Pre-commit hook
 ---------------
