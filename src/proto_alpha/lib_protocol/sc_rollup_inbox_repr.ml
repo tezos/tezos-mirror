@@ -1059,8 +1059,6 @@ struct
 
   let produce_proof ctxt history inbox (l, n) =
     let open Lwt_tzresult_syntax in
-    let cell_ptr = hash_skip_list_cell inbox in
-    let*? history = History.remember cell_ptr inbox history in
     let deref ptr = History.find ptr history in
     let compare hash =
       let*! tree = P.lookup_tree ctxt hash in
@@ -1073,22 +1071,22 @@ struct
           | None -> -1
           | Some level -> Raw_level_repr.compare level l)
     in
-    let* path =
-      option_to_result
-        (Format.sprintf
-           "Skip_list.search failed to find path to requested level (%ld)"
-           (Raw_level_repr.to_int32 l))
-        (Skip_list.search ~deref ~compare ~cell_ptr)
-    in
-    let* inc =
-      option_to_result
-        "failed to deref some level in the path"
-        (Lwt.return (lift_ptr_path deref path))
-    in
-    let* level =
-      option_to_result
-        "Skip_list.search returned empty list"
-        (Lwt.return (List.last_opt inc))
+    let*! result = Skip_list.search ~deref ~compare ~cell:inbox in
+    let* inc, level =
+      match result with
+      | Skip_list.{rev_path; last_cell = Found level} ->
+          return (List.rev rev_path, level)
+      | {last_cell = Nearest _; _}
+      | {last_cell = No_exact_or_lower_ptr; _}
+      | {last_cell = Deref_returned_none; _} ->
+          (* We are only interested to the result where [search] than a
+             path to the cell we were looking for. All the other cases
+             should be considered as an error. *)
+          proof_error
+            (Format.asprintf
+               "Skip_list.search failed to find a valid path: %a"
+               (Skip_list.pp_search_result ~pp_cell:pp_history_proof)
+               result)
     in
     let* level_tree =
       option_to_result
@@ -1112,6 +1110,9 @@ struct
           return (Single_level {level; inc; message_proof}, None)
         else
           let target_index = Skip_list.index level + 1 in
+          let cell_ptr = hash_skip_list_cell inbox in
+          let*? history = History.remember cell_ptr inbox history in
+          let deref ptr = History.find ptr history in
           let* inc =
             option_to_result
               "failed to find path to upper level"
