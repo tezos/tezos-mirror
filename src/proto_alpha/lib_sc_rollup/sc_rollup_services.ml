@@ -49,12 +49,17 @@ open Alpha_context
    See below for a more detailed explanation.
 *)
 
-let commitment_with_hash_and_level_encoding =
-  Data_encoding.(
+module Encodings = struct
+  open Data_encoding
+
+  let commitment_with_hash_and_level =
     obj3
       (req "commitment" Sc_rollup.Commitment.encoding)
       (req "hash" Sc_rollup.Commitment.Hash.encoding)
-      (opt "published_at_level" Raw_level.encoding))
+      (opt "published_at_level" Raw_level.encoding)
+
+  let hex_string = conv Bytes.of_string Bytes.to_string bytes
+end
 
 module Global = struct
   open RPC_path
@@ -121,7 +126,7 @@ module Global = struct
     RPC_service.get_service
       ~description:"Last commitment computed by the node"
       ~query:RPC_query.empty
-      ~output:(Data_encoding.option commitment_with_hash_and_level_encoding)
+      ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (prefix / "last_stored_commitment")
 
   let current_status =
@@ -193,10 +198,6 @@ module Global = struct
            | Error e -> invalid_message e)
     |> seal
 
-  let hex_string =
-    let open Data_encoding in
-    conv Bytes.of_string Bytes.to_string bytes
-
   let outbox_proof =
     RPC_service.get_service
       ~description:"Generate serialized output proof for some outbox message"
@@ -205,7 +206,7 @@ module Global = struct
         Data_encoding.(
           obj2
             (req "commitment" Sc_rollup.Commitment.Hash.encoding)
-            (req "proof" hex_string))
+            (req "proof" Encodings.hex_string))
       (prefix / "proofs" / "outbox")
 
   let dal_slot_pages =
@@ -278,7 +279,7 @@ module Local = struct
     RPC_service.get_service
       ~description:"Last commitment published by the node"
       ~query:RPC_query.empty
-      ~output:(Data_encoding.option commitment_with_hash_and_level_encoding)
+      ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (prefix / "last_published_commitment")
 
   type state_value_query = {key : string}
