@@ -86,27 +86,6 @@ def test_create_mockup_already_initialized(mockup_client: Client):
     assert res == CreateMockupResult.ALREADY_INITIALIZED
 
 
-@pytest.mark.client
-def test_transfer(mockup_client: Client):
-    """Executes `tezos-client --base-dir /tmp/mdir -M mockup
-              transfer 1 from bootstrap1 to bootstrap2`
-    in a valid mockup environment.
-    The call must succeed and the balances must be updated correctly.
-    """
-    giver = "bootstrap1"
-    receiver = "bootstrap2"
-    transferred = 1.0
-
-    giver_balance_before = mockup_client.get_balance(giver)
-    receiver_balance_before = mockup_client.get_balance(receiver)
-    mockup_client.transfer(transferred, giver, receiver)
-    giver_balance_after = mockup_client.get_balance(giver)
-    receiver_balance_after = mockup_client.get_balance(receiver)
-
-    assert giver_balance_after < giver_balance_before - transferred
-    assert receiver_balance_after == receiver_balance_before + transferred
-
-
 # It's impossible to guess values of chain_id, these ones have been
 # obtained by looking at the output of `compute chain id from seed`
 @pytest.mark.parametrize(
