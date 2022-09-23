@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** User activated upgrades: at given level, switch to given protocol. *)
-type upgrades = (Int32.t * Protocol_hash.t) list
+type upgrades = (Int32.t * Tezos_crypto.Protocol_hash.t) list
 
 val upgrades_encoding : upgrades Data_encoding.t
 
@@ -32,6 +32,7 @@ val upgrades_encoding : upgrades Data_encoding.t
 
     An override [(a, b)] denotes that if [a] is to be activated at the end
     of the promotion phase, [b] shall be activated instead. *)
-type protocol_overrides = (Protocol_hash.t * Protocol_hash.t) list
+type protocol_overrides =
+  (Tezos_crypto.Protocol_hash.t * Tezos_crypto.Protocol_hash.t) list
 
 val protocol_overrides_encoding : protocol_overrides Data_encoding.t

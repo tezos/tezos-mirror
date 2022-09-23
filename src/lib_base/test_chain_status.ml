@@ -25,11 +25,14 @@
 
 type t =
   | Not_running
-  | Forking of {protocol : Protocol_hash.t; expiration : Time.Protocol.t}
+  | Forking of {
+      protocol : Tezos_crypto.Protocol_hash.t;
+      expiration : Time.Protocol.t;
+    }
   | Running of {
-      chain_id : Chain_id.t;
-      genesis : Block_hash.t;
-      protocol : Protocol_hash.t;
+      chain_id : Tezos_crypto.Chain_id.t;
+      genesis : Tezos_crypto.Block_hash.t;
+      protocol : Tezos_crypto.Protocol_hash.t;
       expiration : Time.Protocol.t;
     }
 
@@ -54,7 +57,7 @@ let encoding =
            ~title:"Forking"
            (obj3
               (req "status" (constant "forking"))
-              (req "protocol" Protocol_hash.encoding)
+              (req "protocol" Tezos_crypto.Protocol_hash.encoding)
               (req "expiration" Time.Protocol.encoding))
            (function
              | Forking {protocol; expiration} -> Some ((), protocol, expiration)
@@ -65,9 +68,9 @@ let encoding =
            ~title:"Running"
            (obj5
               (req "status" (constant "running"))
-              (req "chain_id" Chain_id.encoding)
-              (req "genesis" Block_hash.encoding)
-              (req "protocol" Protocol_hash.encoding)
+              (req "chain_id" Tezos_crypto.Chain_id.encoding)
+              (req "genesis" Tezos_crypto.Block_hash.encoding)
+              (req "protocol" Tezos_crypto.Protocol_hash.encoding)
               (req "expiration" Time.Protocol.encoding))
            (function
              | Running {chain_id; genesis; protocol; expiration} ->
@@ -83,7 +86,7 @@ let pp ppf = function
       Format.fprintf
         ppf
         "@[<v 2>Forking %a (expires %a)@]"
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         protocol
         Time.System.pp_hum
         (Time.System.of_protocol_exn expiration)
@@ -91,11 +94,11 @@ let pp ppf = function
       Format.fprintf
         ppf
         "@[<v 2>Running %a@ Genesis: %a@ Net id: %a@ Expiration: %a@]"
-        Protocol_hash.pp
+        Tezos_crypto.Protocol_hash.pp
         protocol
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         genesis
-        Chain_id.pp
+        Tezos_crypto.Chain_id.pp
         chain_id
         Time.System.pp_hum
         (Time.System.of_protocol_exn expiration)

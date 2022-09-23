@@ -28,9 +28,9 @@
     accept this identity as genuine. *)
 type t = {
   peer_id : P2p_peer.Id.t;
-  public_key : Crypto_box.public_key;
-  secret_key : Crypto_box.secret_key;
-  proof_of_work_stamp : Crypto_box.nonce;
+  public_key : Tezos_crypto.Crypto_box.public_key;
+  secret_key : Tezos_crypto.Crypto_box.secret_key;
+  proof_of_work_stamp : Tezos_crypto.Crypto_box.nonce;
 }
 
 val encoding : t Data_encoding.t
@@ -40,7 +40,7 @@ val encoding : t Data_encoding.t
 
     The argument [yield_every] (defaults to [500]) introduces a call to
     [Lwt.pause] every that many operations. *)
-val generate : ?yield_every:int -> Crypto_box.pow_target -> t Lwt.t
+val generate : ?yield_every:int -> Tezos_crypto.Crypto_box.pow_target -> t Lwt.t
 
 (** [generate_with_bound pow_target] is a freshly minted identity whose proof of
     work stamp difficulty is at least equal to [pow_target].
@@ -49,7 +49,7 @@ val generate : ?yield_every:int -> Crypto_box.pow_target -> t Lwt.t
     attempts are made without finding a successful pow, the function fails with
     [Not_found]. *)
 val generate_with_bound :
-  ?yield_every:int -> ?max:int -> Crypto_box.pow_target -> t Lwt.t
+  ?yield_every:int -> ?max:int -> Tezos_crypto.Crypto_box.pow_target -> t Lwt.t
 
 (** [generate_with_pow_target_0 pk] generates a proof of work for the
     public key [pk] following a (hard-coded) 0 proof-of-work target.

@@ -1040,7 +1040,7 @@ let octez_base =
     ~deps:
       [
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         data_encoding |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc;
@@ -1076,7 +1076,7 @@ let octez_base_unix =
     ~deps:
       [
         octez_error_monad |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_base |> open_;
         octez_hacl;
         octez_stdlib |> open_;

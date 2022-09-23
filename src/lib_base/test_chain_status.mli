@@ -25,11 +25,14 @@
 
 type t =
   | Not_running
-  | Forking of {protocol : Protocol_hash.t; expiration : Time.Protocol.t}
+  | Forking of {
+      protocol : Tezos_crypto.Protocol_hash.t;
+      expiration : Time.Protocol.t;
+    }
   | Running of {
-      chain_id : Chain_id.t;
-      genesis : Block_hash.t;
-      protocol : Protocol_hash.t;
+      chain_id : Tezos_crypto.Chain_id.t;
+      genesis : Tezos_crypto.Block_hash.t;
+      protocol : Tezos_crypto.Protocol_hash.t;
       expiration : Time.Protocol.t;
     }
 

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type shell_header = {branch : Block_hash.t}
+type shell_header = {branch : Tezos_crypto.Block_hash.t}
 
 val equal_shell_header : shell_header -> shell_header -> bool
 
@@ -31,7 +31,8 @@ val shell_header_encoding : shell_header Data_encoding.t
 
 type t = {shell : shell_header; proto : Bytes.t}
 
-include S.HASHABLE with type t := t and type hash := Operation_hash.t
+include
+  S.HASHABLE with type t := t and type hash := Tezos_crypto.Operation_hash.t
 
 val of_bytes_exn : Bytes.t -> t
 
@@ -43,10 +44,12 @@ val bounded_list_encoding :
   ?max_operation_size:int ->
   ?max_pass:int ->
   unit ->
-  (Operation_list_list_hash.path * t list) Data_encoding.t
+  (Tezos_crypto.Operation_list_list_hash.path * t list) Data_encoding.t
 
 val bounded_hash_list_encoding :
   ?max_length:int ->
   ?max_pass:int ->
   unit ->
-  (Operation_list_list_hash.path * Operation_hash.t list) Data_encoding.t
+  (Tezos_crypto.Operation_list_list_hash.path
+  * Tezos_crypto.Operation_hash.t list)
+  Data_encoding.t

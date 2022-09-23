@@ -23,9 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type shell_header = {branch : Block_hash.t}
+type shell_header = {branch : Tezos_crypto.Block_hash.t}
 
-let equal_shell_header {branch = b1} {branch = b2} = Block_hash.equal b1 b2
+let equal_shell_header {branch = b1} {branch = b2} =
+  Tezos_crypto.Block_hash.equal b1 b2
 
 let shell_header_encoding =
   let open Data_encoding in
@@ -33,7 +34,7 @@ let shell_header_encoding =
   @@ conv
        (fun {branch} -> branch)
        (fun branch -> {branch})
-       (obj1 (req "branch" Block_hash.encoding))
+       (obj1 (req "branch" Tezos_crypto.Block_hash.encoding))
 
 type t = {shell : shell_header; proto : Bytes.t}
 
@@ -42,7 +43,7 @@ include Compare.Make (struct
 
   let compare o1 o2 =
     Compare.or_else
-      (Block_hash.compare o1.shell.branch o2.shell.branch)
+      (Tezos_crypto.Block_hash.compare o1.shell.branch o2.shell.branch)
       (fun () -> Bytes.compare o1.proto o2.proto)
 end)
 
@@ -79,7 +80,9 @@ let bounded_list_encoding ?max_length ?max_size ?max_operation_size ?max_pass ()
   obj2
     (req
        "operation_hashes_path"
-       (Operation_list_list_hash.bounded_path_encoding ?max_length:max_pass ()))
+       (Tezos_crypto.Operation_list_list_hash.bounded_path_encoding
+          ?max_length:max_pass
+          ()))
     (req "operations" op_list_encoding)
 
 let bounded_hash_list_encoding ?max_length ?max_pass () =
@@ -87,8 +90,12 @@ let bounded_hash_list_encoding ?max_length ?max_pass () =
   obj2
     (req
        "operation_hashes_path"
-       (Operation_list_list_hash.bounded_path_encoding ?max_length:max_pass ()))
-    (req "operation_hashes" (Variable.list ?max_length Operation_hash.encoding))
+       (Tezos_crypto.Operation_list_list_hash.bounded_path_encoding
+          ?max_length:max_pass
+          ()))
+    (req
+       "operation_hashes"
+       (Variable.list ?max_length Tezos_crypto.Operation_hash.encoding))
 
 let pp fmt op =
   Data_encoding.Json.pp fmt (Data_encoding.Json.construct encoding op)
@@ -99,9 +106,9 @@ let of_bytes b = Data_encoding.Binary.of_bytes_opt encoding b
 
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 
-let hash op = Operation_hash.hash_bytes [to_bytes op]
+let hash op = Tezos_crypto.Operation_hash.hash_bytes [to_bytes op]
 
-let hash_raw bytes = Operation_hash.hash_bytes [bytes]
+let hash_raw bytes = Tezos_crypto.Operation_hash.hash_bytes [bytes]
 
 let () =
   Data_encoding.Registration.register ~pp encoding ;

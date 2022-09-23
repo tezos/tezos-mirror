@@ -25,7 +25,6 @@
 
 include Tezos_stdlib
 module Error_monad = Tezos_error_monad.Error_monad
-include Tezos_crypto
 include Tezos_micheline
 module Data_encoding = Data_encoding
 include Tezos_error_monad.TzLwtreslib
