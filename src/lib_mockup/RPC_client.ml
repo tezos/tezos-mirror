@@ -26,7 +26,7 @@
 class mockup_ctxt (base_dir : string) (mem_only : bool)
   (mockup_env : Tezos_mockup_registration.Registration.mockup_environment)
   (chain_id : Chain_id.t) (rpc_context : Tezos_protocol_environment.rpc_context)
-  protocol_data : RPC_context.generic =
+  protocol_data : Tezos_rpc.RPC_context.generic =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Local_services.build_directory
@@ -45,7 +45,7 @@ class mockup_ctxt (base_dir : string) (mem_only : bool)
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
           'p ->
           'q ->
           'i ->
@@ -55,7 +55,7 @@ class mockup_ctxt (base_dir : string) (mem_only : bool)
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
           on_chunk:('o -> unit) ->
           on_close:(unit -> unit) ->
           'p ->

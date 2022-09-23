@@ -13,7 +13,6 @@ depends: [
   "tezos-base"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
-  "tezos-rpc"
 ]
 build: [
   ["rm" "-r" "vendors"]

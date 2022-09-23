@@ -41,7 +41,6 @@
   -open Tezos_client_commands
   -open Tezos_baking_015_PtLimaPt_commands
   -open Tezos_stdlib_unix
-  -open Tezos_rpc
   -open Tezos_rpc_http
   -open Tezos_rpc_http_client_unix
   -open Tezos_rpc_http_server

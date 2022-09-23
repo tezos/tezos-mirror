@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open RPC_context
+open Tezos_rpc.RPC_context
 
 type chain_status =
   | Active_main of Chain_id.t
@@ -70,7 +70,7 @@ module S : sig
       unit,
       unit,
       Block_hash.t * Time.Protocol.t )
-    RPC_service.t
+    Tezos_rpc.RPC_service.t
 
   val valid_blocks :
     ( [`GET],
@@ -81,7 +81,7 @@ module S : sig
       ; protocols : Protocol_hash.t list >,
       unit,
       (Chain_id.t * Block_hash.t) * Block_header.t )
-    RPC_service.t
+    Tezos_rpc.RPC_service.t
 
   val heads :
     ( [`GET],
@@ -90,13 +90,14 @@ module S : sig
       < next_protocols : Protocol_hash.t list >,
       unit,
       Block_hash.t * Block_header.t )
-    RPC_service.t
+    Tezos_rpc.RPC_service.t
 
   val protocols :
-    ([`GET], unit, unit, unit, unit, Protocol_hash.t) RPC_service.t
+    ([`GET], unit, unit, unit, unit, Protocol_hash.t) Tezos_rpc.RPC_service.t
 
-  val commit_hash : ([`GET], unit, unit, unit, unit, string) RPC_service.t
+  val commit_hash :
+    ([`GET], unit, unit, unit, unit, string) Tezos_rpc.RPC_service.t
 
   val active_chains :
-    ([`GET], unit, unit, unit, unit, chain_status list) RPC_service.t
+    ([`GET], unit, unit, unit, unit, chain_status list) Tezos_rpc.RPC_service.t
 end

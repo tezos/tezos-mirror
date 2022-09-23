@@ -35,7 +35,6 @@
   -open Tezos_client_base
   -open Tezos_client_014_PtKathma
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_client_base_unix
   -open Tezos_protocol_plugin_014_PtKathma)
  (modules (:standard \ alpha_commands_registration)))
@@ -71,6 +70,5 @@
   -open Tezos_client_commands
   -open Tezos_client_014_PtKathma_commands
   -open Tezos_client_sapling_014_PtKathma
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_014_PtKathma)
  (modules alpha_commands_registration))

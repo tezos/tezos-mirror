@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "resto-cohttp-client" { >= "1.0" }
+  "tezos-rpc"
   "tezos-rpc-http"
 ]
 build: [

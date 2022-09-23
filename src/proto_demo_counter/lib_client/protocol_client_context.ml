@@ -38,6 +38,6 @@ class wrap_full (t : Client_context.full) : full =
 
     inherit
       [Shell_services.chain, Shell_services.block] Environment.proto_rpc_context
-        (t :> RPC_context.t)
+        (t :> Tezos_rpc.RPC_context.t)
         Shell_services.Blocks.path
   end

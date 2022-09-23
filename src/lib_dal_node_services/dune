@@ -13,5 +13,4 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base
-  -open Tezos_rpc))
+  -open Tezos_base))

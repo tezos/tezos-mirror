@@ -85,7 +85,7 @@ module Mock_all_unit :
 
   let finalize_application _ = assert false
 
-  let rpc_services = RPC_directory.empty
+  let rpc_services = Tezos_rpc.RPC_directory.empty
 
   let compare_operations _ = assert false
 

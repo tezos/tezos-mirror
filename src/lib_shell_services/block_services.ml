@@ -47,7 +47,7 @@ let metadata_rpc_arg =
   in
   let description = "defines the way metadata are queried" in
   let name = "metadata_rpc_arg" in
-  RPC_arg.make ~descr:description ~name ~construct ~destruct ()
+  Tezos_rpc.RPC_arg.make ~descr:description ~name ~construct ~destruct ()
 
 let parse_chain s =
   try
@@ -70,7 +70,7 @@ let chain_arg =
   in
   let construct = chain_to_string in
   let destruct = parse_chain in
-  RPC_arg.make ~name ~descr ~construct ~destruct ()
+  Tezos_rpc.RPC_arg.make ~name ~descr ~construct ~destruct ()
 
 type block =
   [ `Genesis
@@ -206,22 +206,22 @@ let blocks_arg =
   in
   let construct = to_string in
   let destruct = parse_block in
-  RPC_arg.make ~name ~descr ~construct ~destruct ()
+  Tezos_rpc.RPC_arg.make ~name ~descr ~construct ~destruct ()
 
 type chain_prefix = unit * chain
 
 type prefix = chain_prefix * block
 
-let chain_path = RPC_path.(root / "chains" /: chain_arg)
+let chain_path = Tezos_rpc.RPC_path.(root / "chains" /: chain_arg)
 
-let mempool_path p = RPC_path.(p / "mempool")
+let mempool_path p = Tezos_rpc.RPC_path.(p / "mempool")
 
-let live_blocks_path p = RPC_path.(p / "live_blocks")
+let live_blocks_path p = Tezos_rpc.RPC_path.(p / "live_blocks")
 
-let dir_path : (chain_prefix, chain_prefix) RPC_path.t =
-  RPC_path.(open_root / "blocks")
+let dir_path : (chain_prefix, chain_prefix) Tezos_rpc.RPC_path.t =
+  Tezos_rpc.RPC_path.(open_root / "blocks")
 
-let path = RPC_path.(dir_path /: blocks_arg)
+let path = Tezos_rpc.RPC_path.(dir_path /: blocks_arg)
 
 type operation_list_quota = {max_size : int; max_op : int option}
 
@@ -570,66 +570,66 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
          (req "operations" (list (dynamic_size (list operation_encoding)))))
 
   module S = struct
-    let path : prefix RPC_path.context = RPC_path.open_root
+    let path : prefix Tezos_rpc.RPC_path.context = Tezos_rpc.RPC_path.open_root
 
     let hash =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The block's hash, its unique identifier."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Block_hash.encoding
-        RPC_path.(path / "hash")
+        Tezos_rpc.RPC_path.(path / "hash")
 
     let header =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The whole block header."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:block_header_encoding
-        RPC_path.(path / "header")
+        Tezos_rpc.RPC_path.(path / "header")
 
     let raw_header =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The whole block header (unparsed)."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:bytes
-        RPC_path.(path / "header" / "raw")
+        Tezos_rpc.RPC_path.(path / "header" / "raw")
 
     let metadata =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"All the metadata associated to the block."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:block_metadata_encoding
-        RPC_path.(path / "metadata")
+        Tezos_rpc.RPC_path.(path / "metadata")
 
     let metadata_hash =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Hash of the metadata associated to the block. This is only set on \
            blocks starting from environment V1."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Block_metadata_hash.encoding
-        RPC_path.(path / "metadata_hash")
+        Tezos_rpc.RPC_path.(path / "metadata_hash")
 
     let protocols =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Current and next protocol."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:raw_protocol_encoding
-        RPC_path.(path / "protocols")
+        Tezos_rpc.RPC_path.(path / "protocols")
 
     module Header = struct
-      let path = RPC_path.(path / "header")
+      let path = Tezos_rpc.RPC_path.(path / "header")
 
       let shell_header =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"The shell-specific fragment of the block header."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:Block_header.shell_header_encoding
-          RPC_path.(path / "shell")
+          Tezos_rpc.RPC_path.(path / "shell")
 
       let protocol_data =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"The version-specific fragment of the block header."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:
             (conv
                (fun h -> ((), h))
@@ -637,19 +637,19 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                (merge_objs
                   (obj1 (req "protocol" (constant protocol_hash)))
                   Proto.block_header_data_encoding))
-          RPC_path.(path / "protocol_data")
+          Tezos_rpc.RPC_path.(path / "protocol_data")
 
       let raw_protocol_data =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The version-specific fragment of the block header (unparsed)."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:bytes
-          RPC_path.(path / "protocol_data" / "raw")
+          Tezos_rpc.RPC_path.(path / "protocol_data" / "raw")
     end
 
     let force_operation_metadata_query =
-      let open RPC_query in
+      let open Tezos_rpc.RPC_query in
       query (fun force_metadata metadata ->
           object
             method force_metadata = force_metadata
@@ -675,10 +675,10 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       |> seal
 
     module Operations = struct
-      let path = RPC_path.(path / "operations")
+      let path = Tezos_rpc.RPC_path.(path / "operations")
 
       let operations =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"All the operations included in the block."
           ~query:force_operation_metadata_query
           ~output:(list (dynamic_size (list operation_encoding)))
@@ -692,7 +692,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           try Ok (int_of_string s)
           with _ -> Error (Format.sprintf "Invalid list offset (%s)" s)
         in
-        RPC_arg.make ~name ~descr ~construct ~destruct ()
+        Tezos_rpc.RPC_arg.make ~name ~descr ~construct ~destruct ()
 
       let offset_arg =
         let name = "operation_offset" in
@@ -704,119 +704,121 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           try Ok (int_of_string s)
           with _ -> Error (Format.sprintf "Invalid operation offset (%s)" s)
         in
-        RPC_arg.make ~name ~descr ~construct ~destruct ()
+        Tezos_rpc.RPC_arg.make ~name ~descr ~construct ~destruct ()
 
       let operations_in_pass =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "All the operations included in `n-th` validation pass of the \
              block."
           ~query:force_operation_metadata_query
           ~output:(list operation_encoding)
-          RPC_path.(path /: list_arg)
+          Tezos_rpc.RPC_path.(path /: list_arg)
 
       let operation =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The `m-th` operation in the `n-th` validation pass of the block."
           ~query:force_operation_metadata_query
           ~output:operation_encoding
-          RPC_path.(path /: list_arg /: offset_arg)
+          Tezos_rpc.RPC_path.(path /: list_arg /: offset_arg)
     end
 
     module Operation_hashes = struct
-      let path = RPC_path.(path / "operation_hashes")
+      let path = Tezos_rpc.RPC_path.(path / "operation_hashes")
 
       let operation_hashes =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"The hashes of all the operations included in the block."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:(list (list Operation_hash.encoding))
           path
 
       let operation_hashes_in_pass =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "All the operations included in `n-th` validation pass of the \
              block."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:(list Operation_hash.encoding)
-          RPC_path.(path /: Operations.list_arg)
+          Tezos_rpc.RPC_path.(path /: Operations.list_arg)
 
       let operation_hash =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The hash of then `m-th` operation in the `n-th` validation pass \
              of the block."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:Operation_hash.encoding
-          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
+          Tezos_rpc.RPC_path.(
+            path /: Operations.list_arg /: Operations.offset_arg)
     end
 
     module Operation_metadata_hashes = struct
       let root =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The root hash of the operations metadata from the block. This is \
              only set on blocks starting from environment V1."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:Operation_metadata_list_list_hash.encoding
-          RPC_path.(path / "operations_metadata_hash")
+          Tezos_rpc.RPC_path.(path / "operations_metadata_hash")
 
-      let path = RPC_path.(path / "operation_metadata_hashes")
+      let path = Tezos_rpc.RPC_path.(path / "operation_metadata_hashes")
 
       let operation_metadata_hashes =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The hashes of all the operation metadata included in the block. \
              This is only set on blocks starting from environment V1."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:(list (list Operation_metadata_hash.encoding))
           path
 
       let operation_metadata_hashes_in_pass =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "All the operation metadata included in `n-th` validation pass of \
              the block. This is only set on blocks starting from environment \
              V1."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:(list Operation_metadata_hash.encoding)
-          RPC_path.(path /: Operations.list_arg)
+          Tezos_rpc.RPC_path.(path /: Operations.list_arg)
 
       let operation_metadata_hash =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "The hash of then `m-th` operation metadata in the `n-th` \
              validation pass of the block. This is only set on blocks starting \
              from environment V1."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:Operation_metadata_hash.encoding
-          RPC_path.(path /: Operations.list_arg /: Operations.offset_arg)
+          Tezos_rpc.RPC_path.(
+            path /: Operations.list_arg /: Operations.offset_arg)
     end
 
     module Helpers = struct
-      let path = RPC_path.(path / "helpers")
+      let path = Tezos_rpc.RPC_path.(path / "helpers")
 
       module Forge = struct
         let block_header =
-          RPC_service.post_service
+          Tezos_rpc.RPC_service.post_service
             ~description:"Forge a block header"
-            ~query:RPC_query.empty
+            ~query:Tezos_rpc.RPC_query.empty
             ~input:Block_header.encoding
             ~output:(obj1 (req "block" bytes))
-            RPC_path.(path / "forge_block_header")
+            Tezos_rpc.RPC_path.(path / "forge_block_header")
       end
 
       module Preapply = struct
-        let path = RPC_path.(path / "preapply")
+        let path = Tezos_rpc.RPC_path.(path / "preapply")
 
         let block_result_encoding =
           obj2
             (req "shell_header" Block_header.shell_header_encoding)
             (req
                "operations"
-               (list (Preapply_result.encoding RPC_error.encoding)))
+               (list (Preapply_result.encoding Tezos_rpc.RPC_error.encoding)))
 
         type block_param = {
           protocol_data : Next_proto.block_header_data;
@@ -841,7 +843,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                   (list (dynamic_size (list next_operation_encoding)))))
 
         let block_query =
-          let open RPC_query in
+          let open Tezos_rpc.RPC_query in
           query (fun sort timestamp ->
               object
                 method sort_operations = sort
@@ -853,50 +855,50 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           |> seal
 
         let block =
-          RPC_service.post_service
+          Tezos_rpc.RPC_service.post_service
             ~description:
               "Simulate the validation of a block that would contain the given \
                operations and return the resulting fitness and context hash."
             ~query:block_query
             ~input:block_param_encoding
             ~output:block_result_encoding
-            RPC_path.(path / "block")
+            Tezos_rpc.RPC_path.(path / "block")
 
         let operations =
-          RPC_service.post_service
+          Tezos_rpc.RPC_service.post_service
             ~description:
               "Simulate the application of the operations with the context of \
                the given block and return the result of each operation \
                application."
-            ~query:RPC_query.empty
+            ~query:Tezos_rpc.RPC_query.empty
             ~input:(list next_operation_encoding)
             ~output:
               (list
                  (dynamic_size Next_proto.operation_data_and_receipt_encoding))
-            RPC_path.(path / "operations")
+            Tezos_rpc.RPC_path.(path / "operations")
       end
 
       let complete =
         let prefix_arg =
           let destruct s = Ok s and construct s = s in
-          RPC_arg.make ~name:"prefix" ~destruct ~construct ()
+          Tezos_rpc.RPC_arg.make ~name:"prefix" ~destruct ~construct ()
         in
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             "Try to complete a prefix of a Base58Check-encoded data. This RPC \
              is actually able to complete hashes of block, operations, \
              public_keys and contracts."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~output:(list string)
-          RPC_path.(path / "complete" /: prefix_arg)
+          Tezos_rpc.RPC_path.(path / "complete" /: prefix_arg)
     end
 
     module Context = struct
-      let path = RPC_path.(path / "context")
+      let path = Tezos_rpc.RPC_path.(path / "context")
 
-      let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
+      let raw_bytes_path = Tezos_rpc.RPC_path.(path / "raw" / "bytes")
 
-      let merkle_tree_v1_path = RPC_path.(path / "merkle_tree")
+      let merkle_tree_v1_path = Tezos_rpc.RPC_path.(path / "merkle_tree")
 
       (* The duplication of the ["/merkle_tree"] RPC path is due to MR !5535.
          This MR introduces a breaking change in the former [merkle_tree] RPC,
@@ -909,33 +911,33 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             and make the clients call ["/merkle_tree"],
          2) once all clients have applied patch 1), remove ["/merkle_tree_v2"]
             altogether. *)
-      let merkle_tree_v2_path = RPC_path.(path / "merkle_tree_v2")
+      let merkle_tree_v2_path = Tezos_rpc.RPC_path.(path / "merkle_tree_v2")
 
-      let context_path_arg : string RPC_arg.t =
+      let context_path_arg : string Tezos_rpc.RPC_arg.t =
         let name = "context_path" in
         let descr = "A path inside the context" in
         let construct s = s in
         let destruct s = Ok s in
-        RPC_arg.make ~name ~descr ~construct ~destruct ()
+        Tezos_rpc.RPC_arg.make ~name ~descr ~construct ~destruct ()
 
-      let raw_context_query : < depth : int option > RPC_query.t =
-        let open RPC_query in
+      let raw_context_query : < depth : int option > Tezos_rpc.RPC_query.t =
+        let open Tezos_rpc.RPC_query in
         query (fun depth ->
             object
               method depth = depth
             end)
-        |+ opt_field "depth" RPC_arg.uint (fun t -> t#depth)
+        |+ opt_field "depth" Tezos_rpc.RPC_arg.uint (fun t -> t#depth)
         |> seal
 
       let read =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"Returns the raw context."
           ~query:raw_context_query
           ~output:raw_context_encoding
-          RPC_path.(raw_bytes_path /:* context_path_arg)
+          Tezos_rpc.RPC_path.(raw_bytes_path /:* context_path_arg)
 
-      let merkle_tree_query : < holey : bool option > RPC_query.t =
-        let open RPC_query in
+      let merkle_tree_query : < holey : bool option > Tezos_rpc.RPC_query.t =
+        let open Tezos_rpc.RPC_query in
         query (fun holey ->
             object
               method holey = holey
@@ -943,27 +945,27 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         |+ opt_field
              ~descr:"Send only hashes, omit data of key"
              "holey"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              (fun t -> t#holey)
         |> seal
 
       let merkle_tree =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"Returns the merkle tree of a piece of context."
           ~query:merkle_tree_query
           ~output:(option merkle_tree_encoding)
-          RPC_path.(merkle_tree_v1_path /:* context_path_arg)
+          Tezos_rpc.RPC_path.(merkle_tree_v1_path /:* context_path_arg)
 
       let merkle_tree_v2 =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"Returns the Irmin merkle tree of a piece of context."
           ~query:merkle_tree_query
           ~output:(option Merkle_proof_encoding.tree_proof_encoding)
-          RPC_path.(merkle_tree_v2_path /:* context_path_arg)
+          Tezos_rpc.RPC_path.(merkle_tree_v2_path /:* context_path_arg)
     end
 
     let info =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "All the information about a block. The associated metadata may not \
            be present depending on the history mode and block's distance from \
@@ -1033,25 +1035,25 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                 (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
-                      (obj1 (req "error" RPC_error.encoding)))))
+                      (obj1 (req "error" Tezos_rpc.RPC_error.encoding)))))
              (req
                 "outdated"
                 (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
-                      (obj1 (req "error" RPC_error.encoding)))))
+                      (obj1 (req "error" Tezos_rpc.RPC_error.encoding)))))
              (req
                 "branch_refused"
                 (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
-                      (obj1 (req "error" RPC_error.encoding)))))
+                      (obj1 (req "error" Tezos_rpc.RPC_error.encoding)))))
              (req
                 "branch_delayed"
                 (Operation_hash.Map.encoding
                    (merge_objs
                       (dynamic_size next_operation_encoding)
-                      (obj1 (req "error" RPC_error.encoding)))))
+                      (obj1 (req "error" Tezos_rpc.RPC_error.encoding)))))
              (req
                 "unprocessed"
                 (Operation_hash.Map.encoding
@@ -1069,7 +1071,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                      (obj1 (req "hash" Operation_hash.encoding))
                      (merge_objs
                         next_operation_encoding
-                        (obj1 (req "error" RPC_error.encoding))))))
+                        (obj1 (req "error" Tezos_rpc.RPC_error.encoding))))))
         in
         conv
           (fun {
@@ -1136,7 +1138,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let default_pending_operations_version = 0
 
       let pending_query =
-        let open RPC_query in
+        let open Tezos_rpc.RPC_query in
         query
           (fun version applied refused outdated branch_refused branch_delayed ->
             object
@@ -1154,37 +1156,37 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
             end)
         |+ field
              "version"
-             RPC_arg.int
+             Tezos_rpc.RPC_arg.int
              default_pending_operations_version
              (fun t -> t#version)
         |+ field
              ~descr:"Include applied operations (true by default)"
              "applied"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#applied)
         |+ field
              ~descr:"Include refused operations (true by default)"
              "refused"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#refused)
         |+ field
              ~descr:"Include outdated operations (true by default)"
              "outdated"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#outdated)
         |+ field
              ~descr:"Include branch refused operations (true by default)"
              "branch_refused"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#branch_refused)
         |+ field
              ~descr:"Include branch delayed operations (true by default)"
              "branch_delayed"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#branch_delayed)
         |> seal
@@ -1217,53 +1219,56 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ]
 
       let pending_operations_version_dispatcher ~version pending_operations =
-        if version = 0 then RPC_answer.return (Version_0 pending_operations)
+        if version = 0 then
+          Tezos_rpc.RPC_answer.return (Version_0 pending_operations)
         else if version = 1 then
-          RPC_answer.return (Version_1 pending_operations)
+          Tezos_rpc.RPC_answer.return (Version_1 pending_operations)
         else
-          RPC_answer.fail
-            (RPC_error.bad_version ~given:version ~supported:supported_version)
+          Tezos_rpc.RPC_answer.fail
+            (Tezos_rpc.RPC_error.bad_version
+               ~given:version
+               ~supported:supported_version)
 
       let pending_operations path =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"List the prevalidated operations."
           ~query:pending_query
           ~output:pending_operations_encoding
-          RPC_path.(path / "pending_operations")
+          Tezos_rpc.RPC_path.(path / "pending_operations")
 
       let ban_operation path =
-        RPC_service.post_service
+        Tezos_rpc.RPC_service.post_service
           ~description:
             "Remove an operation from the mempool if present, reverting its \
              effect if it was applied. Add it to the set of banned operations \
              to prevent it from being fetched/processed/injected in the \
              future. Note: If the baker has already received the operation, \
              then it's necessary to restart it to flush the operation from it."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~input:Operation_hash.encoding
           ~output:unit
-          RPC_path.(path / "ban_operation")
+          Tezos_rpc.RPC_path.(path / "ban_operation")
 
       let unban_operation path =
-        RPC_service.post_service
+        Tezos_rpc.RPC_service.post_service
           ~description:
             "Remove an operation from the set of banned operations (nothing \
              happens if it was not banned)."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~input:Operation_hash.encoding
           ~output:unit
-          RPC_path.(path / "unban_operation")
+          Tezos_rpc.RPC_path.(path / "unban_operation")
 
       let unban_all_operations path =
-        RPC_service.post_service
+        Tezos_rpc.RPC_service.post_service
           ~description:"Clear the set of banned operations."
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~input:Data_encoding.empty
           ~output:unit
-          RPC_path.(path / "unban_all_operations")
+          Tezos_rpc.RPC_path.(path / "unban_all_operations")
 
       let mempool_query =
-        let open RPC_query in
+        let open Tezos_rpc.RPC_query in
         query (fun applied refused outdated branch_refused branch_delayed ->
             object
               method applied = applied
@@ -1279,31 +1284,31 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         |+ field
              ~descr:"Include applied operations (set by default)"
              "applied"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#applied)
         |+ field
              ~descr:"Include refused operations"
              "refused"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              false
              (fun t -> t#refused)
         |+ field
              ~descr:"Include outdated operations"
              "outdated"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              false
              (fun t -> t#outdated)
         |+ field
              ~descr:"Include branch refused operations"
              "branch_refused"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              false
              (fun t -> t#branch_refused)
         |+ field
              ~descr:"Include branch delayed operations (set by default)"
              "branch_delayed"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#branch_delayed)
         |> seal
@@ -1315,17 +1320,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (merge_objs
              (obj1 (req "hash" Operation_hash.encoding))
              next_operation_encoding)
-          (obj1 (dft "error" RPC_error.opt_encoding None))
+          (obj1 (dft "error" Tezos_rpc.RPC_error.opt_encoding None))
 
       let monitor_operations path =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:"Monitor the mempool operations."
           ~query:mempool_query
           ~output:(list processed_operation_encoding)
-          RPC_path.(path / "monitor_operations")
+          Tezos_rpc.RPC_path.(path / "monitor_operations")
 
       let get_filter_query =
-        let open RPC_query in
+        let open Tezos_rpc.RPC_query in
         query (fun include_default ->
             object
               method include_default = include_default
@@ -1333,30 +1338,30 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         |+ field
              ~descr:"Show fields equal to their default value (set by default)"
              "include_default"
-             RPC_arg.bool
+             Tezos_rpc.RPC_arg.bool
              true
              (fun t -> t#include_default)
         |> seal
 
       let get_filter path =
-        RPC_service.get_service
+        Tezos_rpc.RPC_service.get_service
           ~description:
             {|Get the configuration of the mempool filter. The minimal_fees are in mutez. Each field minimal_nanotez_per_xxx is a rational number given as a numerator and a denominator, e.g. "minimal_nanotez_per_gas_unit": [ "100", "1" ].|}
           ~query:get_filter_query
           ~output:json
-          RPC_path.(path / "filter")
+          Tezos_rpc.RPC_path.(path / "filter")
 
       let set_filter path =
-        RPC_service.post_service
+        Tezos_rpc.RPC_service.post_service
           ~description:
             {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./octez-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
-          ~query:RPC_query.empty
+          ~query:Tezos_rpc.RPC_query.empty
           ~input:json
           ~output:json
-          RPC_path.(path / "filter")
+          Tezos_rpc.RPC_path.(path / "filter")
 
       let request_operations_query =
-        let open RPC_query in
+        let open Tezos_rpc.RPC_query in
         query (fun peer_id ->
             object
               method peer_id = peer_id
@@ -1365,40 +1370,40 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         |> seal
 
       let request_operations path =
-        RPC_service.post_service
+        Tezos_rpc.RPC_service.post_service
           ~description:
             "Request the operations of our peers or a specific peer if \
              specified via a query parameter."
           ~input:Data_encoding.empty
           ~query:request_operations_query
           ~output:Data_encoding.empty
-          RPC_path.(path / "request_operations")
+          Tezos_rpc.RPC_path.(path / "request_operations")
     end
 
     let live_blocks =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "List the ancestors of the given block which, if referred to as the \
            branch in an operation header, are recent enough for that operation \
            to be included in the current block."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Block_hash.Set.encoding
-        RPC_path.(live_blocks_path open_root)
+        Tezos_rpc.RPC_path.(live_blocks_path open_root)
   end
 
-  let path = RPC_path.prefix chain_path path
+  let path = Tezos_rpc.RPC_path.prefix chain_path path
 
   let make_call0 s ctxt a b q p =
-    let s = RPC_service.prefix path s in
-    RPC_context.make_call2 s ctxt a b q p
+    let s = Tezos_rpc.RPC_service.prefix path s in
+    Tezos_rpc.RPC_context.make_call2 s ctxt a b q p
 
   let make_call1 s ctxt a b c q p =
-    let s = RPC_service.prefix path s in
-    RPC_context.make_call3 s ctxt a b c q p
+    let s = Tezos_rpc.RPC_service.prefix path s in
+    Tezos_rpc.RPC_context.make_call3 s ctxt a b c q p
 
   let make_call2 s ctxt a b c d q p =
-    let s = RPC_service.prefix path s in
-    RPC_context.make_call s ctxt (((((), a), b), c), d) q p
+    let s = Tezos_rpc.RPC_service.prefix path s in
+    Tezos_rpc.RPC_context.make_call s ctxt (((((), a), b), c), d) q p
 
   let hash ctxt =
     let f = make_call0 S.hash ctxt in
@@ -1633,7 +1638,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ?(refused = true) ?(outdated = true) () =
       let open Lwt_result_syntax in
       let* v =
-        RPC_context.make_call1
+        Tezos_rpc.RPC_context.make_call1
           (S.Mempool.pending_operations (mempool_path chain_path))
           ctxt
           chain
@@ -1658,21 +1663,21 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let ban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.ban_operation (mempool_path chain_path) in
-      RPC_context.make_call1 s ctxt chain () op_hash
+      Tezos_rpc.RPC_context.make_call1 s ctxt chain () op_hash
 
     let unban_operation ctxt ?(chain = `Main) op_hash =
       let s = S.Mempool.unban_operation (mempool_path chain_path) in
-      RPC_context.make_call1 s ctxt chain () op_hash
+      Tezos_rpc.RPC_context.make_call1 s ctxt chain () op_hash
 
     let unban_all_operations ctxt ?(chain = `Main) () =
       let s = S.Mempool.unban_all_operations (mempool_path chain_path) in
-      RPC_context.make_call1 s ctxt chain () ()
+      Tezos_rpc.RPC_context.make_call1 s ctxt chain () ()
 
     let monitor_operations ctxt ?(chain = `Main) ?(applied = true)
         ?(branch_delayed = true) ?(branch_refused = false) ?(refused = false)
         ?(outdated = false) () =
       let s = S.Mempool.monitor_operations (mempool_path chain_path) in
-      RPC_context.make_streamed_call
+      Tezos_rpc.RPC_context.make_streamed_call
         s
         ctxt
         ((), chain)
@@ -1691,7 +1696,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
     let request_operations ctxt ?(chain = `Main) ?peer_id () =
       let s = S.Mempool.request_operations (mempool_path chain_path) in
-      RPC_context.make_call1
+      Tezos_rpc.RPC_context.make_call1
         s
         ctxt
         chain

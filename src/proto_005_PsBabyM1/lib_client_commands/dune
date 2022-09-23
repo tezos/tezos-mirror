@@ -25,8 +25,7 @@
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_client_005_PsBabyM1
-  -open Tezos_client_commands
-  -open Tezos_rpc)
+  -open Tezos_client_commands)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
@@ -53,6 +52,5 @@
   -open Tezos_client_base
   -open Tezos_client_005_PsBabyM1
   -open Tezos_client_commands
-  -open Tezos_client_005_PsBabyM1_commands
-  -open Tezos_rpc)
+  -open Tezos_client_005_PsBabyM1_commands)
  (modules alpha_commands_registration))

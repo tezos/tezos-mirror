@@ -51,7 +51,8 @@ open Prevalidator_worker_state
 module type T = sig
   type types_state
 
-  val get_rpc_directory : types_state -> types_state RPC_directory.t lazy_t
+  val get_rpc_directory :
+    types_state -> types_state Tezos_rpc.RPC_directory.t lazy_t
 
   val name : Name.t
 

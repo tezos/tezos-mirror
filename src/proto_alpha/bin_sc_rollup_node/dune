@@ -52,7 +52,6 @@
   -open Tezos_protocol_alpha
   -open Tezos_protocol_plugin_alpha
   -open Tezos_protocol_alpha_parameters
-  -open Tezos_rpc
   -open Tezos_dal_node_lib
   -open Tezos_shell_services
   -open Tezos_sc_rollup_alpha

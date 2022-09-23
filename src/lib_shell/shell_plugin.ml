@@ -93,7 +93,7 @@ module type RPC = sig
   module Proto : Registered_protocol.T
 
   val rpc_services :
-    Tezos_protocol_environment.rpc_context RPC_directory.directory
+    Tezos_protocol_environment.rpc_context Tezos_rpc.RPC_directory.directory
 end
 
 module No_filter (Proto : Registered_protocol.T) = struct

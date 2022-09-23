@@ -25,5 +25,4 @@
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_protocol_010_PtGRANAD
-  -open Tezos_protocol_plugin_010_PtGRANAD
-  -open Tezos_rpc))
+  -open Tezos_protocol_plugin_010_PtGRANAD))

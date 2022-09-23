@@ -29,5 +29,4 @@
   -open Tezos_client_base
   -open Tezos_protocol_011_PtHangz2
   -open Tezos_protocol_plugin_011_PtHangz2
-  -open Tezos_protocol_011_PtHangz2_parameters
-  -open Tezos_rpc))
+  -open Tezos_protocol_011_PtHangz2_parameters))

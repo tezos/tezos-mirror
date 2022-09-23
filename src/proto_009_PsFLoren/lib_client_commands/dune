@@ -29,7 +29,6 @@
   -open Tezos_client_base
   -open Tezos_client_009_PsFLoren
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_client_base_unix
   -open Tezos_protocol_plugin_009_PsFLoren)
  (modules (:standard \ alpha_commands_registration)))
@@ -61,6 +60,5 @@
   -open Tezos_client_009_PsFLoren
   -open Tezos_client_commands
   -open Tezos_client_009_PsFLoren_commands
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_009_PsFLoren)
  (modules alpha_commands_registration))

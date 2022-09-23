@@ -236,7 +236,7 @@ module Public_key_hash = struct
   end)
 
   let rpc_arg =
-    RPC_arg.like
+    Tezos_rpc.RPC_arg.like
       rpc_arg
       ~descr:"A Secp256k1 of a Ed25519 public key hash (Base58Check-encoded)"
       "pkh"

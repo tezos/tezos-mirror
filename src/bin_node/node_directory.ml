@@ -24,5 +24,5 @@
 (*****************************************************************************)
 
 let build_node_directory config dir =
-  RPC_directory.register0 dir Node_services.S.config (fun () () ->
+  Tezos_rpc.RPC_directory.register0 dir Node_services.S.config (fun () () ->
       Lwt.return_ok config)

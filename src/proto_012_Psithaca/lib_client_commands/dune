@@ -33,7 +33,6 @@
   -open Tezos_client_base
   -open Tezos_client_012_Psithaca
   -open Tezos_client_commands
-  -open Tezos_rpc
   -open Tezos_client_base_unix
   -open Tezos_protocol_plugin_012_Psithaca)
  (modules (:standard \ alpha_commands_registration)))
@@ -67,6 +66,5 @@
   -open Tezos_client_commands
   -open Tezos_client_012_Psithaca_commands
   -open Tezos_client_sapling_012_Psithaca
-  -open Tezos_rpc
   -open Tezos_protocol_plugin_012_Psithaca)
  (modules alpha_commands_registration))

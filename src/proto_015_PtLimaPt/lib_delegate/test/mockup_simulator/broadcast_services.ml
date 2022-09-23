@@ -26,15 +26,15 @@
 module S = struct
   open Data_encoding
 
-  let path = RPC_path.(root / "broadcast")
+  let path = Tezos_rpc.RPC_path.(root / "broadcast")
 
   let dests_query =
-    let open RPC_query in
+    let open Tezos_rpc.RPC_query in
     query (fun dests ->
         object
           method dests = dests
         end)
-    |+ multi_field "dests" RPC_arg.int (fun t -> t#dests)
+    |+ multi_field "dests" Tezos_rpc.RPC_arg.int (fun t -> t#dests)
     |> seal
 
   (* copied from lib_shell_services/injection_services.ml *)
@@ -46,23 +46,23 @@ module S = struct
          (list (dynamic_size (list (dynamic_size Operation.encoding)))))
 
   let block =
-    RPC_service.post_service
+    Tezos_rpc.RPC_service.post_service
       ~description:"Broadcast a block."
       ~query:dests_query
       ~input:block_param
       ~output:unit
-      RPC_path.(path / "block")
+      Tezos_rpc.RPC_path.(path / "block")
 
   let operation =
-    RPC_service.post_service
+    Tezos_rpc.RPC_service.post_service
       ~description:"Broadcast an operation."
       ~query:dests_query
       ~input:Alpha_context.Operation.encoding
       ~output:unit
-      RPC_path.(path / "operation")
+      Tezos_rpc.RPC_path.(path / "operation")
 end
 
-open RPC_context
+open Tezos_rpc.RPC_context
 
 let block ctxt ?(dests = []) raw operations =
   make_call

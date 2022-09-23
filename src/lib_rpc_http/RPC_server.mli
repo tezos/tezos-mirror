@@ -44,7 +44,7 @@ val init_server :
   ?agent:string ->
   ?acl:Resto_acl.Acl.t ->
   media_types:Media_type.t list ->
-  unit RPC_directory.t ->
+  unit Tezos_rpc.RPC_directory.t ->
   server
 
 (** Promise [server].*)

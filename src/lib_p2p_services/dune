@@ -8,7 +8,8 @@
  (public_name tezos-p2p-services)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base)
+  tezos-base
+  tezos-rpc)
  (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags

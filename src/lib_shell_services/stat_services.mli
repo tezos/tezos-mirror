@@ -23,12 +23,20 @@
 (*****************************************************************************)
 
 module S : sig
-  val gc : ([`GET], unit, unit, unit, unit, Gc.stat) RPC_service.service
+  val gc :
+    ([`GET], unit, unit, unit, unit, Gc.stat) Tezos_rpc.RPC_service.service
 
   val memory :
-    ([`GET], unit, unit, unit, unit, Memory.mem_stats) RPC_service.service
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      Memory.mem_stats )
+    Tezos_rpc.RPC_service.service
 end
 
-val gc : #RPC_context.simple -> Gc.stat Error_monad.tzresult Lwt.t
+val gc : #Tezos_rpc.RPC_context.simple -> Gc.stat Error_monad.tzresult Lwt.t
 
-val memory : #RPC_context.simple -> Memory.mem_stats Error_monad.tzresult Lwt.t
+val memory :
+  #Tezos_rpc.RPC_context.simple -> Memory.mem_stats Error_monad.tzresult Lwt.t

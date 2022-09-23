@@ -58,7 +58,7 @@ module Id : sig
 
   val is_global : t -> bool
 
-  val rpc_arg : t RPC_arg.t
+  val rpc_arg : t Tezos_rpc.RPC_arg.t
 
   type parsing_error =
     | Port_not_in_range of int
@@ -96,7 +96,7 @@ module Table : Hashtbl.SeededS with type key = Id.t
 module Filter : sig
   type t = Requested | Accepted | Running | Disconnected
 
-  val rpc_arg : t RPC_arg.t
+  val rpc_arg : t Tezos_rpc.RPC_arg.t
 end
 
 module State : sig

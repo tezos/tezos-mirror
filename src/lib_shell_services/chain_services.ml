@@ -57,7 +57,7 @@ let invalid_block_encoding =
     (obj3
        (req "block" Block_hash.encoding)
        (req "level" int32)
-       (req "errors" RPC_error.encoding))
+       (req "errors" Tezos_rpc.RPC_error.encoding))
 
 let bootstrap_encoding =
   obj2
@@ -65,73 +65,73 @@ let bootstrap_encoding =
     (req "sync_state" Chain_validator_worker_state.sync_status_encoding)
 
 module S = struct
-  let path : prefix RPC_path.context = RPC_path.open_root
+  let path : prefix Tezos_rpc.RPC_path.context = Tezos_rpc.RPC_path.open_root
 
   let chain_id =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"The chain unique identifier."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:Chain_id.encoding
-      RPC_path.(path / "chain_id")
+      Tezos_rpc.RPC_path.(path / "chain_id")
 
   (* DEPRECATED: use `chains/<CHAIN_ID>/levels/{checkpoint, savepoint,
      caboose, history_mode}` instead. *)
   let checkpoint =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:
         "DEPRECATED: use `../levels/{checkpoint, savepoint, caboose, \
          history_mode}` instead. The current checkpoint for this chain."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:checkpoint_encoding
-      RPC_path.(path / "checkpoint")
+      Tezos_rpc.RPC_path.(path / "checkpoint")
 
   let is_bootstrapped =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"The bootstrap status of a chain"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:bootstrap_encoding
-      RPC_path.(path / "is_bootstrapped")
+      Tezos_rpc.RPC_path.(path / "is_bootstrapped")
 
   let bootstrapped_flag_encoding =
     let open Data_encoding in
     obj1 (req "bootstrapped" bool)
 
   let force_bootstrapped =
-    RPC_service.patch_service
+    Tezos_rpc.RPC_service.patch_service
       ~description:"Forcefully set the bootstrapped flag of the node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~input:bootstrapped_flag_encoding
       ~output:unit
       path
 
   module Levels = struct
-    let path = RPC_path.(path / "levels")
+    let path = Tezos_rpc.RPC_path.(path / "levels")
 
     let checkpoint =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The current checkpoint for this chain."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:block_descriptor_encoding
-        RPC_path.(path / "checkpoint")
+        Tezos_rpc.RPC_path.(path / "checkpoint")
 
     let savepoint =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The current savepoint for this chain."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:block_descriptor_encoding
-        RPC_path.(path / "savepoint")
+        Tezos_rpc.RPC_path.(path / "savepoint")
 
     let caboose =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The current caboose for this chain."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:block_descriptor_encoding
-        RPC_path.(path / "caboose")
+        Tezos_rpc.RPC_path.(path / "caboose")
   end
 
   module Blocks = struct
     let list_query =
-      let open RPC_query in
+      let open Tezos_rpc.RPC_query in
       query (fun length heads min_date ->
           object
             method length = length
@@ -145,7 +145,7 @@ module S = struct
            ~descr:
              "The requested number of predecessors to return (per request; see \
               next argument)."
-           RPC_arg.uint
+           Tezos_rpc.RPC_arg.uint
            (fun x -> x#length)
       |+ multi_field
            "head"
@@ -166,11 +166,11 @@ module S = struct
            (fun x -> x#min_date)
       |> seal
 
-    let path = RPC_path.(path / "blocks")
+    let path = Tezos_rpc.RPC_path.(path / "blocks")
 
     let list =
       let open Data_encoding in
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Lists block hashes from '<chain>', up to the last checkpoint, \
            sorted with decreasing fitness. Without arguments it returns the \
@@ -182,40 +182,40 @@ module S = struct
   end
 
   module Invalid_blocks = struct
-    let path = RPC_path.(path / "invalid_blocks")
+    let path = Tezos_rpc.RPC_path.(path / "invalid_blocks")
 
     let list =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Lists blocks that have been declared invalid along with the errors \
            that led to them being declared invalid."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:(list invalid_block_encoding)
         path
 
     let get =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"The errors that appears during the block (in)validation."
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:invalid_block_encoding
-        RPC_path.(path /: Block_hash.rpc_arg)
+        Tezos_rpc.RPC_path.(path /: Block_hash.rpc_arg)
 
     let delete =
-      RPC_service.delete_service
+      Tezos_rpc.RPC_service.delete_service
         ~description:"Remove an invalid block for the tezos storage"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.empty
-        RPC_path.(path /: Block_hash.rpc_arg)
+        Tezos_rpc.RPC_path.(path /: Block_hash.rpc_arg)
   end
 end
 
 let make_call0 s ctxt chain q p =
-  let s = RPC_service.prefix path s in
-  RPC_context.make_call1 s ctxt chain q p
+  let s = Tezos_rpc.RPC_service.prefix path s in
+  Tezos_rpc.RPC_context.make_call1 s ctxt chain q p
 
 let make_call1 s ctxt chain a q p =
-  let s = RPC_service.prefix path s in
-  RPC_context.make_call2 s ctxt chain a q p
+  let s = Tezos_rpc.RPC_service.prefix path s in
+  Tezos_rpc.RPC_context.make_call2 s ctxt chain a q p
 
 let chain_id ctxt =
   let f = make_call0 S.chain_id ctxt in

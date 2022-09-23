@@ -59,7 +59,7 @@ val mem : Nonce.t Block_hash.Map.t -> Block_hash.t -> bool
 val find_opt : Nonce.t Block_hash.Map.t -> Block_hash.t -> Nonce.t option
 
 val get_block_level_opt :
-  #RPC_context.simple ->
+  #Tezos_rpc.RPC_context.simple ->
   chain:Block_services.chain ->
   block:Block_services.block ->
   int32 option Lwt.t

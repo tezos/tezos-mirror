@@ -29,8 +29,6 @@ end
 
 module Error_monad = Tezos_error_monad.Error_monad
 
-include module type of Tezos_rpc
-
 include module type of Tezos_crypto
 
 module Data_encoding = Data_encoding

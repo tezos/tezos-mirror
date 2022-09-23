@@ -27,7 +27,9 @@
 val build_raw_rpc_directory :
   (module Block_services.PROTO) ->
   (module Registered_protocol.T) ->
-  (Store.chain_store * Store.Block.t) RPC_directory.directory
+  (Store.chain_store * Store.Block.t) Tezos_rpc.RPC_directory.directory
 
 val build_rpc_directory :
-  Store.chain_store -> Block_services.block -> 'a RPC_directory.t Lwt.t
+  Store.chain_store ->
+  Block_services.block ->
+  'a Tezos_rpc.RPC_directory.t Lwt.t

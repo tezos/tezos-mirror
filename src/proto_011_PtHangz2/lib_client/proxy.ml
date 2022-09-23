@@ -121,7 +121,7 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
   in
   Lwt_result.ok (Protocol.Main.init_context ctxt)
 
-let time_between_blocks (rpc_context : RPC_context.generic)
+let time_between_blocks (rpc_context : Tezos_rpc.RPC_context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let open Protocol in

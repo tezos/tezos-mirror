@@ -210,7 +210,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
   >>=? fun {level; _} ->
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
-  | Error (RPC_context.Not_found _ :: _) -> return_nil
+  | Error (Tezos_rpc.RPC_context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in

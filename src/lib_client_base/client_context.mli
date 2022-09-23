@@ -150,7 +150,7 @@ class type io_rpcs =
 
     inherit prompter
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.RPC_context.generic
   end
 
 (** User interface related operations. *)
@@ -179,7 +179,7 @@ class type full =
 
     inherit wallet
 
-    inherit RPC_context.generic
+    inherit Tezos_rpc.RPC_context.generic
 
     inherit chain
 

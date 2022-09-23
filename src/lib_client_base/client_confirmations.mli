@@ -57,11 +57,13 @@ val lookup_operation_in_previous_blocks :
 val wait_for_bootstrapped :
   ?retry:
     (((#Client_context.full as 'a) ->
-     ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * RPC_context.stopper)
+     ((Block_hash.t * Time.Protocol.t) Lwt_stream.t
+     * Tezos_rpc.RPC_context.stopper)
      tzresult
      Lwt.t) ->
     'a ->
-    ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * RPC_context.stopper)
+    ((Block_hash.t * Time.Protocol.t) Lwt_stream.t
+    * Tezos_rpc.RPC_context.stopper)
     tzresult
     Lwt.t) ->
   'a ->

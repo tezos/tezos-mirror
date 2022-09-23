@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
 open Protocol
 open Alpha_context
 
@@ -85,8 +84,8 @@ module Arg = struct
             | Some b -> Ok (`Hash b)
             | None -> Error "Cannot parse block id"))
 
-  let block_id : block_id RPC_arg.t =
-    RPC_arg.make
+  let block_id : block_id Tezos_rpc.RPC_arg.t =
+    Tezos_rpc.RPC_arg.make
       ~descr:"An L1 block identifier."
       ~name:"block_id"
       ~construct:construct_block_id
@@ -97,23 +96,26 @@ end
 module type PREFIX = sig
   type prefix
 
-  val prefix : (unit, prefix) RPC_path.t
+  val prefix : (unit, prefix) Tezos_rpc.RPC_path.t
 end
 
 module Make_services (P : PREFIX) = struct
   include P
 
-  let path : prefix RPC_path.context = RPC_path.open_root
+  let path : prefix Tezos_rpc.RPC_path.context = Tezos_rpc.RPC_path.open_root
 
-  let make_call s = RPC_context.make_call (RPC_service.prefix prefix s)
+  let make_call s =
+    Tezos_rpc.RPC_context.make_call (Tezos_rpc.RPC_service.prefix prefix s)
 
-  let make_call1 s = RPC_context.make_call1 (RPC_service.prefix prefix s)
+  let make_call1 s =
+    Tezos_rpc.RPC_context.make_call1 (Tezos_rpc.RPC_service.prefix prefix s)
 
-  let make_call2 s = RPC_context.make_call2 (RPC_service.prefix prefix s)
+  let make_call2 s =
+    Tezos_rpc.RPC_context.make_call2 (Tezos_rpc.RPC_service.prefix prefix s)
 end
 
 module Global = struct
-  open RPC_path
+  open Tezos_rpc.RPC_path
 
   include Make_services (struct
     type prefix = unit
@@ -122,35 +124,35 @@ module Global = struct
   end)
 
   let sc_rollup_address =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Smart-contract rollup address"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:Sc_rollup.Address.encoding
       (path / "sc_rollup_address")
 
   let current_tezos_head =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Tezos head known to the smart-contract rollup node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:(Data_encoding.option Block_hash.encoding)
       (path / "tezos_head")
 
   let current_tezos_level =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Tezos level known to the smart-contract rollup node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:(Data_encoding.option Data_encoding.int32)
       (path / "tezos_level")
 
   let last_stored_commitment =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Last commitment computed by the node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (path / "last_stored_commitment")
 
   let outbox_proof_query =
-    let open RPC_query in
+    let open Tezos_rpc.RPC_query in
     let open Sc_rollup in
     let invalid_message e =
       raise
@@ -180,18 +182,18 @@ module Global = struct
         match message with
         | Error e -> invalid_message e
         | Ok message -> {outbox_level; message_index; message})
-    |+ opt_field "outbox_level" RPC_arg.int32 (fun o ->
+    |+ opt_field "outbox_level" Tezos_rpc.RPC_arg.int32 (fun o ->
            Some (Raw_level.to_int32 o.outbox_level))
-    |+ opt_field "message_index" RPC_arg.int64 (fun o ->
+    |+ opt_field "message_index" Tezos_rpc.RPC_arg.int64 (fun o ->
            Some (Z.to_int64 o.message_index))
-    |+ opt_field "serialized_outbox_message" RPC_arg.string (fun o ->
+    |+ opt_field "serialized_outbox_message" Tezos_rpc.RPC_arg.string (fun o ->
            match Outbox.Message.serialize o.message with
            | Ok message -> Some (Outbox.Message.unsafe_to_string message)
            | Error e -> invalid_message e)
     |> seal
 
   let outbox_proof =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Generate serialized output proof for some outbox message"
       ~query:outbox_proof_query
       ~output:
@@ -209,98 +211,98 @@ module Global = struct
     end)
 
     let hash =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Tezos block hash of block known to the smart-contract rollup node"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Block_hash.encoding
         (path / "hash")
 
     let level =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Level of Tezos block known to the smart-contract rollup node"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.int32
         (path / "level")
 
     let inbox =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Rollup inbox for block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Sc_rollup.Inbox.encoding
         (path / "inbox")
 
     let ticks =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Number of ticks for specified level"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.z
         (path / "ticks")
 
     let total_ticks =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Total number of ticks at specified block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Sc_rollup.Tick.encoding
         (path / "total_ticks")
 
     let num_messages =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Number of messages for specified block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.z
         (path / "num_messages")
 
     let state_hash =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"State hash for this block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Sc_rollup.State_hash.encoding
         (path / "state_hash")
 
     type state_value_query = {key : string}
 
-    let state_value_query : state_value_query RPC_query.t =
-      let open RPC_query in
+    let state_value_query : state_value_query Tezos_rpc.RPC_query.t =
+      let open Tezos_rpc.RPC_query in
       query (fun key -> {key})
-      |+ field "key" RPC_arg.string "" (fun t -> t.key)
+      |+ field "key" Tezos_rpc.RPC_arg.string "" (fun t -> t.key)
       |> seal
 
     let state_value =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Retrieve value from key is PVM state of specified block"
         ~query:state_value_query
         ~output:Data_encoding.bytes
         (path / "state")
 
     let status =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"PVM status at block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.string
         (path / "status")
 
     let outbox =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Outbox at block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:Data_encoding.(list Sc_rollup.output_encoding)
         (path / "outbox")
 
     let dal_slots =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:"Availability slots for a given block"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:(Data_encoding.list Dal.Slot.Header.encoding)
         (path / "dal" / "slot_headers")
 
     let dal_confirmed_slot_pages =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Data availability confirmed & downloaded slot pages for a given \
            block hash"
-        ~query:RPC_query.empty
+        ~query:Tezos_rpc.RPC_query.empty
         ~output:
           (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
                Estimate size of binary encoding and add a check_size to the
@@ -315,7 +317,7 @@ module Global = struct
     type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
 
     let dal_slot_page_query =
-      let open RPC_query in
+      let open Tezos_rpc.RPC_query in
       let req name f = function
         | None ->
             raise
@@ -332,13 +334,13 @@ module Global = struct
           | None -> invalid_parameter @@ Option.value ~default:0 raw_index
           | Some index ->
               if page < 0 then invalid_parameter page else {index; page})
-      |+ opt_field "index" RPC_arg.int (fun q ->
+      |+ opt_field "index" Tezos_rpc.RPC_arg.int (fun q ->
              Some (Dal.Slot_index.to_int q.index))
-      |+ opt_field "slot_page" RPC_arg.int (fun q -> Some q.page)
+      |+ opt_field "slot_page" Tezos_rpc.RPC_arg.int (fun q -> Some q.page)
       |> seal
 
     let dal_slot_page =
-      RPC_service.get_service
+      Tezos_rpc.RPC_service.get_service
         ~description:
           "Data availability downloaded slot pages for a given block hash"
         ~query:dal_slot_page_query
@@ -352,7 +354,7 @@ module Global = struct
 end
 
 module Local = struct
-  open RPC_path
+  open Tezos_rpc.RPC_path
 
   include Make_services (struct
     type prefix = unit
@@ -371,9 +373,9 @@ module Local = struct
      in the rollup node will be different.
   *)
   let last_published_commitment =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"Last commitment published by the node"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (path / "last_published_commitment")
 end

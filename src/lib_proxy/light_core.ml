@@ -183,7 +183,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     let get_first_merkle_tree chain block key leaf_kind :
         (Proof.tree Proof.t
         * (Storelike.tree, bytes) Either.t
-        * (Uri.t * RPC_context.simple) list)
+        * (Uri.t * Tezos_rpc.RPC_context.simple) list)
         option
         Lwt.t =
       get_first_merkle_tree chain block key leaf_kind [] endpoints

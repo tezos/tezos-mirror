@@ -34,7 +34,7 @@ module Error_table :
 module Filter : sig
   type t = Accepted | Running | Disconnected
 
-  val rpc_arg : t RPC_arg.t
+  val rpc_arg : t Tezos_rpc.RPC_arg.t
 end
 
 module State : sig

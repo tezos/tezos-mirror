@@ -110,7 +110,7 @@ type rpc_context_args = {
       (** Given the protocol implementation of the RPCs required by the proxy mode,
           how to build an instance of {!proxy_m} that will then make it possible
           to build a {!Tezos_protocol_environment.Proxy_context}. *)
-  rpc_context : RPC_context.generic;
+  rpc_context : Tezos_rpc.RPC_context.generic;
       (** How to perform RPC calls. We need such a value, because the proxy mode
           performs RPCs to initialize itself (by requesting the header) and
           also to fill {!Tezos_protocol_environment.Proxy_context} on-demand. *)

@@ -28,6 +28,7 @@ depends: [
   "tar"
   "tar-unix" { = "2.0.0" }
   "prometheus" { >= "1.2" }
+  "tezos-rpc"
   "tezos-embedded-protocol-demo-noops" {with-test}
   "tezos-embedded-protocol-genesis" {with-test}
   "tezos-embedded-protocol-alpha" {with-test}

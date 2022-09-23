@@ -64,7 +64,7 @@ module type S = sig
 
   val default_config : config
 
-  class http_ctxt : config -> Media_type.t list -> RPC_context.generic
+  class http_ctxt : config -> Media_type.t list -> Tezos_rpc.RPC_context.generic
 
   (**/**)
 
@@ -73,7 +73,7 @@ module type S = sig
     ?logger:logger ->
     ?headers:(string * string) list ->
     base:Uri.t ->
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
     'p ->
     'q ->
     'i ->
@@ -84,7 +84,7 @@ module type S = sig
     ?logger:logger ->
     ?headers:(string * string) list ->
     base:Uri.t ->
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
     on_chunk:('o -> unit) ->
     on_close:(unit -> unit) ->
     'p ->
@@ -98,7 +98,7 @@ module type S = sig
     ?body:Data_encoding.json ->
     [< Resto.meth] ->
     Uri.t ->
-    RPC_context.generic_call_result tzresult Lwt.t
+    Tezos_rpc.RPC_context.generic_call_result tzresult Lwt.t
 
   type content_type = string * string
 
@@ -109,9 +109,9 @@ module type S = sig
     ?accept:Media_type.t list ->
     ?body:Cohttp_lwt.Body.t ->
     ?media:Media_type.t ->
-    [< RPC_service.meth] ->
+    [< Tezos_rpc.RPC_service.meth] ->
     Uri.t ->
-    (content, content) RPC_context.rest_result Lwt.t
+    (content, content) Tezos_rpc.RPC_context.rest_result Lwt.t
 end
 
 module Make (Client : Resto_cohttp_client.Client.CALL) : S

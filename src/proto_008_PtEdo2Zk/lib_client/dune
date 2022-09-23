@@ -23,5 +23,4 @@
   -open Tezos_shell_services
   -open Tezos_client_base
   -open Tezos_protocol_008_PtEdo2Zk
-  -open Tezos_protocol_plugin_008_PtEdo2Zk
-  -open Tezos_rpc))
+  -open Tezos_protocol_plugin_008_PtEdo2Zk))

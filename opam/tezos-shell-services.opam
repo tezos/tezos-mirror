@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
+  "tezos-rpc"
   "tezos-p2p-services"
   "tezos-version"
   "tezos-context"

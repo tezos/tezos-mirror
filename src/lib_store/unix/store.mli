@@ -914,7 +914,7 @@ module Chain : sig
   val get_rpc_directory :
     chain_store ->
     Block.t ->
-    (chain_store * Block.t) RPC_directory.t option Lwt.t
+    (chain_store * Block.t) Tezos_rpc.RPC_directory.t option Lwt.t
 
   (** [set_rpc_directory chain_store ph next_ph rpc_directory] sets a
       [rpc_directory] for the protocol [ph] and next protocol [next_ph]
@@ -923,7 +923,7 @@ module Chain : sig
     chain_store ->
     protocol_hash:Protocol_hash.t ->
     next_protocol_hash:Protocol_hash.t ->
-    (chain_store * Block.t) RPC_directory.t ->
+    (chain_store * Block.t) Tezos_rpc.RPC_directory.t ->
     unit Lwt.t
 
   (** [register_gc_callback chain_store callback] installs a

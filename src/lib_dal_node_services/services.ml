@@ -25,64 +25,67 @@
 open Tezos_crypto_dal
 
 let split_query =
-  let open RPC_query in
+  let open Tezos_rpc.RPC_query in
   query (fun fill_x00 -> fill_x00)
   |+ flag "fill" (fun fill_x00 -> fill_x00)
   |> seal
 
 let split_slot () =
-  RPC_service.post_service
+  Tezos_rpc.RPC_service.post_service
     ~description:"Split and store a slot"
     ~query:split_query
     ~input:Data_encoding.bytes
     ~output:Data_encoding.string
       (* see [Slot_manager.Slot_header.to_b58check] *)
-    RPC_path.(open_root / "slot" / "split")
+    Tezos_rpc.RPC_path.(open_root / "slot" / "split")
 
 let slot_query =
-  let open RPC_query in
+  let open Tezos_rpc.RPC_query in
   query (fun trim_x00 -> trim_x00)
   |+ flag "trim" (fun trim_x00 -> trim_x00)
   |> seal
 
 let slot () =
-  RPC_service.get_service
+  Tezos_rpc.RPC_service.get_service
     ~description:"Show content of a slot"
     ~query:slot_query
     ~output:Data_encoding.bytes
-    RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
+    Tezos_rpc.RPC_path.(
+      open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
 let slot_pages () =
-  RPC_service.get_service
+  Tezos_rpc.RPC_service.get_service
     ~description:"Fetch slot as list of pages"
-    ~query:RPC_query.empty
+    ~query:Tezos_rpc.RPC_query.empty
     ~output:(Data_encoding.list Data_encoding.bytes)
-    RPC_path.(open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
+    Tezos_rpc.RPC_path.(
+      open_root / "slot" / "pages" /: Cryptobox.Commitment.rpc_arg)
 
 let stored_slot_headers () =
-  RPC_service.get_service
+  Tezos_rpc.RPC_service.get_service
     ~description:"List slot headers for a given block hash"
-    ~query:RPC_query.empty
+    ~query:Tezos_rpc.RPC_query.empty
     ~output:
       Data_encoding.(
         list
           (obj2
              (req "index" int31)
              (req "slot_header" Cryptobox.Commitment.encoding)))
-    RPC_path.(open_root / "stored_slot_headers" /: Block_hash.rpc_arg)
+    Tezos_rpc.RPC_path.(open_root / "stored_slot_headers" /: Block_hash.rpc_arg)
 
 let shard () =
-  let shard_arg = RPC_arg.int in
-  RPC_service.get_service
+  let shard_arg = Tezos_rpc.RPC_arg.int in
+  Tezos_rpc.RPC_service.get_service
     ~description:"Fetch shard as bytes"
-    ~query:RPC_query.empty
+    ~query:Tezos_rpc.RPC_query.empty
     ~output:Cryptobox.shard_encoding
-    RPC_path.(open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
+    Tezos_rpc.RPC_path.(
+      open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
 let monitor_slot_headers () =
-  RPC_service.get_service
+  Tezos_rpc.RPC_service.get_service
     ~description:"Monitor stored slot headers"
-    ~query:RPC_query.empty
+    ~query:Tezos_rpc.RPC_query.empty
     ~output:
       Data_encoding.(obj1 (req "slot_header" Cryptobox.Commitment.encoding))
-    RPC_path.(open_root / "monitor_slot_headers")
+    Tezos_rpc.RPC_path.(open_root / "monitor_slot_headers")

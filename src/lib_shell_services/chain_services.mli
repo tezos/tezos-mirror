@@ -30,15 +30,15 @@ val parse_chain : string -> (chain, string) result
 
 val to_string : chain -> string
 
-val chain_arg : chain RPC_arg.t
+val chain_arg : chain Tezos_rpc.RPC_arg.t
 
 type invalid_block = {hash : Block_hash.t; level : Int32.t; errors : error list}
 
 type prefix = unit * chain
 
-val path : (unit, prefix) RPC_path.path
+val path : (unit, prefix) Tezos_rpc.RPC_path.path
 
-open RPC_context
+open Tezos_rpc.RPC_context
 
 val chain_id : #simple -> ?chain:chain -> unit -> Chain_id.t tzresult Lwt.t
 
@@ -79,7 +79,7 @@ module Blocks : sig
   }
 
   val protocols :
-    #RPC_context.simple ->
+    #Tezos_rpc.RPC_context.simple ->
     ?chain:chain ->
     ?block:Block_services.block ->
     unit ->
@@ -97,7 +97,8 @@ module Invalid_blocks : sig
 end
 
 module S : sig
-  val chain_id : ([`GET], prefix, prefix, unit, unit, Chain_id.t) RPC_service.t
+  val chain_id :
+    ([`GET], prefix, prefix, unit, unit, Chain_id.t) Tezos_rpc.RPC_service.t
 
   val checkpoint :
     ( [`GET],
@@ -106,7 +107,7 @@ module S : sig
       unit,
       unit,
       Block_header.t * int32 * int32 * History_mode.t )
-    RPC_service.t
+    Tezos_rpc.RPC_service.t
 
   val is_bootstrapped :
     ( [`GET],
@@ -115,24 +116,42 @@ module S : sig
       unit,
       unit,
       bool * Chain_validator_worker_state.synchronisation_status )
-    RPC_service.t
+    Tezos_rpc.RPC_service.t
 
   val force_bootstrapped :
-    ([`PATCH], prefix, prefix, unit, bool, unit) RPC_service.t
+    ([`PATCH], prefix, prefix, unit, bool, unit) Tezos_rpc.RPC_service.t
 
   module Levels : sig
     val checkpoint :
-      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_hash.t * int32 )
+      Tezos_rpc.RPC_service.t
 
     val savepoint :
-      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_hash.t * int32 )
+      Tezos_rpc.RPC_service.t
 
     val caboose :
-      ([`GET], prefix, prefix, unit, unit, Block_hash.t * int32) RPC_service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        Block_hash.t * int32 )
+      Tezos_rpc.RPC_service.t
   end
 
   module Blocks : sig
-    val path : (prefix, prefix) RPC_path.t
+    val path : (prefix, prefix) Tezos_rpc.RPC_path.t
 
     val list :
       ( [`GET],
@@ -143,12 +162,18 @@ module S : sig
         ; min_date : Time.Protocol.t option >,
         unit,
         Block_hash.t list list )
-      RPC_service.t
+      Tezos_rpc.RPC_service.t
   end
 
   module Invalid_blocks : sig
     val list :
-      ([`GET], prefix, prefix, unit, unit, invalid_block list) RPC_service.t
+      ( [`GET],
+        prefix,
+        prefix,
+        unit,
+        unit,
+        invalid_block list )
+      Tezos_rpc.RPC_service.t
 
     val get :
       ( [`GET],
@@ -157,9 +182,15 @@ module S : sig
         unit,
         unit,
         invalid_block )
-      RPC_service.t
+      Tezos_rpc.RPC_service.t
 
     val delete :
-      ([`DELETE], prefix, prefix * Block_hash.t, unit, unit, unit) RPC_service.t
+      ( [`DELETE],
+        prefix,
+        prefix * Block_hash.t,
+        unit,
+        unit,
+        unit )
+      Tezos_rpc.RPC_service.t
   end
 end

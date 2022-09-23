@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Directory = Resto_directory.Make (RPC_encoding)
+module Directory = Resto_directory.Make (Tezos_rpc.RPC_encoding)
 open Tezos_shell_services
 
 type error += Injection_not_possible
@@ -126,7 +126,7 @@ module Make (E : MENV) = struct
       (Directory.register
          Directory.empty
          Tezos_shell_services.Chain_services.S.chain_id
-         (fun _ () () -> RPC_answer.return E.chain_id))
+         (fun _ () () -> Tezos_rpc.RPC_answer.return E.chain_id))
 
   let protocols protocol_hash =
     let path =
@@ -151,7 +151,8 @@ module Make (E : MENV) = struct
     Tezos_rpc.RPC_directory.gen_register
       Directory.empty
       Monitor_services.S.bootstrapped
-      (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
+      (fun () () () ->
+        Tezos_rpc.RPC_answer.return (block_hash, block_header.timestamp))
 
   let chain_chain_id = function
     | `Main -> Chain_id.hash_string ["main"]
@@ -352,7 +353,7 @@ module Make (E : MENV) = struct
   let with_chain ?caller_name chain k =
     let open Lwt_syntax in
     let* r = check_chain ?caller_name chain in
-    match r with Error errs -> RPC_answer.fail errs | Ok () -> k ()
+    match r with Error errs -> Tezos_rpc.RPC_answer.fail errs | Ok () -> k ()
 
   let pending_operations () =
     let open Lwt_result_syntax in
@@ -379,7 +380,7 @@ module Make (E : MENV) = struct
           return pending_operations
         in
         match pending_operations with
-        | Error errs -> RPC_answer.fail errs
+        | Error errs -> Tezos_rpc.RPC_answer.fail errs
         | Ok pending_operations ->
             E.Block_services.Mempool.pending_operations_version_dispatcher
               ~version:params#version
@@ -395,7 +396,8 @@ module Make (E : MENV) = struct
     @@ Directory.register
          Directory.empty
          E.Block_services.S.Header.shell_header
-         (fun _prefix () () -> RPC_answer.return E.rpc_context.block_header)
+         (fun _prefix () () ->
+           Tezos_rpc.RPC_answer.return E.rpc_context.block_header)
 
   let block_hash () =
     let path =
@@ -407,7 +409,7 @@ module Make (E : MENV) = struct
     in
     (* Always return the head. *)
     Directory.register Directory.empty service (fun _prefix () () ->
-        RPC_answer.return E.rpc_context.block_hash)
+        Tezos_rpc.RPC_answer.return E.rpc_context.block_hash)
 
   let live_blocks () =
     Directory.prefix
@@ -422,7 +424,7 @@ module Make (E : MENV) = struct
          (fun (((), chain), _block) () () ->
            with_chain ~caller_name:"live blocks" chain (fun () ->
                let set = Block_hash.Set.singleton E.rpc_context.block_hash in
-               RPC_answer.return set))
+               Tezos_rpc.RPC_answer.return set))
 
   let simulate_operation (state, preapply_result) op =
     let open Lwt_result_syntax in
@@ -540,8 +542,8 @@ module Make (E : MENV) = struct
                  return (shell_header, List.rev preapply_results)
                in
                match r with
-               | Error errs -> RPC_answer.fail errs
-               | Ok v -> RPC_answer.return v))
+               | Error errs -> Tezos_rpc.RPC_answer.fail errs
+               | Ok v -> Tezos_rpc.RPC_answer.return v))
 
   let hash_protocol_operation op =
     match
@@ -591,8 +593,8 @@ module Make (E : MENV) = struct
                  return (List.rev acc)
                in
                match outcome with
-               | Ok result -> RPC_answer.return result
-               | Error errs -> RPC_answer.fail errs)))
+               | Ok result -> Tezos_rpc.RPC_answer.return result
+               | Error errs -> Tezos_rpc.RPC_answer.fail errs)))
 
   let hash_op (shell, proto) =
     let proto =
@@ -638,14 +640,14 @@ module Make (E : MENV) = struct
   let inject_operation_with_mempool operation_bytes =
     let open Lwt_result_syntax in
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
-    | Error _ -> RPC_answer.fail [Cannot_parse_op]
+    | Error _ -> Tezos_rpc.RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
           Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
-        | Error _ -> RPC_answer.fail [Cannot_parse_op]
+        | Error _ -> Tezos_rpc.RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
             let op = (shell_header, operation_data) in
             let*! r =
@@ -663,25 +665,25 @@ module Make (E : MENV) = struct
                     op
             in
             match r with
-            | Ok _ -> RPC_answer.return operation_hash
+            | Ok _ -> Tezos_rpc.RPC_answer.return operation_hash
             | Error errs -> (
                 let*! r = Trashpool.append [op] in
                 match r with
-                | Ok _ -> RPC_answer.fail errs
-                | Error errs2 -> RPC_answer.fail (errs @ errs2))))
+                | Ok _ -> Tezos_rpc.RPC_answer.fail errs
+                | Error errs2 -> Tezos_rpc.RPC_answer.fail (errs @ errs2))))
 
   let inject_operation_without_mempool
       (write_context_callback : callback_writer) operation_bytes =
     let open Lwt_result_syntax in
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
-    | Error _ -> RPC_answer.fail [Cannot_parse_op]
+    | Error _ -> Tezos_rpc.RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
         let operation_hash = Operation.hash op in
         let proto_op_opt =
           Data_encoding.Binary.of_bytes E.Protocol.operation_data_encoding proto
         in
         match proto_op_opt with
-        | Error _ -> RPC_answer.fail [Cannot_parse_op]
+        | Error _ -> Tezos_rpc.RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
             let op =
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
@@ -701,9 +703,9 @@ module Make (E : MENV) = struct
                 let rpc_context = {E.rpc_context with context} in
                 let*! result = write_context_callback rpc_context proto in
                 match result with
-                | Ok () -> RPC_answer.return operation_hash
-                | Error errs -> RPC_answer.fail errs)
-            | Error errs -> RPC_answer.fail errs))
+                | Ok () -> Tezos_rpc.RPC_answer.return operation_hash
+                | Error errs -> Tezos_rpc.RPC_answer.fail errs)
+            | Error errs -> Tezos_rpc.RPC_answer.fail errs))
 
   let inject_block_generic (write_context_callback : callback_writer)
       (update_mempool_callback : Operation.t list list -> unit tzresult Lwt.t) =
@@ -767,7 +769,7 @@ module Make (E : MENV) = struct
         (* assert (Files.Mempool.exists ~dirname:E.base_dir) ; *)
         let block_hash = Block_hash.hash_bytes [bytes] in
         match Block_header.of_bytes bytes with
-        | None -> RPC_answer.fail [Cannot_parse_op]
+        | None -> Tezos_rpc.RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
             let*! r =
               let* {context; _}, _ = reconstruct operations block_header in
@@ -788,8 +790,8 @@ module Make (E : MENV) = struct
               update_mempool_callback operations
             in
             match r with
-            | Error errs -> RPC_answer.fail errs
-            | Ok () -> RPC_answer.return block_hash))
+            | Error errs -> Tezos_rpc.RPC_answer.fail errs
+            | Ok () -> Tezos_rpc.RPC_answer.return block_hash))
 
   (** [inject_block] is a feature that assumes that the mockup is on-disk
       and uses a mempool. *)
@@ -839,7 +841,7 @@ module Make (E : MENV) = struct
          injection_directory.ml *)
       Tezos_shell_services.Injection_services.S.operation
       (fun _q _contents operation_bytes ->
-        if mem_only then RPC_answer.fail [Injection_not_possible]
+        if mem_only then Tezos_rpc.RPC_answer.fail [Injection_not_possible]
         else
           (* Looking at the implementations of the two inject_operation_*
              functions it looks like there is code to share (proto_op_opt,
@@ -869,7 +871,7 @@ module Make (E : MENV) = struct
                 }
             in
             let block_hash = E.rpc_context.block_hash in
-            RPC_answer.return (block_hash, block_header)))
+            Tezos_rpc.RPC_answer.return (block_hash, block_header)))
 
   let header () =
     Directory.prefix
@@ -891,7 +893,7 @@ module Make (E : MENV) = struct
                          protocol_data;
                        }
                    in
-                   RPC_answer.return block_header)))
+                   Tezos_rpc.RPC_answer.return block_header)))
 
   let protocol_data_raw () =
     Directory.prefix
@@ -901,7 +903,7 @@ module Make (E : MENV) = struct
          E.Block_services.S.Header.raw_protocol_data
          (fun (((), chain), _block) () () ->
            with_chain ~caller_name:"protocol_data_raw" chain (fun () ->
-               RPC_answer.return E.protocol_data)))
+               Tezos_rpc.RPC_answer.return E.protocol_data)))
 
   let operations () =
     Directory.prefix
@@ -912,7 +914,7 @@ module Make (E : MENV) = struct
          (fun (((), chain), _block) _query () ->
            with_chain ~caller_name:"operations" chain (fun () ->
                (* FIXME: Better answer here *)
-               RPC_answer.return [[]; []; []; []]))
+               Tezos_rpc.RPC_answer.return [[]; []; []; []]))
 
   let monitor_operations () =
     let open Lwt_syntax in
@@ -930,7 +932,7 @@ module Make (E : MENV) = struct
             let* () = on o#branch_refused "branch_refused ignored" in
             let* () = on o#refused "refused ignored" in
             let _ = o#applied in
-            RPC_answer.(
+            Tezos_rpc.RPC_answer.(
               return_stream
                 {next = (fun () -> Lwt.return_none); shutdown = (fun () -> ())})))
 
@@ -986,7 +988,7 @@ let build_shell_directory (base_dir : string)
 let build_directory (base_dir : string) (mem_only : bool)
     (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
     (rpc_context : Tezos_protocol_environment.rpc_context) protocol_data :
-    unit RPC_directory.t =
+    unit Tezos_rpc.RPC_directory.t =
   let write_context rpc_context protocol_data =
     let (module Mockup_environment) = mockup_env in
     Persistence.overwrite_mockup
@@ -1019,6 +1021,6 @@ let build_directory (base_dir : string) (mem_only : bool)
       write_context
   in
   let base = Directory.merge shell_directory proto_directory in
-  RPC_directory.register_describe_directory_service
+  Tezos_rpc.RPC_directory.register_describe_directory_service
     base
-    RPC_service.description_service
+    Tezos_rpc.RPC_service.description_service

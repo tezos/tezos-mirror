@@ -9,7 +9,8 @@ module type Mocked_services_hooks = sig
 
   (** The baker and endorser rely on this stream to be notified of new
      blocks. *)
-  val monitor_heads : unit -> (Block_hash.t * Block_header.t) RPC_answer.stream
+  val monitor_heads :
+    unit -> (Block_hash.t * Block_header.t) Tezos_rpc.RPC_answer.stream
 
   (** Returns current and next protocol for a block. *)
   val protocols :
@@ -54,7 +55,7 @@ module type Mocked_services_hooks = sig
     branch_refused:bool ->
     refused:bool ->
     ((Operation_hash.t * Mockup.M.Protocol.operation) * error trace option) list
-    RPC_answer.stream
+    Tezos_rpc.RPC_answer.stream
 
   (** Lists block hashes from the chain, up to the last checkpoint, sorted
      with decreasing fitness. Without arguments it returns the head of the
@@ -101,7 +102,7 @@ module type Mocked_services_hooks = sig
       simulated node is already bootstrapped, returns the current head
       immediately. *)
   val monitor_bootstrapped :
-    unit -> (Block_hash.t * Time.Protocol.t) RPC_answer.stream
+    unit -> (Block_hash.t * Time.Protocol.t) Tezos_rpc.RPC_answer.stream
 end
 
 type hooks = (module Mocked_services_hooks)
@@ -112,13 +113,14 @@ module Make (Hooks : Mocked_services_hooks) = struct
       Directory.empty
       Monitor_services.S.heads
       (fun _chain _next_protocol () ->
-        RPC_answer.return_stream (Hooks.monitor_heads ()))
+        Tezos_rpc.RPC_answer.return_stream (Hooks.monitor_heads ()))
 
   let monitor_bootstrapped =
     Directory.gen_register0
       Directory.empty
       Monitor_services.S.bootstrapped
-      (fun () () -> RPC_answer.return_stream (Hooks.monitor_bootstrapped ()))
+      (fun () () ->
+        Tezos_rpc.RPC_answer.return_stream (Hooks.monitor_bootstrapped ()))
 
   let protocols =
     let path =
@@ -236,7 +238,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
             ~branch_refused:flags#branch_refused
             ~refused:flags#refused
         in
-        RPC_answer.return_stream stream)
+        Tezos_rpc.RPC_answer.return_stream stream)
 
   let list_blocks =
     Directory.prefix
@@ -290,7 +292,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
               Mockup.M.directory))
     in
     let base = Directory.merge (shell_directory chain_id) proto_directory in
-    RPC_directory.register_describe_directory_service
+    Tezos_rpc.RPC_directory.register_describe_directory_service
       base
-      RPC_service.description_service
+      Tezos_rpc.RPC_service.description_service
 end

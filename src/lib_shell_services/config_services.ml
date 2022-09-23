@@ -23,43 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let path = RPC_path.(open_root / "config")
+let path = Tezos_rpc.RPC_path.(open_root / "config")
 
 module Network = struct
   let user_activated_upgrades =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"List of protocols to switch to at given levels"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:User_activated.upgrades_encoding
-      RPC_path.(path / "network" / "user_activated_upgrades")
+      Tezos_rpc.RPC_path.(path / "network" / "user_activated_upgrades")
 
   let user_activated_protocol_overrides =
-    RPC_service.get_service
+    Tezos_rpc.RPC_service.get_service
       ~description:"List of protocols which replace other protocols"
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~output:User_activated.protocol_overrides_encoding
-      RPC_path.(path / "network" / "user_activated_protocol_overrides")
+      Tezos_rpc.RPC_path.(
+        path / "network" / "user_activated_protocol_overrides")
 end
 
 let history_mode_encoding =
   Data_encoding.(obj1 (req "history_mode" History_mode.encoding))
 
 let history_mode =
-  RPC_service.get_service
+  Tezos_rpc.RPC_service.get_service
     ~description:"Returns the history mode of the node's underlying storage."
-    ~query:RPC_query.empty
+    ~query:Tezos_rpc.RPC_query.empty
     ~output:history_mode_encoding
-    RPC_path.(path / "history_mode")
+    Tezos_rpc.RPC_path.(path / "history_mode")
 
 module Logging = struct
   let configure =
-    RPC_service.put_service
+    Tezos_rpc.RPC_service.put_service
       ~description:"Replace the logging configuration of the node."
-      ~query:RPC_query.empty
+      ~query:Tezos_rpc.RPC_query.empty
       ~input:Tezos_base.Internal_event_config.encoding
       ~output:Data_encoding.empty
-      RPC_path.(root / "config" / "logging")
+      Tezos_rpc.RPC_path.(root / "config" / "logging")
 end
 
 let user_activated_upgrades cctxt =
-  RPC_context.make_call Network.user_activated_upgrades cctxt () () ()
+  Tezos_rpc.RPC_context.make_call Network.user_activated_upgrades cctxt () () ()

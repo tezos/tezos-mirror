@@ -24,6 +24,6 @@
 (*****************************************************************************)
 
 module RPC = struct
-  let rpc_services : Environment.Updater.rpc_context RPC_directory.t =
+  let rpc_services : Environment.Updater.rpc_context Tezos_rpc.RPC_directory.t =
     Protocol.rpc_services
 end

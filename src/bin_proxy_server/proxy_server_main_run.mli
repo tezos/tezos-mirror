@@ -34,4 +34,4 @@ type args = {
 }
 
 (** [run dir args] launches a server honoring [dir], configured by [args] *)
-val run : unit RPC_directory.t -> args -> 'a tzresult Lwt.t
+val run : unit Tezos_rpc.RPC_directory.t -> args -> 'a tzresult Lwt.t

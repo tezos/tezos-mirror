@@ -29,5 +29,4 @@
   -open Tezos_client_base
   -open Tezos_protocol_015_PtLimaPt
   -open Tezos_protocol_plugin_015_PtLimaPt
-  -open Tezos_protocol_015_PtLimaPt_parameters
-  -open Tezos_rpc))
+  -open Tezos_protocol_015_PtLimaPt_parameters))

@@ -13,6 +13,7 @@ depends: [
   "tezos-base"
   "cohttp-lwt-unix" { >= "2.2.0" }
   "resto-cohttp-client" { >= "1.0" }
+  "tezos-rpc"
   "tezos-rpc-http-client"
 ]
 build: [
