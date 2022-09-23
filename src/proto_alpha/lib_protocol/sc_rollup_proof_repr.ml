@@ -271,7 +271,7 @@ let produce pvm_and_state commit_level =
         | Some data ->
             return
               ( Some (Reveal_proof (RawDataProof data)),
-                Some (Sc_rollup_PVM_sig.Reveal_revelation (RawData data)) ))
+                Some (Sc_rollup_PVM_sig.Reveal (RawData data)) ))
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in

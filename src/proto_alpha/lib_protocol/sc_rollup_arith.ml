@@ -927,7 +927,7 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
 
-  let reveal_reveal_monadic (PS.RawData data) =
+  let reveal_monadic (PS.RawData data) =
     (*
 
        The inbox cursor is unchanged as the message comes from the
@@ -954,12 +954,12 @@ module Make (Context : P) :
     let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
     m
 
-  let reveal_reveal data = reveal_reveal_monadic data |> ticked |> state_of
+  let reveal data = reveal_monadic data |> ticked |> state_of
 
   let set_input_monadic input =
     match input with
     | PS.Inbox_message m -> set_inbox_message_monadic m
-    | PS.Reveal s -> reveal_reveal_monadic s
+    | PS.Reveal s -> reveal_monadic s
 
   let set_input input = set_input_monadic input |> ticked |> state_of
 
@@ -1219,7 +1219,7 @@ module Make (Context : P) :
                 state)
       | PS.Needs_reveal _hash -> (
           match input_given with
-          | Some (PS.Reveal data) -> reveal_reveal data state
+          | Some (PS.Reveal data) -> reveal data state
           | None | Some (PS.Inbox_message _) ->
               state_of
                 (internal_error
