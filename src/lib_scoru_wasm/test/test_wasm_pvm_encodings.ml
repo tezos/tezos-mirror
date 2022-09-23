@@ -58,6 +58,24 @@ let init_state_gen =
   let open QCheck2.Gen in
   oneofl [Eval.Init_step; Map_step; Map_concat_step; Join_step; Section_step]
 
+let eval_state_gen =
+  let open QCheck2.Gen in
+  let+ msg = string in
+  Eval.Invoke_step msg
+
+let reveal_error_gen =
+  let open QCheck2.Gen in
+  let reveal_step = return Eval.Reveal_step in
+  let reveal_hash_decoding =
+    let+ raw = string in
+    Eval.Reveal_hash_decoding raw
+  in
+  let reveal_payload_decoding =
+    let+ raw = string in
+    Eval.Reveal_payload_decoding raw
+  in
+  oneof [reveal_step; reveal_hash_decoding; reveal_payload_decoding]
+
 let exn_gen =
   let open QCheck2.Gen in
   let open Lazy_containers in
@@ -82,6 +100,14 @@ let exn_gen =
   let init_step_error =
     let+ state = init_state_gen in
     Eval.Init_step_error state
+  in
+  let eval_step_error =
+    let+ state = eval_state_gen in
+    Eval.Evaluation_step_error state
+  in
+  let reveal_error =
+    let+ err = reveal_error_gen in
+    Eval.Reveal_error err
   in
   let invalid =
     let+ msg = string in
@@ -116,6 +142,8 @@ let exn_gen =
       encode_error;
       decode_step_error;
       init_step_error;
+      eval_step_error;
+      reveal_error;
       return Lazy_map.UnexpectedAccess;
       return Lazy_vector.Bounds;
       return Lazy_vector.SizeOverflow;

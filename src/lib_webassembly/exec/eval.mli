@@ -36,6 +36,14 @@ type init_state =
     initialization. *)
 exception Init_step_error of init_state
 
+(** Possible erroneous states of the small-step evaluation, used for error
+    reporting. *)
+type eval_state = Invoke_step of string
+
+(** Exception raised on irreducible states of the small step
+    evaluation. *)
+exception Evaluation_step_error of eval_state
+
 type frame = {inst : module_key; mutable locals : value Vector.t}
 
 type admin_instr = admin_instr' Source.phrase
@@ -263,13 +271,28 @@ val step :
   buffers ->
   (Durable_storage.t * config) Lwt.t
 
+(* Possible errors raised during the reveal ticks handling. *)
+type reveal_error =
+  | Reveal_step
+  | Reveal_hash_decoding of string
+  | Reveal_payload_decoding of string
+
+(* Exception encapuslating errors during reveal ticks handling. *)
+exception Reveal_error of reveal_error
+
+(** [is_reveal_tick config] returns [Some hash] if the evalutation is
+    in a state expecting the payload of a given hash, and returns [None]
+    otherwise. *)
 val is_reveal_tick : config -> Reveal.reveal option
 
 (** [reveal_step module_reg payload config] loads [payload] in the
     memory of the module whose function is being evaluated with [config].
 
     This function can only be used when [is_reveal_tick] returns
-    something ({i i.e.}, not [None]). *)
+    something ({i i.e.}, not [None]).
+
+    @raise Reveal_error
+*)
 val reveal_step : module_reg -> bytes -> config -> config Lwt.t
 
 val config :

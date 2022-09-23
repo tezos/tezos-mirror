@@ -65,14 +65,14 @@ let decode_state_to_string_raw = function
 let decode_state_to_string exn =
   decode_state_to_string_raw exn |> truncate_message
 
-let eval_state_to_string_raw = function
+let init_state_to_string_raw = function
   | Eval.Init_step -> "Init_step"
   | Map_step -> "Map_step"
   | Map_concat_step -> "Map_concat_step"
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
 
-let eval_state_to_string exn = eval_state_to_string_raw exn |> truncate_message
+let init_state_to_string exn = init_state_to_string_raw exn |> truncate_message
 
 let durable_exn_explanation_raw = function
   | Durable.Invalid_key path -> Some ("Invalid_key: " ^ path)
@@ -83,6 +83,21 @@ let durable_exn_explanation_raw = function
 
 let durable_exn_explanation exn =
   durable_exn_explanation_raw exn |> Option.map truncate_message
+
+let eval_state_to_string_raw = function
+  | Eval.Invoke_step msg -> "Invoke_step: " ^ msg
+
+let eval_state_to_string exn = eval_state_to_string_raw exn |> truncate_message
+
+let reveal_error_to_string_raw = function
+  | Eval.Reveal_step -> "Reveal_step"
+  | Reveal_hash_decoding msg ->
+      Format.sprintf "Unknown error during hash decoding: %s" msg
+  | Reveal_payload_decoding msg ->
+      Format.sprintf "Unknown error during payload decoding: %s" msg
+
+let reveal_error_to_string exn =
+  reveal_error_to_string_raw exn |> truncate_message
 
 let extract_interpreter_error exn =
   let open Lazy_containers in
@@ -114,7 +129,13 @@ let extract_interpreter_error exn =
         {raw_exception; explanation = Some (decode_state_to_string state)}
   | Eval.Init_step_error state ->
       `Interpreter
+        {raw_exception; explanation = Some (init_state_to_string state)}
+  | Eval.Evaluation_step_error state ->
+      `Interpreter
         {raw_exception; explanation = Some (eval_state_to_string state)}
+  | Eval.Reveal_error state ->
+      `Interpreter
+        {raw_exception; explanation = Some (reveal_error_to_string state)}
   | Eval.Missing_memory_0_export ->
       `Interpreter
         {

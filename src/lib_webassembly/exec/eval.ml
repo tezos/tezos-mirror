@@ -104,6 +104,10 @@ type init_state =
 
 exception Init_step_error of init_state
 
+type eval_state = Invoke_step of string
+
+exception Evaluation_step_error of eval_state
+
 let table_error at = function
   | Table.Bounds -> "out of bounds table access"
   | Table.SizeOverflow -> "table size overflow"
@@ -495,7 +499,8 @@ let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
 let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
   function
-  | Inv_stop _ -> assert false
+  | Inv_stop _ ->
+      raise (Evaluation_step_error (Invoke_step "Inv_stop cannot reduce"))
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
       let n1, n2 =
@@ -563,8 +568,12 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                             Reveal_raw_data (input_hash_from_string_exn hash))
                         )
                   in
-                  (* TODO: Proper error handling. *)
-                  assert (Vector.num_elements args = 0l) ;
+                  if Vector.num_elements args <> 0l then
+                    raise
+                      (Evaluation_step_error
+                         (Invoke_step
+                            "The number of passed arguments to \
+                             \"reveal_preimage\" is inconsistent")) ;
                   Lwt.return
                     ( durable,
                       Inv_reveal_tick
@@ -657,7 +666,9 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
   | Inv_reveal_tick {revealed_bytes = None; _} ->
       (* This is a reveal tick, not an evaluation tick. The PVM should
          prevent this execution path. *)
-      assert false
+      raise
+        (Evaluation_step_error
+           (Invoke_step "The reveal tick cannot be evaluated as is"))
   | Inv_reveal_tick {revealed_bytes = Some revealed_bytes; code; _} ->
       let vs, es = code in
       let vs = Vector.cons (Num (I32 revealed_bytes)) vs in
@@ -1557,6 +1568,13 @@ let rec eval durable module_reg (c : config) buffers :
       let* durable, c = step ~init:false ~durable c buffers in
       eval durable module_reg c buffers
 
+type reveal_error =
+  | Reveal_step
+  | Reveal_hash_decoding of string
+  | Reveal_payload_decoding of string
+
+exception Reveal_error of reveal_error
+
 let is_reveal_tick = function
   | {
       step_kont =
@@ -1575,17 +1593,21 @@ let reveal module_reg base_destination max_bytes frame payload =
   Lwt.catch
     (fun () ->
       let* inst = resolve_module_ref module_reg frame.inst in
-      let+ mem = memory inst (0l @@ no_region) in
+      let* mem = memory inst (0l @@ no_region) in
       let payload_size = Bytes.length payload in
       let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
       let payload = Bytes.sub payload 0 revealed_bytes in
-      let _ =
+      let+ () =
         Memory.store_bytes mem base_destination (Bytes.to_string payload)
       in
       Int32.of_int revealed_bytes)
-    (fun _exn ->
-      (* TODO: error handling *)
-      assert false)
+    (function
+      | ( Memory.Bounds (* Memory.store_bytes *)
+        | Lazy_map.UnexpectedAccess (* resolve_module_ref *) ) as exn ->
+          raise exn
+      | exn ->
+          let raw_exn = Printexc.to_string exn in
+          raise (Reveal_error (Reveal_payload_decoding raw_exn)))
 
 let reveal_step module_reg payload =
   let open Lwt.Syntax in
@@ -1618,7 +1640,7 @@ let reveal_step module_reg payload =
                   Inv_reveal_tick {inv with revealed_bytes = Some bytes_count}
                 ) );
       }
-  | _ -> assert false (* TODO: error handling *)
+  | _ -> raise (Reveal_error Reveal_step)
 
 (* Functions & Constants *)
 
