@@ -26,21 +26,6 @@ _PC_FLAG = "protocol-constants"
 
 
 @pytest.mark.client
-def test_retrieve_addresses(mockup_client: Client):
-    """Retrieves known addresses of a fresh mockup.
-    The call must succeed.
-    """
-    addresses = mockup_client.get_known_addresses().wallet
-    assert addresses == {
-        'bootstrap1': 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx',
-        'bootstrap2': 'tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN',
-        'bootstrap3': 'tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU',
-        'bootstrap4': 'tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv',
-        'bootstrap5': 'tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv',
-    }
-
-
-@pytest.mark.client
 def test_create_mockup_already_initialized(mockup_client: Client):
     """Executes `tezos-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir is not fresh.

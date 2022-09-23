@@ -641,6 +641,26 @@ let test_create_mockup_dir_exists_nonempty =
   in
   unit
 
+let test_retrieve_addresses =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Retrieve addresses"
+    ~tags:["mockup"; "client"; "wallet"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* addresses = Client.list_known_addresses client in
+  let expected_addresses =
+    Account.Bootstrap.keys |> Array.to_list |> List.rev
+    |> List.map @@ fun Account.{alias; public_key_hash; _} ->
+       (alias, public_key_hash)
+  in
+  Check.(
+    (addresses = expected_addresses)
+      ~__LOC__
+      (list (tuple2 string string))
+      ~error_msg:"Expected addresses %R, got %L") ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -653,7 +673,8 @@ let register ~protocols =
   test_origination_from_unrevealed_fees protocols ;
   test_multiple_transfers protocols ;
   test_storage_from_file protocols ;
-  test_create_mockup_dir_exists_nonempty protocols
+  test_create_mockup_dir_exists_nonempty protocols ;
+  test_retrieve_addresses protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
