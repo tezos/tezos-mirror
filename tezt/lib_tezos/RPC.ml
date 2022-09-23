@@ -493,6 +493,40 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
     Fun.id
 
+let get_chain_block_context_contract_storage_used_space ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "storage";
+      "used_space";
+    ]
+    JSON.as_int
+
+let get_chain_block_context_contract_storage_paid_space ?(chain = "main")
+    ?(block = "head") contract =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      contract;
+      "storage";
+      "paid_space";
+    ]
+    JSON.as_int
+
 let get_chain_block_helper_baking_rights ?(chain = "main") ?(block = "head")
     ?delegate ?level () =
   let query_string =

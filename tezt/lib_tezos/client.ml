@@ -996,11 +996,29 @@ let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
         "of";
         contract;
         "by";
-        amount;
+        string_of_int amount;
         "bytes";
         "from";
         payer;
       ])
+  |> Process.check_and_read_stdout
+
+let used_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["get"; "contract"; "used"; "storage"; "space"; "for"; contract])
+  |> Process.check_and_read_stdout
+
+let paid_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["get"; "contract"; "paid"; "storage"; "space"; "for"; contract])
   |> Process.check_and_read_stdout
 
 let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
