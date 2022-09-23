@@ -954,8 +954,6 @@ module Make (Context : P) :
     let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
     m
 
-  let reveal data = reveal_monadic data |> ticked |> state_of
-
   let set_input_monadic input =
     match input with
     | PS.Inbox_message m -> set_inbox_message_monadic m
@@ -1219,7 +1217,7 @@ module Make (Context : P) :
                 state)
       | PS.Needs_reveal _hash -> (
           match input_given with
-          | Some (PS.Reveal data) -> reveal data state
+          | Some (PS.Reveal _ as input_given) -> set_input input_given state
           | None | Some (PS.Inbox_message _) ->
               state_of
                 (internal_error
