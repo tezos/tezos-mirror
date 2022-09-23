@@ -315,7 +315,9 @@ let test_merkle3 () =
 (* Test batch insertions against indviduals ones. *)
 let test_batch_insertion () =
   let open Storage.Tree in
-  let random_cm () = Core.Commitment.of_bytes_exn (Hacl.Rand.gen 32) in
+  let random_cm () =
+    Core.Commitment.of_bytes_exn (Tezos_crypto.Hacl.Rand.gen 32)
+  in
   let random_cms = List.init 33 (fun _ -> random_cm ()) in
   (* List of trees with tree i having the first i commitments
      inserted one at the time *)
@@ -366,7 +368,9 @@ let test_batch_insertion () =
 (* with a 10k long list: batch 4.504671 once 127.857964 *)
 let bench_batch_insertion () =
   let open Storage.Tree in
-  let random_cm () = Core.Commitment.of_bytes_exn (Hacl.Rand.gen 32) in
+  let random_cm () =
+    Core.Commitment.of_bytes_exn (Tezos_crypto.Hacl.Rand.gen 32)
+  in
   let random_cms = List.init 33 (fun _ -> random_cm ()) in
   let start = Unix.gettimeofday () in
   let single_insert =

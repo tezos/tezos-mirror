@@ -96,19 +96,20 @@ module Raw = struct
               (req "expsk" expsk_encoding)
               (req "dk" (Fixed.bytes 32)))
 
-    type Base58.data += Data of t
+    type Tezos_crypto.Base58.data += Data of t
 
     let b58check_encoding =
       let to_raw sk = Bytes.to_string @@ to_bytes sk in
       let of_raw str = of_bytes (Bytes.of_string str) in
-      Base58.register_encoding
-        ~prefix:Base58.Prefix.sapling_spending_key
+      Tezos_crypto.Base58.register_encoding
+        ~prefix:Tezos_crypto.Base58.Prefix.sapling_spending_key
         ~length:169
         ~to_raw
         ~of_raw
         ~wrap:(fun x -> Data x)
 
-    let () = Base58.check_encoded_prefix b58check_encoding "sask" 241
+    let () =
+      Tezos_crypto.Base58.check_encoded_prefix b58check_encoding "sask" 241
 
     let of_seed = R.zip32_xsk_master
 
@@ -259,7 +260,7 @@ module Raw = struct
               (req "diversifier" diversifier_encoding)
               (req "pkd" (Fixed.bytes 32)))
 
-    type Base58.data += Data of address
+    type Tezos_crypto.Base58.data += Data of address
 
     let address_b58check_encoding =
       let to_raw address =
@@ -268,14 +269,18 @@ module Raw = struct
       let of_raw str =
         Data_encoding.Binary.of_string_opt address_encoding str
       in
-      Base58.register_encoding
-        ~prefix:Base58.Prefix.sapling_address
+      Tezos_crypto.Base58.register_encoding
+        ~prefix:Tezos_crypto.Base58.Prefix.sapling_address
         ~length:43
         ~to_raw
         ~of_raw
         ~wrap:(fun x -> Data x)
 
-    let () = Base58.check_encoded_prefix address_b58check_encoding "zet1" 69
+    let () =
+      Tezos_crypto.Base58.check_encoded_prefix
+        address_b58check_encoding
+        "zet1"
+        69
 
     let new_address vk j =
       match R.zip32_xfvk_address vk j with
@@ -289,7 +294,7 @@ module Raw = struct
       (* NOTE: the density of valid diversifiers is roughly half. This loop is
          likely to be short. *)
       let rec random_diversifier () =
-        match R.to_diversifier @@ Hacl.Rand.gen 11 with
+        match R.to_diversifier @@ Tezos_crypto.Hacl.Rand.gen 11 with
         | Some diversifier -> diversifier
         | None -> random_diversifier ()
       in
@@ -298,7 +303,7 @@ module Raw = struct
          endian). As ivk is encoded in little endian, we apply the mask on the
          last byte.
       *)
-      let rand = Hacl.Rand.gen 32 in
+      let rand = Tezos_crypto.Hacl.Rand.gen 32 in
       let mask = 0b00000111 in
       let int = Char.code @@ Bytes.get rand (32 - 1) in
       let int_masked = int land mask in
@@ -338,26 +343,30 @@ module Raw = struct
       let symkey =
         Bytes.unsafe_to_string @@ R.of_symkey @@ R.ka_agree_sender pkd esk
       in
-      let hash = Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey]) in
-      Crypto_box.Secretbox.unsafe_of_bytes hash
+      let hash =
+        Tezos_crypto.Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey])
+      in
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes hash
 
     let symkey_receiver epk ivk =
       let symkey =
         Bytes.unsafe_to_string @@ R.of_symkey @@ R.ka_agree_receiver epk ivk
       in
-      let hash = Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey]) in
-      Crypto_box.Secretbox.unsafe_of_bytes hash
+      let hash =
+        Tezos_crypto.Blake2B.(to_bytes @@ hash_string ~key:kdf_key [symkey])
+      in
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes hash
 
     let symkey_out ovk (cv, cm, epk) =
       let key = Bytes.of_string "OCK_keystringderivation_TEZOS" in
       let ock =
-        Blake2B.(
+        Tezos_crypto.Blake2B.(
           to_bytes
             (hash_bytes
                ~key
                [R.of_cv cv; R.of_commitment cm; R.of_epk epk; R.of_ovk ovk]))
       in
-      Crypto_box.Secretbox.unsafe_of_bytes ock
+      Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes ock
   end
 
   module Rcm = struct
@@ -441,12 +450,12 @@ module Raw = struct
          memo *)
       payload_enc : Bytes.t;
       (* nonce for the authenticated encryption of payload_enc *)
-      nonce_enc : Crypto_box.nonce;
+      nonce_enc : Tezos_crypto.Crypto_box.nonce;
       (* authenticated encryption of pkd and esk,
          allows to recover the symkey with symkey_sender *)
       payload_out : Bytes.t;
       (* nonce for the authenticated encryption of payload_out *)
-      nonce_out : Crypto_box.nonce;
+      nonce_out : Tezos_crypto.Crypto_box.nonce;
     }
 
     let encoding =
@@ -457,7 +466,7 @@ module Raw = struct
           @@ fixed_length DH.esk_encoding)
           + (WithExceptions.Option.get ~loc:__LOC__
             @@ fixed_length DH.epk_encoding)
-          + Crypto_box.tag_length)
+          + Tezos_crypto.Crypto_box.tag_length)
       in
       def "sapling.transaction.ciphertext"
       @@ conv
@@ -474,9 +483,9 @@ module Raw = struct
               (req "cv" CV.encoding)
               (req "epk" DH.epk_encoding)
               (req "payload_enc" bytes)
-              (req "nonce_enc" Crypto_box.nonce_encoding)
+              (req "nonce_enc" Tezos_crypto.Crypto_box.nonce_encoding)
               (req "payload_out" (Fixed.bytes payload_out_size))
-              (req "nonce_out" Crypto_box.nonce_encoding))
+              (req "nonce_out" Tezos_crypto.Crypto_box.nonce_encoding))
 
     type plaintext = {
       diversifier : Viewing_key.diversifier;
@@ -514,7 +523,7 @@ module Raw = struct
         + (WithExceptions.Option.get ~loc:__LOC__ @@ Binary.fixed_length int64)
         + (WithExceptions.Option.get ~loc:__LOC__
           @@ Binary.fixed_length Rcm.encoding)
-        + Crypto_box.tag_length + 4
+        + Tezos_crypto.Crypto_box.tag_length + 4
       in
       payload_size - size_besides_memo
 
@@ -528,7 +537,7 @@ module Raw = struct
 
     let encrypt_aux key_agreed_out amount address rcm memo esk cv =
       let epk = DH.derive_ephemeral address esk in
-      let nonce_enc = Crypto_box.random_nonce () in
+      let nonce_enc = Tezos_crypto.Crypto_box.random_nonce () in
       let payload_enc =
         let key_agreed_enc = DH.symkey_sender esk address.pkd in
         let plaintext_enc =
@@ -536,14 +545,20 @@ module Raw = struct
             plaintext_encoding
             {diversifier = Viewing_key.(address.diversifier); amount; rcm; memo}
         in
-        Crypto_box.Secretbox.secretbox key_agreed_enc plaintext_enc nonce_enc
+        Tezos_crypto.Crypto_box.Secretbox.secretbox
+          key_agreed_enc
+          plaintext_enc
+          nonce_enc
       in
-      let nonce_out = Crypto_box.random_nonce () in
+      let nonce_out = Tezos_crypto.Crypto_box.random_nonce () in
       let payload_out =
         let plaintext_out =
           Bytes.cat (R.of_pkd Viewing_key.(address.pkd)) (R.of_esk esk)
         in
-        Crypto_box.Secretbox.secretbox key_agreed_out plaintext_out nonce_out
+        Tezos_crypto.Crypto_box.Secretbox.secretbox
+          key_agreed_out
+          plaintext_out
+          nonce_out
       in
       {epk; payload_enc; nonce_enc; payload_out; nonce_out; cv}
 
@@ -557,7 +572,8 @@ module Raw = struct
        output *)
     let encrypt_without_ovk amount address rcm memo esk cv =
       let key_agreed_out =
-        Crypto_box.Secretbox.unsafe_of_bytes @@ Hacl.Rand.gen 32
+        Tezos_crypto.Crypto_box.Secretbox.unsafe_of_bytes
+        @@ Tezos_crypto.Hacl.Rand.gen 32
       in
       encrypt_aux key_agreed_out amount address rcm memo esk cv
 
@@ -568,7 +584,7 @@ module Raw = struct
       let ivk = Viewing_key.to_ivk xfvk in
       let symkey = DH.symkey_receiver ciphertext.epk ivk in
       let ( >?? ) = Option.bind in
-      Crypto_box.Secretbox.secretbox_open
+      Tezos_crypto.Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_enc
         ciphertext.nonce_enc
@@ -585,7 +601,7 @@ module Raw = struct
       (* symkey for payload_out *)
       let symkey = DH.symkey_out ovk (ciphertext.cv, cm, epk) in
       let ( >?? ) = Option.bind in
-      Crypto_box.Secretbox.secretbox_open
+      Tezos_crypto.Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_out
         ciphertext.nonce_out
@@ -593,7 +609,7 @@ module Raw = struct
       let pkd, esk = decompose_plaintext_out plaintext in
       (* symkey for payload_enc *)
       let symkey = DH.symkey_sender esk pkd in
-      Crypto_box.Secretbox.secretbox_open
+      Tezos_crypto.Crypto_box.Secretbox.secretbox_open
         symkey
         ciphertext.payload_enc
         ciphertext.nonce_enc
@@ -649,7 +665,7 @@ module Raw = struct
     let hash_input cv nf rk proof key_string =
       let key = Bytes.of_string key_string in
       let h =
-        Blake2B.(
+        Tezos_crypto.Blake2B.(
           to_bytes
             (hash_bytes
                ~key
@@ -739,7 +755,7 @@ module Raw = struct
         List.map (Data_encoding.Binary.to_string_exn output_encoding) outputs
       in
       let h =
-        Blake2B.(
+        Tezos_crypto.Blake2B.(
           to_bytes
             (hash_string ~key (input_bytes @ output_bytes @ [bound_data])))
       in

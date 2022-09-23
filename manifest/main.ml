@@ -1795,7 +1795,7 @@ let octez_sapling =
         ctypes_stubs_js;
         data_encoding;
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_rust_lib;
         octez_lwt_result_stdlib;
@@ -1849,7 +1849,7 @@ let _octez_sapling_tests =
     ~deps:
       [
         octez_sapling |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         str;
         octez_base;
         octez_base_unix;

@@ -84,7 +84,7 @@ module type Spending_key = sig
   (** Returns the next available index from a key **)
   val child_index : t -> int32
 
-  val b58check_encoding : t Base58.encoding
+  val b58check_encoding : t Tezos_crypto.Base58.encoding
 end
 
 (** Viewing keys allow to see incoming and outgoing transactions without
@@ -125,7 +125,7 @@ module type Viewing_key = sig
 
   val address_encoding : address Data_encoding.t
 
-  val address_b58check_encoding : address Base58.encoding
+  val address_b58check_encoding : address Tezos_crypto.Base58.encoding
 
   (** Returns a new address and a new index to be used for the next address
       generation. **)
