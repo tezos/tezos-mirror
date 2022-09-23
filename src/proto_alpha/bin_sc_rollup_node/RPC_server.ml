@@ -114,9 +114,6 @@ let get_dal_slot_page store slot_index slot_page =
       | None -> ("Slot was not confirmed", None)
       | Some contents -> ("Slot page is available", Some contents))
 
-let commitment_with_hash commitment =
-  ( Protocol.Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment,
-    commitment )
 
 module Common = struct
   let register_current_num_messages store dir =
@@ -169,18 +166,7 @@ module Common = struct
         return state.num_ticks)
 end
 
-module type S = sig
-  module PVM : Pvm.S
-
-  val shutdown : RPC_server.server -> unit Lwt.t
-
-  val register : Node_context.t -> Configuration.t -> unit RPC_directory.t
-
-  val start :
-    Node_context.t -> Configuration.t -> RPC_server.server tzresult Lwt.t
-end
-
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+module Make (PVM : Pvm.S) = struct
   module PVM = PVM
   module Outbox = Outbox.Make (PVM)
 
