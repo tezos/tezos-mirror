@@ -129,6 +129,9 @@ Baker
 
 - The logs now display both the delegate and its consensus key.
 
+- Improved performance by 50% of Ledger's signing requests by caching
+  redundant requests.
+
 Accuser
 -------
 
