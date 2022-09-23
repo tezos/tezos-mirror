@@ -26,19 +26,6 @@ from . import protocol
 _BA_FLAG = "bootstrap-accounts"
 _PC_FLAG = "protocol-constants"
 
-@pytest.mark.client
-def test_create_mockup_already_initialized(mockup_client: Client):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir is not fresh.
-    The call must fail.
-    """
-    # mockup was created already by fixture, try to create it second time:
-    res = mockup_client.create_mockup(
-        protocol=protocol.HASH, check=False
-    ).create_mockup_result
-    # it should fail:
-    assert res == CreateMockupResult.ALREADY_INITIALIZED
-
 
 # It's impossible to guess values of chain_id, these ones have been
 # obtained by looking at the output of `compute chain id from seed`

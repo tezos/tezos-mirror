@@ -661,6 +661,22 @@ let test_retrieve_addresses =
       ~error_msg:"Expected addresses %R, got %L") ;
   unit
 
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is not fresh. The call must fail. *)
+let test_create_mockup_already_initialized =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup when already initialized."
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is already initialized as a mockup directory")
+  in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -674,7 +690,8 @@ let register ~protocols =
   test_multiple_transfers protocols ;
   test_storage_from_file protocols ;
   test_create_mockup_dir_exists_nonempty protocols ;
-  test_retrieve_addresses protocols
+  test_retrieve_addresses protocols ;
+  test_create_mockup_already_initialized protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
