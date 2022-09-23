@@ -391,6 +391,8 @@ module Ledger_id = struct
   let to_animals = function Animals a -> a | Pkh pkh -> animals_of_pkh pkh
 
   let equal a b = to_animals a = to_animals b
+
+  let hash = Hashtbl.hash
 end
 
 (** An account is a given key-pair corresponding to a
@@ -565,6 +567,19 @@ module Filter = struct
     | `Version (s, _) -> fprintf ppf "%s" s
 end
 
+module Request_cache =
+  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+    (Ledger_id)
+
+type request_info = {
+  version : Ledgerwallet_tezos.Version.t;
+  git_commit : string;
+  device_info : Hidapi.device_info;
+  ledger_id : Ledger_id.t;
+}
+
+let cache = Request_cache.create 7
+
 (* Those constants are provided by the vendor (e.g. check the udev
    rules they provide): *)
 let vendor_id = 0x2c97
@@ -650,30 +665,60 @@ let is_derivation_scheme_supported version curve =
     let {major; minor; patch; _} = version in
     (major, minor, patch) >= min_version_of_derivation_scheme curve)
 
-let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
+let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
   let open Lwt_result_syntax in
+  let f hidapi (version, git_commit) device_info ledger_id =
+    let go () = f hidapi (version, git_commit) device_info ledger_id in
+    match ledger_uri with
+    | `Ledger_account {Ledger_account.curve; _} ->
+        if is_derivation_scheme_supported version curve then go ()
+        else
+          Ledgerwallet_tezos.(
+            failwith
+              "To use derivation scheme %a you need %a or later but you're \
+               using %a."
+              pp_curve
+              curve
+              Version.pp
+              (let a, b, c = min_version_of_derivation_scheme curve in
+               {version with major = a; minor = b; patch = c})
+              Version.pp
+              version)
+    | _ -> go ()
+  in
   let* o =
-    use_ledger
-      ?filter
-      (fun hidapi (version, git_commit) device_info ledger_id ->
-        Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
-            let go () = f hidapi (version, git_commit) device_info ledger_id in
-            match ledger_uri with
-            | `Ledger_account {curve; _} ->
-                if is_derivation_scheme_supported version curve then go ()
-                else
-                  Ledgerwallet_tezos.(
-                    failwith
-                      "To use derivation scheme %a you need %a or later but \
-                       you're using %a."
-                      pp_curve
-                      curve
-                      Version.pp
-                      (let a, b, c = min_version_of_derivation_scheme curve in
-                       {version with major = a; minor = b; patch = c})
-                      Version.pp
-                      version)
-            | _ -> go ()))
+    let check_filter (hid_path, version, git_commit) =
+      match (filter : Filter.t) with
+      | `None -> true
+      | `Hid_path path -> hid_path = path
+      | `Version (_, f) -> f (version, git_commit)
+    in
+    let ledger_id =
+      match ledger_uri with
+      | `Ledger id -> id
+      | `Ledger_account {ledger; _} -> ledger
+    in
+    match Request_cache.find_opt cache ledger_id with
+    | Some {version; git_commit; device_info; ledger_id}
+      when check_filter (device_info.path, version, git_commit) -> (
+        match Hidapi.(open_path device_info.path) with
+        | None -> return_none
+        | Some hidapi ->
+            Lwt.finalize
+              (fun () -> f hidapi (version, git_commit) device_info ledger_id)
+              (fun () ->
+                Hidapi.close hidapi ;
+                Lwt.return_unit))
+    | Some _ | None ->
+        use_ledger
+          ~filter
+          (fun hidapi (version, git_commit) device_info ledger_id ->
+            Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
+                Request_cache.replace
+                  cache
+                  ledger_id
+                  {version; git_commit; device_info; ledger_id} ;
+                f hidapi (version, git_commit) device_info ledger_id))
   in
   match o with
   | Some o -> return o
@@ -684,10 +729,7 @@ let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
         msg
         Ledger_uri.pp
         ledger_uri
-        (fun ppf ->
-          match filter with
-          | Some f -> Format.fprintf ppf " with filter \"%a\"" Filter.pp f
-          | None -> ())
+        (fun ppf -> Format.fprintf ppf " with filter \"%a\"" Filter.pp filter)
 
 (** A global {!Hashtbl.t} which allows us to avoid calling
     {!Signer_implementation.get_public_key} too often. *)
