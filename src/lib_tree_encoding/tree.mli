@@ -51,7 +51,7 @@ module type S = sig
 
   val find_tree : tree -> key -> tree option Lwt.t
 
-  val hash : tree -> Context_hash.t
+  val hash : tree -> Tezos_crypto.Context_hash.t
 
   val length : tree -> key -> int Lwt.t
 
