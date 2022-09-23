@@ -134,6 +134,27 @@ let test_boot () =
   | No_input_required ->
       failwith "After booting, the machine must be waiting for input."
 
+let test_metadata () =
+  let open Sc_rollup_PVM_sig in
+  let open Lwt_result_syntax in
+  boot "" @@ fun _ctxt state ->
+  let metadata =
+    Sc_rollup_metadata_repr.
+      {
+        address = Sc_rollup_repr.Address.zero;
+        origination_level = Raw_level_repr.root;
+      }
+  in
+  let input = Reveal (Metadata metadata) in
+  let*! state = set_input input state in
+  let*! input_request = is_input_state state in
+  match input_request with
+  | Initial -> return ()
+  | Needs_reveal _ | First_after _ | No_input_required ->
+      failwith
+        "After evaluating the metadata, the machine must be in the [Initial] \
+         state."
+
 let test_input_message () =
   let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
@@ -419,6 +440,7 @@ let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
     Tztest.tztest "Boot" `Quick test_boot;
+    Tztest.tztest "Metadata" `Quick test_metadata;
     Tztest.tztest "Input message" `Quick test_input_message;
     Tztest.tztest "Parsing message" `Quick test_parsing_messages;
     Tztest.tztest "Evaluating message" `Quick test_evaluation_messages;
