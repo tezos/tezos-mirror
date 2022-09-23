@@ -184,7 +184,6 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
-.. _protocol_constants:
 .. _protocol_constants_jakarta:
 
 Protocol constants
