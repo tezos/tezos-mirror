@@ -731,6 +731,7 @@ val spawn_get_balance_for :
 val create_mockup :
   ?sync_mode:mockup_sync_mode ->
   ?parameter_file:string ->
+  ?bootstrap_accounts_file:string ->
   protocol:Protocol.t ->
   t ->
   unit Lwt.t
@@ -739,6 +740,7 @@ val create_mockup :
 val spawn_create_mockup :
   ?sync_mode:mockup_sync_mode ->
   ?parameter_file:string ->
+  ?bootstrap_accounts_file:string ->
   protocol:Protocol.t ->
   t ->
   Process.t
