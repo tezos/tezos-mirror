@@ -291,9 +291,9 @@ module Cfg_file = struct
          (opt "node_port" uint16)
          (opt "tls" bool)
          (opt "media_type" Media_type.Command_line.encoding)
-         (opt "endpoint" Tezos_rpc.RPC_encoding.uri_encoding)
+         (opt "endpoint" Tezos_rpc.Encoding.uri_encoding)
          (opt "web_port" uint16)
-         (opt "remote_signer" Tezos_rpc.RPC_encoding.uri_encoding)
+         (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
          (opt "confirmations" int8)
          (opt "password_filename" string))
 

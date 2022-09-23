@@ -58,7 +58,7 @@ let of_string str =
 let to_string saddr = Format.asprintf "%a" pp saddr
 
 let rpc_arg =
-  Tezos_rpc.RPC_arg.make
+  Tezos_rpc.Arg.make
     ~name:"addr"
     ~descr:"A network address (ipv4 or [ipv6])."
     ~destruct:of_string

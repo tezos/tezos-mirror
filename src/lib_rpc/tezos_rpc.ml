@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module RPC_answer = RPC_answer
-module RPC_arg = RPC_arg
-module RPC_context = RPC_context
-module RPC_description = RPC_description
-module RPC_directory = RPC_directory
-module RPC_encoding = RPC_encoding
-module RPC_error = RPC_error
-module RPC_path = RPC_path
-module RPC_query = RPC_query
-module RPC_service = RPC_service
+module Answer = RPC_answer
+module Arg = RPC_arg
+module Context = RPC_context
+module Description = RPC_description
+module Directory = RPC_directory
+module Encoding = RPC_encoding
+module Error = RPC_error
+module Path = RPC_path
+module Query = RPC_query
+module Service = RPC_service

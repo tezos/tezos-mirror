@@ -28,15 +28,12 @@ let build_rpc_directory validator mainchain_validator =
   let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
   let store = Distributed_db.store distributed_db in
-  let dir : unit Tezos_rpc.RPC_directory.t ref =
-    ref Tezos_rpc.RPC_directory.empty
-  in
+  let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
   let gen_register0 s f =
-    dir := Tezos_rpc.RPC_directory.gen_register !dir s (fun () p q -> f p q)
+    dir := Tezos_rpc.Directory.gen_register !dir s (fun () p q -> f p q)
   in
   let gen_register1 s f =
-    dir :=
-      Tezos_rpc.RPC_directory.gen_register !dir s (fun ((), a) p q -> f a p q)
+    dir := Tezos_rpc.Directory.gen_register !dir s (fun ((), a) p q -> f a p q)
   in
   gen_register0 Monitor_services.S.bootstrapped (fun () () ->
       let block_stream, stopper =
@@ -63,7 +60,7 @@ let build_rpc_directory validator mainchain_validator =
             ]
       in
       let shutdown () = Lwt_watcher.shutdown stopper in
-      Tezos_rpc.RPC_answer.return_stream {next; shutdown}) ;
+      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.valid_blocks (fun q () ->
       let block_stream, stopper = Store.global_block_watcher store in
       let shutdown () = Lwt_watcher.shutdown stopper in
@@ -117,7 +114,7 @@ let build_rpc_directory validator mainchain_validator =
           block_stream
       in
       let next () = Lwt_stream.get stream in
-      Tezos_rpc.RPC_answer.return_stream {next; shutdown}) ;
+      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register1 Monitor_services.S.heads (fun chain q () ->
       (* TODO: when `chain = `Test`, should we reset then stream when
          the `testnet` change, or dias we currently do ?? *)
@@ -160,14 +157,14 @@ let build_rpc_directory validator mainchain_validator =
               Lwt.return_some (Store.Block.hash head, Store.Block.header head))
             else Lwt_stream.get stream
           in
-          Tezos_rpc.RPC_answer.return_stream {next; shutdown}) ;
+          Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.protocols (fun () () ->
       let stream, stopper = Store.Protocol.protocol_watcher store in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
-      Tezos_rpc.RPC_answer.return_stream {next; shutdown}) ;
+      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   gen_register0 Monitor_services.S.commit_hash (fun () () ->
-      Tezos_rpc.RPC_answer.return Tezos_version.Current_git_info.commit_hash) ;
+      Tezos_rpc.Answer.return Tezos_version.Current_git_info.commit_hash) ;
   gen_register0 Monitor_services.S.active_chains (fun () () ->
       let stream, stopper = Validator.chains_watcher validator in
       let shutdown () = Lwt_watcher.shutdown stopper in
@@ -220,5 +217,5 @@ let build_rpc_directory validator mainchain_validator =
               let* status = convert c in
               Lwt.return_some [status]
       in
-      Tezos_rpc.RPC_answer.return_stream {next; shutdown}) ;
+      Tezos_rpc.Answer.return_stream {next; shutdown}) ;
   !dir

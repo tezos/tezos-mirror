@@ -62,7 +62,7 @@ let () =
 
     let protocol_hash = Protocol.hash
 
-    let directory = Tezos_rpc.RPC_directory.empty
+    let directory = Tezos_rpc.Directory.empty
 
     let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
         (hash : Context_hash.t) =

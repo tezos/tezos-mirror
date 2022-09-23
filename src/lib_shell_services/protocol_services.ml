@@ -29,32 +29,32 @@ module S = struct
   let protocols_arg = Protocol_hash.rpc_arg
 
   let contents =
-    Tezos_rpc.RPC_service.get_service
-      ~query:Tezos_rpc.RPC_query.empty
+    Tezos_rpc.Service.get_service
+      ~query:Tezos_rpc.Query.empty
       ~output:Protocol.encoding
-      Tezos_rpc.RPC_path.(root / "protocols" /: protocols_arg)
+      Tezos_rpc.Path.(root / "protocols" /: protocols_arg)
 
   let environment =
-    Tezos_rpc.RPC_service.get_service
-      ~query:Tezos_rpc.RPC_query.empty
+    Tezos_rpc.Service.get_service
+      ~query:Tezos_rpc.Query.empty
       ~output:Protocol.env_version_encoding
-      Tezos_rpc.RPC_path.(root / "protocols" /: protocols_arg / "environment")
+      Tezos_rpc.Path.(root / "protocols" /: protocols_arg / "environment")
 
   let list =
-    Tezos_rpc.RPC_service.get_service
-      ~query:Tezos_rpc.RPC_query.empty
+    Tezos_rpc.Service.get_service
+      ~query:Tezos_rpc.Query.empty
       ~output:(list Protocol_hash.encoding)
-      Tezos_rpc.RPC_path.(root / "protocols")
+      Tezos_rpc.Path.(root / "protocols")
 
   let fetch =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Fetch a protocol from the network."
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:unit
-      Tezos_rpc.RPC_path.(root / "fetch_protocol" /: protocols_arg)
+      Tezos_rpc.Path.(root / "fetch_protocol" /: protocols_arg)
 end
 
-open Tezos_rpc.RPC_context
+open Tezos_rpc.Context
 
 let contents ctxt h = make_call1 S.contents ctxt h () ()
 

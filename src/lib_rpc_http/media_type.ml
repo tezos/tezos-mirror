@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Resto_cohttp.Media_type.Make (Tezos_rpc.RPC_encoding)
+include Resto_cohttp.Media_type.Make (Tezos_rpc.Encoding)
 
 (* emits chunks of size approx chunk_size_hint but occasionally a bit bigger *)
 let chunk_size_hint = 4096
@@ -180,7 +180,7 @@ let octet_stream =
 
 let all_media_types = [json; bson; octet_stream]
 
-let encoding : t Tezos_rpc.RPC_encoding.t =
+let encoding : t Tezos_rpc.Encoding.t =
   Data_encoding.string_enum
     [
       ("application/json", json);

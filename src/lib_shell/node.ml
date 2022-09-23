@@ -338,12 +338,10 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
 let shutdown node = node.shutdown ()
 
 let build_rpc_directory node =
-  let dir : unit Tezos_rpc.RPC_directory.t ref =
-    ref Tezos_rpc.RPC_directory.empty
-  in
-  let merge d = dir := Tezos_rpc.RPC_directory.merge !dir d in
+  let dir : unit Tezos_rpc.Directory.t ref = ref Tezos_rpc.Directory.empty in
+  let merge d = dir := Tezos_rpc.Directory.merge !dir d in
   let register0 s f =
-    dir := Tezos_rpc.RPC_directory.register !dir s (fun () p q -> f p q)
+    dir := Tezos_rpc.Directory.register !dir s (fun () p q -> f p q)
   in
   merge
     (Protocol_directory.build_rpc_directory
@@ -365,6 +363,6 @@ let build_rpc_directory node =
        ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
-  register0 Tezos_rpc.RPC_service.error_service (fun () () ->
+  register0 Tezos_rpc.Service.error_service (fun () () ->
       Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

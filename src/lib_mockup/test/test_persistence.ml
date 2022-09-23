@@ -115,7 +115,7 @@ module Mock_mockup : Registration.MOCKUP = struct
   module Block_services =
     Tezos_shell_services.Block_services.Make (Mock_protocol) (Mock_protocol)
 
-  let directory = Tezos_rpc.RPC_directory.empty
+  let directory = Tezos_rpc.Directory.empty
 
   let init ~cctxt:_ ~parameters:_ ~constants_overrides_json:_
       ~bootstrap_accounts_json:_ =

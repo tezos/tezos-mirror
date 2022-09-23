@@ -28,4 +28,4 @@ val build_rpc_directory :
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   mainchain_validator:Chain_validator.t ->
   Store.t ->
-  unit Tezos_rpc.RPC_directory.t
+  unit Tezos_rpc.Directory.t

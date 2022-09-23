@@ -133,7 +133,7 @@ module Protocol : sig
      [rfc_encoding] for human-readable format. *)
   val rfc_encoding : t Data_encoding.t
 
-  val rpc_arg : t Tezos_rpc.RPC_arg.t
+  val rpc_arg : t Tezos_rpc.Arg.t
 
   (** {2 Pretty-printing functions} *)
 
@@ -183,7 +183,7 @@ module System : sig
 
     (** {2 Serialization functions} *)
 
-    val rpc_arg : t Tezos_rpc.RPC_arg.t
+    val rpc_arg : t Tezos_rpc.Arg.t
 
     val pp_hum : Format.formatter -> t -> unit
 
@@ -232,7 +232,7 @@ module System : sig
 
   val rfc_encoding : t Data_encoding.t
 
-  val rpc_arg : t Tezos_rpc.RPC_arg.t
+  val rpc_arg : t Tezos_rpc.Arg.t
 
   (** {2 Pretty-printing} *)
 

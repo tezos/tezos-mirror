@@ -384,9 +384,9 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let dir = Node.build_rpc_directory node in
   let dir = Node_directory.build_node_directory config dir in
   let dir =
-    Tezos_rpc.RPC_directory.register_describe_directory_service
+    Tezos_rpc.Directory.register_describe_directory_service
       dir
-      Tezos_rpc.RPC_service.description_service
+      Tezos_rpc.Service.description_service
   in
   let mode =
     match rpc_config.tls with

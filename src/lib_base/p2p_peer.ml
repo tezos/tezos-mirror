@@ -33,7 +33,7 @@ module Filter = struct
   type t = Accepted | Running | Disconnected
 
   let rpc_arg =
-    Tezos_rpc.RPC_arg.make
+    Tezos_rpc.Arg.make
       ~name:"p2p.point.state_filter"
       ~destruct:(function
         | "accepted" -> Ok Accepted

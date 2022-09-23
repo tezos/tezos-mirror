@@ -24,14 +24,8 @@
 
 module S : sig
   val version :
-    ( [`GET],
-      unit,
-      unit,
-      unit,
-      unit,
-      Node_version.t )
-    Tezos_rpc.RPC_service.service
+    ([`GET], unit, unit, unit, unit, Node_version.t) Tezos_rpc.Service.service
 end
 
 val version :
-  #Tezos_rpc.RPC_context.simple -> Node_version.t Error_monad.tzresult Lwt.t
+  #Tezos_rpc.Context.simple -> Node_version.t Error_monad.tzresult Lwt.t

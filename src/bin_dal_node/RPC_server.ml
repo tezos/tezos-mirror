@@ -87,25 +87,25 @@ let handle_monitor_slot_headers ctxt () () () =
   let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
   let shutdown () = Lwt_watcher.shutdown stopper in
   let next () = Lwt_stream.get stream in
-  Tezos_rpc.RPC_answer.return_stream {next; shutdown}
+  Tezos_rpc.Answer.return_stream {next; shutdown}
 
 let register_stored_slot_headers ctxt dir =
-  Tezos_rpc.RPC_directory.register
+  Tezos_rpc.Directory.register
     dir
     (Services.stored_slot_headers ())
     (handle_stored_slot_headers ctxt)
 
 let register_split_slot ctxt dir =
-  Tezos_rpc.RPC_directory.register0
+  Tezos_rpc.Directory.register0
     dir
     (Services.split_slot ())
     (handle_split_slot ctxt)
 
 let register_show_slot ctxt dir =
-  Tezos_rpc.RPC_directory.register dir (Services.slot ()) (handle_slot ctxt)
+  Tezos_rpc.Directory.register dir (Services.slot ()) (handle_slot ctxt)
 
 let register_show_slot_pages ctxt dir =
-  Tezos_rpc.RPC_directory.register
+  Tezos_rpc.Directory.register
     dir
     (Services.slot_pages ())
     (handle_slot_pages ctxt)
@@ -113,26 +113,21 @@ let register_show_slot_pages ctxt dir =
 let shard_service = Services.shard ()
 
 let register_shard ctxt dir =
-  Tezos_rpc.RPC_directory.register dir shard_service (handle_shard ctxt)
+  Tezos_rpc.Directory.register dir shard_service (handle_shard ctxt)
 
 let shard_rpc ctxt commitment shard =
-  Tezos_rpc.RPC_context.make_call
-    shard_service
-    ctxt
-    (((), commitment), shard)
-    ()
-    ()
+  Tezos_rpc.Context.make_call shard_service ctxt (((), commitment), shard) () ()
 
 let monitor_slot_headers_service = Services.monitor_slot_headers ()
 
 let register_monitor_slot_headers ctxt dir =
-  Tezos_rpc.RPC_directory.gen_register
+  Tezos_rpc.Directory.gen_register
     dir
     monitor_slot_headers_service
     (handle_monitor_slot_headers ctxt)
 
 let monitor_slot_headers_rpc ctxt =
-  Tezos_rpc.RPC_context.make_streamed_call
+  Tezos_rpc.Context.make_streamed_call
     monitor_slot_headers_service
     ctxt
     ()
@@ -140,13 +135,13 @@ let monitor_slot_headers_rpc ctxt =
     ()
 
 let register ctxt =
-  Tezos_rpc.RPC_directory.empty
+  Tezos_rpc.Directory.empty
   |> register_stored_slot_headers ctxt
   |> register_split_slot ctxt |> register_show_slot ctxt |> register_shard ctxt
   |> register_show_slot_pages ctxt
   |> register_monitor_slot_headers ctxt
 
-let merge dir plugin_dir = Tezos_rpc.RPC_directory.merge dir plugin_dir
+let merge dir plugin_dir = Tezos_rpc.Directory.merge dir plugin_dir
 
 let start configuration dir =
   let open Lwt_syntax in

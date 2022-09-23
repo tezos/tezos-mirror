@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc.RPC_context
+open Tezos_rpc.Context
 
 val contents : #simple -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
@@ -42,7 +42,7 @@ module S : sig
       unit,
       unit,
       Protocol.t )
-    Tezos_rpc.RPC_service.t
+    Tezos_rpc.Service.t
 
   val environment :
     ( [`GET],
@@ -51,23 +51,11 @@ module S : sig
       unit,
       unit,
       Protocol.env_version )
-    Tezos_rpc.RPC_service.t
+    Tezos_rpc.Service.t
 
   val list :
-    ( [`GET],
-      unit,
-      unit,
-      unit,
-      unit,
-      Protocol_hash.t list )
-    Tezos_rpc.RPC_service.t
+    ([`GET], unit, unit, unit, unit, Protocol_hash.t list) Tezos_rpc.Service.t
 
   val fetch :
-    ( [`GET],
-      unit,
-      unit * Protocol_hash.t,
-      unit,
-      unit,
-      unit )
-    Tezos_rpc.RPC_service.t
+    ([`GET], unit, unit * Protocol_hash.t, unit, unit, unit) Tezos_rpc.Service.t
 end

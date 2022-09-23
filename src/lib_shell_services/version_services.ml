@@ -24,11 +24,11 @@
 
 module S = struct
   let version =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"Get information on the node version"
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Node_version.encoding
-      Tezos_rpc.RPC_path.(root / "version")
+      Tezos_rpc.Path.(root / "version")
 end
 
-let version ctxt = Tezos_rpc.RPC_context.make_call S.version ctxt () () ()
+let version ctxt = Tezos_rpc.Context.make_call S.version ctxt () () ()

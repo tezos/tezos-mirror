@@ -23,8 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Directory = Tezos_rpc.RPC_directory
-module Service = Tezos_rpc.RPC_service
+module Directory = Tezos_rpc.Directory
+module Service = Tezos_rpc.Service
 
 let media_types = [Tezos_rpc_http.Media_type.json]
 
@@ -52,11 +52,11 @@ end
 
 module Call =
   Resto_cohttp_self_serving_client.Self_serving_client.Make
-    (Tezos_rpc.RPC_encoding)
+    (Tezos_rpc.Encoding)
     (NullLogger)
 
-let local_ctxt (directory : unit Tezos_rpc.RPC_directory.t) :
-    Tezos_rpc.RPC_context.generic =
+let local_ctxt (directory : unit Tezos_rpc.Directory.t) :
+    Tezos_rpc.Context.generic =
   let local_client =
     Call.launch ?cors:None ?agent:None ~media_types directory
   in
@@ -70,7 +70,7 @@ let local_ctxt (directory : unit Tezos_rpc.RPC_directory.t) :
 
     method call_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           'p ->
           'q ->
           'i ->
@@ -80,7 +80,7 @@ let local_ctxt (directory : unit Tezos_rpc.RPC_directory.t) :
 
     method call_streamed_service
         : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
           on_chunk:('o -> unit) ->
           on_close:(unit -> unit) ->
           'p ->

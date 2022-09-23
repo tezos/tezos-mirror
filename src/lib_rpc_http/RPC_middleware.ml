@@ -60,7 +60,7 @@ let rpc_metrics_transform_callback ~update_metrics dir callback conn req body =
       | _ -> Lwt.return_error @@ `Method_not_allowed []
     in
     let* uri_desc =
-      Tezos_rpc.RPC_directory.lookup_uri_desc dir () resto_meth decoded
+      Tezos_rpc.Directory.lookup_uri_desc dir () resto_meth decoded
     in
     Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
   in

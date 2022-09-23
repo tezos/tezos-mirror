@@ -51,7 +51,7 @@ class type tx_client_context =
   object
     inherit Tezos_client_base.Client_context.io_wallet
 
-    inherit Tezos_rpc.RPC_context.generic
+    inherit Tezos_rpc.Context.generic
   end
 
 (** Instance of [tx_client_context] for linux systems. Relies on

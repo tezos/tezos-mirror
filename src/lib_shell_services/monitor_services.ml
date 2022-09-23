@@ -67,25 +67,25 @@ let chain_status_encoding =
 module S = struct
   open Data_encoding
 
-  let path = Tezos_rpc.RPC_path.(root / "monitor")
+  let path = Tezos_rpc.Path.(root / "monitor")
 
   let bootstrapped =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Wait for the node to have synchronized its chain with a few peers \
          (configured by the node's administrator), streaming head updates that \
          happen during the bootstrapping process, and closing the stream at \
          the end. If the node was already bootstrapped, returns the current \
          head immediately."
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:
         (obj2
            (req "block" Block_hash.encoding)
            (req "timestamp" Time.Protocol.encoding))
-      Tezos_rpc.RPC_path.(path / "bootstrapped")
+      Tezos_rpc.Path.(path / "bootstrapped")
 
   let valid_blocks_query =
-    let open Tezos_rpc.RPC_query in
+    let open Tezos_rpc.Query in
     query (fun protocols next_protocols chains ->
         object
           method protocols = protocols
@@ -101,7 +101,7 @@ module S = struct
     |> seal
 
   let valid_blocks =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Monitor all blocks that are successfully validated by the node, \
          disregarding whether they were selected as the new head or not."
@@ -112,10 +112,10 @@ module S = struct
               (req "chain_id" Chain_id.encoding)
               (req "hash" Block_hash.encoding))
            Block_header.encoding)
-      Tezos_rpc.RPC_path.(path / "valid_blocks")
+      Tezos_rpc.Path.(path / "valid_blocks")
 
   let heads_query =
-    let open Tezos_rpc.RPC_query in
+    let open Tezos_rpc.Query in
     query (fun next_protocols ->
         object
           method next_protocols = next_protocols
@@ -125,7 +125,7 @@ module S = struct
     |> seal
 
   let heads =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Monitor all blocks that are successfully validated by the node and \
          selected as the new head of the given chain."
@@ -134,36 +134,36 @@ module S = struct
         (merge_objs
            (obj1 (req "hash" Block_hash.encoding))
            Block_header.encoding)
-      Tezos_rpc.RPC_path.(path / "heads" /: Chain_services.chain_arg)
+      Tezos_rpc.Path.(path / "heads" /: Chain_services.chain_arg)
 
   let protocols =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Monitor all economic protocols that are retrieved and successfully \
          loaded and compiled by the node."
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:Protocol_hash.encoding
-      Tezos_rpc.RPC_path.(path / "protocols")
+      Tezos_rpc.Path.(path / "protocols")
 
   (* DEPRECATED: use [version] from "version_services" instead. *)
   let commit_hash =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:"DEPRECATED: use `version` instead."
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:string
-      Tezos_rpc.RPC_path.(path / "commit_hash")
+      Tezos_rpc.Path.(path / "commit_hash")
 
   let active_chains =
-    Tezos_rpc.RPC_service.get_service
+    Tezos_rpc.Service.get_service
       ~description:
         "Monitor every chain creation and destruction. Currently active chains \
          will be given as first elements"
-      ~query:Tezos_rpc.RPC_query.empty
+      ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.list chain_status_encoding)
-      Tezos_rpc.RPC_path.(path / "active_chains")
+      Tezos_rpc.Path.(path / "active_chains")
 end
 
-open Tezos_rpc.RPC_context
+open Tezos_rpc.Context
 
 let bootstrapped ctxt = make_streamed_call S.bootstrapped ctxt () () ()
 

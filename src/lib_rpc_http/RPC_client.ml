@@ -64,7 +64,7 @@ module type S = sig
 
   val default_config : config
 
-  class http_ctxt : config -> Media_type.t list -> Tezos_rpc.RPC_context.generic
+  class http_ctxt : config -> Media_type.t list -> Tezos_rpc.Context.generic
 
   (**/**)
 
@@ -73,7 +73,7 @@ module type S = sig
     ?logger:logger ->
     ?headers:(string * string) list ->
     base:Uri.t ->
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
     'p ->
     'q ->
     'i ->
@@ -84,7 +84,7 @@ module type S = sig
     ?logger:logger ->
     ?headers:(string * string) list ->
     base:Uri.t ->
-    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t ->
+    ([< Resto.meth], unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
     on_chunk:('o -> unit) ->
     on_close:(unit -> unit) ->
     'p ->
@@ -100,23 +100,22 @@ module type S = sig
     ?headers:(string * string) list ->
     accept:Media_type.t list ->
     ?body:Data_encoding.json ->
-    [< Tezos_rpc.RPC_service.meth] ->
+    [< Tezos_rpc.Service.meth] ->
     Uri.t ->
-    Tezos_rpc.RPC_context.generic_call_result tzresult Lwt.t
+    Tezos_rpc.Context.generic_call_result tzresult Lwt.t
 
   val generic_call :
     ?headers:(string * string) list ->
     ?accept:Media_type.t list ->
     ?body:Cohttp_lwt.Body.t ->
     ?media:Media_type.t ->
-    [< Tezos_rpc.RPC_service.meth] ->
+    [< Tezos_rpc.Service.meth] ->
     Uri.t ->
-    (content, content) Tezos_rpc.RPC_context.rest_result Lwt.t
+    (content, content) Tezos_rpc.Context.rest_result Lwt.t
 end
 
 module Make (Client : Resto_cohttp_client.Client.CALL) = struct
-  module Client =
-    Resto_cohttp_client.Client.Make (Tezos_rpc.RPC_encoding) (Client)
+  module Client = Resto_cohttp_client.Client.Make (Tezos_rpc.Encoding) (Client)
 
   module type LOGGER = Client.LOGGER
 
@@ -133,14 +132,12 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
   let request_failed meth uri error =
-    let meth =
-      (meth : [< Tezos_rpc.RPC_service.meth] :> Tezos_rpc.RPC_service.meth)
-    in
+    let meth = (meth : [< Tezos_rpc.Service.meth] :> Tezos_rpc.Service.meth) in
     Lwt_result_syntax.tzfail
       (RPC_client_errors.Request_failed {meth; uri; error})
 
   let generic_call ?headers ?accept ?body ?media meth uri :
-      (content, content) Tezos_rpc.RPC_context.rest_result Lwt.t =
+      (content, content) Tezos_rpc.Context.rest_result Lwt.t =
     let open Lwt_syntax in
     let* r =
       Client.generic_call
@@ -168,7 +165,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           (Unexpected_status_code {code; content; media_type})
     | `Method_not_allowed allowed ->
         let allowed =
-          List.filter_map Tezos_rpc.RPC_service.meth_of_string allowed
+          List.filter_map Tezos_rpc.Service.meth_of_string allowed
         in
         request_failed meth uri (Method_not_allowed allowed)
     | `Unsupported_media_type ->
@@ -200,7 +197,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   let jsonify_other meth uri content_type error :
       ( Data_encoding.json,
         Data_encoding.json option )
-      Tezos_rpc.RPC_context.rest_result
+      Tezos_rpc.Context.rest_result
       Lwt.t =
     let open Lwt_result_syntax in
     let jsonify_body string_body =
@@ -324,7 +321,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   (* This function checks that the content type of the answer belongs to accepted ones in [accept]. If not, it is processed as an error. If the answer lacks content-type, the response is decoded as JSON if possible. *)
   let generic_media_type_call ?headers ~accept ?body meth uri :
-      Tezos_rpc.RPC_context.generic_call_result tzresult Lwt.t =
+      Tezos_rpc.Context.generic_call_result tzresult Lwt.t =
     let open Lwt_result_syntax in
     let body =
       Option.map
@@ -367,13 +364,13 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     match ans with
     | `Ok (Some v) -> return v
     | `Ok None -> request_failed meth uri Empty_answer
-    | `Gone None -> tzfail (Tezos_rpc.RPC_context.Gone {meth; uri})
+    | `Gone None -> tzfail (Tezos_rpc.Context.Gone {meth; uri})
     | `Not_found None ->
         (* The client's proxy mode matches on the error raised here,
            to detect that a local RPC is unavailable at call_service and
            call_streamed_service, and hence that delegation
            to the endpoint must be done. *)
-        tzfail (Tezos_rpc.RPC_context.Not_found {meth; uri})
+        tzfail (Tezos_rpc.Context.Not_found {meth; uri})
     | `Conflict (Some err)
     | `Error (Some err)
     | `Forbidden (Some err)
@@ -384,7 +381,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Unauthorized None -> request_failed meth uri Unauthorized_uri
     | `Forbidden None -> request_failed meth uri Forbidden
     | `Conflict None | `Error None ->
-        tzfail (Tezos_rpc.RPC_context.Generic_error {meth; uri})
+        tzfail (Tezos_rpc.Context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
         let*! content = Cohttp_lwt.Body.to_string content in
@@ -394,7 +391,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           (Unexpected_status_code {code; content; media_type})
     | `Method_not_allowed allowed ->
         let allowed =
-          List.filter_map Tezos_rpc.RPC_service.meth_of_string allowed
+          List.filter_map Tezos_rpc.Service.meth_of_string allowed
         in
         request_failed meth uri (Method_not_allowed allowed)
     | `Unsupported_media_type ->
@@ -436,7 +433,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         request_failed meth uri (Redirect_without_location msg)
 
   let call_streamed_service (type p q i o) accept ?logger ?headers ~base
-      (service : (_, _, p, q, i, o) Tezos_rpc.RPC_service.t) ~on_chunk ~on_close
+      (service : (_, _, p, q, i, o) Tezos_rpc.Service.t) ~on_chunk ~on_close
       (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
     let open Lwt_syntax in
     let* ans =
@@ -455,7 +452,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     handle accept ans
 
   let call_service (type p q i o) accept ?logger ?headers ~base
-      (service : (_, _, p, q, i, o) Tezos_rpc.RPC_service.t) (params : p)
+      (service : (_, _, p, q, i, o) Tezos_rpc.Service.t) (params : p)
       (query : q) (body : i) : o tzresult Lwt.t =
     let open Lwt_syntax in
     let* ans =
@@ -485,7 +482,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         {media_type; endpoint; logger = null_logger})
       (obj2
          (req "media-type" Media_type.Command_line.encoding)
-         (req "endpoint" Tezos_rpc.RPC_encoding.uri_encoding))
+         (req "endpoint" Tezos_rpc.Encoding.uri_encoding))
 
   let default_config =
     {
@@ -494,7 +491,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
       logger = null_logger;
     }
 
-  class http_ctxt config media_types : Tezos_rpc.RPC_context.generic =
+  class http_ctxt config media_types : Tezos_rpc.Context.generic =
     let base = config.endpoint in
     let logger = config.logger in
     object
@@ -512,13 +509,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
       method call_service
           : 'm 'p 'q 'i 'o.
-            ( ([< Resto.meth] as 'm),
-              unit,
-              'p,
-              'q,
-              'i,
-              'o )
-            Tezos_rpc.RPC_service.t ->
+            (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
             'p ->
             'q ->
             'i ->
@@ -528,13 +519,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
       method call_streamed_service
           : 'm 'p 'q 'i 'o.
-            ( ([< Resto.meth] as 'm),
-              unit,
-              'p,
-              'q,
-              'i,
-              'o )
-            Tezos_rpc.RPC_service.t ->
+            (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
             on_chunk:('o -> unit) ->
             on_close:(unit -> unit) ->
             'p ->

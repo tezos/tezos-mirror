@@ -52,7 +52,7 @@ module type T = sig
   type types_state
 
   val get_rpc_directory :
-    types_state -> types_state Tezos_rpc.RPC_directory.t lazy_t
+    types_state -> types_state Tezos_rpc.Directory.t lazy_t
 
   val name : Name.t
 

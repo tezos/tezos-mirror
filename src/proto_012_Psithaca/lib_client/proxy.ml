@@ -121,7 +121,7 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
   in
   Lwt_result.ok (Protocol.Main.init_cache ctxt)
 
-let round_durations (rpc_context : Tezos_rpc.RPC_context.generic)
+let round_durations (rpc_context : Tezos_rpc.Context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let open Protocol in

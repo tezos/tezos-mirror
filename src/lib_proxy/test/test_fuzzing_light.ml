@@ -43,17 +43,11 @@ open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 module Consensus = struct
   let chain, block = (`Main, `Head 0)
 
-  class mock_rpc_context : Tezos_rpc.RPC_context.simple =
+  class mock_rpc_context : Tezos_rpc.Context.simple =
     object
       method call_service
           : 'm 'p 'q 'i 'o.
-            ( ([< Resto.meth] as 'm),
-              unit,
-              'p,
-              'q,
-              'i,
-              'o )
-            Tezos_rpc.RPC_service.t ->
+            (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
             'p ->
             'q ->
             'i ->

@@ -111,7 +111,7 @@ module type ENCODER = sig
 
   val encoding : t Data_encoding.t
 
-  val rpc_arg : t Tezos_rpc.RPC_arg.t
+  val rpc_arg : t Tezos_rpc.Arg.t
 end
 
 module type PVSS = sig

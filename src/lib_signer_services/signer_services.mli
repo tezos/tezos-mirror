@@ -30,7 +30,7 @@ val sign :
     Signature.t option,
     Bytes.t,
     Signature.t )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t
 
 val deterministic_nonce :
   ( [`POST],
@@ -39,7 +39,7 @@ val deterministic_nonce :
     Signature.t option,
     Bytes.t,
     Bytes.t )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t
 
 val deterministic_nonce_hash :
   ( [`POST],
@@ -48,7 +48,7 @@ val deterministic_nonce_hash :
     Signature.t option,
     Bytes.t,
     Bytes.t )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t
 
 val supports_deterministic_nonces :
   ( [`GET],
@@ -57,7 +57,7 @@ val supports_deterministic_nonces :
     unit,
     unit,
     bool )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t
 
 val public_key :
   ( [`GET],
@@ -66,7 +66,7 @@ val public_key :
     unit,
     unit,
     Signature.Public_key.t )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t
 
 val authorized_keys :
   ( [`GET],
@@ -75,4 +75,4 @@ val authorized_keys :
     unit,
     unit,
     Signature.Public_key_hash.t list option )
-  Tezos_rpc.RPC_service.t
+  Tezos_rpc.Service.t

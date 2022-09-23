@@ -131,7 +131,7 @@ type proxy_builder =
 type rpc_context_args = {
   printer : Tezos_client_base.Client_context.printer option;
   proxy_builder : proxy_builder;
-  rpc_context : Tezos_rpc.RPC_context.generic;
+  rpc_context : Tezos_rpc.Context.generic;
   mode : Proxy.mode;
   chain : Tezos_shell_services.Block_services.chain;
   block : Tezos_shell_services.Block_services.block;
@@ -148,7 +148,7 @@ let make_delegate (ctx : rpc_context_args)
       let*! (module Initial_context) = f proto_rpc in
       let pgi : Proxy.proxy_getter_input =
         {
-          rpc_context = (ctx.rpc_context :> Tezos_rpc.RPC_context.simple);
+          rpc_context = (ctx.rpc_context :> Tezos_rpc.Context.simple);
           mode = ctx.mode;
           chain = ctx.chain;
           block = ctx.block;

@@ -228,7 +228,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
               (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                  {rpc_config with endpoint}
                  (Media_type.Command_line.of_command_line rpc_config.media_type)
-                :> Tezos_rpc.RPC_context.simple)
+                :> Tezos_rpc.Context.simple)
             in
             let sources =
               Tezos_proxy.Light.sources_config_to_sources

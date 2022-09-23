@@ -68,8 +68,7 @@ module type MOCKUP = sig
       module type of
         Tezos_shell_services.Block_services.Make (Protocol) (Protocol)
 
-  val directory :
-    Tezos_protocol_environment.rpc_context Tezos_rpc.RPC_directory.t
+  val directory : Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.t
 
   val init :
     cctxt:Tezos_client_base.Client_context.printer ->

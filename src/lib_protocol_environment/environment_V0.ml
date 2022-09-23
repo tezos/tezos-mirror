@@ -49,7 +49,7 @@ module type T = sig
        and type Operation.t = Operation.t
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
-       and type 'a RPC_directory.t = 'a Tezos_rpc.RPC_directory.t
+       and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
        and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
        and type Ed25519.Public_key.t = Ed25519.Public_key.t
        and type Ed25519.t = Ed25519.t
@@ -67,10 +67,10 @@ module type T = sig
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
        and type Data_encoding.json_schema = Data_encoding.json_schema
-       and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.RPC_path.t
-       and type RPC_service.meth = Tezos_rpc.RPC_service.meth
+       and type ('a, 'b) RPC_path.t = ('a, 'b) Tezos_rpc.Path.t
+       and type RPC_service.meth = Tezos_rpc.Service.meth
        and type (+'m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t =
-        ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.RPC_service.t
+        ('m, 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t
        and type Error_monad.shell_error = Error_monad.error
 
   type error += Ecoproto_error of Error_monad.error
@@ -88,7 +88,7 @@ module type T = sig
        and type validation_state = P.validation_state
 
   class ['chain, 'block] proto_rpc_context :
-    Tezos_rpc.RPC_context.t
+    Tezos_rpc.Context.t
     -> (unit, (unit * 'chain) * 'block) RPC_path.t
     -> ['chain * 'block] RPC_context.simple
 
@@ -215,7 +215,7 @@ struct
 
       val encoding : t Data_encoding.t
 
-      val rpc_arg : t Tezos_rpc.RPC_arg.t
+      val rpc_arg : t Tezos_rpc.Arg.t
     end
 
     module type SET = S.SET
@@ -417,10 +417,10 @@ struct
   module Operation = Operation
   module Block_header = Block_header
   module Protocol = Protocol
-  module RPC_arg = Tezos_rpc.RPC_arg
-  module RPC_path = Tezos_rpc.RPC_path
-  module RPC_query = Tezos_rpc.RPC_query
-  module RPC_service = Tezos_rpc.RPC_service
+  module RPC_arg = Tezos_rpc.Arg
+  module RPC_path = Tezos_rpc.Path
+  module RPC_query = Tezos_rpc.Query
+  module RPC_service = Tezos_rpc.Service
 
   module RPC_answer = struct
     type 'o t =
@@ -631,7 +631,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call0 s ctxt block q i in
       match r with
-      | Error [Tezos_rpc.RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -639,7 +639,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call1 s ctxt block a1 q i in
       match r with
-      | Error [Tezos_rpc.RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -647,7 +647,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call2 s ctxt block a1 a2 q i in
       match r with
-      | Error [Tezos_rpc.RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
@@ -655,7 +655,7 @@ struct
       let open Lwt_syntax in
       let* r = make_call3 s ctxt block a1 a2 a3 q i in
       match r with
-      | Error [Tezos_rpc.RPC_context.Not_found _] -> Lwt.return_ok None
+      | Error [Tezos_rpc.Context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
   end
@@ -831,7 +831,7 @@ struct
     let environment_version = Protocol.V0
   end
 
-  class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
+  class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.Context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
     object
       method call_proto_service0
@@ -915,7 +915,7 @@ struct
 
   class ['block] proto_rpc_context_of_directory conv dir :
     ['block] RPC_context.simple =
-    let lookup = new Tezos_rpc.RPC_context.of_directory dir in
+    let lookup = new Tezos_rpc.Context.of_directory dir in
     object
       method call_proto_service0
           : 'm 'q 'i 'o.

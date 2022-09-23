@@ -142,11 +142,10 @@ let pipeline_length (t : t) =
   let w = Lazy.force Prevalidator.worker in
   Prevalidator.Worker.Queue.pending_requests_length w
 
-let empty_rpc_directory : unit Tezos_rpc.RPC_directory.t =
-  Tezos_rpc.RPC_directory.gen_register
-    Tezos_rpc.RPC_directory.empty
-    (Block_services.Empty.S.Mempool.pending_operations
-       Tezos_rpc.RPC_path.open_root)
+let empty_rpc_directory : unit Tezos_rpc.Directory.t =
+  Tezos_rpc.Directory.gen_register
+    Tezos_rpc.Directory.empty
+    (Block_services.Empty.S.Mempool.pending_operations Tezos_rpc.Path.open_root)
     (fun _pv params () ->
       let pending_operations =
         {
@@ -162,14 +161,14 @@ let empty_rpc_directory : unit Tezos_rpc.RPC_directory.t =
         ~version:params#version
         pending_operations)
 
-let rpc_directory : t option Tezos_rpc.RPC_directory.t =
-  Tezos_rpc.RPC_directory.register_dynamic_directory
-    Tezos_rpc.RPC_directory.empty
-    (Block_services.mempool_path Tezos_rpc.RPC_path.open_root)
+let rpc_directory : t option Tezos_rpc.Directory.t =
+  Tezos_rpc.Directory.register_dynamic_directory
+    Tezos_rpc.Directory.empty
+    (Block_services.mempool_path Tezos_rpc.Path.open_root)
     (function
       | None ->
           Lwt.return
-            (Tezos_rpc.RPC_directory.map
+            (Tezos_rpc.Directory.map
                (fun _ -> Lwt.return_unit)
                empty_rpc_directory)
       | Some t ->
@@ -178,4 +177,4 @@ let rpc_directory : t option Tezos_rpc.RPC_directory.t =
           let pv = Prevalidator.Worker.state w in
           let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
           Lwt.return
-            (Tezos_rpc.RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+            (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))

@@ -140,7 +140,7 @@ let filter_outdated_nonces state nonces =
 
 let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
-  | Error (Tezos_rpc.RPC_context.Not_found _ :: _) -> return_nil
+  | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
   | Ok (first, last) -> (
       Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->

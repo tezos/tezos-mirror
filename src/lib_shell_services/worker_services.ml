@@ -28,9 +28,9 @@ open Data_encoding
 module Prevalidators = struct
   module S = struct
     let list =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Lists the Prevalidator workers and their status."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (list
              (obj4
@@ -38,27 +38,27 @@ module Prevalidators = struct
                 (req
                    "status"
                    (Worker_types.worker_status_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req
                    "information"
                    (Worker_types.worker_information_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req "pipelines" int16)))
-        Tezos_rpc.RPC_path.(root / "workers" / "prevalidators")
+        Tezos_rpc.Path.(root / "workers" / "prevalidators")
 
     let state =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Introspect the state of prevalidator workers."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (Worker_types.full_status_encoding
              Prevalidator_worker_state.Request.encoding
-             Tezos_rpc.RPC_error.encoding)
-        Tezos_rpc.RPC_path.(
+             Tezos_rpc.Error.encoding)
+        Tezos_rpc.Path.(
           root / "workers" / "prevalidators" /: Chain_services.chain_arg)
   end
 
-  open Tezos_rpc.RPC_context
+  open Tezos_rpc.Context
 
   let list ctxt = make_call S.list ctxt () () ()
 
@@ -68,17 +68,17 @@ end
 module Block_validator = struct
   module S = struct
     let state =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Introspect the state of the block_validator worker."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (Worker_types.full_status_encoding
              Block_validator_worker_state.Request.encoding
-             Tezos_rpc.RPC_error.encoding)
-        Tezos_rpc.RPC_path.(root / "workers" / "block_validator")
+             Tezos_rpc.Error.encoding)
+        Tezos_rpc.Path.(root / "workers" / "block_validator")
   end
 
-  open Tezos_rpc.RPC_context
+  open Tezos_rpc.Context
 
   let state ctxt = make_call S.state ctxt () () ()
 end
@@ -86,9 +86,9 @@ end
 module Peer_validators = struct
   module S = struct
     let list =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Lists the peer validator workers and their status."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (list
              (obj4
@@ -96,32 +96,32 @@ module Peer_validators = struct
                 (req
                    "status"
                    (Worker_types.worker_status_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req
                    "information"
                    (Worker_types.worker_information_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req
                    "pipelines"
                    Peer_validator_worker_state.pipeline_length_encoding)))
-        Tezos_rpc.RPC_path.(
+        Tezos_rpc.Path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg
           / "peers_validators")
 
     let state =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Introspect the state of a peer validator worker."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (Worker_types.full_status_encoding
              Peer_validator_worker_state.Request.encoding
-             Tezos_rpc.RPC_error.encoding)
-        Tezos_rpc.RPC_path.(
+             Tezos_rpc.Error.encoding)
+        Tezos_rpc.Path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg
           / "peers_validators" /: P2p_peer.Id.rpc_arg)
   end
 
-  open Tezos_rpc.RPC_context
+  open Tezos_rpc.Context
 
   let list ctxt n = make_call1 S.list ctxt n () ()
 
@@ -131,9 +131,9 @@ end
 module Chain_validators = struct
   module S = struct
     let list =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Lists the chain validator workers and their status."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (list
              (obj4
@@ -141,38 +141,38 @@ module Chain_validators = struct
                 (req
                    "status"
                    (Worker_types.worker_status_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req
                    "information"
                    (Worker_types.worker_information_encoding
-                      Tezos_rpc.RPC_error.encoding))
+                      Tezos_rpc.Error.encoding))
                 (req "pipelines" int16)))
-        Tezos_rpc.RPC_path.(root / "workers" / "chain_validators")
+        Tezos_rpc.Path.(root / "workers" / "chain_validators")
 
     let state =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:"Introspect the state of a chain validator worker."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:
           (Worker_types.full_status_encoding
              Chain_validator_worker_state.Request.encoding
-             Tezos_rpc.RPC_error.encoding)
-        Tezos_rpc.RPC_path.(
+             Tezos_rpc.Error.encoding)
+        Tezos_rpc.Path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg)
 
     let ddb_state =
-      Tezos_rpc.RPC_service.get_service
+      Tezos_rpc.Service.get_service
         ~description:
           "Introspect the state of the DDB attached to a chain validator \
            worker."
-        ~query:Tezos_rpc.RPC_query.empty
+        ~query:Tezos_rpc.Query.empty
         ~output:Chain_validator_worker_state.Distributed_db_state.encoding
-        Tezos_rpc.RPC_path.(
+        Tezos_rpc.Path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg
           / "ddb")
   end
 
-  open Tezos_rpc.RPC_context
+  open Tezos_rpc.Context
 
   let list ctxt = make_call S.list ctxt () () ()
 

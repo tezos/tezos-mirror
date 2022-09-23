@@ -78,7 +78,7 @@ and chain_store = {
   genesis_block_data : block Stored_data.t;
   block_watcher : block Lwt_watcher.input;
   block_rpc_directories :
-    (chain_store * block) Tezos_rpc.RPC_directory.t Protocol_hash.Map.t
+    (chain_store * block) Tezos_rpc.Directory.t Protocol_hash.Map.t
     Protocol_hash.Table.t;
   lockfile : Lwt_unix.file_descr;
 }

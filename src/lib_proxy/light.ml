@@ -74,7 +74,7 @@ let destruct_sources_config json =
 
 type sources = {
   min_agreement : float;
-  endpoints : (Uri.t * Tezos_rpc.RPC_context.simple) list;
+  endpoints : (Uri.t * Tezos_rpc.Context.simple) list;
 }
 
 let sources_config_to_sources rpc_context_builder {min_agreement; uris} =

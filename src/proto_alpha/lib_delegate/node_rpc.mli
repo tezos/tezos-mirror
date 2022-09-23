@@ -55,7 +55,7 @@ val preapply_block :
     @param cache is unset by default 
 *)
 val proposal :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   ?cache:Baking_state.block_info Baking_cache.Block_cache.t ->
   chain:Shell_services.chain ->
   Block_hash.t ->

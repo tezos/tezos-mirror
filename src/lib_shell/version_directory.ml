@@ -23,7 +23,7 @@
 (*****************************************************************************)
 
 let rpc_directory net =
-  let dir = Tezos_rpc.RPC_directory.empty in
+  let dir = Tezos_rpc.Directory.empty in
   let version = Current_git_info.version in
   let network_version = P2p.announced_version net in
   let commit_hash = Current_git_info.commit_hash in
@@ -31,9 +31,9 @@ let rpc_directory net =
   let commit_info =
     Some ({commit_hash; commit_date} : Node_version.commit_info)
   in
-  Tezos_rpc.RPC_directory.gen_register
+  Tezos_rpc.Directory.gen_register
     dir
     Version_services.S.version
     (fun () () () ->
-      Tezos_rpc.RPC_answer.return
+      Tezos_rpc.Answer.return
       @@ ({version; network_version; commit_info} : Node_version.t))

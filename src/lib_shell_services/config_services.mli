@@ -31,7 +31,7 @@ module Network : sig
       unit,
       unit,
       User_activated.upgrades )
-    Tezos_rpc.RPC_service.t
+    Tezos_rpc.Service.t
 
   val user_activated_protocol_overrides :
     ( [`GET],
@@ -40,7 +40,7 @@ module Network : sig
       unit,
       unit,
       User_activated.protocol_overrides )
-    Tezos_rpc.RPC_service.t
+    Tezos_rpc.Service.t
 end
 
 val history_mode :
@@ -51,7 +51,7 @@ val history_mode :
     unit,
     History_mode.t,
     error trace )
-  Tezos_rpc.RPC_service.raw
+  Tezos_rpc.Service.raw
 
 module Logging : sig
   val configure :
@@ -61,8 +61,8 @@ module Logging : sig
       unit,
       Tezos_base.Internal_event_config.t,
       unit )
-    Tezos_rpc.RPC_service.service
+    Tezos_rpc.Service.service
 end
 
 val user_activated_upgrades :
-  #Tezos_rpc.RPC_context.simple -> User_activated.upgrades tzresult Lwt.t
+  #Tezos_rpc.Context.simple -> User_activated.upgrades tzresult Lwt.t

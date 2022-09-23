@@ -23,16 +23,13 @@
 (*****************************************************************************)
 
 let rpc_directory () =
-  let dir = Tezos_rpc.RPC_directory.empty in
-  Tezos_rpc.RPC_directory.gen_register dir Stat_services.S.gc (fun () () () ->
-      Tezos_rpc.RPC_answer.return @@ Gc.stat ())
+  let dir = Tezos_rpc.Directory.empty in
+  Tezos_rpc.Directory.gen_register dir Stat_services.S.gc (fun () () () ->
+      Tezos_rpc.Answer.return @@ Gc.stat ())
   |> fun dir ->
-  Tezos_rpc.RPC_directory.gen_register
-    dir
-    Stat_services.S.memory
-    (fun () () () ->
+  Tezos_rpc.Directory.gen_register dir Stat_services.S.memory (fun () () () ->
       let open Lwt_syntax in
       let* r = Sys_info.memory_stats () in
       match r with
-      | Ok stats -> Tezos_rpc.RPC_answer.return stats
-      | Error err -> Tezos_rpc.RPC_answer.fail [err])
+      | Ok stats -> Tezos_rpc.Answer.return stats
+      | Error err -> Tezos_rpc.Answer.fail [err])

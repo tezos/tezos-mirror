@@ -25,4 +25,4 @@
 
 (** The function [local_ctxt directory] creates
     an RPC context that executes RPCs locally. *)
-val local_ctxt : unit Tezos_rpc.RPC_directory.t -> Tezos_rpc.RPC_context.generic
+val local_ctxt : unit Tezos_rpc.Directory.t -> Tezos_rpc.Context.generic

@@ -54,7 +54,7 @@ val start_server : Node_config.t -> State.t -> RPC_server.server tzresult Lwt.t
 
 (** Returns the balance for an l2-address and a ticket. *)
 val balance :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   Alpha_context.Ticket_hash.t ->
   Tx_rollup_l2_address.t ->
@@ -62,59 +62,58 @@ val balance :
 
 (** Returns the current counter for the given address. *)
 val counter :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   Tx_rollup_l2_address.t ->
   int64 Error_monad.tzresult Lwt.t
 
 (** Returns the tx-rollup-node inbox for a given block. *)
 val inbox :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   Inbox.t option Error_monad.tzresult Lwt.t
 
 (** Returns the L2 block in the tx-rollup-node in the raw format. *)
 val raw_block :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   (L2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
 
 (** Returns the L2 block in the tx-rollup-node. *)
 val block :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   (Fancy_l2block.t * L2block.metadata) option Error_monad.tzresult Lwt.t
 
 (** Returns the whole queue of L2 transactions. *)
 val get_queue :
-  #Tezos_rpc.RPC_context.simple ->
-  L2_transaction.t list Error_monad.tzresult Lwt.t
+  #Tezos_rpc.Context.simple -> L2_transaction.t list Error_monad.tzresult Lwt.t
 
 (** Returns an L2 transaction in the queue given a transaction hash. *)
 val get_transaction :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   L2_transaction.hash ->
   L2_transaction.t option Error_monad.tzresult Lwt.t
 
 (** Inject an L2 transaction in the queue of the rollup node and returns
     the transaction hash. *)
 val inject_transaction :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   ?eager_batch:bool ->
   L2_transaction.t ->
   L2_transaction.hash Error_monad.tzresult Lwt.t
 
 (** Get the merkle proof associated to a message position in the block's inbox. *)
 val get_message_proof :
-  #Tezos_rpc.RPC_context.simple ->
+  #Tezos_rpc.Context.simple ->
   block_id ->
   message_position:int ->
   Tx_rollup_l2_proof.t option Error_monad.tzresult Lwt.t
 
 (** Monitors the synchronized progress of the rollup node with respect to L1. *)
 val monitor_synchronized :
-  #Tezos_rpc.RPC_context.streamed ->
+  #Tezos_rpc.Context.streamed ->
   ([`Synchronizing of State.sync_levels | `Synchronized] Lwt_stream.t
-  * Tezos_rpc.RPC_context.stopper)
+  * Tezos_rpc.Context.stopper)
   tzresult
   Lwt.t

@@ -70,7 +70,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     entrypoint
   >>= function
   | Ok ty -> return_some ty
-  | Error (Tezos_rpc.RPC_context.Not_found _ :: _) -> return None
+  | Error (Tezos_rpc.Context.Not_found _ :: _) -> return None
   | Error _ as err -> Lwt.return err
 
 let print_entrypoint_type (cctxt : #Client_context.printer)

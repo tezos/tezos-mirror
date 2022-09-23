@@ -172,7 +172,7 @@ module Public_key_hash = struct
   end)
 
   let rpc_arg =
-    Tezos_rpc.RPC_arg.like
+    Tezos_rpc.Arg.like
       rpc_arg
       ~descr:"An aggregate public key hash (Base58Check-encoded)"
       "pkh"
