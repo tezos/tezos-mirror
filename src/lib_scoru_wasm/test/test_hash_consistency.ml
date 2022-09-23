@@ -40,12 +40,10 @@ let test_execution_correspondance skip count () =
       let* tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
       let* tree =
         if skip = 0L then Lwt.return tree
-        else Wasm.Internal_for_tests.compute_step_many ~max_steps:skip tree
+        else Wasm.compute_step_many ~max_steps:skip tree
       in
       let rec explore tree' n =
-        let* tree_ref =
-          Wasm.Internal_for_tests.compute_step_many ~max_steps:n tree
-        in
+        let* tree_ref = Wasm.compute_step_many ~max_steps:n tree in
         let* tree' = Wasm.compute_step tree' in
         assert (
           Context_hash.(Context.Tree.hash tree_ref = Context.Tree.hash tree')) ;

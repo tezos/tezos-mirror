@@ -409,7 +409,7 @@ struct
       in
       return pvm_state
 
-    let compute_step_many ?(max_steps = 1L) tree =
+    let compute_step_many ~max_steps tree =
       let open Lwt.Syntax in
       assert (max_steps > 0L) ;
 
@@ -548,8 +548,6 @@ struct
         match pvm.tick_state with
         | Stuck error -> Lwt.return_some error
         | _ -> Lwt.return_none
-
-      let compute_step_many = compute_step_many
 
       let set_max_nb_ticks n tree =
         let open Lwt_syntax in

@@ -61,8 +61,6 @@ module type Internal_for_tests = sig
 
   val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
 
-  val compute_step_many : ?max_steps:int64 -> tree -> tree Lwt.t
-
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
 end
 
@@ -72,16 +70,24 @@ module type S = sig
 
   type tick_state
 
-  (** [compute_step] forwards the VM by one compute tick. If the VM is expecting
-      input, it gets stuck. If the VM is already stuck, this function may
-      raise an exception. *)
+  (** [compute_step_many ~max_steps tree] forwards the VM by at most [max_step]
+      compute tick, yielding if it reaches the maximum number of ticks for a
+      toplevel kernel call. If the VM is expecting input, it gets stuck. If the
+      VM is already stuck, this function may raise an exception. It is more
+      efficient than [compute_step] if it has to be called for more than one
+      tick, but its resulting tree will be stricly equivalent. *)
+  val compute_step_many : max_steps:int64 -> tree -> tree Lwt.t
+
+  (** [compute_step tree] forwards the VM by one compute tick. If the VM is expecting
+      input, it gets stuck. If the VM is already stuck, this function may raise
+      an exception. It is strictly equivalent to [compute_step_many ~max_step=1
+      tree]. *)
   val compute_step : tree -> tree Lwt.t
 
-  (** [set_input_step] forwards the VM by one input tick. If the VM is not
-      expecting input, it gets stuck. If the VM is already stuck, this function
-      may raise an exception. Note at this point the function raises an
-      exception if the  VM is not expecting input. WHen we implement astuck
-      state this needs to be slightly changed.*)
+  (** [set_input_step input_info message tree] forwards the VM by one input
+      tick. If the VM is not expecting input, it gets stuck. If the VM is
+      already stuck, this function may raise an exception. Note at this point
+      the function raises an exception if the VM is not expecting input. *)
   val set_input_step : input_info -> string -> tree -> tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given

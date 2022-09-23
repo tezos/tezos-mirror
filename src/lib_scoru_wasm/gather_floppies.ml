@@ -418,6 +418,8 @@ module Make
                     inner_info.last_input_read;
               })
 
+  let compute_step_many = Wasm.compute_step_many
+
   module Internal_for_tests = struct
     include Wasm.Internal_for_tests
 
