@@ -83,12 +83,16 @@ type pvm_state = {
 }
 
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree and type tick_state = tick_state =
-struct
+  Gather_floppies.S
+    with type tree = T.tree
+     and type tick_state = tick_state
+     and type pvm_state = pvm_state = struct
   module Raw = struct
     type tree = T.tree
 
     type nonrec tick_state = tick_state
+
+    type nonrec pvm_state = pvm_state
 
     module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
     module Parsing = Binary_parser_encodings
@@ -485,13 +489,35 @@ struct
       eval_has_finished pvm_state.tick_state
       && not (is_time_for_snapshot pvm_state)
 
-    let compute_step_many ~max_steps tree =
+    let decode tree = Tree_encoding_runner.decode pvm_state_encoding tree
+
+    let encode pvm_state tree =
+      let open Lwt.Syntax in
+      (* {{Note tick state clean-up}}
+
+         The "wasm" directory in the Irmin tree of the PVM is used to
+         maintain a lot of information across tick, but as of now, it
+         was never cleaned up. It meant that the tree would become
+         crowded with data that were no longer needed.
+
+         It turns out it is very simple to clean up, thanks to subtree
+         move.  Because we keep in the lazy-containers the original
+         subtree, and we inject it prior to updating read keys, the
+         tree-encoding library does not rely on the input tree at
+         encoding time.
+
+         With this, we gain an additional 5% of proof size in the
+         worst tick of the computation.wasm kernel. *)
+      let* tree = T.remove tree ["wasm"] in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue
+        pvm_state =
       let open Lwt.Syntax in
       assert (max_steps > 0L) ;
-
       let rec go steps_left pvm_state =
-        let* input_request = input_request pvm_state in
-        if steps_left > 0L && input_request = No_input_required then
+        let* continue = should_continue pvm_state in
+        if steps_left > 0L && continue then
           if is_top_level_padding pvm_state then
             (* We're in the top-level padding after the evaluation has
                finished. That means we can skip up to the tick before the
@@ -511,31 +537,34 @@ struct
             go (Int64.pred steps_left) pvm_state
         else Lwt.return pvm_state
       in
-
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Make sure we perform at least 1 step. The assertion above ensures that
          we were asked to perform at least 1. *)
       let* pvm_state = compute_step_inner pvm_state in
-      let* pvm_state = go (Int64.pred max_steps) pvm_state in
+      go (Int64.pred max_steps) pvm_state
 
-      (* {{Note tick state clean-up}}
+    let compute_step_many_until ?(max_steps = 1L) should_continue tree =
+      let open Lwt.Syntax in
+      assert (max_steps > 0L) ;
 
-         The "wasm" directory in the Irmin tree of the PVM is used to
-         maintain a lot of information across tick, but as of now, it
-         was never cleaned up. It meant that the tree would become
-         crowded with data that were no longer needed.
+      let* pvm_state = decode tree in
 
-         It turns out it is very simple to clean up, thanks to subtree
-         move.  Because we keep in the lazy-containers the original
-         subtree, and we inject it prior to updating read keys, the
-         tree-encoding library does not rely on the input tree at
-         encoding time.
+      (* Make sure we perform at least 1 step. The assertion above ensures that
+         we were asked to perform at least 1. *)
+      let* pvm_state =
+        compute_step_many_until_pvm_state ~max_steps should_continue pvm_state
+      in
 
-         With this, we gain an additional 5% of proof size in the
-         worst tick of the computation.wasm kernel. *)
-      let* tree = T.remove tree ["wasm"] in
+      encode pvm_state tree
 
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+    let compute_step_many ~max_steps tree =
+      let open Lwt_syntax in
+      let should_continue pvm_state =
+        let* input_request_val = input_request pvm_state in
+        match input_request_val with
+        | Reveal_required _ | Input_required -> return false
+        | No_input_required -> return true
+      in
+      compute_step_many_until ~max_steps should_continue tree
 
     let compute_step tree = compute_step_many ~max_steps:1L tree
 
@@ -698,6 +727,14 @@ struct
         match pvm.tick_state with
         | Stuck error -> Lwt.return_some error
         | _ -> Lwt.return_none
+
+      let decode = decode
+
+      let encode = encode
+
+      let compute_step_many_until_pvm_state = compute_step_many_until_pvm_state
+
+      let compute_step_many_until = compute_step_many_until
 
       let set_max_nb_ticks n tree =
         let open Lwt_syntax in

@@ -66,12 +66,24 @@ module type Internal_for_tests = sig
 
   type tick_state
 
+  type pvm_state
+
   val get_tick_state : tree -> tick_state Lwt.t
 
   val get_module_instance_exn :
     tree -> Tezos_webassembly_interpreter.Instance.module_inst Lwt.t
 
   val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
+
+  val decode : tree -> pvm_state Lwt.t
+
+  val encode : pvm_state -> tree -> tree Lwt.t
+
+  val compute_step_many_until_pvm_state :
+    ?max_steps:int64 -> (pvm_state -> bool) -> pvm_state -> pvm_state Lwt.t
+
+  val compute_step_many_until :
+    ?max_steps:int64 -> (pvm_state -> bool Lwt.t) -> tree -> tree Lwt.t
 
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
 
@@ -85,6 +97,8 @@ module type S = sig
   type tree
 
   type tick_state
+
+  type pvm_state
 
   (** [compute_step_many ~max_steps tree] forwards the VM by at most [max_step]
       compute tick, yielding if it reaches the maximum number of ticks for a
@@ -124,7 +138,10 @@ module type S = sig
   val get_info : tree -> info Lwt.t
 
   module Internal_for_tests :
-    Internal_for_tests with type tree := tree and type tick_state := tick_state
+    Internal_for_tests
+      with type tree := tree
+       and type tick_state := tick_state
+       and type pvm_state := pvm_state
 end
 
 (* Encodings *)

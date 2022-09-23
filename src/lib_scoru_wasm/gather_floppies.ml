@@ -110,6 +110,7 @@ module type S = sig
       Wasm_pvm_sig.Internal_for_tests
         with type tree := tree
          and type tick_state := tick_state
+         and type pvm_state := pvm_state
 
     val get_internal_status : tree -> internal_status option Lwt.t
 
@@ -120,10 +121,15 @@ end
 module Make
     (T : Tezos_tree_encoding.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
-  S with type tree = T.tree and type tick_state = Wasm.tick_state = struct
+  S
+    with type tree = T.tree
+     and type tick_state = Wasm.tick_state
+     and type pvm_state = Wasm.pvm_state = struct
   type tree = Wasm.tree
 
   type tick_state = Wasm.tick_state
+
+  type pvm_state = Wasm.pvm_state
 
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
