@@ -44,9 +44,9 @@ module Hash : sig
 
   val to_raw_string : t -> string
 
-  val to_context_hash : t -> Context_hash.t
+  val to_context_hash : t -> Tezos_crypto.Context_hash.t
 
-  val of_context_hash : Context_hash.t -> t
+  val of_context_hash : Tezos_crypto.Context_hash.t -> t
 end = struct
   module H = Digestif.Make_BLAKE2B (struct
     let digest_size = 32
@@ -58,14 +58,16 @@ end = struct
 
   let unsafe_of_raw_string s = H.of_raw_string s
 
-  let of_context_hash s = H.of_raw_string (Context_hash.to_string s)
+  let of_context_hash s =
+    H.of_raw_string (Tezos_crypto.Context_hash.to_string s)
 
-  let to_context_hash h = Context_hash.of_string_exn (H.to_raw_string h)
+  let to_context_hash h =
+    Tezos_crypto.Context_hash.of_string_exn (H.to_raw_string h)
 
-  let pp ppf t = Context_hash.pp ppf (to_context_hash t)
+  let pp ppf t = Tezos_crypto.Context_hash.pp ppf (to_context_hash t)
 
   let of_string x =
-    match Context_hash.of_b58check x with
+    match Tezos_crypto.Context_hash.of_b58check x with
     | Ok x -> Ok (of_context_hash x)
     | Error err ->
         Error

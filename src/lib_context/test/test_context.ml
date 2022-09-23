@@ -34,7 +34,13 @@ module Assert_lib = Lib_test_extra.Assert_lib
 module Assert = Lib_test.Assert
 
 let equal_context_hash ?loc ?msg l1 l2 =
-  Assert.equal ?loc ~eq:Context_hash.( = ) ~pp:Context_hash.pp ?msg l1 l2
+  Assert.equal
+    ?loc
+    ~eq:Tezos_crypto.Context_hash.( = )
+    ~pp:Tezos_crypto.Context_hash.pp
+    ?msg
+    l1
+    l2
 
 let ( let* ) = Lwt.bind
 
@@ -54,16 +60,16 @@ open Filename.Infix
 (** Basic blocks *)
 
 let genesis_block =
-  Block_hash.of_b58check_exn
+  Tezos_crypto.Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol =
-  Protocol_hash.of_b58check_exn
+  Tezos_crypto.Protocol_hash.of_b58check_exn
     "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let genesis_time = Time.Protocol.of_seconds 0L
 
-let chain_id = Chain_id.of_block_hash genesis_block
+let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis_block
 
 (** Test functors *)
 
@@ -113,10 +119,10 @@ struct
 
   type t = {
     idx : Context.index;
-    genesis : Context_hash.t;
-    block2 : Context_hash.t;
-    block3a : Context_hash.t;
-    block3b : Context_hash.t;
+    genesis : Tezos_crypto.Context_hash.t;
+    block2 : Tezos_crypto.Context_hash.t;
+    block3a : Tezos_crypto.Context_hash.t;
+    block3b : Tezos_crypto.Context_hash.t;
   }
 
   type init_config = {indexing_strategy : [`Always | `Minimal]}
@@ -487,14 +493,14 @@ struct
         let* h = commit ctxt in
         equal_context_hash
           ~loc:__LOC__
-          (Context_hash.of_b58check_exn
+          (Tezos_crypto.Context_hash.of_b58check_exn
              "CoWJsL2ehZ39seTr8inBCJb5tVjW8KGNweJ5cvuVq51mAASrRmim")
           h ;
         let* ctxt = add ctxt [string 255] foo2 in
         let* h = commit ctxt in
         equal_context_hash
           ~loc:__LOC__
-          (Context_hash.of_b58check_exn
+          (Tezos_crypto.Context_hash.of_b58check_exn
              "CoVexcEHMXmSA2k42aNc5MCDtVJFRs3CC6vcQWYwFoj7EFsBPw1c")
           h ;
         Lwt.return ()
@@ -548,7 +554,8 @@ struct
       (fun wrong_version ->
         let* ctxt = Context.checkout_exn idx block2 in
         let+ r =
-          set_hash_version ctxt @@ Context_hash.Version.of_int wrong_version
+          set_hash_version ctxt
+          @@ Tezos_crypto.Context_hash.Version.of_int wrong_version
         in
         match r with
         | Ok _ ->
@@ -724,10 +731,10 @@ struct
 
   type t = {
     idx : Context.index;
-    genesis : Context_hash.t;
-    block2 : Context_hash.t;
-    block3a : Context_hash.t;
-    block3b : Context_hash.t;
+    genesis : Tezos_crypto.Context_hash.t;
+    block2 : Tezos_crypto.Context_hash.t;
+    block3a : Tezos_crypto.Context_hash.t;
+    block3b : Tezos_crypto.Context_hash.t;
   }
 
   type init_config = {indexing_strategy : [`Always | `Minimal]}
@@ -769,10 +776,10 @@ struct
                   {
                     level = 0l;
                     proto_level = 0;
-                    predecessor = Block_hash.zero;
+                    predecessor = Tezos_crypto.Block_hash.zero;
                     timestamp = Time.Protocol.epoch;
                     validation_passes = 0;
-                    operations_hash = Operation_list_list_hash.zero;
+                    operations_hash = Tezos_crypto.Operation_list_list_hash.zero;
                     fitness = [];
                     context;
                   };

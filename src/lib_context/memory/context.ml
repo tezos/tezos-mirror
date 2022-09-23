@@ -33,8 +33,8 @@ module type TEZOS_CONTEXT_MEMORY = sig
     Tezos_context_sigs.Context.TEZOS_CONTEXT
       with type memory_context_tree := tree
        and type tree := tree
-       and type value_key = Context_hash.t
-       and type node_key = Context_hash.t
+       and type value_key = Tezos_crypto.Context_hash.t
+       and type node_key = Tezos_crypto.Context_hash.t
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed so that it can be catched by the proxy where such
@@ -56,9 +56,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   module Info = Store.Info
   module P = Store.Backend
 
-  type node_key = Context_hash.t
+  type node_key = Tezos_crypto.Context_hash.t
 
-  type value_key = Context_hash.t
+  type value_key = Tezos_crypto.Context_hash.t
 
   type kinded_key = [`Value of value_key | `Node of node_key]
 
@@ -156,11 +156,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 ())
           children)
 
-  let get_hash_version _c = Context_hash.Version.of_int 0
+  let get_hash_version _c = Tezos_crypto.Context_hash.Version.of_int 0
 
   let set_hash_version c v =
     let open Lwt_result_syntax in
-    if Context_hash.Version.(of_int 0 = v) then return c
+    if Tezos_crypto.Context_hash.Version.(of_int 0 = v) then return c
     else
       tzfail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
 
@@ -401,10 +401,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       let data =
         WithExceptions.Option.to_exn_f ~none:(fun () -> assert false) o
       in
-      Protocol_hash.of_bytes_exn data
+      Tezos_crypto.Protocol_hash.of_bytes_exn data
 
     let add_protocol t v =
-      let v = Protocol_hash.to_bytes v in
+      let v = Tezos_crypto.Protocol_hash.to_bytes v in
       Tree.add t current_protocol_key v
 
     let get_test_chain t =
@@ -437,7 +437,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       | None -> return_none
       | Some data -> (
           match
-            Data_encoding.Binary.of_bytes_opt Block_metadata_hash.encoding data
+            Data_encoding.Binary.of_bytes_opt
+              Tezos_crypto.Block_metadata_hash.encoding
+              data
           with
           | None ->
               raise
@@ -448,7 +450,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
     let add_predecessor_block_metadata_hash t hash =
       let data =
-        Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_crypto.Block_metadata_hash.encoding
+          hash
       in
       Tree.add t current_predecessor_block_metadata_hash_key data
 
@@ -460,7 +464,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       | Some data -> (
           match
             Data_encoding.Binary.of_bytes_opt
-              Operation_metadata_list_list_hash.encoding
+              Tezos_crypto.Operation_metadata_list_list_hash.encoding
               data
           with
           | None ->
@@ -473,7 +477,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let add_predecessor_ops_metadata_hash t hash =
       let data =
         Data_encoding.Binary.to_bytes_exn
-          Operation_metadata_list_list_hash.encoding
+          Tezos_crypto.Operation_metadata_list_list_hash.encoding
           hash
       in
       Tree.add t current_predecessor_ops_metadata_hash_key data
@@ -526,7 +530,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let is_empty t = Tree.is_empty t.tree
 
-  let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
+  let get_branch chain_id =
+    Format.asprintf "%a" Tezos_crypto.Chain_id.pp chain_id
 
   let commit_genesis index ~chain_id ~time ~protocol =
     let open Lwt_result_syntax in
@@ -587,11 +592,17 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       concrete_encoding
 
   let compute_testchain_chain_id genesis =
-    let genesis_hash = Block_hash.hash_bytes [Block_hash.to_bytes genesis] in
-    Chain_id.of_block_hash genesis_hash
+    let genesis_hash =
+      Tezos_crypto.Block_hash.hash_bytes
+        [Tezos_crypto.Block_hash.to_bytes genesis]
+    in
+    Tezos_crypto.Chain_id.of_block_hash genesis_hash
 
   let compute_testchain_genesis forked_block =
-    let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
+    let genesis =
+      Tezos_crypto.Block_hash.hash_bytes
+        [Tezos_crypto.Block_hash.to_bytes forked_block]
+    in
     genesis
 
   let commit_test_chain_genesis ctxt (forked_header : Block_header.t) =
@@ -608,9 +619,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       {
         forked_header.shell with
         proto_level = succ forked_header.shell.proto_level;
-        predecessor = Block_hash.zero;
+        predecessor = Tezos_crypto.Block_hash.zero;
         validation_passes = 0;
-        operations_hash = Operation_list_list_hash.empty;
+        operations_hash = Tezos_crypto.Operation_list_list_hash.empty;
         context = Hash.to_context_hash (Store.Commit.hash commit);
       }
     in
@@ -658,7 +669,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
               (fun k -> P.Commit.Key.to_hash k |> Hash.to_context_hash)
               parents
           in
-          List.sort Context_hash.compare parents
+          List.sort Tezos_crypto.Context_hash.compare parents
       | _ -> assert false
 
     let context_info = function
@@ -729,5 +740,5 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       P.Commit_portable.v ~info ~parents ~node
       |> Commit_hash.hash |> Hash.to_context_hash
     in
-    Context_hash.equal ctxt_h expected_context_hash
+    Tezos_crypto.Context_hash.equal ctxt_h expected_context_hash
 end

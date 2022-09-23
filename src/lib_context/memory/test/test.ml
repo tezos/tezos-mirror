@@ -30,16 +30,16 @@ module C = struct
   (** Basic blocks *)
 
   let genesis_block =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
   let genesis_protocol =
-    Protocol_hash.of_b58check_exn
+    Tezos_crypto.Protocol_hash.of_b58check_exn
       "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
   let genesis_time = Time.Protocol.of_seconds 0L
 
-  let chain_id = Chain_id.of_block_hash genesis_block
+  let chain_id = Tezos_crypto.Chain_id.of_block_hash genesis_block
 
   let make_context () =
     (* there is no simple way to build a context *)
@@ -97,14 +97,14 @@ let test_hash =
     let module M = Make (M) in
     let* ch = C.hash_of_dir n in
     let* mh = M.hash_of_dir n in
-    if not @@ Context_hash.equal ch mh then
+    if not @@ Tezos_crypto.Context_hash.equal ch mh then
       Stdlib.failwith
         (Format.asprintf
            "hash mismatch: n=%d context: %a memory: %a"
            n
-           Context_hash.pp
+           Tezos_crypto.Context_hash.pp
            ch
-           Context_hash.pp
+           Tezos_crypto.Context_hash.pp
            mh)
     else Lwt.return ()
   in
