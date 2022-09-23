@@ -47,7 +47,7 @@ open Sc_rollup_repr
 
 (** The proof that a reveal is valid. *)
 type reveal_proof =
-  | RawDataProof of string
+  | Raw_data_proof of string
       (** The existence of reveal for a given hash when the
           [input_requested] is the [Needs_for_reveal]. *)
 

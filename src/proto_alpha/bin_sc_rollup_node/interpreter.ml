@@ -100,13 +100,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                 eval_tick tick failing_ticks state
               in
               go (consume_fuel fuel) (tick + 1) failing_ticks next_state
-          | Needs_reveal (RevealRawData hash) -> (
+          | Needs_reveal (Reveal_raw_data hash) -> (
               match Reveals.get ~data_dir ~pvm_name:PVM.name ~hash with
               | None ->
                   tzfail (Sc_rollup_node_errors.Cannot_retrieve_reveal hash)
               | Some data ->
                   let*! next_state =
-                    PVM.set_input (Reveal (RawData data)) state
+                    PVM.set_input (Reveal (Raw_data data)) state
                   in
                   go (consume_fuel fuel) (tick + 1) failing_ticks next_state)
           | _ -> return (state, fuel, tick, failing_ticks))

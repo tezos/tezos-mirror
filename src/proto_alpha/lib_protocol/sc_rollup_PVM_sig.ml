@@ -63,7 +63,7 @@ type inbox_message = {
   payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
-type reveal_data = RawData of string
+type reveal_data = Raw_data of string
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -92,8 +92,8 @@ let reveal_data_encoding =
          (req
             "raw_data"
             (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
-      (function RawData m -> Some ((), Bytes.of_string m))
-      (fun ((), m) -> RawData (Bytes.to_string m))
+      (function Raw_data m -> Some ((), Bytes.of_string m))
+      (fun ((), m) -> Raw_data (Bytes.to_string m))
   in
   union [case_raw_data]
 
@@ -129,7 +129,7 @@ let inbox_message_equal a b =
   && String.equal (payload :> string) (b.payload :> string)
 
 let reveal_data_equal a b =
-  match (a, b) with RawData a, RawData b -> String.equal a b
+  match (a, b) with Raw_data a, Raw_data b -> String.equal a b
 
 let input_equal a b =
   match (a, b) with
@@ -151,7 +151,7 @@ module Input_hash =
       let size = Some 20
     end)
 
-type reveal = RevealRawData of Input_hash.t
+type reveal = Reveal_raw_data of Input_hash.t
 
 let reveal_encoding =
   let open Data_encoding in
@@ -162,8 +162,8 @@ let reveal_encoding =
       (obj2
          (req "reveal_kind" (constant "reveal_raw_data"))
          (req "input_hash" Input_hash.encoding))
-      (function RevealRawData s -> Some ((), s))
-      (fun ((), s) -> RevealRawData s)
+      (function Reveal_raw_data s -> Some ((), s))
+      (fun ((), s) -> Reveal_raw_data s)
   in
   union [case_raw_data]
 
@@ -224,7 +224,7 @@ let input_request_encoding =
         (fun ((), p) -> Needs_reveal p);
     ]
 
-let pp_reveal fmt (RevealRawData hash) = Input_hash.pp fmt hash
+let pp_reveal fmt (Reveal_raw_data hash) = Input_hash.pp fmt hash
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -245,7 +245,7 @@ let pp_input_request fmt request =
 
 let reveal_equal p1 p2 =
   match (p1, p2) with
-  | RevealRawData h1, RevealRawData h2 -> Input_hash.equal h1 h2
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Input_hash.equal h1 h2
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =

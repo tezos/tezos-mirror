@@ -867,7 +867,7 @@ module Make (Context : P) :
         let* h = Required_reveal.get in
         match h with
         | None -> internal_error "Internal error: Reveal invariant broken"
-        | Some h -> return (PS.Needs_reveal (RevealRawData h)))
+        | Some h -> return (PS.Needs_reveal (Reveal_raw_data h)))
     | _ -> return PS.No_input_required
 
   let is_input_state =
@@ -927,7 +927,7 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
 
-  let reveal_monadic (PS.RawData data) =
+  let reveal_monadic (PS.Raw_data data) =
     (*
 
        The inbox cursor is unchanged as the message comes from the

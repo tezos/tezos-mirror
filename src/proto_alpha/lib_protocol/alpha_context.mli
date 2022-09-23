@@ -2981,7 +2981,7 @@ module Sc_rollup : sig
     payload : Inbox_message.serialized;
   }
 
-  type reveal_data = RawData of string
+  type reveal_data = Raw_data of string
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -2991,7 +2991,7 @@ module Sc_rollup : sig
 
   module Input_hash : S.HASH
 
-  type reveal = RevealRawData of Input_hash.t
+  type reveal = Reveal_raw_data of Input_hash.t
 
   type input_request =
     | No_input_required
@@ -3482,7 +3482,7 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type reveal_proof = RawDataProof of string
+    type reveal_proof = Raw_data_proof of string
 
     type input_proof =
       | Inbox_proof of {
