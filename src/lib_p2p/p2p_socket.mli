@@ -108,7 +108,7 @@ val private_node : ('msg, 'meta) t -> bool
     - [P2p_errors.Connection_closed] if the remote peer closes the connection *)
 val authenticate :
   canceler:Lwt_canceler.t ->
-  proof_of_work_target:Crypto_box.pow_target ->
+  proof_of_work_target:Tezos_crypto.Crypto_box.pow_target ->
   incoming:bool ->
   P2p_io_scheduler.connection ->
   P2p_point.Id.t ->

@@ -282,7 +282,7 @@ module Peers : sig
     val patch :
       ( [`PATCH],
         unit,
-        unit * Crypto_box.Public_key_hash.t,
+        unit * Tezos_crypto.Crypto_box.Public_key_hash.t,
         unit,
         [`Ban | `Open | `Trust] option,
         (Peer_metadata.t, Connection_metadata.t) P2p_peer.Info.t )

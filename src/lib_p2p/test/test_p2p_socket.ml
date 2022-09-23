@@ -43,7 +43,7 @@ let tzassert b pos =
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
   if b then return_unit else fail_with_exn (Assert_failure (p pos))
 
-let high_pow_target = Crypto_box.make_pow_target 100.
+let high_pow_target = Tezos_crypto.Crypto_box.make_pow_target 100.
 
 let sync ch =
   let open Lwt_result_syntax in
@@ -91,7 +91,7 @@ module Crypto_test = struct
   let header_length = 2
 
   (* The size of extra data added by encryption. *)
-  let tag_length = Crypto_box.tag_length
+  let tag_length = Tezos_crypto.Crypto_box.tag_length
 
   (* The number of bytes added by encryption + header *)
   let extrabytes = header_length + tag_length
@@ -99,9 +99,9 @@ module Crypto_test = struct
   let max_content_length = bufsize - extrabytes
 
   type data = {
-    channel_key : Crypto_box.channel_key;
-    mutable local_nonce : Crypto_box.nonce;
-    mutable remote_nonce : Crypto_box.nonce;
+    channel_key : Tezos_crypto.Crypto_box.channel_key;
+    mutable local_nonce : Tezos_crypto.Crypto_box.nonce;
+    mutable remote_nonce : Tezos_crypto.Crypto_box.nonce;
   }
 
   let () = assert (tag_length >= header_length)
@@ -119,8 +119,13 @@ module Crypto_test = struct
     let tag = Bytes.make tag_length '\x00' in
     let cmsg = Bytes.copy msg in
     let local_nonce = cryptobox_data.local_nonce in
-    cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
-    Crypto_box.fast_box_noalloc cryptobox_data.channel_key local_nonce tag cmsg ;
+    cryptobox_data.local_nonce <-
+      Tezos_crypto.Crypto_box.increment_nonce local_nonce ;
+    Tezos_crypto.Crypto_box.fast_box_noalloc
+      cryptobox_data.channel_key
+      local_nonce
+      tag
+      cmsg ;
     let payload = Bytes.make payload_length '\x00' in
     TzEndian.set_int16 payload 0 encrypted_length ;
     Bytes.blit tag 0 payload header_length tag_length ;
@@ -146,10 +151,11 @@ module Crypto_test = struct
     in
     let* () = tzassert (msg_length = i) __POS__ in
     let remote_nonce = cryptobox_data.remote_nonce in
-    cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
+    cryptobox_data.remote_nonce <-
+      Tezos_crypto.Crypto_box.increment_nonce remote_nonce ;
     let*? () =
       error_unless
-        (Crypto_box.fast_box_open_noalloc
+        (Tezos_crypto.Crypto_box.fast_box_open_noalloc
            cryptobox_data.channel_key
            remote_nonce
            tag
@@ -158,11 +164,11 @@ module Crypto_test = struct
     in
     return msg
 
-  let sk, pk, _pkh = Crypto_box.random_keypair ()
+  let sk, pk, _pkh = Tezos_crypto.Crypto_box.random_keypair ()
 
-  let zero_nonce = Crypto_box.zero_nonce
+  let zero_nonce = Tezos_crypto.Crypto_box.zero_nonce
 
-  let channel_key = Crypto_box.precompute sk pk
+  let channel_key = Tezos_crypto.Crypto_box.precompute sk pk
 
   let in_fd, out_fd = Unix.pipe ()
 
@@ -215,7 +221,7 @@ end
     and identical.
 *)
 module Low_level = struct
-  let simple_msg = Rand.generate (1 lsl 4)
+  let simple_msg = Tezos_crypto.Rand.generate (1 lsl 4)
 
   let client ch sched addr port =
     let open Lwt_result_syntax in
@@ -317,9 +323,9 @@ end
 module Simple_message = struct
   let encoding = Data_encoding.bytes
 
-  let simple_msg = Rand.generate (1 lsl 4)
+  let simple_msg = Tezos_crypto.Rand.generate (1 lsl 4)
 
-  let simple_msg2 = Rand.generate (1 lsl 4)
+  let simple_msg2 = Tezos_crypto.Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     let open Lwt_result_syntax in
@@ -355,9 +361,9 @@ end
 module Chunked_message = struct
   let encoding = Data_encoding.bytes
 
-  let simple_msg = Rand.generate (1 lsl 8)
+  let simple_msg = Tezos_crypto.Rand.generate (1 lsl 8)
 
-  let simple_msg2 = Rand.generate (1 lsl 8)
+  let simple_msg2 = Tezos_crypto.Rand.generate (1 lsl 8)
 
   let server ch sched socket =
     let open Lwt_result_syntax in
@@ -396,7 +402,7 @@ module Oversized_message = struct
   let encoding = Data_encoding.bytes
 
   let rec rand_gen () =
-    try Rand.generate (1 lsl 17)
+    try Tezos_crypto.Rand.generate (1 lsl 17)
     with _ ->
       log_error "Not enough entropy, retrying to generate random data" ;
       rand_gen ()
@@ -467,7 +473,7 @@ end
 module Close_on_write = struct
   let encoding = Data_encoding.bytes
 
-  let simple_msg = Rand.generate (1 lsl 4)
+  let simple_msg = Tezos_crypto.Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     let open Lwt_result_syntax in
