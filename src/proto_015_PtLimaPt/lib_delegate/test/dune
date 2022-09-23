@@ -6,12 +6,12 @@
  (libraries
   tezos-base
   tezos-micheline
-  tezos-client-alpha
-  tezos-protocol-alpha
+  tezos-client-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt
   tezos-base-test-helpers
-  tezos-baking-alpha.mockup-simulator
-  tezos-baking-alpha
-  tezos-protocol-alpha.parameters
+  tezos-baking-015-PtLimaPt.mockup-simulator
+  tezos-baking-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt.parameters
   tezos-crypto
   alcotest-lwt
   uri)
@@ -20,13 +20,13 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
-  -open Tezos_client_alpha
-  -open Tezos_protocol_alpha
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_protocol_015_PtLimaPt
   -open Tezos_base_test_helpers
-  -open Tezos_alpha_mockup_simulator
-  -open Tezos_baking_alpha))
+  -open Tezos_015_PtLimaPt_mockup_simulator
+  -open Tezos_baking_015_PtLimaPt))
 
 (rule
  (alias runtest)
- (package tezos-baking-alpha)
+ (package tezos-baking-015-PtLimaPt)
  (action (run %{dep:./main.exe})))

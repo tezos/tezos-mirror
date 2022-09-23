@@ -62,6 +62,21 @@
  (modules get_contracts_014_PtKathma))
 
 (executable
+ (name get_contracts_015_PtLimaPt)
+ (libraries
+  tezos-base
+  tezos-protocol-015-PtLimaPt
+  tezos-client-015-PtLimaPt
+  get_contracts)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_protocol_015_PtLimaPt.Protocol
+  -open Tezos_client_015_PtLimaPt)
+ (modules get_contracts_015_PtLimaPt))
+
+(executable
  (name get_contracts_alpha)
  (libraries
   tezos-base

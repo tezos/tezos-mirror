@@ -30,6 +30,9 @@ depends: [
   "tezos-client-014-PtKathma"
   "tezos-baking-014-PtKathma-commands"
   "tezos-protocol-plugin-014-PtKathma"
+  "tezos-client-015-PtLimaPt"
+  "tezos-baking-015-PtLimaPt-commands"
+  "tezos-protocol-plugin-015-PtLimaPt"
 ]
 depopts: [
   "tezos-client-genesis"

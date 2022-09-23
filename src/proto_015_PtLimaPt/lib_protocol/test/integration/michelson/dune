@@ -7,25 +7,25 @@
   alcotest-lwt
   tezos-base
   tezos-protocol-015-PtLimaPt
-  tezos-alpha-test-helpers
+  tezos-015-PtLimaPt-test-helpers
   tezos-base-test-helpers
-  tezos-client-alpha
+  tezos-client-015-PtLimaPt
   tezos-benchmark
   tezos-micheline
-  tezos-benchmark-alpha
-  tezos-benchmark-type-inference-alpha
+  tezos-benchmark-015-PtLimaPt
+  tezos-benchmark-type-inference-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_015_PtLimaPt
-  -open Tezos_alpha_test_helpers
+  -open Tezos_015_PtLimaPt_test_helpers
   -open Tezos_base_test_helpers
-  -open Tezos_client_alpha
+  -open Tezos_client_015_PtLimaPt
   -open Tezos_micheline
-  -open Tezos_benchmark_alpha
-  -open Tezos_benchmark_type_inference_alpha))
+  -open Tezos_benchmark_015_PtLimaPt
+  -open Tezos_benchmark_type_inference_015_PtLimaPt))
 
 (rule
  (alias runtest)

@@ -2,17 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_injector_alpha)
- (public_name tezos-injector-alpha)
+ (name tezos_injector_015_PtLimaPt)
+ (public_name tezos-injector-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
   tezos-crypto
-  tezos-protocol-alpha
+  tezos-protocol-015-PtLimaPt
   tezos-micheline
-  tezos-client-alpha
+  tezos-client-015-PtLimaPt
   tezos-client-base
   tezos-workers
   tezos-shell)
@@ -26,8 +26,8 @@
   -open Tezos_base
   -open Tezos_stdlib_unix
   -open Tezos_crypto
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_015_PtLimaPt
   -open Tezos_micheline
-  -open Tezos_client_alpha
+  -open Tezos_client_015_PtLimaPt
   -open Tezos_client_base
   -open Tezos_workers))

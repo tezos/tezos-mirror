@@ -8,16 +8,16 @@
   tezos-base
   tezos-protocol-015-PtLimaPt
   qcheck-alcotest
-  tezos-client-alpha
-  tezos-alpha-test-helpers
+  tezos-client-015-PtLimaPt
+  tezos-015-PtLimaPt-test-helpers
   tezos-base-test-helpers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_protocol_015_PtLimaPt
-  -open Tezos_client_alpha
-  -open Tezos_alpha_test_helpers
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_015_PtLimaPt_test_helpers
   -open Tezos_base_test_helpers))
 
 (rule

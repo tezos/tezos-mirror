@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_sapling_alpha)
- (public_name tezos-client-alpha.sapling)
+ (name tezos_client_sapling_015_PtLimaPt)
+ (public_name tezos-client-015-PtLimaPt.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -11,10 +11,10 @@
   tezos-stdlib-unix
   tezos-client-base
   tezos-signer-backends
-  tezos-client-alpha
-  tezos-client-alpha.commands
-  tezos-protocol-alpha
-  tezos-protocol-plugin-alpha)
+  tezos-client-015-PtLimaPt
+  tezos-client-015-PtLimaPt.commands
+  tezos-protocol-015-PtLimaPt
+  tezos-protocol-plugin-015-PtLimaPt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,7 +22,7 @@
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_stdlib_unix
   -open Tezos_client_base
-  -open Tezos_client_alpha
-  -open Tezos_client_alpha_commands
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_plugin_alpha))
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_client_015_PtLimaPt_commands
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_protocol_plugin_015_PtLimaPt))

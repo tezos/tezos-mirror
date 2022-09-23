@@ -2,13 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_client_alpha_commands)
- (public_name tezos-client-alpha.commands)
+ (name tezos_client_015_PtLimaPt_commands)
+ (public_name tezos-client-015-PtLimaPt.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha
-  tezos-protocol-alpha.parameters
+  tezos-protocol-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt.parameters
   tezos-stdlib-unix
   tezos-protocol-environment
   tezos-shell-services
@@ -16,57 +16,57 @@
   tezos-mockup-registration
   tezos-mockup-commands
   tezos-client-base
-  tezos-client-alpha
+  tezos-client-015-PtLimaPt
   tezos-client-commands
   tezos-rpc
   tezos-client-base-unix
-  tezos-protocol-plugin-alpha
+  tezos-protocol-plugin-015-PtLimaPt
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_protocol_015_PtLimaPt_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_015_PtLimaPt
   -open Tezos_client_commands
   -open Tezos_rpc
   -open Tezos_client_base_unix
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_protocol_plugin_015_PtLimaPt)
  (modules (:standard \ alpha_commands_registration)))
 
 (library
- (name tezos_client_alpha_commands_registration)
- (public_name tezos-client-alpha.commands-registration)
+ (name tezos_client_015_PtLimaPt_commands_registration)
+ (public_name tezos-client-015-PtLimaPt.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha
-  tezos-protocol-alpha.parameters
+  tezos-protocol-015-PtLimaPt
+  tezos-protocol-015-PtLimaPt.parameters
   tezos-protocol-environment
   tezos-shell-services
   tezos-client-base
-  tezos-client-alpha
+  tezos-client-015-PtLimaPt
   tezos-client-commands
-  tezos-client-alpha.commands
-  tezos-client-alpha.sapling
+  tezos-client-015-PtLimaPt.commands
+  tezos-client-015-PtLimaPt.sapling
   tezos-rpc
-  tezos-protocol-plugin-alpha)
+  tezos-protocol-plugin-015-PtLimaPt)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_alpha
-  -open Tezos_protocol_alpha_parameters
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_protocol_015_PtLimaPt_parameters
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_alpha
+  -open Tezos_client_015_PtLimaPt
   -open Tezos_client_commands
-  -open Tezos_client_alpha_commands
-  -open Tezos_client_sapling_alpha
+  -open Tezos_client_015_PtLimaPt_commands
+  -open Tezos_client_sapling_015_PtLimaPt
   -open Tezos_rpc
-  -open Tezos_protocol_plugin_alpha)
+  -open Tezos_protocol_plugin_015_PtLimaPt)
  (modules alpha_commands_registration))

@@ -14,6 +14,7 @@
   tezos-protocol-012-Psithaca
   tezos-protocol-013-PtJakart
   tezos-protocol-014-PtKathma
+  tezos-protocol-015-PtLimaPt
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
  (flags

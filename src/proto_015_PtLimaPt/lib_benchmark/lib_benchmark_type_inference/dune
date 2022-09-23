@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_benchmark_type_inference_alpha)
- (public_name tezos-benchmark-type-inference-alpha)
+ (name tezos_benchmark_type_inference_015_PtLimaPt)
+ (public_name tezos-benchmark-type-inference-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-stdlib
@@ -11,7 +11,7 @@
   tezos-crypto
   tezos-micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha
+  tezos-protocol-015-PtLimaPt
   hashcons)
  (flags
   (:standard)
@@ -19,4 +19,4 @@
   -open Tezos_error_monad
   -open Tezos_micheline
   -open Tezos_micheline_rewriting
-  -open Tezos_protocol_alpha))
+  -open Tezos_protocol_015_PtLimaPt))

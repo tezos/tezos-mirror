@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_alpha_test_helpers)
- (public_name tezos-alpha-test-helpers)
+ (name tezos_015_PtLimaPt_test_helpers)
+ (public_name tezos-015-PtLimaPt-test-helpers)
  (instrumentation (backend bisect_ppx))
  (libraries
   alcotest-lwt
@@ -13,10 +13,10 @@
   tezos-micheline
   tezos-stdlib-unix
   tezos-protocol-015-PtLimaPt
-  tezos-client-alpha
+  tezos-client-015-PtLimaPt
   tezos-protocol-015-PtLimaPt.parameters
   tezos-protocol-environment
-  tezos-protocol-plugin-alpha
+  tezos-protocol-plugin-015-PtLimaPt
   tezos-shell-services
   tezos-plompiler)
  (flags
@@ -26,6 +26,6 @@
   -open Tezos_micheline
   -open Tezos_stdlib_unix
   -open Tezos_protocol_015_PtLimaPt
-  -open Tezos_client_alpha
-  -open Tezos_protocol_plugin_alpha
+  -open Tezos_client_015_PtLimaPt
+  -open Tezos_protocol_plugin_015_PtLimaPt
   -open Tezos_shell_services))

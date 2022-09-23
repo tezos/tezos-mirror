@@ -2,17 +2,17 @@
 ; Edit file manifest/main.ml instead.
 
 (executable
- (name main_tx_rollup_node_alpha)
- (public_name tezos-tx-rollup-node-alpha)
- (package tezos-tx-rollup-node-alpha)
+ (name main_tx_rollup_node_015_PtLimaPt)
+ (public_name tezos-tx-rollup-node-015-PtLimaPt)
+ (package tezos-tx-rollup-node-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-alpha
-  tezos-client-alpha
+  tezos-protocol-015-PtLimaPt
+  tezos-client-015-PtLimaPt
   tezos-client-base
   tezos-client-base-unix
-  tezos-tx-rollup-alpha)
+  tezos-tx-rollup-015-PtLimaPt)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
@@ -21,8 +21,8 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_base
-  -open Tezos_protocol_alpha
-  -open Tezos_client_alpha
+  -open Tezos_protocol_015_PtLimaPt
+  -open Tezos_client_015_PtLimaPt
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_tx_rollup_alpha))
+  -open Tezos_tx_rollup_015_PtLimaPt))

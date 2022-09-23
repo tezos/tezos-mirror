@@ -11,11 +11,11 @@
   tezos-base
   tezos-micheline
   tezos-micheline-rewriting
-  tezos-protocol-alpha
+  tezos-protocol-015-PtLimaPt
   tezos-benchmark
-  tezos-benchmark-type-inference-alpha
-  tezos-benchmark-alpha
-  tezos-alpha-test-helpers
+  tezos-benchmark-type-inference-015-PtLimaPt
+  tezos-benchmark-015-PtLimaPt
+  tezos-015-PtLimaPt-test-helpers
   tezos-error-monad
   alcotest-lwt
   prbnmcn-stats)
@@ -23,11 +23,11 @@
   (:standard)
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
   -open Tezos_micheline
-  -open Tezos_protocol_alpha
+  -open Tezos_protocol_015_PtLimaPt
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_benchmark_alpha
-  -open Tezos_alpha_test_helpers))
+  -open Tezos_benchmark_type_inference_015_PtLimaPt
+  -open Tezos_benchmark_015_PtLimaPt
+  -open Tezos_015_PtLimaPt_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)
