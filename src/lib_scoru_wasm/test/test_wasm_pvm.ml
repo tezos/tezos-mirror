@@ -697,7 +697,8 @@ let test_rebuild_snapshotable_state () =
   (* Both hash should be exactly the same. *)
   let hash_tree_after_eval = Test_encodings_util.Tree.hash tree_after_eval in
   let hash_rebuilded_tree = Test_encodings_util.Tree.hash rebuilded_tree in
-  assert (Context_hash.equal hash_tree_after_eval hash_rebuilded_tree) ;
+  assert (
+    Tezos_crypto.Context_hash.equal hash_tree_after_eval hash_rebuilded_tree) ;
 
   (* The hash of the tree rebuilded from the evaluated one without the "wasm"
      part should also be exactly the same. *)
@@ -705,7 +706,9 @@ let test_rebuild_snapshotable_state () =
     Test_encodings_util.Tree.hash rebuilded_tree_without_wasm
   in
   assert (
-    Context_hash.equal hash_tree_after_eval hash_rebuilded_tree_without_wasm) ;
+    Tezos_crypto.Context_hash.equal
+      hash_tree_after_eval
+      hash_rebuilded_tree_without_wasm) ;
 
   (* To be sure, let's try to evaluate a new input from these two, either by the
      regular tree or the snapshoted one. *)
@@ -726,7 +729,9 @@ let test_rebuild_snapshotable_state () =
   in
 
   assert (
-    Context_hash.equal hash_input_tree_after_eval hash_input_rebuilded_tree) ;
+    Tezos_crypto.Context_hash.equal
+      hash_input_tree_after_eval
+      hash_input_rebuilded_tree) ;
   return_unit
 
 let test_unkown_host_function_truncated () =
@@ -794,7 +799,8 @@ let test_bulk_noops () =
     let* tree_fast, _ = Wasm.compute_step_many ~max_steps:ticks base_tree in
     let* tree_slow = Wasm.compute_step tree_slow in
     assert (
-      Context_hash.(Test_encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
+      Tezos_crypto.Context_hash.(
+        Test_encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
 
     let* stuck_flag = has_stuck_flag tree_fast in
     assert (not stuck_flag) ;

@@ -83,7 +83,7 @@ let test_against_both ~from_binary ~kernel ~messages =
   let* fast_hashes = run_with apply_fast in
   let* slow_hashes = run_with (fun _ tree -> apply_slow tree) in
 
-  assert (List.equal Context_hash.equal slow_hashes fast_hashes) ;
+  assert (List.equal Tezos_crypto.Context_hash.equal slow_hashes fast_hashes) ;
 
   Lwt_result_syntax.return_unit
 

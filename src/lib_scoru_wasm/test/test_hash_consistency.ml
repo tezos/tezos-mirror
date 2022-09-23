@@ -50,7 +50,8 @@ let test_execution_correspondance skip count () =
         let*! tree_ref, _ = Wasm.compute_step_many ~max_steps:n tree in
         let*! tree' = Wasm.compute_step tree' in
         assert (
-          Context_hash.(Context.Tree.hash tree_ref = Context.Tree.hash tree')) ;
+          Tezos_crypto.Context_hash.(
+            Context.Tree.hash tree_ref = Context.Tree.hash tree')) ;
         if n < count then explore tree' (Int64.succ n) else return_unit
       in
       explore tree 1L)
