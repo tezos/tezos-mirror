@@ -44,8 +44,27 @@ module Wasm_2_0_0_proof_format =
         .tree_proof_encoding
     end)
 
+module type TreeS =
+  Tezos_context_sigs.Context.TREE
+    with type key = string list
+     and type value = bytes
+
+module Make_backend (Tree : TreeS) = struct
+  type Lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+
+  include Tezos_scoru_wasm.Wasm_pvm.Make (struct
+    include Tree
+
+    let select = function
+      | PVM_tree t -> t
+      | _ -> raise Tree_encoding.Incorrect_tree_type
+
+    let wrap t = PVM_tree t
+  end)
+end
+
 module Impl : Pvm.S = struct
-  include Sc_rollup.Wasm_2_0_0PVM.Make (Wasm_2_0_0_proof_format)
+  include Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
   module State = Context.PVMState
 
   let string_of_status : status -> string = function

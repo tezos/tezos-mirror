@@ -98,7 +98,7 @@ module Wasm_pvm :
      and type proof =
       Tezos_context_memory.Context.Proof.tree
       Tezos_context_memory.Context.Proof.t =
-  Sc_rollup.Wasm_2_0_0PVM.Make (In_memory_context)
+  Sc_rollup.Wasm_2_0_0PVM.Make (Environment.Wasm_2_0_0.Make) (In_memory_context)
 
 let origination_proof ~boot_sector = function
   | Sc_rollup.Kind.Example_arith ->

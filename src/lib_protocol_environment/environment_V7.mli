@@ -102,6 +102,13 @@ module type T = sig
         * Tezos_protocol_environment_structs.V7.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.Verifier.commitment
+       and type Bounded.Non_negative_int32.t =
+        Tezos_base.Bounded.Non_negative_int32.t
+       and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info
+       and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_sig.output_info
+       and type Wasm_2_0_0.input_request =
+        Tezos_scoru_wasm.Wasm_pvm_sig.input_request
+       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_sig.info
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 

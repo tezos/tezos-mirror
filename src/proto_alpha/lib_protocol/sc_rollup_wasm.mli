@@ -83,8 +83,10 @@ module V2_0_0 : sig
       Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
   end
 
+  module type Make_wasm = module type of Wasm_2_0_0.Make
+
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
-  module Make (Context : P) :
+  module Make (Lib_scoru_Wasm : Make_wasm) (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree

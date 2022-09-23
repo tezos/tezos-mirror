@@ -108,7 +108,10 @@ end
 
 module Verifier = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Protocol_implementation
 
-module Prover = Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make (WASM_P)
+module Prover =
+  Alpha_context.Sc_rollup.Wasm_2_0_0PVM.Make
+    (Environment.Wasm_2_0_0.Make)
+    (WASM_P)
 (* Helpers *)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2198

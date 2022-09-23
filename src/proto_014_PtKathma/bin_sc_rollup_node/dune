@@ -31,7 +31,8 @@
   irmin
   ringo
   ringo-lwt
-  tezos-injector-014-PtKathma)
+  tezos-injector-014-PtKathma
+  tezos-scoru-wasm)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))

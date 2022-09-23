@@ -32,7 +32,8 @@
   irmin
   ringo
   ringo-lwt
-  tezos-injector-alpha)
+  tezos-injector-alpha
+  tezos-scoru-wasm)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp))
