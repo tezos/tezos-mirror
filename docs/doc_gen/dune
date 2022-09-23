@@ -8,6 +8,7 @@
             tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-embedded-protocol-014-PtKathma
+            tezos-embedded-protocol-015-PtLimaPt
             tezos-embedded-protocol-alpha
             data-encoding
             re)
