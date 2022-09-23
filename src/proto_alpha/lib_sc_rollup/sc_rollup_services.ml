@@ -86,7 +86,7 @@ module Global = struct
     RPC_service.get_service
       ~description:"Current inbox"
       ~query:RPC_query.empty
-      ~output:Sc_rollup.Inbox.encoding
+      ~output:(Data_encoding.option Sc_rollup.Inbox.encoding)
       (prefix / "inbox")
 
   let current_ticks =

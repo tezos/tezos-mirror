@@ -147,7 +147,7 @@ module Common = struct
       (fun () () -> get_head_level_opt store >>= return)
 
   let register_current_inbox node_ctxt dir =
-    RPC_directory.opt_register0
+    RPC_directory.register0
       dir
       Sc_rollup_services.Global.current_inbox
       (fun () () ->
