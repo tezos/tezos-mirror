@@ -556,6 +556,14 @@ val show_address : alias:string -> t -> Account.key Lwt.t
     (which also implies that there is no output key to parse). *)
 val spawn_show_address : alias:string -> t -> Process.t
 
+(** Run [tezos-client list known addresses] and parse the output into
+    a association list from aliases to public key hashes. *)
+val list_known_addresses : t -> (string * string) list Lwt.t
+
+(** Same as [list_known_addresses] but do not wait for the process to
+    exit. *)
+val spawn_list_known_addresses : t -> Process.t
+
 (** Run [tezos-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
