@@ -862,6 +862,9 @@ let run_with_scheduler scheduler =
          @ List.map
              (fun x -> "--title " ^ Log.quote_shell x)
              Cli.options.tests_to_run
+         @ List.map
+             (fun r -> "--match " ^ Log.quote_shell (show_rex r))
+             Cli.options.patterns_to_run
          @ Cli.options.tags_to_run
          @ List.map (sf "/%s") Cli.options.tags_not_to_run)) ;
     if Cli.options.list = None then
