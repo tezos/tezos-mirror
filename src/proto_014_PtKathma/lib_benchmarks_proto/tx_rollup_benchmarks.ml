@@ -220,8 +220,8 @@ module Prover_context = Tx_rollup_l2_context.Make (Prover_storage)
 module Prover_apply = Tx_rollup_l2_apply.Make (Prover_context)
 
 type address = {
-  sk : Bls12_381.Signature.sk;
-  pk : Bls12_381.Signature.MinPk.pk;
+  sk : Bls12_381_signature.sk;
+  pk : Bls12_381_signature.MinPk.pk;
   addr : Tx_rollup_l2_address.t;
   index : Tx_rollup_l2_context_sig.address_index;
   mutable counter : int;
@@ -250,8 +250,8 @@ let unique_ticket_id =
 
 let gen_l2_account rng_state =
   let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
+  let secret_key = Bls12_381_signature.generate_sk seed in
+  let public_key = Bls12_381_signature.MinPk.derive_pk secret_key in
   (secret_key, public_key)
 
 let hash_key_exn ctxt ~ticketer ~typ ~contents ~owner =
@@ -494,10 +494,10 @@ let make_msg ~rng_state input nb_op =
       transaction
   in
   let signatures =
-    List.map (fun sk -> Bls12_381.Signature.MinPk.Aug.sign sk buf) signers
+    List.map (fun sk -> Bls12_381_signature.MinPk.Aug.sign sk buf) signers
   in
   let aggregated_signature =
-    match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+    match Bls12_381_signature.MinPk.aggregate_signature_opt signatures with
     | Some res -> res
     | None -> assert false
   in

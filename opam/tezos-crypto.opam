@@ -20,7 +20,8 @@ depends: [
   "ringo" { >= "0.9" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "bls12-381" { >= "4.0.0" & < "4.1.0" }
+  "bls12-381" { >= "5.0.0" & < "5.1.0" }
+  "bls12-381-signature" { = "1.0.0" }
   "alcotest" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.18" }
   "tezos-test-helpers" {with-test}
