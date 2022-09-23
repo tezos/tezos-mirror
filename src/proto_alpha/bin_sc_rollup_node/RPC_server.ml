@@ -167,30 +167,6 @@ module Common = struct
         let open Lwt_result_syntax in
         let* state = get_state_info_exn store in
         return state.num_ticks)
-
-  let start configuration dir =
-    let open Lwt_result_syntax in
-    let Configuration.{rpc_addr; rpc_port; _} = configuration in
-    let rpc_addr = P2p_addr.of_string_exn rpc_addr in
-    let host = Ipaddr.V6.to_string rpc_addr in
-    let node = `TCP (`Port rpc_port) in
-    let acl = RPC_server.Acl.default rpc_addr in
-    let server =
-      RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
-    in
-    Lwt.catch
-      (fun () ->
-        let*! () =
-          RPC_server.launch
-            ~host
-            server
-            ~callback:(RPC_server.resto_callback server)
-            node
-        in
-        return server)
-      fail_with_exn
-
-  let shutdown = RPC_server.shutdown
 end
 
 module type S = sig
@@ -205,7 +181,6 @@ module type S = sig
 end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
-  include Common
   module PVM = PVM
   module Outbox = Outbox.Make (PVM)
 
@@ -374,5 +349,27 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_dal_slot_page node_ctxt.store
 
   let start node_ctxt configuration =
-    Common.start configuration (register node_ctxt configuration)
+    let open Lwt_result_syntax in
+    let Configuration.{rpc_addr; rpc_port; _} = configuration in
+    let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+    let host = Ipaddr.V6.to_string rpc_addr in
+    let node = `TCP (`Port rpc_port) in
+    let acl = RPC_server.Acl.default rpc_addr in
+    let dir = register node_ctxt configuration in
+    let server =
+      RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
+    in
+    Lwt.catch
+      (fun () ->
+        let*! () =
+          RPC_server.launch
+            ~host
+            server
+            ~callback:(RPC_server.resto_callback server)
+            node
+        in
+        return server)
+      fail_with_exn
+
+  let shutdown = RPC_server.shutdown
 end
