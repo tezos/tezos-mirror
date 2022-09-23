@@ -33,6 +33,7 @@ type t = {
       (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt;
       (** Client context to query the dal node. *)
+  data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;
@@ -72,7 +73,7 @@ val is_operator : t -> Signature.Public_key_hash.t -> bool
 *)
 val get_fee_parameter : t -> Configuration.purpose -> Injection.fee_parameter
 
-(** [init cctxt dal_cctxt l1_ctxt sc_rollup genesis_info kind operators fees
+(** [init cctxt dal_cctxt ~data_dir l1_ctxt sc_rollup genesis_info kind operators fees
     ~loser_mode store context] initialises the rollup representation. The rollup
     origination level and kind are fetched via an RPC call to the layer1 node
     that [cctxt] uses for RPC requests.
@@ -80,6 +81,7 @@ val get_fee_parameter : t -> Configuration.purpose -> Injection.fee_parameter
 val init :
   Protocol_client_context.full ->
   Dal_node_client.cctxt ->
+  data_dir:string ->
   Layer1.t ->
   Sc_rollup.t ->
   Protocol.Alpha_context.Sc_rollup.Kind.t ->

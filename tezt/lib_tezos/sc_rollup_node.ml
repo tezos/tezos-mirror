@@ -163,6 +163,22 @@ module Config_file = struct
   let update sc_node update = read sc_node |> update |> write sc_node
 end
 
+let spawn_import sc_node ~pvm_name ~filename =
+  spawn_command sc_node
+  @@ [
+       "import";
+       "--data-dir";
+       data_dir sc_node;
+       "--pvm-name";
+       pvm_name;
+       "--filename";
+       filename;
+     ]
+
+let import sc_node ~pvm_name ~filename =
+  let process = spawn_import sc_node ~pvm_name ~filename in
+  Process.check_and_read_stdout process
+
 let trigger_ready sc_node value =
   let pending = sc_node.persistent_state.pending_ready in
   sc_node.persistent_state.pending_ready <- [] ;

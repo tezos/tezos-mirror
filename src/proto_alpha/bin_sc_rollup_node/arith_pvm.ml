@@ -52,6 +52,7 @@ module Impl : Pvm.S = struct
     match status with
     | Halted -> "Halted"
     | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal -> "Waiting for reveal"
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 end

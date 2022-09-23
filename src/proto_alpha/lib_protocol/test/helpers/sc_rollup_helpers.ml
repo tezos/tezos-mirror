@@ -184,7 +184,7 @@ let make_external_inbox_message_repr str =
 
 let make_input_repr ?(inbox_level = Raw_level_repr.root)
     ?(message_counter = Z.zero) message =
-  Sc_rollup_PVM_sig.
+  Sc_rollup_PVM_sig.Inbox_message
     {
       inbox_level;
       message_counter;
@@ -198,7 +198,7 @@ let make_external_inbox_message str =
 
 let make_input ?(inbox_level = Raw_level.root) ?(message_counter = Z.zero)
     message =
-  Sc_rollup.
+  Sc_rollup.Inbox_message
     {
       inbox_level;
       message_counter;

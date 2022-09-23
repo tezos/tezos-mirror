@@ -23,15 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module implements the refutation game logic of the rollup
-    node. *)
-module type S = sig
-  module PVM : Pvm.S
+(** This module provides basic support for reveals.
 
-  (** [process head config node_ctxt] reacts to any operations of
-      [head] related to refutation games. *)
-  val process :
-    Layer1.head -> Configuration.t -> Node_context.t -> unit tzresult Lwt.t
-end
+    The rollup can ask for data being the reveal of some hash. This
+    allows transferring data directly to the rollup without going
+    through the L1 inbox.
 
-module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM
+    Data length must be under 4KB to be refutable in a single L1
+    operation.
+
+    Data must be made available by off-chain mechanisms: it is the
+    responsibility of the rollup kernel to make sure that the reveal
+    data is available: otherwise, there is a potential safety issue.
+
+    For the moment, the support is basic and mostly manual as the operator
+    needs to explicitly import a file in the rollup node data directoy to
+    enable the rollup node to answer reveal requests.
+
+*)
+
+(* FIXME:https://gitlab.com/tezos/tezos/-/issues/3854
+
+   We should probably have a mechanism to let the kernel declare
+   sources of reveal data so that the rollup node can automatically
+   download data in advance. *)
+
+open Protocol.Alpha_context
+
+(** [get ~data_dir ~pvm_name ~hash] returns [Some data] such that
+    [Input_hash.hash_string [data] = hash]. If such [data] is known
+    to the rollup node. Otherwise, returns [None]. *)
+val get :
+  data_dir:string ->
+  pvm_name:string ->
+  hash:Sc_rollup.Input_hash.t ->
+  string option
+
+(** [import ~data_dir ~pvm_name ~filename] turns the content of ~filename
+    into a chunk of pages of (at most) 4KB, returning the hash of the first
+    chunk. *)
+val import :
+  data_dir:string ->
+  pvm_name:string ->
+  filename:string ->
+  Sc_rollup.Input_hash.t

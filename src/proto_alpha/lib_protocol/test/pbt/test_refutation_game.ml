@@ -910,7 +910,8 @@ module Arith_test_pvm = struct
   let mk_input level message_counter msg =
     let payload = make_external_inbox_message msg in
     let level = Int32.of_int level in
-    {payload; message_counter; inbox_level = Raw_level.of_int32_exn level}
+    Sc_rollup.Inbox_message
+      {payload; message_counter; inbox_level = Raw_level.of_int32_exn level}
 
   let consume_fuel = Option.map pred
 
@@ -1312,6 +1313,8 @@ let build_proof ~player_client start_tick (game : Game.t) =
     let context = inbox_context
 
     let state = state
+
+    let reveal _ = assert false
 
     module Inbox_with_history = struct
       include Store_inbox

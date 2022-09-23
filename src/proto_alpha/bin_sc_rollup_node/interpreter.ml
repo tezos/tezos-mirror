@@ -53,7 +53,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let consume_fuel = Option.map pred
 
   let continue_with_fuel fuel state f =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     match fuel with
     | Some 0 -> return (state, fuel)
     | _ -> f (consume_fuel fuel) state
@@ -65,23 +65,23 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       some [message_index] at a given [level] and this is the
       [start_tick] of this message processing. If some [failing_ticks]
       are planned by the loser mode, they will be made. *)
-  let eval_until_input level message_index ~fuel start_tick failing_ticks state
-      =
-    let open Lwt_syntax in
+  let eval_until_input data_dir level message_index ~fuel start_tick
+      failing_ticks state =
+    let open Lwt_result_syntax in
     let eval_tick tick failing_ticks state =
       let normal_eval state =
-        let* state = PVM.eval state in
+        let*! state = PVM.eval state in
         return (state, failing_ticks)
       in
       let failure_insertion_eval state failing_ticks' =
-        let* () =
+        let*! () =
           Interpreter_event.intended_failure
             ~level
             ~message_index
             ~message_tick:tick
             ~internal:true
         in
-        let* state = PVM.Internal_for_tests.insert_failure state in
+        let*! state = PVM.Internal_for_tests.insert_failure state in
         return (state, failing_ticks')
       in
       match failing_ticks with
@@ -90,7 +90,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       | _ -> normal_eval state
     in
     let rec go fuel tick failing_ticks state =
-      let* input_request = PVM.is_input_state state in
+      let*! input_request = PVM.is_input_state state in
       match fuel with
       | Some 0 -> return (state, fuel, tick, failing_ticks)
       | None | Some _ -> (
@@ -100,6 +100,15 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                 eval_tick tick failing_ticks state
               in
               go (consume_fuel fuel) (tick + 1) failing_ticks next_state
+          | Needs_reveal (Reveal_raw_data hash) -> (
+              match Reveals.get ~data_dir ~pvm_name:PVM.name ~hash with
+              | None ->
+                  tzfail (Sc_rollup_node_errors.Cannot_retrieve_reveal hash)
+              | Some data ->
+                  let*! next_state =
+                    PVM.set_input (Reveal (Raw_data data)) state
+                  in
+                  go (consume_fuel fuel) (tick + 1) failing_ticks next_state)
           | _ -> return (state, fuel, tick, failing_ticks))
     in
     go fuel start_tick failing_ticks state
@@ -115,17 +124,17 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       step that requires an input. This function is controlled by
       some [fuel] and may introduce intended failures at some given
       [failing_ticks]. *)
-  let feed_input level message_index ~fuel ~failing_ticks state input =
-    let open Lwt_syntax in
+  let feed_input data_dir level message_index ~fuel ~failing_ticks state input =
+    let open Lwt_result_syntax in
     let* state, fuel, tick, failing_ticks =
-      eval_until_input level message_index ~fuel 0 failing_ticks state
+      eval_until_input data_dir level message_index ~fuel 0 failing_ticks state
     in
     continue_with_fuel fuel state @@ fun fuel state ->
     let* input, failing_ticks =
       match failing_ticks with
       | xtick :: failing_ticks' ->
           if xtick = tick then
-            let* () =
+            let*! () =
               Interpreter_event.intended_failure
                 ~level
                 ~message_index
@@ -136,13 +145,20 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           else return (input, failing_ticks)
       | _ -> return (input, failing_ticks)
     in
-    let* state = PVM.set_input input state in
+    let*! state = PVM.set_input (Inbox_message input) state in
     let* state, fuel, _tick, _failing_ticks =
-      eval_until_input level message_index ~fuel tick failing_ticks state
+      eval_until_input
+        data_dir
+        level
+        message_index
+        ~fuel
+        tick
+        failing_ticks
+        state
     in
     return (state, fuel)
 
-  let eval_block_inbox ?fuel failures store hash state =
+  let eval_block_inbox data_dir ?fuel failures store hash state =
     let open Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
     let*! inbox = Store.Inboxes.find store hash in
@@ -181,8 +197,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                   ~level
                   ~message_index:message_counter
               in
-              let*! state, fuel =
+              let* state, fuel =
                 feed_input
+                  data_dir
                   level
                   message_counter
                   ~fuel
@@ -226,6 +243,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let transition_pvm node_ctxt ctxt predecessor_hash (Layer1.Head {hash; level})
       =
     let open Lwt_result_syntax in
+    let data_dir = node_ctxt.Node_context.data_dir in
     (* Retrieve the previous PVM state from store. *)
     let pred_level = Int32.pred level |> Raw_level.of_int32_exn in
     let* ctxt, predecessor_state =
@@ -235,6 +253,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     let* state, num_messages, inbox_level, _fuel =
       eval_block_inbox
+        data_dir
         node_ctxt.loser_mode
         node_ctxt.store
         hash
@@ -303,6 +322,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     let* state, _counter, _level, _fuel =
       eval_block_inbox
+        node_ctxt.data_dir
         node_ctxt.loser_mode
         ~fuel:tick_distance
         node_ctxt.store

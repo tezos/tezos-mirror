@@ -57,14 +57,18 @@
     be put into a variant.
 *)
 
-type input = {
+type inbox_message = {
   inbox_level : Raw_level_repr.t;
   message_counter : Z.t;
   payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
-(** [input_encoding] encoding value for {!input}. *)
-let input_encoding =
+type reveal_data = Raw_data of string
+
+type input = Inbox_message of inbox_message | Reveal of reveal_data
+
+(** [inbox_message_encoding] encoding value for {!inbox_message}. *)
+let inbox_message_encoding =
   let open Data_encoding in
   conv
     (fun {inbox_level; message_counter; payload} ->
@@ -77,13 +81,91 @@ let input_encoding =
        (req "message_counter" n)
        (req "payload" string))
 
+let reveal_data_encoding =
+  let open Data_encoding in
+  let case_raw_data =
+    case
+      ~title:"raw data"
+      (Tag 0)
+      (obj2
+         (req "reveal_data_kind" (constant "raw_data"))
+         (req
+            "raw_data"
+            (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
+      (function Raw_data m -> Some ((), Bytes.of_string m))
+      (fun ((), m) -> Raw_data (Bytes.to_string m))
+  in
+  union [case_raw_data]
+
+let input_encoding =
+  let open Data_encoding in
+  let case_inbox_message =
+    case
+      ~title:"inbox msg"
+      (Tag 0)
+      (obj2
+         (req "input_kind" (constant "inbox_message"))
+         (req "inbox_message" inbox_message_encoding))
+      (function Inbox_message m -> Some ((), m) | _ -> None)
+      (fun ((), m) -> Inbox_message m)
+  and case_reveal_revelation =
+    case
+      ~title:"reveal"
+      (Tag 1)
+      (obj2
+         (req "input_kind" (constant "reveal_revelation"))
+         (req "reveal_data" reveal_data_encoding))
+      (function Reveal d -> Some ((), d) | _ -> None)
+      (fun ((), d) -> Reveal d)
+  in
+  union [case_inbox_message; case_reveal_revelation]
+
 (** [input_equal i1 i2] return whether [i1] and [i2] are equal. *)
-let input_equal (a : input) (b : input) : bool =
+let inbox_message_equal a b =
   let {inbox_level; message_counter; payload} = a in
   (* To be robust to the addition of fields in [input] *)
   Raw_level_repr.equal inbox_level b.inbox_level
   && Z.equal message_counter b.message_counter
   && String.equal (payload :> string) (b.payload :> string)
+
+let reveal_data_equal a b =
+  match (a, b) with Raw_data a, Raw_data b -> String.equal a b
+
+let input_equal a b =
+  match (a, b) with
+  | Inbox_message a, Inbox_message b -> inbox_message_equal a b
+  | Reveal a, Reveal b -> reveal_data_equal a b
+  | Inbox_message _, Reveal _ | Reveal _, Inbox_message _ -> false
+
+module Input_hash =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Sc_rollup_input_hash"
+
+      let title = "A smart contract rollup input hash"
+
+      let b58check_prefix =
+        "\001\118\125\135" (* "scd1(37)" decoded from base 58. *)
+
+      let size = Some 20
+    end)
+
+type reveal = Reveal_raw_data of Input_hash.t
+
+let reveal_encoding =
+  let open Data_encoding in
+  let case_raw_data =
+    case
+      ~title:"RevealRawData"
+      (Tag 0)
+      (obj2
+         (req "reveal_kind" (constant "reveal_raw_data"))
+         (req "input_hash" Input_hash.encoding))
+      (function Reveal_raw_data s -> Some ((), s))
+      (fun ((), s) -> Reveal_raw_data s)
+  in
+  union [case_raw_data]
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
@@ -92,11 +174,16 @@ let input_equal (a : input) (b : input) : bool =
       first item in the inbox.
 
     - [First_after (level, counter)] expects whatever comes next after that
-      position in the inbox. *)
+      position in the inbox.
+
+    - [Needs_reveal reveal] if the machine reveals the existence of
+      some data and needs this data to continue its execution.
+*)
 type input_request =
   | No_input_required
   | Initial
   | First_after of Raw_level_repr.t * Z.t
+  | Needs_reveal of reveal
 
 (** [input_request_encoding] encoding value for {!input_request}. *)
 let input_request_encoding =
@@ -107,27 +194,37 @@ let input_request_encoding =
       case
         ~title:"No_input_required"
         (Tag 0)
-        (obj1 (req "kind" (constant "no_input_required")))
+        (obj1 (req "input_request_kind" (constant "no_input_required")))
         (function No_input_required -> Some () | _ -> None)
         (fun () -> No_input_required);
       case
         ~title:"Initial"
         (Tag 1)
-        (obj1 (req "kind" (constant "initial")))
+        (obj1 (req "input_request_kind" (constant "initial")))
         (function Initial -> Some () | _ -> None)
         (fun () -> Initial);
       case
         ~title:"First_after"
         (Tag 2)
         (obj3
-           (req "kind" (constant "first_after"))
+           (req "input_request_kind" (constant "first_after"))
            (req "level" Raw_level_repr.encoding)
            (req "counter" n))
         (function
           | First_after (level, counter) -> Some ((), level, counter)
           | _ -> None)
         (fun ((), level, counter) -> First_after (level, counter));
+      case
+        ~title:"Needs_reveal"
+        (Tag 3)
+        (obj2
+           (req "input_request_kind" (constant "needs_reveal"))
+           (req "reveal" reveal_encoding))
+        (function Needs_reveal p -> Some ((), p) | _ -> None)
+        (fun ((), p) -> Needs_reveal p);
     ]
+
+let pp_reveal fmt (Reveal_raw_data hash) = Input_hash.pp fmt hash
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -143,6 +240,12 @@ let pp_input_request fmt request =
         l
         Z.pp_print
         n
+  | Needs_reveal reveal ->
+      Format.fprintf fmt "Needs reveal of %a" pp_reveal reveal
+
+let reveal_equal p1 p2 =
+  match (p1, p2) with
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Input_hash.equal h1 h2
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =
@@ -154,6 +257,8 @@ let input_request_equal a b =
   | First_after (l, n), First_after (m, o) ->
       Raw_level_repr.equal l m && Z.equal n o
   | First_after _, _ -> false
+  | Needs_reveal p1, Needs_reveal p2 -> reveal_equal p1 p2
+  | Needs_reveal _, _ -> false
 
 (** Type that describes output values. *)
 type output = {
@@ -296,10 +401,9 @@ module type S = sig
       has it read so far? *)
   val is_input_state : state -> input_request Lwt.t
 
-  (** [set_input (level, n, msg) state] sets [msg] in [state] as the next
-      message to be processed. This input message is assumed to be the number
-      [n] in the inbox messages at the given [level]. The input message must be
-      the message next to the previous message processed by the rollup. *)
+  (** [set_input input state] sets [input] in [state] as the next
+      input to be processed. This must answer the [input_request]
+      from [is_input_state state]. *)
   val set_input : input -> state -> state Lwt.t
 
   (** [eval s0] returns a state [s1] resulting from the
