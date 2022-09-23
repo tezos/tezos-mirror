@@ -60,34 +60,6 @@ def _create_accounts_list():
 
 
 @pytest.mark.client
-def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
-    """Tests `octez-client create mockup` --bootstrap-accounts argument
-    The call must succeed.
-    """
-    accounts_list = _create_accounts_list()
-
-    # Use another directory so that the constants change takes effect
-    with tempfile.TemporaryDirectory(
-        prefix='octez-client.'
-    ) as base_dir, tempfile.NamedTemporaryFile(
-        prefix='tezos-bootstrap-accounts', mode='w+t'
-    ) as json_file:
-        json.dump(accounts_list, json_file)
-        json_file.flush()
-        # Follow pattern of mockup_client fixture:
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, bootstrap_accounts_file=json_file.name
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        addresses_result = mock_client.get_known_addresses()
-        names_sent = sorted([account["name"] for account in accounts_list])
-        names_witnessed = sorted(list(addresses_result.wallet.keys()))
-        assert names_sent == names_witnessed
-
-
-@pytest.mark.client
 def test_transfer_bad_base_dir(sandbox: Sandbox):
     """Executes `octez-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir looks like a dubious base directory.

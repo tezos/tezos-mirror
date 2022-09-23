@@ -717,6 +717,60 @@ let test_create_mockup_custom_constants =
   let* () = Client.create_mockup ~protocol ~parameter_file client in
   unit
 
+(* A [mockup_bootstrap_account] represents a bootstrap accounts as
+   taken by the [--bootstrap-accounts] option of mockup mode *)
+type mockup_bootstrap_account = {name : string; sk_uri : string; amount : Tez.t}
+
+let test_accounts : mockup_bootstrap_account list =
+  [
+    {
+      name = "bootstrap0";
+      sk_uri = "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
+      amount = Tez.of_int 2000000000000;
+    };
+    {
+      name = "bootstrap1";
+      sk_uri = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+      amount = Tez.of_int 1000000000000;
+    };
+  ]
+
+let mockup_bootstrap_account_to_json {name; sk_uri; amount} : JSON.u =
+  `O
+    [
+      ("name", `String name);
+      ("sk_uri", `String ("unencrypted:" ^ sk_uri));
+      ("amount", `String (Tez.to_string amount));
+    ]
+
+(* Tests [tezos-client create mockup --bootstrap-accounts]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_bootstrap_accounts =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom bootstrap accounts."
+    ~tags:["mockup"; "client"; "mockup_bootstrap_accounts"]
+  @@ fun protocol ->
+  let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
+  JSON.encode_to_file_u
+    bootstrap_accounts_file
+    (`A (List.map mockup_bootstrap_account_to_json test_accounts)) ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~bootstrap_accounts_file client in
+
+  let names_sent =
+    test_accounts |> List.map (fun {name; _} -> name) |> List.rev
+  in
+  let* accounts_witnessed = Client.list_known_addresses client in
+  let names_witnessed = List.map fst accounts_witnessed in
+  Check.(
+    (names_witnessed = names_sent)
+      ~__LOC__
+      (list string)
+      ~error_msg:"Expected names %R, got %L") ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -732,7 +786,8 @@ let register ~protocols =
   test_create_mockup_dir_exists_nonempty protocols ;
   test_retrieve_addresses protocols ;
   test_create_mockup_already_initialized protocols ;
-  test_create_mockup_custom_constants protocols
+  test_create_mockup_custom_constants protocols ;
+  test_create_mockup_custom_bootstrap_accounts protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
