@@ -404,7 +404,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 
-  let data_key key = current_data_key @ key
+  let data_key = Tezos_context_sigs.Context.data_key
 
   type key = string list
 

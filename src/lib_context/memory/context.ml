@@ -119,7 +119,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let current_test_chain_key = ["test_chain"]
 
-  let current_data_key = ["data"]
+  let current_data_key = Tezos_context_sigs.Context.current_data_key
 
   let current_predecessor_block_metadata_hash_key =
     ["predecessor_block_metadata_hash"]
@@ -210,9 +210,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 
-  let data_key key = current_data_key @ key
-
-  let current_data_key = data_key []
+  let data_key = Tezos_context_sigs.Context.data_key
 
   let mem : t -> key -> bool Lwt.t =
    fun ctxt key -> Tree.mem ctxt.tree (data_key key)

@@ -857,6 +857,14 @@ module type Storelike = sig
   val unshallow : tree -> tree Lwt.t
 end
 
+let current_data_key = ["data"]
+
+(* Data in stores is prefixed by key "data".
+    It seems that the correctness of the protocol assumes that the prefix key
+    is the same in the client store and the server store, so we define it
+    centrally here for use in disk/context.ml and memory/context.ml. *)
+let data_key k = current_data_key @ k
+
 module With_get_data (Store : Storelike) = struct
   let get_data (leaf_kind : Proof_types.merkle_leaf_kind)
       (keys : Store.key list) (tree : Store.tree) :
@@ -864,13 +872,6 @@ module With_get_data (Store : Storelike) = struct
       * (Store.key * (Store.tree, Store.value) Either.t Option.t) list)
       Lwt.t =
     let open Lwt_syntax in
-    (* Data in stores is prefixed by key "data". This indirection function is duplicated
-       from disk/context.ml and memory/context.ml
-       It seems that the correctness of the protocol assumes that the prefix key
-       is the same in the client store and the server store.
-
-       TODO: share this prefixing within all stores, and this function. *)
-    let data_key k = "data" :: k in
     let find k =
       match leaf_kind with
       | Proof_types.Hole -> return [(k, None)]
