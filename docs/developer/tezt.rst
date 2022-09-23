@@ -58,44 +58,6 @@ with up to 8 tests in parallel::
 
     tezt -f encoding.ml -j 8
 
-Regression Tests
-~~~~~~~~~~~~~~~~
-
-This form of testing is used to prevent unintended changes to existing
-functionality by ensuring that the software behaves the same way as it did
-before introduced changes.
-
-Regression tests capture commands and output of commands executed during a test.
-An output of some regression test is stored in the repository and is expected to
-match exactly with the captured output on subsequent runs. An added advantage of
-this is that when a change in behaviour is intentional, its effect is made
-visible by the change in test's output.
-
-To run all the regression tests, use the ``regression`` tag::
-
-    dune exec tezt/tests/main.exe regression
-
-When the change in behaviour is intentional or when a new regression test is
-introduced, the output of regression test must be (re-)generated. This can be
-done with the ``--reset-regressions`` option, e.g.::
-
-    dune exec tezt/tests/main.exe regression -- --reset-regressions
-
-Pre-commit hook
-~~~~~~~~~~~~~~~
-
-The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
-hook located in :src:`scripts/pre_commit/pre_commit.py`
-executes modified Tezt tests automatically. It looks for staged files
-(the default) or modified files (if ``--unstaged`` is passed) in
-:src:`tezt/tests` and executes them. This avoids
-pushing commits that will break the CI. It is also handy to execute
-the relevant subset of tests by calling
-``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
-
-We refer to the header of ``pre_commit.py`` and its ``--help`` flag
-for additional instructions.
-
 How to Write New Tests
 ----------------------
 
@@ -247,3 +209,41 @@ Let's review what our basic test in the previous section does.
   we can simply run ``dune exec tezt/tests/main.exe -- basic full``.
   You can see our list of basic tests and their tags
   with ``dune exec tezt/tests/main.exe -- basic --list``.
+
+Regression Tests
+----------------
+
+This form of testing is used to prevent unintended changes to existing
+functionality by ensuring that the software behaves the same way as it did
+before introduced changes.
+
+Regression tests capture commands and output of commands executed during a test.
+An output of some regression test is stored in the repository and is expected to
+match exactly with the captured output on subsequent runs. An added advantage of
+this is that when a change in behaviour is intentional, its effect is made
+visible by the change in test's output.
+
+To run all the regression tests, use the ``regression`` tag::
+
+    dune exec tezt/tests/main.exe regression
+
+When the change in behaviour is intentional or when a new regression test is
+introduced, the output of regression test must be (re-)generated. This can be
+done with the ``--reset-regressions`` option, e.g.::
+
+    dune exec tezt/tests/main.exe regression -- --reset-regressions
+
+Pre-commit hook
+---------------
+
+The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
+hook located in :src:`scripts/pre_commit/pre_commit.py`
+executes modified Tezt tests automatically. It looks for staged files
+(the default) or modified files (if ``--unstaged`` is passed) in
+:src:`tezt/tests` and executes them. This avoids
+pushing commits that will break the CI. It is also handy to execute
+the relevant subset of tests by calling
+``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
+
+We refer to the header of ``pre_commit.py`` and its ``--help`` flag
+for additional instructions.
