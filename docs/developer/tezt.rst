@@ -58,15 +58,15 @@ with up to 8 tests in parallel::
 
     tezt -f encoding.ml -j 8
 
-How to Write New Tests
-----------------------
+How to Write New Integration Tests
+----------------------------------
 
 The best way to get started is to have a look at existing tests in directory
 ``tezt/tests`` of the Tezos repository.
 
-Currently, all tests are part of the same binary ``main.exe``.
+Most integration tests are part of the same executable ``tezt/tests/main.exe``.
 The source of this module is :src:`tezt/tests/main.ml`.
-This binary runs all tests, but you can restrict the set of tests to run
+This executable runs all tests, but you can restrict the set of tests to run
 by specifying tags on the command line, or even the titles of the tests to run
 (with the ``--test`` option).
 
@@ -209,6 +209,78 @@ Let's review what our basic test in the previous section does.
   we can simply run ``dune exec tezt/tests/main.exe -- basic full``.
   You can see our list of basic tests and their tags
   with ``dune exec tezt/tests/main.exe -- basic --list``.
+
+How to Write New Unit Tests
+---------------------------
+
+For Tezt, the main difference between a unit test and an integration test is
+that a unit test does not use the ``Process`` module. Indeed, an integration
+test tests an executable by running it, while a unit test links with a library
+to test its functions directly.
+
+Since the scope of unit tests is much smaller, they are usually registered
+in executables that are dedicated to the library being tested. For instance,
+tests for ``src/lib_base`` could be put in an executable named
+``src/lib_base/tezt/main.exe``. Such executables are usually faster to
+compile and run than ``tezt/tests/main.exe`` since their dependency cone is limited.
+
+To add unit tests to a library which does not yet have a Tezt executable,
+create files such as ``src/lib_base/tezt/example.ml`` and ``src/lib_base/tezt/other.ml``
+and use ``Test.register`` to register tests in those files, at toplevel.
+Here is a minimal example::
+
+    let () =
+      Test.register
+        ~__FILE__
+        ~title:"test title here"
+        ~tags:["test"; "tags"; "here"]
+      @@ fun () ->
+      (* your test here *)
+      unit
+
+Then, declare those files in ``manifest/main.ml``::
+
+    let _octez_base_tezts =
+      tezt
+        ["example"; "other"]
+        ~path:"src/lib_base/tezt"
+        ~opam:"tezos-base"
+        ~deps:[octez_base]
+
+This causes the manifest to generate executable ``src/lib_base/tezt/main.exe`` for you.
+This executable calls ``Test.run``. It also declares a Dune alias ``runtezt``
+so that you can run your tests with either of the following commands::
+
+    dune build @src/lib_base/runtezt
+    dune exec src/lib_base/tezt/main.exe
+
+Note that your tests will actually also be available in ``tezt/tests/main.exe``.
+This executable gathers all tests so that the CI can auto-balance them.
+
+JavaScript
+~~~~~~~~~~
+
+If you want to be able to run your test with Node.js, declare them in the manifest
+with ``~js_compatible:true`` and with ``JS`` in ``~modes``. For instance::
+
+    let _octez_base_tezts =
+      tezt
+        ["example"; "other"]
+        ~path:"src/lib_base/tezt"
+        ~opam:"tezos-base"
+        ~js_compatible:true
+        ~modes:[Native; JS]
+        ~deps:[octez_base]
+
+Running ``dune build`` will generate not only a native executable
+(``src/lib_base/tezt/main.exe``) but also a JavaScript file
+(``src/lib_base/tezt/main_js.bc.js``) that you can run with Node.js::
+
+    nodejs _build/default/src/lib_base/tezt/main_js.bc.js
+
+Note however that tests that use ``Tezt.Process``, ``Tezt.Temp`` or ``Tezt.Runner``
+cannot use the JavaScript backend. In other words, integration tests cannot
+be run with Node.js, only unit tests.
 
 Regression Tests
 ----------------
