@@ -9,7 +9,8 @@
   tezos-protocol-012-Psithaca
   tezos-client-012-Psithaca
   tezos-012-Psithaca-test-helpers
-  tezos-base-test-helpers)
+  tezos-base-test-helpers
+  tezos-protocol-plugin-012-Psithaca)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -17,7 +18,8 @@
   -open Tezos_protocol_012_Psithaca
   -open Tezos_client_012_Psithaca
   -open Tezos_012_Psithaca_test_helpers
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_012_Psithaca))
 
 (rule
  (alias runtest)
