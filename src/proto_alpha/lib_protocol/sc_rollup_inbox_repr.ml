@@ -1059,8 +1059,6 @@ struct
 
   let produce_proof ctxt history inbox (l, n) =
     let open Lwt_tzresult_syntax in
-    let cell_ptr = hash_skip_list_cell inbox in
-    let*? history = History.remember cell_ptr inbox history in
     let deref ptr = History.find ptr history in
     let compare hash =
       let*! tree = P.lookup_tree ctxt hash in
@@ -1112,6 +1110,9 @@ struct
           return (Single_level {level; inc; message_proof}, None)
         else
           let target_index = Skip_list.index level + 1 in
+          let cell_ptr = hash_skip_list_cell inbox in
+          let*? history = History.remember cell_ptr inbox history in
+          let deref ptr = History.find ptr history in
           let* inc =
             option_to_result
               "failed to find path to upper level"
