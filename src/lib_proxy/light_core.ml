@@ -97,35 +97,15 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
 
     (** Returns an {!irmin} value but don't update {!irmin_ref}. We want to
         update only when the consensus has been checked, not before! *)
-    let stage pgi key (mproof : Store.Proof.tree Store.Proof.t) =
+    let stage key (tree : (Storelike.tree, bytes) Either.t) =
       let open Lwt_syntax in
-      let* verification =
-        Store.verify_tree_proof
-          mproof
-          (Get_data.get_data Proof.Raw_context [key])
+      let* irmin = get_irmin () in
+      let* root =
+        match tree with
+        | Either.Left tree -> Store.Tree.add_tree irmin.root key tree
+        | Either.Right value -> Store.Tree.add irmin.root key value
       in
-      match verification with
-      | Error (`Proof_mismatch msg) -> light_failwith pgi msg
-      (* The other two types of error are only related to *stream* proofs.
-         If we get once such error here, it is a programming error, as opposed to
-         a functional error.
-         We don't want the client to process those errors "normally", hence
-         the different treatment. *)
-      | Error _ ->
-          Stdlib.failwith
-            "IMPOSSIBLE: encountered a *stream* verification error when doing \
-             a *tree* verification"
-      | Ok (_, [(k, Some tree)]) when k = key ->
-          let* irmin = get_irmin () in
-          let* root =
-            match tree with
-            | Either.Left tree -> Store.Tree.add_tree irmin.root key tree
-            | Either.Right value -> Store.Tree.add irmin.root key value
-          in
-          return_ok {irmin with root}
-      | Ok _ ->
-          light_failwith pgi
-          @@ Printf.sprintf "Key \"%s\" not found" (String.concat ";" key)
+      return_ok {irmin with root}
 
     let rec get_first_merkle_tree chain block key leaf_kind tried_endpoints_rev
         remaining_endpoints =
@@ -147,14 +127,13 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                   (Get_data.get_data Proof.Raw_context [key])
               in
               match verification with
-              | Ok (_, [(k, _)]) when k = key ->
+              | Ok (_, [(k, Some tree)]) when k = key ->
                   let other_endpoints =
-                    List.rev tried_endpoints_rev @ tl_remaining_endpoints
+                    List.rev_append tried_endpoints_rev tl_remaining_endpoints
                   in
-                  Lwt.return_some (mproof, other_endpoints)
+                  Lwt.return_some (mproof, tree, other_endpoints)
               | _ ->
-                  (* Here we ignore an endpoint that succeeded with a proof
-                     which doesn't verifies. the endpoint's context does not map 'key'.
+                  (* Here we skip an endpoint that succeeded with a proof that doesn't map 'key'.
                      It's okay. *)
                   let* () =
                     printer#warning
@@ -172,7 +151,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                     (hd_endpoint :: tried_endpoints_rev)
                     tl_remaining_endpoints)
           | Ok None ->
-              (* Here we ignore an endpoint that succeeded but returned None
+              (* Here we skip an endpoint that succeeded but returned None
                  This means the endpoint's context does not map 'key'.
                  It's okay. *)
               let* () =
@@ -216,7 +195,11 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
         If [Some (mtree, other_endpoints)] is returned, it is guaranteed that
         [List.length endpoints = List.length other_endpoints + 1] *)
     let get_first_merkle_tree chain block key leaf_kind :
-        (Proof.tree Proof.t * (Uri.t * RPC_context.simple) list) option Lwt.t =
+        (Proof.tree Proof.t
+        * (Storelike.tree, bytes) Either.t
+        * (Uri.t * RPC_context.simple) list)
+        option
+        Lwt.t =
       get_first_merkle_tree chain block key leaf_kind [] endpoints
 
     let get key =
@@ -241,8 +224,8 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                "None of the %d endpoints could provide data for key: %s"
                nb_endpoints
                (key_to_string key)
-      | Some (mproof, validating_endpoints) -> (
-          let* {root; repo} = stage pgi key mproof in
+      | Some (mproof, tree, validating_endpoints) -> (
+          let* staged = stage key tree in
           let*! () =
             Logger.(
               emit
@@ -259,6 +242,6 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
               @@ Format.sprintf "Consensus cannot be reached for key: %s"
               @@ key_to_string key
           | true ->
-              irmin_ref := Some {repo; root} ;
+              irmin_ref := Some staged ;
               return_unit)
   end : Proxy.CORE)
