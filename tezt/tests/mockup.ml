@@ -609,6 +609,19 @@ let test_storage_from_file =
       in
       unit)
 
+(* Executes `tezos-client list mockup protocols`. The call must
+   succeed and return a non empty list. *)
+let test_list_mockup_protocols () =
+  Test.register
+    ~__FILE__
+    ~title:"(Mockup) List mockup protocols."
+    ~tags:["mockup"; "client"; "protocols"]
+  @@ fun () ->
+  let client = Client.create_with_mode Client.Mockup in
+  let* protocols = Client.list_protocols `Mockup client in
+  if protocols = [] then Test.fail "List of mockup protocols must be non-empty" ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -633,4 +646,6 @@ let register_global_constants ~protocols =
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
 
-let register_protocol_independent () = test_migration_transfer ()
+let register_protocol_independent () =
+  test_migration_transfer () ;
+  test_list_mockup_protocols ()

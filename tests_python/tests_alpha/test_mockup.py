@@ -28,19 +28,6 @@ _PC_FLAG = "protocol-constants"
 
 
 @pytest.mark.client
-def test_list_mockup_protocols(sandbox: Sandbox):
-    """Executes `tezos-client list mockup protocols`
-    The call must succeed and return a non empty list.
-    """
-    try:
-        client = sandbox.create_client()
-        protocols = client.list_mockup_protocols().mockup_protocols
-        assert protocols
-    finally:
-        shutil.rmtree(client.base_dir)
-
-
-@pytest.mark.client
 def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
     """Executes `tezos-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir is a non empty directory which is NOT a mockup
