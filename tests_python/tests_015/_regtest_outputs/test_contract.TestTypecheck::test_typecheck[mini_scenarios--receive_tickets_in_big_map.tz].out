@@ -1,0 +1,12 @@
+tests_015/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/receive_tickets_in_big_map.tz]
+
+Well typed
+Gas remaining: 1039997.029 units remaining
+{ parameter (big_map int (ticket string)) ;
+  storage (big_map int (ticket string)) ;
+  code { CAR
+         /* [ big_map int (ticket string) ] */ ;
+         NIL operation
+         /* [ list operation : big_map int (ticket string) ] */ ;
+         PAIR
+         /* [ pair (list operation) (big_map int (ticket string)) ] */ } }

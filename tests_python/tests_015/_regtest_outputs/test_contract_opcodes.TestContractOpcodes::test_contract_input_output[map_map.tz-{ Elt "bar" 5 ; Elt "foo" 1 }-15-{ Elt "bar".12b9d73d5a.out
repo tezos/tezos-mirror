@@ -1,0 +1,68 @@
+tests_015/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_map.tz-{ Elt "bar" 5 ; Elt "foo" 1 }-15-{ Elt "bar" 20 ; Elt "foo" 16 }]
+
+storage
+  { Elt "bar" 20 ; Elt "foo" 16 }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039990.083 units remaining)
+    [ (Pair 15 { Elt "bar" 5 ; Elt "foo" 1 }) ]
+  - location: 9 (remaining gas: 1039990.073 units remaining)
+    [ 15
+      { Elt "bar" 5 ; Elt "foo" 1 } ]
+  - location: 10 (remaining gas: 1039990.063 units remaining)
+    [ { Elt "bar" 5 ; Elt "foo" 1 }
+      15 ]
+  - location: 11 (remaining gas: 1039990.063 units remaining)
+    [ (Pair "bar" 5)
+      15 ]
+  - location: 13 (remaining gas: 1039990.053 units remaining)
+    [ 5
+      15 ]
+  - location: 14 (remaining gas: 1039990.053 units remaining)
+    [ 15 ]
+  - location: 16 (remaining gas: 1039990.043 units remaining)
+    [ 15
+      15 ]
+  - location: 14 (remaining gas: 1039990.023 units remaining)
+    [ 5
+      15
+      15 ]
+  - location: 17 (remaining gas: 1039989.988 units remaining)
+    [ 20
+      15 ]
+  - location: 11 (remaining gas: 1039989.978 units remaining)
+    [ (Pair "foo" 1)
+      15 ]
+  - location: 13 (remaining gas: 1039989.968 units remaining)
+    [ 1
+      15 ]
+  - location: 14 (remaining gas: 1039989.968 units remaining)
+    [ 15 ]
+  - location: 16 (remaining gas: 1039989.958 units remaining)
+    [ 15
+      15 ]
+  - location: 14 (remaining gas: 1039989.938 units remaining)
+    [ 1
+      15
+      15 ]
+  - location: 17 (remaining gas: 1039989.903 units remaining)
+    [ 16
+      15 ]
+  - location: 11 (remaining gas: 1039989.893 units remaining)
+    [ { Elt "bar" 20 ; Elt "foo" 16 }
+      15 ]
+  - location: 18 (remaining gas: 1039989.893 units remaining)
+    [ 15 ]
+  - location: 20 (remaining gas: 1039989.883 units remaining)
+    [  ]
+  - location: 18 (remaining gas: 1039989.863 units remaining)
+    [ { Elt "bar" 20 ; Elt "foo" 16 } ]
+  - location: 21 (remaining gas: 1039989.853 units remaining)
+    [ {}
+      { Elt "bar" 20 ; Elt "foo" 16 } ]
+  - location: 23 (remaining gas: 1039989.843 units remaining)
+    [ (Pair {} { Elt "bar" 20 ; Elt "foo" 16 }) ]
+

@@ -1,0 +1,42 @@
+tests_015/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_string.tz-(Pair {} None)-"bar"-(Pair 4 (Some False))]
+
+storage
+  (Pair 4 (Some False))
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+trace
+  - location: 12 (remaining gas: 1039990.020 units remaining)
+    [ (Pair "bar" {} None) ]
+  - location: 12 (remaining gas: 1039990.010 units remaining)
+    [ "bar"
+      (Pair {} None) ]
+  - location: 13 (remaining gas: 1039990.010 units remaining)
+    [ (Pair {} None) ]
+  - location: 15 (remaining gas: 1039990 units remaining)
+    [ {} ]
+  - location: 16 (remaining gas: 1039989.990 units remaining)
+    [ {}
+      {} ]
+  - location: 13 (remaining gas: 1039989.970 units remaining)
+    [ "bar"
+      {}
+      {} ]
+  - location: 17 (remaining gas: 1039989.258 units remaining)
+    [ False
+      {} ]
+  - location: 18 (remaining gas: 1039989.248 units remaining)
+    [ (Some False)
+      {} ]
+  - location: 19 (remaining gas: 1039989.238 units remaining)
+    [ {}
+      (Some False) ]
+  - location: 20 (remaining gas: 1039989.228 units remaining)
+    [ (Pair {} (Some False)) ]
+  - location: 21 (remaining gas: 1039989.218 units remaining)
+    [ {}
+      (Pair {} (Some False)) ]
+  - location: 23 (remaining gas: 1039989.208 units remaining)
+    [ (Pair {} {} (Some False)) ]
+

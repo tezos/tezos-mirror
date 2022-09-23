@@ -14,9 +14,9 @@ TENDERBAKE_PARAMETERS['consensus_committee_size'] = 67
 
 FOLDER = constants.ALPHA_FOLDER
 
-PREV_HASH = constants.KATHMANDU
-PREV_DAEMON = constants.KATHMANDU_DAEMON
-PREV_PARAMETERS = constants.KATHMANDU_PARAMETERS
+PREV_HASH = constants.LIMA
+PREV_DAEMON = constants.LIMA_DAEMON
+PREV_PARAMETERS = constants.LIMA_PARAMETERS
 
 
 def activate(
