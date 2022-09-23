@@ -32,28 +32,31 @@ The rest of this page explains how to run the test suite and how to add new test
 How to Run Tests
 ----------------
 
-If you just want to run tests and see whether they succeed, run::
+It is recommended to set up an alias::
 
-    make test-tezt
+    alias tezt='dune exec tezt/tests/main.exe --'
 
-If you need more control, get the list of command-line options as follows::
+Try it with ``--help`` to get the list of command-line options as follows::
 
-    dune exec tezt/tests/main.exe -- --help
+    tezt --help
 
-Command-line options give you control over verbosity and the list of tests to run.
-It also allows to keep temporary files or to keep going with other tests if a test fails.
-For instance, here is how to run all tests with tag ``node`` in verbose mode::
+Just run ``tezt`` with no options to run all tests.
+However, most often you only want to run a subset of the tests.
+You can get the list of tests with ``--list``::
 
-    dune exec tezt/tests/main.exe -- --verbose node
+    tezt --list
 
-And here is how to get the list of tests and their tags::
+For instance, to run only tests from files ``basic.ml`` and ``RPC_test.ml``
+that have tag ``alpha`` but not tag ``regression``, with log level "info", run::
 
-    dune exec tezt/tests/main.exe -- --list
+    tezt -f basic.ml -f RPC_test.ml alpha /regression -i
 
-To speed things up, you can run tests in parallel.
-Use ``parallel-tezt.Makefile`` and specify the number of parallel jobs with ``-jobs`` (or ``-j``)::
+You can also run tests in parallel, although in that case it is recommended
+to use the default log level to avoid interleaving logs. For instance,
+the following command runs tests declared in file ``encoding.ml``
+with up to 8 tests in parallel::
 
-    make --makefile parallel-tezt.Makefile --jobs 8
+    tezt -f encoding.ml -j 8
 
 Regression Tests
 ~~~~~~~~~~~~~~~~
@@ -127,7 +130,7 @@ Finally, let's try it with::
 
     dune exec tezt/tests/main.exe -- basic --info
 
-The ``--info`` flag allows you to see the ``Log.info`` messages.
+The ``--info`` flag allows you to see the ``Log.info`` messages. It is the same as ``-i``.
 Here is what you should see::
 
     $ dune exec tezt/tests/main.exe -- basic --info
