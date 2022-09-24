@@ -57,7 +57,7 @@ Updated randomness generation
 -----------------------------
 
 Introduce a new randomness generation protocol based on Verifiable Delay
-Functions (VDFs). See :doc:`Randomness generation <../kathmandu/randomness_generation>`
+Functions (VDFs). See :doc:`Randomness generation <../active/randomness_generation>`
 for an explanation of how this protocol works.
 (MRs :gl:`!5064`, :gl:`!5848`)
 
@@ -136,7 +136,7 @@ Operation receipts
   contract events. See :doc:`Event <../alpha/event>` for more information.
 
 - New operation ``Vdf_revelation`` introduced for VDF revelation. See
-  :doc:`Randomness generation <../kathmandu/randomness_generation>` for more
+  :doc:`Randomness generation <../active/randomness_generation>` for more
   details.
 
 - New operation ``Increase_paid_storage`` introduced to increase the paid

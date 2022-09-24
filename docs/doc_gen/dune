@@ -7,7 +7,6 @@
             tezos-rpc-http-server
             tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
-            tezos-embedded-protocol-013-PtJakart
             tezos-embedded-protocol-014-PtKathma
             tezos-embedded-protocol-alpha
             data-encoding

@@ -134,6 +134,7 @@ A *VDF revelation* is an operation. A reward ``SEED_NONCE_REVELATION_TIP`` is
 given for the first correct VDF revelation, subsequent VDF revelation
 operations being discarded.
 
+.. _rg_constants:
 .. _rg_constants_kathmandu:
 
 Randomness generation parameters

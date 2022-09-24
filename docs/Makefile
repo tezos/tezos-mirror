@@ -13,16 +13,14 @@ P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = jakarta kathmandu
+NAMED_PROTOS  = kathmandu
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-jakarta_long  = PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 kathmandu_long = PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-jakarta_short = 013-PtJakart
 kathmandu_short = 014-PtKathma
 alpha_short   = alpha
 
@@ -97,8 +95,7 @@ redirectcheck: html
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) jakarta
-	$(CHECKXREFS) -l kathmandu
+	$(CHECKXREFS) kathmandu
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -156,7 +153,7 @@ html: api/errors.rst developer/metrics.csv user/node-config.json \
 		rpc p2p manuals install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/jakarta" || true
+	@ln -s active "$(BUILDDIR)/kathmandu" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -200,4 +197,4 @@ lint: pylint pycodestyle lint_black
 clean:
 	@-rm -Rf "$(BUILDDIR)" linkcheck
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html jakarta/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html kathmandu/tezos-*.html alpha/tezos-*.html

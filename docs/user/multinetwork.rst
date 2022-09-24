@@ -32,11 +32,11 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Jakartanet::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Kathmandunet::
 
-  tezos-node config init --data-dir ~/tezos-jakartanet --network jakartanet
-  tezos-node identity generate --data-dir ~/tezos-jakartanet
-  tezos-node run --data-dir ~/tezos-jakartanet
+  tezos-node config init --data-dir ~/tezos-kathmandunet --network kathmandunet
+  tezos-node identity generate --data-dir ~/tezos-kathmandunet
+  tezos-node run --data-dir ~/tezos-kathmandunet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -54,19 +54,17 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``jakartanet`` (available from version 13.0)
-
 - ``kathmandunet`` (available from version 14.0)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Jakartanet::
+it runs on Kathmandunet::
 
-  tezos-node run --data-dir ~/tezos-jakartanet --network jakartanet
+  tezos-node run --data-dir ~/tezos-kathmandunet --network kathmandunet
 
-This command will fail with an error if the configured network is not Jakartanet.
+This command will fail with an error if the configured network is not Kathmandunet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
@@ -199,11 +197,11 @@ Alias Versus Explicit Configuration
 
 If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Jakartanet, it will contain something like::
+to connect to Kathmandunet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "jakartanet"
+    "network": "kathmandunet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -215,7 +213,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``jakartanet``. Instead,
+no longer contain an alias such as ``mainnet`` or ``kathmandunet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.

@@ -149,21 +149,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Jakarta Protocol doc:
+   :caption: Kathmandu Protocol doc:
 
    active/protocol
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Kathmandu Protocol doc:
-
-   kathmandu/protocol
-   kathmandu/glossary
-   kathmandu/cli-commands
-   kathmandu/rpc
 
 .. toctree::
    :maxdepth: 2
