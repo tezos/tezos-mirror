@@ -1547,7 +1547,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~src:account
       ~prg:
         (match protocol with
-        | Alpha ->
+        | Lima | Alpha ->
             "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
         | _ ->
             "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz")

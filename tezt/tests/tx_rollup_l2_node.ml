@@ -848,7 +848,7 @@ let get_ticket_hash_from_deposit_json inbox =
 
 let choose_deposit_contract_by_protocol ~protocol =
   match protocol with
-  | Protocol.Alpha ->
+  | Protocol.Lima | Alpha ->
       "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
   | _ ->
       "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz"
