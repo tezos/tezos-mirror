@@ -32,7 +32,7 @@
             other files.
 *)
 
-let protocols = Protocol.[Jakarta; Kathmandu; Alpha]
+let protocols = Protocol.[Jakarta; Kathmandu; Lima; Alpha]
 
 let migrate_to = Protocol.Alpha
 
@@ -88,7 +88,7 @@ let register_protocol_agnostic_tests () =
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols:[Alpha] ;
   Baking.register ~protocols ;
-  Baking.register_operations_pool ~protocols:[Jakarta; Kathmandu; Alpha] ;
+  Baking.register_operations_pool ~protocols:[Jakarta; Kathmandu; Lima; Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
@@ -160,7 +160,7 @@ let register_L_plus_tests () =
   (* Relies on a feature only available since L.
      Move these to [register_protocol_agnostic_tests] once L is the smallest
      protocol. *)
-  let protocols = Protocol.[Alpha] in
+  let protocols = Protocol.[Lima; Alpha] in
   Used_paid_storage_spaces.register ~protocols
 
 let () =
