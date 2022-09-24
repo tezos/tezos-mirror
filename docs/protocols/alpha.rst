@@ -1,14 +1,11 @@
 Protocol Alpha
 ==============
 
-This page contains all the relevant information for protocol Alpha
-(see :ref:`naming_convention`).
-
-The code can be found in the :src:`src/proto_alpha` directory of the
-``master`` branch of Tezos.
-
 This page documents the changes brought by protocol Alpha with respect
-to Kathmandu.
+to Kathmandu (see :ref:`naming_convention`).
+
+The code can be found in directory :src:`src/proto_alpha` of the ``master``
+branch of Tezos.
 
 .. contents::
 
@@ -30,7 +27,7 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 - Introduce an Array module, making a subset of Stdlib.Array available to the
   protocol (MR :gl:`!6042`)
 
-- Introduce an Q module, making a subset of Zarith.Q available to the
+- Introduce a module Q, making a subset of Zarith.Q available to the
   protocol (MR :gl:`!6042`)
 
 - Generalise the Bounded module to support more datatypes. (MR :gl:`!6076`)
@@ -44,6 +41,8 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 
 - Introduce a new protocol API adapted to pipelined validation.
   (MR :gl:`!6335`)
+
+- Add missing list functions. (MR :gl:`!6316`)
 
 Consensus key
 -------------
@@ -174,7 +173,7 @@ Two new operations have been added:
           "first_slot": 0, "endorsing_power": 58,
           "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
 
-MRs: :gl:`!5936`, :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
+MRs: :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -193,7 +192,9 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!6050`, :gl:`!6030`, :gl:`!6060`, :gl:`!5891`, :gl:`!6071`, :gl:`!5926`,
 :gl:`!6104`, :gl:`!6102`, :gl:`!5973`, :gl:`!6132`, :gl:`!6146`, :gl:`!6185`,
 :gl:`!6197`, :gl:`!6230`, :gl:`!6237`, :gl:`!6236`, :gl:`!6056`, :gl:`!6186`,
-:gl:`!6249`, :gl:`!6182`, :gl:`!6243`, :gl:`!6234`, :gl:`!6254`, :gl:`!6280`)
+:gl:`!6249`, :gl:`!6182`, :gl:`!6243`, :gl:`!6234`, :gl:`!6254`, :gl:`!6280`,
+:gl:`!6250`, :gl:`!6258`, :gl:`!6130`, :gl:`!6305`, :gl:`!6290`, :gl:`!6303`,
+:gl:`!6315`, :gl:`!6177`, :gl:`!6294`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
@@ -206,7 +207,7 @@ Data Availability Layer (ongoing)
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
 :gl:`!6024`, :gl:`!5959`, :gl:`!6062`, :gl:`!6210`, :gl:`!6216`, :gl:`!6033`,
-:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`)
+:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`, :gl:`!6272`, :gl:`!6328`)
 
 Liquidity Baking
 ------------------
@@ -219,9 +220,11 @@ Breaking Changes
 
 - Deprecate timelock functionality, that is the `CHEST_OPEN`
   instruction, in michelson to prevent origination of new contracts using. A
-  safer version of timelock will come in a future procotol.  (MR :gl: `!6260`)
+  safer version of timelock will come in a future procotol.  (MRs :gl:`!6260`,
+  :gl:`!6327`)
 
 - Rename the parameter ``tokens_per_roll`` to ``minimal_stake``. (MR :gl:`!5897`)
+
 - Disallow creation, transfer and storage of tickets with zero amounts.
   ``TICKET`` instruction now returns ``option ticket 'a`` instead of ``ticket 'a``.
   For contracts already originated, their ``TICKET`` instructions are renamed to ``TICKET_DEPRECATED``.
