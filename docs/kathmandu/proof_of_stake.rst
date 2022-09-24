@@ -53,6 +53,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_kathmandu:
 
 A delegate can be marked as either active or passive. A passive
@@ -71,6 +72,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_kathmandu:
 
 Random seed
@@ -82,6 +84,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _snapshots:
 .. _snapshots_kathmandu:
 
 Stake snapshots
@@ -104,6 +107,7 @@ cycle ``n``.
 
 Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
 
+.. _rights:
 .. _rights_kathmandu:
 
 Slot selection
@@ -136,6 +140,7 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
+.. _ps_constants:
 .. _ps_constants_kathmandu:
 
 Proof-of-stake parameters

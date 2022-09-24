@@ -102,7 +102,7 @@ poetry --version # should output 1.1.13
 ##
 ## Test installing Octez python development dependencies
 ##
-git clone https://gitlab.com/tezos/tezos.git --depth 1 --branch "$BRANCH"
+git clone "$CI_REPOSITORY_URL" --depth 1 --branch "$BRANCH"
 
 # [install octez python dev-dependencies]
 cd tezos

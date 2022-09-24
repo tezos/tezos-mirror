@@ -428,6 +428,7 @@ refunded by another layer-1 operation, once the last commitment on the
 rollup from its creator has been removed from the context (that is,
 after the finality and withdrawal period).
 
+.. _rejected:
 .. _rejected_kathmandu:
 
 If a commitment is wrong (that is, its Merkle proof does not
@@ -460,6 +461,7 @@ succeeds. So such messages are always treated as no-ops.
 In the case of a valid rejection, half of the commitment bond goes to
 the rejector; the rest is burned.
 
+.. _withdrawals:
 .. _withdrawals_kathmandu:
 
 Ticket withdrawals

@@ -1205,10 +1205,10 @@
                           ]
                         },
                         {
-                          "title": "hangzhounet",
+                          "title": "kathmandunet",
                           "type": "string",
                           "enum": [
-                            "hangzhounet"
+                            "kathmandunet"
                           ]
                         },
                         {

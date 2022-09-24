@@ -123,10 +123,18 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+.. _glossary_michelson:
 .. _glossary_michelson_kathmandu:
 
 Michelson
     The built-in language used by a `smart contract`_.
+
+.. _glossary_minimal_stake:
+.. _glossary_minimal_stake_kathmandu:
+
+_`Minimal stake`
+    An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
+    delegate to have baking_ and voting rights in a cycle_.
 
 _`Operations`
     The main operations in the protocol are transactions (to transfer funds
@@ -148,10 +156,7 @@ _`Round`
     round results in an invalid block_.
 
 _`Roll`
-    An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
-    delegate to have baking_ and voting rights in a cycle_. However,
-    rolls are not used as a unit for baking_ or voting rights, these are based
-    on the actual, non-approximated stake.
+    deprecated; see `Minimal stake`_.
 
 _`Smart contract`
     Account_ which is associated to a :ref:`Michelson <glossary_michelson_kathmandu>` script. They are

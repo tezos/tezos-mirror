@@ -50,8 +50,8 @@ install_bin_rc_focal:
   script:
     - ./docs/introduction/install-bin-fedora.sh
 
-install_bin_fedora_34:
-  image: fedora:34
+install_bin_fedora_35:
+  image: fedora:35
   extends: .install_bin_fedora_template
 
 .install_bin_rc_fedora_template:
@@ -62,8 +62,8 @@ install_bin_fedora_34:
   script:
     - ./docs/introduction/install-bin-fedora.sh rc
 
-install_bin_rc_fedora_34:
-  image: fedora:34
+install_bin_rc_fedora_35:
+  image: fedora:35
   extends: .install_bin_rc_fedora_template
 
 .install_opam_ubuntu_template:
