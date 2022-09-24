@@ -138,8 +138,8 @@ let register_protocol_agnostic_tests () =
   Ticket_updates_in_receipt.register ~protocols:[Alpha] ;
   Timelock.register ~protocols ;
   Tickets.register ~protocols ;
-  Tx_rollup.register ~protocols ;
-  Tx_rollup_l2_node.register ~protocols ;
+  Tx_rollup.register ~protocols:[Kathmandu; Lima; Alpha] ;
+  Tx_rollup_l2_node.register ~protocols:[Kathmandu; Lima; Alpha] ;
   Views.register [Alpha] ;
   Retro.register ~protocols
 
