@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+open Protocol_client_context
 
 type error +=
   | Slot_size_is_too_big of {actual_size : int; max_size : int}
