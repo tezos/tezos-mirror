@@ -102,6 +102,7 @@ module type T = sig
         * Tezos_protocol_environment_structs.V8.Plonk.transcript
        and type Dal.parameters = Tezos_crypto_dal.Cryptobox.Verifier.parameters
        and type Dal.commitment = Tezos_crypto_dal.Cryptobox.Verifier.commitment
+       and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
        and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info
