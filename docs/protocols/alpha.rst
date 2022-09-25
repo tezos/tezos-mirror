@@ -194,20 +194,22 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!6197`, :gl:`!6230`, :gl:`!6237`, :gl:`!6236`, :gl:`!6056`, :gl:`!6186`,
 :gl:`!6249`, :gl:`!6182`, :gl:`!6243`, :gl:`!6234`, :gl:`!6254`, :gl:`!6280`,
 :gl:`!6250`, :gl:`!6258`, :gl:`!6130`, :gl:`!6305`, :gl:`!6290`, :gl:`!6303`,
-:gl:`!6315`, :gl:`!6177`, :gl:`!6294`)
+:gl:`!6315`, :gl:`!6177`, :gl:`!6294`, :gl:`!6263`, :gl:`!6361`, :gl:`!6278`,
+:gl:`!6358`, :gl:`!6231`, :gl:`!6400`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
 Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!6044`,
-:gl:`!6184`)
+:gl:`!6184`, :gl:`!6045`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
 :gl:`!6024`, :gl:`!5959`, :gl:`!6062`, :gl:`!6210`, :gl:`!6216`, :gl:`!6033`,
-:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`, :gl:`!6272`, :gl:`!6328`)
+:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`, :gl:`!6272`, :gl:`!6328`,
+:gl:`!6279`, :gl:`!6348`, :gl:`!6256`, :gl:`!6321`)
 
 Liquidity Baking
 ------------------
@@ -379,6 +381,13 @@ Internal
   API allowing a light validation of operations. This as well as
   maintaining a commutative set of operations that may also be
   efficiently merged with another. This enables the implementation of
+  a parallelized shell's mempool. (MR :gl:`!6274`)
+
+- Add more functions in Bitset. (MRs :gl:`!6352`, :gl:`!6376`)
+
+- Make Micheline serialization gas accounting consistent by construction.
+  (MR :gl:`!6403`)
 
 - Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
+
 - Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
