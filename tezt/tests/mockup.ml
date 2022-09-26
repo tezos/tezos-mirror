@@ -809,6 +809,32 @@ let test_transfer_bad_base_dir =
   in
   unit
 
+(* Executes [tezos-client --mode mockup config show] in a state where
+   it should succeed. *)
+let test_config_show_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = Client.config_show ~protocol client in
+  unit
+
+(* Executes [tezos-client --mode mockup config show] when base dir is
+   NOT a mockup. It should fail as this is dangerous (the default base
+   directory could contain sensitive data, such as private keys) *)
+let test_config_show_mockup_fail =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config failure."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () = rmdir (Client.base_dir client) in
+  let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -826,7 +852,9 @@ let register ~protocols =
   test_create_mockup_already_initialized protocols ;
   test_create_mockup_custom_constants protocols ;
   test_create_mockup_custom_bootstrap_accounts protocols ;
-  test_transfer_bad_base_dir protocols
+  test_transfer_bad_base_dir protocols ;
+  test_config_show_mockup protocols ;
+  test_config_show_mockup_fail protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;

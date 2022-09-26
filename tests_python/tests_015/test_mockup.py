@@ -59,32 +59,6 @@ def _create_accounts_list():
 
 
 @pytest.mark.client
-def test_config_show_mockup(mockup_client: Client):
-    """Executes `octez-client --mode mockup config show` in
-    a state where it should succeed.
-    """
-    mockup_client.run_generic(["--protocol", protocol.HASH, "config", "show"])
-
-
-@pytest.mark.client
-def test_config_show_mockup_fail(mockup_client: Client):
-    """Executes `octez-client --mode mockup config show` when
-    base dir is NOT a mockup. It should fail as this is dangerous
-    (the default base directory could contain sensitive data,
-     such as private keys)
-    """
-    shutil.rmtree(mockup_client.base_dir)  # See test_config_init_mockup_fail
-    # for a variant of how to make the base dir invalid for the mockup mode
-    _, _, return_code = mockup_client.run_generic(
-        ["config", "show"], check=False
-    )
-
-    # recreate directory: the cleanup later on expects its existence
-    os.mkdir(mockup_client.base_dir)
-    assert return_code != 0
-
-
-@pytest.mark.client
 def test_config_init_mockup(mockup_client: Client):
     """Executes `octez-client config init mockup` in
     a state where it should succeed.
