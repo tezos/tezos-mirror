@@ -230,6 +230,9 @@ val show_history_mode : history_mode -> string
 (** Run [octez-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
+(** Run [tezos-node config update]. *)
+val config_update : t -> argument list -> unit Lwt.t
+
 (** Run [tezos-node config reset]. *)
 val config_reset : t -> argument list -> unit Lwt.t
 
@@ -282,6 +285,9 @@ end
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
+
+(** Same as [config_update], but do not wait for the process to exit. *)
+val spawn_config_update : t -> argument list -> Process.t
 
 (** Same as [config_reset], but do not wait for the process to exit. *)
 val spawn_config_reset : t -> argument list -> Process.t

@@ -235,12 +235,17 @@ let spawn_config_command command node arguments =
 
 let spawn_config_init = spawn_config_command "init"
 
+let spawn_config_update = spawn_config_command "update"
+
 let spawn_config_reset node arguments =
   node.persistent_state.arguments <- node.persistent_state.default_arguments ;
   spawn_config_command "reset" node arguments
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
+
+let config_update node arguments =
+  spawn_config_update node arguments |> Process.check
 
 let config_reset node arguments =
   spawn_config_reset node arguments |> Process.check

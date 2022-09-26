@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Node config commands
+   Invocation:   dune exec tezt/tests/main.exe -- --file config.ml
+   Subject:      Check various usages of the node's config command
+*)
+
 let config_init node args =
   let* () = Node.config_init node args in
   Node.config_show node
