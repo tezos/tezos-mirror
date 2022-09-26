@@ -34,6 +34,10 @@ let config_init node args =
   let* () = Node.config_init node args in
   Node.config_show node
 
+let config_update node args =
+  let* () = Node.config_update node args in
+  Node.config_show node
+
 let config_reset node args =
   let* () = Node.config_reset node args in
   Node.config_show node
@@ -74,6 +78,26 @@ let test_config_init () =
   check_default_config config ;
   unit
 
+let test_config_update () =
+  let node = Node.create [] in
+  let* () = Node.config_init node [] in
+  let* updated_config = config_update node [Metrics_addr ":1234"] in
+  (* Checks the consistency of the reset config *)
+  check_config_keys
+    updated_config
+    ["data-dir"; "network"; "p2p"; "metrics_addr"] ;
+  check_p2p_config
+    updated_config
+    ["bootstrap-peers"; "expected-proof-of-work"; "listen-addr"] ;
+  (* Checks the updated value *)
+  let metrics_addr =
+    JSON.(updated_config |-> "metrics_addr" |=> 0 |> as_string)
+  in
+  return
+  @@ Check.((metrics_addr = ":1234") string)
+       ~error_msg:
+         "config.rpc.listen-addrs[0] contains %L but should contain %R."
+
 let test_config_reset () =
   let node = Node.create [] in
   let* initial_config = config_init node [] in
@@ -99,5 +123,7 @@ let test_config_reset () =
 let register () =
   Test.register ~__FILE__ ~title:"config init" ~tags:["config"; "init"]
   @@ test_config_init ;
+  Test.register ~__FILE__ ~title:"config update" ~tags:["config"; "update"]
+  @@ test_config_update ;
   Test.register ~__FILE__ ~title:"config reset" ~tags:["config"; "reset"]
   @@ test_config_reset
