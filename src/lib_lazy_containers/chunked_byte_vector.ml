@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech  <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -144,6 +144,56 @@ let load_byte vector address =
   let+ chunk = get_chunk (Chunk.index address) vector in
   Array1_64.get chunk (Chunk.offset address)
 
+let load_bytes vector start length =
+  let open Lwt.Syntax in
+  let end_offset = Int64.pred @@ Int64.add start length in
+  (* Ensure [offset] and [end_offset] are valid indeces in the vector.
+
+     Once we ensure the vector can be contained in a string, we can safely
+     convert everything to int, since the size of the vector is contained in
+     a `nativeint`. See {!of_string} comment. *)
+  if
+    start < 0L || length < 0L || end_offset > vector.length
+    || vector.length > Int64.of_int Sys.max_string_length
+  then raise Bounds ;
+
+  if length = 0L then Lwt.return Bytes.empty
+  else
+    let buffer = Bytes.create @@ Int64.to_int length in
+
+    let rec copy chunk offset length dest_offset =
+      if length > 0L then (
+        Array1.get chunk offset |> Char.chr |> Bytes.set buffer dest_offset ;
+        (copy [@tailcall])
+          chunk
+          (Int.succ offset)
+          (Int64.pred length)
+          (Int.succ dest_offset))
+      else ()
+    in
+
+    let rec go offset length =
+      if length > 0L then (
+        let chunk_index = Chunk.index offset in
+        let chunk_offset = Chunk.offset offset in
+        let chunk_length = Int64.(min (sub Chunk.size chunk_offset) length) in
+        let* chunk = get_chunk chunk_index vector in
+
+        copy
+          chunk
+          (Int64.to_int chunk_offset)
+          chunk_length
+          Int64.(sub offset start |> to_int) ;
+
+        (go [@tailcall])
+          (Int64.add offset chunk_length)
+          (Int64.sub length chunk_length))
+      else Lwt.return_unit
+    in
+
+    let+ () = go start length in
+    buffer
+
 let store_byte vector address byte =
   let open Lwt.Syntax in
   if Int64.compare address vector.length >= 0 then raise Bounds ;
@@ -212,38 +262,7 @@ let of_bytes bytes =
   in
   vector
 
-let to_bytes vector =
-  let open Lwt.Syntax in
-  let chunks_number = Vector.num_elements vector.chunks in
-  if vector.length > Int64.of_int Sys.max_string_length then raise Bounds ;
-  (* Once we ensure the vector can be contained in a string, we can safely
-     convert everything to int, since the size of the vector is contained in
-     a `nativeint`. See {!of_string} comment. *)
-  let buffer = Bytes.create (Int64.to_int vector.length) in
-  let add_chunk index chunk =
-    let rem =
-      (* The last chunk (at `length - 1`) is not necessarily of size
-         [Chunk.size], i.e. if the length of the chunked_byte_vector is not a
-         multiple of [Chunk.size]. *)
-      let r = Int64.rem vector.length Chunk.size in
-      if index >= Int64.pred chunks_number && r <> 0L then r else Chunk.size
-    in
-    for offset = 0 to Int64.to_int rem - 1 do
-      let address =
-        Chunk.address ~index ~offset:(Int64.of_int offset) |> Int64.to_int
-      in
-      Bytes.set buffer address (Char.chr @@ Array1.get chunk offset)
-    done
-  in
-  let rec fold index =
-    if index >= chunks_number then Lwt.return ()
-    else
-      let* chunk = get_chunk index vector in
-      add_chunk index chunk ;
-      fold (Int64.succ index)
-  in
-  let+ () = fold 0L in
-  buffer
+let to_bytes vector = load_bytes vector 0L vector.length
 
 let to_string vector =
   let open Lwt.Syntax in

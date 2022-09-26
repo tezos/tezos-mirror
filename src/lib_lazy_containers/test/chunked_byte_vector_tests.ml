@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech  <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -31,6 +31,62 @@ let create_works =
   Test.make ~name:"create works" Gen.ui64 (fun len ->
       let vector = create len in
       length vector = len)
+
+let to_bytes_works =
+  Test.make ~name:"from_bytes to_bytes roundtrip" Gen.string (fun str ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let bytes = Bytes.of_string str in
+      let vector = of_bytes bytes in
+      let* bytes' = to_bytes vector in
+      let vector' = of_bytes bytes' in
+      let+ bytes'' = to_bytes vector' in
+      bytes = bytes' && bytes = bytes'')
+
+let load_bytes_works_no_offset =
+  Test.make
+    ~name:"load_bytes without offset"
+    (Gen.tup3 Gen.string Gen.nat Gen.nat)
+    (fun (str, _offset, num_bytes) ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let bytes = Bytes.of_string str in
+      let len = Bytes.length bytes in
+      let offset = 0 in
+      let num_bytes =
+        if len > offset + 1 then num_bytes mod (len - offset - 1) else 0
+      in
+      let vector = of_bytes bytes in
+      let+ bytes' =
+        load_bytes vector (Int64.of_int offset) (Int64.of_int num_bytes)
+      in
+      let expected = Bytes.sub bytes offset num_bytes in
+      expected = bytes')
+
+let load_bytes_works =
+  Test.make
+    ~name:"load_bytes roundtrip"
+    (Gen.tup3 Gen.string Gen.nat Gen.nat)
+    (fun (str, offset, num_bytes) ->
+      let open Lwt.Syntax in
+      Lwt_main.run
+      @@
+      let bytes = Bytes.of_string str in
+      let len = Bytes.length bytes in
+      let offset = offset mod max 1 len in
+      let num_bytes =
+        if len > offset + 1 then num_bytes mod (len - offset - 1) else 0
+      in
+      let vector = of_bytes bytes in
+      let+ bytes' =
+        load_bytes vector (Int64.of_int offset) (Int64.of_int num_bytes)
+      in
+      let expected =
+        if num_bytes = 0 then Bytes.empty else Bytes.sub bytes offset num_bytes
+      in
+      expected = bytes')
 
 let store_load_byte_works =
   Test.make ~name:"store_byte and load_byte work" Gen.string (fun str ->
@@ -125,5 +181,8 @@ let tests =
     to_alcotest store_load_byte_works;
     to_alcotest grow_works;
     to_alcotest can_write_after_grow;
+    to_alcotest load_bytes_works_no_offset;
+    to_alcotest to_bytes_works;
+    to_alcotest load_bytes_works;
     internal_num_pages_edge_case;
   ]

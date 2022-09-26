@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2022 TriliTech  <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -96,6 +96,13 @@ val length : t -> int64
 
 (** [load_byte vector offset] read the byte at [offset]. *)
 val load_byte : t -> int64 -> int Lwt.t
+
+(** [load_bytes vector offset num_bytes] loads the bytes at [offset]
+    to [offset + num_bytes].
+
+    {b Note:} This function may be dangerous to use in a tick if
+    [num_bytes] is too large. *)
+val load_bytes : t -> int64 -> int64 -> bytes Lwt.t
 
 (** [store_byte vector offset byte] set the byte at [offset] to [byte]. *)
 val store_byte : t -> int64 -> int -> unit Lwt.t
