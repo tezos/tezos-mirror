@@ -58,6 +58,22 @@ let check_p2p_config config expected_p2p_keys =
       (list string))
     ~error_msg:"P2P config should contain keys %R but contains keys %L."
 
+let check_default_config config =
+  check_config_keys config ["data-dir"; "network"; "p2p"] ;
+  check_p2p_config
+    config
+    ["bootstrap-peers"; "expected-proof-of-work"; "listen-addr"] ;
+  (* Checks p2p value *)
+  let addr = JSON.(config |-> "p2p" |-> "listen-addr" |> as_string) in
+  Check.((addr = "[::]:9732") ~__LOC__ string)
+    ~error_msg:"P2P listening address should be %R but is %L."
+
+let test_config_init () =
+  let node = Node.create [] in
+  let* config = config_init node [] in
+  check_default_config config ;
+  unit
+
 let test_config_reset () =
   let node = Node.create [] in
   let* initial_config = config_init node [] in
@@ -81,5 +97,7 @@ let test_config_reset () =
          "Configs after reset should be identical. Was %L before, and now %R."
 
 let register () =
+  Test.register ~__FILE__ ~title:"config init" ~tags:["config"; "init"]
+  @@ test_config_init ;
   Test.register ~__FILE__ ~title:"config reset" ~tags:["config"; "reset"]
   @@ test_config_reset
