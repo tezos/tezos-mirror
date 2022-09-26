@@ -198,6 +198,10 @@ module Common = struct
     @@ fun (_node_ctxt, block) () () -> return block
 
   let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.level
+    @@ fun (node_ctxt, block) () () -> State.level_of_hash node_ctxt.store block
+
+  let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.inbox
     @@ fun (node_ctxt, block) () () -> Inbox.inbox_of_hash node_ctxt block
 

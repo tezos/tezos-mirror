@@ -216,6 +216,14 @@ module Global = struct
         ~output:Block_hash.encoding
         (path / "hash")
 
+    let level =
+      RPC_service.get_service
+        ~description:
+          "Level of Tezos block known to the smart-contract rollup node"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int32
+        (path / "level")
+
     let inbox =
       RPC_service.get_service
         ~description:"Rollup inbox for block"
