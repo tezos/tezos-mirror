@@ -324,7 +324,6 @@ let store_copy =
       ] ->
           let from_key_length = Int32.to_int from_key_length in
           let to_key_length = Int32.to_int to_key_length in
-
           if from_key_length > Durable.max_key_length then
             raise (Key_too_large from_key_length) ;
           if to_key_length > Durable.max_key_length then
@@ -389,6 +388,8 @@ module Internal_for_tests = struct
   let store_has = Func.HostFunc (store_has_type, store_has_name)
 
   let store_delete = Func.HostFunc (store_delete_type, store_delete_name)
+
+  let store_copy = Func.HostFunc (store_copy_type, store_copy_name)
 
   let store_list_size =
     Func.HostFunc (store_list_size_type, store_list_size_name)
