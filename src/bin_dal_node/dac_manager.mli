@@ -35,8 +35,8 @@ module Keys : sig
   val get_keys :
     #Client_context.wallet ->
     Configuration.t ->
-    (Aggregate_signature.public_key_hash
-    * Aggregate_signature.public_key option
+    (Tezos_crypto.Aggregate_signature.public_key_hash
+    * Tezos_crypto.Aggregate_signature.public_key option
     * Client_keys.aggregate_sk_uri)
     option
     list

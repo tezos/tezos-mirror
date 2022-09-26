@@ -71,7 +71,8 @@ let stored_slot_headers () =
           (obj2
              (req "index" int31)
              (req "slot_header" Cryptobox.Commitment.encoding)))
-    Tezos_rpc.Path.(open_root / "stored_slot_headers" /: Block_hash.rpc_arg)
+    Tezos_rpc.Path.(
+      open_root / "stored_slot_headers" /: Tezos_crypto.Block_hash.rpc_arg)
 
 let shard () =
   let shard_arg = Tezos_rpc.Arg.int in

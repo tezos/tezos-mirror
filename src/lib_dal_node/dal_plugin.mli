@@ -45,4 +45,4 @@ end
 
 val register : (module T) -> unit
 
-val get : Protocol_hash.Table.key -> (module T) option
+val get : Tezos_crypto.Protocol_hash.Table.key -> (module T) option
