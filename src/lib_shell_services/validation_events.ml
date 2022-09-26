@@ -33,8 +33,8 @@ let new_protocol_initialisation =
     ~name:"new_protocol_initialisation"
     ~msg:"initializing protocol {proto_hash}..."
     ~level:Notice
-    ~pp1:Protocol_hash.pp_short
-    ("proto_hash", Protocol_hash.encoding)
+    ~pp1:Tezos_crypto.Protocol_hash.pp_short
+    ("proto_hash", Tezos_crypto.Protocol_hash.encoding)
 
 let using_preapply_result =
   declare_1
@@ -42,5 +42,5 @@ let using_preapply_result =
     ~name:"using_preapply_result"
     ~msg:"using pre-application result for block {block_hash} application"
     ~level:Info
-    ~pp1:Block_hash.pp
-    ("block_hash", Block_hash.encoding)
+    ~pp1:Tezos_crypto.Block_hash.pp
+    ("block_hash", Tezos_crypto.Block_hash.encoding)

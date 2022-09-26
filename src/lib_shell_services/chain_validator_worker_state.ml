@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Request = struct
-  type view = Hash of Block_hash.t | PeerId of P2p_peer.Id.t
+  type view = Hash of Tezos_crypto.Block_hash.t | PeerId of P2p_peer.Id.t
 
   let encoding =
     let open Data_encoding in
@@ -34,7 +34,7 @@ module Request = struct
         case
           (Tag 0)
           ~title:"Hash"
-          (obj1 (req "hash" Block_hash.encoding))
+          (obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
           (function Hash h -> Some h | _ -> None)
           (fun h -> Hash h);
         case
@@ -46,7 +46,7 @@ module Request = struct
       ]
 
   let pp ppf = function
-    | Hash h -> Block_hash.pp ppf h
+    | Hash h -> Tezos_crypto.Block_hash.pp ppf h
     | PeerId pid -> P2p_peer.Id.pp ppf pid
 end
 

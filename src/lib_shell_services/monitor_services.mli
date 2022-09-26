@@ -26,36 +26,42 @@
 open Tezos_rpc.Context
 
 type chain_status =
-  | Active_main of Chain_id.t
+  | Active_main of Tezos_crypto.Chain_id.t
   | Active_test of {
-      chain : Chain_id.t;
-      protocol : Protocol_hash.t;
+      chain : Tezos_crypto.Chain_id.t;
+      protocol : Tezos_crypto.Protocol_hash.t;
       expiration_date : Time.Protocol.t;
     }
-  | Stopping of Chain_id.t
+  | Stopping of Tezos_crypto.Chain_id.t
 
 val bootstrapped :
   #streamed ->
-  ((Block_hash.t * Time.Protocol.t) Lwt_stream.t * stopper) tzresult Lwt.t
+  ((Tezos_crypto.Block_hash.t * Time.Protocol.t) Lwt_stream.t * stopper)
+  tzresult
+  Lwt.t
 
 val valid_blocks :
   #streamed ->
   ?chains:Chain_services.chain list ->
-  ?protocols:Protocol_hash.t list ->
-  ?next_protocols:Protocol_hash.t list ->
+  ?protocols:Tezos_crypto.Protocol_hash.t list ->
+  ?next_protocols:Tezos_crypto.Protocol_hash.t list ->
   unit ->
-  (((Chain_id.t * Block_hash.t) * Block_header.t) Lwt_stream.t * stopper)
+  (((Tezos_crypto.Chain_id.t * Tezos_crypto.Block_hash.t) * Block_header.t)
+   Lwt_stream.t
+  * stopper)
   tzresult
   Lwt.t
 
 val heads :
   #streamed ->
-  ?next_protocols:Protocol_hash.t list ->
+  ?next_protocols:Tezos_crypto.Protocol_hash.t list ->
   Chain_services.chain ->
-  ((Block_hash.t * Block_header.t) Lwt_stream.t * stopper) tzresult Lwt.t
+  ((Tezos_crypto.Block_hash.t * Block_header.t) Lwt_stream.t * stopper) tzresult
+  Lwt.t
 
 val protocols :
-  #streamed -> (Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
+  #streamed ->
+  (Tezos_crypto.Protocol_hash.t Lwt_stream.t * stopper) tzresult Lwt.t
 
 val commit_hash : #simple -> string tzresult Lwt.t
 
@@ -69,7 +75,7 @@ module S : sig
       unit,
       unit,
       unit,
-      Block_hash.t * Time.Protocol.t )
+      Tezos_crypto.Block_hash.t * Time.Protocol.t )
     Tezos_rpc.Service.t
 
   val valid_blocks :
@@ -77,23 +83,29 @@ module S : sig
       unit,
       unit,
       < chains : Chain_services.chain list
-      ; next_protocols : Protocol_hash.t list
-      ; protocols : Protocol_hash.t list >,
+      ; next_protocols : Tezos_crypto.Protocol_hash.t list
+      ; protocols : Tezos_crypto.Protocol_hash.t list >,
       unit,
-      (Chain_id.t * Block_hash.t) * Block_header.t )
+      (Tezos_crypto.Chain_id.t * Tezos_crypto.Block_hash.t) * Block_header.t )
     Tezos_rpc.Service.t
 
   val heads :
     ( [`GET],
       unit,
       unit * Chain_services.chain,
-      < next_protocols : Protocol_hash.t list >,
+      < next_protocols : Tezos_crypto.Protocol_hash.t list >,
       unit,
-      Block_hash.t * Block_header.t )
+      Tezos_crypto.Block_hash.t * Block_header.t )
     Tezos_rpc.Service.t
 
   val protocols :
-    ([`GET], unit, unit, unit, unit, Protocol_hash.t) Tezos_rpc.Service.t
+    ( [`GET],
+      unit,
+      unit,
+      unit,
+      unit,
+      Tezos_crypto.Protocol_hash.t )
+    Tezos_rpc.Service.t
 
   val commit_hash : ([`GET], unit, unit, unit, unit, string) Tezos_rpc.Service.t
 

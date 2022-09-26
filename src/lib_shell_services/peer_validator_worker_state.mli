@@ -24,7 +24,9 @@
 (*****************************************************************************)
 
 module Request : sig
-  type view = New_head of Block_hash.t | New_branch of Block_hash.t * int
+  type view =
+    | New_head of Tezos_crypto.Block_hash.t
+    | New_branch of Tezos_crypto.Block_hash.t * int
 
   val encoding : view Data_encoding.encoding
 
