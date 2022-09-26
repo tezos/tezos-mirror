@@ -59,41 +59,6 @@ def _create_accounts_list():
 
 
 @pytest.mark.client
-def test_config_init_mockup(mockup_client: Client):
-    """Executes `octez-client config init mockup` in
-    a state where it should succeed.
-    """
-    # We cannot use NamedTemporaryFile because `config init mockup`
-    # does not overwrite files. Because NamedTemporaryFile creates the file
-    # it would make the test fail.
-    ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
-    pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
-    # 1/ call `config init mockup`
-    mockup_client.run(
-        [
-            "--protocol",
-            protocol.HASH,
-            "config",
-            "init",
-            f"--{_BA_FLAG}",
-            ba_json_file,
-            f"--{_PC_FLAG}",
-            pc_json_file,
-        ]
-    )
-
-    # 2/ Try loading the files, to check they are valid json
-    with open(ba_json_file) as handle:
-        json.load(handle)
-    with open(pc_json_file) as handle:
-        json.load(handle)
-
-    # Cleanup
-    os.remove(ba_json_file)
-    os.remove(pc_json_file)
-
-
-@pytest.mark.client
 def test_config_init_mockup_fail(mockup_client: Client):
     """Executes `octez-client config init mockup` when
     base dir is NOT a mockup. It should fail as this is dangerous

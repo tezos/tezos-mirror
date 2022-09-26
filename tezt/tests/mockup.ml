@@ -835,6 +835,57 @@ let test_config_show_mockup_fail =
   let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
   unit
 
+(* @pytest.mark.client
+   def test_config_init_mockup(mockup_client: Client):
+       """Executes `tezos-client config init mockup` in
+       a state where it should succeed.
+       """
+       # We cannot use NamedTemporaryFile because `config init mockup`
+       # does not overwrite files. Because NamedTemporaryFile creates the file
+       # it would make the test fail.
+       ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
+       pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
+       # 1/ call `config init mockup`
+       mockup_client.run(
+           [
+               "--protocol",
+               protocol.HASH,
+               "config",
+               "init",
+               f"--{_BA_FLAG}",
+               ba_json_file,
+               f"--{_PC_FLAG}",
+               pc_json_file,
+           ]
+       )
+
+       # 2/ Try loading the files, to check they are valid json
+       with open(ba_json_file) as handle:
+           json.load(handle)
+       with open(pc_json_file) as handle:
+           json.load(handle)
+
+       # Cleanup
+       os.remove(ba_json_file)
+       os.remove(pc_json_file) *)
+(* Executes [tezos-client config init mockup] in a state where it
+   should succeed *)
+let test_config_init_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup config initialization."
+    ~tags:["mockup"; "client"; "config"; "initialization"]
+  @@ fun protocol ->
+  let protocol_constants = Temp.file "protocol-constants.json" in
+  let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.config_init ~protocol ~bootstrap_accounts ~protocol_constants client
+  in
+  let (_ : JSON.t) = JSON.parse_file protocol_constants in
+  let (_ : JSON.t) = JSON.parse_file bootstrap_accounts in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -854,7 +905,8 @@ let register ~protocols =
   test_create_mockup_custom_bootstrap_accounts protocols ;
   test_transfer_bad_base_dir protocols ;
   test_config_show_mockup protocols ;
-  test_config_show_mockup_fail protocols
+  test_config_show_mockup_fail protocols ;
+  test_config_init_mockup protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
