@@ -611,6 +611,14 @@ struct
         let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         pvm_state.tick_state
 
+      let get_module_instance_exn tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        match pvm_state.tick_state with
+        | Eval config ->
+            Wasm.Instance.ModuleMap.get wasm_main_module_name config.module_reg
+        | _ -> raise (Invalid_argument "get_module_instance")
+
       let is_stuck tree =
         let open Lwt.Syntax in
         let* pvm = Tree_encoding_runner.decode pvm_state_encoding tree in

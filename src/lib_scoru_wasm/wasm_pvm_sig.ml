@@ -68,6 +68,9 @@ module type Internal_for_tests = sig
 
   val get_tick_state : tree -> tick_state Lwt.t
 
+  val get_module_instance_exn :
+    tree -> Tezos_webassembly_interpreter.Instance.module_inst Lwt.t
+
   val is_stuck : tree -> Wasm_pvm_errors.t option Lwt.t
 
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t

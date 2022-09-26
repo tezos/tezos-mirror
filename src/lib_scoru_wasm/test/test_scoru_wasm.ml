@@ -46,5 +46,6 @@ let () =
       ("Module Initialisation", Test_init.tests);
       ("Max nb of ticks", Test_fixed_nb_ticks.tests);
       ("Hash correspondence", Test_hash_consistency.tests);
+      ("Reveal", Test_reveal.tests);
     ]
   |> Lwt_main.run
