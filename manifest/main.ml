@@ -2612,7 +2612,7 @@ let _octez_signer_backends_tests =
         octez_base_unix;
         octez_stdlib |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
-        octez_crypto |> open_;
+        octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends |> open_;
         alcotest_lwt;
@@ -2656,7 +2656,7 @@ let _octez_signer_backends_unix_tests =
       [
         octez_error_monad |> open_;
         octez_stdlib |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_client_base |> open_;
         octez_signer_backends_unix |> open_;
         alcotest_lwt;

@@ -293,14 +293,14 @@ let commands base_dir require_auth : Client_context.full Tezos_clic.command list
              ~name:"pk"
              ~desc:"full public key (Base58 encoded)"
              (parameter (fun _ s ->
-                  Lwt.return (Signature.Public_key.of_b58check s)))
+                  Lwt.return (Tezos_crypto.Signature.Public_key.of_b58check s)))
         @@ stop)
         (fun name key cctxt ->
-          let pkh = Signature.Public_key.hash key in
+          let pkh = Tezos_crypto.Signature.Public_key.hash key in
           let name =
             match name with
             | Some name -> name
-            | None -> Signature.Public_key_hash.to_b58check pkh
+            | None -> Tezos_crypto.Signature.Public_key_hash.to_b58check pkh
           in
           Handler.Authorized_key.add ~force:false cctxt name key);
     ]

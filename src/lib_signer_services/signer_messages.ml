@@ -25,12 +25,13 @@
 
 module type Authenticated_request = sig
   type t = {
-    pkh : Signature.Public_key_hash.t;
+    pkh : Tezos_crypto.Signature.Public_key_hash.t;
     data : Bytes.t;
-    signature : Signature.t option;
+    signature : Tezos_crypto.Signature.t option;
   }
 
-  val to_sign : pkh:Signature.Public_key_hash.t -> data:Bytes.t -> Bytes.t
+  val to_sign :
+    pkh:Tezos_crypto.Signature.Public_key_hash.t -> data:Bytes.t -> Bytes.t
 
   val encoding : t Data_encoding.t
 end
@@ -41,9 +42,9 @@ end
 
 module Make_authenticated_request (T : Tag) : Authenticated_request = struct
   type t = {
-    pkh : Signature.Public_key_hash.t;
+    pkh : Tezos_crypto.Signature.Public_key_hash.t;
     data : Bytes.t;
-    signature : Signature.t option;
+    signature : Tezos_crypto.Signature.t option;
   }
 
   let x04 = Bytes.of_string "\x04"
@@ -53,7 +54,7 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
     TzEndian.set_int8 tag 0 T.tag ;
     Bytes.concat
       Bytes.empty
-      [x04; tag; Signature.Public_key_hash.to_bytes pkh; data]
+      [x04; tag; Tezos_crypto.Signature.Public_key_hash.to_bytes pkh; data]
 
   let encoding =
     let open Data_encoding in
@@ -61,9 +62,9 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
       (fun {pkh; data; signature} -> (pkh, data, signature))
       (fun (pkh, data, signature) -> {pkh; data; signature})
       (obj3
-         (req "pkh" Signature.Public_key_hash.encoding)
+         (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "data" bytes)
-         (opt "signature" Signature.encoding))
+         (opt "signature" Tezos_crypto.Signature.encoding))
 end
 
 module Sign = struct
@@ -72,12 +73,12 @@ module Sign = struct
   end)
 
   module Response = struct
-    type t = Signature.t
+    type t = Tezos_crypto.Signature.t
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.sign.response"
-      @@ obj1 (req "signature" Signature.encoding)
+      @@ obj1 (req "signature" Tezos_crypto.Signature.encoding)
   end
 end
 
@@ -113,12 +114,12 @@ end
 
 module Supports_deterministic_nonces = struct
   module Request = struct
-    type t = Signature.Public_key_hash.t
+    type t = Tezos_crypto.Signature.Public_key_hash.t
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.supports_deterministic_nonces.request"
-      @@ obj1 (req "pkh" Signature.Public_key_hash.encoding)
+      @@ obj1 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
   end
 
   module Response = struct
@@ -133,21 +134,21 @@ end
 
 module Public_key = struct
   module Request = struct
-    type t = Signature.Public_key_hash.t
+    type t = Tezos_crypto.Signature.Public_key_hash.t
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.public_key.request"
-      @@ obj1 (req "pkh" Signature.Public_key_hash.encoding)
+      @@ obj1 (req "pkh" Tezos_crypto.Signature.Public_key_hash.encoding)
   end
 
   module Response = struct
-    type t = Signature.Public_key.t
+    type t = Tezos_crypto.Signature.Public_key.t
 
     let encoding =
       let open Data_encoding in
       def "signer_messages.public_key.response"
-      @@ obj1 (req "pubkey" Signature.Public_key.encoding)
+      @@ obj1 (req "pubkey" Tezos_crypto.Signature.Public_key.encoding)
   end
 end
 
@@ -155,7 +156,7 @@ module Authorized_keys = struct
   module Response = struct
     type t =
       | No_authentication
-      | Authorized_keys of Signature.Public_key_hash.t list
+      | Authorized_keys of Tezos_crypto.Signature.Public_key_hash.t list
 
     let encoding =
       let open Data_encoding in
@@ -170,7 +171,7 @@ module Authorized_keys = struct
           case
             (Tag 1)
             ~title:"Authorized_keys"
-            (list Signature.Public_key_hash.encoding)
+            (list Tezos_crypto.Signature.Public_key_hash.encoding)
             (function Authorized_keys l -> Some l | _ -> None)
             (fun l -> Authorized_keys l);
         ]

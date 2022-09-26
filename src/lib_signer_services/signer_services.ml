@@ -32,7 +32,7 @@ let query =
           case, it must be the signature of the public key hash and message \
           concatenated, by one of the keys authorized by the signer."
        "authentication"
-       Signature.rpc_arg
+       Tezos_crypto.Signature.rpc_arg
        (fun signature -> signature)
   |> seal
 
@@ -41,8 +41,10 @@ let sign =
     ~description:"Sign a piece of data with a given remote key"
     ~query
     ~input:Data_encoding.bytes
-    ~output:Data_encoding.(obj1 (req "signature" Signature.encoding))
-    Tezos_rpc.Path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+    ~output:
+      Data_encoding.(obj1 (req "signature" Tezos_crypto.Signature.encoding))
+    Tezos_rpc.Path.(
+      root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
 let deterministic_nonce =
   Tezos_rpc.Service.post_service
@@ -52,7 +54,8 @@ let deterministic_nonce =
     ~query
     ~input:Data_encoding.bytes
     ~output:Data_encoding.(obj1 (req "deterministic_nonce" bytes))
-    Tezos_rpc.Path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+    Tezos_rpc.Path.(
+      root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
 let deterministic_nonce_hash =
   Tezos_rpc.Service.post_service
@@ -62,7 +65,8 @@ let deterministic_nonce_hash =
     ~query
     ~input:Data_encoding.bytes
     ~output:Data_encoding.(obj1 (req "deterministic_nonce_hash" bytes))
-    Tezos_rpc.Path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+    Tezos_rpc.Path.(
+      root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
 let supports_deterministic_nonces =
   Tezos_rpc.Service.get_service
@@ -71,15 +75,18 @@ let supports_deterministic_nonces =
        functionality"
     ~query:Tezos_rpc.Query.empty
     ~output:Data_encoding.(obj1 (req "supports_deterministic_nonces" bool))
-    Tezos_rpc.Path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+    Tezos_rpc.Path.(
+      root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
 let public_key =
   Tezos_rpc.Service.get_service
     ~description:"Retrieve the public key of a given remote key"
     ~query:Tezos_rpc.Query.empty
     ~output:
-      Data_encoding.(obj1 (req "public_key" Signature.Public_key.encoding))
-    Tezos_rpc.Path.(root / "keys" /: Signature.Public_key_hash.rpc_arg)
+      Data_encoding.(
+        obj1 (req "public_key" Tezos_crypto.Signature.Public_key.encoding))
+    Tezos_rpc.Path.(
+      root / "keys" /: Tezos_crypto.Signature.Public_key_hash.rpc_arg)
 
 let authorized_keys =
   Tezos_rpc.Service.get_service
@@ -91,5 +98,8 @@ let authorized_keys =
     ~query:Tezos_rpc.Query.empty
     ~output:
       Data_encoding.(
-        obj1 (opt "authorized_keys" (list Signature.Public_key_hash.encoding)))
+        obj1
+          (opt
+             "authorized_keys"
+             (list Tezos_crypto.Signature.Public_key_hash.encoding)))
     Tezos_rpc.Path.(root / "authorized_keys")

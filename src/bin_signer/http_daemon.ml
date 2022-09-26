@@ -55,7 +55,9 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
         if require_auth then
           let* keys = Handler.Authorized_key.load cctxt in
           let hashes =
-            List.map (fun (_, k) -> Signature.Public_key.hash k) keys
+            List.map
+              (fun (_, k) -> Tezos_crypto.Signature.Public_key.hash k)
+              keys
           in
           return_some hashes
         else return_none)

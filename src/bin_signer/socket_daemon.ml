@@ -63,7 +63,9 @@ let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
         if require_auth then
           let* keys = Handler.Authorized_key.load cctxt in
           let hashes =
-            List.map (fun (_, k) -> Signature.Public_key.hash k) keys
+            List.map
+              (fun (_, k) -> Tezos_crypto.Signature.Public_key.hash k)
+              keys
           in
           return (Authorized_keys.Response.Authorized_keys hashes)
         else return Authorized_keys.Response.No_authentication

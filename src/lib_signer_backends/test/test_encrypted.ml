@@ -178,12 +178,14 @@ let bls12_381_sks_encrypted =
     ]
 
 let sk_testable =
-  Alcotest.testable Signature.Secret_key.pp Signature.Secret_key.equal
+  Alcotest.testable
+    Tezos_crypto.Signature.Secret_key.pp
+    Tezos_crypto.Signature.Secret_key.equal
 
 let aggregate_sk_testable =
   Alcotest.testable
-    Aggregate_signature.Secret_key.pp
-    Aggregate_signature.Secret_key.equal
+    Tezos_crypto.Aggregate_signature.Secret_key.pp
+    Tezos_crypto.Aggregate_signature.Secret_key.equal
 
 let test_vectors () =
   let open Encrypted in
@@ -191,7 +193,9 @@ let test_vectors () =
     (fun (sks, encrypted_sks) ->
       let open Lwt_result_syntax in
       let ctx = fake_ctx () in
-      let sks = List.map Signature.Secret_key.of_b58check_exn sks in
+      let sks =
+        List.map Tezos_crypto.Signature.Secret_key.of_b58check_exn sks
+      in
       let*? l = encrypted_sks in
       let* decs = List.map_es (decrypt ctx) l in
       assert (decs = sks) ;
@@ -208,10 +212,13 @@ let test_vectors_aggregate () =
     (fun (sks, encrypted_sks) ->
       let open Lwt_result_syntax in
       let ctx = fake_ctx () in
-      let sks = List.map Aggregate_signature.Secret_key.of_b58check_exn sks in
+      let sks =
+        List.map Tezos_crypto.Aggregate_signature.Secret_key.of_b58check_exn sks
+      in
       let*? l = encrypted_sks in
       let* decs = List.map_es (decrypt_aggregate ctx) l in
-      assert (List.equal Aggregate_signature.Secret_key.equal decs sks) ;
+      assert (
+        List.equal Tezos_crypto.Aggregate_signature.Secret_key.equal decs sks) ;
       return_unit)
     [(bls12_381_sks, bls12_381_sks_encrypted)]
 
@@ -223,7 +230,7 @@ let test_random algo =
     let open Lwt_result_syntax in
     if i >= loops then return_unit
     else
-      let _, _, sk = Signature.generate_key ~algo () in
+      let _, _, sk = Tezos_crypto.Signature.generate_key ~algo () in
       let* sk_uri =
         Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt ctx sk
       in
@@ -241,7 +248,7 @@ let test_random_aggregate () =
     let open Lwt_result_syntax in
     if i >= loops then return_unit
     else
-      let _, _, sk = Aggregate_signature.generate_key () in
+      let _, _, sk = Tezos_crypto.Aggregate_signature.generate_key () in
       let* sk_uri =
         Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt_aggregate
           ctx
@@ -257,7 +264,7 @@ let test_random_aggregate () =
   in
   inner 0
 
-(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+(** For each of the algorithms [[Ed25519; Secp256k1; P256]], creates a
     dummy context. It randomly generates a Base58-encoded secret key,
     then encrypts it into a URI and decrypts it. It it asserted that
     the secret key is preserved after Base58-decoding comparison. This
@@ -265,12 +272,14 @@ let test_random_aggregate () =
 *)
 let test_random _switch () =
   let open Lwt_syntax in
-  let* r = List.iter_es test_random Signature.[Ed25519; Secp256k1; P256] in
+  let* r =
+    List.iter_es test_random Tezos_crypto.Signature.[Ed25519; Secp256k1; P256]
+  in
   match r with
   | Ok _ -> Lwt.return_unit
   | Error _ -> Lwt.fail_with "test_random"
 
-(** For each of the algorithms [Ed25519; Secp256k1; P256], creates a
+(** For each of the algorithms [[Ed25519; Secp256k1; P256]], creates a
     dummy context, uses it to decrypt a list of secret key URIs
     [...__sks_encrypted]. It is asserted that the decrypted keys shall
     match the list [..._sks].

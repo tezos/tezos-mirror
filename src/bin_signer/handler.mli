@@ -24,14 +24,15 @@
 (*****************************************************************************)
 
 (** Storage for keys that have been authorized for baking. *)
-module Authorized_key : Client_aliases.Alias with type t := Signature.public_key
+module Authorized_key :
+  Client_aliases.Alias with type t := Tezos_crypto.Signature.public_key
 
 (** [public_key cctxt pkh] returns the public key whose hash is [pkh]
     iff it is present if [cctxt]. *)
 val public_key :
   #Client_context.wallet ->
-  Signature.public_key_hash ->
-  Signature.public_key tzresult Lwt.t
+  Tezos_crypto.Signature.public_key_hash ->
+  Tezos_crypto.Signature.public_key tzresult Lwt.t
 
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
@@ -41,7 +42,7 @@ val sign :
   require_auth:bool ->
   #Client_context.wallet ->
   Signer_messages.Sign.Request.t ->
-  Signature.t tzresult Lwt.t
+  Tezos_crypto.Signature.t tzresult Lwt.t
 
 (** [deterministic_nonce cctxt req ~require_auth] generates
     deterministically a nonce from [req.data]. *)
@@ -63,4 +64,6 @@ val deterministic_nonce_hash :
 (** [supports_deterministic_nonces cctxt pkh] determines whether the signer
     provides the deterministic nonce functionality. *)
 val supports_deterministic_nonces :
-  #Client_context.wallet -> Signature.public_key_hash -> bool tzresult Lwt.t
+  #Client_context.wallet ->
+  Tezos_crypto.Signature.public_key_hash ->
+  bool tzresult Lwt.t

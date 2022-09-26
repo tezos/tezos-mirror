@@ -25,7 +25,9 @@
 
 module Make (P : sig
   val authenticate :
-    Signature.Public_key_hash.t list -> Bytes.t -> Signature.t tzresult Lwt.t
+    Tezos_crypto.Signature.Public_key_hash.t list ->
+    Bytes.t ->
+    Tezos_crypto.Signature.t tzresult Lwt.t
 end) : sig
   module Unix : Client_keys.SIGNER
 
