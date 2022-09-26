@@ -1740,12 +1740,15 @@ let test_draw_with_two_invalid_moves () =
       let choice = Sc_rollup.Tick.initial in
       dumb_proof ~choice
     in
-
     let* p1_final_move_op =
       Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
     in
     add_op block p1_final_move_op
   in
+
+  (* Get the frozen bonds for the two players before the draw. *)
+  let* frozen_bonds_p1 = Context.Contract.frozen_bonds (B block) p1 in
+  let* frozen_bonds_p2 = Context.Contract.frozen_bonds (B block) p2 in
 
   (* Player2 will also send an invalid final move. *)
   let* incr =
@@ -1762,7 +1765,28 @@ let test_draw_with_two_invalid_moves () =
 
   (* As both players played invalid moves, the game ends in a draw. *)
   let expected_game_status : Sc_rollup.Game.status = Ended Draw in
-  assert_refute_result ~game_status:expected_game_status incr
+  let* () = assert_refute_result ~game_status:expected_game_status incr in
+
+  (* The two players should have been slashed. *)
+  let* constants = Context.get_constants (I incr) in
+  let stake_amount = constants.parametric.sc_rollup.stake_amount in
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (I incr)
+      p1
+      frozen_bonds_p1
+      stake_amount
+  in
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (I incr)
+      p2
+      frozen_bonds_p2
+      stake_amount
+  in
+  return_unit
 
 (** Test that timeout a player during the final move ends the game if
     the other player played. *)
