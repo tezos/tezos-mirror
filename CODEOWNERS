@@ -15,11 +15,18 @@
 # Insert code owner declarations here!
 # ************************************
 
+/src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_openapi             @romain.nl
-/src/lib_version             @romain.nl
+/src/lib_base                @raphael-proust
+/src/lib_error_monad         @raphael-proust
 /src/lib_event_logging       @romain.nl
+/src/lib_lwt_result_stdlib   @raphael-proust
 /src/lib_openapi             @romain.nl
+/src/lib_protocol_environment   @raphael-proust
+/src/lib_stdlib              @raphael-proust
+/src/lib_stdlib_unix         @raphael-proust
+/src/lib_version             @romain.nl
 
 /scripts                     @romain.nl
 
