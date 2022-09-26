@@ -28,18 +28,20 @@
 module type Param_S = sig
   val size : int
 
-  val algo : [`Algo of Signature.algo | `Default]
+  val algo : [`Algo of Tezos_crypto.Signature.algo | `Default]
 end
 
 module type Finite_key_pool_S = sig
-  val pk : Signature.public_key Base_samplers.sampler
+  val pk : Tezos_crypto.Signature.public_key Base_samplers.sampler
 
-  val pkh : Signature.public_key_hash Base_samplers.sampler
+  val pkh : Tezos_crypto.Signature.public_key_hash Base_samplers.sampler
 
-  val sk : Signature.secret_key Base_samplers.sampler
+  val sk : Tezos_crypto.Signature.secret_key Base_samplers.sampler
 
   val all :
-    (Signature.public_key_hash * Signature.public_key * Signature.secret_key)
+    (Tezos_crypto.Signature.public_key_hash
+    * Tezos_crypto.Signature.public_key
+    * Tezos_crypto.Signature.secret_key)
     Base_samplers.sampler
 end
 
@@ -51,7 +53,12 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
 
   let key_pool = Queue.create ()
 
-  let all_algos = [|Signature.Ed25519; Signature.Secp256k1; Signature.P256|]
+  let all_algos =
+    [|
+      Tezos_crypto.Signature.Ed25519;
+      Tezos_crypto.Signature.Secp256k1;
+      Tezos_crypto.Signature.P256;
+    |]
 
   let uniform_algo state =
     let i = Random.State.int state (Array.length all_algos) in
@@ -67,7 +74,7 @@ module Make_finite_key_pool (Arg : Param_S) : Finite_key_pool_S = struct
       let seed =
         Base_samplers.uniform_bytes ~nbytes:minimal_seed_length state
       in
-      let triple = Signature.generate_key ~algo ~seed () in
+      let triple = Tezos_crypto.Signature.generate_key ~algo ~seed () in
       Queue.add triple key_pool ;
       triple)
     else

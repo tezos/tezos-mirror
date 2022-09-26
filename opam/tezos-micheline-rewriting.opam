@@ -12,6 +12,7 @@ depends: [
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "tezos-stdlib"
+  "tezos-crypto"
   "tezos-error-monad"
   "tezos-micheline"
   "tezos-protocol-alpha" {with-test}

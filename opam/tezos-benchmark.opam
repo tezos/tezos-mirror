@@ -12,6 +12,7 @@ depends: [
   "ppx_expect"
   "tezos-base"
   "tezos-stdlib-unix"
+  "tezos-crypto"
   "tezos-micheline"
   "tezos-clic"
   "data-encoding" { >= "0.6" & < "0.7" }

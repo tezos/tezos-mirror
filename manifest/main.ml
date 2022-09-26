@@ -2949,6 +2949,7 @@ let octez_benchmark =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_stdlib_unix |> open_;
+        octez_crypto;
         octez_micheline;
         octez_clic;
         data_encoding;
@@ -3011,6 +3012,7 @@ let octez_micheline_rewriting =
         zarith;
         zarith_stubs_js;
         octez_stdlib |> open_;
+        octez_crypto;
         octez_error_monad |> open_;
         octez_micheline |> open_;
       ]
@@ -3026,7 +3028,7 @@ let octez_shell_benchmarks =
         octez_base |> open_ |> open_ ~m:"TzPervasives";
         octez_error_monad |> open_;
         octez_benchmark |> open_;
-        octez_crypto |> open_;
+        octez_crypto;
         octez_context;
         octez_shell_context;
         octez_micheline;
