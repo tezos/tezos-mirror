@@ -208,6 +208,14 @@ module Global = struct
       let prefix = prefix / "block" /: Arg.block_id
     end)
 
+    let hash =
+      RPC_service.get_service
+        ~description:
+          "Tezos block hash of block known to the smart-contract rollup node"
+        ~query:RPC_query.empty
+        ~output:Block_hash.encoding
+        (path / "hash")
+
     let inbox =
       RPC_service.get_service
         ~description:"Rollup inbox for block"
