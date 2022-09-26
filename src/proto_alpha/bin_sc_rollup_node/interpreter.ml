@@ -183,14 +183,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return (state, fuel)
 
   let eval_block_inbox ~metadata ?fuel
-      Node_context.{data_dir; store; l1_ctxt; loser_mode; _} hash state =
+      Node_context.{data_dir; store; loser_mode; _} hash state =
     let open Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
     let*! inbox = Store.Inboxes.find store hash in
     match inbox with
     | None ->
         (* A level with no messages for use. Skip it. *)
-        let* level = Layer1.level_of_hash l1_ctxt hash in
+        let* level = State.level_of_hash store hash in
         return (state, Z.zero, Raw_level.of_int32_exn level, fuel)
     | Some inbox ->
         let inbox_level = Inbox.inbox_level inbox in

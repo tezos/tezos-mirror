@@ -38,6 +38,8 @@ module State = struct
 
   let add_history = Store.Histories.add
 
+  let level_of_hash = State.level_of_hash
+
   (** [inbox_of_head node_ctxt store block] returns the latest
       inbox at the given [block]. This function always returns
       [Some inbox] for all levels after the rollup genesis even when
@@ -212,12 +214,12 @@ let process_head node_ctxt Layer1.({level; hash = head_hash} as head) =
 
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
-  let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
+  let* level = State.level_of_hash node_ctxt.Node_context.store hash in
   State.inbox_of_head node_ctxt {hash; level}
 
 let history_of_hash node_ctxt hash =
   let open Lwt_result_syntax in
-  let* level = Layer1.level_of_hash node_ctxt.Node_context.l1_ctxt hash in
+  let* level = State.level_of_hash node_ctxt.Node_context.store hash in
   State.history_of_head node_ctxt {hash; level}
 
 let start () = Inbox_event.starting ()

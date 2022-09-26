@@ -241,28 +241,6 @@ let reconnect configuration l1_ctxt store =
   in
   return {l1_ctxt with heads; stopper}
 
-let level_of_hash =
-  let max_cached = 1023 in
-  let cache = Blocks_cache.create max_cached in
-  fun l1_ctxt hash ->
-    let open Lwt_result_syntax in
-    let*! level =
-      match Blocks_cache.find_opt cache hash with
-      | Some level -> level
-      | None -> Lwt.return_none
-    in
-    match level with
-    | Some level -> return level
-    | None ->
-        let+ {level; _} =
-          Tezos_shell_services.Chain_services.Blocks.Header.shell_header
-            l1_ctxt.cctxt
-            ~block:(`Hash (hash, 0))
-            ()
-        in
-        Blocks_cache.replace cache hash (Lwt.return_some level) ;
-        level
-
 let shutdown state =
   state.stopper () ;
   Lwt.return_unit

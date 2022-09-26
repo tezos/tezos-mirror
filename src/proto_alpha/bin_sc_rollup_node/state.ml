@@ -39,9 +39,9 @@ module Store = struct
 
     let string_of_key = Block_hash.to_b58check
 
-    type value = unit
+    type value = int32
 
-    let value_encoding = Data_encoding.unit
+    let value_encoding = Data_encoding.int32
   end)
 
   module LastProcessedHead = Store_utils.Make_mutable_value (struct
@@ -77,9 +77,16 @@ end
 
 let hash_of_level store level = Store.Levels.get store level
 
+let level_of_hash store hash =
+  let open Lwt_result_syntax in
+  let*! level = Store.ProcessedHashes.find store hash in
+  match level with
+  | None -> failwith "No level known for block %a" Block_hash.pp hash
+  | Some l -> return l
+
 let mark_processed_head store Layer1.({hash; level} as head) =
   let open Lwt_syntax in
-  let* () = Store.ProcessedHashes.add store hash () in
+  let* () = Store.ProcessedHashes.add store hash level in
   let* () = Store.Levels.add store level hash in
   Store.LastProcessedHead.set store head
 

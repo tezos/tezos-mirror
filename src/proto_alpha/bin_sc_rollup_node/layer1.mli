@@ -62,11 +62,6 @@ val start :
     exponential backoff (capped to 1.5h) . *)
 val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
-(** [level_of_hash l1_ctxt hash] returns the level for a given block
-   [hash]. Raise [Invalid_argument] if [hash] does not belong to
-   [store]. *)
-val level_of_hash : t -> Block_hash.t -> int32 tzresult Lwt.t
-
 (** [get_predecessor_opt state head] returns the predecessor of block [head],
     when [head] is not the genesis block. *)
 val get_predecessor_opt : t -> head -> head option tzresult Lwt.t

@@ -47,3 +47,7 @@ val get_finalized_head_opt : Store.t -> Layer1.head option Lwt.t
    given [level]. Raise [Invalid_argument] if [hash] does not belong
    to [store]. *)
 val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
+
+(** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
+    it is known by the rollup node. *)
+val level_of_hash : Store.t -> Block_hash.t -> int32 tzresult Lwt.t
