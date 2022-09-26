@@ -127,15 +127,17 @@ module Make (Interpreter : Interpreter.S) :
         let inbox = snapshot
       end
     end in
+    let metadata = Interpreter.metadata node_ctxt in
     let* proof =
       trace
         (Sc_rollup_node_errors.Cannot_produce_proof
            (snapshot_inbox, snapshot_history, game.inbox_level))
-      @@ (Sc_rollup.Proof.produce (module P) game.inbox_level
+      @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
     let*! res =
       Sc_rollup.Proof.valid
+        ~metadata
         snapshot
         game.inbox_level
         ~pvm_name:game.pvm_name
