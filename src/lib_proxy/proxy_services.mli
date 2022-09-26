@@ -42,7 +42,7 @@ type mode =
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : Ptime.span option;
       on_disk_proxy_builder :
-        (Context_hash.t ->
+        (Tezos_crypto.Context_hash.t ->
         Tezos_protocol_environment.Proxy_delegate.t tzresult Lwt.t)
         option;
     }
@@ -50,7 +50,7 @@ type mode =
           by {!Lwt_unix.sleep}. We don't want to depend on it directly
           (for compiling to Javascript), hence this field. The [Ptime.span option] field
           is the value of argument [--sym-block-caching-time]. The
-          [(Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option]
+          [(Tezos_crypto.Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option]
           value is constructed from argument [--data-dir]: if the argument
           is present, this value represents how data is looked up in the
           data-dir of a running node. *)
@@ -68,5 +68,5 @@ val build_directory :
   Tezos_client_base.Client_context.printer ->
   Tezos_rpc.Context.generic ->
   mode ->
-  Protocol_hash.t option ->
+  Tezos_crypto.Protocol_hash.t option ->
   unit Tezos_rpc.Directory.t

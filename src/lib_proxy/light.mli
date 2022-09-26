@@ -72,4 +72,4 @@ val sources_config_to_sources :
 
 (** [None] if the given block is symbolic, otherwise its concrete hash. *)
 val hash_of_block :
-  Tezos_shell_services.Block_services.block -> Block_hash.t option
+  Tezos_shell_services.Block_services.block -> Tezos_crypto.Block_hash.t option
