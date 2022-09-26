@@ -33,7 +33,7 @@ type determinizer_option = Percentile of int | Mean
 type storage_kind =
   | Memory
   | Disk of {
-      source : Signature.public_key_hash;
+      source : Tezos_crypto.Signature.public_key_hash;
       base_dir : string;
       header_json : string;
     }
@@ -114,7 +114,7 @@ let storage_kind_encoding : storage_kind Data_encoding.t =
       case
         ~title:"disk"
         (Tag 1)
-        (tup3 Signature.Public_key_hash.encoding string string)
+        (tup3 Tezos_crypto.Signature.Public_key_hash.encoding string string)
         (function
           | Memory -> None
           | Disk {source; base_dir; header_json} ->
