@@ -279,6 +279,9 @@ val raises :
 (** Check that a file with the given name exists. *)
 val file_exists : ?__LOC__:string -> string -> unit
 
+(** Check that a directory with the given name exists. *)
+val directory_exists : ?__LOC__:string -> string -> unit
+
 (** {2 Predicates on booleans} *)
 
 (** Check that a boolean is true.

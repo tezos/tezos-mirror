@@ -381,6 +381,10 @@ let file_exists ?__LOC__ path =
   if not (Sys.file_exists path) then
     Test.fail ?__LOC__ "expected that file %s exists" path
 
+let directory_exists ?__LOC__ path =
+  if not (Sys.is_directory path) then
+    Test.fail ?__LOC__ "expected that directory %s exists" path
+
 let is_true ?__LOC__ b ~error_msg =
   if not b then Test.fail ?__LOC__ "%s" error_msg
 
