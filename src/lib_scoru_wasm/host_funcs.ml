@@ -348,6 +348,47 @@ let store_copy =
             to_key_length
       | _ -> raise Bad_input)
 
+let store_move_name = "tezos_store_move"
+
+let store_move_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
+    |> Vector.of_list
+  in
+  let output_types = Vector.of_list [] in
+  Types.FuncType (input_types, output_types)
+
+let store_move =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | [
+       Values.(Num (I32 from_key_offset));
+       Values.(Num (I32 from_key_length));
+       Values.(Num (I32 to_key_offset));
+       Values.(Num (I32 to_key_length));
+      ] ->
+          let from_key_length = Int32.to_int from_key_length in
+          let to_key_length = Int32.to_int to_key_length in
+          if from_key_length > Durable.max_key_length then
+            raise (Key_too_large from_key_length) ;
+          if to_key_length > Durable.max_key_length then
+            raise (Key_too_large to_key_length) ;
+          let* memory = retrieve_memory memories in
+          let* from_key =
+            Memory.load_bytes memory from_key_offset from_key_length
+          in
+          let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
+          let tree = Durable.of_storage_exn durable in
+          let from_key = Durable.key_of_string_exn from_key in
+          let to_key = Durable.key_of_string_exn to_key in
+          let* move_tree = Durable.find_tree_exn tree from_key in
+          let* tree = Durable.add_tree tree to_key move_tree in
+          let+ tree = Durable.delete tree from_key in
+          (Durable.to_storage tree, [])
+      | _ -> raise Bad_input)
+
 let lookup_opt name =
   match name with
   | "read_input" ->
@@ -363,6 +404,8 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_delete_type, store_delete_name)))
   | "store_copy" ->
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
+  | "store_move" ->
+      Some (ExternFunc (HostFunc (store_move_type, store_move_name)))
   | _ -> None
 
 let lookup name =
@@ -381,6 +424,7 @@ let register_host_funcs registry =
       (store_list_size_name, store_list_size);
       (store_delete_name, store_delete);
       (store_copy_name, store_copy);
+      (store_move_name, store_move);
     ]
 
 module Internal_for_tests = struct
@@ -397,6 +441,8 @@ module Internal_for_tests = struct
   let store_delete = Func.HostFunc (store_delete_type, store_delete_name)
 
   let store_copy = Func.HostFunc (store_copy_type, store_copy_name)
+
+  let store_move = Func.HostFunc (store_move_type, store_move_name)
 
   let store_list_size =
     Func.HostFunc (store_list_size_type, store_list_size_name)
