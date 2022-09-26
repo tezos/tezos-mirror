@@ -17,21 +17,6 @@
  (modules config get_contracts sigs storage_helpers contract_size))
 
 (executable
- (name get_contracts_013_PtJakart)
- (libraries
-  tezos-base
-  tezos-protocol-013-PtJakart
-  tezos-client-013-PtJakart
-  get_contracts)
- (flags
-  (:standard)
-  -open Tezos_base.TzPervasives
-  -open Tezos_protocol_013_PtJakart
-  -open Tezos_protocol_013_PtJakart.Protocol
-  -open Tezos_client_013_PtJakart)
- (modules get_contracts_013_PtJakart))
-
-(executable
  (name get_contracts_014_PtKathma)
  (libraries
   tezos-base

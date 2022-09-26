@@ -89,11 +89,6 @@ ALPHA_DAEMON = "alpha"  # tezos-baker-alpha
 ALPHA_FOLDER = "proto_alpha"
 ALPHA_PARAMETERS = get_parameters(ALPHA_FOLDER)
 
-JAKARTA = "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
-JAKARTA_DAEMON = "013-PtJakart"
-JAKARTA_FOLDER = "proto_013_PtJakart"
-JAKARTA_PARAMETERS = get_parameters(JAKARTA_FOLDER)
-
 KATHMANDU = "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
 KATHMANDU_DAEMON = "014-PtKathma"
 KATHMANDU_FOLDER = "proto_014_PtKathma"

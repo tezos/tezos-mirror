@@ -102,8 +102,12 @@
   (select void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer from
    (tezos-protocol-plugin-012-Psithaca-registerer -> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty))
-  tezos-embedded-protocol-013-PtJakart
-  tezos-protocol-plugin-013-PtJakart-registerer
+  (select void_for_linking-tezos-embedded-protocol-013-PtJakart from
+   (tezos-embedded-protocol-013-PtJakart -> void_for_linking-tezos-embedded-protocol-013-PtJakart.empty)
+   (-> void_for_linking-tezos-embedded-protocol-013-PtJakart.empty))
+  (select void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer from
+   (tezos-protocol-plugin-013-PtJakart-registerer -> void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty)
+   (-> void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty))
   tezos-embedded-protocol-014-PtKathma
   tezos-protocol-plugin-014-PtKathma-registerer
   tezos-embedded-protocol-015-PtLimaPt
@@ -163,6 +167,8 @@
    (write-file void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-012-Psithaca.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty "")
+   (write-file void_for_linking-tezos-embedded-protocol-013-PtJakart.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 

@@ -21,9 +21,6 @@ depends: [
   "tezos-client-base-unix"
   "tezos-signer-backends"
   "uri" { >= "2.2.0" }
-  "tezos-client-013-PtJakart"
-  "tezos-baking-013-PtJakart-commands"
-  "tezos-protocol-plugin-013-PtJakart"
   "tezos-client-014-PtKathma"
   "tezos-baking-014-PtKathma-commands"
   "tezos-protocol-plugin-014-PtKathma"
@@ -53,6 +50,8 @@ depopts: [
   "tezos-protocol-plugin-011-PtHangz2"
   "tezos-client-012-Psithaca"
   "tezos-protocol-plugin-012-Psithaca"
+  "tezos-client-013-PtJakart"
+  "tezos-protocol-plugin-013-PtJakart"
   "tezos-client-alpha"
   "tezos-baking-alpha-commands"
   "tezos-protocol-plugin-alpha"
