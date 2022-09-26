@@ -36,6 +36,7 @@ open Lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 include Test_encodings_util
+open Wasm_utils
 module Wasm = Wasm_pvm.Make (Tree)
 module Wrapped_tree_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
 
@@ -64,8 +65,9 @@ let wrap_as_durable_storage tree =
 (* Test checking that if [key] is missing, [store_has key] returns [false] *)
 let test_store_has_missing_key () =
   let open Lwt.Syntax in
-  let* tree = empty_tree () in
-  let* durable = wrap_as_durable_storage tree in
+  let* durable = make_durable [("keepme", "true")] in
+  (* let* tree = empty_tree () in
+     let* durable = wrap_as_durable_storage tree in *)
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 10l in
@@ -109,8 +111,7 @@ let assert_invalid_key run =
 (* Test checking that if [key] is too large, [store_has key] traps. *)
 let test_store_has_key_too_long () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
-  let* durable = wrap_as_durable_storage tree in
+  let* durable = make_durable [("keepme", "true")] in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 10l in
@@ -159,8 +160,6 @@ let test_store_has_key_too_long () =
    subtrees. *)
 let test_store_list_size () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
-  let value () = Chunked_byte_vector.of_string "a very long value" in
   (*
   Store the following tree:
 
@@ -173,32 +172,14 @@ let test_store_list_size () =
   Note that the value of "/durable/a/short/path/_" is not included in the listing.
   *)
   let key = "/a/short/path" in
-  let key_steps = ["a"; "short"; "path"] in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
+  let* durable =
+    make_durable
+      [
+        ("a/short/path", "true");
+        ("a/short/path/one", "true");
+        ("a/short/path/two", "true");
+      ]
   in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["one"; "_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["two"; "_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* durable = wrap_as_durable_storage tree in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 20l in
@@ -230,8 +211,6 @@ let test_store_list_size () =
    durable storage. *)
 let test_store_delete () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
-  let value () = Chunked_byte_vector.of_string "a very long value" in
   (*
   Store the following tree:
     /durable/a/short/path/_ = "..."
@@ -240,33 +219,15 @@ let test_store_delete () =
 
   We expect that deleting "/a/short/path" is leaves only "/durable/a/long/path".
   *)
+  let* durable =
+    make_durable
+      [
+        ("a/short/path", "true");
+        ("a/short/path/one", "true");
+        ("a/long/path", "true");
+      ]
+  in
   let key = "/a/short/path" in
-  let key_steps = ["a"; "short"; "path"] in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["one"; "_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ["durable"; "a"; "long"; "path"; "_"]
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* durable = wrap_as_durable_storage tree in
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 20l in
@@ -311,45 +272,18 @@ let test_store_delete () =
    the correct enum value. *)
 let test_store_has_existing_key () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
-  let value () = Chunked_byte_vector.of_string "a very long value" in
-  let key_steps =
-    [
-      "thequickbrownfoxjumpedoverthelazydog";
-      "THEQUICKBROWNFOXJUMPEDOVERTHELAZYDOG";
-      "0123456789";
-      "key.containing.all.valid.chars";
-    ]
+  let root =
+    "thequickbrownfoxjumpedoverthelazydog/THEQUICKBROWNFOXJUMPEDOVERTHELAZYDOG/0123456789"
   in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
+  let* durable =
+    make_durable
+      [(root, "true"); (root ^ "/one", "true"); (root ^ "/two/three", "true")]
   in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["one"; "_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ("durable" :: List.append key_steps ["two"; "three"; "_"])
-         Tree_encoding.chunked_byte_vector)
-      (value ())
-      tree
-  in
-  let* durable = wrap_as_durable_storage tree in
+
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
   let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 20l in
-  let key = "/" ^ String.concat "/" key_steps in
+  let key = "/" ^ root in
   let _ = Memory.store_bytes memory src key in
   let src_one = 1000l in
   let key_one = key ^ "/one" in
@@ -393,18 +327,8 @@ let test_store_has_existing_key () =
    chunked_byte_vector *)
 let test_durable_find_value () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
-  let value = Chunked_byte_vector.of_string "a very long value" in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ["durable"; "hello"; "value"; "_"]
-         Tree_encoding.chunked_byte_vector)
-      value
-      tree
-  in
-  let* tree = wrap_as_durable_storage tree in
-  let durable = Durable.of_storage_exn tree in
+  let* durable = make_durable [("hello/value", "a very long value")] in
+  let durable = Durable.of_storage_exn durable in
   let* r =
     Durable.find_value durable @@ Durable.key_of_string_exn "/hello/value"
   in
@@ -428,26 +352,21 @@ let test_durable_find_value () =
 
 let test_durable_count_subtrees () =
   let open Lwt_syntax in
-  let* tree = empty_tree () in
+  let* tree =
+    make_durable
+      [
+        ("hello", "a very long value");
+        ("hello/world", "a very long value");
+        ("hello/you", "a very long value");
+        ("hello/you/too", "a very long value");
+      ]
+  in
   let assert_subtree_count t count under =
-    let* t = wrap_as_durable_storage t in
     let dbl = Durable.of_storage_exn t in
     let+ n = Durable.count_subtrees dbl @@ Durable.key_of_string_exn under in
     assert (n = count)
   in
-  let add_value t at =
-    let value = Chunked_byte_vector.of_string "a very long value" in
-    Tree_encoding_runner.encode
-      (Tree_encoding.scope at Tree_encoding.chunked_byte_vector)
-      value
-      t
-  in
-  let* () = assert_subtree_count tree 0 "/hello" in
-  let* tree = add_value tree ["durable"; "hello"; "world"; "_"] in
-  let* () = assert_subtree_count tree 1 "/hello" in
-  let* tree = add_value tree ["durable"; "hello"; "you"; "_"] in
   let* () = assert_subtree_count tree 2 "/hello" in
-  let* tree = add_value tree ["durable"; "hello"; "you"; "too"; "_"] in
   let* () = assert_subtree_count tree 2 "/hello" in
   let* () = assert_subtree_count tree 1 "/hello/you" in
   let* () = assert_subtree_count tree 0 "/hello/you/too" in

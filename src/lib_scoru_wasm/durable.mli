@@ -60,6 +60,8 @@ val max_key_length : int
 (** raise @Invalid_key *)
 val key_of_string_exn : string -> key
 
+val to_value_key : key -> string list
+
 (** [find_value durable key] optionally looks for the value encoded at [key]
     in [durable]. *)
 val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
