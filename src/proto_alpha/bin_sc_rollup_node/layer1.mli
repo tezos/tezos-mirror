@@ -69,9 +69,6 @@ val get_predecessor_opt : t -> head -> head option tzresult Lwt.t
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
 val get_predecessor : t -> head -> head tzresult Lwt.t
 
-(** [genesis_hash] is the hash of the genesis block of the chain. *)
-val genesis_hash : Block_hash.t
-
 (** [shutdown store] properly shut the layer 1 down. *)
 val shutdown : t -> unit Lwt.t
 

@@ -111,10 +111,6 @@ type t = {
 
 *)
 
-let genesis_hash =
-  Block_hash.of_b58check_exn
-    "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
-
 (** [predecessors_of_blocks hashes] given a list of successive hashes,
     returns an associative list that associates a hash to its
     predecessor in this list. *)
