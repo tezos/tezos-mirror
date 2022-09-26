@@ -809,7 +809,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
   let* () = Client.bake_for_and_wait client in
   let* final_period =
     let get_period () =
-      let* json = RPC.Votes.get_current_period client in
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+      in
       return @@ JSON.(json |-> "voting_period" |-> "kind" |> as_string)
     in
     let current_period = ref "proposal" in
@@ -839,7 +841,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       string
       ~error_msg:"We never reached the adoption period") ;
 
-  let* json = RPC.Votes.get_current_period client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+  in
   let level = JSON.(json |-> "remaining" |> as_int) in
   Log.info "Remaining %d blocks before the end of %s" level final_period ;
   Check.(
@@ -877,7 +881,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       int
       ~error_msg:"Expecting %R, got %L") ;
 
-  let* _json = RPC.Votes.get_current_period client in
+  let* _json =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+  in
   let* () = Client.bake_for_and_wait client in
   let* predicted_gas_in_simulation = simulate 4 in
   Log.info

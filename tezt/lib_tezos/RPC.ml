@@ -1049,4 +1049,45 @@ let get_chain_block_context_raw_json ?(chain = "main") ?(block = "head")
     (["chains"; chain; "blocks"; block; "context"; "raw"; "json"] @ path)
     Fun.id
 
+let get_chain_block_votes_ballot_list ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "ballot_list"] Fun.id
+
+let get_chain_block_votes_ballots ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "ballots"] Fun.id
+
+let get_chain_block_votes_current_period ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "current_period"] Fun.id
+
+let get_chain_block_votes_current_proposal ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "votes"; "current_proposal"]
+    Fun.id
+
+let get_chain_block_votes_current_quorum ?(chain = "main") ?(block = "head") ()
+    =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "current_quorum"] Fun.id
+
+let get_chain_block_votes_listings ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "listings"] Fun.id
+
+let get_chain_block_votes_proposals ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "votes"; "proposals"] Fun.id
+
+let get_chain_block_votes_successor_period ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "votes"; "successor_period"]
+    Fun.id
+
+let get_chain_block_votes_total_voting_power ?(chain = "main") ?(block = "head")
+    () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "votes"; "total_voting_power"]
+    Fun.id
+
 let make = RPC_core.make

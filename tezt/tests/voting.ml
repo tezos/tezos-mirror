@@ -126,15 +126,19 @@ let decode_period json =
 
 let get_current_period ?level client =
   let* json =
-    RPC.Votes.get_current_period ?block:(Option.map string_of_int level) client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_current_period
+         ?block:(Option.map string_of_int level)
+         ()
   in
   return (decode_period json)
 
 let get_successor_period ?level client =
   let* json =
-    RPC.Votes.get_successor_period
-      ?block:(Option.map string_of_int level)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_successor_period
+         ?block:(Option.map string_of_int level)
+         ()
   in
   return (decode_period json)
 
@@ -167,7 +171,10 @@ let check_current_level client expected_level =
 
 let get_proposals ?level client =
   let* proposals =
-    RPC.Votes.get_proposals ?block:(Option.map string_of_int level) client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_proposals
+         ?block:(Option.map string_of_int level)
+         ()
   in
   JSON.as_list proposals |> List.map JSON.as_list
   |> List.map (function
@@ -179,9 +186,10 @@ let get_proposals ?level client =
 
 let get_current_proposal ?level client =
   let* proposal =
-    RPC.Votes.get_current_proposal
-      ?block:(Option.map string_of_int level)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_current_proposal
+         ?block:(Option.map string_of_int level)
+         ()
   in
   if JSON.is_null proposal then return None
   else return (Some JSON.(proposal |> as_string))
@@ -203,7 +211,9 @@ let check_protocols ?level client expected_protocols =
   unit
 
 let check_listings_not_empty client =
-  let* listings = RPC.Votes.get_listings client in
+  let* listings =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_listings ()
+  in
   match JSON.as_list listings with
   | [] ->
       Test.fail "Expected GET .../votes/listing RPC to return a non-empty list"

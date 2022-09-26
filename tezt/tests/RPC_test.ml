@@ -588,15 +588,16 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   let* () = Client.submit_proposals ~proto_hash client in
   let* () = Client.bake_for_and_wait client in
   (* RPC calls *)
-  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
+  let call rpc = RPC.Client.call ?endpoint ~hooks client rpc in
+  let* _ = call @@ RPC.get_chain_block_votes_ballot_list () in
+  let* _ = call @@ RPC.get_chain_block_votes_ballots () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_period () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_proposal () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_quorum () in
+  let* _ = call @@ RPC.get_chain_block_votes_listings () in
+  let* _ = call @@ RPC.get_chain_block_votes_proposals () in
+  let* _ = call @@ RPC.get_chain_block_votes_successor_period () in
+  let* _ = call @@ RPC.get_chain_block_votes_total_voting_power () in
   (* bake to testing vote period and submit some ballots *)
   let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
@@ -604,15 +605,15 @@ let test_votes _test_mode_tag _protocol ?endpoint client =
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
   let* () = Client.bake_for_and_wait client in
   (* RPC calls again *)
-  let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_proposal ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_current_quorum ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_listings ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_proposals ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
-  let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
+  let* _ = call @@ RPC.get_chain_block_votes_ballot_list () in
+  let* _ = call @@ RPC.get_chain_block_votes_ballots () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_period () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_proposal () in
+  let* _ = call @@ RPC.get_chain_block_votes_current_quorum () in
+  let* _ = call @@ RPC.get_chain_block_votes_listings () in
+  let* _ = call @@ RPC.get_chain_block_votes_proposals () in
+  let* _ = call @@ RPC.get_chain_block_votes_successor_period () in
+  let* _ = call @@ RPC.get_chain_block_votes_total_voting_power () in
   unit
 
 (* Test the various other RPCs. *)

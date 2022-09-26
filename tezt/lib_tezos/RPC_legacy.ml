@@ -40,54 +40,6 @@ module Seed = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
-module Votes = struct
-  let sub_path ~chain ~block sub =
-    ["chains"; chain; "blocks"; block; "votes"; sub]
-
-  let get_ballot_list ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "ballot_list" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_ballots ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = sub_path ~chain ~block "ballots" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_proposal ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_proposal" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_quorum ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_quorum" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_listings ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
-    let path = sub_path ~chain ~block "listings" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_proposals ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = sub_path ~chain ~block "proposals" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_current_period ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "current_period" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_successor_period ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      client =
-    let path = sub_path ~chain ~block "successor_period" in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let get_total_voting_power ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") client =
-    let path = sub_path ~chain ~block "total_voting_power" in
-    Client.rpc ?endpoint ?hooks GET path client
-end
-
 module Script_cache = struct
   let get_cached_contracts ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       client =
