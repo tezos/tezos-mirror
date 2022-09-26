@@ -294,7 +294,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
             reconnection_config = config.p2p.reconnection_config;
             identity;
             proof_of_work_target =
-              Crypto_box.make_pow_target config.p2p.expected_pow;
+              Tezos_crypto.Crypto_box.make_pow_target config.p2p.expected_pow;
             trust_discovered_peers = sandbox <> None;
           }
         in
@@ -626,7 +626,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
               let target =
                 match l with
                 | [block_hash; level] ->
-                    ( Block_hash.of_b58check_exn block_hash,
+                    ( Tezos_crypto.Block_hash.of_b58check_exn block_hash,
                       Int32.of_string level )
                 | _ -> assert false
               in

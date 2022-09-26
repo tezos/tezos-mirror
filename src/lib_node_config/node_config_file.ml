@@ -70,12 +70,13 @@ let make_blockchain_network ~alias ~chain_name ?old_chain_name
     sandboxed_chain_name = of_string sandboxed_chain_name;
     user_activated_upgrades =
       List.map
-        (fun (l, h) -> (l, Protocol_hash.of_b58check_exn h))
+        (fun (l, h) -> (l, Tezos_crypto.Protocol_hash.of_b58check_exn h))
         user_activated_upgrades;
     user_activated_protocol_overrides =
       List.map
         (fun (a, b) ->
-          (Protocol_hash.of_b58check_exn a, Protocol_hash.of_b58check_exn b))
+          ( Tezos_crypto.Protocol_hash.of_b58check_exn a,
+            Tezos_crypto.Protocol_hash.of_b58check_exn b ))
         user_activated_protocol_overrides;
     default_bootstrap_peers;
   }
@@ -102,10 +103,10 @@ let blockchain_network_mainnet =
     {
       time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
       block =
-        Block_hash.of_b58check_exn
+        Tezos_crypto.Block_hash.of_b58check_exn
           "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
       protocol =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
     ~chain_name:"TEZOS_MAINNET"
@@ -131,10 +132,10 @@ let blockchain_network_ghostnet =
     {
       time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
       block =
-        Block_hash.of_b58check_exn
+        Tezos_crypto.Block_hash.of_b58check_exn
           "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9";
       protocol =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
     ~genesis_parameters:
@@ -172,10 +173,10 @@ let blockchain_network_limanet =
     {
       time = Time.Protocol.of_notation_exn "2022-10-13T15:00:00Z";
       block =
-        Block_hash.of_b58check_exn
+        Tezos_crypto.Block_hash.of_b58check_exn
           "BL3LAGwnWoNFM2H5ZA3Mbd622CVWMe8Kzfkksws4roKDD9WwBmf";
       protocol =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
     ~genesis_parameters:
@@ -207,10 +208,10 @@ let blockchain_network_kathmandunet =
     {
       time = Time.Protocol.of_notation_exn "2022-07-28T15:00:00Z";
       block =
-        Block_hash.of_b58check_exn
+        Tezos_crypto.Block_hash.of_b58check_exn
           "BLPZJvbTNPG2kgX97n2eCzPAFicqbxZNWSf6BkWsud5uihNua3a";
       protocol =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
     ~genesis_parameters:
@@ -241,10 +242,10 @@ let blockchain_network_sandbox =
     {
       time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
       block =
-        Block_hash.of_b58check_exn
+        Tezos_crypto.Block_hash.of_b58check_exn
           "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
       protocol =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
     }
     ~genesis_parameters:
