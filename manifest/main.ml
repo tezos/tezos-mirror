@@ -4724,7 +4724,7 @@ module Protocol = Protocol
             |> open_;
             octez_base_unix;
             octez_stdlib_unix |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             main |> open_;
             octez_micheline |> open_;
             client |> if_some |> open_;
@@ -4864,7 +4864,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
             |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             main |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
@@ -5023,7 +5023,7 @@ module Protocol = Protocol
             octez_benchmark |> open_;
             benchmark_type_inference |> if_some |> open_;
             main |> open_;
-            octez_crypto |> open_;
+            octez_crypto;
             parameters |> if_some;
             hashcons;
             test_helpers |> open_;
@@ -5095,7 +5095,7 @@ module Protocol = Protocol
             benchmark |> if_some |> open_;
             benchmark_type_inference |> if_some |> open_;
             main |> open_ |> open_ ~m:"Protocol";
-            octez_crypto |> open_;
+            octez_crypto;
             octez_shell_benchmarks;
             octez_micheline |> open_;
             test_helpers |> open_;
