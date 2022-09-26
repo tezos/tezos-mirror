@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 type error += Bad_amount_param of (string * string)
 
 let msg_parameter _param = Clic.parameter (fun _ s -> return s)

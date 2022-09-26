@@ -486,7 +486,7 @@ module Ledger_uri = struct
       "An imported ledger alias or a ledger URI (e.g. \
        \"ledger://animal/curve/path\")."
     in
-    let open Clic in
+    let open Tezos_clic.Clic in
     param
       ~name
       ~desc
@@ -816,7 +816,7 @@ let pp_ledger_chain_id fmt s =
 (** Commands for both ledger applications. *)
 let generic_commands group =
   let open Lwt_result_syntax in
-  Clic.
+  Tezos_clic.Clic.
     [
       command
         ~group
@@ -882,7 +882,7 @@ let generic_commands group =
                 return_none)
           in
           return_unit);
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Display version/public-key/address information for a Ledger URI"
         (args1 (switch ~doc:"Test signing operation" ~long:"test-sign" ()))
@@ -1010,9 +1010,9 @@ let generic_commands group =
     which get a specific treatment in {!high_water_mark_commands}. *)
 let baking_commands group =
   let open Lwt_result_syntax in
-  Clic.
+  Tezos_clic.Clic.
     [
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Query the path of the authorized key"
         no_options
@@ -1071,7 +1071,7 @@ let baking_commands group =
                         curve
                         Bip32_path.pp_path
                         (Bip32_path.tezos_root @ path))));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:
           "Authorize a Ledger to bake for a key (deprecated, use `setup ledger \
@@ -1130,7 +1130,7 @@ let baking_commands group =
                   pk
               in
               return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Setup a Ledger to bake for a key"
         (let hwm_arg kind =
@@ -1265,7 +1265,7 @@ let baking_commands group =
                   pk
               in
               return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Deauthorize Ledger from baking"
         no_options
@@ -1295,9 +1295,9 @@ let high_water_mark_commands group watermark_spelling =
       desc ^ " (legacy/deprecated spelling)"
     else desc
   in
-  Clic.
+  Tezos_clic.Clic.
     [
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:(make_desc "Get high water mark of a Ledger")
         (args1
@@ -1361,7 +1361,7 @@ let high_water_mark_commands group watermark_spelling =
                       tr
                   in
                   return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:(make_desc "Set high water mark of a Ledger")
         no_options
@@ -1406,7 +1406,7 @@ let high_water_mark_commands group watermark_spelling =
 let commands =
   let group =
     {
-      Clic.name = "ledger";
+      Tezos_clic.Clic.name = "ledger";
       title = "Commands for managing the connected Ledger Nano devices";
     }
   in

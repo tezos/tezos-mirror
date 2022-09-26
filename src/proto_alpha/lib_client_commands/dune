@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-clic
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-stdlib-unix
@@ -26,6 +27,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_clic
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_stdlib_unix
@@ -44,6 +46,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-clic
   tezos-protocol-alpha
   tezos-protocol-alpha.parameters
   tezos-protocol-environment
@@ -59,6 +62,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_clic
   -open Tezos_protocol_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_shell_services

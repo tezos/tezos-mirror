@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 (** {2 Cryptographic keys tables } *)
 
 type pk_uri = private Uri.t

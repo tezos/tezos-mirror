@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_clic
 
 module Sapling_gen_cmd = struct
   let lift_opt f opt_arg state =

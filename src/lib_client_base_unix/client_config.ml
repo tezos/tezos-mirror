@@ -324,7 +324,7 @@ let default_cli_args =
     client_mode = `Mode_client;
   }
 
-open Clic
+open Tezos_clic.Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> Lwt.return_ok x)
@@ -769,10 +769,10 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
 
 let commands config_file cfg (client_mode : client_mode)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
-  let open Clic in
+  let open Tezos_clic.Clic in
   let group =
     {
-      Clic.name = "config";
+      name = "config";
       title = "Commands for editing and viewing the client's config file";
     }
   in

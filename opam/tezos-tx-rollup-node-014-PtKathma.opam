@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
+  "tezos-clic"
   "tezos-protocol-014-PtKathma"
   "tezos-client-014-PtKathma"
   "tezos-client-base"

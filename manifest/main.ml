@@ -1018,7 +1018,6 @@ let octez_base =
         data_encoding |> open_;
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         octez_rpc |> open_;
-        octez_clic |> open_;
         octez_micheline |> open_;
         octez_event_logging |> open_;
         ptime;
@@ -2491,6 +2490,7 @@ let octez_client_base =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_clic;
         octez_rpc |> open_;
         octez_shell_services |> open_;
         octez_sapling;
@@ -2587,6 +2587,7 @@ let octez_signer_backends_unix =
         fmt;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_clic;
         octez_stdlib_unix |> open_;
         octez_stdlib |> open_;
         octez_client_base |> open_;
@@ -2628,6 +2629,7 @@ let octez_client_commands =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_rpc |> open_;
+        octez_clic |> open_;
         octez_clic_unix |> open_;
         octez_client_base |> open_;
         octez_shell_services |> open_;
@@ -2711,6 +2713,7 @@ let octez_mockup_commands =
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
+        octez_clic;
         octez_client_commands;
         octez_client_base;
         octez_mockup |> open_;
@@ -2823,6 +2826,7 @@ let octez_client_base_unix =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_clic;
         octez_rpc_http |> open_;
         octez_rpc_http_client_unix |> open_;
         octez_shell_services |> open_;
@@ -4120,6 +4124,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             octez_shell_services |> open_;
             octez_client_base |> open_;
             main |> open_;
@@ -4229,6 +4234,7 @@ module Protocol = Protocol
             |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
+            octez_clic |> open_;
             main |> open_;
             parameters |> if_some |> if_ N.(number >= 013) |> open_;
             octez_stdlib_unix |> open_;
@@ -4260,6 +4266,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             octez_crypto;
             octez_stdlib_unix |> open_;
             octez_client_base |> open_;
@@ -4284,6 +4291,7 @@ module Protocol = Protocol
             |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_base |> if_ N.(number >= 15) |> open_ ~m:"TzPervasives";
+            octez_clic |> open_;
             main |> open_;
             parameters |> if_some |> if_ N.(number >= 013) |> open_;
             octez_protocol_environment;
@@ -4313,6 +4321,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             octez_version;
             main |> open_;
             plugin |> if_some |> open_;
@@ -4494,6 +4503,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             main |> open_;
             client |> if_some |> open_;
             octez_client_commands |> open_;
@@ -4575,6 +4585,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             octez_client_base;
             client |> if_some |> open_;
             octez_client_commands |> open_;
@@ -4599,6 +4610,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             octez_client_commands |> open_;
             octez_stdlib_unix |> open_;
             octez_client_base |> open_;
@@ -4675,6 +4687,7 @@ module Protocol = Protocol
           [
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            octez_clic |> open_;
             main |> open_ |> open_ ~m:"Protocol";
             client |> if_some |> open_;
             client_commands |> if_some |> open_;
@@ -4697,6 +4710,7 @@ module Protocol = Protocol
             octez_base |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
             |> open_;
+            octez_clic |> open_;
             main |> open_;
             client |> if_some |> open_;
             octez_client_base |> open_;
@@ -5361,6 +5375,7 @@ let _octez_client =
       ([
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
+         octez_clic |> open_;
          octez_rpc_http_client |> open_;
          octez_stdlib_unix |> open_;
          octez_shell_services |> open_;
@@ -5467,7 +5482,7 @@ let _octez_snoop =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix |> open_;
-        octez_clic;
+        octez_clic |> open_;
         octez_benchmark |> open_;
         octez_benchmark_examples;
         octez_shell_benchmarks;
@@ -5525,6 +5540,7 @@ let _octez_signer =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_clic;
         octez_client_base |> open_;
         octez_client_base_unix |> open_;
         octez_client_commands |> open_;
@@ -5619,6 +5635,7 @@ let _octez_dal_node =
       ([
          octez_base |> open_ ~m:"TzPervasives";
          octez_base_unix;
+         octez_clic |> open_;
          octez_client_base |> open_;
          octez_client_base_unix |> open_;
          octez_client_commands |> open_;

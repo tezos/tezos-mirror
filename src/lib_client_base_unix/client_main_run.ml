@@ -27,6 +27,7 @@
 (* Tezos Command line interface - Main Program *)
 
 open Client_context_unix
+open Tezos_clic
 
 let builtin_commands =
   let open Lwt_syntax in

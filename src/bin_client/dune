@@ -9,6 +9,7 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-clic
   tezos-rpc-http-client
   tezos-stdlib-unix
   tezos-shell-services
@@ -100,6 +101,7 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
+  -open Tezos_clic
   -open Tezos_rpc_http_client
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
