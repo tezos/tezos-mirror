@@ -5668,6 +5668,10 @@ let exclude filename =
   | "vendors" :: _ -> true
   | "scripts" :: _ -> true
   | "docs" :: _ -> true
+  (* opam/mandatory-for-make.opam is a trick to have [make build-deps]
+     install some optional dependencies in a mandatory way.
+     Once we use lock files, we can remove this, probably. *)
+  | ["opam"; "mandatory-for-make.opam"] -> true
   (* opam-repository is used by scripts/opam-release.sh *)
   | "opam-repository" :: _ -> true
   (* Tezt is only partially managed by the manifest.
