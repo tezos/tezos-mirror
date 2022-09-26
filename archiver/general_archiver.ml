@@ -114,18 +114,26 @@ module Db_tables = Tables (Db_archiver)
 module Json_tables = Tables (Json_archiver)
 module Server_tables = Tables (Server_archiver)
 
-let maybe_add_rights (module T : TABLES) (module A : Archiver.S) level rights
-    wallet =
+let tables (module A : Archiver.S) =
+  match A.name with
+  | "db-archiver" -> (module Db_tables : TABLES)
+  | "json-archiver" -> (module Json_tables : TABLES)
+  | "remote-archiver" -> (module Server_tables : TABLES)
+  | _ -> Stdlib.failwith "unknown archiver"
+
+let maybe_add_rights (module A : Archiver.S) level rights wallet =
+  let module T = (val tables (module A)) in
   if Ring.mem T.registered_rights_levels level then ()
   else
     let () = Ring.add T.registered_rights_levels level in
     A.add_rights ~level rights wallet
 
 module Define
-    (Tables : TABLES)
     (Services : Protocol_machinery.PROTOCOL_SERVICES)
     (Archiver : Archiver.S) =
 struct
+  module Tables = (val tables (module Archiver))
+
   let rights_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     Services.endorsing_rights cctx ~reference_level:level level
@@ -175,9 +183,7 @@ struct
   let dump_my_current_endorsements cctx' wallet ~full reference_level level ops
       =
     let* rights = Services.endorsing_rights cctx' ~reference_level level in
-    let () =
-      maybe_add_rights (module Tables) (module Archiver) level rights wallet
-    in
+    let () = maybe_add_rights (module Archiver) level rights wallet in
     let (items, missing) = Services.couple_ops_to_rights ops rights in
     let endorsements =
       if full then
@@ -227,68 +233,56 @@ struct
 end
 
 (* Db modules *)
-module DM001 = Define (Db_tables) (PtCJ7pwo_machine.Services) (Db_archiver)
-module DM002 = Define (Db_tables) (PsYLVpVv_machine.Services) (Db_archiver)
-module DM003 = Define (Db_tables) (PsddFKi3_machine.Services) (Db_archiver)
-module DM004 = Define (Db_tables) (Pt24m4xi_machine.Services) (Db_archiver)
-module DM005 = Define (Db_tables) (PsBabyM1_machine.Services) (Db_archiver)
-module DM006 = Define (Db_tables) (PsCARTHA_machine.Services) (Db_archiver)
-module DM007 = Define (Db_tables) (PsDELPH1_machine.Services) (Db_archiver)
-module DM008 = Define (Db_tables) (PtEdo2Zk_machine.Services) (Db_archiver)
-module DM009 = Define (Db_tables) (PsFLoren_machine.Services) (Db_archiver)
-module DM010 = Define (Db_tables) (PtGRANAD_machine.Services) (Db_archiver)
-module DM011 = Define (Db_tables) (PtHangz2_machine.Services) (Db_archiver)
-module DM012 = Define (Db_tables) (Psithaca_machine.Services) (Db_archiver)
-module DM013 = Define (Db_tables) (PtJakart_machine.Services) (Db_archiver)
-module DM014 = Define (Db_tables) (PtKathma_machine.Services) (Db_archiver)
+module DM001 = Define (PtCJ7pwo_machine.Services) (Db_archiver)
+module DM002 = Define (PsYLVpVv_machine.Services) (Db_archiver)
+module DM003 = Define (PsddFKi3_machine.Services) (Db_archiver)
+module DM004 = Define (Pt24m4xi_machine.Services) (Db_archiver)
+module DM005 = Define (PsBabyM1_machine.Services) (Db_archiver)
+module DM006 = Define (PsCARTHA_machine.Services) (Db_archiver)
+module DM007 = Define (PsDELPH1_machine.Services) (Db_archiver)
+module DM008 = Define (PtEdo2Zk_machine.Services) (Db_archiver)
+module DM009 = Define (PsFLoren_machine.Services) (Db_archiver)
+module DM010 = Define (PtGRANAD_machine.Services) (Db_archiver)
+module DM011 = Define (PtHangz2_machine.Services) (Db_archiver)
+module DM012 = Define (Psithaca_machine.Services) (Db_archiver)
+module DM013 = Define (PtJakart_machine.Services) (Db_archiver)
+module DM014 = Define (PtKathma_machine.Services) (Db_archiver)
 
 (* Json modules *)
-module JM001 = Define (Json_tables) (PtCJ7pwo_machine.Services) (Json_archiver)
-module JM002 = Define (Json_tables) (PsYLVpVv_machine.Services) (Json_archiver)
-module JM003 = Define (Json_tables) (PsddFKi3_machine.Services) (Json_archiver)
-module JM004 = Define (Json_tables) (Pt24m4xi_machine.Services) (Json_archiver)
-module JM005 = Define (Json_tables) (PsBabyM1_machine.Services) (Json_archiver)
-module JM006 = Define (Json_tables) (PsCARTHA_machine.Services) (Json_archiver)
-module JM007 = Define (Json_tables) (PsDELPH1_machine.Services) (Json_archiver)
-module JM008 = Define (Json_tables) (PtEdo2Zk_machine.Services) (Json_archiver)
-module JM009 = Define (Json_tables) (PsFLoren_machine.Services) (Json_archiver)
-module JM010 = Define (Json_tables) (PtGRANAD_machine.Services) (Json_archiver)
-module JM011 = Define (Json_tables) (PtHangz2_machine.Services) (Json_archiver)
-module JM012 = Define (Json_tables) (Psithaca_machine.Services) (Json_archiver)
-module JM013 = Define (Json_tables) (PtJakart_machine.Services) (Json_archiver)
-module JM014 = Define (Json_tables) (PtKathma_machine.Services) (Json_archiver)
+module JM001 = Define (PtCJ7pwo_machine.Services) (Json_archiver)
+module JM002 = Define (PsYLVpVv_machine.Services) (Json_archiver)
+module JM003 = Define (PsddFKi3_machine.Services) (Json_archiver)
+module JM004 = Define (Pt24m4xi_machine.Services) (Json_archiver)
+module JM005 = Define (PsBabyM1_machine.Services) (Json_archiver)
+module JM006 = Define (PsCARTHA_machine.Services) (Json_archiver)
+module JM007 = Define (PsDELPH1_machine.Services) (Json_archiver)
+module JM008 = Define (PtEdo2Zk_machine.Services) (Json_archiver)
+module JM009 = Define (PsFLoren_machine.Services) (Json_archiver)
+module JM010 = Define (PtGRANAD_machine.Services) (Json_archiver)
+module JM011 = Define (PtHangz2_machine.Services) (Json_archiver)
+module JM012 = Define (Psithaca_machine.Services) (Json_archiver)
+module JM013 = Define (PtJakart_machine.Services) (Json_archiver)
+module JM014 = Define (PtKathma_machine.Services) (Json_archiver)
 
 (* Server modules *)
-module SM001 =
-  Define (Server_tables) (PtCJ7pwo_machine.Services) (Server_archiver)
-module SM002 =
-  Define (Server_tables) (PsYLVpVv_machine.Services) (Server_archiver)
-module SM003 =
-  Define (Server_tables) (PsddFKi3_machine.Services) (Server_archiver)
-module SM004 =
-  Define (Server_tables) (Pt24m4xi_machine.Services) (Server_archiver)
-module SM005 =
-  Define (Server_tables) (PsBabyM1_machine.Services) (Server_archiver)
-module SM006 =
-  Define (Server_tables) (PsCARTHA_machine.Services) (Server_archiver)
-module SM007 =
-  Define (Server_tables) (PsDELPH1_machine.Services) (Server_archiver)
-module SM008 =
-  Define (Server_tables) (PtEdo2Zk_machine.Services) (Server_archiver)
-module SM009 =
-  Define (Server_tables) (PsFLoren_machine.Services) (Server_archiver)
-module SM010 =
-  Define (Server_tables) (PtGRANAD_machine.Services) (Server_archiver)
-module SM011 =
-  Define (Server_tables) (PtHangz2_machine.Services) (Server_archiver)
-module SM012 =
-  Define (Server_tables) (Psithaca_machine.Services) (Server_archiver)
-module SM013 =
-  Define (Server_tables) (PtJakart_machine.Services) (Server_archiver)
-module SM014 =
-  Define (Server_tables) (PtKathma_machine.Services) (Server_archiver)
+module SM001 = Define (PtCJ7pwo_machine.Services) (Server_archiver)
+module SM002 = Define (PsYLVpVv_machine.Services) (Server_archiver)
+module SM003 = Define (PsddFKi3_machine.Services) (Server_archiver)
+module SM004 = Define (Pt24m4xi_machine.Services) (Server_archiver)
+module SM005 = Define (PsBabyM1_machine.Services) (Server_archiver)
+module SM006 = Define (PsCARTHA_machine.Services) (Server_archiver)
+module SM007 = Define (PsDELPH1_machine.Services) (Server_archiver)
+module SM008 = Define (PtEdo2Zk_machine.Services) (Server_archiver)
+module SM009 = Define (PsFLoren_machine.Services) (Server_archiver)
+module SM010 = Define (PtGRANAD_machine.Services) (Server_archiver)
+module SM011 = Define (PtHangz2_machine.Services) (Server_archiver)
+module SM012 = Define (Psithaca_machine.Services) (Server_archiver)
+module SM013 = Define (PtJakart_machine.Services) (Server_archiver)
+module SM014 = Define (PtKathma_machine.Services) (Server_archiver)
 
-module Loops (Tables : TABLES) (Archiver : Archiver.S) = struct
+module Loops (Archiver : Archiver.S) = struct
+  module Tables = (val tables (module Archiver))
+
   let mecanism chain starting ctxt f =
     let rec loop current ending =
       if current > ending then
@@ -326,14 +320,7 @@ module Loops (Tables : TABLES) (Archiver : Archiver.S) = struct
         match Protocol_hash.Table.find Tables.rights_machine next_protocol with
         | Some deal_with ->
             let* rights = deal_with cctx level in
-            let () =
-              maybe_add_rights
-                (module Tables)
-                (module Archiver)
-                level
-                rights
-                wallet
-            in
+            let () = maybe_add_rights (module Archiver) level rights wallet in
             return_unit
         | None -> return_unit)
 
@@ -474,7 +461,6 @@ module Loops (Tables : TABLES) (Archiver : Archiver.S) = struct
                                     in
                                     let () =
                                       maybe_add_rights
-                                        (module Tables)
                                         (module Archiver)
                                         (Int32.pred level)
                                         rights
@@ -489,7 +475,6 @@ module Loops (Tables : TABLES) (Archiver : Archiver.S) = struct
                                     let* rights = rights_of cctx level in
                                     let () =
                                       maybe_add_rights
-                                        (module Tables)
                                         (module Archiver)
                                         level
                                         rights
@@ -533,6 +518,6 @@ module Loops (Tables : TABLES) (Archiver : Archiver.S) = struct
         Lwt.return_unit
 end
 
-module Db_loops = Loops (Db_tables) (Db_archiver)
-module Json_loops = Loops (Json_tables) (Json_archiver)
-module Server_loops = Loops (Server_tables) (Server_archiver)
+module Db_loops = Loops (Db_archiver)
+module Json_loops = Loops (Json_archiver)
+module Server_loops = Loops (Server_archiver)
