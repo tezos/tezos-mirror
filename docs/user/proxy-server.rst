@@ -282,10 +282,10 @@ underlying node, it only serves the readonly requests (``GET`` requests, as
 well as a subset of the ``POST`` requests).
 
 Because computations done by the proxy server are protocol dependent, the proxy server
-does not support all protocols. However, it is expected than, at any
-given time, the proxy server supports ``Alpha`` and the three protocols
-before that. In doubt, execute
-``tezos-client list proxy protocols`` to see the supported protocols.
+does not support all protocols. However, it is expected that, at any
+given time, the proxy server supports ``Alpha``, the current protocol
+of Mainnet and the current protocol proposal on Mainnet at the time of release.
+In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
 
 .. _unsupported_rpcs:
 
