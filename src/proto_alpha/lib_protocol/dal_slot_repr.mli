@@ -97,6 +97,8 @@ type slot = t
 
 val equal : t -> t -> bool
 
+val pp_slot : Format.formatter -> t -> unit
+
 type slot_index = Index.t
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content
@@ -298,5 +300,6 @@ module Slots_history : sig
 
   module Internal_for_tests : sig
     val content : t -> slot
+
   end
 end
