@@ -757,8 +757,8 @@ module Consensus = struct
         consensus_content.slot
         vs.consensus_state.preendorsements_seen
     with
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
     | None -> ok_unit
 
   let wrap_preendorsement_conflict = function
@@ -1489,8 +1489,8 @@ module Voting = struct
       Signature.Public_key_hash.Map.find_opt source vs.voting_state.ballots_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_ballot_conflict = function
     | Ok () -> ok_unit
@@ -1538,8 +1538,8 @@ module Anonymous = struct
         vs.anonymous_state.activation_pkhs_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_activate_account_conflict
       (operation : Kind.activate_account operation) = function
@@ -1673,8 +1673,8 @@ module Anonymous = struct
             vs.anonymous_state.double_endorsing_evidences_seen
         with
         | None -> ok_unit
-        | Some oph' ->
-            Error (Operation_conflict {existing = oph'; new_operation = oph}))
+        | Some existing ->
+            Error (Operation_conflict {existing; new_operation = oph}))
 
   let check_double_preendorsement_evidence_conflict vs oph
       (operation : Kind.double_preendorsement_evidence operation) =
@@ -1828,8 +1828,8 @@ module Anonymous = struct
         vs.anonymous_state.double_baking_evidences_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let add_double_baking_evidence vs oph
       (operation : Kind.double_baking_evidence operation) =
@@ -1954,8 +1954,8 @@ module Anonymous = struct
         state.manager_state.managers_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_drain_delegate_conflict (operation : Kind.drain_delegate Operation.t)
       =
@@ -2012,8 +2012,8 @@ module Anonymous = struct
         vs.anonymous_state.seed_nonce_levels_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_seed_nonce_revelation_conflict = function
     | Ok () -> ok_unit
@@ -2057,8 +2057,8 @@ module Anonymous = struct
   let check_vdf_revelation_conflict vs oph =
     match vs.anonymous_state.vdf_solution_seen with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_vdf_revelation_conflict = function
     | Ok () -> ok_unit
@@ -2511,8 +2511,8 @@ module Manager = struct
         vs.manager_state.managers_seen
     with
     | None -> ok_unit
-    | Some oph' ->
-        Error (Operation_conflict {existing = oph'; new_operation = oph})
+    | Some existing ->
+        Error (Operation_conflict {existing; new_operation = oph})
 
   let wrap_check_manager_operation_conflict (type kind)
       (operation : kind Kind.manager operation) =
