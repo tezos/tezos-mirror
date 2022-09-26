@@ -30,7 +30,7 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 - Introduce an Array module, making a subset of Stdlib.Array available to the
   protocol (MR :gl:`!6042`)
 
-- Introduce an Q module, making a subset of Zarith.Q available to the
+- Introduce a module Q, making a subset of Zarith.Q available to the
   protocol (MR :gl:`!6042`)
 
 - Generalise the Bounded module to support more datatypes. (MR :gl:`!6076`)
@@ -235,7 +235,7 @@ RPC Changes
 - The ``run_operation`` RPC description has been updated to indicate
   that the RPC does not support consensus operations. It could already
   give inconsistent results on such operations, which was not
-  documented. It now returns on error when called on a consensus
+  documented. It now returns an error when called on a consensus
   operation. (MR :gl:`!5707`)
 
 - New RPC ``/chains/<chain_id>/blocks/<block>/context/constants/parametric``
