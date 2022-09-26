@@ -1,7 +1,7 @@
 [
   {
     "file": "test_logging.ml",
-    "title": "alpha: auction",
+    "title": "alpha: conditionals",
     "tags": [
       "regression",
       "protocol",
@@ -9,7 +9,7 @@
       "logging"
     ],
     "successful_runs": {
-      "total_time": "54192",
+      "total_time": "23607",
       "count": "1"
     },
     "failed_runs": {
@@ -19,7 +19,7 @@
   },
   {
     "file": "test_logging.ml",
-    "title": "alpha: xor",
+    "title": "015_PtLimaPt: big_map_union",
     "tags": [
       "regression",
       "protocol",
@@ -27,7 +27,7 @@
       "logging"
     ],
     "successful_runs": {
-      "total_time": "26116",
+      "total_time": "51141",
       "count": "1"
     },
     "failed_runs": {
@@ -37,7 +37,7 @@
   },
   {
     "file": "test_logging.ml",
-    "title": "015_PtLimaPt: spawn_identities",
+    "title": "014_PtKathma: cps_fact",
     "tags": [
       "regression",
       "protocol",
@@ -45,7 +45,7 @@
       "logging"
     ],
     "successful_runs": {
-      "total_time": "222624",
+      "total_time": "36010",
       "count": "1"
     },
     "failed_runs": {
@@ -54,16 +54,14 @@
     }
   },
   {
-    "file": "test_logging.ml",
-    "title": "014_PtKathma: comb-set",
+    "file": "injection.ml",
+    "title": "protocol activation (protocol already linked to the node)",
     "tags": [
-      "regression",
       "protocol",
-      "regression",
-      "logging"
+      "activation"
     ],
     "successful_runs": {
-      "total_time": "28913",
+      "total_time": "7822371",
       "count": "1"
     },
     "failed_runs": {
@@ -72,16 +70,15 @@
     }
   },
   {
-    "file": "test_logging.ml",
-    "title": "014_PtKathma: ticket_split",
+    "file": "p2p.ml",
+    "title": "check ip greylisting",
     "tags": [
-      "regression",
-      "protocol",
-      "regression",
-      "logging"
+      "p2p",
+      "acl",
+      "greylist"
     ],
     "successful_runs": {
-      "total_time": "29356",
+      "total_time": "9017701",
       "count": "1"
     },
     "failed_runs": {
@@ -90,15 +87,32 @@
     }
   },
   {
-    "file": "iticket_migration.ml",
-    "title": "ITicket semantics after migration",
+    "file": "bad_indentation.ml",
+    "title": "Alpha: Bad indentation contract hash is expected",
     "tags": [
-      "protocol",
-      "migration",
-      "sandbox"
+      "alpha",
+      "client",
+      "michelson"
     ],
     "successful_runs": {
-      "total_time": "11637308",
+      "total_time": "1973794",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "bad_indentation.ml",
+    "title": "Kathmandu: Formatted bad indentation contract is well-typed",
+    "tags": [
+      "kathmandu",
+      "client",
+      "michelson"
+    ],
+    "successful_runs": {
+      "total_time": "3000252",
       "count": "1"
     },
     "failed_runs": {
@@ -108,14 +122,14 @@
   },
   {
     "file": "baking.ml",
-    "title": "Kathmandu: External operations are ordered (5 transfers, max 1 operations)",
+    "title": "Alpha: wrong branch operation dismissal",
     "tags": [
-      "kathmandu",
-      "operations_pool",
-      "baking"
+      "alpha",
+      "baking",
+      "branch"
     ],
     "successful_runs": {
-      "total_time": "23541136",
+      "total_time": "14910765",
       "count": "1"
     },
     "failed_runs": {
@@ -124,20 +138,32 @@
     }
   },
   {
-    "file": "bootstrap.ml",
-    "title": "Alpha: node synchronization (rolling_0 / archive)",
+    "file": "baking.ml",
+    "title": "Jakarta: External operations are ordered (1 transfers, max 1 operations)",
     "tags": [
-      "alpha",
-      "bootstrap",
-      "node",
-      "sync",
-      "activate",
-      "bake",
-      "primary_rolling_0",
-      "secondary_archive"
+      "jakarta",
+      "operations_pool",
+      "baking"
     ],
     "successful_runs": {
-      "total_time": "52981807",
+      "total_time": "16963117",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "baking.ml",
+    "title": "Lima: External operations are ordered (3 transfers, max 3 operations)",
+    "tags": [
+      "lima",
+      "operations_pool",
+      "baking"
+    ],
+    "successful_runs": {
+      "total_time": "18371066",
       "count": "1"
     },
     "failed_runs": {
@@ -147,34 +173,15 @@
   },
   {
     "file": "cache_cache.ml",
-    "title": "Kathmandu: cache cache",
+    "title": "Jakarta: cache cache",
     "tags": [
-      "kathmandu",
+      "jakarta",
       "cache",
       "node",
       "baker"
     ],
     "successful_runs": {
-      "total_time": "21184186",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "client_commands.ml",
-    "title": "Jakarta: Simulation of failing operation with force",
-    "tags": [
-      "jakarta",
-      "client",
-      "simulation",
-      "failing",
-      "force"
-    ],
-    "successful_runs": {
-      "total_time": "8664682",
+      "total_time": "18275746",
       "count": "1"
     },
     "failed_runs": {
@@ -184,15 +191,15 @@
   },
   {
     "file": "client_run_view.ml",
-    "title": "Jakarta: Run view `v_entrypoint` with 10",
+    "title": "Kathmandu: Run view `v_entrypoint` with 10",
     "tags": [
-      "jakarta",
+      "kathmandu",
       "client",
       "michelson",
       "view"
     ],
     "successful_runs": {
-      "total_time": "3265120",
+      "total_time": "2974322",
       "count": "1"
     },
     "failed_runs": {
@@ -202,7 +209,7 @@
   },
   {
     "file": "client_run_view.ml",
-    "title": "Lima: Run view `loop` with default gas limit",
+    "title": "Lima: Run view calling another contract",
     "tags": [
       "lima",
       "client",
@@ -210,7 +217,45 @@
       "view"
     ],
     "successful_runs": {
-      "total_time": "3549615",
+      "total_time": "6834130",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "client_run_view.ml",
+    "title": "Jakarta: Run view on non existing contract",
+    "tags": [
+      "jakarta",
+      "client",
+      "michelson",
+      "view"
+    ],
+    "successful_runs": {
+      "total_time": "1960138",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "contract_hash_fun.ml",
+    "title": "Jakarta: Test contract hash function: keccak",
+    "tags": [
+      "jakarta",
+      "michelson",
+      "crypto",
+      "contract",
+      "hash",
+      "keccak"
+    ],
+    "successful_runs": {
+      "total_time": "37134903",
       "count": "1"
     },
     "failed_runs": {
@@ -220,7 +265,61 @@
   },
   {
     "file": "encoding.ml",
-    "title": "Kathmandu: protocol encoding regression test: block_header.unsigned",
+    "title": "Lima: protocol encoding regression test: operation",
+    "tags": [
+      "regression",
+      "lima",
+      "encoding",
+      "protocol"
+    ],
+    "successful_runs": {
+      "total_time": "23190471",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Jakarta: protocol encoding regression test: operation.raw",
+    "tags": [
+      "regression",
+      "jakarta",
+      "encoding",
+      "protocol"
+    ],
+    "successful_runs": {
+      "total_time": "1765480",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Alpha: protocol encoding regression test: operation.unsigned",
+    "tags": [
+      "regression",
+      "alpha",
+      "encoding",
+      "protocol"
+    ],
+    "successful_runs": {
+      "total_time": "21480092",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Kathmandu: protocol encoding regression test: vote.ballot",
     "tags": [
       "regression",
       "kathmandu",
@@ -228,25 +327,7 @@
       "protocol"
     ],
     "successful_runs": {
-      "total_time": "2270732",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "encoding.ml",
-    "title": "Lima: protocol encoding regression test: cycle",
-    "tags": [
-      "regression",
-      "lima",
-      "encoding",
-      "protocol"
-    ],
-    "successful_runs": {
-      "total_time": "4916707",
+      "total_time": "4747138",
       "count": "1"
     },
     "failed_runs": {
@@ -256,15 +337,35 @@
   },
   {
     "file": "manager_operations.ml",
-    "title": "Alpha: Contract call with not enough gas to deserialize argument",
+    "title": "Kathmandu: Contract's initial storage illtyped",
     "tags": [
-      "alpha",
+      "kathmandu",
+      "precheck",
+      "illtyped",
+      "origination",
+      "typing"
+    ],
+    "successful_runs": {
+      "total_time": "15499934",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Jakarta: Smart contract call that should succeeds with the provided gas limit",
+    "tags": [
+      "jakarta",
       "precheck",
       "gas",
-      "deserialization"
+      "deserialization",
+      "canary"
     ],
     "successful_runs": {
-      "total_time": "19631510",
+      "total_time": "19459788",
       "count": "1"
     },
     "failed_runs": {
@@ -274,14 +375,14 @@
   },
   {
     "file": "manager_operations.ml",
-    "title": "Lima: Simple transfer with wrong signature",
+    "title": "Lima: Two reveals in a batch. Second key is wrong",
     "tags": [
       "lima",
-      "transaction",
-      "transfer"
+      "reveal",
+      "revelation"
     ],
     "successful_runs": {
-      "total_time": "20836016",
+      "total_time": "25103332",
       "count": "1"
     },
     "failed_runs": {
@@ -291,71 +392,14 @@
   },
   {
     "file": "manager_operations.ml",
-    "title": "Lima: Test simple transfer with low balance to pay allocation (2)",
-    "tags": [
-      "lima",
-      "transaction",
-      "transfer"
-    ],
-    "successful_runs": {
-      "total_time": "41339598",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "manager_operations.ml",
-    "title": "Kathmandu: Test succesive injections with same manager",
+    "title": "Kathmandu: Simple transfer with not enough gas",
     "tags": [
       "kathmandu",
       "transaction",
-      "transfer",
-      "counters"
-    ],
-    "successful_runs": {
-      "total_time": "36810254",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Kathmandu: (Mockup) Transfer (empty, asynchronous)",
-    "tags": [
-      "kathmandu",
-      "mockup",
-      "client",
-      "empty",
-      "bake_for",
-      "asynchronous"
-    ],
-    "successful_runs": {
-      "total_time": "2671128",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Alpha: (Mockup) multiple transfer simulation",
-    "tags": [
-      "alpha",
-      "mockup",
-      "client",
-      "multiple",
       "transfer"
     ],
     "successful_runs": {
-      "total_time": "2482291",
+      "total_time": "16295675",
       "count": "1"
     },
     "failed_runs": {
@@ -364,53 +408,15 @@
     }
   },
   {
-    "file": "mockup.ml",
-    "title": "Alpha: (Mockup) Typechecking and normalization work with constants",
-    "tags": [
-      "alpha",
-      "mockup",
-      "client",
-      "global_constant"
-    ],
-    "successful_runs": {
-      "total_time": "7342655",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "multinode_snapshot.ml",
-    "title": "Alpha: storage snapshot, import and export",
-    "tags": [
-      "alpha",
-      "storage",
-      "snapshot",
-      "import",
-      "export"
-    ],
-    "successful_runs": {
-      "total_time": "261761522",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "prevalidator.ml",
-    "title": "Jakarta: Ensure that branch_refused operation is not recycled when we increment our head",
+    "file": "manager_operations.ml",
+    "title": "Jakarta: Test simple transfer with low balance to pay allocation (2)",
     "tags": [
       "jakarta",
-      "mempool",
-      "recycle",
-      "branch_refused"
+      "transaction",
+      "transfer"
     ],
     "successful_runs": {
-      "total_time": "37045480",
+      "total_time": "38184402",
       "count": "1"
     },
     "failed_runs": {
@@ -419,16 +425,73 @@
     }
   },
   {
-    "file": "prevalidator.ml",
-    "title": "Lima: Manager_restriction_ban",
+    "file": "manager_operations.ml",
+    "title": "Alpha: Test batch with wrong counters (+1, +2, +2)",
+    "tags": [
+      "alpha",
+      "transaction",
+      "transfer",
+      "counters",
+      "batch"
+    ],
+    "successful_runs": {
+      "total_time": "18654392",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Jakarta: Smart contract call with illtyped argument",
+    "tags": [
+      "jakarta",
+      "simple_contract_calls",
+      "smart",
+      "contract",
+      "call"
+    ],
+    "successful_runs": {
+      "total_time": "18898633",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Lima: Smart contract call that loops/fails with 'not enough gas' at exec",
     "tags": [
       "lima",
-      "mempool",
-      "manager_restriction",
-      "ban"
+      "simple_contract_calls",
+      "smart",
+      "contract",
+      "call"
     ],
     "successful_runs": {
-      "total_time": "16520117",
+      "total_time": "18283998",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "mockup.ml",
+    "title": "Alpha: (Mockup) origination fees from unrevealed",
+    "tags": [
+      "alpha",
+      "mockup",
+      "client",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "4259214",
       "count": "1"
     },
     "failed_runs": {
@@ -438,16 +501,15 @@
   },
   {
     "file": "prevalidator.ml",
-    "title": "Alpha: Manager_restriction_inject_isolated_node",
+    "title": "Alpha: Manager_restriction_propagation",
     "tags": [
       "alpha",
       "mempool",
       "manager_restriction",
-      "inject",
-      "isolated_node"
+      "propagation"
     ],
     "successful_runs": {
-      "total_time": "34983311",
+      "total_time": "30222654",
       "count": "1"
     },
     "failed_runs": {
@@ -457,33 +519,16 @@
   },
   {
     "file": "prevalidator.ml",
-    "title": "Kathmandu: mempool unban all operations",
-    "tags": [
-      "kathmandu",
-      "mempool",
-      "node",
-      "ban"
-    ],
-    "successful_runs": {
-      "total_time": "48386378",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "prevalidator.ml",
-    "title": "Lima: Ensure that future endorsement are propagated",
+    "title": "Lima: Max refused operations branch_delayed",
     "tags": [
       "lima",
-      "endorsement",
       "mempool",
+      "refused",
+      "max",
       "branch_delayed"
     ],
     "successful_runs": {
-      "total_time": "37848696",
+      "total_time": "29212777",
       "count": "1"
     },
     "failed_runs": {
@@ -493,17 +538,16 @@
   },
   {
     "file": "prevalidator.ml",
-    "title": "Alpha: mempool filter arrival",
+    "title": "Jakarta: mempool unban operation and reinject",
     "tags": [
-      "alpha",
+      "jakarta",
       "mempool",
       "node",
-      "filter",
-      "refused",
-      "applied"
+      "ban",
+      "reinject"
     ],
     "successful_runs": {
-      "total_time": "30460676",
+      "total_time": "54587568",
       "count": "1"
     },
     "failed_runs": {
@@ -513,15 +557,14 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Jakarta: (Proxy) (/chains/main/blocks/head/votes/ballots) No useless RPC call",
+    "title": "Kathmandu: (Proxy) Transfer",
     "tags": [
-      "jakarta",
+      "kathmandu",
       "proxy",
-      "rpc",
-      "get"
+      "transfer"
     ],
     "successful_runs": {
-      "total_time": "8108989",
+      "total_time": "9824486",
       "count": "1"
     },
     "failed_runs": {
@@ -531,15 +574,14 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Lima: (Proxy) (/chains/main/blocks/head/context/constants/errors) Cache at most once",
+    "title": "Kathmandu: (Proxy) Wrong proto",
     "tags": [
-      "lima",
+      "kathmandu",
       "proxy",
-      "rpc",
-      "get"
+      "initialization"
     ],
     "successful_runs": {
-      "total_time": "8291274",
+      "total_time": "7196238",
       "count": "1"
     },
     "failed_runs": {
@@ -549,15 +591,14 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Lima: (Proxy) (/chains/main/blocks/head/votes/total_voting_power) Cache at most once",
+    "title": "Lima: (Proxy) Wrong proto",
     "tags": [
       "lima",
       "proxy",
-      "rpc",
-      "get"
+      "initialization"
     ],
     "successful_runs": {
-      "total_time": "8494349",
+      "total_time": "7439980",
       "count": "1"
     },
     "failed_runs": {
@@ -567,7 +608,7 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Kathmandu: (Proxy) (/chains/main/blocks/head/votes/current_proposal) Cache at most once",
+    "title": "Kathmandu: (Proxy) (/chains/main/blocks/head/context/contracts) No useless RPC call",
     "tags": [
       "kathmandu",
       "proxy",
@@ -575,7 +616,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "8777590",
+      "total_time": "6991350",
       "count": "1"
     },
     "failed_runs": {
@@ -585,7 +626,43 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Kathmandu: (Proxy) (/chains/main/blocks/head/votes/listings) Cache at most once",
+    "title": "Lima: (Proxy) (/chains/main/blocks/head/helpers/baking_rights) Cache at most once",
+    "tags": [
+      "lima",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "7036254",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/context/nonces/3) Cache at most once",
+    "tags": [
+      "alpha",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "7626693",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Kathmandu: (Proxy) (/chains/main/blocks/head/votes/proposals) Cache at most once",
     "tags": [
       "kathmandu",
       "proxy",
@@ -593,7 +670,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "8767184",
+      "total_time": "8226469",
       "count": "1"
     },
     "failed_runs": {
@@ -603,69 +680,15 @@
   },
   {
     "file": "replace_by_fees.ml",
-    "title": "Alpha: Second op's fees are below threshold by 1 mutez",
+    "title": "Kathmandu: Much more fees in second op, but counter in the future",
     "tags": [
-      "alpha",
+      "kathmandu",
       "replace",
       "fee",
       "manager"
     ],
     "successful_runs": {
-      "total_time": "20951098",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "replace_by_fees.ml",
-    "title": "Alpha: Replace a replacement requires bumping fees again",
-    "tags": [
-      "alpha",
-      "replace",
-      "fee",
-      "manager"
-    ],
-    "successful_runs": {
-      "total_time": "30058582",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "replace_by_fees.ml",
-    "title": "Jakarta: Op2's gas/fee is more important, but fees are not higher than max",
-    "tags": [
-      "jakarta",
-      "replace",
-      "fee",
-      "manager"
-    ],
-    "successful_runs": {
-      "total_time": "32328021",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "replace_by_fees.ml",
-    "title": "Alpha: Replacing a batched op is possible if enough fees are provided",
-    "tags": [
-      "alpha",
-      "replace",
-      "fee",
-      "manager"
-    ],
-    "successful_runs": {
-      "total_time": "23755608",
+      "total_time": "19780187",
       "count": "1"
     },
     "failed_runs": {
@@ -675,16 +698,16 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Alpha: (mode light) RPC regression tests: votes",
+    "title": "Jakarta: (mode light) RPC regression tests: votes",
     "tags": [
       "regression",
-      "alpha",
+      "jakarta",
       "rpc",
       "light",
       "votes"
     ],
     "successful_runs": {
-      "total_time": "39085973",
+      "total_time": "33737616",
       "count": "1"
     },
     "failed_runs": {
@@ -694,16 +717,16 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Jakarta: (mode light) RPC regression tests: misc_protocol",
+    "title": "Alpha: (mode proxy_server_data_dir) RPC regression tests: votes",
     "tags": [
       "regression",
-      "jakarta",
+      "alpha",
       "rpc",
-      "light",
-      "misc_protocol"
+      "proxy_server_data_dir",
+      "votes"
     ],
     "successful_runs": {
-      "total_time": "13652521",
+      "total_time": "32685045",
       "count": "1"
     },
     "failed_runs": {
@@ -713,53 +736,16 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Jakarta: (mode proxy) RPC regression tests: delegates",
+    "title": "Lima: (mode proxy_server_data_dir) RPC regression tests: misc_protocol",
     "tags": [
       "regression",
-      "jakarta",
-      "rpc",
-      "proxy",
-      "delegates"
-    ],
-    "successful_runs": {
-      "total_time": "27921812",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Lima: (mode proxy) RPC tests: chain",
-    "tags": [
       "lima",
       "rpc",
-      "proxy",
-      "chain"
-    ],
-    "successful_runs": {
-      "total_time": "255779016",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "RPC_test.ml",
-    "title": "Kathmandu: (mode proxy_server_rpc) RPC regression tests: misc_protocol",
-    "tags": [
-      "regression",
-      "kathmandu",
-      "rpc",
-      "proxy_server_rpc",
+      "proxy_server_data_dir",
       "misc_protocol"
     ],
     "successful_runs": {
-      "total_time": "12611716",
+      "total_time": "11287189",
       "count": "1"
     },
     "failed_runs": {
@@ -769,19 +755,53 @@
   },
   {
     "file": "run_operation_RPC.ml",
-    "title": "Jakarta: Run_operation misc manager ops from fresh account",
+    "title": "Alpha: Run_operation correct batch",
     "tags": [
-      "jakarta",
+      "alpha",
       "rpc",
       "run_operation",
-      "fresh_account",
       "manager",
-      "reveal",
+      "batch",
       "transaction",
-      "delegation"
+      "delegation",
+      "correct_batch"
     ],
     "successful_runs": {
-      "total_time": "26047049",
+      "total_time": "7717928",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "runtime_script_failure.ml",
+    "title": "Kathmandu: Runtime Script Failure: client force",
+    "tags": [
+      "kathmandu",
+      "runtime_script_failure"
+    ],
+    "successful_runs": {
+      "total_time": "10021545",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "synchronisation_heuristic.ml",
+    "title": "Alpha: Check prevalidator start",
+    "tags": [
+      "alpha",
+      "bootstrap",
+      "node",
+      "prevalidator"
+    ],
+    "successful_runs": {
+      "total_time": "71353850",
       "count": "1"
     },
     "failed_runs": {
@@ -791,7 +811,7 @@
   },
   {
     "file": "test_contract_bls12_381.ml",
-    "title": "Alpha: Bls12_381 contract primitives, g2: negate",
+    "title": "Alpha: Bls12_381 contract primitives: pairing_check(neg, pos)",
     "tags": [
       "regression",
       "alpha",
@@ -799,51 +819,10 @@
       "crypto",
       "contract",
       "bls12_381",
-      "g2",
-      "negate"
+      "pairing_check"
     ],
     "successful_runs": {
-      "total_time": "14151006",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "tx_rollup.ml",
-    "title": "Kathmandu: RPC (tx_rollups, regression) - pending bonded commitments",
-    "tags": [
-      "regression",
-      "kathmandu",
-      "tx_rollup",
-      "rpc",
-      "commitment",
-      "bond"
-    ],
-    "successful_runs": {
-      "total_time": "17928557",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "tx_rollup.ml",
-    "title": "Alpha: RPC (tx_rollups, regression) - pending bonded commitments",
-    "tags": [
-      "regression",
-      "alpha",
-      "tx_rollup",
-      "rpc",
-      "commitment",
-      "bond"
-    ],
-    "successful_runs": {
-      "total_time": "17737452",
+      "total_time": "129672273",
       "count": "1"
     },
     "failed_runs": {
@@ -853,32 +832,16 @@
   },
   {
     "file": "tx_rollup_l2_node.ml",
-    "title": "Kathmandu: TX_rollup: configuration",
-    "tags": [
-      "kathmandu",
-      "tx_rollup",
-      "configuration"
-    ],
-    "successful_runs": {
-      "total_time": "7619847",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "tx_rollup_l2_node.ml",
-    "title": "Kathmandu: TX_rollup: test that the rollup node exits when it cannot connect to a Tezos node on startup",
+    "title": "Kathmandu: TX_rollup: test that the node refuses to start if not allowed to deposit",
     "tags": [
       "kathmandu",
       "tx_rollup",
       "node",
-      "connect"
+      "allow",
+      "deposit"
     ],
     "successful_runs": {
-      "total_time": "8693474",
+      "total_time": "7472225",
       "count": "1"
     },
     "failed_runs": {
@@ -888,15 +851,15 @@
   },
   {
     "file": "tx_rollup_l2_node.ml",
-    "title": "Kathmandu: TX_rollup: tickets hashes to tickets context",
+    "title": "Alpha: TX_rollup: inject transaction with transfer command",
     "tags": [
-      "kathmandu",
+      "alpha",
       "tx_rollup",
-      "tickets",
-      "context"
+      "client",
+      "transfer"
     ],
     "successful_runs": {
-      "total_time": "28908671",
+      "total_time": "18264549",
       "count": "1"
     },
     "failed_runs": {
@@ -906,15 +869,35 @@
   },
   {
     "file": "tx_rollup_l2_node.ml",
-    "title": "Lima: TX_rollup: dispatch withdrawals",
+    "title": "Lima: TX_rollup: origination and first deposit in same block",
     "tags": [
       "lima",
       "tx_rollup",
-      "dispatch",
-      "withdrawals"
+      "origination",
+      "genesis",
+      "deposit"
     ],
     "successful_runs": {
-      "total_time": "48401780",
+      "total_time": "11418669",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "tx_rollup_l2_node.ml",
+    "title": "Alpha: TX_rollup: origination and first deposit in same block",
+    "tags": [
+      "alpha",
+      "tx_rollup",
+      "origination",
+      "genesis",
+      "deposit"
+    ],
+    "successful_runs": {
+      "total_time": "12809810",
       "count": "1"
     },
     "failed_runs": {
@@ -924,7 +907,7 @@
   },
   {
     "file": "sc_rollup.ml",
-    "title": "Alpha: wasm_2_0_0 - refutation games winning strategies (inbox_proof)",
+    "title": "Alpha: wasm_2_0_0 - refutation games winning strategies (pvm_proof_2)",
     "tags": [
       "regression",
       "alpha",
@@ -932,10 +915,10 @@
       "refutation",
       "node",
       "wasm_2_0_0",
-      "inbox_proof"
+      "pvm_proof_2"
     ],
     "successful_runs": {
-      "total_time": "124076616",
+      "total_time": "102075046",
       "count": "1"
     },
     "failed_runs": {
@@ -945,7 +928,27 @@
   },
   {
     "file": "sc_rollup.ml",
-    "title": "Alpha: arith - rollup node - correct handling of commitments (first_published_at_level_global)",
+    "title": "Alpha: arith - get genesis info of a sc rollup",
+    "tags": [
+      "regression",
+      "alpha",
+      "sc_rollup",
+      "sc_rollup",
+      "genesis_info",
+      "arith"
+    ],
+    "successful_runs": {
+      "total_time": "15291323",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Alpha: arith - rollup node - correct handling of commitments (non_final_level)",
     "tags": [
       "regression",
       "alpha",
@@ -953,30 +956,10 @@
       "commitment",
       "node",
       "arith",
-      "first_published_at_level_global"
+      "non_final_level"
     ],
     "successful_runs": {
-      "total_time": "50955466",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "sc_rollup.ml",
-    "title": "Alpha: arith - a late rollup should catch up (late)",
-    "tags": [
-      "regression",
-      "alpha",
-      "sc_rollup",
-      "node",
-      "arith",
-      "late"
-    ],
-    "successful_runs": {
-      "total_time": "108279816",
+      "total_time": "70168891",
       "count": "1"
     },
     "failed_runs": {
@@ -986,15 +969,33 @@
   },
   {
     "file": "testnet_dictator.ml",
-    "title": "Alpha: testnet dictator (ghostnet, exploration)",
+    "title": "Alpha: testnet dictator (mainnet, exploration)",
     "tags": [
       "alpha",
       "amendment",
-      "ghostnet",
+      "mainnet",
       "exploration"
     ],
     "successful_runs": {
-      "total_time": "33989412",
+      "total_time": "30981182",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "testnet_dictator.ml",
+    "title": "Kathmandu: testnet dictator (ghostnet, adoption)",
+    "tags": [
+      "kathmandu",
+      "amendment",
+      "ghostnet",
+      "adoption"
+    ],
+    "successful_runs": {
+      "total_time": "48522032",
       "count": "1"
     },
     "failed_runs": {
