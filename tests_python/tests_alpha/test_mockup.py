@@ -12,7 +12,6 @@ import os
 import re
 import shutil
 import tempfile
-from pathlib import Path
 from typing import Any, List, Optional, Tuple, Iterator, Dict
 from pprint import pformat
 import pytest
@@ -57,44 +56,6 @@ def _create_accounts_list():
     )
 
     return accounts_list
-
-
-@pytest.mark.client
-def test_transfer_bad_base_dir(sandbox: Sandbox):
-    """Executes `octez-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir looks like a dubious base directory.
-    Checks that a warning is printed.
-    """
-    try:
-        unmanaged_client = sandbox.create_client()
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-        base_dir = unmanaged_client.base_dir
-        mockup_dir = os.path.join(base_dir, "mockup")
-
-        # A valid mockup has a directory named "mockup", in its directory:
-        assert os.path.isdir(mockup_dir)
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        # Delete this directory:
-        shutil.rmtree(mockup_dir)
-        # And put a file instead:
-        Path(os.path.join(mockup_dir)).touch()
-
-        # Now execute a command
-        cmd = ["transfer", "1", "from", "bootstrap1", "to", "bootstrap2"]
-        (_, err_output, _) = mock_client.run_generic(cmd, check=False)
-        # See
-        # https://gitlab.com/tezos/tezos/-/merge_requests/1760#note_329071488
-        # for the content being matched
-        searched = "Some commands .* might not work correctly."
-        # Witness that warning is printed:
-        assert re.search(
-            searched, err_output
-        ), f"'{searched}' not matched in error output"
-    finally:
-        shutil.rmtree(base_dir)
 
 
 @pytest.mark.client

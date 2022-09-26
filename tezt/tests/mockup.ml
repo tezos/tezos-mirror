@@ -771,6 +771,44 @@ let test_create_mockup_custom_bootstrap_accounts =
       ~error_msg:"Expected names %R, got %L") ;
   unit
 
+let rmdir dir = Process.spawn "rm" ["-rf"; dir] |> Process.check
+
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] looks like a dubious base directory. Checks that a warning
+   is printed. *)
+let test_transfer_bad_base_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Transfer bad base dir."
+    ~tags:["mockup"; "client"; "initialization"]
+  @@ fun protocol ->
+  Log.info "First create mockup with an empty base dir" ;
+  let base_dir = Temp.dir "mockup-dir" in
+  Sys.rmdir base_dir ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () = Client.create_mockup ~protocol client in
+  let base_dir = Client.base_dir client in
+  let mockup_dir = base_dir // "mockup" in
+  Log.info "A valid mockup has a directory named [mockup], in its directory" ;
+  Check.directory_exists ~__LOC__ mockup_dir ;
+
+  Log.info "Delete this directory:" ;
+  let* () = rmdir mockup_dir in
+  Log.info "And put a file instead:" ;
+  write_file mockup_dir ~contents:"" ;
+
+  Log.info "Now execute a command" ;
+  let* () =
+    Client.spawn_transfer
+      ~amount:Tez.one
+      ~giver:"bootstrap1"
+      ~receiver:"bootstrap2"
+      client
+    |> Process.check_error
+         ~msg:(rex "Some commands .* might not work correctly.")
+  in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -787,7 +825,8 @@ let register ~protocols =
   test_retrieve_addresses protocols ;
   test_create_mockup_already_initialized protocols ;
   test_create_mockup_custom_constants protocols ;
-  test_create_mockup_custom_bootstrap_accounts protocols
+  test_create_mockup_custom_bootstrap_accounts protocols ;
+  test_transfer_bad_base_dir protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
