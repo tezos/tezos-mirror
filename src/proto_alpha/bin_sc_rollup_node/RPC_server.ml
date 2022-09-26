@@ -33,6 +33,22 @@ let get_head store =
   let*! head = State.last_processed_head_opt store in
   match head with None -> failwith "No head" | Some {hash; _} -> return hash
 
+let get_finalized store =
+  let open Lwt_result_syntax in
+  let*! head = State.get_finalized_head_opt store in
+  match head with
+  | None -> failwith "No finalized head"
+  | Some {hash; _} -> return hash
+
+let get_last_cemented store =
+  let open Lwt_result_syntax in
+  protect @@ fun () ->
+  let*! lcc_level = Store.Last_cemented_commitment_level.get store in
+  let*! lcc_hash =
+    State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
+  in
+  return lcc_hash
+
 let get_head_hash_opt store =
   let open Lwt_option_syntax in
   let+ {hash; _} = State.last_processed_head_opt store in
@@ -151,6 +167,8 @@ module Block_directory = Make_directory (struct
       | `Head -> get_head node_ctxt.Node_context.store
       | `Hash b -> return b
       | `Level l -> State.hash_of_level node_ctxt.store l >>= return
+      | `Finalized -> get_finalized node_ctxt.Node_context.store
+      | `Cemented -> get_last_cemented node_ctxt.Node_context.store
     in
     (node_ctxt, block)
 end)
@@ -299,10 +317,7 @@ module Make (PVM : Pvm.S) = struct
     @@ fun node_ctxt () () ->
     let open Lwt_result_syntax in
     let store = node_ctxt.Node_context.store in
-    let*! lcc_level = Store.Last_cemented_commitment_level.get store in
-    let*! block_hash =
-      State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
-    in
+    let* block_hash = get_last_cemented store in
     let* state = get_state node_ctxt block_hash in
     let*! outbox = PVM.get_outbox state in
     return outbox

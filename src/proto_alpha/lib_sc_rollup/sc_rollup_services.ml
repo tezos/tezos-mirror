@@ -62,16 +62,21 @@ module Encodings = struct
 end
 
 module Arg = struct
-  type block_id = [`Head | `Hash of Block_hash.t | `Level of Int32.t]
+  type block_id =
+    [`Head | `Hash of Block_hash.t | `Level of Int32.t | `Finalized | `Cemented]
 
   let construct_block_id = function
     | `Head -> "head"
     | `Hash h -> Block_hash.to_b58check h
     | `Level l -> Int32.to_string l
+    | `Finalized -> "finalized"
+    | `Cemented -> "cemented"
 
   let destruct_block_id h =
     match h with
     | "head" -> Ok `Head
+    | "finalized" -> Ok `Finalized
+    | "cemented" -> Ok `Cemented
     | _ -> (
         match Int32.of_string_opt h with
         | Some l -> Ok (`Level l)
