@@ -38,8 +38,8 @@ type error +=
       layer1_inbox : Sc_rollup.Inbox.t;
       inbox : Sc_rollup.Inbox.t;
     }
-  | Missing_PVM_state of Block_hash.t * Int32.t
-  | Cannot_checkout_context of Block_hash.t * string option
+  | Missing_PVM_state of Tezos_crypto.Block_hash.t * Int32.t
+  | Cannot_checkout_context of Tezos_crypto.Block_hash.t * string option
   | Cannot_retrieve_reveal of Sc_rollup.Reveal_hash.t
 
 type error +=
@@ -176,10 +176,11 @@ let () =
       Format.fprintf
         ppf
         "Cannot retrieve PVM state for block %a at level %ld"
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block
         level)
-    Data_encoding.(obj2 (req "block" Block_hash.encoding) (req "level" int32))
+    Data_encoding.(
+      obj2 (req "block" Tezos_crypto.Block_hash.encoding) (req "level" int32))
     (function
       | Missing_PVM_state (block, level) -> Some (block, level) | _ -> None)
     (fun (block, level) -> Missing_PVM_state (block, level)) ;
@@ -198,11 +199,11 @@ let () =
            ~none:""
            ~some:(fun c -> Hex.(show (of_string c)))
            context_hash)
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         block)
     Data_encoding.(
       obj2
-        (req "block" Block_hash.encoding)
+        (req "block" Tezos_crypto.Block_hash.encoding)
         (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
     (function
       | Cannot_checkout_context (block, context) -> Some (block, context)
@@ -219,7 +220,7 @@ let () =
         ppf
         "The rollup node lost the refutation game for operator %a and was \
          slashed %s%a, for reason: %a."
-        Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.Public_key_hash.pp
         loser
         tez_sym
         Tez.pp
@@ -228,7 +229,7 @@ let () =
         reason)
     Data_encoding.(
       obj3
-        (req "loser" Signature.Public_key_hash.encoding)
+        (req "loser" Tezos_crypto.Signature.Public_key_hash.encoding)
         (req "reason" Protocol.Alpha_context.Sc_rollup.Game.reason_encoding)
         (req "slashed" Tez.encoding))
     (function

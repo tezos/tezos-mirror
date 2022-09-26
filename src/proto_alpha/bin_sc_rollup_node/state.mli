@@ -25,7 +25,7 @@
 
 (** [is_processed store hash] returns [true] if the block with [hash] has
     already been processed by the daemon. *)
-val is_processed : Store.t -> Block_hash.t -> bool Lwt.t
+val is_processed : Store.t -> Tezos_crypto.Block_hash.t -> bool Lwt.t
 
 (** [mark_processed_head store head] remembers that the [head] is processed. The
     system should not have to come back to it. *)
@@ -46,11 +46,11 @@ val get_finalized_head_opt : Store.t -> Layer1.head option Lwt.t
 (** [hash_of_level store level] returns the current block hash for a
    given [level]. Raise [Invalid_argument] if [hash] does not belong
    to [store]. *)
-val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
+val hash_of_level : Store.t -> int32 -> Tezos_crypto.Block_hash.t Lwt.t
 
 (** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
     it is known by the rollup node. *)
-val level_of_hash : Store.t -> Block_hash.t -> int32 tzresult Lwt.t
+val level_of_hash : Store.t -> Tezos_crypto.Block_hash.t -> int32 tzresult Lwt.t
 
 (** [set_block_level_and_has store head] registers the correspondences
     [head.level |-> head.hash] and [head.hash |-> head.level] in the store. *)

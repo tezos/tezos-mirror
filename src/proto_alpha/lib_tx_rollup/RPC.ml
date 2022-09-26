@@ -31,7 +31,7 @@ open Alpha_context
 type block_id =
   [ `Head
   | `L2_block of L2block.hash
-  | `Tezos_block of Block_hash.t
+  | `Tezos_block of Tezos_crypto.Block_hash.t
   | `Level of L2block.level ]
 
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
@@ -62,7 +62,7 @@ let context_of_id state context_id =
 let construct_block_id = function
   | `Head -> "head"
   | `L2_block h -> L2block.Hash.to_b58check h
-  | `Tezos_block h -> Block_hash.to_b58check h
+  | `Tezos_block h -> Tezos_crypto.Block_hash.to_b58check h
   | `Level l -> L2block.level_to_string l
 
 let destruct_block_id h =
@@ -76,7 +76,7 @@ let destruct_block_id h =
           | Error _ -> Error "Invalid rollup level"
           | Ok l -> Ok (`Level l))
       | None -> (
-          match Block_hash.of_b58check_opt h with
+          match Tezos_crypto.Block_hash.of_b58check_opt h with
           | Some b -> Ok (`Tezos_block b)
           | None -> (
               match L2block.Hash.of_b58check_opt h with
@@ -344,7 +344,8 @@ module Block = struct
     | None -> return_none
     | Some block -> (
         match block_id with
-        | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+        | `Tezos_block b
+          when Tezos_crypto.Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
             return_none
         | _ -> return_some block.inbox)
@@ -357,9 +358,13 @@ module Block = struct
     | Some block ->
         let*? () =
           match block_id with
-          | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+          | `Tezos_block b
+            when Tezos_crypto.Block_hash.(block.header.tezos_block <> b) ->
               (* Tezos block has no l2 inbox *)
-              error_with "The tezos block (%a) has not L2 inbox" Block_hash.pp b
+              error_with
+                "The tezos block (%a) has not L2 inbox"
+                Tezos_crypto.Block_hash.pp
+                b
           | _ -> ok ()
         in
         let*? () =
@@ -413,7 +418,7 @@ module Context_RPC = struct
   type address_metadata = {
     index : Tx_rollup_l2_context_sig.address_index;
     counter : int64;
-    public_key : Bls.Public_key.t;
+    public_key : Tezos_crypto.Bls.Public_key.t;
   }
 
   let address_metadata_encoding =
@@ -424,7 +429,7 @@ module Context_RPC = struct
       @@ obj3
            (req "index" Tx_rollup_l2_address.Indexable.index_encoding)
            (req "counter" int64)
-           (req "public_key" Bls.Public_key.encoding))
+           (req "public_key" Tezos_crypto.Bls.Public_key.encoding))
 
   let balance =
     Tezos_rpc.Service.get_service
@@ -496,7 +501,7 @@ module Context_RPC = struct
         "Get the BLS public key associated to the given address, or null if \
          the address has not performed any transfer or withdraw on the rollup."
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option Bls.Public_key.encoding)
+      ~output:(Data_encoding.option Tezos_crypto.Bls.Public_key.encoding)
       Tezos_rpc.Path.(
         path / "addresses" /: Arg.address_indexable / "public_key")
 

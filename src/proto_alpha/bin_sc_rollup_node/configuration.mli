@@ -39,7 +39,7 @@ type purpose = Publish | Add_messages | Cement | Timeout | Refute
 
 module Operator_purpose_map : Map.S with type key = purpose
 
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
+type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 

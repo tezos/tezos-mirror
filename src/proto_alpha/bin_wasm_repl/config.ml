@@ -25,13 +25,13 @@
 
 let default_sender = Protocol.Contract_hash.zero
 
-let default_source = Signature.Public_key_hash.zero
+let default_source = Tezos_crypto.Signature.Public_key_hash.zero
 
 let default_destination = Protocol.Alpha_context.Sc_rollup.Address.zero
 
 type config = {
   sender : Protocol.Contract_hash.t;
-  source : Signature.public_key_hash;
+  source : Tezos_crypto.Signature.public_key_hash;
   destination : Protocol.Alpha_context.Sc_rollup.t;
 }
 

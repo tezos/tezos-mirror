@@ -44,7 +44,7 @@ let pp_prechecked_manager_ops fmt set =
          Format.fprintf
            ppf
            "(%a -> {fee: %a; gas: %a; weight: %a})"
-           Operation_hash.pp
+           Tezos_crypto.Operation_hash.pp
            oph
            Alpha_context.Tez.pp
            op_info.fee
@@ -52,13 +52,13 @@ let pp_prechecked_manager_ops fmt set =
            op_info.gas_limit
            Q.pp_print
            op_info.weight))
-    (Operation_hash.Map.bindings set)
+    (Tezos_crypto.Operation_hash.Map.bindings set)
 
 let pp_manager_op_weight fmt weight =
   Format.fprintf
     fmt
     "{oph: %a; weight: %a}"
-    Operation_hash.pp
+    Tezos_crypto.Operation_hash.pp
     weight.operation_hash
     Q.pp_print
     weight.weight
@@ -95,7 +95,7 @@ let pp_state fmt state =
     state.min_prechecked_op_weight
 
 let eq_prechecked_manager_ops =
-  Operation_hash.Map.equal
+  Tezos_crypto.Operation_hash.Map.equal
     (fun
       {manager_op = _; fee = fee1; gas_limit = gas1; weight = w1}
       {manager_op = _; fee = fee2; gas_limit = gas2; weight = w2}
@@ -103,7 +103,9 @@ let eq_prechecked_manager_ops =
 
 let eq_op_weight_opt =
   Option.equal (fun op_weight1 op_weight2 ->
-      Operation_hash.equal op_weight1.operation_hash op_weight2.operation_hash
+      Tezos_crypto.Operation_hash.equal
+        op_weight1.operation_hash
+        op_weight2.operation_hash
       && Q.equal op_weight1.weight op_weight2.weight)
 
 (* This function needs to be updated if the filter state is extended *)

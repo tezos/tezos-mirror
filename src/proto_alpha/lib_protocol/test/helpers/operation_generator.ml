@@ -121,7 +121,7 @@ let pp_kind fmt k =
 
 let block_hashes =
   List.map
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
     [
       "BLbcVY1kYiKQy2MJJfoHJMN2xRk5QPG1PEKWMDSyW2JMxBsMmiL";
       "BLFhLKqQQn32Cc9QXqtEqysYqWNCowNKaypVHP5zEyZcywbXcHo";
@@ -141,7 +141,7 @@ let random_payload_hash = QCheck2.Gen.oneofl payload_hashes
 
 let signatures =
   List.map
-    Signature.of_b58check_exn
+    Tezos_crypto.Signature.of_b58check_exn
     [
       "sigaNsiye7D8dJHKSQZBwDbS2aQNXipDP7bw8uQnMgnaXi5pcnoPZRKXrDeFRx4FjWJD2xfyUA9CuBXhwPHhVs7LxkL4vT32";
       "sigvtPBMQvk2DgNtu3AKFU1ZRsagGxsoiZVQyQhJNEojReBY2vE5sDwt3H7Mh8RMe27QHBjemxqhMVVszZqpNsdDux6KAELX";
@@ -152,7 +152,7 @@ let random_signature = QCheck2.Gen.oneofl signatures
 
 let pkhs =
   List.map
-    Signature.Public_key_hash.of_b58check_exn
+    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
     [
       "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
       "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv";
@@ -163,7 +163,7 @@ let random_pkh = QCheck2.Gen.oneofl pkhs
 
 let pks =
   List.map
-    Signature.Public_key.of_b58check_exn
+    Tezos_crypto.Signature.Public_key.of_b58check_exn
     [
       "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2";
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n";
@@ -227,7 +227,7 @@ let random_sc_rollup = QCheck2.Gen.oneofl sc_rollups
 
 let protos =
   List.map
-    (fun s -> Protocol_hash.of_b58check_exn s)
+    (fun s -> Tezos_crypto.Protocol_hash.of_b58check_exn s)
     [
       "ProtoALphaALphaALphaALphaALphaALphaALpha61322gcLUGH";
       "ProtoALphaALphaALphaALphaALphaALphaALphabc2a7ebx6WB";
@@ -442,7 +442,11 @@ let generate_activate_account =
   let open QCheck2.Gen in
   let* activation_code = random_code in
   let+ id = random_pkh in
-  let id = match id with Signature.Ed25519 pkh -> pkh | _ -> assert false in
+  let id =
+    match id with
+    | Tezos_crypto.Signature.Ed25519 pkh -> pkh
+    | _ -> assert false
+  in
   Activate_account {id; activation_code}
 
 let random_period =
@@ -576,7 +580,7 @@ let generate_tx_rollup_rejection =
     {
       version = 1;
       before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Context_hash.zero;
+      after = `Value Tezos_crypto.Context_hash.zero;
       state = Seq.empty;
     }
   in
@@ -614,7 +618,7 @@ let generate_tx_dispatch_tickets =
   let level = Tx_rollup_level.root in
   let message_index = 0 in
   let message_result_path = Tx_rollup_commitment.Merkle.dummy_path in
-  let context_hash = Context_hash.zero in
+  let context_hash = Tezos_crypto.Context_hash.zero in
   let reveal =
     Tx_rollup_reveal.
       {

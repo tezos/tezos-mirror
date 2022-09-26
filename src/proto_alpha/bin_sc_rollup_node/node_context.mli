@@ -60,11 +60,11 @@ type t = {
     who has purpose [purpose], if any.
 *)
 val get_operator :
-  t -> Configuration.purpose -> Signature.Public_key_hash.t option
+  t -> Configuration.purpose -> Tezos_crypto.Signature.Public_key_hash.t option
 
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)
-val is_operator : t -> Signature.Public_key_hash.t -> bool
+val is_operator : t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
 
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
@@ -94,4 +94,5 @@ val init :
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
-val checkout_context : t -> Block_hash.t -> Context.t tzresult Lwt.t
+val checkout_context :
+  t -> Tezos_crypto.Block_hash.t -> Context.t tzresult Lwt.t

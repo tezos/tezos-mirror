@@ -35,7 +35,7 @@ open Injector_common
 
 *)
 
-type error += Cannot_find_block of Block_hash.t
+type error += Cannot_find_block of Tezos_crypto.Block_hash.t
 
 let () =
   register_error_kind
@@ -46,14 +46,14 @@ let () =
       Format.fprintf
         ppf
         "Block with hash %a was not found on the L1 node."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash)
     `Temporary
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
     (function Cannot_find_block hash -> Some hash | _ -> None)
     (fun hash -> Cannot_find_block hash)
 
-type error += Cannot_find_predecessor of Block_hash.t
+type error += Cannot_find_predecessor of Tezos_crypto.Block_hash.t
 
 let () =
   register_error_kind
@@ -64,10 +64,10 @@ let () =
       Format.fprintf
         ppf
         "Block with hash %a has no predecessor on the L1 node."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash)
     `Temporary
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
     (function Cannot_find_predecessor hash -> Some hash | _ -> None)
     (fun hash -> Cannot_find_predecessor hash)
 
@@ -78,20 +78,22 @@ let () =
 
 *)
 
-type head = {hash : Block_hash.t; level : int32}
+type head = {hash : Tezos_crypto.Block_hash.t; level : int32}
 
 let head_encoding =
   Data_encoding.(
     conv
       (fun {hash; level} -> (hash, level))
       (fun (hash, level) -> {hash; level})
-      (obj2 (req "hash" Block_hash.encoding) (req "level" Data_encoding.int32)))
+      (obj2
+         (req "hash" Tezos_crypto.Block_hash.encoding)
+         (req "level" Data_encoding.int32)))
 
 module Blocks_cache =
   Ringo_lwt.Functors.Make_opt
     ((val Ringo.(
             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Block_hash))
+       (Tezos_crypto.Block_hash))
 
 type blocks_cache =
   Protocol_client_context.Alpha_block_services.block_info Blocks_cache.t
@@ -127,7 +129,7 @@ let get_predecessor =
   let (module HMF : Ringo.MAP_MAKER) =
     Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise)
   in
-  let module HM = HMF (Block_hash) in
+  let module HM = HMF (Tezos_crypto.Block_hash) in
   let cache = HM.create max_cached in
   fun cctxt (chain : Tezos_shell_services.Chain_services.chain) ancestor ->
     let open Lwt_result_syntax in
@@ -266,7 +268,7 @@ let get_tezos_reorg_for_new_head l1_state old_head new_head =
   let open Lwt_result_syntax in
   (* old_head and new_head must have the same level when calling aux *)
   let rec aux reorg old_head new_head =
-    if Block_hash.(old_head.hash = new_head.hash) then return reorg
+    if Tezos_crypto.Block_hash.(old_head.hash = new_head.hash) then return reorg
     else
       let* old_head_pred = get_predecessor l1_state old_head in
       let* new_head_pred = get_predecessor l1_state new_head in

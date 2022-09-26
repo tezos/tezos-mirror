@@ -81,7 +81,7 @@ module Simple = struct
       ~msg:
         "Computing and storing new commitment for head {head} at level {level}"
       ~level:Notice
-      ("head", Block_hash.encoding)
+      ("head", Tezos_crypto.Block_hash.encoding)
       ("level", Raw_level.encoding)
 
   let commitment_parent_is_not_lcc =

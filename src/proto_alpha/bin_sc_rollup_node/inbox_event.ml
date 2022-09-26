@@ -52,7 +52,7 @@ module Simple = struct
         "Fetching {number_of_messages} messages from block {hash} at level \
          {level}"
       ~level:Notice
-      ("hash", Block_hash.encoding)
+      ("hash", Tezos_crypto.Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("number_of_messages", Data_encoding.int32)
 end

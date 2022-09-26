@@ -81,7 +81,7 @@ module Arith_Context = struct
     (* FIXME: With on-disk context, we cannot commit the empty
        context. Is it also true in our case? *)
     let* context = Context_binary.add_tree context [] tree in
-    let* (_hash : Context_hash.t) =
+    let* (_hash : Tezos_crypto.Context_hash.t) =
       Context_binary.commit ~time:Time.Protocol.epoch context
     in
     let index = Context_binary.index context in
@@ -451,7 +451,7 @@ let dummy_internal_transfer address =
   let source =
     WithExceptions.Result.get_ok
       ~loc:__LOC__
-      (Signature.Public_key_hash.of_b58check
+      (Tezos_crypto.Signature.Public_key_hash.of_b58check
          "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
   in
   let*? payload = Environment.wrap_tzresult (Script_string.of_string "foo") in

@@ -32,9 +32,9 @@ module Store = struct
         let path = ["tezos"; "processed_blocks"]
       end)
       (struct
-        type key = Block_hash.t
+        type key = Tezos_crypto.Block_hash.t
 
-        let to_path_representation = Block_hash.to_b58check
+        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
       end)
       (struct
         type value = unit
@@ -82,11 +82,11 @@ module Store = struct
         let to_path_representation = Int32.to_string
       end)
       (struct
-        type value = Block_hash.t
+        type value = Tezos_crypto.Block_hash.t
 
         let name = "block_hash"
 
-        let encoding = Block_hash.encoding
+        let encoding = Tezos_crypto.Block_hash.encoding
       end)
 
   (** Table from L1 blocks hashes to levels. *)
@@ -96,9 +96,9 @@ module Store = struct
         let path = ["tezos"; "blocks_hashes"]
       end)
       (struct
-        type key = Block_hash.t
+        type key = Tezos_crypto.Block_hash.t
 
-        let to_path_representation = Block_hash.to_b58check
+        let to_path_representation = Tezos_crypto.Block_hash.to_b58check
       end)
       (struct
         type value = int32
@@ -115,7 +115,8 @@ let level_of_hash store hash =
   let open Lwt_result_syntax in
   let*! level = Store.Hashes_to_levels.find store hash in
   match level with
-  | None -> failwith "No level known for block %a" Block_hash.pp hash
+  | None ->
+      failwith "No level known for block %a" Tezos_crypto.Block_hash.pp hash
   | Some l -> return l
 
 let mark_processed_head store Layer1.({hash; level = _} as head) =

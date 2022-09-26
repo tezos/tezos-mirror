@@ -38,7 +38,7 @@ type 'a purposed = {
   dispatch_withdrawals : 'a;
 }
 
-type signers = Signature.public_key_hash option purposed
+type signers = Tezos_crypto.Signature.public_key_hash option purposed
 
 type cost_caps = {
   fee_cap : Protocol.Alpha_context.Tez.t;
@@ -171,28 +171,28 @@ let signers_encoding =
        (opt
           ~description:"The operator of the rollup (public key hash) if any"
           "operator"
-          Signature.Public_key_hash.encoding)
+          Tezos_crypto.Signature.Public_key_hash.encoding)
        (opt
           "submit_batch"
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.Public_key_hash.encoding
           ~description:"The public key hash of the signer for batch submission")
        (opt
           "finalize_commitment"
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.Public_key_hash.encoding
           ~description:
             "The public key hash of the signer for finalization of commitments")
        (opt
           "remove_commitment"
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.Public_key_hash.encoding
           ~description:
             "The public key hash of the signer for removals of commitments")
        (opt
           "rejection"
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.Public_key_hash.encoding
           ~description:"The public key hash of the signer for rejections")
        (opt
           "dispatch_withdrawals"
-          Signature.Public_key_hash.encoding
+          Tezos_crypto.Signature.Public_key_hash.encoding
           ~description:
             "The public key hash of the signer for the dispatch of withdrawals")
 

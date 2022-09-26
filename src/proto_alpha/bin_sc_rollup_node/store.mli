@@ -50,15 +50,15 @@ val load : string -> t Lwt.t
 (** Extraneous state information for the PVM *)
 module StateInfo :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = state_info
      and type store = t
 
 module StateHistoryRepr : sig
   type event = {
     tick : Sc_rollup.Tick.t;
-    block_hash : Block_hash.t;
-    predecessor_hash : Block_hash.t;
+    block_hash : Tezos_crypto.Block_hash.t;
+    predecessor_hash : Tezos_crypto.Block_hash.t;
     level : Raw_level.t;
   }
 
@@ -87,24 +87,24 @@ module StateHistory : sig
 end
 
 (** Storage for persisting messages downloaded from the L1 node, indexed by
-    [Block_hash.t]. *)
+    [Tezos_crypto.Block_hash.t]. *)
 module Messages :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Sc_rollup.Inbox_message.t list
      and type store = t
 
 (** Aggregated collection of messages from the L1 inbox *)
 module Inboxes :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Sc_rollup.Inbox.t
      and type store = t
 
 (** Histories from the rollup node. **)
 module Histories :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Sc_rollup.Inbox.History.t
      and type store = t
 
@@ -151,7 +151,7 @@ module Commitments_published_at_level :
 (** Storage containing the hashes of contexts retrieved from the L1 node. *)
 module Contexts :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Context.hash
      and type store = t
 
@@ -161,14 +161,14 @@ module Contexts :
     list into a [Dal.Slot_index.t]-indexed map. *)
 module Dal_slots_headers :
   Store_sigs.Nested_map
-    with type primary_key = Block_hash.t
+    with type primary_key = Tezos_crypto.Block_hash.t
      and type secondary_key = Dal.Slot_index.t
      and type value = Dal.Slot.Header.t
      and type store = t
 
 module Dal_confirmed_slots_history :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Dal.Slots_history.t
      and type store = t
 
@@ -176,7 +176,7 @@ module Dal_confirmed_slots_history :
     {Dal_slot_repr.Slots_history} for more details. *)
 module Dal_confirmed_slots_histories :
   Store_sigs.Map
-    with type key = Block_hash.t
+    with type key = Tezos_crypto.Block_hash.t
      and type value = Dal.Slots_history.History_cache.t
      and type store = t
 
@@ -188,7 +188,7 @@ module Dal_confirmed_slots_histories :
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map
-    with type primary_key = Block_hash.t
+    with type primary_key = Tezos_crypto.Block_hash.t
      and type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
      and type value = Dal.Page.content
      and type store = t
@@ -202,7 +202,7 @@ module Dal_slot_pages :
 *)
 module Dal_processed_slots :
   Store_sigs.Nested_map
-    with type primary_key = Block_hash.t
+    with type primary_key = Tezos_crypto.Block_hash.t
      and type secondary_key = Dal.Slot_index.t
      and type value = [`Confirmed | `Unconfirmed]
      and type store = t

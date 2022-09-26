@@ -113,7 +113,8 @@ let prepare_command_display prepared_command bytes_only =
         Format.fprintf
           ppf
           "Blake 2B Hash: '%s'"
-          (Base58.raw_encode Blake2B.(hash_bytes [x] |> to_string)))
+          (Tezos_crypto.Base58.raw_encode
+             Tezos_crypto.Blake2B.(hash_bytes [x] |> to_string)))
       prepared_command.Client_proto_multisig.bytes
       (fun ppf z ->
         Format.fprintf
@@ -127,7 +128,7 @@ let prepare_command_display prepared_command bytes_only =
           "@[<2>Public keys of the signers:@ %a@]"
           (Format.pp_print_list
              ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ ")
-             Signature.Public_key.pp))
+             Tezos_crypto.Signature.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
 let get_parameter_type (cctxt : #Protocol_client_context.full)
@@ -335,7 +336,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
-          Format.printf "%a@." Signature.pp signature ;
+          Format.printf "%a@." Tezos_crypto.Signature.pp signature ;
           return_unit);
       command
         ~group
@@ -369,7 +370,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
-          Format.printf "%a@." Signature.pp signature ;
+          Format.printf "%a@." Tezos_crypto.Signature.pp signature ;
           return_unit);
       command
         ~group
@@ -401,7 +402,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
-          Format.printf "%a@." Signature.pp signature ;
+          Format.printf "%a@." Tezos_crypto.Signature.pp signature ;
           return_unit);
       command
         ~group
@@ -426,7 +427,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
-          Format.printf "%a@." Signature.pp signature ;
+          Format.printf "%a@." Tezos_crypto.Signature.pp signature ;
           return_unit);
       command
         ~group
@@ -466,7 +467,7 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
               ()
           in
           let* signature = Client_keys.sign cctxt sk prepared_command.bytes in
-          Format.printf "%a@." Signature.pp signature ;
+          Format.printf "%a@." Tezos_crypto.Signature.pp signature ;
           return_unit);
       command
         ~group

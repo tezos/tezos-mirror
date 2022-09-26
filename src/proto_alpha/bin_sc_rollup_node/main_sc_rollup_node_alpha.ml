@@ -50,7 +50,7 @@ let sc_rollup_node_operator_param =
   let parse_pkh s =
     let from_alias s = Client_keys.Public_key_hash.find cctxt s in
     let from_key s =
-      match Signature.Public_key_hash.of_b58check_opt s with
+      match Tezos_crypto.Signature.Public_key_hash.of_b58check_opt s with
       | None ->
           failwith "Could not read public key hash for rollup node operator"
       | Some pkh -> return pkh

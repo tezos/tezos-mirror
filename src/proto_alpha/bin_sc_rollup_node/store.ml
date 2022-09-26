@@ -53,9 +53,9 @@ module StateInfo =
       let path = ["state_info"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = state_info
@@ -78,8 +78,8 @@ module StateInfo =
 module StateHistoryRepr = struct
   type event = {
     tick : Sc_rollup.Tick.t;
-    block_hash : Block_hash.t;
-    predecessor_hash : Block_hash.t;
+    block_hash : Tezos_crypto.Block_hash.t;
+    predecessor_hash : Tezos_crypto.Block_hash.t;
     level : Raw_level.t;
   }
 
@@ -96,8 +96,8 @@ module StateHistoryRepr = struct
         {tick; block_hash; predecessor_hash; level})
       (obj4
          (req "tick" Sc_rollup.Tick.encoding)
-         (req "block_hash" Block_hash.encoding)
-         (req "predecessor_hash" Block_hash.encoding)
+         (req "block_hash" Tezos_crypto.Block_hash.encoding)
+         (req "predecessor_hash" Tezos_crypto.Block_hash.encoding)
          (req "level" Raw_level.encoding))
 
   let name = "state_history"
@@ -150,9 +150,9 @@ module Messages =
       let path = ["messages"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Sc_rollup.Inbox_message.t list
@@ -170,9 +170,9 @@ module Inboxes =
       let path = ["inboxes"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Sc_rollup.Inbox.t
@@ -189,9 +189,9 @@ module Histories =
       let path = ["histories"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Sc_rollup.Inbox.History.t
@@ -299,9 +299,9 @@ module Contexts =
       let path = ["contexts"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Context.hash
@@ -321,9 +321,9 @@ module Dal_slot_pages =
       let path = ["dal"; "slot_pages"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type key = Dal.Slot_index.t * Dal.Page.Index.t
@@ -353,9 +353,9 @@ module Dal_processed_slots =
       let path = ["dal"; "processed_slots"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type key = Dal.Slot_index.t
@@ -395,9 +395,9 @@ module Dal_slots_headers =
       let path = ["dal"; "slot_headers"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type key = Dal.Slot_index.t
@@ -431,9 +431,9 @@ module Dal_confirmed_slots_history =
       let path = ["dal"; "confirmed_slots_history"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Dal.Slots_history.t
@@ -451,9 +451,9 @@ module Dal_confirmed_slots_histories =
       let path = ["dal"; "confirmed_slots_histories_cache"]
     end)
     (struct
-      type key = Block_hash.t
+      type key = Tezos_crypto.Block_hash.t
 
-      let to_path_representation = Block_hash.to_b58check
+      let to_path_representation = Tezos_crypto.Block_hash.to_b58check
     end)
     (struct
       type value = Dal.Slots_history.History_cache.t

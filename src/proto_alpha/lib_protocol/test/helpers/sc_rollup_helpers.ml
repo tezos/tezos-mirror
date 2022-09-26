@@ -447,7 +447,9 @@ module Tree_inbox = struct
   let commit_tree store key tree =
     let open Lwt_syntax in
     let* store = Store.add_tree store key tree in
-    let* (_ : Context_hash.t) = Store.commit ~time:Time.Protocol.epoch store in
+    let* (_ : Tezos_crypto.Context_hash.t) =
+      Store.commit ~time:Time.Protocol.epoch store
+    in
     return ()
 
   let lookup_tree store hash =

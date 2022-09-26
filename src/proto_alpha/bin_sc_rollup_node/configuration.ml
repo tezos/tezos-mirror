@@ -38,7 +38,7 @@ module Operator_purpose_map = Map.Make (struct
   let compare = Stdlib.compare
 end)
 
-type operators = Signature.Public_key_hash.t Operator_purpose_map.t
+type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
@@ -254,7 +254,8 @@ let operator_purpose_map_encoding encoding =
     Data_encoding.Json.encoding
 
 let operators_encoding =
-  operator_purpose_map_encoding (fun _ -> Signature.Public_key_hash.encoding)
+  operator_purpose_map_encoding (fun _ ->
+      Tezos_crypto.Signature.Public_key_hash.encoding)
 
 let fee_parameter_encoding purpose =
   let open Data_encoding in

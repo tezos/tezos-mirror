@@ -46,13 +46,14 @@ let check_filter_state_invariants filter_state =
         filter_state)
     ~cond:(fun filter_state ->
       filter_state.prechecked_manager_op_count
-      = Operation_hash.Map.cardinal filter_state.prechecked_manager_ops
+      = Tezos_crypto.Operation_hash.Map.cardinal
+          filter_state.prechecked_manager_ops
       && filter_state.prechecked_manager_op_count
          = ManagerOpWeightSet.cardinal filter_state.prechecked_op_weights
       && ManagerOpWeightSet.for_all
            (fun {operation_hash; weight} ->
              match
-               Operation_hash.Map.find
+               Tezos_crypto.Operation_hash.Map.find
                  operation_hash
                  filter_state.prechecked_manager_ops
              with
@@ -79,7 +80,7 @@ let test_add_manager_op =
          already present in [filter_state] or fresh. *)
       let replacement =
         if should_replace then (
-          assume (not (Operation_hash.equal oph_to_replace oph)) ;
+          assume (not (Tezos_crypto.Operation_hash.equal oph_to_replace oph)) ;
           `Replace (oph_to_replace, ()))
         else `No_replace
       in
@@ -90,11 +91,11 @@ let test_add_manager_op =
              Format.fprintf
                fmt
                "%a was not found in prechecked_manager_ops: %a"
-               Operation_hash.pp
+               Tezos_crypto.Operation_hash.pp
                oph
                pp_prechecked_manager_ops
                set)
-           ~cond:(Operation_hash.Map.mem oph)
+           ~cond:(Tezos_crypto.Operation_hash.Map.mem oph)
            filter_state.prechecked_manager_ops
            ()
       &&
@@ -104,11 +105,11 @@ let test_add_manager_op =
             Format.fprintf
               fmt
               "%a should have been removed from prechecked_manager_ops."
-              Operation_hash.pp
+              Tezos_crypto.Operation_hash.pp
               oph_to_replace)
           ~cond:(fun () ->
             not
-              (Operation_hash.Map.mem
+              (Tezos_crypto.Operation_hash.Map.mem
                  oph_to_replace
                  filter_state.prechecked_manager_ops))
           ()
@@ -131,7 +132,10 @@ let test_remove_present =
     ->
       (* Add a fresh operation [oph] to the state. *)
       assume
-        (not (Operation_hash.Map.mem oph initial_state.prechecked_manager_ops)) ;
+        (not
+           (Tezos_crypto.Operation_hash.Map.mem
+              oph
+              initial_state.prechecked_manager_ops)) ;
       let replacement =
         if should_replace then `Replace (oph_to_replace, ()) else `No_replace
       in
@@ -147,11 +151,11 @@ let test_remove_present =
                Format.fprintf
                  fmt
                  "%a should have been removed from prechecked_manager_ops."
-                 Operation_hash.pp
+                 Tezos_crypto.Operation_hash.pp
                  oph)
              ~cond:(fun () ->
                not
-                 (Operation_hash.Map.mem
+                 (Tezos_crypto.Operation_hash.Map.mem
                     oph
                     filter_state.prechecked_manager_ops))
              ()
@@ -179,7 +183,10 @@ let test_remove_unknown =
     (Gen.pair Generators.filter_state_gen Generators.operation_hash_gen)
     (fun (initial_state, oph) ->
       assume
-        (not (Operation_hash.Map.mem oph initial_state.prechecked_manager_ops)) ;
+        (not
+           (Tezos_crypto.Operation_hash.Map.mem
+              oph
+              initial_state.prechecked_manager_ops)) ;
       let filter_state = remove ~filter_state:initial_state oph in
       qcheck_eq ~pp:pp_state ~eq:eq_state initial_state filter_state)
 

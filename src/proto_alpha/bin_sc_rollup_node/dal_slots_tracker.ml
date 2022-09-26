@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
 
-type error += Cannot_read_block_metadata of Block_hash.t
+type error += Cannot_read_block_metadata of Tezos_crypto.Block_hash.t
 
 let () =
   register_error_kind
@@ -38,10 +38,10 @@ let () =
       Format.fprintf
         ppf
         "Could not read block receipt for block with hash %a."
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         hash)
     `Temporary
-    Data_encoding.(obj1 (req "hash" Block_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Tezos_crypto.Block_hash.encoding))
     (function Cannot_read_block_metadata hash -> Some hash | _ -> None)
     (fun hash -> Cannot_read_block_metadata hash)
 
@@ -65,7 +65,7 @@ let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
    the slot has been confirmed after the endorsement_lag has passed. *)
 type confirmations_info = {
   (* The hash of the block in which the slots have been published. *)
-  published_block_hash : Block_hash.t;
+  published_block_hash : Tezos_crypto.Block_hash.t;
   (* The indexes of slots that have beenp published in block
      with hash `published_block_hash`, and have later been confirmed. *)
   confirmed_slots_indexes : Bitset.t;
@@ -326,7 +326,7 @@ module Confirmed_slots_history = struct
           "The confirmed DAL %S for block hash %a (level = %a) is not expected \
            to be found in the store, but is exists."
           entry_kind
-          Block_hash.pp
+          Tezos_crypto.Block_hash.pp
           block_hash
           Raw_level.pp
           block_level
@@ -335,7 +335,7 @@ module Confirmed_slots_history = struct
           "The confirmed DAL %S for block hash %a (level = %a) is expected to \
            be found in the store, but is missing."
           entry_kind
-          Block_hash.pp
+          Tezos_crypto.Block_hash.pp
           block_hash
           Raw_level.pp
           block_level

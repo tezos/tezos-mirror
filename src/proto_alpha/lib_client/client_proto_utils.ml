@@ -40,7 +40,11 @@ let sign_message (cctxt : #full) ~src_sk ~block ~message =
   let json, bytes = to_json_and_bytes block message in
   cctxt#message "signed content: @[%a@]" Data_encoding.Json.pp json
   >>= fun () ->
-  Client_keys.sign cctxt ~watermark:Signature.Generic_operation src_sk bytes
+  Client_keys.sign
+    cctxt
+    ~watermark:Tezos_crypto.Signature.Generic_operation
+    src_sk
+    bytes
 
 let check_message (cctxt : #full) ~block ~key_locator ~quiet ~message ~signature
     =
@@ -49,7 +53,7 @@ let check_message (cctxt : #full) ~block ~key_locator ~quiet ~message ~signature
   else cctxt#message "checked content: @[%a@]" Data_encoding.Json.pp json)
   >>= fun () ->
   Client_keys.check
-    ~watermark:Signature.Generic_operation
+    ~watermark:Tezos_crypto.Signature.Generic_operation
     key_locator
     signature
     bytes

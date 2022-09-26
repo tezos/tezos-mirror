@@ -48,7 +48,7 @@ let get_operator node_ctxt purpose =
 
 let is_operator node_ctxt pkh =
   Configuration.Operator_purpose_map.exists
-    (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
+    (fun _ operator -> Tezos_crypto.Signature.Public_key_hash.(operator = pkh))
     node_ctxt.operators
 
 let get_fee_parameter node_ctxt purpose =

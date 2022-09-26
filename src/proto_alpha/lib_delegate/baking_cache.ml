@@ -31,7 +31,7 @@ type round = Round.t
 
 module Block_cache =
   (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-    (Block_hash)
+    (Tezos_crypto.Block_hash)
 
 (** The [Timestamp_of_round_tbl] module allows to create memoization tables
     to store function calls of [Round.timestamp_of_round]. *)
