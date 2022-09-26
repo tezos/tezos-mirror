@@ -316,8 +316,9 @@ module Make
 
   (* Encapsulated WASM *)
 
-  (** [compute_step tree] instruments [Wasm.compute_step] to check the
-      current status of the PVM.
+  (** [compute_step_gen wasm_step tree] instruments [wasm_step] to check the
+      current status of the PVM. [wasm_step] must be a function that from a step
+      computes another step.
 
       {ul
         {li If the state has not yet been initialized, it means it is
@@ -329,8 +330,8 @@ module Make
             [compute_step] raises an exception.}
         {li If the status is [Not_gathering_floppies], then the PVM
             pre-boot has ended, the kernel has been provided, and
-            [Wasm.compute_step] is called.}} *)
-  let compute_step tree =
+            [wasm_step] is called.}} *)
+  let compute_step_gen wasm_step tree =
     let open Lwt_syntax in
     let* state = read_state tree in
     match state with
@@ -347,7 +348,9 @@ module Make
         let state = increment_ticks state in
         match state.internal_status with
         | Gathering_floppies _ -> raise Compute_step_expected_input
-        | Not_gathering_floppies -> Wasm.compute_step tree)
+        | Not_gathering_floppies -> wasm_step tree)
+
+  let compute_step tree = compute_step_gen Wasm.compute_step tree
 
   (** [set_input_step input message tree] instruments
       [Wasm.set_input_step] to interpret incoming input messages as
@@ -422,7 +425,8 @@ module Make
                     inner_info.last_input_read;
               })
 
-  let compute_step_many = Wasm.compute_step_many
+  let compute_step_many ~max_steps =
+    compute_step_gen (Wasm.compute_step_many ~max_steps)
 
   module Internal_for_tests = struct
     include Wasm.Internal_for_tests
