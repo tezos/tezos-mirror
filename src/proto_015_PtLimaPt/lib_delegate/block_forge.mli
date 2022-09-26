@@ -50,7 +50,7 @@ val forge_faked_protocol_data :
 
 val forge :
   #Protocol_client_context.full ->
-  chain_id:Chain_id.t ->
+  chain_id:Tezos_crypto.Chain_id.t ->
   pred_info:Baking_state.block_info ->
   timestamp:Time.Protocol.t ->
   liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->

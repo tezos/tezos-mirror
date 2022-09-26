@@ -29,7 +29,7 @@ open Protocol
 open Alpha_context
 
 type t = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;  (** Resulting context *)
@@ -128,7 +128,7 @@ val genesis :
   ?dal_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
-  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
+  (Account.t * Tez.tez * Tezos_crypto.Signature.Public_key_hash.t option) list ->
   block tzresult Lwt.t
 
 val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
@@ -140,7 +140,7 @@ val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 val alpha_context :
   ?commitments:Commitment.t list ->
   ?min_proposal_quorum:int32 ->
-  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
+  (Account.t * Tez.tez * Tezos_crypto.Signature.Public_key_hash.t option) list ->
   Alpha_context.t tzresult Lwt.t
 
 (**
@@ -272,8 +272,10 @@ val prepare_initial_context_params :
   ?dal_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
-  (Account.t * Tez.t * Signature.Public_key_hash.t option) list ->
-  ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
+  (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list ->
+  ( Constants.Parametric.t
+    * Block_header.shell_header
+    * Tezos_crypto.Block_hash.t,
     tztrace )
   result
   Lwt.t

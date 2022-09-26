@@ -198,7 +198,7 @@ let apply_with_gas header ?(operations = []) (pred : Block.t) =
   let open Alpha_context in
   (let open Environment.Error_monad in
   begin_application
-    ~chain_id:Chain_id.zero
+    ~chain_id:Tezos_crypto.Chain_id.zero
     ~predecessor_context:pred.context
     ~predecessor_fitness:pred.header.shell.fitness
     ~predecessor_timestamp:pred.header.shell.timestamp

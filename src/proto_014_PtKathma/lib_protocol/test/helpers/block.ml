@@ -31,7 +31,7 @@ open Alpha_context
 
 (* This type collects a block and the context that results from its application *)
 type t = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Tezos_protocol_environment.Context.t;
@@ -81,7 +81,11 @@ let get_next_baker_by_account pkh block =
   >>=? fun bakers ->
   (match List.hd bakers with
   | Some b -> return b
-  | None -> failwith "No slots found for %a" Signature.Public_key_hash.pp pkh)
+  | None ->
+      failwith
+        "No slots found for %a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        pkh)
   >>=? fun {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} ->
   Environment.wrap_tzresult (Round.to_int round) >>?= fun round ->
   return
@@ -94,7 +98,10 @@ let get_next_baker_excluding excludes block =
     @@ List.find
          (fun {Plugin.RPC.Baking_rights.delegate; _} ->
            not
-             (List.mem ~equal:Signature.Public_key_hash.equal delegate excludes))
+             (List.mem
+                ~equal:Tezos_crypto.Signature.Public_key_hash.equal
+                delegate
+                excludes))
          bakers
   in
   Environment.wrap_tzresult (Round.to_int round) >>?= fun round ->
@@ -146,7 +153,7 @@ module Forge = struct
         (* We don't care of the following values, only the shell validates them. *)
         proto_level = 0;
         validation_passes = 0;
-        context = Context_hash.zero;
+        context = Tezos_crypto.Context_hash.zero;
       }
 
   let set_seed_nonce_hash seed_nonce_hash {baker; shell; contents} =
@@ -162,8 +169,9 @@ module Forge = struct
         (shell, contents)
     in
     let signature =
-      Signature.sign
-        ~watermark:Block_header.(to_watermark (Block_header Chain_id.zero))
+      Tezos_crypto.Signature.sign
+        ~watermark:
+          Block_header.(to_watermark (Block_header Tezos_crypto.Chain_id.zero))
         delegate.sk
         unsigned_bytes
     in
@@ -204,7 +212,8 @@ module Forge = struct
     >|=? fun seed_nonce_hash ->
     let hashes = List.map Operation.hash_packed operations in
     let operations_hash =
-      Operation_list_list_hash.compute [Operation_list_hash.compute hashes]
+      Tezos_crypto.Operation_list_list_hash.compute
+        [Tezos_crypto.Operation_list_hash.compute hashes]
     in
     let shell =
       make_shell
@@ -219,7 +228,9 @@ module Forge = struct
       List.concat (match List.tl operations with None -> [] | Some l -> l)
     in
     let hashes = List.map Operation.hash_packed non_consensus_operations in
-    let non_consensus_operations_hash = Operation_list_hash.compute hashes in
+    let non_consensus_operations_hash =
+      Tezos_crypto.Operation_list_hash.compute hashes
+    in
     let payload_round =
       match payload_round with None -> round | Some r -> r
     in
@@ -362,13 +373,13 @@ let initial_alpha_context ?(commitments = []) constants
     ~typecheck
     ~level
     ~timestamp
-    Chain_id.zero
+    Tezos_crypto.Chain_id.zero
     ctxt
   >|= Environment.wrap_tzresult
 
 let genesis_with_parameters parameters =
   let hash =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let fitness =
@@ -384,7 +395,7 @@ let genesis_with_parameters parameters =
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
+      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
   in
   let contents =
     Forge.make_contents
@@ -403,19 +414,23 @@ let genesis_with_parameters parameters =
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt protocol_param_key proto_params)
   >>= fun ctxt ->
-  let chain_id = Chain_id.of_block_hash hash in
+  let chain_id = Tezos_crypto.Chain_id.of_block_hash hash in
   Main.init chain_id ctxt shell >|= Environment.wrap_tzresult
   >|=? fun {context; _} ->
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      };
     operations = [];
     context;
   }
 
 let validate_initial_accounts
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
+      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
     tokens_per_roll =
   if initial_accounts = [] then
     Stdlib.failwith "Must have one account with a roll to bake" ;
@@ -551,7 +566,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =
-    Block_hash.of_b58check_exn
+    Tezos_crypto.Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
   in
   let level = Option.value ~default:0l level in
@@ -568,7 +583,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~predecessor:hash
       ~timestamp:Time.Protocol.epoch
       ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
+      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
   in
   validate_initial_accounts initial_accounts constants.tokens_per_roll
   (* Perhaps this could return a new type  signifying its name *)
@@ -584,7 +599,8 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
     ?hard_gas_limit_per_block ?nonce_revelation_threshold
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
+      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
+    =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -609,7 +625,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   initial_context
     ?commitments
     ?bootstrap_contracts
-    (Chain_id.of_block_hash hash)
+    (Tezos_crypto.Chain_id.of_block_hash hash)
     constants
     shell
     initial_accounts
@@ -623,14 +639,19 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   in
   {
     hash;
-    header = {shell; protocol_data = {contents; signature = Signature.zero}};
+    header =
+      {
+        shell;
+        protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
+      };
     operations = [];
     context;
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
     (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
+      (Account.t * Tez.t * Tezos_crypto.Signature.Public_key_hash.t option) list)
+    =
   prepare_initial_context_params ?min_proposal_quorum initial_accounts
   >>=? fun (constants, shell, _hash) ->
   initial_alpha_context ?commitments constants shell initial_accounts
@@ -645,7 +666,7 @@ let get_application_vstate (pred : t) (operations : Protocol.operation trace) =
   Forge.sign_header header >>=? fun header ->
   let open Environment.Error_monad in
   Main.begin_application
-    ~chain_id:Chain_id.zero
+    ~chain_id:Tezos_crypto.Chain_id.zero
     ~predecessor_context:pred.context
     ~predecessor_fitness:pred.header.shell.fitness
     ~predecessor_timestamp:pred.header.shell.timestamp
@@ -658,7 +679,7 @@ let get_construction_vstate ?(policy = By_round 0) ?timestamp
   dispatch_policy policy pred >>=? fun (_pkh, _round, expected_timestamp) ->
   let timestamp = Option.value ~default:expected_timestamp timestamp in
   Main.begin_construction
-    ~chain_id:Chain_id.zero
+    ~chain_id:Tezos_crypto.Chain_id.zero
     ~predecessor_context:pred.context
     ~predecessor_timestamp:pred.header.shell.timestamp
     ~predecessor_level:pred.header.shell.level
@@ -675,7 +696,7 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
   ( (match baking_mode with
     | Application ->
         Main.begin_application
-          ~chain_id:Chain_id.zero
+          ~chain_id:Tezos_crypto.Chain_id.zero
           ~predecessor_context:pred.context
           ~predecessor_fitness:pred.header.shell.fitness
           ~predecessor_timestamp:pred.header.shell.timestamp

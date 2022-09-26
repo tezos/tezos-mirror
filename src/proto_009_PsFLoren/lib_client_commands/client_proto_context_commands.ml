@@ -96,7 +96,7 @@ let non_negative_param =
 
 let block_hash_param =
   Tezos_clic.parameter (fun _ s ->
-      try return (Block_hash.of_b58check_exn s)
+      try return (Tezos_crypto.Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
@@ -1268,7 +1268,7 @@ let commands network () =
              ~name:"operation"
              ~desc:"Operation to be included"
              (parameter (fun _ x ->
-                  match Operation_hash.of_b58check_opt x with
+                  match Tezos_crypto.Operation_hash.of_b58check_opt x with
                   | None ->
                       Error_monad.failwith "Invalid operation hash: '%s'" x
                   | Some hash -> return hash))
@@ -1299,7 +1299,7 @@ let commands network () =
              ~name:"operation"
              ~desc:"Operation to be looked up"
              (parameter (fun _ x ->
-                  match Operation_hash.of_b58check_opt x with
+                  match Tezos_crypto.Operation_hash.of_b58check_opt x with
                   | None ->
                       Error_monad.failwith "Invalid operation hash: '%s'" x
                   | Some hash -> return hash))
@@ -1356,7 +1356,7 @@ let commands network () =
                 ~name:"proposal"
                 ~desc:"the protocol hash proposal to be submitted"
                 (parameter (fun _ x ->
-                     match Protocol_hash.of_b58check_opt x with
+                     match Tezos_crypto.Protocol_hash.of_b58check_opt x with
                      | None ->
                          Error_monad.failwith "Invalid proposal hash: '%s'" x
                      | Some hash -> return hash))))
@@ -1404,7 +1404,7 @@ let commands network () =
                     Constants.fixed.max_proposals_per_delegate ;
                 (match
                    Base.List.find_all_dups
-                     ~compare:Protocol_hash.compare
+                     ~compare:Tezos_crypto.Protocol_hash.compare
                      proposals
                  with
                 | [] -> ()
@@ -1417,31 +1417,36 @@ let commands network () =
                       Format.(
                         pp_print_list
                           ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                          Protocol_hash.pp)
+                          Tezos_crypto.Protocol_hash.pp)
                       dups) ;
                 List.iter
-                  (fun (p : Protocol_hash.t) ->
+                  (fun (p : Tezos_crypto.Protocol_hash.t) ->
                     if
-                      List.mem ~equal:Protocol_hash.equal p known_protos
+                      List.mem
+                        ~equal:Tezos_crypto.Protocol_hash.equal
+                        p
+                        known_protos
                       || Environment.Protocol_hash.Map.mem p known_proposals
                     then ()
                     else
                       error
                         "Protocol %a is not a known proposal."
-                        Protocol_hash.pp
+                        Tezos_crypto.Protocol_hash.pp
                         p)
                   proposals ;
                 if
                   not
                     (List.exists
                        (fun (pkh, _) ->
-                         Signature.Public_key_hash.equal pkh src_pkh)
+                         Tezos_crypto.Signature.Public_key_hash.equal
+                           pkh
+                           src_pkh)
                        listings)
                 then
                   error
                     "Public-key-hash `%a` from account `%s` does not appear to \
                      have voting rights."
-                    Signature.Public_key_hash.pp
+                    Tezos_crypto.Signature.Public_key_hash.pp
                     src_pkh
                     src_name ;
                 if !errors <> [] then
@@ -1513,7 +1518,7 @@ let commands network () =
              ~name:"proposal"
              ~desc:"the protocol hash proposal to vote for"
              (parameter (fun _ x ->
-                  match Protocol_hash.of_b58check_opt x with
+                  match Tezos_crypto.Protocol_hash.of_b58check_opt x with
                   | None -> failwith "Invalid proposal hash: '%s'" x
                   | Some hash -> return hash))
         @@ param
@@ -1592,7 +1597,10 @@ let commands network () =
                also on the last block of the exploration and promotion
                periods when the proposal is not approved *)
             | Some proposal ->
-                cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
+                cctxt#message
+                  "Current proposal: %a"
+                  Tezos_crypto.Protocol_hash.pp
+                  proposal
           in
           match info.current_period_kind with
           | Proposal ->
@@ -1610,11 +1618,14 @@ let commands network () =
                           fprintf
                             ppf
                             "* %a %ld (%sknown by the node)@."
-                            Protocol_hash.pp
+                            Tezos_crypto.Protocol_hash.pp
                             p
                             w
                             (if
-                             List.mem ~equal:Protocol_hash.equal p known_protos
+                             List.mem
+                               ~equal:Tezos_crypto.Protocol_hash.equal
+                               p
+                               known_protos
                             then ""
                             else "not "))
                         ranks ;

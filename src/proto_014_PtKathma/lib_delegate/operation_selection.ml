@@ -57,7 +57,9 @@ module PrioritizedManagerSet = Set.Make (struct
   let compare {source; counter; weight; op; _}
       {source = source'; counter = counter'; weight = weight'; op = op'; _} =
     (* Be careful with the [compare] *)
-    let cmp_src = Signature.Public_key_hash.compare source source' in
+    let cmp_src =
+      Tezos_crypto.Signature.Public_key_hash.compare source source'
+    in
     if cmp_src = 0 then
       (* we want the smallest counter first *)
       let c = Z.compare counter counter' in
@@ -163,7 +165,7 @@ type simulation_result = {
   validation_result : Tezos_protocol_environment.validation_result;
   block_header_metadata : block_header_metadata;
   operations : packed_operation list list;
-  operations_hash : Operation_list_list_hash.t;
+  operations_hash : Tezos_crypto.Operation_list_list_hash.t;
 }
 
 let validate_operation inc op =
@@ -248,10 +250,11 @@ let filter_operations_with_simulation initial_inc fees_config
   >>= fun (inc, managers) ->
   let operations = [consensus; votes; anonymous; managers] in
   let operations_hash =
-    Operation_list_list_hash.compute
+    Tezos_crypto.Operation_list_list_hash.compute
       (List.map
          (fun sl ->
-           Operation_list_hash.compute (List.map Operation.hash_packed sl))
+           Tezos_crypto.Operation_list_hash.compute
+             (List.map Operation.hash_packed sl))
          operations)
   in
   let inc = {inc with header = {inc.header with operations_hash}} in

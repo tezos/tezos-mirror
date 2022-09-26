@@ -26,7 +26,7 @@
 (** Produce dispatch of withdrawals operations and sends them to the
     injector. *)
 val dispatch_withdrawals :
-  source:Signature.Public_key_hash.t ->
+  source:Tezos_crypto.Signature.Public_key_hash.t ->
   State.t ->
   L2block.t ->
   unit tzresult Lwt.t

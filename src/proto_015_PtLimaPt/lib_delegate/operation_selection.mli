@@ -31,7 +31,7 @@ type simulation_result = {
   validation_result : validation_result;
   block_header_metadata : Apply_results.block_metadata;
   operations : packed_operation list list;
-  operations_hash : Operation_list_list_hash.t;
+  operations_hash : Tezos_crypto.Operation_list_list_hash.t;
 }
 
 val filter_operations_with_simulation :

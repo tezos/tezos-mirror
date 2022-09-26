@@ -27,8 +27,8 @@ open Protocol_client_context
 
 type signer = {
   alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
+  pkh : Tezos_crypto.Signature.public_key_hash;
+  pk : Tezos_crypto.Signature.public_key;
   sk : Client_keys.sk_uri;
 }
 
@@ -68,7 +68,7 @@ let tezos_reorg fetch_tezos_block ~old_head_hash ~new_head_hash =
   let open Alpha_block_services in
   let open Lwt_result_syntax in
   let rec loop old_chain new_chain old_head_hash new_head_hash =
-    if Block_hash.(old_head_hash = new_head_hash) then
+    if Tezos_crypto.Block_hash.(old_head_hash = new_head_hash) then
       return {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
     else
       let* new_head = fetch_tezos_block new_head_hash in

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Timelock_samplers = Timelock
+module Timelock_samplers = Tezos_crypto.Timelock
 open Protocol
 
 (* ------------------------------------------------------------------------- *)
@@ -2255,13 +2255,15 @@ module Registration_section = struct
         ~kinstr:(ILevel (dummy_loc, halt))
         ()
 
-    let check_signature (algo : Signature.algo) ~for_intercept =
+    let check_signature (algo : Tezos_crypto.Signature.algo) ~for_intercept =
       let name =
         match algo with
-        | Signature.Ed25519 -> Interpreter_workload.N_ICheck_signature_ed25519
-        | Signature.Secp256k1 ->
+        | Tezos_crypto.Signature.Ed25519 ->
+            Interpreter_workload.N_ICheck_signature_ed25519
+        | Tezos_crypto.Signature.Secp256k1 ->
             Interpreter_workload.N_ICheck_signature_secp256k1
-        | Signature.P256 -> Interpreter_workload.N_ICheck_signature_p256
+        | Tezos_crypto.Signature.P256 ->
+            Interpreter_workload.N_ICheck_signature_p256
       in
       benchmark_with_stack_sampler
         ~intercept:for_intercept
@@ -2278,7 +2280,9 @@ module Registration_section = struct
               if for_intercept then Environment.Bytes.empty
               else Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
-            let signed_message = Signature.sign sk unsigned_message in
+            let signed_message =
+              Tezos_crypto.Signature.sign sk unsigned_message
+            in
             let signed_message = Script_signature.make signed_message in
             (pk, (signed_message, (unsigned_message, eos))))
         ()
@@ -2287,11 +2291,11 @@ module Registration_section = struct
       check_signature algo ~for_intercept:true ;
       check_signature algo ~for_intercept:false
 
-    let () = check_signature Signature.Ed25519
+    let () = check_signature Tezos_crypto.Signature.Ed25519
 
-    let () = check_signature Signature.Secp256k1
+    let () = check_signature Tezos_crypto.Signature.Secp256k1
 
-    let () = check_signature Signature.P256
+    let () = check_signature Tezos_crypto.Signature.P256
 
     let () =
       simple_benchmark
@@ -2986,7 +2990,9 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let open Script_typed_ir in
           let open Alpha_context in
-          let zero = Contract.Implicit Signature.Public_key_hash.zero in
+          let zero =
+            Contract.Implicit Tezos_crypto.Signature.Public_key_hash.zero
+          in
           let step_constants =
             {
               source = zero;
@@ -2994,7 +3000,7 @@ module Registration_section = struct
               self = Contract_hash.zero;
               amount = Tez.zero;
               balance = Tez.zero;
-              chain_id = Chain_id.zero;
+              chain_id = Tezos_crypto.Chain_id.zero;
               now = Script_timestamp.of_zint Z.zero;
               level = Script_int.zero_n;
             }

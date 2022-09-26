@@ -823,7 +823,7 @@ let mk_tx_rollup_reject (oinfos : operation_req) (infos : infos) =
     {
       version = 1;
       before = `Value Tx_rollup_message_result.empty_l2_context_hash;
-      after = `Value Context_hash.zero;
+      after = `Value Tezos_crypto.Context_hash.zero;
       state = Seq.empty;
     }
   in
@@ -908,7 +908,7 @@ let mk_tx_rollup_dispacth_ticket (oinfos : operation_req) (infos : infos) =
     ~message_result_path:Tx_rollup_commitment.Merkle.dummy_path
     tx_rollup
     Tx_rollup_level.root
-    Context_hash.zero
+    Tezos_crypto.Context_hash.zero
     [reveal]
 
 let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
@@ -1167,7 +1167,7 @@ let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
    increment of the counters aka 1 for a single operation, n for a
    batch of n manager operations. *)
 type probes = {
-  source : Signature.Public_key_hash.t;
+  source : Tezos_crypto.Signature.Public_key_hash.t;
   fee : Tez.tez;
   gas_limit : Gas.Arith.integral;
   nb_counter : Z.t;

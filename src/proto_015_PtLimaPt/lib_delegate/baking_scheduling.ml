@@ -211,8 +211,10 @@ let compute_next_round_time state =
     | None -> state.level_state.latest_proposal
     | Some {proposal; _} -> proposal
   in
-  if Protocol_hash.(proposal.predecessor.next_protocol <> Protocol.hash) then
-    None
+  if
+    Tezos_crypto.Protocol_hash.(
+      proposal.predecessor.next_protocol <> Protocol.hash)
+  then None
   else
     match state.level_state.next_level_proposed_round with
     | Some _proposed_round ->
@@ -630,7 +632,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
   >>=? fun next_level_delegate_slots ->
   let elected_block =
     if
-      Protocol_hash.(
+      Tezos_crypto.Protocol_hash.(
         current_proposal.block.protocol <> Protocol.hash
         && current_proposal.block.next_protocol = Protocol.hash)
     then

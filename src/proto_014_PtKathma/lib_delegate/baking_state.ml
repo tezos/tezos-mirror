@@ -31,8 +31,8 @@ open Protocol_client_context
     public key, its public key hash, and its secret key. *)
 type delegate = {
   alias : string option;
-  public_key : Signature.Public_key.t;
-  public_key_hash : Signature.Public_key_hash.t;
+  public_key : Tezos_crypto.Signature.Public_key.t;
+  public_key_hash : Tezos_crypto.Signature.Public_key_hash.t;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -56,19 +56,24 @@ let delegate_encoding =
       })
     (obj4
        (req "alias" (option string))
-       (req "public_key" Signature.Public_key.encoding)
-       (req "public_key_hash" Signature.Public_key_hash.encoding)
+       (req "public_key" Tezos_crypto.Signature.Public_key.encoding)
+       (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
        (req "secret_key_uri" string))
 
 let pp_delegate fmt {alias; public_key_hash; _} =
   match alias with
-  | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
+  | None ->
+      Format.fprintf
+        fmt
+        "%a"
+        Tezos_crypto.Signature.Public_key_hash.pp
+        public_key_hash
   | Some alias ->
       Format.fprintf
         fmt
         "%s (%a)"
         alias
-        Signature.Public_key_hash.pp
+        Tezos_crypto.Signature.Public_key_hash.pp
         public_key_hash
 
 type validation_mode = Node | Local of Abstract_context_index.t
@@ -81,17 +86,17 @@ type prequorum = {
 }
 
 type block_info = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   shell : Block_header.shell_header;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
+  protocol : Tezos_crypto.Protocol_hash.t;
+  next_protocol : Tezos_crypto.Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
+  live_blocks : Tezos_crypto.Block_hash.Set.t;
 }
 
 type cache = {
@@ -105,7 +110,7 @@ type global_state = {
   (* client context *)
   cctxt : Protocol_client_context.full;
   (* chain id *)
-  chain_id : Chain_id.t;
+  chain_id : Tezos_crypto.Chain_id.t;
   (* baker configuration *)
   config : Baking_configuration.t;
   (* protocol constants *)
@@ -193,17 +198,17 @@ let block_info_encoding =
       })
     (merge_objs
        (obj10
-          (req "hash" Block_hash.encoding)
+          (req "hash" Tezos_crypto.Block_hash.encoding)
           (req "shell" Block_header.shell_header_encoding)
           (req "payload_hash" Block_payload_hash.encoding)
           (req "payload_round" Round.encoding)
           (req "round" Round.encoding)
-          (req "protocol" Protocol_hash.encoding)
-          (req "next_protocol" Protocol_hash.encoding)
+          (req "protocol" Tezos_crypto.Protocol_hash.encoding)
+          (req "next_protocol" Tezos_crypto.Protocol_hash.encoding)
           (req "prequorum" (option prequorum_encoding))
           (req "quorum" (list (dynamic_size Operation.encoding)))
           (req "payload" Operation_pool.payload_encoding))
-       (obj1 (req "live_blocks" Block_hash.Set.encoding)))
+       (obj1 (req "live_blocks" Tezos_crypto.Block_hash.Set.encoding)))
 
 let round_of_shell_header shell_header =
   Environment.wrap_tzresult
@@ -217,7 +222,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
 type endorsing_slot = {
-  delegate : Signature.Public_key_hash.t;
+  delegate : Tezos_crypto.Signature.Public_key_hash.t;
   slots : Slot.t list;
   endorsing_power : int;
 }
@@ -579,7 +584,7 @@ module DelegateSet = struct
     type t = delegate
 
     let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
-      Signature.Public_key_hash.compare pkh pkh'
+      Tezos_crypto.Signature.Public_key_hash.compare pkh pkh'
   end)
 
   let find_pkh pkh s =
@@ -587,8 +592,8 @@ module DelegateSet = struct
     try
       iter
         (fun ({public_key_hash; _} as delegate) ->
-          if Signature.Public_key_hash.equal pkh public_key_hash then
-            raise (Found delegate)
+          if Tezos_crypto.Signature.Public_key_hash.equal pkh public_key_hash
+          then raise (Found delegate)
           else ())
         s ;
       None
@@ -653,7 +658,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     fmt
     "@[<v 2>Global state:@ chain_id: %a@ @[<v 2>config:@ %a@]@ \
      validation_mode: %a@ @[<v 2>delegates:@ %a@]@]"
-    Chain_id.pp
+    Tezos_crypto.Chain_id.pp
     chain_id
     Baking_configuration.pp
     config
@@ -695,16 +700,16 @@ let pp_block_info fmt
     "@[<v 2>Block:@ hash: %a@ payload_hash: %a@ level: %ld@ round: %a@ \
      protocol: %a@ next protocol: %a@ prequorum: %a@ quorum: %d endorsements@ \
      payload: %a@]"
-    Block_hash.pp
+    Tezos_crypto.Block_hash.pp
     hash
     Block_payload_hash.pp_short
     payload_hash
     shell.level
     Round.pp
     round
-    Protocol_hash.pp_short
+    Tezos_crypto.Protocol_hash.pp_short
     protocol
-    Protocol_hash.pp_short
+    Tezos_crypto.Protocol_hash.pp_short
     next_protocol
     (pp_option pp_prequorum)
     prequorum
@@ -727,7 +732,7 @@ let pp_endorsable_payload fmt {proposal; prequorum} =
   Format.fprintf
     fmt
     "proposal: %a, prequorum: %a"
-    Block_hash.pp
+    Tezos_crypto.Block_hash.pp
     proposal.block.hash
     pp_prequorum
     prequorum
@@ -843,7 +848,7 @@ let pp_event fmt = function
          round %a"
         (List.length preendos)
         voting_power
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched
@@ -853,7 +858,7 @@ let pp_event fmt = function
         "quorum reached with %d endorsements (power: %d) for %a at round %a"
         (List.length endos)
         voting_power
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         candidate.Operation_worker.hash
         Round.pp
         candidate.round_watched

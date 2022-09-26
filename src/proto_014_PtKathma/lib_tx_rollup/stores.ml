@@ -308,7 +308,7 @@ end
 module L2_block_key = struct
   include L2block.Hash
 
-  (* [hash] in Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
+  (* [hash] in Tezos_crypto.Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
   let hash_size = 30 (* in bits *)
 
   let t =
@@ -358,9 +358,9 @@ module L2_level_key = struct
 end
 
 module Operation_key = struct
-  include Operation_hash
+  include Tezos_crypto.Operation_hash
 
-  (* [hash] in Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
+  (* [hash] in Tezos_crypto.Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
   let hash_size = 30 (* in bits *)
 
   let t =
@@ -461,7 +461,7 @@ module Tezos_block_info = struct
   type t = {
     l2_block : L2block.hash option;
     level : int32;
-    predecessor : Block_hash.t;
+    predecessor : Tezos_crypto.Block_hash.t;
   }
 
   let t =
@@ -471,7 +471,8 @@ module Tezos_block_info = struct
       (fun (l2_block, level, predecessor) -> {l2_block; level; predecessor})
       (fun {l2_block; level; predecessor} -> (l2_block, level, predecessor))
 
-  let encoded_size = L2block.Hash.size + 4 (* level *) + Block_hash.size
+  let encoded_size =
+    L2block.Hash.size + 4 (* level *) + Tezos_crypto.Block_hash.size
 
   let encode v =
     let dst = Bytes.create encoded_size in
@@ -482,7 +483,9 @@ module Tezos_block_info = struct
     in
     let offset = blit ~src:l2_block_bytes ~dst 0 in
     let offset = bytes_set_int32 ~dst ~src:v.level offset in
-    let _ = blit ~src:(Block_hash.to_bytes v.predecessor) ~dst offset in
+    let _ =
+      blit ~src:(Tezos_crypto.Block_hash.to_bytes v.predecessor) ~dst offset
+    in
     Bytes.unsafe_to_string dst
 
   let decode str offset =
@@ -493,13 +496,20 @@ module Tezos_block_info = struct
     in
     let level, offset = read_int32 str offset in
     let predecessor, _ =
-      read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
+      read_str
+        str
+        ~offset
+        ~len:Tezos_crypto.Block_hash.size
+        Tezos_crypto.Block_hash.of_string_exn
     in
     {l2_block; level; predecessor}
 end
 
 module Commitment_info = struct
-  type t = {block : Block_hash.t; operation : Operation_hash.t}
+  type t = {
+    block : Tezos_crypto.Block_hash.t;
+    operation : Tezos_crypto.Operation_hash.t;
+  }
 
   let t =
     let open Repr in
@@ -508,20 +518,31 @@ module Commitment_info = struct
       (fun (block, operation) -> {block; operation})
       (fun {block; operation} -> (block, operation))
 
-  let encoded_size = Block_hash.size + Operation_hash.size
+  let encoded_size =
+    Tezos_crypto.Block_hash.size + Tezos_crypto.Operation_hash.size
 
   let encode v =
     let dst = Bytes.create encoded_size in
-    let offset = blit ~src:(Block_hash.to_bytes v.block) ~dst 0 in
-    let _ = blit ~src:(Operation_hash.to_bytes v.operation) ~dst offset in
+    let offset = blit ~src:(Tezos_crypto.Block_hash.to_bytes v.block) ~dst 0 in
+    let _ =
+      blit ~src:(Tezos_crypto.Operation_hash.to_bytes v.operation) ~dst offset
+    in
     Bytes.unsafe_to_string dst
 
   let decode str offset =
     let block, offset =
-      read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
+      read_str
+        str
+        ~offset
+        ~len:Tezos_crypto.Block_hash.size
+        Tezos_crypto.Block_hash.of_string_exn
     in
     let operation, _ =
-      read_str str ~offset ~len:Operation_hash.size Operation_hash.of_string_exn
+      read_str
+        str
+        ~offset
+        ~len:Tezos_crypto.Operation_hash.size
+        Tezos_crypto.Operation_hash.of_string_exn
     in
     {block; operation}
 end
@@ -530,7 +551,7 @@ module Tezos_block_store = struct
   type value = Tezos_block_info.t = {
     l2_block : L2block.hash option;
     level : int32;
-    predecessor : Block_hash.t;
+    predecessor : Tezos_crypto.Block_hash.t;
   }
 
   include
@@ -548,8 +569,8 @@ module Level_store =
 
 module Commitment_store = struct
   type value = Commitment_info.t = {
-    block : Block_hash.t;
-    operation : Operation_hash.t;
+    block : Tezos_crypto.Block_hash.t;
+    operation : Tezos_crypto.Operation_hash.t;
   }
 
   include
@@ -713,11 +734,11 @@ module Head_store = Make_singleton (struct
 end)
 
 module Tezos_head_store = Make_singleton (struct
-  type t = Block_hash.t
+  type t = Tezos_crypto.Block_hash.t
 
   let name = "tezos_head"
 
-  let encoding = Block_hash.encoding
+  let encoding = Tezos_crypto.Block_hash.encoding
 end)
 
 type rollup_info = {

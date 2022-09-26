@@ -52,7 +52,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
           liquidity_baking_toggle_vote;
         };
-      signature = Signature.zero;
+      signature = Tezos_crypto.Signature.zero;
     }
 
 let convert_operation (op : packed_operation) : Tezos_base.Operation.t =
@@ -112,7 +112,7 @@ let finalize_block_header shell_header timestamp validation_result
 let retain_live_operations_only ~live_blocks operation_pool =
   Operation_pool.Prioritized.filter
     (fun ({shell; _} : packed_operation) ->
-      Block_hash.Set.mem shell.branch live_blocks)
+      Tezos_crypto.Block_hash.Set.mem shell.branch live_blocks)
     operation_pool
 
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
@@ -136,7 +136,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       | None -> next_protocol
       | Some hash -> hash
     in
-    return Protocol_hash.(Protocol.hash <> next_protocol)
+    return Tezos_crypto.Protocol_hash.(Protocol.hash <> next_protocol)
   in
   let filter_via_node ~operation_pool =
     let filtered_operations =
@@ -168,7 +168,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       let operation_list_hash =
         Stdlib.List.tl operations |> List.flatten
         |> List.map Tezos_base.Operation.hash
-        |> Operation_list_hash.compute
+        |> Tezos_crypto.Operation_list_hash.compute
       in
       Block_payload.hash
         ~predecessor:shell_header.predecessor
@@ -242,7 +242,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         let operation_list_hash =
           Stdlib.List.tl operations |> List.flatten
           |> List.map Tezos_base.Operation.hash
-          |> Operation_list_hash.compute
+          |> Tezos_crypto.Operation_list_hash.compute
         in
         Block_payload.hash
           ~predecessor:shell_header.predecessor
@@ -297,10 +297,11 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     >>=? fun (incremental, ordered_pool) ->
     let operations = Operation_pool.ordered_to_list_list ordered_pool in
     let operations_hash =
-      Operation_list_list_hash.compute
+      Tezos_crypto.Operation_list_list_hash.compute
         (List.map
            (fun sl ->
-             Operation_list_hash.compute (List.map Operation.hash_packed sl))
+             Tezos_crypto.Operation_list_hash.compute
+               (List.map Operation.hash_packed sl))
            operations)
     in
     (* We need to compute the final [operations_hash] before
@@ -384,7 +385,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
   let unsigned_block_header =
     {
       Block_header.shell = shell_header;
-      protocol_data = {contents; signature = Signature.zero};
+      protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
     }
   in
   return {unsigned_block_header; operations}

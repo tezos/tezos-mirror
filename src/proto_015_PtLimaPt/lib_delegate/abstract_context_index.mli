@@ -25,7 +25,8 @@
 
 type t = {
   checkout_fun :
-    Context_hash.t -> Tezos_protocol_environment.Context.t option Lwt.t;
+    Tezos_crypto.Context_hash.t ->
+    Tezos_protocol_environment.Context.t option Lwt.t;
   finalize_fun : unit -> unit Lwt.t;
 }
 

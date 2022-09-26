@@ -26,14 +26,15 @@
 open Protocol
 open Alpha_context
 
-let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
+let sign ?(watermark = Tezos_crypto.Signature.Generic_operation) sk ctxt
+    contents =
   let branch = Context.branch ctxt in
   let unsigned =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
       ({branch}, Contents_list contents)
   in
-  let signature = Some (Signature.sign ~watermark sk unsigned) in
+  let signature = Some (Tezos_crypto.Signature.sign ~watermark sk unsigned) in
   ({shell = {branch}; protocol_data = {contents; signature}} : _ Operation.t)
 
 (** Generates the block payload hash based on the hash [pred_hash] of
@@ -45,7 +46,9 @@ let mk_block_payload_hash pred_hash payload_round (b : Block.t) =
     List.concat (match List.tl ops with None -> [] | Some l -> l)
   in
   let hashes = List.map Operation.hash_packed non_consensus_operations in
-  let non_consensus_operations_hash = Operation_list_hash.compute hashes in
+  let non_consensus_operations_hash =
+    Tezos_crypto.Operation_list_hash.compute hashes
+  in
   Block_payload.hash
     ~predecessor:pred_hash
     payload_round
@@ -80,7 +83,8 @@ let endorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:Operation.(to_watermark (Endorsement Chain_id.zero))
+       ~watermark:
+         Operation.(to_watermark (Endorsement Tezos_crypto.Chain_id.zero))
        delegate.sk
        signing_context
        op)
@@ -113,7 +117,8 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
   Account.find delegate_pkh >>=? fun delegate ->
   return
     (sign
-       ~watermark:Operation.(to_watermark (Preendorsement Chain_id.zero))
+       ~watermark:
+         Operation.(to_watermark (Preendorsement Tezos_crypto.Chain_id.zero))
        delegate.sk
        signing_context
        op)
@@ -189,7 +194,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   assert (
     List.for_all
       (fun {shell = {Tezos_base.Operation.branch = b; _}; _} ->
-        Block_hash.(branch = b))
+        Tezos_crypto.Block_hash.(branch = b))
       packed_operations) ;
   (* TODO? : check signatures consistency *)
   let unpacked_operations =
@@ -218,7 +223,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
        let reveal_op =
          Manager_operation
            {
-             source = Signature.Public_key.hash public_key;
+             source = Tezos_crypto.Signature.Public_key.hash public_key;
              fee = Tez.zero;
              counter;
              operation = Reveal public_key;
@@ -287,7 +292,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
     let op =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          source = Tezos_crypto.Signature.Public_key.hash public_key;
           fee;
           counter;
           operation;
@@ -303,7 +308,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
     let op_reveal =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          source = Tezos_crypto.Signature.Public_key.hash public_key;
           fee = Tez.zero;
           counter;
           operation = Reveal public_key;
@@ -314,7 +319,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
     let op =
       Manager_operation
         {
-          source = Signature.Public_key.hash public_key;
+          source = Tezos_crypto.Signature.Public_key.hash public_key;
           fee;
           counter = Z.succ counter;
           operation;
@@ -333,7 +338,7 @@ let revelation ?(fee = Tez.zero) ?(gas_limit = High) ?(storage_limit = Z.zero)
   let pkh =
     match forge_pkh with
     | Some pkh -> pkh
-    | None -> Signature.Public_key.hash public_key
+    | None -> Tezos_crypto.Signature.Public_key.hash public_key
   in
   resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   let source = Contract.Implicit pkh in
@@ -500,14 +505,15 @@ let increase_paid_storage ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt sop
 
-let activation ctxt (pkh : Signature.Public_key_hash.t) activation_code =
+let activation ctxt (pkh : Tezos_crypto.Signature.Public_key_hash.t)
+    activation_code =
   (match pkh with
   | Ed25519 edpkh -> return edpkh
   | _ ->
       failwith
         "Wrong public key hash : %a - Commitments must be activated with an \
-         Ed25519 encrypted public key hash"
-        Signature.Public_key_hash.pp
+         Tezos_crypto.Ed25519 encrypted public key hash"
+        Tezos_crypto.Signature.Public_key_hash.pp
         pkh)
   >|=? fun id ->
   let contents = Single (Activate_account {id; activation_code}) in

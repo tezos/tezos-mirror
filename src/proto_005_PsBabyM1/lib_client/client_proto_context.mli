@@ -73,7 +73,7 @@ type period_info = {
   current_period_kind : Voting_period.kind;
   position : Int32.t;
   remaining : Int32.t;
-  current_proposal : Protocol_hash.t option;
+  current_proposal : Tezos_crypto.Protocol_hash.t option;
 }
 
 type ballots_info = {
@@ -107,5 +107,5 @@ val display_receipt_for_operation :
   #Protocol_client_context.full ->
   chain:Block_services.chain ->
   ?predecessors:int ->
-  Operation_list_hash.elt ->
+  Tezos_crypto.Operation_list_hash.elt ->
   unit tzresult Lwt.t

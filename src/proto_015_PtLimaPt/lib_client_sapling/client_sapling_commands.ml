@@ -54,7 +54,7 @@ let viewing_key_of_string s =
   let encoding = Viewing_key.address_b58check_encoding in
   WithExceptions.Option.to_exn
     ~none:Unknown_sapling_address
-    (Base58.simple_decode encoding s)
+    (Tezos_crypto.Base58.simple_decode encoding s)
 
 (** All signatures are done with an anti-replay string.
     In Tezos' protocol this string is set to be chain_id + KT1. **)
@@ -62,7 +62,7 @@ let anti_replay cctxt contract =
   Tezos_shell_services.Chain_services.chain_id cctxt ~chain:cctxt#chain ()
   >>=? fun chain_id ->
   let address = Protocol.Contract_hash.to_b58check contract in
-  let chain_id = Chain_id.to_b58check chain_id in
+  let chain_id = Tezos_crypto.Chain_id.to_b58check chain_id in
   return (address ^ chain_id)
 
 (** The shielded tez contract expects the recipient pkh encoded in Micheline
@@ -71,7 +71,9 @@ let bound_data_of_public_key_hash cctxt dst =
   let open Tezos_micheline in
   let open Protocol.Michelson_v1_primitives in
   let pkh_bytes =
-    Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding dst
+    Data_encoding.Binary.to_bytes_exn
+      Tezos_crypto.Signature.Public_key_hash.encoding
+      dst
   in
   let micheline_bytes = Micheline.(Bytes (0, pkh_bytes) |> strip_locations) in
   let micheline_pkh_type =
@@ -663,7 +665,9 @@ let commands () =
         Wallet.new_address cctxt name index_opt
         >>=? fun (_, corrected_index, address) ->
         let address_b58 =
-          Base58.simple_encode Viewing_key.address_b58check_encoding address
+          Tezos_crypto.Base58.simple_encode
+            Viewing_key.address_b58check_encoding
+            address
         in
         cctxt#message
           "Generated address:@.%s@.at index %Ld"

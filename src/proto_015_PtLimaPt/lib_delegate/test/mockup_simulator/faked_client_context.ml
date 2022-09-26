@@ -46,8 +46,8 @@ let log _channel msg =
   print_endline msg ;
   Lwt.return_unit
 
-class faked_ctxt (hooks : Faked_services.hooks) (chain_id : Chain_id.t) :
-  Tezos_rpc.Context.generic =
+class faked_ctxt (hooks : Faked_services.hooks)
+  (chain_id : Tezos_crypto.Chain_id.t) : Tezos_rpc.Context.generic =
   let local_ctxt =
     let module Services = Faked_services.Make ((val hooks)) in
     Tezos_mockup_proxy.RPC_client.local_ctxt (Services.directory chain_id)

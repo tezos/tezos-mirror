@@ -65,7 +65,8 @@ module Arith_Context = struct
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
-        Sc_rollup_repr.State_hash.hash_bytes [Context_hash.to_bytes hash]
+        Sc_rollup_repr.State_hash.hash_bytes
+          [Tezos_crypto.Context_hash.to_bytes hash]
 
   let proof_before proof =
     kinded_hash_to_state_hash proof.Context_binary.Proof.before

@@ -92,7 +92,7 @@ module Protocol_constants_overrides = struct
     sc_rollup_challenge_window_in_blocks : int option;
     sc_rollup_max_available_messages : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
-    chain_id : Chain_id.t option;
+    chain_id : Tezos_crypto.Chain_id.t option;
     timestamp : Time.Protocol.t option;
     initial_seed : State_hash.t option option;
   }
@@ -319,7 +319,7 @@ module Protocol_constants_overrides = struct
                      (opt
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                         Constants.ratio_encoding)
-                     (opt "chain_id" Chain_id.encoding)
+                     (opt "chain_id" Tezos_crypto.Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
                   (merge_objs
@@ -740,7 +740,12 @@ module Protocol_constants_overrides = struct
             override_value = o.sc_rollup_challenge_window_in_blocks;
             pp = pp_print_int;
           };
-        O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
+        O
+          {
+            name = "chain_id";
+            override_value = o.chain_id;
+            pp = Tezos_crypto.Chain_id.pp;
+          };
         O
           {
             name = "timestamp";
@@ -1028,7 +1033,7 @@ module Parsed_account = struct
   let to_bootstrap_account repr =
     Tezos_client_base.Client_keys.neuterize repr.sk_uri >>=? fun pk_uri ->
     Tezos_client_base.Client_keys.public_key pk_uri >>=? fun public_key ->
-    let public_key_hash = Signature.Public_key.hash public_key in
+    let public_key_hash = Tezos_crypto.Signature.Public_key.hash public_key in
     return
       Parameters.
         {public_key_hash; public_key = Some public_key; amount = repr.amount}
@@ -1088,8 +1093,8 @@ module Bootstrap_account = struct
       (fun (public_key_hash, public_key, amount) ->
         {public_key_hash; public_key; amount})
       (obj3
-         (req "public_key_hash" Signature.Public_key_hash.encoding)
-         (opt "public_key" Signature.Public_key.encoding)
+         (req "public_key_hash" Tezos_crypto.Signature.Public_key_hash.encoding)
+         (opt "public_key" Tezos_crypto.Signature.Public_key.encoding)
          (req "amount" Tez.encoding))
 end
 
@@ -1101,7 +1106,7 @@ module Bootstrap_contract = struct
       (fun {delegate; amount; script} -> (delegate, amount, script))
       (fun (delegate, amount, script) -> {delegate; amount; script})
       (obj3
-         (opt "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate" Tezos_crypto.Signature.Public_key_hash.encoding)
          (req "amount" Tez.encoding)
          (req "script" Script.encoding))
 end
@@ -1162,10 +1167,10 @@ let lib_parameters_json_encoding =
       (fun (pk, amount) ->
         {
           Parameters.public_key = Some pk;
-          public_key_hash = Signature.Public_key.hash pk;
+          public_key_hash = Tezos_crypto.Signature.Public_key.hash pk;
           amount;
         })
-      (tup2 Signature.Public_key.encoding Tez.encoding)
+      (tup2 Tezos_crypto.Signature.Public_key.encoding Tez.encoding)
   in
   Data_encoding.(
     merge_objs
@@ -1178,7 +1183,7 @@ let lib_parameters_json_encoding =
 (* Blocks *)
 
 type block = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   header : Block_header.t;
   operations : Operation.packed list;
   context : Environment.Context.t;
@@ -1198,14 +1203,14 @@ module Forge = struct
         operations_hash;
         proto_level = 0;
         validation_passes = 0;
-        context = Context_hash.zero;
+        context = Tezos_crypto.Context_hash.zero;
       }
 end
 
 (* ------------------------------------------------------------------------- *)
 (* RPC context *)
 let genesis_block_hash =
-  Block_hash.of_b58check_exn
+  Tezos_crypto.Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU"
 
 let endorsement_branch_data_encoding =
@@ -1214,7 +1219,7 @@ let endorsement_branch_data_encoding =
     (fun (block_hash, block_payload_hash) -> (block_hash, block_payload_hash))
     (fun (block_hash, block_payload_hash) -> (block_hash, block_payload_hash))
     (obj2
-       (req "block_hash" Block_hash.encoding)
+       (req "block_hash" Tezos_crypto.Block_hash.encoding)
        (req "block_payload_hash" Protocol.Block_payload_hash.encoding))
 
 let initial_context chain_id (header : Block_header.shell_header)
@@ -1323,7 +1328,7 @@ let mem_init :
       ~predecessor:hash
       ~timestamp
       ~fitness
-      ~operations_hash:Operation_list_list_hash.zero
+      ~operations_hash:Tezos_crypto.Operation_list_list_hash.zero
   in
   Protocol_constants_overrides.apply_overrides
     (cctxt :> Tezos_client_base.Client_context.printer)
@@ -1380,10 +1385,13 @@ let mem_init :
   let protocol_data =
     let payload_hash =
       Protocol.Block_payload_hash.hash_bytes
-        [Block_hash.to_bytes hash; Operation_list_hash.(to_bytes @@ compute [])]
+        [
+          Tezos_crypto.Block_hash.to_bytes hash;
+          Tezos_crypto.Operation_list_hash.(to_bytes @@ compute []);
+        ]
     in
     let open Protocol.Alpha_context.Block_header in
-    let _, _, sk = Signature.generate_key () in
+    let _, _, sk = Tezos_crypto.Signature.generate_key () in
     let proof_of_work_nonce =
       Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
     in
@@ -1403,7 +1411,7 @@ let mem_init :
         (shell_header, contents)
     in
     let signature =
-      Signature.sign
+      Tezos_crypto.Signature.sign
         ~watermark:
           Protocol.Alpha_context.Block_header.(
             to_watermark (Block_header chain_id))

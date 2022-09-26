@@ -57,12 +57,15 @@ let get_branch (rpc_config : #Protocol_client_context.full) ~chain
   return (chain_id, hash)
 
 type 'kind preapply_result =
-  Operation_hash.t * 'kind operation * 'kind operation_metadata
+  Tezos_crypto.Operation_hash.t * 'kind operation * 'kind operation_metadata
 
 type 'kind result_list =
-  Operation_hash.t * 'kind contents_list * 'kind contents_result_list
+  Tezos_crypto.Operation_hash.t
+  * 'kind contents_list
+  * 'kind contents_result_list
 
-type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
+type 'kind result =
+  Tezos_crypto.Operation_hash.t * 'kind contents * 'kind contents_result
 
 let get_manager_operation_gas_and_fee (contents : packed_contents_list) =
   let l = Operation.to_list contents in
@@ -176,18 +179,23 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
     pp_print_cut ppf ()
   in
   let hash_pp l =
-    fprintf ppf "%s" (Base58.raw_encode Blake2B.(hash_bytes l |> to_string))
+    fprintf
+      ppf
+      "%s"
+      (Tezos_crypto.Base58.raw_encode
+         Tezos_crypto.Blake2B.(hash_bytes l |> to_string))
   in
   item (fun ppf () ->
       pp_print_text ppf "Branch: " ;
-      Block_hash.pp ppf branch) ;
+      Tezos_crypto.Block_hash.pp ppf branch) ;
   item (fun ppf () ->
       fprintf
         ppf
         "Watermark: `%a` (0x%s)"
-        Signature.pp_watermark
+        Tezos_crypto.Signature.pp_watermark
         watermark
-        (Hex.of_bytes (Signature.bytes_of_watermark watermark) |> Hex.show)) ;
+        (Hex.of_bytes (Tezos_crypto.Signature.bytes_of_watermark watermark)
+        |> Hex.show)) ;
   item (fun ppf () ->
       pp_print_text ppf "Operation bytes: " ;
       TzString.fold_left (* We split the bytes into lines for display: *)
@@ -210,7 +218,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
       pp_print_text
         ppf
         "Blake 2B Hash (ledger-style, with operation watermark): " ;
-      hash_pp [Signature.bytes_of_watermark watermark; bytes]) ;
+      hash_pp [Tezos_crypto.Signature.bytes_of_watermark watermark; bytes]) ;
   let json =
     Data_encoding.Json.construct
       Operation.unsigned_encoding
@@ -236,7 +244,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
       let watermark =
         match contents with
         (* TODO-TB sign endorsement? *)
-        | _ -> Signature.Generic_operation
+        | _ -> Tezos_crypto.Signature.Generic_operation
       in
       (if verbose_signing then
        cctxt#message
@@ -251,7 +259,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     {shell = {branch}; protocol_data = {contents; signature}}
   in
   let oph = Operation.hash op in
-  let size = Bytes.length bytes + Signature.size in
+  let size = Bytes.length bytes + Tezos_crypto.Signature.size in
   (match fee_parameter with
   | Some fee_parameter -> check_fees cctxt fee_parameter contents size
   | None -> Lwt.return_unit)
@@ -771,7 +779,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             + Data_encoding.Binary.length
                 Operation.contents_encoding
                 (Contents op)
-            + Signature.size
+            + Tezos_crypto.Signature.size
           else
             Data_encoding.Binary.length
               Operation.contents_encoding
@@ -1034,12 +1042,12 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
   if dry_run || simulation then
-    let oph = Operation_hash.hash_bytes [bytes] in
+    let oph = Tezos_crypto.Operation_hash.hash_bytes [bytes] in
     cctxt#message
       "@[<v 0>Operation: 0x%a@,Operation hash is '%a'@]"
       Hex.pp
       (Hex.of_bytes bytes)
-      Operation_hash.pp
+      Tezos_crypto.Operation_hash.pp
       oph
     >>= fun () ->
     cctxt#message
@@ -1050,7 +1058,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
   else
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
-    cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
+    cctxt#message "Operation hash is '%a'" Tezos_crypto.Operation_hash.pp oph
+    >>= fun () ->
     (* Adjust user-provided confirmations with respect to Alpha protocol finality properties *)
     tenderbake_adjust_confirmations cctxt confirmations >>= fun confirmations ->
     (match confirmations with
@@ -1062,10 +1071,10 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
            --branch %a@,\
            and/or an external block explorer to make sure that it has been \
            included.@]"
-          Operation_hash.pp
+          Tezos_crypto.Operation_hash.pp
           oph
           tenderbake_finality_confirmations
-          Block_hash.pp
+          Tezos_crypto.Block_hash.pp
           op.shell.branch
         >>= fun () -> return result
     | Some confirmations -> (
@@ -1126,10 +1135,10 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
              --branch %a@,\
              and/or an external block explorer.@]"
             number
-            Operation_hash.pp
+            Tezos_crypto.Operation_hash.pp
             oph
             tenderbake_finality_confirmations
-            Block_hash.pp
+            Tezos_crypto.Block_hash.pp
             op.shell.branch)
     >>= fun () -> return (oph, op, result.contents)
 
@@ -1192,10 +1201,10 @@ let pending_applied_operations_of_source (cctxt : #full) chain src :
            (fun acc (_oph, {protocol_data = Operation_data {contents; _}; _}) ->
              match contents with
              | Single (Manager_operation {source; _} as _op)
-               when Signature.Public_key_hash.equal source src ->
+               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
                  Contents_list contents :: acc
              | Cons (Manager_operation {source; _}, _rest) as _op
-               when Signature.Public_key_hash.equal source src ->
+               when Tezos_crypto.Signature.Public_key_hash.equal source src ->
                  Contents_list contents :: acc
              | _ -> acc)
            []
@@ -1318,14 +1327,14 @@ let replace_operation (type kind) (cctxt : #full) chain source
           cctxt#error
             "Cannot replace! No applied manager operation found for %a in \
              mempool@."
-            Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.Public_key_hash.pp
             source
           >>= fun () -> exit 1
       | _ :: _ :: _ as l ->
           cctxt#error
             "More than one applied manager operation found for %a in mempool. \
              Found %d operations. Are you sure the node is in precheck mode?@."
-            Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.Public_key_hash.pp
             source
             (List.length l)
           >>= fun () -> exit 1
@@ -1350,7 +1359,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
     ~src_sk ~fee ~gas_limit ~storage_limit ?counter ?(replace_by_fees = false)
     ~fee_parameter (type kind)
     (operations : kind Annotated_manager_operation.annotated_list) :
-    (Operation_hash.t
+    (Tezos_crypto.Operation_hash.t
     * packed_operation
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)

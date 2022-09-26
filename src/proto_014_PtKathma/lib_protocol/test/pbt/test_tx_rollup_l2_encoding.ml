@@ -48,7 +48,9 @@ let bls_pk =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let _pkh, public_key, _secret_key = Bls.generate_key ~seed:ikm () in
+  let _pkh, public_key, _secret_key =
+    Tezos_crypto.Bls.generate_key ~seed:ikm ()
+  in
   public_key
 
 let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
@@ -77,7 +79,7 @@ let idx_l2_address_gen =
   oneof [idx_l2_address_idx_gen; return idx_l2_address_value]
 
 let public_key_hash =
-  Signature.Public_key_hash.of_b58check_exn
+  Tezos_crypto.Signature.Public_key_hash.of_b58check_exn
     "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let public_key_hash_gen =
@@ -90,7 +92,9 @@ let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2592
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
-  let ticketer_pkh = Signature.Public_key_hash.of_b58check_exn ticketer_b58 in
+  let ticketer_pkh =
+    Tezos_crypto.Signature.Public_key_hash.of_b58check_exn ticketer_b58
+  in
   let ticketer = Protocol.Alpha_context.Contract.Implicit ticketer_pkh in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address
 

@@ -28,8 +28,8 @@ open Alpha_context
 
 type delegate = {
   alias : string option;
-  public_key : Signature.public_key;
-  public_key_hash : Signature.public_key_hash;
+  public_key : Tezos_crypto.Signature.public_key;
+  public_key_hash : Tezos_crypto.Signature.public_key_hash;
   secret_key_uri : Client_keys.sk_uri;
 }
 
@@ -47,17 +47,17 @@ type prequorum = {
 }
 
 type block_info = {
-  hash : Block_hash.t;
+  hash : Tezos_crypto.Block_hash.t;
   shell : Block_header.shell_header;
   payload_hash : Block_payload_hash.t;
   payload_round : Round.t;
   round : Round.t;
-  protocol : Protocol_hash.t;
-  next_protocol : Protocol_hash.t;
+  protocol : Tezos_crypto.Protocol_hash.t;
+  next_protocol : Tezos_crypto.Protocol_hash.t;
   prequorum : prequorum option;
   quorum : Kind.endorsement operation list;
   payload : Operation_pool.payload;
-  live_blocks : Block_hash.Set.t;
+  live_blocks : Tezos_crypto.Block_hash.Set.t;
       (** Set of live blocks for this block that is used to filter
           old or too recent operations. *)
 }
@@ -71,7 +71,7 @@ type cache = {
 
 type global_state = {
   cctxt : Protocol_client_context.full;
-  chain_id : Chain_id.t;
+  chain_id : Tezos_crypto.Chain_id.t;
   config : Baking_configuration.t;
   constants : Constants.t;
   round_durations : Round.round_durations;
@@ -88,7 +88,7 @@ val round_of_shell_header : Block_header.shell_header -> Round.t tzresult
 module SlotMap : Map.S with type key = Slot.t
 
 type endorsing_slot = {
-  delegate : Signature.public_key_hash;
+  delegate : Tezos_crypto.Signature.public_key_hash;
   slots : Slot.t trace;
   endorsing_power : int;
 }

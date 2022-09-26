@@ -73,7 +73,7 @@ module Make (Rollup : PARAMETERS) = struct
       node. *)
   type injected_info = {
     op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Operation_hash.t;
+    oph : Tezos_crypto.Operation_hash.t;
         (** The hash of the operation which contains [op] (this can be an L1 batch of
           several manager operations). *)
   }
@@ -93,20 +93,20 @@ module Make (Rollup : PARAMETERS) = struct
       let open Data_encoding in
       conv (fun {op; oph} -> (oph, op)) (fun (oph, op) -> {op; oph})
       @@ merge_objs
-           (obj1 (req "oph" Operation_hash.encoding))
+           (obj1 (req "oph" Tezos_crypto.Operation_hash.encoding))
            L1_operation.encoding
   end)
 
   module Injected_ophs = Disk_persistence.Make_table (struct
-    include Operation_hash.Table
+    include Tezos_crypto.Operation_hash.Table
 
     type value = L1_operation.Hash.t list
 
     let name = "injected_ophs"
 
-    let string_of_key = Operation_hash.to_b58check
+    let string_of_key = Tezos_crypto.Operation_hash.to_b58check
 
-    let key_of_string = Operation_hash.of_b58check_opt
+    let key_of_string = Tezos_crypto.Operation_hash.of_b58check_opt
 
     let value_encoding = Data_encoding.list L1_operation.Hash.encoding
   end)
@@ -126,10 +126,10 @@ module Make (Rollup : PARAMETERS) = struct
     block. *)
   type included_info = {
     op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Operation_hash.t;
+    oph : Tezos_crypto.Operation_hash.t;
         (** The hash of the operation which contains [op] (this can be an L1 batch of
           several manager operations). *)
-    l1_block : Block_hash.t;
+    l1_block : Tezos_crypto.Block_hash.t;
         (** The hash of the L1 block in which the operation was included. *)
     l1_level : int32;  (** The level of [l1_block]. *)
   }
@@ -153,21 +153,21 @@ module Make (Rollup : PARAMETERS) = struct
       @@ merge_objs
            L1_operation.encoding
            (obj3
-              (req "oph" Operation_hash.encoding)
-              (req "l1_block" Block_hash.encoding)
+              (req "oph" Tezos_crypto.Operation_hash.encoding)
+              (req "l1_block" Tezos_crypto.Block_hash.encoding)
               (req "l1_level" int32))
   end)
 
   module Included_in_blocks = Disk_persistence.Make_table (struct
-    include Block_hash.Table
+    include Tezos_crypto.Block_hash.Table
 
     type value = int32 * L1_operation.Hash.t list
 
     let name = "included_in_blocks"
 
-    let string_of_key = Block_hash.to_b58check
+    let string_of_key = Tezos_crypto.Block_hash.to_b58check
 
-    let key_of_string = Block_hash.of_b58check_opt
+    let key_of_string = Tezos_crypto.Block_hash.of_b58check_opt
 
     let value_encoding =
       let open Data_encoding in
@@ -509,7 +509,7 @@ module Make (Rollup : PARAMETERS) = struct
     let* signature =
       Client_keys.sign
         state.cctxt
-        ~watermark:Signature.Generic_operation
+        ~watermark:Tezos_crypto.Signature.Generic_operation
         state.signer.sk
         unsigned_op_bytes
     in
@@ -621,11 +621,13 @@ module Make (Rollup : PARAMETERS) = struct
     in
     let signature =
       match state.signer.pkh with
-      | Signature.Ed25519 _ -> Signature.of_ed25519 Ed25519.zero
-      | Secp256k1 _ -> Signature.of_secp256k1 Secp256k1.zero
-      | P256 _ -> Signature.of_p256 P256.zero
+      | Tezos_crypto.Signature.Ed25519 _ ->
+          Tezos_crypto.Signature.of_ed25519 Tezos_crypto.Ed25519.zero
+      | Secp256k1 _ ->
+          Tezos_crypto.Signature.of_secp256k1 Tezos_crypto.Secp256k1.zero
+      | P256 _ -> Tezos_crypto.Signature.of_p256 Tezos_crypto.P256.zero
     in
-    let branch = Block_hash.zero in
+    let branch = Tezos_crypto.Block_hash.zero in
     let operation =
       {
         shell = {branch};
@@ -921,7 +923,9 @@ module Make (Rollup : PARAMETERS) = struct
         (fun acc (signer, strategy, tags) ->
           let tags = Tags.of_list tags in
           let strategy, tags =
-            match Signature.Public_key_hash.Map.find_opt signer acc with
+            match
+              Tezos_crypto.Signature.Public_key_hash.Map.find_opt signer acc
+            with
             | None -> (strategy, tags)
             | Some (other_strategy, other_tags) ->
                 let strategy =
@@ -935,11 +939,14 @@ module Make (Rollup : PARAMETERS) = struct
                 in
                 (strategy, Tags.union other_tags tags)
           in
-          Signature.Public_key_hash.Map.add signer (strategy, tags) acc)
-        Signature.Public_key_hash.Map.empty
+          Tezos_crypto.Signature.Public_key_hash.Map.add
+            signer
+            (strategy, tags)
+            acc)
+        Tezos_crypto.Signature.Public_key_hash.Map.empty
         signers
     in
-    Signature.Public_key_hash.Map.iter_es
+    Tezos_crypto.Signature.Public_key_hash.Map.iter_es
       (fun signer (strategy, tags) ->
         let+ worker =
           Worker.launch

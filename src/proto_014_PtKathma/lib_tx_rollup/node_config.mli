@@ -50,7 +50,7 @@ type 'a purposed = {
   dispatch_withdrawals : 'a;
 }
 
-type signers = Signature.public_key_hash option purposed
+type signers = Tezos_crypto.Signature.public_key_hash option purposed
 
 type cost_caps = {
   fee_cap : Protocol.Alpha_context.Tez.t;

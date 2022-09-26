@@ -211,7 +211,9 @@ module Sc_rollup_add_external_messages_benchmark = struct
       let ctxt = Incremental.alpha_ctxt b in
       (* Necessary to originate rollups. *)
       let ctxt =
-        Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
+        Alpha_context.Origination_nonce.init
+          ctxt
+          Tezos_crypto.Operation_hash.zero
       in
       Alpha_context.Internal_for_tests.to_raw ctxt
     in

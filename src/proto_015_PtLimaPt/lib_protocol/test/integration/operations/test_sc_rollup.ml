@@ -1570,7 +1570,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Context_hash.hash_string ["first"]);
+          (Tezos_crypto.Context_hash.hash_string ["first"]);
     }
   in
   let commitment2 =
@@ -1579,7 +1579,7 @@ let test_timeout () =
       number_of_ticks = number_of_ticks_exn 4L;
       compressed_state =
         Sc_rollup.State_hash.context_hash_to_state_hash
-          (Context_hash.hash_string ["second"]);
+          (Tezos_crypto.Context_hash.hash_string ["second"]);
     }
   in
 
@@ -1608,17 +1608,17 @@ let test_timeout () =
                (%ld, %a)] but got [Sc_rollup_timeout_level_not_reached (%ld, \
                %a)]"
               expected_block_left
-              Signature.Public_key_hash.pp
+              Tezos_crypto.Signature.Public_key_hash.pp
               pkh1
               blocks_left
-              Signature.Public_key_hash.pp
+              Tezos_crypto.Signature.Public_key_hash.pp
               staker
       | _ ->
           failwith
             "It should have failed with [Sc_rollup_timeout_level_not_reached \
              (%ld, %a)]"
             expected_block_left
-            Signature.Public_key_hash.pp
+            Tezos_crypto.Signature.Public_key_hash.pp
             pkh1
     in
     let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
@@ -1677,14 +1677,14 @@ let init_with_conflict () =
   let* block, rollup = sc_originate block account1 "unit" in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Context_hash.hash_string ["first"])
+      (Tezos_crypto.Context_hash.hash_string ["first"])
   in
   let* commitment1 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
   in
   let compressed_state =
     Sc_rollup.State_hash.context_hash_to_state_hash
-      (Context_hash.hash_string ["second"])
+      (Tezos_crypto.Context_hash.hash_string ["second"])
   in
   let* commitment2 =
     dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup

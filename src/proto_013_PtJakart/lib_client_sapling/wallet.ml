@@ -27,7 +27,7 @@ open Client_keys
 open Tezos_sapling.Core.Client
 
 module Mnemonic = struct
-  let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
+  let new_random = Bip39.of_entropy (Tezos_crypto.Hacl.Rand.gen 32)
 
   let to_sapling_key mnemonic =
     (* Z-cash needs 32 bytes and BIP-39 gives 64 bytes of entropy.

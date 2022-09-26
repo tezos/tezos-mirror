@@ -37,7 +37,6 @@
   -open Tezos_benchmark_type_inference_015_PtLimaPt
   -open Tezos_protocol_015_PtLimaPt
   -open Tezos_protocol_015_PtLimaPt.Protocol
-  -open Tezos_crypto
   -open Tezos_micheline
   -open Tezos_015_PtLimaPt_test_helpers
   -open Tezos_client_015_PtLimaPt

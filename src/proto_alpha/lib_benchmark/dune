@@ -30,5 +30,6 @@
   -open Tezos_benchmark
   -open Tezos_benchmark_type_inference_alpha
   -open Tezos_protocol_alpha
+  -open Tezos_crypto
   -open Tezos_alpha_test_helpers)
  (private_modules kernel rules state_space))

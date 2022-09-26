@@ -30,8 +30,8 @@ open Alpha_context
    Improve documentation of the operation helpers *)
 
 val sign :
-  ?watermark:Signature.watermark ->
-  Signature.secret_key ->
+  ?watermark:Tezos_crypto.Signature.watermark ->
+  Tezos_crypto.Signature.secret_key ->
   Context.t ->
   packed_contents_list ->
   packed_operation
@@ -230,7 +230,7 @@ val originated_contract : Operation.packed -> Contract.t
 val register_global_constant :
   ?force_reveal:bool ->
   ?counter:Z.t ->
-  ?public_key:Signature.public_key ->
+  ?public_key:Tezos_crypto.Signature.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -261,7 +261,7 @@ val double_baking :
 
 val activation :
   Context.t ->
-  Signature.Public_key_hash.t ->
+  Tezos_crypto.Signature.Public_key_hash.t ->
   Blinded_public_key_hash.activation_code ->
   Operation.packed tzresult Lwt.t
 
@@ -295,14 +295,14 @@ val vdf_revelation : Context.t -> Seed.vdf_solution -> Operation.packed
 val proposals :
   Context.t ->
   Contract.t ->
-  Protocol_hash.t list ->
+  Tezos_crypto.Protocol_hash.t list ->
   Operation.packed tzresult Lwt.t
 
 (** Cast a vote yay, nay or pass *)
 val ballot :
   Context.t ->
   Contract.t ->
-  Protocol_hash.t ->
+  Tezos_crypto.Protocol_hash.t ->
   Vote.ballot ->
   Operation.packed tzresult Lwt.t
 
@@ -442,7 +442,7 @@ val tx_rollup_dispatch_tickets :
   message_result_path:Tx_rollup_commitment.Merkle.path ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
-  Context_hash.t ->
+  Tezos_crypto.Context_hash.t ->
   Tx_rollup_reveal.t list ->
   (packed_operation, tztrace) result Lwt.t
 

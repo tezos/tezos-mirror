@@ -43,8 +43,8 @@ module State_transitions = struct
       ~name:"new_head"
       ~level:Notice
       ~msg:"received new head {block} at level {level}, round {round}"
-      ~pp1:Block_hash.pp
-      ("block", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block", Tezos_crypto.Block_hash.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -119,12 +119,12 @@ module State_transitions = struct
       ~msg:
         "proposal {new_proposal} for current round ({current_round}) has \
          already been seen {previous_proposal}"
-      ~pp1:Block_hash.pp
-      ("new_proposal", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("new_proposal", Tezos_crypto.Block_hash.encoding)
       ~pp2:Round.pp
       ("current_round", Round.encoding)
-      ~pp3:Block_hash.pp
-      ("previous_proposal", Block_hash.encoding)
+      ~pp3:Tezos_crypto.Block_hash.pp
+      ("previous_proposal", Tezos_crypto.Block_hash.encoding)
 
   let updating_latest_proposal =
     declare_1
@@ -132,8 +132,8 @@ module State_transitions = struct
       ~name:"updating_latest_proposal"
       ~msg:"updating latest proposal to {block_hash}"
       ~level:Info
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
 
   let baker_is_ahead_of_node =
     declare_2
@@ -156,10 +156,10 @@ module State_transitions = struct
       ~msg:
         "received a proposal on another branch - current: current \
          pred{current_branch}, new pred {new_branch}"
-      ~pp1:Block_hash.pp
-      ("current_branch", Block_hash.encoding)
-      ~pp2:Block_hash.pp
-      ("new_branch", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("current_branch", Tezos_crypto.Block_hash.encoding)
+      ~pp2:Tezos_crypto.Block_hash.pp
+      ("new_branch", Tezos_crypto.Block_hash.encoding)
 
   let switching_branch =
     declare_0
@@ -215,8 +215,8 @@ module State_transitions = struct
       ~name:"attempting_preendorsing_proposal"
       ~level:Info
       ~msg:"attempting to preendorse proposal {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
 
   let skipping_invalid_proposal =
     declare_0
@@ -232,8 +232,8 @@ module State_transitions = struct
       ~name:"outdated_proposal"
       ~level:Debug
       ~msg:"outdated proposal {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
 
   let proposing_fresh_block =
     declare_2
@@ -271,10 +271,10 @@ module State_transitions = struct
       ~msg:
         "unexpected prequorum received for {received_hash} instead of \
          {expected_hash}"
-      ~pp1:Block_hash.pp
-      ("received_hash", Block_hash.encoding)
-      ~pp2:Block_hash.pp
-      ("expected_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("received_hash", Tezos_crypto.Block_hash.encoding)
+      ~pp2:Tezos_crypto.Block_hash.pp
+      ("expected_hash", Tezos_crypto.Block_hash.encoding)
 
   let unexpected_quorum_received =
     declare_2
@@ -284,10 +284,10 @@ module State_transitions = struct
       ~msg:
         "unexpected quorum received for {received_hash} instead of \
          {expected_hash}"
-      ~pp1:Block_hash.pp
-      ("received_hash", Block_hash.encoding)
-      ~pp2:Block_hash.pp
-      ("expected_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("received_hash", Tezos_crypto.Block_hash.encoding)
+      ~pp2:Tezos_crypto.Block_hash.pp
+      ("expected_hash", Tezos_crypto.Block_hash.encoding)
 
   let step_current_phase =
     declare_2
@@ -321,8 +321,8 @@ module Node_rpc = struct
       ~name:"raw_info"
       ~level:Debug
       ~msg:"raw info for {block_hash} at level {level}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 end
@@ -451,8 +451,8 @@ module Scheduling = struct
       ~name:"proposal_in_the_future"
       ~level:Debug
       ~msg:"received proposal in the future {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
 
   let process_proposal_in_the_future =
     declare_1
@@ -460,8 +460,8 @@ module Scheduling = struct
       ~name:"process_proposal_in_the_future"
       ~level:Debug
       ~msg:"process proposal received in the future with hash {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block_hash", Tezos_crypto.Block_hash.encoding)
 end
 
 module Lib = struct
@@ -543,8 +543,8 @@ module Actions = struct
       ~name:"preendorsement_injected"
       ~level:Notice
       ~msg:"injected preendorsement {ophash} for {delegate}"
-      ~pp1:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
+      ~pp1:Tezos_crypto.Operation_hash.pp
+      ("ophash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:Baking_state.pp_delegate
       ("delegate", Baking_state.delegate_encoding)
 
@@ -554,8 +554,8 @@ module Actions = struct
       ~name:"endorsement_injected"
       ~level:Notice
       ~msg:"injected endorsement {ophash} for {delegate}"
-      ~pp1:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
+      ~pp1:Tezos_crypto.Operation_hash.pp
+      ("ophash", Tezos_crypto.Operation_hash.encoding)
       ~pp2:Baking_state.pp_delegate
       ("delegate", Baking_state.delegate_encoding)
 
@@ -565,8 +565,8 @@ module Actions = struct
       ~name:"synchronizing_round"
       ~level:Info
       ~msg:"synchronizing round after block {block}"
-      ~pp1:Block_hash.pp
-      ("block", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let forging_block =
     declare_3
@@ -605,11 +605,11 @@ module Actions = struct
       ~msg:
         "block {block} at level {level}, round {round} injected for delegate \
          {delegate}"
-      ~pp1:Block_hash.pp
+      ~pp1:Tezos_crypto.Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
       ~pp4:Baking_state.pp_delegate
-      ("block", Block_hash.encoding)
+      ("block", Tezos_crypto.Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Baking_state.delegate_encoding)
@@ -684,8 +684,8 @@ module VDF = struct
       ("cycle", Data_encoding.int32)
       ~pp2:Format.pp_print_string
       ("chain", Data_encoding.string)
-      ~pp3:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
+      ~pp3:Tezos_crypto.Operation_hash.pp
+      ("ophash", Tezos_crypto.Operation_hash.encoding)
 
   let vdf_daemon_start =
     declare_1
@@ -733,8 +733,8 @@ module Nonces = struct
       ~name:"found_nonce_to_reveal"
       ~level:Notice
       ~msg:"found nonce to reveal for block {block}, level {level}"
-      ~pp1:Block_hash.pp
-      ("block", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block", Tezos_crypto.Block_hash.encoding)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 
@@ -750,8 +750,8 @@ module Nonces = struct
       ("level", Data_encoding.int32)
       ~pp2:Format.pp_print_string
       ("chain", Data_encoding.string)
-      ~pp3:Operation_hash.pp
-      ("ophash", Operation_hash.encoding)
+      ~pp3:Tezos_crypto.Operation_hash.pp
+      ("ophash", Tezos_crypto.Operation_hash.encoding)
 
   let cannot_fetch_chain_head_level =
     declare_0
@@ -825,8 +825,8 @@ module Nonces = struct
       ~name:"registering_nonce"
       ~level:Info
       ~msg:"registering nonce for block {block}"
-      ~pp1:Block_hash.pp
-      ("block", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let nothing_to_reveal =
     declare_1
@@ -834,8 +834,8 @@ module Nonces = struct
       ~name:"nothing_to_reveal"
       ~level:Info
       ~msg:"nothing to reveal for block {block}"
-      ~pp1:Block_hash.pp
-      ("block", Block_hash.encoding)
+      ~pp1:Tezos_crypto.Block_hash.pp
+      ("block", Tezos_crypto.Block_hash.encoding)
 
   let revelation_worker_started =
     declare_0
@@ -920,8 +920,8 @@ module Selection = struct
       ~name:"invalid_operation_filtered"
       ~level:Warning
       ~msg:"filtered invalid operation {op}: {errors}"
-      ~pp1:Operation_hash.pp
-      ("op", Operation_hash.encoding)
+      ~pp1:Tezos_crypto.Operation_hash.pp
+      ("op", Tezos_crypto.Operation_hash.encoding)
       ~pp2:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
@@ -931,6 +931,6 @@ module Selection = struct
       ~name:"cannot_serialize_operation_metadata"
       ~level:Warning
       ~msg:"cannot serialize operation {op} metadata"
-      ~pp1:Operation_hash.pp
-      ("op", Operation_hash.encoding)
+      ~pp1:Tezos_crypto.Operation_hash.pp
+      ("op", Tezos_crypto.Operation_hash.encoding)
 end

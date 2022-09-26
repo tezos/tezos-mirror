@@ -44,15 +44,15 @@ let pp_prechecked_managers fmt set =
          Format.fprintf
            ppf
            "(%a -> (hash:%a,gas:%a,fee:%a))"
-           Signature.Public_key_hash.pp
+           Tezos_crypto.Signature.Public_key_hash.pp
            pkh
-           Operation_hash.pp
+           Tezos_crypto.Operation_hash.pp
            op_info.operation_hash
            Alpha_context.Gas.Arith.pp
            op_info.gas_limit
            Alpha_context.Tez.pp
            op_info.fee))
-    (Signature.Public_key_hash.Map.bindings set)
+    (Tezos_crypto.Signature.Public_key_hash.Map.bindings set)
 
 let pp_operation_hash_manager fmt map =
   Format.fprintf
@@ -62,17 +62,17 @@ let pp_operation_hash_manager fmt map =
          Format.fprintf
            ppf
            "(%a -> %a)"
-           Operation_hash.pp
+           Tezos_crypto.Operation_hash.pp
            hash
-           Signature.Public_key_hash.pp
+           Tezos_crypto.Signature.Public_key_hash.pp
            pkh))
-    (Operation_hash.Map.bindings map)
+    (Tezos_crypto.Operation_hash.Map.bindings map)
 
 let pp_manager_op_weight fmt weight =
   Format.fprintf
     fmt
     "(oph: %a;weight: %a)"
-    Operation_hash.pp
+    Tezos_crypto.Operation_hash.pp
     weight.operation_hash
     Q.pp_print
     weight.weight
@@ -113,13 +113,13 @@ let pp_state fmt state =
     state.min_prechecked_op_weight
 
 let eq_prechecked_managers =
-  Signature.Public_key_hash.Map.equal
+  Tezos_crypto.Signature.Public_key_hash.Map.equal
     (fun
       ({operation_hash = oph1; gas_limit = _; fee = _; weight = _} :
         manager_op_info)
       ({operation_hash = oph2; gas_limit = _; fee = _; weight = _} :
         manager_op_info)
-    -> Operation_hash.equal oph1 oph2)
+    -> Tezos_crypto.Operation_hash.equal oph1 oph2)
 
 (* This function needs to be updated if the filter state is extended *)
 let eq_state s1 s2 =
@@ -128,12 +128,12 @@ let eq_state s1 s2 =
     | None, None -> true
     | Some _, None | None, Some _ -> false
     | Some w1, Some w2 ->
-        Operation_hash.equal w1.operation_hash w2.operation_hash
+        Tezos_crypto.Operation_hash.equal w1.operation_hash w2.operation_hash
         && Q.equal w1.weight w2.weight
   in
   eq_prechecked_managers s1.op_prechecked_managers s2.op_prechecked_managers
-  && Operation_hash.Map.equal
-       (fun k1 k2 -> Signature.Public_key_hash.equal k1 k2)
+  && Tezos_crypto.Operation_hash.Map.equal
+       (fun k1 k2 -> Tezos_crypto.Signature.Public_key_hash.equal k1 k2)
        s1.operation_hash_to_manager
        s2.operation_hash_to_manager
   && s1.prechecked_operations_count = s2.prechecked_operations_count

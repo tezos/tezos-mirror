@@ -26,7 +26,9 @@
 open Protocol
 
 type delegate_selection =
-  (Raw_level_repr.t * (Round_repr.t * Signature.public_key_hash) list) list
+  (Raw_level_repr.t
+  * (Round_repr.t * Tezos_crypto.Signature.public_key_hash) list)
+  list
 
 module LevelRoundMap = Map.Make (struct
   type t = Level_repr.t * Round_repr.t
@@ -103,8 +105,12 @@ let check ctxt ~selection =
           Delegate_sampler.baking_rights_owner ctxt level ~round
           >|= Environment.wrap_tzresult
           >>=? fun (ctxt, _, pk) ->
-          if not (Signature.Public_key_hash.equal delegate pk.delegate) then
-            raise Exit
+          if
+            not
+              (Tezos_crypto.Signature.Public_key_hash.equal
+                 delegate
+                 pk.delegate)
+          then raise Exit
           else return ctxt)
         selection
         ctxt

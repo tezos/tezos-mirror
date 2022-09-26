@@ -52,7 +52,7 @@ let rpc_context st =
   let fitness = (header st).shell.fitness in
   let result = Alpha_context.finalize st.state.ctxt fitness in
   {
-    Environment.Updater.block_hash = Block_hash.zero;
+    Environment.Updater.block_hash = Tezos_crypto.Block_hash.zero;
     block_header = {st.header.shell with fitness = result.fitness};
     context = result.context;
   }
@@ -88,7 +88,7 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
   in
   let protocol_data =
     if mempool_mode then None
-    else Some {Block_header.contents; signature = Signature.zero}
+    else Some {Block_header.contents; signature = Tezos_crypto.Signature.zero}
   in
   let header =
     {
@@ -100,14 +100,14 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
           fitness = predecessor.header.shell.fitness;
           timestamp;
           level = predecessor.header.shell.level;
-          context = Context_hash.zero;
-          operations_hash = Operation_list_list_hash.zero;
+          context = Tezos_crypto.Context_hash.zero;
+          operations_hash = Tezos_crypto.Operation_list_list_hash.zero;
         };
-      protocol_data = {contents; signature = Signature.zero};
+      protocol_data = {contents; signature = Tezos_crypto.Signature.zero};
     }
   in
   begin_construction
-    ~chain_id:Chain_id.zero
+    ~chain_id:Tezos_crypto.Chain_id.zero
     ~predecessor_context:predecessor.context
     ~predecessor_timestamp:predecessor.header.shell.timestamp
     ~predecessor_fitness:predecessor.header.shell.fitness
@@ -222,8 +222,11 @@ let add_operation ?expect_failure ?expect_apply_failure ?check_size st op =
 let finalize_block st =
   let operations = List.rev st.rev_operations in
   let operations_hash =
-    Operation_list_list_hash.compute
-      [Operation_list_hash.compute (List.map Operation.hash_packed operations)]
+    Tezos_crypto.Operation_list_list_hash.compute
+      [
+        Tezos_crypto.Operation_list_hash.compute
+          (List.map Operation.hash_packed operations);
+      ]
   in
   let shell_header =
     {
@@ -236,8 +239,11 @@ let finalize_block st =
   Environment.wrap_tzresult x >|? fun (result, _) ->
   let operations = List.rev st.rev_operations in
   let operations_hash =
-    Operation_list_list_hash.compute
-      [Operation_list_hash.compute (List.map Operation.hash_packed operations)]
+    Tezos_crypto.Operation_list_list_hash.compute
+      [
+        Tezos_crypto.Operation_list_hash.compute
+          (List.map Operation.hash_packed operations);
+      ]
   in
   let header =
     {

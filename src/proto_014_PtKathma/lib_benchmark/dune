@@ -30,6 +30,5 @@
   -open Tezos_benchmark
   -open Tezos_benchmark_type_inference_014_PtKathma
   -open Tezos_protocol_014_PtKathma
-  -open Tezos_crypto
   -open Tezos_014_PtKathma_test_helpers)
  (private_modules kernel rules state_space))
