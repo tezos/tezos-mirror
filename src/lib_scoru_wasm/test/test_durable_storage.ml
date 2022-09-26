@@ -462,7 +462,6 @@ let test_store_copy () =
 
   We expect that deleting "/a/short/path" is leaves only "/durable/a/long/path".
   *)
-  let _key = "/a/short/path" in
   let key_steps = ["a"; "short"; "path"] in
   let* tree =
     Tree_encoding_runner.encode
@@ -524,13 +523,16 @@ let test_store_copy () =
   in
   assert (result = []) ;
   let durable = Durable.of_storage_exn durable in
-  let* from_tree_opt =
-    Durable.find_tree durable @@ Durable.key_of_string_exn to_key
+  let* from_tree =
+    Durable.find_value_exn durable @@ Durable.key_of_string_exn from_key
   in
-  let* to_tree_opt =
-    Durable.find_tree durable @@ Durable.key_of_string_exn to_key
+  let* to_tree =
+    Durable.find_value_exn durable @@ Durable.key_of_string_exn to_key
   in
-  assert (from_tree_opt = to_tree_opt) ;
+
+  assert (
+    Chunked_byte_vector.to_string from_tree
+    = Chunked_byte_vector.to_string to_tree) ;
   Lwt.return_ok ()
 
 (* Test invalid key encodings are rejected. *)

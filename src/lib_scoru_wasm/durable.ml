@@ -97,12 +97,16 @@ let find_value_exn tree key =
   | None -> raise Not_found
   | Some subtree -> Runner.decode E.chunked_byte_vector subtree
 
-let find_tree tree key = T.find_tree tree @@ to_value_key key
-
 let find_tree_exn tree key =
   let open Lwt.Syntax in
-  let* opt = T.find_tree tree @@ to_value_key key in
+  let* opt = T.find_tree tree key in
   match opt with None -> raise Not_found | Some subtree -> Lwt.return subtree
+
+let copy_tree_exn tree from_key to_key =
+  let open Lwt.Syntax in
+  let* move_tree = find_tree_exn tree from_key in
+  let+ tree = T.add_tree tree to_key move_tree in
+  tree
 
 let count_subtrees tree key =
   let open Lwt.Syntax in
@@ -111,8 +115,6 @@ let count_subtrees tree key =
   if Option.is_none opt then len else len - 1
 
 let delete tree key = T.remove tree key
-
-let add_tree = T.add_tree
 
 let hash_exn tree key =
   let open Lwt.Syntax in

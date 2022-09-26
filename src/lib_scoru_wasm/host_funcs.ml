@@ -336,8 +336,7 @@ let store_copy =
           let tree = Durable.of_storage_exn durable in
           let from_key = Durable.key_of_string_exn from_key in
           let to_key = Durable.key_of_string_exn to_key in
-          let* move_tree = Durable.find_tree_exn tree from_key in
-          let+ tree = Durable.add_tree tree to_key move_tree in
+          let+ tree = Durable.copy_tree_exn tree from_key to_key in
           (Durable.to_storage tree, [])
       | _ -> raise Bad_input)
 

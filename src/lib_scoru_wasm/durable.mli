@@ -67,21 +67,15 @@ val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
 (** raise @Not_found *)
 val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t
 
-(** [find_tree durable key] optionally looks for the tree encoded at [key]
-    in [durable]. *)
-val find_tree : t -> key -> t option Lwt.t
-
-(** raise @Not_found *)
-val find_tree_exn : t -> key -> t Lwt.t
+(** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of 
+    the entire subtree at from_key is copied at  to_key.*)
+val copy_tree_exn : t -> key -> key -> t Lwt.t
 
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
 
 (** [delete durable key] deletes the value at and/or subtrees of [key]. *)
 val delete : t -> key -> t Lwt.t
-
-(** [add durable key subtree] adds [subtree] to [durable] at [key]. *)
-val add_tree : t -> key -> t -> t Lwt.t
 
 (** [hash_exn durable key] retrieves the tree hash of the value at the given [key].
     This is not the same as the hash of the value.
