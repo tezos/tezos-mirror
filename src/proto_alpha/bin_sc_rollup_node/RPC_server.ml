@@ -313,12 +313,10 @@ module Make (PVM : Pvm.S) = struct
     get_dal_slot_page node_ctxt.store block index page
 
   let () =
-    Global_directory.register0 Sc_rollup_services.Global.outbox
-    @@ fun node_ctxt () () ->
+    Block_directory.register0 Sc_rollup_services.Global.Block.outbox
+    @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in
-    let store = node_ctxt.Node_context.store in
-    let* block_hash = get_last_cemented store in
-    let* state = get_state node_ctxt block_hash in
+    let* state = get_state node_ctxt block in
     let*! outbox = PVM.get_outbox state in
     return outbox
 

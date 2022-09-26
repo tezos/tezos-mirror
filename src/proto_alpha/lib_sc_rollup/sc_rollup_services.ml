@@ -149,13 +149,6 @@ module Global = struct
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (path / "last_stored_commitment")
 
-  let outbox =
-    RPC_service.get_service
-      ~description:"Outbox at block"
-      ~query:RPC_query.empty
-      ~output:Data_encoding.(list Sc_rollup.output_encoding)
-      (path / "outbox")
-
   let outbox_proof_query =
     let open RPC_query in
     let open Sc_rollup in
@@ -271,6 +264,13 @@ module Global = struct
         ~query:RPC_query.empty
         ~output:Data_encoding.string
         (path / "status")
+
+    let outbox =
+      RPC_service.get_service
+        ~description:"Outbox at block"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(list Sc_rollup.output_encoding)
+        (path / "outbox")
 
     let dal_slot_subscriptions =
       RPC_service.get_service
