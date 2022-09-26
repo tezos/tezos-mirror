@@ -30,6 +30,18 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
+(** Boilerplate code to create a user-migratable node. Used in the tests below. **)
+let user_migratable_node_init ~migration_level ~migrate_to =
+  let* node =
+    Node.init
+      ~patch_config:
+        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])
+      [Synchronisation_threshold 0; Private_mode]
+  in
+  let* client = Client.(init ~endpoint:(Node node) ()) in
+  Lwt.return (client, node)
+
 (* Migration to Tenderbake is only supported after the first cycle,
    therefore at [migration_level >= blocks_per_cycle]. *)
 let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
@@ -41,35 +53,47 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   @@ fun () ->
   assert (migration_level >= blocks_per_cycle) ;
   Log.info "Node starting" ;
-  let* node =
-    Node.init
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      []
-  in
+  let* client, _node = user_migratable_node_init ~migration_level ~migrate_to in
   Log.info "Node initialized" ;
-  let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   Log.info "Protocol activated" ;
   (* Bake until migration *)
-  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
-  (* Ensure that we did migrate *)
-  let* migration_block =
-    RPC.Client.call client @@ RPC.get_chain_block_metadata ~block:"2" ()
+  let* () =
+    repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
+  in
+  (* Ensure that the block before migration *)
+  let* pre_migration_block =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_metadata ~block:(Int.to_string migration_level) ()
   in
   Log.info "Checking migration block consistency" ;
   Check.(
-    (migration_block.protocol = Protocol.hash migrate_from)
+    (pre_migration_block.protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected protocol = %R, got %L") ;
   Check.(
-    (migration_block.next_protocol = Protocol.hash migrate_from)
+    (pre_migration_block.next_protocol = Protocol.hash migrate_to)
+      string
+      ~error_msg:"expected next_protocol = %R, got %L") ;
+  let* () = Client.bake_for_and_wait client in
+  (* Ensure that we migrated *)
+  let* migration_block =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_metadata
+         ~block:(Int.to_string (migration_level + 1))
+         ()
+  in
+  Log.info "Checking migration block consistency" ;
+  Check.(
+    (migration_block.protocol = Protocol.hash migrate_to)
+      string
+      ~error_msg:"expected protocol = %R, got %L") ;
+  Check.(
+    (migration_block.next_protocol = Protocol.hash migrate_to)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
-  unit
+  repeat 5 (fun () -> Client.bake_for_and_wait client)
 
 (** Test all levels for one cycle, after the first cycle. *)
 let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
@@ -82,18 +106,6 @@ let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
       ~migrate_from
       ~migrate_to
   done
-
-(** Boilerplate code to create a user-migratable node. Used in the tests below. **)
-let user_migratable_node_init ~migration_level ~migrate_to =
-  let* node =
-    Node.init
-      ~patch_config:
-        (Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-           [(migration_level, migrate_to)])
-      [Synchronisation_threshold 0; Private_mode]
-  in
-  let* client = Client.(init ~endpoint:(Node node) ()) in
-  Lwt.return (client, node)
 
 (** [block_check ~level ~expected_block_type ~migrate_to ~migrate_from client]
     is generic check that a block of type [expected_block_type] contains
@@ -188,7 +200,7 @@ let check_block_has_endorsements ~level client =
 
    @param consensus_threshold is a function of [consensus_committee_size],
    defauls to the mainnet value (2/3 [consensus_committee_size] + 1), instead of
-   0 in the sandbox. 
+   0 in the sandbox.
    @param round_duration is the (minimal) round duration in seconds (set by
    parameter [minimal_block_delay]), defaults to the sandbox value (typically 1s).
    @param expected_bake_for_blocks is how many blocks you are going to bake with
