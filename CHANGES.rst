@@ -160,3 +160,5 @@ Miscellaneous
 -------------
 
 -  Recommend rust version 1.60.0 instead of 1.52.1.
+
+-  Removed delegates for protocols Ithaca and Jakarta.
