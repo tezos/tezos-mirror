@@ -32,7 +32,7 @@
             other files.
 *)
 
-let protocols = Protocol.[Jakarta; Kathmandu; Lima; Alpha]
+let protocols = Protocol.[Kathmandu; Lima; Alpha]
 
 let migrate_to = Protocol.Alpha
 
@@ -88,7 +88,7 @@ let register_protocol_agnostic_tests () =
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols:[Alpha] ;
   Baking.register ~protocols ;
-  Baking.register_operations_pool ~protocols:[Jakarta; Kathmandu; Lima; Alpha] ;
+  Baking.register_operations_pool ~protocols:[Kathmandu; Lima; Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;

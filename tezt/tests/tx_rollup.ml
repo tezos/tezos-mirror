@@ -341,12 +341,7 @@ module Regressions = struct
         submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
       in
       let* () =
-        let error =
-          match protocol with
-          | Jakarta -> "tx_rollup_no_commitment_to_remove"
-          | _ -> "tx_rollup_remove_commitment_too_early"
-        in
-        Process.check_error ~msg:(rex error) p
+        Process.check_error ~msg:(rex "tx_rollup_remove_commitment_too_early") p
       in
 
       Log.info "Step 8. Last_removed_commitments_hashes is None before removing" ;
@@ -883,7 +878,7 @@ let test_submit_from_originated_source =
   let msg =
     match protocol with
     | Lima | Alpha -> rex "Erroneous command line argument"
-    | Jakarta | Kathmandu ->
+    | Kathmandu ->
         rex "Only implicit accounts can submit transaction rollup batches"
   in
   let* () = Process.check_error ~exit_code:1 ~msg process in
