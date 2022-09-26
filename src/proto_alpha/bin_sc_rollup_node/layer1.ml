@@ -160,9 +160,11 @@ let get_predecessor =
 
 let get_predecessor_opt state {level; hash} =
   let open Lwt_result_syntax in
-  let level = Int32.pred level in
-  let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
-  Option.map (fun hash -> {level; hash}) hash
+  if level = 0l then return_none
+  else
+    let level = Int32.pred level in
+    let+ hash = get_predecessor state.cctxt state.cctxt#chain hash in
+    Option.map (fun hash -> {level; hash}) hash
 
 let get_predecessor state ({hash; _} as head) =
   let open Lwt_result_syntax in

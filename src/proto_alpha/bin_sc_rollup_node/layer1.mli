@@ -67,8 +67,8 @@ val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
    [store]. *)
 val level_of_hash : t -> Block_hash.t -> int32 tzresult Lwt.t
 
-(** [get_predecessor_opt state head] returns the predecessor, if any, of block
-    of [head]. *)
+(** [get_predecessor_opt state head] returns the predecessor of block [head],
+    when [head] is not the genesis block. *)
 val get_predecessor_opt : t -> head -> head option tzresult Lwt.t
 
 (** [get_predecessor state head] returns the predecessor block of [head]. *)
