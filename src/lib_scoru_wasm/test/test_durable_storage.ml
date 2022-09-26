@@ -66,24 +66,14 @@ let wrap_as_durable_storage tree =
 let test_store_has_missing_key () =
   let open Lwt.Syntax in
   let* durable = make_durable [("keepme", "true")] in
-  (* let* tree = empty_tree () in
-     let* durable = wrap_as_durable_storage tree in *)
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
-  let src = 10l in
   let key = "/test/path" in
-  let _ = Memory.store_bytes memory src key in
-  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-  let module_inst = {module_inst with memories} in
+  let src = 10l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
-  let module_reg = Instance.ModuleMap.create () in
-  let module_key = Instance.Module_key "test" in
-  Instance.update_module_ref module_reg module_key module_inst ;
-
   let* _, result =
     Eval.invoke
       ~module_reg
@@ -112,21 +102,12 @@ let assert_invalid_key run =
 let test_store_has_key_too_long () =
   let open Lwt_syntax in
   let* durable = make_durable [("keepme", "true")] in
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
-  let src = 10l in
   (* Together with the '/durable' prefix, and '/_' this key is too long *)
+  let src = 10l in
   let key = List.repeat 240 "a" |> String.concat "" |> ( ^ ) "/" in
-  let _ = Memory.store_bytes memory src key in
-  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-  let module_inst = {module_inst with memories} in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
-
-  let module_reg = Instance.ModuleMap.create () in
-  let module_key = Instance.Module_key "test" in
-  Instance.update_module_ref module_reg module_key module_inst ;
-
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] 10l
+  in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
@@ -171,7 +152,6 @@ let test_store_list_size () =
 
   Note that the value of "/durable/a/short/path/_" is not included in the listing.
   *)
-  let key = "/a/short/path" in
   let* durable =
     make_durable
       [
@@ -180,18 +160,11 @@ let test_store_list_size () =
         ("a/short/path/two", "true");
       ]
   in
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  let key = "/a/short/path" in
   let src = 20l in
-  let _ = Memory.store_bytes memory src key in
-  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-  let module_inst = {module_inst with memories} in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
-
-  let module_reg = Instance.ModuleMap.create () in
-  let module_key = Instance.Module_key "test" in
-  Instance.update_module_ref module_reg module_key module_inst ;
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
@@ -228,18 +201,10 @@ let test_store_delete () =
       ]
   in
   let key = "/a/short/path" in
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
   let src = 20l in
-  let _ = Memory.store_bytes memory src key in
-  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-  let module_inst = {module_inst with memories} in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
-
-  let module_reg = Instance.ModuleMap.create () in
-  let module_key = Instance.Module_key "test" in
-  Instance.update_module_ref module_reg module_key module_inst ;
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
@@ -280,26 +245,31 @@ let test_store_has_existing_key () =
       [(root, "true"); (root ^ "/one", "true"); (root ^ "/two/three", "true")]
   in
 
-  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  (* let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
+     let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in *)
   let src = 20l in
   let key = "/" ^ root in
-  let _ = Memory.store_bytes memory src key in
-  let src_one = 1000l in
+  (* let _ = Memory.store_bytes memory src key in *)
+  let src_one = Int32.add src @@ Int32.of_int @@ String.length key in
   let key_one = key ^ "/one" in
-  let _ = Memory.store_bytes memory src_one key_one in
-  let src_two = 2000l in
+  (* let _ = Memory.store_bytes memory src_one key_one in *)
+  let src_two = Int32.add src_one @@ Int32.of_int @@ String.length key_one in
   let key_two = key ^ "/two" in
-  let _ = Memory.store_bytes memory src_two key_two in
-  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-  let module_inst = {module_inst with memories} in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
 
-  let module_reg = Instance.ModuleMap.create () in
-  let module_key = Instance.Module_key "test" in
-  Instance.update_module_ref module_reg module_key module_inst ;
+  (* let _ = Memory.store_bytes memory src_two key_two in *)
+  (* let src = 20l in *)
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key; key_one; key_two] src
+  in
 
+  (* let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
+     let module_inst = {module_inst with memories} in
+     let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+     Host_funcs.register_host_funcs host_funcs_registry ;
+
+     let module_reg = Instance.ModuleMap.create () in
+     let module_key = Instance.Module_key "test" in
+     Instance.update_module_ref module_reg module_key module_inst ; *)
   let check src key expected =
     let values =
       Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -317,8 +287,10 @@ let test_store_has_existing_key () =
   in
   (* key has a value, and subtrees at 'one' & 'two' *)
   let* _ = check src key 3 in
+
   (* key/one has a value, and no subtrees. *)
   let* _ = check src_one key_one 1 in
+
   (* key/two has no value, and a subtree at key/two/three. *)
   let* _ = check src_two key_two 2 in
   Lwt.return_ok ()

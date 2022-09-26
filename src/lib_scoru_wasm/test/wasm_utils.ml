@@ -156,7 +156,6 @@ let wrap_as_durable_storage tree =
 let make_durable list_key_vals =
   let open Lwt_syntax in
   let* tree = empty_tree () in
-  (* let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in *)
   let* tree =
     List.fold_left
       (fun acc (key, value) ->
@@ -170,19 +169,28 @@ let make_durable list_key_vals =
             (Chunked_byte_vector.of_string value)
             tree
         in
-        (* let _ = Memory.store_bytes memory src key in *)
         Lwt.return tree)
       (Lwt.return tree)
       list_key_vals
   in
   wrap_as_durable_storage tree
-(* let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-   let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-   let module_inst = {module_inst with memories} in
-   let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-   Host_funcs.register_host_funcs host_funcs_registry ;
 
-   let module_reg = Instance.ModuleMap.create () in
-   let module_key = Instance.Module_key "test" in
-   Instance.update_module_ref module_reg module_key module_inst ;
-   Lwt.return (durable, module_reg, module_key, host_funcs_registry) *)
+let make_module_inst list_key_vals src =
+  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
+  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  let _ =
+    List.fold_left
+      (fun acc key ->
+        let _ = Memory.store_bytes memory acc key in
+        Int32.add acc @@ Int32.of_int (String.length key))
+      src
+      list_key_vals
+  in
+  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
+  let module_inst = {module_inst with memories} in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+  let module_reg = Instance.ModuleMap.create () in
+  let module_key = Instance.Module_key "test" in
+  Instance.update_module_ref module_reg module_key module_inst ;
+  (module_reg, module_key, host_funcs_registry)
