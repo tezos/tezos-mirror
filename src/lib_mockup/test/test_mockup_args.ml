@@ -35,7 +35,8 @@ open Tezos_mockup_registration.Mockup_args
 let testable_chain_id =
   Alcotest.testable Tezos_crypto.Chain_id.pp Tezos_crypto.Chain_id.( = )
 
-(** {!val:Chain_id.choose} uses the dummy value if no config file is specified *)
+(** {!val:Tezos_crypto.Chain_id.choose} uses the dummy value if no config file
+    is specified *)
 let test_no_config_file_dummy () =
   let expected = Chain_id.dummy in
   let actual = Chain_id.choose ~from_config_file:None in

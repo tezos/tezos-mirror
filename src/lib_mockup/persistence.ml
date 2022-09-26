@@ -46,14 +46,14 @@ module Make (Registration : Registration.S) = struct
       (fun (block_hash, block_header, context) ->
         {block_hash; block_header; context})
       (obj3
-         (req "block_hash" Block_hash.encoding)
+         (req "block_hash" Tezos_crypto.Block_hash.encoding)
          (req "shell_header" Block_header.shell_header_encoding)
          (req "context" Memory_context.encoding))
 
   module Persistent_mockup_environment = struct
     type t = {
-      protocol_hash : Protocol_hash.t;
-      chain_id : Chain_id.t;
+      protocol_hash : Tezos_crypto.Protocol_hash.t;
+      chain_id : Tezos_crypto.Chain_id.t;
       rpc_context : Tezos_protocol_environment.rpc_context;
       protocol_data : bytes;
     }
@@ -66,8 +66,8 @@ module Make (Registration : Registration.S) = struct
         (fun (protocol_hash, chain_id, rpc_context, protocol_data) ->
           {protocol_hash; chain_id; rpc_context; protocol_data})
         (obj4
-           (req "protocol_hash" Protocol_hash.encoding)
-           (req "chain_id" Chain_id.encoding)
+           (req "protocol_hash" Tezos_crypto.Protocol_hash.encoding)
+           (req "chain_id" Tezos_crypto.Chain_id.encoding)
            (req "context" rpc_context_encoding)
            (req "protocol_data" Variable.bytes))
 
@@ -76,7 +76,8 @@ module Make (Registration : Registration.S) = struct
     let of_json = Data_encoding.Json.destruct encoding
   end
 
-  let get_registered_mockup (protocol_hash_opt : Protocol_hash.t option)
+  let get_registered_mockup
+      (protocol_hash_opt : Tezos_crypto.Protocol_hash.t option)
       (printer : #Tezos_client_base.Client_context.printer) :
       Registration.mockup_environment tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -84,11 +85,11 @@ module Make (Registration : Registration.S) = struct
     let hash_is_of_mockup hash (module Mockup : Registration.MOCKUP) =
       match hash with
       | Some protocol_hash ->
-          Protocol_hash.equal protocol_hash Mockup.protocol_hash
+          Tezos_crypto.Protocol_hash.equal protocol_hash Mockup.protocol_hash
       | None ->
           Re.Str.string_match
             is_proto_alpha_regexp
-            (Protocol_hash.to_b58check Mockup.protocol_hash)
+            (Tezos_crypto.Protocol_hash.to_b58check Mockup.protocol_hash)
             0
     in
     let*! () =
@@ -107,7 +108,7 @@ module Make (Registration : Registration.S) = struct
           | Some requested ->
               Format.asprintf
                 "Requested protocol with hash %a"
-                Protocol_hash.pp
+                Tezos_crypto.Protocol_hash.pp
                 requested
           | None -> "Default protocol Alpha (no requested protocol)"
         in
@@ -123,7 +124,7 @@ module Make (Registration : Registration.S) = struct
           Format.(
             pp_print_list
               ~pp_sep:(fun fmt () -> fprintf fmt ", ")
-              Protocol_hash.pp)
+              Tezos_crypto.Protocol_hash.pp)
           protocol_hashes
 
   let default_mockup_context :
@@ -145,7 +146,7 @@ module Make (Registration : Registration.S) = struct
 
   let init_mockup_context_by_protocol_hash :
       cctxt:Tezos_client_base.Client_context.printer ->
-      protocol_hash:Protocol_hash.t ->
+      protocol_hash:Tezos_crypto.Protocol_hash.t ->
       constants_overrides_json:Data_encoding.json option ->
       bootstrap_accounts_json:Data_encoding.json option ->
       (Registration.mockup_environment * Registration.mockup_context) tzresult
@@ -238,7 +239,7 @@ module Make (Registration : Registration.S) = struct
             match protocol_hash with
             | None -> return_unit
             | Some desired_protocol
-              when Protocol_hash.equal
+              when Tezos_crypto.Protocol_hash.equal
                      Mockup_environment.protocol_hash
                      desired_protocol ->
                 return_unit
@@ -246,10 +247,10 @@ module Make (Registration : Registration.S) = struct
                 failwith
                   "Protocol %a was requested via --protocol\n\
                    yet the mockup at %s was initialized with %a"
-                  Protocol_hash.pp_short
+                  Tezos_crypto.Protocol_hash.pp_short
                   desired_protocol
                   base_dir
-                  Protocol_hash.pp_short
+                  Tezos_crypto.Protocol_hash.pp_short
                   Mockup_environment.protocol_hash
           in
           return res

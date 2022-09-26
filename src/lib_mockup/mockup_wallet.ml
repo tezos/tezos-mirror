@@ -68,7 +68,10 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
     Client_keys.import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
   in
   let*! () =
-    cctxt#message "Tezos address added: %a" Signature.Public_key_hash.pp pkh
+    cctxt#message
+      "Tezos address added: %a"
+      Tezos_crypto.Signature.Public_key_hash.pp
+      pkh
   in
   Client_keys.register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
 

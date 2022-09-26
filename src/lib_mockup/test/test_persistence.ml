@@ -91,7 +91,7 @@ module Mock_protocol : Registration.PROTOCOL = struct
   open Tezos_protocol_environment.Internal_for_tests
   include Environment_protocol_T_test.Mock_all_unit
 
-  let hash = Protocol_hash.hash_string [""]
+  let hash = Tezos_crypto.Protocol_hash.hash_string [""]
 end
 
 module Mock_mockup : Registration.MOCKUP = struct
@@ -124,7 +124,7 @@ module Mock_mockup : Registration.MOCKUP = struct
   let migrate _ = assert false
 end
 
-let mock_mockup_module (protocol_hash' : Protocol_hash.t) :
+let mock_mockup_module (protocol_hash' : Tezos_crypto.Protocol_hash.t) :
     (module Registration.MOCKUP) =
   (module struct
     include Mock_mockup
@@ -179,9 +179,9 @@ let test_get_registered_mockup_not_found =
     (fun () ->
       let module Registration = Registration.Internal_for_tests.Make () in
       let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
-      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
-      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
-      let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
+      let proto_hash_1 = Tezos_crypto.Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_2 = Tezos_crypto.Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_3 = Tezos_crypto.Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
       let*! r =
@@ -197,11 +197,11 @@ let test_get_registered_mockup_not_found =
             Format.asprintf
               "Requested protocol with hash %a not found in available mockup \
                environments. Available protocol hashes: [%a, %a]"
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               proto_hash_3
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               proto_hash_2
-              Protocol_hash.pp
+              Tezos_crypto.Protocol_hash.pp
               proto_hash_1
           in
           return
@@ -222,19 +222,21 @@ let test_get_registered_mockup_take_alpha =
       let module Registration = Registration.Internal_for_tests.Make () in
       let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
       let printer = mock_printer () in
-      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_1 = Tezos_crypto.Protocol_hash.hash_string ["mock1"] in
       let proto_hash_alpha =
-        Protocol_hash.of_b58check_exn
+        Tezos_crypto.Protocol_hash.of_b58check_exn
           "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
       in
-      let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
+      let proto_hash_3 = Tezos_crypto.Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_alpha) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_3) ;
       let+ (module Result) = Persistence.get_registered_mockup None printer in
       Alcotest.check'
-        (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
+        (Alcotest.testable
+           Tezos_crypto.Protocol_hash.pp
+           Tezos_crypto.Protocol_hash.equal)
         ~msg:"The Alpha protocol is returned"
         ~expected:proto_hash_alpha
         ~actual:Result.protocol_hash ;
@@ -254,15 +256,17 @@ let test_get_registered_mockup_take_requested =
     (fun () ->
       let module Registration = Registration.Internal_for_tests.Make () in
       let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
-      let proto_hash_1 = Protocol_hash.hash_string ["mock1"] in
-      let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
+      let proto_hash_1 = Tezos_crypto.Protocol_hash.hash_string ["mock1"] in
+      let proto_hash_2 = Tezos_crypto.Protocol_hash.hash_string ["mock2"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
       let+ (module Result) =
         Persistence.get_registered_mockup (Some proto_hash_1) (mock_printer ())
       in
       Alcotest.check'
-        (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
+        (Alcotest.testable
+           Tezos_crypto.Protocol_hash.pp
+           Tezos_crypto.Protocol_hash.equal)
         ~msg:"The requested protocol is returned"
         ~expected:proto_hash_1
         ~actual:Result.protocol_hash)
