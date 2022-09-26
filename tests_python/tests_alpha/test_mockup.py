@@ -10,7 +10,6 @@
 import json
 import os
 import re
-import shutil
 import tempfile
 from typing import Any, List, Optional, Tuple, Iterator, Dict
 from pprint import pformat
@@ -56,41 +55,6 @@ def _create_accounts_list():
     )
 
     return accounts_list
-
-
-@pytest.mark.client
-def test_config_init_mockup_fail(mockup_client: Client):
-    """Executes `octez-client config init mockup` when
-    base dir is NOT a mockup. It should fail as this is dangerous
-    (the default base directory could contain sensitive data,
-     such as private keys)
-    """
-    ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
-    pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
-    cmd = [
-        "--protocol",
-        protocol.HASH,
-        "config",
-        "init",
-        f"--{_BA_FLAG}",
-        ba_json_file,
-        f"--{_PC_FLAG}",
-        pc_json_file,
-    ]
-
-    # A valid mockup has a directory named "mockup" in its base_dir:
-    mockup_dir = os.path.join(mockup_client.base_dir, "mockup")
-    assert os.path.isdir(mockup_dir)
-    # Delete this directory, so that the base_dir is not a valid mockup
-    # base dir anymore:
-    shutil.rmtree(mockup_dir)  # See test_config_show_mockup_fail above
-    # for a variant of how to make the base_dir invalid for the mockup mode
-
-    _, _, return_code = mockup_client.run_generic(cmd, check=False)
-    assert return_code != 0
-    # Check the test doesn't leak directories:
-    assert not os.path.exists(ba_json_file)
-    assert not os.path.exists(pc_json_file)
 
 
 def _try_json_loads(flag: str, string: str) -> Any:
