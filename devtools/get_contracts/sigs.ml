@@ -60,7 +60,7 @@ module type PROTOCOL = sig
 
     val lazy_expr : expr -> lazy_expr
 
-    val decode_and_costs : lazy_expr -> expr * int * int
+    val decode_and_costs : lazy_expr -> (expr * int * int) tzresult
 
     val print_expr : Format.formatter -> expr -> unit
 

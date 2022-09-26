@@ -62,12 +62,9 @@ module Proto = struct
     let print_expr = Michelson_v1_printer.print_expr
 
     let decode_and_costs lazy_expr =
+      let open Result_syntax in
       let decode_cost = Script_repr.stable_force_decode_cost lazy_expr in
-      let expr =
-        match Data_encoding.force_decode lazy_expr with
-        | Some expr -> expr
-        | None -> assert false
-      in
+      let+ expr = wrap_tzresult @@ Script_repr.force_decode lazy_expr in
       let encode_cost =
         let decoded_lazy_expr = Script_repr.lazy_expr expr in
         Script_repr.force_bytes_cost decoded_lazy_expr

@@ -32,11 +32,22 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   module Storage_helpers = struct
     include Storage_helpers
 
+    let decode_and_costs expr =
+      match P.Script.decode_and_costs expr with
+      | Ok res -> Ok res
+      | Error err ->
+          Format.eprintf
+            "Failed decoding expression:\n%a\n"
+            Error_monad.pp_print_trace
+            err ;
+          assert (not Config.fatal) ;
+          Error `AlreadyWarned
+
     let get_lazy_expr ~what ~getter ~pp ctxt x =
       let open Lwt_result_syntax in
-      let+ _, expr = get_value ~what ~getter ~pp ctxt x in
-      let expr, decode, encode = P.Script.decode_and_costs expr in
-      (expr, {decode; encode})
+      let* _, expr = get_value ~what ~getter ~pp ctxt x in
+      let*? expr, decode, encode = decode_and_costs expr in
+      return (expr, {decode; encode})
   end
 
   module ExprMap = Map.Make (P.Script.Hash)
