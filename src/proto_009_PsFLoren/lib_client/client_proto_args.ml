@@ -27,7 +27,6 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -123,10 +122,10 @@ let () =
 
 let tez_sym = "\xEA\x9C\xA9"
 
-let string_parameter = parameter (fun _ x -> return x)
+let string_parameter = Tezos_clic.parameter (fun _ x -> return x)
 
 let int_parameter =
-  parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
 let bytes_of_prefixed_string s =
@@ -138,10 +137,11 @@ let bytes_of_prefixed_string s =
   | None ->
       failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
 
-let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
+let bytes_parameter =
+  Tezos_clic.parameter (fun _ s -> bytes_of_prefixed_string s)
 
 let init_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"init"
     ~placeholder:"data"
     ~doc:"initial value of the contract's storage"
@@ -149,14 +149,14 @@ let init_arg =
     string_parameter
 
 let arg_arg =
-  arg
+  Tezos_clic.arg
     ~long:"arg"
     ~placeholder:"data"
     ~doc:"argument passed to the contract's script, if needed"
     string_parameter
 
 let default_arg_arg =
-  arg
+  Tezos_clic.arg
     ~long:"default-arg"
     ~placeholder:"data"
     ~doc:"default argument passed to each contract's script, if needed"
@@ -170,28 +170,28 @@ let delegate_arg =
     ()
 
 let source_arg =
-  arg
+  Tezos_clic.arg
     ~long:"source"
     ~placeholder:"address"
     ~doc:"source of the deposits to be paid\nMust be a known address."
     string_parameter
 
 let entrypoint_arg =
-  arg
+  Tezos_clic.arg
     ~long:"entrypoint"
     ~placeholder:"name"
     ~doc:"entrypoint of the smart contract"
     string_parameter
 
 let default_entrypoint_arg =
-  arg
+  Tezos_clic.arg
     ~long:"default-entrypoint"
     ~placeholder:"name"
     ~doc:"default entrypoint of the smart contracts"
     string_parameter
 
 let force_switch =
-  switch
+  Tezos_clic.switch
     ~long:"force"
     ~short:'f'
     ~doc:
@@ -201,7 +201,7 @@ let force_switch =
     ()
 
 let minimal_timestamp_switch =
-  switch
+  Tezos_clic.switch
     ~long:"minimal-timestamp"
     ~doc:
       "Use the minimal timestamp instead of the current date as timestamp of \
@@ -214,13 +214,13 @@ let tez_format =
    are allowed."
 
 let tez_parameter param =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Tez.of_string s with
       | Some tez -> return tez
       | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg
+  Tezos_clic.default_arg
     ~long:parameter
     ~placeholder:"amount"
     ~doc
@@ -235,28 +235,28 @@ let tez_param ~name ~desc next =
     next
 
 let fee_arg =
-  arg
+  Tezos_clic.arg
     ~long:"fee"
     ~placeholder:"amount"
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
     (tez_parameter "--fee")
 
 let default_fee_arg =
-  arg
+  Tezos_clic.arg
     ~long:"default-fee"
     ~placeholder:"amount"
     ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
     (tez_parameter "--default-fee")
 
 let gas_limit_kind =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try
         let v = Z.of_string s in
         return (Gas.Arith.integral_exn v)
       with _ -> failwith "invalid gas limit (must be a positive number)")
 
 let gas_limit_arg =
-  arg
+  Tezos_clic.arg
     ~long:"gas-limit"
     ~short:'G'
     ~placeholder:"amount"
@@ -266,7 +266,7 @@ let gas_limit_arg =
     gas_limit_kind
 
 let default_gas_limit_arg =
-  arg
+  Tezos_clic.arg
     ~long:"default-gas-limit"
     ~short:'G'
     ~placeholder:"amount"
@@ -276,7 +276,7 @@ let default_gas_limit_arg =
     gas_limit_kind
 
 let storage_limit_kind =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try
         let v = Z.of_string s in
         assert (Compare.Z.(v >= Z.zero)) ;
@@ -285,7 +285,7 @@ let storage_limit_kind =
         failwith "invalid storage limit (must be a positive number of bytes)")
 
 let storage_limit_arg =
-  arg
+  Tezos_clic.arg
     ~long:"storage-limit"
     ~short:'S'
     ~placeholder:"amount"
@@ -295,7 +295,7 @@ let storage_limit_arg =
     storage_limit_kind
 
 let default_storage_limit_arg =
-  arg
+  Tezos_clic.arg
     ~long:"default-storage-limit"
     ~short:'S'
     ~placeholder:"amount"
@@ -305,12 +305,12 @@ let default_storage_limit_arg =
     storage_limit_kind
 
 let counter_arg =
-  arg
+  Tezos_clic.arg
     ~long:"counter"
     ~short:'C'
     ~placeholder:"counter"
     ~doc:"Set the counter to be used by the transaction"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try
            let v = Z.of_string s in
            assert (Compare.Z.(v >= Z.zero)) ;
@@ -319,11 +319,11 @@ let counter_arg =
            failwith "invalid counter (must be a positive number of bytes)"))
 
 let max_priority_arg =
-  arg
+  Tezos_clic.arg
     ~long:"max-priority"
     ~placeholder:"slot"
     ~doc:"maximum allowed baking slot"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try return (int_of_string s) with _ -> fail (Bad_max_priority s)))
 
 let default_minimal_fees =
@@ -334,80 +334,80 @@ let default_minimal_nanotez_per_gas_unit = Q.of_int 100
 let default_minimal_nanotez_per_byte = Q.of_int 1000
 
 let minimal_fees_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"minimal-fees"
     ~placeholder:"amount"
     ~doc:"exclude operations with fees lower than this threshold (in tez)"
     ~default:(Tez.to_string default_minimal_fees)
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
          | None -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"minimal-nanotez-per-gas-unit"
     ~placeholder:"amount"
     ~doc:
       "exclude operations with fees per gas lower than this threshold (in \
        nanotez)"
     ~default:(Q.to_string default_minimal_nanotez_per_gas_unit)
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_byte_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"minimal-nanotez-per-byte"
     ~placeholder:"amount"
     ~default:(Q.to_string default_minimal_nanotez_per_byte)
     ~doc:
       "exclude operations with fees per byte lower than this threshold (in \
        nanotez)"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
 
 let force_low_fee_arg =
-  switch
+  Tezos_clic.switch
     ~long:"force-low-fee"
     ~doc:"Don't check that the fee is lower than the estimated default value"
     ()
 
 let fee_cap_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"fee-cap"
     ~placeholder:"amount"
     ~default:"1.0"
     ~doc:"Set the fee cap"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
          | None -> failwith "Bad fee cap"))
 
 let burn_cap_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"burn-cap"
     ~placeholder:"amount"
     ~default:"0"
     ~doc:"Set the burn cap"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
          | None -> failwith "Bad burn cap"))
 
 let no_waiting_for_endorsements_arg =
-  switch
+  Tezos_clic.switch
     ~long:"no-waiting-for-late-endorsements"
     ~doc:"Disable waiting for late endorsements"
     ()
 
 let await_endorsements_arg =
-  switch
+  Tezos_clic.switch
     ~long:"await-late-endorsements"
     ~doc:"Await late endorsements when baking a block"
     ()
 
 let endorsement_delay_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"endorsement-delay"
     ~placeholder:"seconds"
     ~doc:
@@ -415,7 +415,7 @@ let endorsement_delay_arg =
        Delay between notifications of new blocks from the node and production \
        of endorsements for these blocks."
     ~default:"5"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try
            let i = int_of_string s in
            fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
@@ -423,12 +423,12 @@ let endorsement_delay_arg =
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
     ~default:"4096"
-    (parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in
            if preserved_cycles < 0 then fail (Bad_preserved_levels s)
@@ -436,7 +436,7 @@ let preserved_levels_arg =
          with _ -> fail (Bad_preserved_levels s)))
 
 let no_print_source_flag =
-  switch
+  Tezos_clic.switch
     ~long:"no-print-source"
     ~short:'q'
     ~doc:
@@ -447,19 +447,19 @@ let no_print_source_flag =
     ()
 
 let no_confirmation =
-  switch
+  Tezos_clic.switch
     ~long:"no-confirmation"
     ~doc:"don't print wait for the operation to be confirmed."
     ()
 
 let signature_parameter =
-  parameter (fun _cctxt s ->
+  Tezos_clic.parameter (fun _cctxt s ->
       match Signature.of_b58check_opt s with
       | Some s -> return s
       | None -> failwith "Not given a valid signature")
 
 let unparsing_mode_parameter =
-  parameter
+  Tezos_clic.parameter
     ~autocomplete:(fun _cctxt ->
       return ["Readable"; "Optimized"; "Optimized_legacy"])
     (fun _cctxt s ->
@@ -470,7 +470,7 @@ let unparsing_mode_parameter =
       | _ -> failwith "Unknown unparsing mode %s" s)
 
 let unparsing_mode_arg ~default =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"unparsing-mode"
     ~placeholder:"mode"
     ~doc:
@@ -494,7 +494,7 @@ let unparsing_mode_arg ~default =
     unparsing_mode_parameter
 
 let enforce_indentation_flag =
-  switch
+  Tezos_clic.switch
     ~long:"enforce-indentation"
     ~doc:
       "Check that the Micheline expression passed to this command is \
@@ -502,18 +502,26 @@ let enforce_indentation_flag =
     ()
 
 let display_names_flag =
-  switch
+  Tezos_clic.switch
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
 
 module Daemon = struct
   let baking_switch =
-    switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
+    Tezos_clic.switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
 
   let endorsement_switch =
-    switch ~long:"endorsement" ~short:'E' ~doc:"run the endorsement daemon" ()
+    Tezos_clic.switch
+      ~long:"endorsement"
+      ~short:'E'
+      ~doc:"run the endorsement daemon"
+      ()
 
   let denunciation_switch =
-    switch ~long:"denunciation" ~short:'D' ~doc:"run the denunciation daemon" ()
+    Tezos_clic.switch
+      ~long:"denunciation"
+      ~short:'D'
+      ~doc:"run the denunciation daemon"
+      ()
 end

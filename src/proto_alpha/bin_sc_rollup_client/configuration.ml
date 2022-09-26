@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
 open Lwt_result_syntax
 module Base = Tezos_client_base
 
@@ -44,7 +43,7 @@ let valid_endpoint _configuration s =
   | _ -> failwith "Endpoint should be of the form http[s]://address:port"
 
 let endpoint_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"endpoint"
     ~short:'E'
     ~placeholder:"uri"
@@ -52,7 +51,7 @@ let endpoint_arg () =
       (Printf.sprintf
          "endpoint of the sc rollup node; e.g. '%s'"
          default_endpoint)
-  @@ parameter valid_endpoint
+  @@ Tezos_clic.parameter valid_endpoint
 
 let valid_base_dir _configuration base_dir =
   if not (Sys.file_exists base_dir && Sys.is_directory base_dir) then
@@ -60,7 +59,7 @@ let valid_base_dir _configuration base_dir =
   else return base_dir
 
 let base_dir_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -71,7 +70,7 @@ let base_dir_arg () =
           its data.@,\
           If absent, its value defaults to %s@]@]@."
          default_base_dir)
-    (parameter valid_base_dir)
+    (Tezos_clic.parameter valid_base_dir)
 
 let global_options () = Tezos_clic.args2 (base_dir_arg ()) (endpoint_arg ())
 

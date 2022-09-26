@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
 open Client_keys
 open Tezos_sapling.Core.Client
 

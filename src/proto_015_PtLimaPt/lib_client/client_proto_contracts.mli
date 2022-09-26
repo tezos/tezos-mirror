@@ -36,8 +36,8 @@ module OriginatedContractAlias : sig
   val destination_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'wallet)) params ->
-    (Contract_hash.t -> 'a, 'wallet) params
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (Contract_hash.t -> 'a, 'wallet) Tezos_clic.params
 
   val destination_arg :
     ?name:string ->
@@ -53,8 +53,8 @@ module ContractAlias : sig
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'wallet)) params ->
-    (Contract.t -> 'a, 'wallet) params
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (Contract.t -> 'a, 'wallet) Tezos_clic.params
 
   val find_destination :
     #Client_context.wallet -> string -> Contract.t tzresult Lwt.t
@@ -62,8 +62,8 @@ module ContractAlias : sig
   val destination_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'wallet)) params ->
-    (Contract.t -> 'a, 'wallet) params
+    ('a, (#Client_context.wallet as 'wallet)) Tezos_clic.params ->
+    (Contract.t -> 'a, 'wallet) Tezos_clic.params
 
   val destination_arg :
     ?name:string ->

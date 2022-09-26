@@ -758,7 +758,6 @@ let network_arg =
     network_parameter
 
 let commands =
-  let open Tezos_clic in
   [
     command
       ~desc:"Extracts all contracts from the storage"

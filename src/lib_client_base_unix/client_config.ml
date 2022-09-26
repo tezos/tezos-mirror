@@ -324,22 +324,20 @@ let default_cli_args =
     client_mode = `Mode_client;
   }
 
-open Tezos_clic
-
-let string_parameter () : (string, #Client_context.full) parameter =
-  parameter (fun _ x -> Lwt.return_ok x)
+let string_parameter () : (string, #Client_context.full) Tezos_clic.parameter =
+  Tezos_clic.parameter (fun _ x -> Lwt.return_ok x)
 
 let media_type_parameter () :
-    (Media_type.Command_line.t, #Client_context.full) parameter =
+    (Media_type.Command_line.t, #Client_context.full) Tezos_clic.parameter =
   let open Lwt_result_syntax in
-  parameter (fun _ x ->
+  Tezos_clic.parameter (fun _ x ->
       match Media_type.Command_line.parse_cli_parameter x with
       | Some v -> return v
       | None -> tzfail (Invalid_media_type_arg x))
 
 let endpoint_parameter () =
   let open Lwt_result_syntax in
-  parameter (fun _ x ->
+  Tezos_clic.parameter (fun _ x ->
       let parsed = Uri.of_string x in
       let* _ =
         match Uri.scheme parsed with
@@ -358,7 +356,7 @@ let endpoint_parameter () =
 
 let sources_parameter () =
   let open Lwt_result_syntax in
-  parameter (fun _ path ->
+  Tezos_clic.parameter (fun _ path ->
       let*! r = Lwt_utils_unix.Json.read_file path in
       match r with
       | Error errs ->
@@ -380,21 +378,21 @@ let sources_parameter () =
               exn))
 
 let chain_parameter () =
-  parameter (fun _ chain ->
+  Tezos_clic.parameter (fun _ chain ->
       let open Lwt_result_syntax in
       match Chain_services.parse_chain chain with
       | Error _ -> tzfail (Invalid_chain_argument chain)
       | Ok chain -> return chain)
 
 let block_parameter () =
-  parameter (fun _ block ->
+  Tezos_clic.parameter (fun _ block ->
       let open Lwt_result_syntax in
       match Block_services.parse_block block with
       | Error _ -> tzfail (Invalid_block_argument block)
       | Ok block -> return block)
 
 let wait_parameter () =
-  parameter (fun _ wait ->
+  Tezos_clic.parameter (fun _ wait ->
       let open Lwt_result_syntax in
       match wait with
       | "no" | "none" -> return_none
@@ -404,7 +402,7 @@ let wait_parameter () =
           | None | Some _ -> tzfail (Invalid_wait_arg wait)))
 
 let protocol_parameter () =
-  parameter (fun _ arg ->
+  Tezos_clic.parameter (fun _ arg ->
       let open Lwt_result_syntax in
       match
         Seq.filter
@@ -418,7 +416,7 @@ let protocol_parameter () =
 
 (* Command-line only args (not in config file) *)
 let base_dir_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -436,7 +434,7 @@ let base_dir_arg () =
     (string_parameter ())
 
 let config_file_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"config-file"
     ~short:'c'
     ~placeholder:"path"
@@ -444,10 +442,10 @@ let config_file_arg () =
     (string_parameter ())
 
 let timings_switch () =
-  switch ~long:"timings" ~short:'t' ~doc:"show RPC request times" ()
+  Tezos_clic.switch ~long:"timings" ~short:'t' ~doc:"show RPC request times" ()
 
 let chain_arg () =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"chain"
     ~placeholder:"hash|tag"
     ~doc:
@@ -458,7 +456,7 @@ let chain_arg () =
     (chain_parameter ())
 
 let block_arg () =
-  default_arg
+  Tezos_clic.default_arg
     ~long:"block"
     ~short:'b'
     ~placeholder:"hash|level|tag"
@@ -472,7 +470,7 @@ let block_arg () =
     (block_parameter ())
 
 let wait_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"wait"
     ~short:'w'
     ~placeholder:"none|<int>"
@@ -482,7 +480,7 @@ let wait_arg () =
     (wait_parameter ())
 
 let protocol_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"protocol"
     ~short:'p'
     ~placeholder:"hash"
@@ -490,10 +488,14 @@ let protocol_arg () =
     (protocol_parameter ())
 
 let log_requests_switch () =
-  switch ~long:"log-requests" ~short:'l' ~doc:"log all requests to the node" ()
+  Tezos_clic.switch
+    ~long:"log-requests"
+    ~short:'l'
+    ~doc:"log all requests to the node"
+    ()
 
 let better_errors () =
-  switch
+  Tezos_clic.switch
     ~long:"better-errors"
     ~doc:
       "Error reporting is more detailed. Can be used if a call to an RPC fails \
@@ -505,7 +507,7 @@ let better_errors () =
 let addr_confdesc = "-A/--addr ('node_addr' in config file)"
 
 let addr_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"addr"
     ~short:'A'
     ~placeholder:"IP addr|host"
@@ -515,12 +517,12 @@ let addr_arg () =
 let port_confdesc = "-P/--port ('node_port' in config file)"
 
 let port_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"port"
     ~short:'P'
     ~placeholder:"number"
     ~doc:"[DEPRECATED: use --endpoint instead] RPC port of the node"
-    (parameter (fun _ x ->
+    (Tezos_clic.parameter (fun _ x ->
          let open Lwt_result_syntax in
          match int_of_string_opt x with
          | Some i -> return i
@@ -529,7 +531,7 @@ let port_arg () =
 let tls_confdesc = "-S/--tls ('tls' in config file)"
 
 let tls_switch () =
-  switch
+  Tezos_clic.switch
     ~long:"tls"
     ~short:'S'
     ~doc:"[DEPRECATED: use --endpoint instead] use TLS to connect to node."
@@ -538,7 +540,7 @@ let tls_switch () =
 let media_type_confdesc = "-m/--media-type"
 
 let media_type_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"media-type"
     ~short:'m'
     ~placeholder:"json, binary, any or default"
@@ -554,7 +556,7 @@ let media_type_arg () =
 let endpoint_confdesc = "-E/--endpoint ('endpoint' in config file)"
 
 let endpoint_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"endpoint"
     ~short:'E'
     ~placeholder:"uri"
@@ -563,7 +565,7 @@ let endpoint_arg () =
     (endpoint_parameter ())
 
 let sources_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"sources"
     ~short:'s'
     ~placeholder:"path"
@@ -573,15 +575,16 @@ let sources_arg () =
     (sources_parameter ())
 
 let remote_signer_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"remote-signer"
     ~short:'R'
     ~placeholder:"uri"
     ~doc:"URI of the remote signer"
-    (parameter (fun _ x -> Tezos_signer_backends_unix.Remote.parse_base_uri x))
+    (Tezos_clic.parameter (fun _ x ->
+         Tezos_signer_backends_unix.Remote.parse_base_uri x))
 
 let password_filename_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
@@ -602,13 +605,13 @@ let client_mode_arg () =
     | None -> tzfail (Invalid_mode_arg str)
     | Some mode -> return mode
   in
-  default_arg
+  Tezos_clic.default_arg
     ~short:'M'
     ~long:"mode"
     ~placeholder:(String.concat "|" mode_strings)
     ~doc:"how to interact with the node"
     ~default:(client_mode_to_string `Mode_client)
-    (parameter
+    (Tezos_clic.parameter
        ~autocomplete:(fun _ -> Lwt.return_ok mode_strings)
        (fun _ param -> Lwt.return (parse_client_mode param)))
 
@@ -856,7 +859,7 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  args18
+  Tezos_clic.args18
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -879,7 +882,7 @@ let global_options () =
 type parsed_config_args = {
   parsed_config_file : Cfg_file.t option;
   parsed_args : cli_args option;
-  config_commands : Client_context.full command list;
+  config_commands : Client_context.full Tezos_clic.command list;
   base_dir : string option;
   require_auth : bool;
 }
@@ -1046,7 +1049,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
            password_filename,
            client_mode ),
          remaining ) =
-    parse_global_options (global_options ()) ctx argv
+    Tezos_clic.parse_global_options (global_options ()) ctx argv
   in
   let* base_dir =
     match base_dir with

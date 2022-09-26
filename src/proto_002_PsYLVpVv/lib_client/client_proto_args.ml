@@ -26,7 +26,6 @@
 open Alpha_client_context
 open Protocol
 open Alpha_context
-open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -51,13 +50,13 @@ let () =
 let tez_sym = "\xEA\x9C\xA9"
 
 let tez_parameter param =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Tez.of_string s with
       | Some tez -> return tez
       | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg
+  Tezos_clic.default_arg
     ~long:parameter
     ~placeholder:"amount"
     ~doc
@@ -65,7 +64,7 @@ let tez_arg ~default ~parameter ~doc =
     (tez_parameter ("--" ^ parameter))
 
 let no_print_source_flag =
-  switch
+  Tezos_clic.switch
     ~long:"no-print-source"
     ~short:'q'
     ~doc:

@@ -27,7 +27,6 @@
 open Alpha_client_context
 open Protocol
 open Alpha_context
-open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -52,11 +51,11 @@ let () =
 let tez_sym = "\xEA\x9C\xA9"
 
 let int_parameter =
-  parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
 let bytes_parameter =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match
         if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then None
         else Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2)))
@@ -67,13 +66,13 @@ let bytes_parameter =
             "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)")
 
 let tez_parameter param =
-  parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Tez.of_string s with
       | Some tez -> return tez
       | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg
+  Tezos_clic.default_arg
     ~long:parameter
     ~placeholder:"amount"
     ~doc
@@ -81,7 +80,7 @@ let tez_arg ~default ~parameter ~doc =
     (tez_parameter ("--" ^ parameter))
 
 let no_print_source_flag =
-  switch
+  Tezos_clic.switch
     ~long:"no-print-source"
     ~short:'q'
     ~doc:
