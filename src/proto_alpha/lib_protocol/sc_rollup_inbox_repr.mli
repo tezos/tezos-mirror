@@ -311,10 +311,13 @@ module type Merkelized_operations = sig
       the beginning of a refutation game to create the snapshot against
       which proofs in that game must be valid.
 
-      This will however produce a [history_proof] with exactly the same
-      hash as the one produced by [form_history_proof], run on a node
-      with a complete [inbox_context]. *)
-  val take_snapshot : t -> history_proof
+      One important note:
+      It takes the snapshot of the inbox for the [current_level]. The snapshot
+      points to the inbox at the *beginning* of the current block level.
+      This prevents to create a mid-level snapshot for a refutation game
+      if new messages are added before and/or after in the same block.
+  *)
+  val take_snapshot : current_level:Raw_level_repr.t -> t -> history_proof
 
   (** Given a inbox [A] at some level [L] and another inbox [B] at
       some level [L' >= L], an [inclusion_proof] guarantees that [A] is

@@ -445,7 +445,7 @@ module type Merkelized_operations = sig
     tree option ->
     (History.t * history_proof) tzresult Lwt.t
 
-  val take_snapshot : t -> history_proof
+  val take_snapshot : current_level:Raw_level_repr.t -> t -> history_proof
 
   type inclusion_proof
 
@@ -602,10 +602,20 @@ struct
       previous levels of the inbox. *)
   let no_history = History.empty ~capacity:0L
 
-  let take_snapshot inbox =
+  let take_snapshot ~current_level inbox =
     let prev_cell = inbox.old_levels_messages in
-    let prev_cell_ptr = hash_skip_list_cell prev_cell in
-    Skip_list.next ~prev_cell ~prev_cell_ptr (current_level_hash inbox)
+    if Raw_level_repr.(inbox.level < current_level) then
+      (* If the level of the inbox is lower than the current level, there
+         is no new messages in the inbox for the current level. It is then safe
+         to take a snapshot of the actual inbox. *)
+      let prev_cell_ptr = hash_skip_list_cell prev_cell in
+      Skip_list.next ~prev_cell ~prev_cell_ptr (current_level_hash inbox)
+    else
+      (* If there is a level tree for the [current_level] in the inbox, we need
+         to ignore this new level as it is not finished yet (regarding the
+         block's completion). We take the inbox's current predecessor instead.
+      *)
+      prev_cell
 
   let key_of_level level =
     let level_bytes =
