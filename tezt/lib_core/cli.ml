@@ -289,14 +289,14 @@ let init ?args () =
           Arg.String
             (fun pattern ->
               options.patterns_to_run <-
-                Base.rex pattern :: options.patterns_to_run),
-          "<PERL_REGEXP> Only run tests matching PERL_REGEXP (see SELECTING \
-           TESTS)." );
+                Base.rex ~opts:[`Caseless] pattern :: options.patterns_to_run),
+          "<PERL_REGEXP> Only run tests matching PERL_REGEXP (case \
+           insensitive) (see SELECTING TESTS)." );
         ( "-m",
           Arg.String
             (fun pattern ->
               options.patterns_to_run <-
-                Base.rex pattern :: options.patterns_to_run),
+                Base.rex ~opts:[`Caseless] pattern :: options.patterns_to_run),
           "<PERL_REGEXP> Same as --match." );
         ( "--title",
           Arg.String

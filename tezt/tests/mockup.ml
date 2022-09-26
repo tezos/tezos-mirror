@@ -63,7 +63,7 @@ let test_rpc_header_shell =
 let transfer_data =
   (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
-let test_balances_after_transfer giver amount receiver =
+let check_balances_after_transfer giver amount receiver =
   let giver_balance_before, giver_balance_after = giver in
   let receiver_balance_before, receiver_balance_after = receiver in
   if not Tez.(giver_balance_after < giver_balance_before - amount) then
@@ -109,7 +109,7 @@ let test_transfer =
   let* receiver_balance_after =
     Client.get_balance_for ~account:receiver client
   in
-  test_balances_after_transfer
+  check_balances_after_transfer
     (giver_balance_before, giver_balance_after)
     amount
     (receiver_balance_before, receiver_balance_after) ;
@@ -455,7 +455,7 @@ let test_migration_transfer ?migration_spec () =
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
       in
-      test_balances_after_transfer
+      check_balances_after_transfer
         (giver_balance_before, giver_balance_after)
         amount
         (receiver_balance_before, receiver_balance_after) ;
@@ -609,6 +609,74 @@ let test_storage_from_file =
       in
       unit)
 
+(* Executes `tezos-client list mockup protocols`. The call must
+   succeed and return a non empty list. *)
+let test_list_mockup_protocols () =
+  Test.register
+    ~__FILE__
+    ~title:"(Mockup) List mockup protocols."
+    ~tags:["mockup"; "client"; "protocols"]
+  @@ fun () ->
+  let client = Client.create_with_mode Client.Mockup in
+  let* protocols = Client.list_protocols `Mockup client in
+  if protocols = [] then Test.fail "List of mockup protocols must be non-empty" ;
+  unit
+
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is a non empty directory which is NOT a mockup
+   directory. The call must fail. *)
+let test_create_mockup_dir_exists_nonempty =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup in existing base dir"
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let base_dir = Temp.dir "mockup_dir" in
+  Base.write_file ~contents:"" (base_dir ^ "/" ^ "whatever") ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is not empty, please specify a fresh base directory")
+  in
+  unit
+
+let test_retrieve_addresses =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Retrieve addresses"
+    ~tags:["mockup"; "client"; "wallet"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* addresses = Client.list_known_addresses client in
+  let expected_addresses =
+    Account.Bootstrap.keys |> Array.to_list |> List.rev
+    |> List.map @@ fun Account.{alias; public_key_hash; _} ->
+       (alias, public_key_hash)
+  in
+  Check.(
+    (addresses = expected_addresses)
+      ~__LOC__
+      (list (tuple2 string string))
+      ~error_msg:"Expected addresses %R, got %L") ;
+  unit
+
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is not fresh. The call must fail. *)
+let test_create_mockup_already_initialized =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup when already initialized."
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is already initialized as a mockup directory")
+  in
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -620,7 +688,10 @@ let register ~protocols =
   test_rpc_header_shell protocols ;
   test_origination_from_unrevealed_fees protocols ;
   test_multiple_transfers protocols ;
-  test_storage_from_file protocols
+  test_storage_from_file protocols ;
+  test_create_mockup_dir_exists_nonempty protocols ;
+  test_retrieve_addresses protocols ;
+  test_create_mockup_already_initialized protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
@@ -633,4 +704,6 @@ let register_global_constants ~protocols =
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
 
-let register_protocol_independent () = test_migration_transfer ()
+let register_protocol_independent () =
+  test_migration_transfer () ;
+  test_list_mockup_protocols ()

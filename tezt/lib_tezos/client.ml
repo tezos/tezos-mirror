@@ -721,6 +721,27 @@ let show_address ~alias client =
   in
   return @@ Account.parse_client_output ~alias ~client_output
 
+let spawn_list_known_addresses client =
+  spawn_command client ["list"; "known"; "addresses"]
+
+let list_known_addresses client =
+  let* client_output =
+    spawn_list_known_addresses client |> Process.check_and_read_stdout
+  in
+  let addresses =
+    client_output |> String.trim |> String.split_on_char '\n'
+    |> List.map @@ fun line ->
+       match line =~** rex "(.*): ([^ ]*)" with
+       | Some (alias, pkh) -> (alias, pkh)
+       | None ->
+           Test.fail
+             "Cannot parse line %S from list of known addresses from \
+              client_output: %s"
+             line
+             client_output
+  in
+  return addresses
+
 let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
