@@ -21,16 +21,17 @@
     <form>
         <div>
             <label for="selectedLevel_begin">First bloc:</label>
-            <input name="level_" id="selectedLevel_begin" type="number" value="179000" />
+            <input name="level_" id="selectedLevel_begin" type="number" />
             <span id='tick_begin'></span>
             <br>
             <label for="selectedLevel_end">Last bloc:</label>
-            <input name="level_" id="selectedLevel_end" type="number" value="179020" />
+            <input name="level_" id="selectedLevel_end" type="number" />
             <span id='tick_end'></span>
             <br>
             <label for="adress_">delegate adress:</label>
-            <input name="adress_" id="adress_" type="string" value="tz3WXYtyDUNL91qfiCJtVUX746QpNv5i5ve5" />
+            <input name="adress_" id="adress_" type="string" value="tz1Ro4GjLWajnL7FWE1RxFTweLwsGdPqKbdZ" />
             <input type="button" id="submit_" value="Search ">
+            
 
         </div>
     </form>
@@ -38,25 +39,92 @@
         var dict_data = {};
         function main() {
             try {
-                $('#submit_').mouseup(async function (e) {
-                    beg_ = document.getElementById('selectedLevel_begin').value;
-                    end_ = document.getElementById('selectedLevel_end').value;
-                    adresse = document.getElementById('adress_').value;
+               // parameter from URL  
+               const params = new Proxy(new URLSearchParams(window.location.search), { // to input parameters in URL
+                    get: (searchParams, prop) => searchParams.get(prop),
+                });
+                // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
+                let first_bloc; // "some_value"
+                let last_bloc;
+                let address;
+                console.log(parseInt(params.first_bloc),parseInt(params.last_bloc), isNaN(params.address))
+                if((!(isNaN(parseInt(params.first_bloc))))&&(!(isNaN(parseInt(params.last_bloc))))&&(params.address)){
+                    
+                    first_bloc = parseInt(params.first_bloc);
+                    document.getElementById("selectedLevel_begin").value = first_bloc;             
 
-                    let dict_data = populate_v1(server_adress, beg_, end_).then(dict_data => {
-                        let t_valide=delegate_delays_distribution_of_operations(dict_data, adresse,true);
+                    last_bloc = parseInt(params.last_bloc);
+                    document.getElementById("selectedLevel_end").value = last_bloc;             
+
+                    address =params.address;
+                    document.getElementById("adress_").value = address;             
+
+                    let dict_data = populate_v1(server_adress, first_bloc, last_bloc).then(dict_data => {
+                        let t_valide=delegate_delays_distribution_of_operations(dict_data, address,true);
                         console.log(t_valide);
-                        let ope_observation = classify_operations(dict_data, adresse,true);
+                        let ope_observation = classify_operations(dict_data, address,true);
                         console.log("ope_observation",ope_observation);
                         let result = get_info_bloc(dict_data,true);
                         let t_baker=result[1]
                         chart_consensus_operation_specific_address(t_valide);
                         chart_time_mean_deviation(t_valide);
-                        resume_obs(ope_observation,t_baker, adresse);
-                    })
+                        resume_obs(ope_observation,t_baker, address);
+                    });
 
+                }else if(params.address){
+                    console.log("ah",console.log(params.address))
+                    address =params.address;
+                    var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
+                    var b= a.then(level=>{
+                        return populate_v1(server_adress, level-50, level);
+                    });
+                    Promise.all([a,b]).then(([bloc_value,dict_data])=>{
+                        document.getElementById("selectedLevel_begin").value = bloc_value-50;             
+                        document.getElementById("selectedLevel_end").value = bloc_value;             
+                        
+                        let t_valide=delegate_delays_distribution_of_operations(dict_data, address,true);
+                        console.log(t_valide);
+                        let ope_observation = classify_operations(dict_data, address,true);
+                        console.log("ope_observation",ope_observation);
+                        let result = get_info_bloc(dict_data,true);
+                        let t_baker=result[1]
+                        chart_consensus_operation_specific_address(t_valide);
+                        chart_time_mean_deviation(t_valide);
+                        resume_obs(ope_observation,t_baker, address);
+                    });
+
+                }
+                else{
+                    address =document.getElementById("adress_").value;
+                    var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
+                    var b= a.then(level=>{
+                        return populate_v1(server_adress, level-50, level);
+                    });
+                    Promise.all([a,b]).then(([bloc_value,dict_data])=>{
+                        document.getElementById("selectedLevel_begin").value = bloc_value-50;             
+                        document.getElementById("selectedLevel_end").value = bloc_value;             
+                        
+                        let t_valide=delegate_delays_distribution_of_operations(dict_data, address,true);
+                        console.log(t_valide);
+                        let ope_observation = classify_operations(dict_data, address,true);
+                        console.log("ope_observation",ope_observation);
+                        let result = get_info_bloc(dict_data,true);
+                        let t_baker=result[1]
+                        chart_consensus_operation_specific_address(t_valide);
+                        chart_time_mean_deviation(t_valide);
+                        resume_obs(ope_observation,t_baker, address);
+                    });
+                    
+                }
+                $('#submit_').mouseup(async function (e) {
+                    console.log(document.getElementById('adress_').value)
+                    if((!(isNaN(document.getElementById('selectedLevel_begin').value)))&&(!(isNaN(document.getElementById('selectedLevel_end').value)))&&(""!=document.getElementById('adress_').value)){
+                        window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value+"&first_bloc="+document.getElementById('selectedLevel_begin').value +"&last_bloc="+document.getElementById('selectedLevel_end').value;
+                    }else if(""!=(document.getElementById('adress_').value)){
+                        window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value;
+
+                    }
                 });
-
 
             } catch (e) {
                 console.log(e)

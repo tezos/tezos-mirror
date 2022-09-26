@@ -24,24 +24,19 @@ function populate_v1(server_adress, beg, end) {
         })).then(_ => { return dict_data })
 }
 
-const populate_v0 = function (server, beg, end, directories, dict_data) {
-    var range_bloc = range(beg, end);
-    range_bloc.forEach((a) => {
-        Object.entries(directories).forEach(([k, v]) => {
-            if ((+a) <= v[1] && (+a) >= v[0]) {
-                try {
-                    axios
-                        .get(server + "/" + k + "/" + a + ".json")
-                        .then(json_data => {
-                            dict_data[a] = json_data.data;
-                        })
-                } catch {
-                    console.log("bloc: " + a + " est introuvable");
-                }
-            }
+
+const getHead = function(server){
+    let level;
+    return axios
+        .get(server+"head.json")
+        .then(json => {
+            let json_data=json.data
+            level= json_data["level"]
+            console.log(level)
         })
-    })
-    return dict_data
+        .then(_=>{return level-1}) 
+        .catch(error => { console.error(error); throw error; });
+
 }
 
 function get_info_bloc(dict_data, msec = false) {
@@ -372,7 +367,6 @@ const percIntegration = function (threshold, t_op_pre_valide) {
         try {
             console.log(typeof (v_bloc))
             Object.entries(v_bloc).forEach(([level, v_level]) => {
-                //for (let [level, v_level] of Object.entries(v_bloc)) {
                 var card_valide_tcible = 0;
                 Object.entries(v_level).forEach(element => {
                     if (element <= t_cible) {
@@ -400,7 +394,6 @@ const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valide, 
         pI_level[bloc] = {};
         try {
             Object.entries(v_bloc).forEach(([level, v_level]) => {
-                //for (let [level, v_level] of Object.entries(v_bloc)) {
                 var card_valide_tcible = 0;
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
@@ -469,9 +462,7 @@ const TimeForPercIntegration_w_endorsing_power = function (threshold, t_op_pre_v
             }
             var block_fin = v_bloc[last_round_[last_round_.length - 1]]; // This graph is based on the valid rounds, i.e. the last round of each block
             console.log(block_fin);
-            //block_fin = sort_dictionnary(block_fin);// sort the receipt delay vector, in ascending order
             console.log("block_fin", block_fin)
-            //array of reception order weighted by endorsing
             array_end_power_recep_time = get_reception_order_weighted_by_endorsing_pow(keys_in_sorted_order_of_values(block_fin), endorsing_power[bloc]);
             console.log("array_end_power_recep_time.length", Object.keys(array_end_power_recep_time).length, array_end_power_recep_time);
             seuil_validation = block_fin[get_delegate_threshold_validation_(Math.ceil(qd_ * l_), array_end_power_recep_time)]; // Date on which we have the minimum number of pre endo for the round to be valid 
@@ -539,7 +530,6 @@ const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_val
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
                         card_valide_tcible += endorsing_power[bloc][delegate];
-                        //console.log(card_valide_tcible,endorsing_power[bloc][delegate], typeof(endorsing_power[bloc][delegate]))
                     }
                 });
                 if (isNaN(card_valide_tcible / sumValues(endorsing_power[bloc])) == false) {
@@ -570,7 +560,7 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
         var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
             width = 1000, // outer width of chart, in pixels
             height = 400; // outer height of chart, in pixels 
-        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du niveau dernièrement observé 
+        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { //Clean screen 
             console.log(niveau + " supprimer si round 0 !!!");
             const e = document.querySelector("p");
             while (e.firstChild) {
@@ -582,7 +572,7 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
         const svg = d3.select("body").select(dom).append("svg").attr("height", height).attr("viewBox", [0, 0, width, height]);
 
         const xAxis = svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`);
-        const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);//.append("title").text("↑ # Délégués");
+        const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);
         const graph = svg.append("g").attr("fill", "steelblue");
 
         let minValue = Object.values(data[0])[0]; //We calculate the Range of time values measured for a block, in order to adjust the display dimensions
@@ -613,7 +603,7 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
         bins3 = d3.bin().thresholds(maxValue - minValue)([delai_recep_bloc_]);
         console.log(bins3);
 
-        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([delai_recep_bloc_])); // aide à définir x: Mauavise idéé 
+        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([delai_recep_bloc_]));
 
         x = d3.scaleLinear()
             .domain([0, bins_tot[bins_tot.length - 1].x1])
@@ -679,7 +669,6 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
             .attr("text-anchor", "end")
             .text("reception times (seconds) →");
 
-        // Handmade legend
         svg.append("circle").attr("cx", width - 130).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
         svg.append("circle").attr("cx", width - 130).attr("cy", 60).attr("r", 6).style("fill", "#404080")
         svg.append("text").attr("x", width - 110).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
@@ -687,7 +676,6 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
         svg.append("circle").attr("cx", width - 130).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
         svg.append("text").attr("x", width - 110).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
 
-        //xAxis.call(d3.axisBottom(x).tickSizeOuter(2));
         xAxis.call(d3.axisBottom(x))
             .selectAll("text")
             .attr("transform", "translate(" + tickDistance / 2 + ",0)rotate(-45)")
@@ -725,14 +713,14 @@ const resume_obs = function (data, t_baker, delegate = "") {
         const elements = document.getElementById("resume").querySelector("table");
         elements.parentElement.removeChild(elements);
     } catch (e) {
-        //console.log(e)
+        console.log(e)
     }
     var tbl = document.createElement('table');
     tbl.style.width = '100%';
     tbl.setAttribute('border', '1');
     var tbdy = document.createElement('tbody');
 
-    let manque = ["missed", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
+    let manque = ["missed", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];
     let entete;
     if (delegate == "") {
         entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
@@ -1169,7 +1157,6 @@ function chart_time_required(data) {
 
 function chart_consensus_operation_specific_address(data) {
     if (!(isEmpty(data))) {
-        //console.log(data)
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
         height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
@@ -1192,10 +1179,8 @@ function chart_consensus_operation_specific_address(data) {
 
             var myX = d3.map(data, d => d.bloc)
             var myY = d3.map(data, d => d.timestamp_delay)
-            //console.log("my", myX, myY);
 
             var sumstat = d3.group(data, d => d.cat);
-            //console.log(sumstat)
 
             // Add X axis --> it is a date format
             var x = d3.scaleLinear()
@@ -1227,7 +1212,6 @@ function chart_consensus_operation_specific_address(data) {
             var color_dots = d3.scaleOrdinal()
                 .domain(["Endorsement", "Preendorsement round 0", "Preendorsement round 1", "Preendorsement round 2", "Preendorsement round 3", "Preendorsement round 4", "Preendorsement round 5", "Preendorsement round 6", "Preendorsement round 7"])
                 .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999']);
-            //ar legend = d3.legendColor().scale(color_dots);
 
 
 
@@ -1300,7 +1284,6 @@ function chart_consensus_operation_specific_address(data) {
 
 function chart_time_mean_deviation(data) {
     if (!(isEmpty(data))) {
-        //console.log(data)
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
         height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
@@ -1323,10 +1306,8 @@ function chart_time_mean_deviation(data) {
 
             var myX = d3.map(data, d => d.bloc)
             var myY = d3.map(data, d => d.deviation_from_the_mean)
-            //console.log("my", myX, myY);
 
             var sumstat = d3.group(data, d => d.cat);
-            //console.log(sumstat)
 
             // Add X axis --> it is a date format
             var x = d3.scaleLinear()
@@ -1338,12 +1319,6 @@ function chart_time_mean_deviation(data) {
 
             // Add Y axis
             let max_abs_tab = Math.max(...data.map(o => Math.abs(o.deviation_from_the_mean)))
-            /*var y = d3.scaleLinear()
-                .domain([-max_abs_tab, max_abs_tab])//(d3.extent(data, d => d.timestamp_delay))
-                .range([height/2, -height/2]);
-            svgg.append("g")
-                .attr("transform", "translate(0," + (height/2) + ")")
-                .call(d3.axisLeft(y).tickSizeOuter(0));*/
             var y = d3.scaleLinear()
                 .domain([-max_abs_tab, max_abs_tab])
                 .range([height, 0]);
@@ -1362,11 +1337,9 @@ function chart_time_mean_deviation(data) {
 
             svgg.append("g").attr("transform", "translate(" + (width + 30) + ",10)").call(legend);
 
-            //MAJ
             var color_dots = d3.scaleOrdinal()
                 .domain(["Endorsement", "Preendorsement round 0", "Preendorsement round 1", "Preendorsement round 2", "Preendorsement round 3", "Preendorsement round 4", "Preendorsement round 5", "Preendorsement round 6", "Preendorsement round 7"])
                 .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999']);
-            //ar legend = d3.legendColor().scale(color_dots);
 
 
 
