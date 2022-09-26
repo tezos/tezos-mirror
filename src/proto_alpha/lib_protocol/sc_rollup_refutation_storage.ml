@@ -367,7 +367,14 @@ let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
         in
         let balances_updates = balance_updates_loser @ balance_updates_winner in
         return (ctxt, balances_updates)
-    | Draw -> return (ctxt, [])
+    | Draw ->
+        let* ctxt, balances_updates_alice =
+          Stake_storage.remove_staker ctxt rollup stakers.alice
+        in
+        let* ctxt, balances_updates_bob =
+          Stake_storage.remove_staker ctxt rollup stakers.bob
+        in
+        return (ctxt, balances_updates_alice @ balances_updates_bob)
   in
   let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
