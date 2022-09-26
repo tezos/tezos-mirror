@@ -2867,6 +2867,30 @@ let test_late_rollup_node =
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
   return ()
 
+(* Test interruption of rollup node before the first inbox is processed. Upon
+   restart the node should not complain that an inbox is missing. *)
+let test_interrupt_rollup_node =
+  test_scenario
+    {
+      tags = ["node"];
+      variant = "interrupt";
+      description = "a rollup should recover on interruption before first inbox";
+    }
+  @@ fun _protocol sc_rollup_node _sc_rollup_address _node client ->
+  let processing_promise =
+    Sc_rollup_node.wait_for
+      sc_rollup_node
+      "sc_rollup_daemon_processing_heads.v0"
+      (fun _ -> Some ())
+  in
+  let* () = bake_levels 15 client in
+  let* () = Sc_rollup_node.run sc_rollup_node and* () = processing_promise in
+  let* () = Sc_rollup_node.terminate ~kill:true sc_rollup_node in
+  let* () = bake_levels 1 client in
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 15 in
+  unit
+
 (* Testing the timeout to record gas consumption in a regression trace and
    detect when the value changes.
    For functional tests on timing-out a dispute, see unit tests in
@@ -3304,6 +3328,7 @@ let register ~kind ~protocols =
   test_consecutive_commitments protocols ~kind ;
   test_refutation protocols ~kind ;
   test_late_rollup_node protocols ~kind ;
+  test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message ~earliness:0 "" protocols ~kind ;
   test_outbox_message ~earliness:0 "aux" protocols ~kind ;
   test_outbox_message
