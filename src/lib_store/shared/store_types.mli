@@ -26,7 +26,7 @@
 (** {1 Global types used in the store library} *)
 
 (** The type used to describe a block pointer i.e. its hash and level. *)
-type block_descriptor = Block_hash.t * int32
+type block_descriptor = Tezos_crypto.Block_hash.t * int32
 
 (** Encoding for {!block_descriptor}. *)
 val block_descriptor_encoding : block_descriptor Data_encoding.t
@@ -55,7 +55,7 @@ val invalid_block_encoding : invalid_block Data_encoding.t
 (** Module [Block_lru_cache] implements a lwt LRU cache map indexed by
     block hashes. *)
 module Block_lru_cache :
-  Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Block_hash.t
+  Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Tezos_crypto.Block_hash.t
 
 (** Module [Protocol_levels] represents an associative map of protocol
     levels to corresponding blocks which supposedly activate new
@@ -65,7 +65,7 @@ module Protocol_levels : sig
   include Map.S with type key = int
 
   (** The type representing a subset of the commit information. These
-      are used to easily check that a given [Context_hash.t], with the
+      are used to easily check that a given [Tezos_crypto.Context_hash.t], with the
       associated context not present on disk, is consistent.  It is
       used to verify that an announced protocol is indeed the one that
       was committed on disk. Fields are:
@@ -88,22 +88,23 @@ module Protocol_levels : sig
     author : string;
     message : string;
     test_chain_status : Test_chain_status.t;
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-    data_merkle_root : Context_hash.t;
-    parents_contexts : Context_hash.t list;
+    predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash :
+      Tezos_crypto.Operation_metadata_list_list_hash.t option;
+    data_merkle_root : Tezos_crypto.Context_hash.t;
+    parents_contexts : Tezos_crypto.Context_hash.t list;
   }
 
   val commit_info_of_tuple :
-    Protocol_hash.t
+    Tezos_crypto.Protocol_hash.t
     * string
     * string
     * Time.Protocol.t
     * Test_chain_status.t
-    * Context_hash.t
-    * Block_metadata_hash.t option
-    * Operation_metadata_list_list_hash.t option
-    * Context_hash.t list ->
+    * Tezos_crypto.Context_hash.t
+    * Tezos_crypto.Block_metadata_hash.t option
+    * Tezos_crypto.Operation_metadata_list_list_hash.t option
+    * Tezos_crypto.Context_hash.t list ->
     commit_info
 
   (** Encoding for {!commit_info}. *)
@@ -132,7 +133,7 @@ module Protocol_levels : sig
      allowing us to remove the option. *)
   type activation_block = {
     block : block_descriptor;
-    protocol : Protocol_hash.t;
+    protocol : Tezos_crypto.Protocol_hash.t;
     commit_info : commit_info option;
   }
 

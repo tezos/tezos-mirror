@@ -157,7 +157,7 @@ type t = block_store
 
     A block key may represent an invalid block (wrong hash and/or
     offset) as it is not ensured to be valid by construction.*)
-type key = Block of (Block_hash.t * int)
+type key = Block of (Tezos_crypto.Block_hash.t * int)
 
 (** The status of the merging thread *)
 type merge_status = Not_running | Running | Merge_failed of tztrace
@@ -181,7 +181,8 @@ val mem : block_store -> key -> bool tzresult Lwt.t
 (** [get_hash block_store key] retrieves the hash corresponding to the
    given [key] in [block_store]. Return [None] if the block is
    unknown. *)
-val get_hash : block_store -> key -> Block_hash.t option tzresult Lwt.t
+val get_hash :
+  block_store -> key -> Tezos_crypto.Block_hash.t option tzresult Lwt.t
 
 (** [read_block ~read_metadata block_store key] reads the block [key]
    in [block_store] if present. Return [None] if the block is

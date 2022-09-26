@@ -25,8 +25,9 @@
 
 type failure_kind =
   | Nothing_to_reconstruct
-  | Context_hash_mismatch of Block_header.t * Context_hash.t * Context_hash.t
-  | Cannot_read_block_hash of Block_hash.t
+  | Context_hash_mismatch of
+      Block_header.t * Tezos_crypto.Context_hash.t * Tezos_crypto.Context_hash.t
+  | Cannot_read_block_hash of Tezos_crypto.Block_hash.t
   | Cannot_read_block_level of Int32.t
 
 let failure_kind_encoding =
@@ -44,15 +45,15 @@ let failure_kind_encoding =
         ~title:"context_hash_mismatch"
         (obj3
            (req "block_header" Block_header.encoding)
-           (req "expected" Context_hash.encoding)
-           (req "got" Context_hash.encoding))
+           (req "expected" Tezos_crypto.Context_hash.encoding)
+           (req "got" Tezos_crypto.Context_hash.encoding))
         (function
           | Context_hash_mismatch (h, e, g) -> Some (h, e, g) | _ -> None)
         (fun (h, e, g) -> Context_hash_mismatch (h, e, g));
       case
         (Tag 2)
         ~title:"cannot_read_block_hash"
-        Block_hash.encoding
+        Tezos_crypto.Block_hash.encoding
         (function Cannot_read_block_hash h -> Some h | _ -> None)
         (fun h -> Cannot_read_block_hash h);
       case
@@ -70,15 +71,19 @@ let failure_kind_pp ppf = function
         ppf
         "resulting context hash for block %a (level %ld) does not match. \
          Context hash expected %a, got %a"
-        Block_hash.pp
+        Tezos_crypto.Block_hash.pp
         (Block_header.hash h)
         h.shell.level
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         e
-        Context_hash.pp
+        Tezos_crypto.Context_hash.pp
         g
   | Cannot_read_block_hash h ->
-      Format.fprintf ppf "Unexpected missing block in store: %a" Block_hash.pp h
+      Format.fprintf
+        ppf
+        "Unexpected missing block in store: %a"
+        Tezos_crypto.Block_hash.pp
+        h
   | Cannot_read_block_level l ->
       Format.fprintf ppf "Unexpected missing block in store at level %ld" l
 
@@ -160,13 +165,13 @@ let check_context_hash_consistency block_validation_result block_header =
   let expected = block_header.Block_header.shell.context in
   let got = block_validation_result.Block_validation.context_hash in
   fail_unless
-    (Context_hash.equal expected got)
+    (Tezos_crypto.Context_hash.equal expected got)
     (Reconstruction_failure
        (Context_hash_mismatch (block_header, expected, got)))
 
 (* We assume that the given list is not empty. *)
 let compute_block_metadata_hash block_metadata =
-  Some (Block_metadata_hash.hash_bytes [block_metadata])
+  Some (Tezos_crypto.Block_metadata_hash.hash_bytes [block_metadata])
 
 let split_operations_metadata = function
   | Block_validation.No_metadata_hash metadata -> (metadata, None)
@@ -186,8 +191,8 @@ let compute_all_operations_metadata_hash block =
   else
     Option.map
       (fun ll ->
-        Operation_metadata_list_list_hash.compute
-          (List.map Operation_metadata_list_hash.compute ll))
+        Tezos_crypto.Operation_metadata_list_list_hash.compute
+          (List.map Tezos_crypto.Operation_metadata_list_hash.compute ll))
       (Block_repr.operations_metadata_hashes block)
 
 let apply_context context_index chain_id ~user_activated_upgrades

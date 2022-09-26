@@ -60,10 +60,12 @@ let store_dir ~dir_path = {dir_path}
 let protocol_store_dir base_dir = mk_dir base_dir "protocols"
 
 let protocol_file dir proto_hash =
-  mk_file dir (Protocol_hash.to_b58check proto_hash)
+  mk_file dir (Tezos_crypto.Protocol_hash.to_b58check proto_hash)
 
 let chain_dir dir chain_id =
-  mk_dir dir (Format.asprintf "chain_%a" Chain_id.pp_short chain_id)
+  mk_dir
+    dir
+    (Format.asprintf "chain_%a" Tezos_crypto.Chain_id.pp_short chain_id)
 
 let chain_config_file dir =
   make_encoded_file ~json:true dir ~filename:"config.json" chain_config_encoding
@@ -108,13 +110,13 @@ let invalid_blocks_file dir =
   make_encoded_file
     dir
     ~filename:"invalid_blocks"
-    (Block_hash.Map.encoding invalid_block_encoding)
+    (Tezos_crypto.Block_hash.Map.encoding invalid_block_encoding)
 
 let forked_chains_file dir =
   make_encoded_file
     dir
     ~filename:"forked_chains"
-    (Chain_id.Map.encoding Block_hash.encoding)
+    (Tezos_crypto.Chain_id.Map.encoding Tezos_crypto.Block_hash.encoding)
 
 let savepoint_file dir =
   make_encoded_file dir ~filename:"savepoint" block_descriptor_encoding

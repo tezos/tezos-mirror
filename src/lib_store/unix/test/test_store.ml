@@ -60,7 +60,9 @@ let pp_print_list fmt l =
   Format.fprintf
     fmt
     "@[<h>%a@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space Block_hash.pp_short)
+    (Format.pp_print_list
+       ~pp_sep:Format.pp_print_space
+       Tezos_crypto.Block_hash.pp_short)
     (List.map Store.Block.hash l)
 
 let test_path chain_store tbl =
@@ -107,7 +109,9 @@ let test_ancestor chain_store tbl =
     | Some a ->
         if
           not
-            (Block_hash.equal (Store.Block.hash a) (Store.Block.hash expected))
+            (Tezos_crypto.Block_hash.equal
+               (Store.Block.hash a)
+               (Store.Block.hash expected))
         then Assert.fail_msg "bad ancestor %s %s" h1 h2 ;
         Lwt.return_unit
   in
@@ -163,8 +167,12 @@ let test_locator chain_store tbl =
         (List.length expected) ;
     iter2_exn
       (fun h h2 ->
-        if not (Block_hash.equal h (Store.Block.hash @@ vblock tbl h2)) then
-          Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
+        if
+          not
+            (Tezos_crypto.Block_hash.equal
+               h
+               (Store.Block.hash @@ vblock tbl h2))
+        then Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
       history
       expected ;
     Lwt.return_unit
@@ -193,8 +201,10 @@ let compare s name heads l =
   List.iter
     (fun bname ->
       let hash = Store.Block.hash (vblock s bname) in
-      if not (List.exists (fun bh -> Block_hash.equal hash bh) heads) then
-        Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
+      if
+        not
+          (List.exists (fun bh -> Tezos_crypto.Block_hash.equal hash bh) heads)
+      then Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
     l
 
 let test_known_heads chain_store tbl =
@@ -314,7 +324,7 @@ let test_new_blocks chain_store tbl =
     in
     if
       not
-        (Block_hash.equal
+        (Tezos_crypto.Block_hash.equal
            (Store.Block.hash ancestor)
            (Store.Block.hash @@ vblock tbl expected_ancestor))
     then
@@ -333,7 +343,7 @@ let test_new_blocks chain_store tbl =
       (fun h1 h2 ->
         if
           not
-            (Block_hash.equal
+            (Tezos_crypto.Block_hash.equal
                (Store.Block.hash h1)
                (Store.Block.hash @@ vblock tbl h2))
         then
@@ -383,7 +393,7 @@ let test_basic_checkpoint chain_store table =
     | None -> return_unit
   in
   if
-    (not (Block_hash.equal c_block (Store.Block.hash block)))
+    (not (Tezos_crypto.Block_hash.equal c_block (Store.Block.hash block)))
     && Int32.equal c_level (Store.Block.level block)
   then Assert.fail_msg "unexpected checkpoint"
   else return_unit
@@ -533,7 +543,7 @@ let test_reach_target chain_store table =
   then
     if
       Int32.equal header.shell.level checkpoint_level
-      && not (Block_hash.equal checkpoint_hash c_hash)
+      && not (Tezos_crypto.Block_hash.equal checkpoint_hash c_hash)
     then Assert.fail_msg "checkpoint error"
     else
       let* _ = Store.Chain.set_head chain_store (vblock table "A2") in
@@ -594,8 +604,9 @@ let test_not_may_update_target chain_store table =
 
 let testable_hash =
   Alcotest.testable
-    (fun fmt h -> Format.fprintf fmt "%s" (Block_hash.to_b58check h))
-    Block_hash.equal
+    (fun fmt h ->
+      Format.fprintf fmt "%s" (Tezos_crypto.Block_hash.to_b58check h))
+    Tezos_crypto.Block_hash.equal
 
 let init_block_of_identifier_test chain_store table =
   let open Lwt_result_syntax in
@@ -623,7 +634,7 @@ let assert_failing_block_of_identifier ?(init = init_block_of_identifier_test)
   match r with
   | Ok b ->
       Assert.fail_msg
-        ~given:(Store.Block.hash b |> Block_hash.to_b58check)
+        ~given:(Store.Block.hash b |> Tezos_crypto.Block_hash.to_b58check)
         "retrieving the block did not failed as expected"
   | _ -> return_unit
 

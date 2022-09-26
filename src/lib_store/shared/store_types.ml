@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type block_descriptor = Block_hash.t * int32
+type block_descriptor = Tezos_crypto.Block_hash.t * int32
 
 let block_descriptor_encoding =
   let open Data_encoding in
-  tup2 Block_hash.encoding int32
+  tup2 Tezos_crypto.Block_hash.encoding int32
 
 let pp_block_descriptor fmt (hash, level) =
-  Format.fprintf fmt "%a (level: %ld)" Block_hash.pp hash level
+  Format.fprintf fmt "%a (level: %ld)" Tezos_crypto.Block_hash.pp hash level
 
 type chain_config = {
   history_mode : History_mode.t;
@@ -63,7 +63,7 @@ module Block_lru_cache =
   Ringo_lwt.Functors.Make_opt
     ((val Ringo.(
             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
-       (Block_hash))
+       (Tezos_crypto.Block_hash))
 
 module Protocol_levels = struct
   include Map.Make (struct
@@ -76,10 +76,11 @@ module Protocol_levels = struct
     author : string;
     message : string;
     test_chain_status : Test_chain_status.t;
-    predecessor_block_metadata_hash : Block_metadata_hash.t option;
-    predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
-    data_merkle_root : Context_hash.t;
-    parents_contexts : Context_hash.t list;
+    predecessor_block_metadata_hash : Tezos_crypto.Block_metadata_hash.t option;
+    predecessor_ops_metadata_hash :
+      Tezos_crypto.Operation_metadata_list_list_hash.t option;
+    data_merkle_root : Tezos_crypto.Context_hash.t;
+    parents_contexts : Tezos_crypto.Context_hash.t list;
   }
 
   let commit_info_of_tuple
@@ -141,16 +142,18 @@ module Protocol_levels = struct
          (req "author" string)
          (req "message" string)
          (req "test_chain_status" Test_chain_status.encoding)
-         (req "data_merkle_root" Context_hash.encoding)
-         (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
+         (req "data_merkle_root" Tezos_crypto.Context_hash.encoding)
+         (opt
+            "predecessor_block_metadata_hash"
+            Tezos_crypto.Block_metadata_hash.encoding)
          (opt
             "predecessor_ops_metadata_hash"
-            Operation_metadata_list_list_hash.encoding)
-         (req "parents_contexts" (list Context_hash.encoding)))
+            Tezos_crypto.Operation_metadata_list_list_hash.encoding)
+         (req "parents_contexts" (list Tezos_crypto.Context_hash.encoding)))
 
   type activation_block = {
     block : block_descriptor;
-    protocol : Protocol_hash.t;
+    protocol : Tezos_crypto.Protocol_hash.t;
     commit_info : commit_info option;
   }
 
@@ -161,7 +164,7 @@ module Protocol_levels = struct
       (fun (block, protocol, commit_info) -> {block; protocol; commit_info})
       (obj3
          (req "block" block_descriptor_encoding)
-         (req "protocol" Protocol_hash.encoding)
+         (req "protocol" Tezos_crypto.Protocol_hash.encoding)
          (opt "commit_info" commit_info_encoding))
 
   let encoding =

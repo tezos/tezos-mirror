@@ -5503,7 +5503,7 @@ let _yes_wallet_test =
     ~deps:
       [
         octez_error_monad |> open_ ~m:"TzLwtreslib";
-        octez_crypto |> open_;
+        octez_crypto;
         zarith;
         zarith_stubs_js;
         data_encoding |> open_;

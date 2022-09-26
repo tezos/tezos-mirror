@@ -158,11 +158,11 @@ let test_storing_and_access_predecessors block_store =
             | None -> Alcotest.fail "expected predecessor but none found"
             | Some h ->
                 Alcotest.check
-                  (module Block_hash)
+                  (module Tezos_crypto.Block_hash)
                   (Format.asprintf
                      "get %d-th predecessor of %a (%ld)"
                      distance
-                     Block_hash.pp
+                     Tezos_crypto.Block_hash.pp
                      hash
                      level)
                   h
@@ -201,7 +201,8 @@ let make_n_consecutive_cycles pred ~cycle_length ~nb_cycles =
         Lwt.return (List.rev acc, head)
     | n ->
         let cycle_length =
-          if Block_hash.equal (fst pred) genesis_hash then cycle_length - 1
+          if Tezos_crypto.Block_hash.equal (fst pred) genesis_hash then
+            cycle_length - 1
           else cycle_length
         in
         let lafl = max 0l (snd pred) in
@@ -661,10 +662,10 @@ let wrap_test ?(keep_dir = false) (name, g) =
     let genesis_block =
       Block_repr.create_genesis_block
         ~genesis:Test_utils.genesis
-        Context_hash.zero
+        Tezos_crypto.Context_hash.zero
     in
     let store_dir = Naming.store_dir ~dir_path in
-    let chain_dir = Naming.chain_dir store_dir Chain_id.zero in
+    let chain_dir = Naming.chain_dir store_dir Tezos_crypto.Chain_id.zero in
     let*! () = Lwt_utils_unix.create_dir (Naming.dir_path chain_dir) in
     let*! r = Block_store.create chain_dir ~genesis_block in
     match r with
