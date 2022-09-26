@@ -28,7 +28,8 @@ let block_param ~name ~desc t =
   Tezos_clic.param
     ~name
     ~desc
-    (Tezos_clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str ->
+         Lwt.return (Tezos_crypto.Block_hash.of_b58check str)))
     t
 
 let operation_param ~name ~desc t =
@@ -36,7 +37,7 @@ let operation_param ~name ~desc t =
     ~name
     ~desc
     (Tezos_clic.parameter (fun _ str ->
-         Lwt.return (Operation_hash.of_b58check str)))
+         Lwt.return (Tezos_crypto.Operation_hash.of_b58check str)))
     t
 
 let commands () =
@@ -65,7 +66,7 @@ let commands () =
             let*! () =
               cctxt#message
                 "Block %a no longer marked invalid."
-                Block_hash.pp
+                Tezos_crypto.Block_hash.pp
                 block
             in
             return_unit)
@@ -83,7 +84,7 @@ let commands () =
             let*! () =
               cctxt#message
                 "Block %a no longer marked invalid."
-                Block_hash.pp_short
+                Tezos_crypto.Block_hash.pp_short
                 hash
             in
             return_unit)
@@ -102,7 +103,7 @@ let commands () =
         let*! () =
           cctxt#message
             "@[<v 0>Checkpoint: %a@,Checkpoint level: %ld@]"
-            Block_hash.pp
+            Tezos_crypto.Block_hash.pp
             checkpoint_hash
             checkpoint_level
         in
@@ -124,7 +125,10 @@ let commands () =
           Shell_services.Mempool.ban_operation cctxt ~chain:cctxt#chain op_hash
         in
         let*! () =
-          cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
+          cctxt#message
+            "Operation %a is now banned."
+            Tezos_crypto.Operation_hash.pp
+            op_hash
         in
         return ());
     command
@@ -146,7 +150,7 @@ let commands () =
         let*! () =
           cctxt#message
             "Operation %a is now unbanned."
-            Operation_hash.pp
+            Tezos_crypto.Operation_hash.pp
             op_hash
         in
         return ());

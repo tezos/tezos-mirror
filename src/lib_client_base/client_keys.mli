@@ -67,10 +67,11 @@ type error += Unregistered_key_scheme of string
 type error += Invalid_uri of Uri.t
 
 module Public_key_hash :
-  Client_aliases.Alias with type t = Signature.Public_key_hash.t
+  Client_aliases.Alias with type t = Tezos_crypto.Signature.Public_key_hash.t
 
 module Public_key :
-  Client_aliases.Alias with type t = pk_uri * Signature.Public_key.t option
+  Client_aliases.Alias
+    with type t = pk_uri * Tezos_crypto.Signature.Public_key.t option
 
 module Secret_key : Client_aliases.Alias with type t = sk_uri
 
@@ -91,16 +92,18 @@ module Sapling_key : Client_aliases.Alias with type t = sapling_key
    standard signature (i.e. [Public_key], [Public_key_hash], and [Secret_key]).
 
     On possible refactor would be to move the alias definition in
-   [Aggregate_signature] (resp. [Signature]).
+   [Tezos_crypto.Aggregate_signature] (resp. [Tezos_crypto.Signature]).
 
     See [Client_aliases] for more information about Aliases.*)
 module Aggregate_alias : sig
   module Public_key_hash :
-    Client_aliases.Alias with type t = Aggregate_signature.Public_key_hash.t
+    Client_aliases.Alias
+      with type t = Tezos_crypto.Aggregate_signature.Public_key_hash.t
 
   module Public_key :
     Client_aliases.Alias
-      with type t = aggregate_pk_uri * Aggregate_signature.Public_key.t option
+      with type t =
+        aggregate_pk_uri * Tezos_crypto.Aggregate_signature.Public_key.t option
 
   module Secret_key : Client_aliases.Alias with type t = aggregate_sk_uri
 end
@@ -161,11 +164,11 @@ end
 (** [Signature_type] is a small module to be included in signer to conform to
     the module type [SIGNER] instead of rewriting all type. *)
 module Signature_type : sig
-  type public_key_hash = Signature.Public_key_hash.t
+  type public_key_hash = Tezos_crypto.Signature.Public_key_hash.t
 
-  type public_key = Signature.Public_key.t
+  type public_key = Tezos_crypto.Signature.Public_key.t
 
-  type secret_key = Signature.Secret_key.t
+  type secret_key = Tezos_crypto.Signature.Secret_key.t
 
   type nonrec pk_uri = pk_uri
 
@@ -173,11 +176,11 @@ module Signature_type : sig
 end
 
 module Aggregate_type : sig
-  type public_key_hash = Aggregate_signature.Public_key_hash.t
+  type public_key_hash = Tezos_crypto.Aggregate_signature.Public_key_hash.t
 
-  type public_key = Aggregate_signature.Public_key.t
+  type public_key = Tezos_crypto.Aggregate_signature.Public_key.t
 
-  type secret_key = Aggregate_signature.Secret_key.t
+  type secret_key = Tezos_crypto.Aggregate_signature.Secret_key.t
 
   type pk_uri = aggregate_pk_uri
 
@@ -187,19 +190,19 @@ end
 module type SIGNER = sig
   include
     COMMON_SIGNER
-      with type public_key_hash = Signature.Public_key_hash.t
-       and type public_key = Signature.Public_key.t
-       and type secret_key = Signature.Secret_key.t
+      with type public_key_hash = Tezos_crypto.Signature.Public_key_hash.t
+       and type public_key = Tezos_crypto.Signature.Public_key.t
+       and type secret_key = Tezos_crypto.Signature.Secret_key.t
        and type pk_uri = pk_uri
        and type sk_uri = sk_uri
 
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
   val sign :
-    ?watermark:Signature.watermark ->
+    ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->
-    Signature.t tzresult Lwt.t
+    Tezos_crypto.Signature.t tzresult Lwt.t
 
   (** [deterministic_nonce sk data] is a nonce obtained
       deterministically from [data] and [sk]. *)
@@ -217,14 +220,18 @@ end
 module type AGGREGATE_SIGNER = sig
   include
     COMMON_SIGNER
-      with type public_key_hash = Aggregate_signature.Public_key_hash.t
-       and type public_key = Aggregate_signature.Public_key.t
-       and type secret_key = Aggregate_signature.Secret_key.t
+      with type public_key_hash =
+        Tezos_crypto.Aggregate_signature.Public_key_hash.t
+       and type public_key = Tezos_crypto.Aggregate_signature.Public_key.t
+       and type secret_key = Tezos_crypto.Aggregate_signature.Secret_key.t
        and type pk_uri = aggregate_pk_uri
        and type sk_uri = aggregate_sk_uri
 
   (** [sign sk data] is signature obtained by signing [data] with [sk]. *)
-  val sign : aggregate_sk_uri -> Bytes.t -> Aggregate_signature.t tzresult Lwt.t
+  val sign :
+    aggregate_sk_uri ->
+    Bytes.t ->
+    Tezos_crypto.Aggregate_signature.t tzresult Lwt.t
 end
 
 type signer =
@@ -244,34 +251,40 @@ val register_aggregate_signer : (module AGGREGATE_SIGNER) -> unit
 val import_secret_key :
   io:Client_context.io_wallet ->
   pk_uri ->
-  (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+  (Tezos_crypto.Signature.Public_key_hash.t
+  * Tezos_crypto.Signature.Public_key.t option)
+  tzresult
+  Lwt.t
 
-val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
+val public_key : pk_uri -> Tezos_crypto.Signature.Public_key.t tzresult Lwt.t
 
 val public_key_hash :
   pk_uri ->
-  (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+  (Tezos_crypto.Signature.Public_key_hash.t
+  * Tezos_crypto.Signature.Public_key.t option)
+  tzresult
+  Lwt.t
 
 val neuterize : sk_uri -> pk_uri tzresult Lwt.t
 
 val sign :
   #Client_context.wallet ->
-  ?watermark:Signature.watermark ->
+  ?watermark:Tezos_crypto.Signature.watermark ->
   sk_uri ->
   Bytes.t ->
-  Signature.t tzresult Lwt.t
+  Tezos_crypto.Signature.t tzresult Lwt.t
 
 val append :
   #Client_context.wallet ->
-  ?watermark:Signature.watermark ->
+  ?watermark:Tezos_crypto.Signature.watermark ->
   sk_uri ->
   Bytes.t ->
   Bytes.t tzresult Lwt.t
 
 val check :
-  ?watermark:Signature.watermark ->
+  ?watermark:Tezos_crypto.Signature.watermark ->
   pk_uri ->
-  Signature.t ->
+  Tezos_crypto.Signature.t ->
   Bytes.t ->
   bool tzresult Lwt.t
 
@@ -284,8 +297,8 @@ val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 val register_key :
   #Client_context.wallet ->
   ?force:bool ->
-  Signature.Public_key_hash.t * pk_uri * sk_uri ->
-  ?public_key:Signature.Public_key.t ->
+  Tezos_crypto.Signature.Public_key_hash.t * pk_uri * sk_uri ->
+  ?public_key:Tezos_crypto.Signature.Public_key.t ->
   string ->
   unit tzresult Lwt.t
 
@@ -294,8 +307,8 @@ val register_key :
 val register_keys :
   #Client_context.wallet ->
   (string
-  * Signature.Public_key_hash.t
-  * Signature.public_key
+  * Tezos_crypto.Signature.Public_key_hash.t
+  * Tezos_crypto.Signature.public_key
   * pk_uri
   * sk_uri)
   list ->
@@ -303,7 +316,10 @@ val register_keys :
 
 val list_keys :
   #Client_context.wallet ->
-  (string * Public_key_hash.t * Signature.public_key option * sk_uri option)
+  (string
+  * Public_key_hash.t
+  * Tezos_crypto.Signature.public_key option
+  * sk_uri option)
   list
   tzresult
   Lwt.t
@@ -311,23 +327,26 @@ val list_keys :
 val alias_keys :
   #Client_context.wallet ->
   string ->
-  (Public_key_hash.t * Signature.public_key option * sk_uri option) option
+  (Public_key_hash.t * Tezos_crypto.Signature.public_key option * sk_uri option)
+  option
   tzresult
   Lwt.t
 
 val get_key :
   #Client_context.wallet ->
   Public_key_hash.t ->
-  (string * Signature.Public_key.t * sk_uri) tzresult Lwt.t
+  (string * Tezos_crypto.Signature.Public_key.t * sk_uri) tzresult Lwt.t
 
 val get_public_key :
   #Client_context.wallet ->
   Public_key_hash.t ->
-  (string * Signature.Public_key.t) tzresult Lwt.t
+  (string * Tezos_crypto.Signature.Public_key.t) tzresult Lwt.t
 
 val get_keys :
   #Client_context.wallet ->
-  (string * Public_key_hash.t * Signature.Public_key.t * sk_uri) list tzresult
+  (string * Public_key_hash.t * Tezos_crypto.Signature.Public_key.t * sk_uri)
+  list
+  tzresult
   Lwt.t
 
 val force_switch : unit -> (bool, 'ctx) Tezos_clic.arg
@@ -337,16 +356,18 @@ val aggregate_neuterize : aggregate_sk_uri -> aggregate_pk_uri tzresult Lwt.t
 val register_aggregate_key :
   #Client_context.wallet ->
   ?force:bool ->
-  Aggregate_signature.Public_key_hash.t * aggregate_pk_uri * aggregate_sk_uri ->
-  ?public_key:Aggregate_signature.Public_key.t ->
+  Tezos_crypto.Aggregate_signature.Public_key_hash.t
+  * aggregate_pk_uri
+  * aggregate_sk_uri ->
+  ?public_key:Tezos_crypto.Aggregate_signature.Public_key.t ->
   string ->
   unit tzresult Lwt.t
 
 val list_aggregate_keys :
   #Client_context.wallet ->
   (string
-  * Aggregate_signature.Public_key_hash.t
-  * Aggregate_signature.Public_key.t option
+  * Tezos_crypto.Aggregate_signature.Public_key_hash.t
+  * Tezos_crypto.Aggregate_signature.Public_key.t option
   * aggregate_sk_uri option)
   list
   tzresult
@@ -355,16 +376,16 @@ val list_aggregate_keys :
 val import_aggregate_secret_key :
   io:Client_context.io_wallet ->
   aggregate_pk_uri ->
-  (Aggregate_signature.Public_key_hash.t
-  * Aggregate_signature.Public_key.t option)
+  (Tezos_crypto.Aggregate_signature.Public_key_hash.t
+  * Tezos_crypto.Aggregate_signature.Public_key.t option)
   tzresult
   Lwt.t
 
 val alias_aggregate_keys :
   #Client_context.wallet ->
   string ->
-  (Aggregate_signature.Public_key_hash.t
-  * Aggregate_signature.Public_key.t option
+  (Tezos_crypto.Aggregate_signature.Public_key_hash.t
+  * Tezos_crypto.Aggregate_signature.Public_key.t option
   * aggregate_sk_uri option)
   option
   tzresult
@@ -374,7 +395,7 @@ val aggregate_sign :
   #Client_context.wallet ->
   aggregate_sk_uri ->
   Bytes.t ->
-  Aggregate_signature.t tzresult Lwt.t
+  Tezos_crypto.Aggregate_signature.t tzresult Lwt.t
 
 (**/**)
 

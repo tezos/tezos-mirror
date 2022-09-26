@@ -6,10 +6,9 @@
                   when using hash functions SHA256 and SHA512.
 *)
 
-open Tezos_crypto
-
 (* PBKDF2 *)
-let test_pbkdf2 (module A : Hacl.Hash.S) ~password ~salt ~count ~dk_len ~dk =
+let test_pbkdf2 (module A : Tezos_crypto.Hacl.Hash.S) ~password ~salt ~count
+    ~dk_len ~dk =
   let module P = Pbkdf.Make (A) in
   let salt = Tezos_stdlib.Hex.to_bytes_exn (`Hex salt) in
   let dk = Tezos_stdlib.Hex.to_bytes_exn (`Hex dk) in
@@ -38,7 +37,7 @@ let test_pbkdf2 (module A : Hacl.Hash.S) ~password ~salt ~count ~dk_len ~dk =
 *)
 let pbkdf2_test11 =
   test_pbkdf2
-    (module Hacl.Hash.SHA256)
+    (module Tezos_crypto.Hacl.Hash.SHA256)
     ~password:"xyz"
     ~salt:"0001020304050607"
     ~count:10000
@@ -53,7 +52,7 @@ let pbkdf2_test11 =
 *)
 let pbkdf2_test13 =
   test_pbkdf2
-    (module Hacl.Hash.SHA512)
+    (module Tezos_crypto.Hacl.Hash.SHA512)
     ~password:"xyz"
     ~salt:"0001020304050607"
     ~count:10000

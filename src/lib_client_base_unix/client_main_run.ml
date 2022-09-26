@@ -39,7 +39,8 @@ let builtin_commands =
       (fun () (cctxt : #Client_context.full) ->
         let* () =
           Seq.iter_s
-            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
+            (fun (ver, _) ->
+              cctxt#message "%a" Tezos_crypto.Protocol_hash.pp_short ver)
             (Client_commands.get_versions ())
         in
         return_ok_unit);
@@ -92,7 +93,10 @@ let setup_remote_signer (module C : M) client_config
           (function
             | _, known_pkh, _, Some known_sk_uri
               when List.exists
-                     (fun pkh -> Signature.Public_key_hash.equal pkh known_pkh)
+                     (fun pkh ->
+                       Tezos_crypto.Signature.Public_key_hash.equal
+                         pkh
+                         known_pkh)
                      pkhs ->
                 Some known_sk_uri
             | _ -> None)

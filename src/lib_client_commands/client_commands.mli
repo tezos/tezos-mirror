@@ -31,9 +31,12 @@ type network = [`Mainnet | `Testnet]
 
 exception Version_not_found
 
-val register : Protocol_hash.t -> (network option -> command list) -> unit
+val register :
+  Tezos_crypto.Protocol_hash.t -> (network option -> command list) -> unit
 
-val commands_for_version : Protocol_hash.t -> network option -> command list
+val commands_for_version :
+  Tezos_crypto.Protocol_hash.t -> network option -> command list
 
 val get_versions :
-  unit -> (Protocol_hash.t * (network option -> command list)) Seq.t
+  unit ->
+  (Tezos_crypto.Protocol_hash.t * (network option -> command list)) Seq.t
