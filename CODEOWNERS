@@ -15,42 +15,21 @@
 # Insert code owner declarations here!
 # ************************************
 
-/docs                        @NicVolanschi @raphael-proust @Saroupille @arvidnl @yrg @dannywillems @lthms @rafoo_
-
-/src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
-/src/bin_proxy_server        @smelc
-/src/bin_snoop               @lrand
 /src/bin_openapi             @romain.nl
-
-/src/lib_base                @raphael-proust
-/src/lib_benchmark           @lrand
-/src/lib_context             @smelc
-/src/lib_error_monad         @raphael-proust
-/src/lib_mockup              @smelc
-/src/lib_mockup_proxy        @smelc
-/src/lib_p2p*                @julien.t @vivienpe
-/src/lib_protocol_environment @raphael-proust
-/src/lib_proxy               @smelc
-/src/lib_proxy_server_config @smelc
-/src/lib_rpc*                @smelc @raphael-proust
-/src/lib_shell_benchmarks    @lrand
-/src/lib_stdlib*             @raphael-proust
 /src/lib_version             @romain.nl
 /src/lib_event_logging       @romain.nl
 /src/lib_openapi             @romain.nl
-/src/proto_*/lib_benchmark   @lrand
-/src/proto_*/lib_benchmarks_proto @lrand
 
 /scripts                     @romain.nl
-/scripts/pre_commit          @smelc
 
+/tests_python                @arvidnl
 /tezt/lib*                   @romain.nl
 /tezt/records                @romain.nl
 
 /manifest                    @romain.nl
 
-/.gitlab                     @romain.nl @raphael-proust
+/.gitlab                     @romain.nl
 
 # Octez Merge Team
 #
