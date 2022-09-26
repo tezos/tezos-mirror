@@ -75,7 +75,7 @@ let build_rpc_directory validator mainchain_validator =
                 match o with
                 | None -> false
                 | Some this_chain_id ->
-                    Chain_id.equal this_chain_id that_chain_id)
+                    Tezos_crypto.Chain_id.equal this_chain_id that_chain_id)
               chains
       in
       let in_protocols (chain_store, block) =
@@ -89,7 +89,9 @@ let build_rpc_directory validator mainchain_validator =
                 let* context = Store.Block.context_exn chain_store pred in
                 let* protocol = Context_ops.get_protocol context in
                 Lwt.return
-                  (List.exists (Protocol_hash.equal protocol) protocols))
+                  (List.exists
+                     (Tezos_crypto.Protocol_hash.equal protocol)
+                     protocols))
       in
       let in_next_protocols (chain_store, block) =
         match q#next_protocols with
@@ -98,7 +100,9 @@ let build_rpc_directory validator mainchain_validator =
             let* context = Store.Block.context_exn chain_store block in
             let* next_protocol = Context_ops.get_protocol context in
             Lwt.return
-              (List.exists (Protocol_hash.equal next_protocol) protocols)
+              (List.exists
+                 (Tezos_crypto.Protocol_hash.equal next_protocol)
+                 protocols)
       in
       let stream =
         Lwt_stream.filter_map_s
@@ -134,7 +138,9 @@ let build_rpc_directory validator mainchain_validator =
                 let* context = Store.Block.context_exn chain_store block in
                 let* next_protocol = Context_ops.get_protocol context in
                 Lwt.return
-                  (List.exists (Protocol_hash.equal next_protocol) protocols)
+                  (List.exists
+                     (Tezos_crypto.Protocol_hash.equal next_protocol)
+                     protocols)
           in
           let stream =
             Lwt_stream.filter_map_s
@@ -176,7 +182,7 @@ let build_rpc_directory validator mainchain_validator =
         let convert (chain_id, b) =
           if not b then Lwt.return (Monitor_services.Stopping chain_id)
           else if
-            Chain_id.equal
+            Tezos_crypto.Chain_id.equal
               (Store.Chain.chain_id (Store.main_chain_store store))
               chain_id
           then Lwt.return (Monitor_services.Active_main chain_id)
@@ -193,7 +199,7 @@ let build_rpc_directory validator mainchain_validator =
                         (Format.asprintf
                            "Monitor.active_chains: no expiration date for the \
                             chain %a"
-                           Chain_id.pp
+                           Tezos_crypto.Chain_id.pp
                            chain_id))
                     (Store.Chain.expiration chain_store)
                 in

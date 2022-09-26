@@ -39,7 +39,7 @@
 open Validation_errors
 
 type 'protocol_operation operation = {
-  hash : Operation_hash.t;
+  hash : Tezos_crypto.Operation_hash.t;
   raw : Operation.t;
   protocol : 'protocol_operation;
   count_successful_prechecks : int;
@@ -67,7 +67,7 @@ module type CHAIN_STORE = sig
     Store.Block.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t
 
-  val chain_id : chain_store -> Chain_id.t
+  val chain_id : chain_store -> Tezos_crypto.Chain_id.t
 end
 
 module type T = sig
@@ -82,7 +82,9 @@ module type T = sig
   type t
 
   val parse :
-    Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
+    Tezos_crypto.Operation_hash.t ->
+    Operation.t ->
+    protocol_operation operation tzresult
 
   val increment_successful_precheck :
     protocol_operation operation -> protocol_operation operation
@@ -90,7 +92,7 @@ module type T = sig
   val create :
     chain_store ->
     predecessor:Store.Block.t ->
-    live_operations:Operation_hash.Set.t ->
+    live_operations:Tezos_crypto.Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
@@ -144,7 +146,7 @@ module MakeAbstract
     validation_state : validation_state;
     application_state : Proto.application_state;
     applied : (protocol_operation operation * Proto.operation_receipt) list;
-    live_operations : Operation_hash.Set.t;
+    live_operations : Tezos_crypto.Operation_hash.Set.t;
   }
 
   type result =
@@ -218,7 +220,7 @@ module MakeAbstract
 
   let apply_operation pv op =
     let open Lwt_syntax in
-    if Operation_hash.Set.mem op.hash pv.live_operations then
+    if Tezos_crypto.Operation_hash.Set.mem op.hash pv.live_operations then
       (* As of November 2021, it is dubious that this case can happen.
          If it can, it is more likely to be because of a consensus operation;
          hence the returned error. *)
@@ -243,7 +245,7 @@ module MakeAbstract
               application_state;
               applied = (op, receipt) :: pv.applied;
               live_operations =
-                Operation_hash.Set.add op.hash pv.live_operations;
+                Tezos_crypto.Operation_hash.Set.add op.hash pv.live_operations;
             }
           in
           match

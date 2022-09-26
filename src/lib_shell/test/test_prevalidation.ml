@@ -65,21 +65,22 @@ module Classification = Prevalidator_classification
 
 module Parameters :
   Requester_impl.PARAMETERS
-    with type key = Operation_hash.t
+    with type key = Tezos_crypto.Operation_hash.t
      and type value = int = struct
-  type key = Operation_hash.t
+  type key = Tezos_crypto.Operation_hash.t
 
   type value = int
 end
 
-module Hash : Requester.HASH with type t = Operation_hash.t = struct
+module Hash : Requester.HASH with type t = Tezos_crypto.Operation_hash.t =
+struct
   type t = Parameters.key
 
   let name = "test_with_key_Operation_hash_dot_t"
 
-  let encoding = Operation_hash.encoding
+  let encoding = Tezos_crypto.Operation_hash.encoding
 
-  let pp = Operation_hash.pp
+  let pp = Tezos_crypto.Operation_hash.pp
 end
 
 module Test_request = Requester_impl.Simple_request (Parameters)
@@ -105,7 +106,7 @@ let mk_operation n : Operation.t =
   let base_prefix = String.sub base 0 (base_len - n_string_len) in
   let hash_string = base_prefix ^ n_string in
   assert (String.length hash_string = base_len) ;
-  let branch = Block_hash.of_string_exn hash_string in
+  let branch = Tezos_crypto.Block_hash.of_string_exn hash_string in
   let proto = Bytes.of_string n_string in
   {shell = {branch}; proto}
 
@@ -172,7 +173,9 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
     f [] op classes
   in
   List.iter handle (1 -- nb_ops) ;
-  let actual_in_mempool_size = Operation_hash.Map.cardinal classes.in_mempool in
+  let actual_in_mempool_size =
+    Tezos_crypto.Operation_hash.Map.cardinal classes.in_mempool
+  in
   Alcotest.(
     check
       bool
@@ -203,7 +206,7 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
     let op = mk_operation i in
     let oph = Operation.hash op in
     let op = Prevalidation.Internal_for_tests.make_operation op oph () in
-    Format.printf "Injecting op: %a\n" Operation_hash.pp oph ;
+    Format.printf "Injecting op: %a\n" Tezos_crypto.Operation_hash.pp oph ;
     let injected = Lwt_main.run @@ Test_Requester.inject requester oph i in
     assert injected ;
     f [] op classes ;
@@ -212,7 +215,7 @@ let test_db_do_not_clear_right_away f (nb_ops : int) (_ : unit) =
         bool
         (Format.asprintf
            "requester memory contains most recent classified operation (%a)"
-           Operation_hash.pp
+           Tezos_crypto.Operation_hash.pp
            oph)
         (Option.is_some @@ Lwt_main.run @@ Test_Requester.read_opt requester oph)
         true)

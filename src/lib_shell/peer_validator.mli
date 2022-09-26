@@ -41,9 +41,10 @@ val shutdown : t -> unit Lwt.t
 
 val notify_branch : t -> Block_locator.t -> unit
 
-val notify_head : t -> Block_hash.t -> Block_header.t -> unit
+val notify_head : t -> Tezos_crypto.Block_hash.t -> Block_header.t -> unit
 
-val running_workers : unit -> ((Chain_id.t * P2p_peer.Id.t) * t) list
+val running_workers :
+  unit -> ((Tezos_crypto.Chain_id.t * P2p_peer.Id.t) * t) list
 
 val status : t -> Worker_types.worker_status
 
@@ -58,5 +59,8 @@ val pipeline_length : t -> Peer_validator_worker_state.pipeline_length
 
 module Internal_for_tests : sig
   val validate_new_head :
-    t -> Block_hash.t -> Block_header.t -> (unit, error trace) result Lwt.t
+    t ->
+    Tezos_crypto.Block_hash.t ->
+    Block_header.t ->
+    (unit, error trace) result Lwt.t
 end

@@ -53,7 +53,7 @@ let inject_operation validator ~force ?chain bytes =
     | None -> failwith "Can't parse the operation"
     | Some op -> Validator.inject_operation validator ~force ?chain_id op
   in
-  let hash = Operation_hash.hash_bytes [bytes] in
+  let hash = Tezos_crypto.Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
 let inject_operations validator ~force ?chain bytes_list =
@@ -101,18 +101,22 @@ let inject_operations validator ~force ?chain bytes_list =
 let inject_protocol store proto =
   let open Lwt_result_syntax in
   let proto_bytes = Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
-  let hash = Protocol_hash.hash_bytes [proto_bytes] in
+  let hash = Tezos_crypto.Protocol_hash.hash_bytes [proto_bytes] in
   let validation =
     let*! b = Updater.compile hash proto in
     match b with
-    | false -> failwith "Compilation failed (%a)" Protocol_hash.pp_short hash
+    | false ->
+        failwith
+          "Compilation failed (%a)"
+          Tezos_crypto.Protocol_hash.pp_short
+          hash
     | true -> (
         let*! o = Store.Protocol.store store hash proto in
         match o with
         | None ->
             failwith
               "Previously registered protocol (%a)"
-              Protocol_hash.pp_short
+              Tezos_crypto.Protocol_hash.pp_short
               hash
         | Some _ -> return_unit)
   in

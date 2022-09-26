@@ -132,7 +132,7 @@ type config = {
     Tezos_protocol_environment.Context.t tzresult Lwt.t)
     option;
   p2p : (P2p.config * P2p_limits.t) option;
-  target : (Block_hash.t * int32) option;
+  target : (Tezos_crypto.Block_hash.t * int32) option;
   disable_mempool : bool;
   enable_testchain : bool;
 }
@@ -141,7 +141,7 @@ type config = {
    do not have their actual hash on purpose. *)
 let test_protocol_hashes =
   List.map
-    (fun s -> Protocol_hash.of_b58check_exn s)
+    (fun s -> Tezos_crypto.Protocol_hash.of_b58check_exn s)
     [
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK";
       "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT";
@@ -161,10 +161,10 @@ let store_known_protocols store =
           | None -> Node_event.(emit store_protocol_missing_files) protocol_hash
           | Some protocol -> (
               let hash = Protocol.hash protocol in
-              if not (Protocol_hash.equal hash protocol_hash) then
+              if not (Tezos_crypto.Protocol_hash.equal hash protocol_hash) then
                 if
                   List.mem
-                    ~equal:Protocol_hash.equal
+                    ~equal:Tezos_crypto.Protocol_hash.equal
                     protocol_hash
                     test_protocol_hashes
                 then Lwt.return_unit

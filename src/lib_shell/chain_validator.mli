@@ -29,19 +29,19 @@ type t
 val create :
   start_prevalidator:bool ->
   start_testchain:bool ->
-  active_chains:t Chain_id.Table.t ->
+  active_chains:t Tezos_crypto.Chain_id.Table.t ->
   block_validator_process:Block_validator_process.t ->
   Shell_limits.peer_validator_limits ->
   Shell_limits.prevalidator_limits ->
   Block_validator.t ->
   Store.Block.t Lwt_watcher.input ->
-  (Chain_id.t * bool) Lwt_watcher.input ->
+  (Tezos_crypto.Chain_id.t * bool) Lwt_watcher.input ->
   Distributed_db.t ->
   Store.chain_store ->
   Shell_limits.chain_validator_limits ->
   t tzresult Lwt.t
 
-val chain_id : t -> Chain_id.t
+val chain_id : t -> Tezos_crypto.Chain_id.t
 
 val chain_store : t -> Store.chain_store
 
@@ -69,7 +69,7 @@ val reconfigure_event_logging :
 val validate_block :
   t ->
   ?force:bool ->
-  Block_hash.t ->
+  Tezos_crypto.Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
   unit tzresult Lwt.t
@@ -80,7 +80,7 @@ val valid_block_watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
 val new_head_watcher : t -> Store.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
-val running_workers : unit -> (Chain_id.t * t) list
+val running_workers : unit -> (Tezos_crypto.Chain_id.t * t) list
 
 val status : t -> Worker_types.worker_status
 

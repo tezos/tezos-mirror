@@ -98,7 +98,7 @@ val validate :
   ?notify_new_block:(Store.Block.t -> unit) ->
   ?precheck_and_notify:bool ->
   Distributed_db.chain_db ->
-  Block_hash.t ->
+  Tezos_crypto.Block_hash.t ->
   Block_header.t ->
   Operation.t list list ->
   block_validity Lwt.t
@@ -129,7 +129,7 @@ val fetch_and_compile_protocol :
   t ->
   ?peer:P2p_peer.Id.t ->
   ?timeout:Time.System.Span.t ->
-  Protocol_hash.t ->
+  Tezos_crypto.Protocol_hash.t ->
   Registered_protocol.t tzresult Lwt.t
 
 (** [context_garbage_collection bv chain_store context_hash] moves the
@@ -137,7 +137,7 @@ val fetch_and_compile_protocol :
    to the lower layer. For full and rolling nodes, this is considered
    as a garbage collection. *)
 val context_garbage_collection :
-  t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+  t -> Context_ops.index -> Tezos_crypto.Context_hash.t -> unit tzresult Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

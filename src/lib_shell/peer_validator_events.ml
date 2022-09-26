@@ -46,9 +46,9 @@ let new_branch_validated =
     ~msg:"branch from {peer} validated with head {hash}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let fetching_operations_for_head =
   declare_2
@@ -57,9 +57,9 @@ let fetching_operations_for_head =
     ~msg:"fetching operaitons from {peer} for head {hash}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let requesting_new_head_validation =
   declare_2
@@ -68,9 +68,9 @@ let requesting_new_head_validation =
     ~msg:"requesting new head validation from {peer} for head {hash}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let new_head_validation_end =
   declare_2
@@ -79,9 +79,9 @@ let new_head_validation_end =
     ~msg:"new head validation from {peer} for head {hash} ended"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_head =
   declare_2
@@ -90,9 +90,9 @@ let ignoring_head =
     ~msg:"ignoring head {hash} from peer {peer} with non-increasing fitness"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_previously_validated_block =
   declare_2
@@ -101,9 +101,9 @@ let ignoring_previously_validated_block =
     ~msg:"ignoring previously validated head {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_invalid_block =
   declare_2
@@ -112,9 +112,9 @@ let ignoring_invalid_block =
     ~msg:"ignoring invalid block {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_valid_block =
   declare_2
@@ -123,9 +123,9 @@ let ignoring_valid_block =
     ~msg:"ignoring prechecked head {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_prechecked_invalid_block =
   declare_2
@@ -134,9 +134,9 @@ let ignoring_prechecked_invalid_block =
     ~msg:"ignoring invalid block {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let missing_new_head_predecessor =
   declare_2
@@ -145,9 +145,9 @@ let missing_new_head_predecessor =
     ~msg:"missing new head's predecessor {hash} from {peer}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_branch_with_invalid_locator =
   declare_2
@@ -156,9 +156,9 @@ let ignoring_branch_with_invalid_locator =
     ~msg:"ignoring branch with head {hash} from {peer} (invalid locator)"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let ignoring_branch_without_common_ancestor =
   declare_2
@@ -167,9 +167,9 @@ let ignoring_branch_without_common_ancestor =
     ~msg:"ignoring branch with head {hash} from {peer} (no common ancestor)"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let no_new_head_from_peer =
   declare_2
@@ -189,9 +189,9 @@ let processing_new_head =
     ~msg:"processing new head fron peer {peer}: {hash}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let processing_new_branch =
   declare_2
@@ -200,9 +200,9 @@ let processing_new_branch =
     ~msg:"processing new branch fron peer {peer}: {hash}"
     ~level:Debug
     ~pp1:P2p_peer.Id.pp
-    ~pp2:Block_hash.pp
+    ~pp2:Tezos_crypto.Block_hash.pp
     ("peer", P2p_peer.Id.encoding)
-    ("hash", Block_hash.encoding)
+    ("hash", Tezos_crypto.Block_hash.encoding)
 
 let terminating_worker =
   declare_2

@@ -35,7 +35,7 @@ type t = {
     (Protocol.t
     * Registered_protocol.t tzresult Lwt.t
     * Registered_protocol.t tzresult Lwt.u)
-    Protocol_hash.Map.t;
+    Tezos_crypto.Protocol_hash.Map.t;
   canceler : Lwt_canceler.t;
 }
 
@@ -44,12 +44,12 @@ type t = {
 let rec worker_loop bv =
   let open Lwt_result_syntax in
   let*! r =
-    match Protocol_hash.Map.choose bv.pending with
+    match Tezos_crypto.Protocol_hash.Map.choose bv.pending with
     | None ->
         let*! v = Lwt_condition.wait bv.request in
         return v
     | Some (hash, (protocol, _, wakener)) ->
-        bv.pending <- Protocol_hash.Map.remove hash bv.pending ;
+        bv.pending <- Tezos_crypto.Protocol_hash.Map.remove hash bv.pending ;
         let*! valid = Updater.compile hash protocol in
         if valid then (
           let* _ = Distributed_db.commit_protocol bv.db hash protocol in
@@ -80,11 +80,13 @@ let rec worker_loop bv =
 
 let create db =
   let canceler = Lwt_canceler.create () in
-  let pending = Protocol_hash.Map.empty in
+  let pending = Tezos_crypto.Protocol_hash.Map.empty in
   let request = Lwt_condition.create () in
   let bv = {canceler; pending; request; db; worker = Lwt.return_unit} in
   Lwt_canceler.on_cancel bv.canceler (fun () ->
-      Protocol_hash.Map.iter (fun _ (_, r, _) -> Lwt.cancel r) bv.pending ;
+      Tezos_crypto.Protocol_hash.Map.iter
+        (fun _ (_, r, _) -> Lwt.cancel r)
+        bv.pending ;
       Lwt.return_unit) ;
   bv.worker <-
     Lwt_utils.worker
@@ -111,12 +113,17 @@ let validate state hash protocol =
       let* () =
         Protocol_validator_event.(emit pushing_protocol_validation) hash
       in
-      match Protocol_hash.Map.find hash state.pending with
+      match Tezos_crypto.Protocol_hash.Map.find hash state.pending with
       | None ->
           let res, wakener = Lwt.task () in
-          let broadcast = Protocol_hash.Map.cardinal state.pending = 0 in
+          let broadcast =
+            Tezos_crypto.Protocol_hash.Map.cardinal state.pending = 0
+          in
           state.pending <-
-            Protocol_hash.Map.add hash (protocol, res, wakener) state.pending ;
+            Tezos_crypto.Protocol_hash.Map.add
+              hash
+              (protocol, res, wakener)
+              state.pending ;
           if broadcast then Lwt_condition.broadcast state.request () ;
           res
       | Some (_, res, _) -> res)

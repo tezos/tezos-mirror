@@ -63,7 +63,8 @@ let predecessors chain_store ignored length head =
       match o with
       | None -> return (List.rev acc)
       | Some pred ->
-          if Block_hash.Set.mem block ignored then return (List.rev acc)
+          if Tezos_crypto.Block_hash.Set.mem block ignored then
+            return (List.rev acc)
           else loop (pred :: acc) (length - 1) pred
   in
   let head_hash = Store.Block.hash head in
@@ -111,12 +112,12 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
             let* predecessors = predecessors chain_store ignored length block in
             let ignored =
               List.fold_left
-                (fun acc v -> Block_hash.Set.add v acc)
+                (fun acc v -> Tezos_crypto.Block_hash.Set.add v acc)
                 ignored
                 predecessors
             in
             return (ignored, predecessors :: acc))
-      (Block_hash.Set.empty, [])
+      (Tezos_crypto.Block_hash.Set.empty, [])
       requested_heads
   in
   return (List.rev blocks)
@@ -190,7 +191,7 @@ let rpc_directory validator =
   register0 S.Invalid_blocks.list (fun chain_store () () ->
       let convert (hash, {Store_types.level; errors}) = {hash; level; errors} in
       let*! invalid_blocks_map = Store.Block.read_invalid_blocks chain_store in
-      let blocks = Block_hash.Map.bindings invalid_blocks_map in
+      let blocks = Tezos_crypto.Block_hash.Map.bindings invalid_blocks_map in
       return (List.map convert blocks)) ;
   register1 S.Invalid_blocks.get (fun chain_store hash () () ->
       let*! o = Store.Block.read_invalid_block_opt chain_store hash in

@@ -40,7 +40,7 @@
     prevalidation_state. *)
 
 type 'protocol_operation operation = private {
-  hash : Operation_hash.t;  (** Hash of an operation. *)
+  hash : Tezos_crypto.Operation_hash.t;  (** Hash of an operation. *)
   raw : Operation.t;
       (** Raw representation of an operation (from the point view of the
           shell). *)
@@ -86,7 +86,9 @@ module type T = sig
         data within [op] is too large (to protect against DoS attacks), and
       - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
   val parse :
-    Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
+    Tezos_crypto.Operation_hash.t ->
+    Operation.t ->
+    protocol_operation operation tzresult
 
   (** [increment_successful_precheck op] increments the field
       [count_successful_prechecks] of the given operation [op]. It is supposed
@@ -101,7 +103,7 @@ module type T = sig
   val create :
     chain_store ->
     predecessor:Store.Block.t ->
-    live_operations:Operation_hash.Set.t ->
+    live_operations:Tezos_crypto.Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
@@ -153,11 +155,12 @@ module Internal_for_tests : sig
   val to_raw : _ operation -> Operation.t
 
   (** The hash of an {!operation} *)
-  val hash_of : _ operation -> Operation_hash.t
+  val hash_of : _ operation -> Tezos_crypto.Operation_hash.t
 
   (** A constructor for the [operation] datatype. It by-passes the
       checks done by the [parse] function. *)
-  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
+  val make_operation :
+    Operation.t -> Tezos_crypto.Operation_hash.t -> 'a -> 'a operation
 
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
       Any error happening during parsing becomes {!Parse_error}.
@@ -179,9 +182,9 @@ module Internal_for_tests : sig
       Store.Block.t ->
       Tezos_protocol_environment.Context.t tzresult Lwt.t
 
-    (** [chain_id store] returns the {!Chain_id.t} to which [store]
+    (** [chain_id store] returns the {!Tezos_crypto.Chain_id.t} to which [store]
         corresponds *)
-    val chain_id : chain_store -> Chain_id.t
+    val chain_id : chain_store -> Tezos_crypto.Chain_id.t
   end
 
   (** A variant of [Make] above that is parameterized by {!CHAIN_STORE},

@@ -127,9 +127,12 @@ type t = {
   locator : Block_locator.t;
   block_validator : Block_validator.t;
   notify_new_block : Store.Block.t -> unit;
-  fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.Bounded.t;
+  fetched_headers :
+    (Tezos_crypto.Block_hash.t * Block_header.t) list Lwt_pipe.Bounded.t;
   fetched_blocks :
-    (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
+    (Tezos_crypto.Block_hash.t
+    * Block_header.t
+    * Operation.t list list tzresult Lwt.t)
     Lwt_pipe.Bounded.t;
   (* HACK, a worker should be able
      to return the 'error'. *)
@@ -167,7 +170,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let* () =
     fail_when
       (Compare.Int32.(header.shell.level = checkpoint_level)
-      && not (Block_hash.equal hash checkpoint_hash))
+      && not (Tezos_crypto.Block_hash.equal hash checkpoint_hash))
       (Checkpoint_error (hash, Some pipeline.peer_id))
   in
   let*! current_head = Store.Chain.current_head chain_store in
@@ -218,7 +221,7 @@ let fetch_step pipeline (step : Block_locator.step) =
         Bootstrap_pipeline_event.(emit step_too_long) pipeline.peer_id
       in
       tzfail (Invalid_locator (pipeline.peer_id, pipeline.locator))
-    else if Block_hash.equal hash step.predecessor then
+    else if Tezos_crypto.Block_hash.equal hash step.predecessor then
       if step.strict_step && cpt <> step.step then
         let*! () =
           Bootstrap_pipeline_event.(emit step_too_short) pipeline.peer_id
@@ -585,7 +588,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          "bootstrap_pipeline-headers_fetch.%a.%a"
          P2p_peer.Id.pp_short
          peer_id
-         Block_hash.pp_short
+         Tezos_crypto.Block_hash.pp_short
          locator.Block_locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
@@ -596,7 +599,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          "bootstrap_pipeline-operations_fetch.%a.%a"
          P2p_peer.Id.pp_short
          peer_id
-         Block_hash.pp_short
+         Tezos_crypto.Block_hash.pp_short
          locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
@@ -607,7 +610,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          "bootstrap_pipeline-validation.%a.%a"
          P2p_peer.Id.pp_short
          peer_id
-         Block_hash.pp_short
+         Tezos_crypto.Block_hash.pp_short
          locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> validation_worker_loop pipeline)

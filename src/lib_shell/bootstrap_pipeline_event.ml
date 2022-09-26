@@ -66,8 +66,8 @@ let fetching_step_from_peer =
     ("step_number", Data_encoding.int31)
     ("number_of_steps", Data_encoding.int31)
     ("step_length", Data_encoding.int31)
-    ("block", Block_hash.encoding)
-    ("predecessor", Block_hash.encoding)
+    ("block", Tezos_crypto.Block_hash.encoding)
+    ("predecessor", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 let fetching_block_header_from_peer =
@@ -76,7 +76,7 @@ let fetching_block_header_from_peer =
     ~name:"fetching_block_header_from_peer"
     ~msg:"fetched header {block} from {peer_id} {block_fetched}/{step_length}"
     ~level:Debug
-    ("block", Block_hash.encoding)
+    ("block", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
     ("block_fetched", Data_encoding.int31)
     ("step_length", Data_encoding.int31)
@@ -97,7 +97,7 @@ let fetching_operations =
     ~name:"fetching_operations"
     ~msg:"fetching operations of block {block_hash} from peer {peer_id}"
     ~level:Debug
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 let fetched_operations =
@@ -106,7 +106,7 @@ let fetched_operations =
     ~name:"fetched_operations"
     ~msg:"fetched operations of block {block_hash} from peer {peer_id}"
     ~level:Debug
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 let requesting_validation =
@@ -115,7 +115,7 @@ let requesting_validation =
     ~name:"requesting_validation"
     ~msg:"requesting validation for block {block_hash} from peer {peer_id}"
     ~level:Debug
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 let validated_block =
@@ -124,7 +124,7 @@ let validated_block =
     ~name:"validated_block"
     ~msg:"validated block {block_hash} from peer {peer_id}"
     ~level:Debug
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 (* warning level events *)
@@ -137,7 +137,7 @@ let request_operations_timeout =
       "request for operations {block_hash}:{operations_index_tag} from peer \
        {peer_id} timed out"
     ~level:Warning
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("operations_index_tag", Data_encoding.int31)
     ("peer_id", P2p_peer.Id.encoding)
 
@@ -163,7 +163,7 @@ let header_request_timeout =
     ~name:"header_request_timeout"
     ~msg:"request for header {block_hash} from peer {peer_id} timed out"
     ~level:Warning
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
 
 let locator_contains_future_block =
@@ -172,7 +172,7 @@ let locator_contains_future_block =
     ~name:"locator_contains_future_block"
     ~msg:"block locator {block_hash} from peer {peer_id} contains future blocks"
     ~level:Warning
-    ("block_hash", Block_hash.encoding)
+    ("block_hash", Tezos_crypto.Block_hash.encoding)
     ("peer_id", P2p_peer.Id.encoding)
     ("time", Time.System.encoding)
     ("block_time", Time.Protocol.encoding)
