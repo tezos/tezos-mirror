@@ -88,12 +88,17 @@ val fetch_tezos_block :
   Block_hash.t ->
   Protocol_client_context.Alpha_block_services.block_info tzresult Lwt.t
 
+(** [nth_predecessor l1_ctxt n head] return [block, history] where [block] is
+    the nth predecessor of [head] and [history] is the list of blocks between
+    [block] (excluded) and [head] (included) on the chain *)
+val nth_predecessor : t -> int -> head -> (head * head list) tzresult Lwt.t
+
 (** [get_tezos_reorg_for_new_head l1_ctxt old_head new_head] returns the
-    reorganization of L1 blocks (if any) between [old_head] and [new_head]. *)
+    reorganization of L1 blocks between [old_head] and [new_head]. If [old_head]
+    is [`Level l], then it returns the reorganization between [new_head] and
+    level [l] on the same chain. *)
 val get_tezos_reorg_for_new_head :
   t ->
-  Block_hash.t option ->
-  Block_hash.t ->
-  Protocol_client_context.Alpha_block_services.block_info Injector_common.reorg
-  tzresult
-  Lwt.t
+  [`Head of head | `Level of int32] ->
+  head ->
+  head Injector_common.reorg tzresult Lwt.t

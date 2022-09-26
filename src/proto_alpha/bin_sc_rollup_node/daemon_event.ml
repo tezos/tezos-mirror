@@ -52,11 +52,24 @@ module Simple = struct
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
+  let processing_heads_iteration =
+    declare_3
+      ~section
+      ~name:"sc_rollup_daemon_processing_heads"
+      ~msg:
+        "A new iteration of process_heads has been triggered: processing \
+         {number} heads from level {from} to level {to}"
+      ~level:Notice
+      ("number", Data_encoding.int31)
+      ("from", Data_encoding.int32)
+      ("to", Data_encoding.int32)
+
   let new_heads_processed =
     declare_3
       ~section
       ~name:"sc_rollup_node_layer_1_new_heads_processed"
-      ~msg:"Finished processing {number} layer 1 heads for levels {from} {to}"
+      ~msg:
+        "Finished processing {number} layer 1 heads for levels {from} to {to}"
       ~level:Notice
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
@@ -120,17 +133,22 @@ let head_processing hash level ~finalized =
 let new_head_processed hash level =
   Simple.(emit new_head_processed (hash, level))
 
-let new_heads_processed = function
-  | newest :: rest ->
-      let oldest =
-        match List.rev rest with [] -> newest | oldest :: _ -> oldest
+let new_heads_iteration event = function
+  | oldest :: rest ->
+      let newest =
+        match List.rev rest with [] -> oldest | newest :: _ -> newest
       in
       let number =
         Int32.sub newest.Layer1.level oldest.Layer1.level
         |> Int32.succ |> Int32.to_int
       in
-      Simple.(emit new_heads_processed (number, oldest.level, newest.level))
+      Simple.emit event (number, oldest.level, newest.level)
   | [] -> Lwt.return_unit
+
+let processing_heads_iteration =
+  new_heads_iteration Simple.processing_heads_iteration
+
+let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
 let included_operation (type kind) ~finalized
     (operation : kind Protocol.Alpha_context.manager_operation)

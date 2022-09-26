@@ -38,6 +38,10 @@ val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
     processing the head of the given [hash] and at the given [level]. *)
 val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
 
+(** [processing_heads_iteration heads] emits the event that the [heads] are
+    going to be processed. *)
+val processing_heads_iteration : Layer1.head list -> unit Lwt.t
+
 (** [new_heads_processed heads] emits the event that the [heads] were
     processed. *)
 val new_heads_processed : Layer1.head list -> unit Lwt.t
