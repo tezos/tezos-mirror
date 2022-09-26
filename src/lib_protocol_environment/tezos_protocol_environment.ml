@@ -41,7 +41,7 @@ type validation_result = Environment_context.validation_result = {
 type quota = Environment_context.quota = {max_size : int; max_op : int option}
 
 type rpc_context = Environment_context.rpc_context = {
-  block_hash : Block_hash.t;
+  block_hash : Tezos_crypto.Block_hash.t;
   block_header : Block_header.shell_header;
   context : Context.t;
 }

@@ -35,14 +35,15 @@ module type T = sig
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Chain_id.t = Chain_id.t
-       and type Block_hash.t = Block_hash.t
-       and type Operation_hash.t = Operation_hash.t
-       and type Operation_list_hash.t = Operation_list_hash.t
-       and type Operation_list_list_hash.t = Operation_list_list_hash.t
+       and type Chain_id.t = Tezos_crypto.Chain_id.t
+       and type Block_hash.t = Tezos_crypto.Block_hash.t
+       and type Operation_hash.t = Tezos_crypto.Operation_hash.t
+       and type Operation_list_hash.t = Tezos_crypto.Operation_list_hash.t
+       and type Operation_list_list_hash.t =
+        Tezos_crypto.Operation_list_list_hash.t
        and type Context.t = Context.t
-       and type Context_hash.t = Context_hash.t
-       and type Protocol_hash.t = Protocol_hash.t
+       and type Context_hash.t = Tezos_crypto.Context_hash.t
+       and type Protocol_hash.t = Tezos_crypto.Protocol_hash.t
        and type Time.t = Time.Protocol.t
        and type MBytes.t = Tezos_protocol_environment_structs.V0.MBytes.t
        and type Operation.shell_header = Operation.shell_header
@@ -50,19 +51,22 @@ module type T = sig
        and type Block_header.shell_header = Block_header.shell_header
        and type Block_header.t = Block_header.t
        and type 'a RPC_directory.t = 'a Tezos_rpc.Directory.t
-       and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
-       and type Ed25519.Public_key.t = Ed25519.Public_key.t
-       and type Ed25519.t = Ed25519.t
-       and type Secp256k1.Public_key_hash.t = Secp256k1.Public_key_hash.t
-       and type Secp256k1.Public_key.t = Secp256k1.Public_key.t
-       and type Secp256k1.t = Secp256k1.t
-       and type P256.Public_key_hash.t = P256.Public_key_hash.t
-       and type P256.Public_key.t = P256.Public_key.t
-       and type P256.t = P256.t
-       and type Signature.public_key_hash = Signature.public_key_hash
-       and type Signature.public_key = Signature.public_key
-       and type Signature.t = Signature.t
-       and type Signature.watermark = Signature.watermark
+       and type Ed25519.Public_key_hash.t =
+        Tezos_crypto.Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Tezos_crypto.Ed25519.Public_key.t
+       and type Ed25519.t = Tezos_crypto.Ed25519.t
+       and type Secp256k1.Public_key_hash.t =
+        Tezos_crypto.Secp256k1.Public_key_hash.t
+       and type Secp256k1.Public_key.t = Tezos_crypto.Secp256k1.Public_key.t
+       and type Secp256k1.t = Tezos_crypto.Secp256k1.t
+       and type P256.Public_key_hash.t = Tezos_crypto.P256.Public_key_hash.t
+       and type P256.Public_key.t = Tezos_crypto.P256.Public_key.t
+       and type P256.t = Tezos_crypto.P256.t
+       and type Signature.public_key_hash =
+        Tezos_crypto.Signature.public_key_hash
+       and type Signature.public_key = Tezos_crypto.Signature.public_key
+       and type Signature.t = Tezos_crypto.Signature.t
+       and type Signature.watermark = Tezos_crypto.Signature.watermark
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
@@ -135,11 +139,12 @@ struct
   module MBytes = MBytes
 
   module Raw_hashes = struct
-    let sha256 = Hacl.Hash.SHA256.digest
+    let sha256 = Tezos_crypto.Hacl.Hash.SHA256.digest
 
-    let sha512 = Hacl.Hash.SHA512.digest
+    let sha512 = Tezos_crypto.Hacl.Hash.SHA512.digest
 
-    let blake2b msg = Blake2B.to_bytes (Blake2B.hash_bytes [msg])
+    let blake2b msg =
+      Tezos_crypto.Blake2B.to_bytes (Tezos_crypto.Blake2B.hash_bytes [msg])
   end
 
   module Z = struct
@@ -193,9 +198,9 @@ struct
 
       val of_b58check_opt : string -> t option
 
-      type Base58.data += Data of t
+      type Tezos_crypto.Base58.data += Data of t
 
-      val b58check_encoding : t Base58.encoding
+      val b58check_encoding : t Tezos_crypto.Base58.encoding
     end
 
     module type RAW_DATA = sig
