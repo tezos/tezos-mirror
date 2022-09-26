@@ -4753,7 +4753,7 @@ module Protocol = Protocol
           [
             octez_stdlib |> open_;
             octez_error_monad |> open_;
-            octez_crypto;
+            octez_crypto |> open_;
             octez_micheline |> open_;
             octez_micheline_rewriting |> open_;
             main |> open_;

@@ -49,7 +49,7 @@ module type S = sig
 end
 
 module Make
-    (X : Signature.S)
+    (X : Algebraic_signature.S)
     (M : Micheline_sig.S with type head = X.t)
     (Path : Path.S)
     (Patt : Pattern.S

@@ -53,7 +53,7 @@ module type S = sig
 
   val nat : Script_int.n Script_int.num sampler
 
-  val signature : Tezos_crypto.Signature.t sampler
+  val signature : Signature.t sampler
 
   val string : Script_string.t sampler
 

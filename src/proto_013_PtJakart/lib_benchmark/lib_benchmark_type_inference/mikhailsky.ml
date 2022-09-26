@@ -27,8 +27,8 @@ open Protocol
 
 exception Term_contains_holes
 
-module Mikhailsky_signature : Signature.S with type t = Mikhailsky_prim.prim =
-struct
+module Mikhailsky_signature :
+  Algebraic_signature.S with type t = Mikhailsky_prim.prim = struct
   type t = Mikhailsky_prim.prim
 
   let compare (x : t) (y : t) = Stdlib.compare x y
@@ -386,18 +386,12 @@ module Data = struct
 
   let key_hash kh =
     let b =
-      Data_encoding.Binary.to_bytes_exn
-        Tezos_crypto.Signature.Public_key_hash.encoding
-        kh
+      Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding kh
     in
     prim A_Key_hash [bytes b] []
 
   let key k =
-    let b =
-      Data_encoding.Binary.to_bytes_exn
-        Tezos_crypto.Signature.Public_key.encoding
-        k
-    in
+    let b = Data_encoding.Binary.to_bytes_exn Signature.Public_key.encoding k in
     prim A_Key [bytes b] []
 
   let integer (i : int) = prim A_Int [int (Z.of_int i)] []

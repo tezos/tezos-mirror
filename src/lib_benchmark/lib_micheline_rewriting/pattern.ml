@@ -139,7 +139,7 @@ module type S = sig
 end
 
 module Make
-    (X : Signature.S)
+    (X : Algebraic_signature.S)
     (Micheline : Micheline_sig.S with type head = X.t)
     (Path : Path.S) =
 struct
@@ -335,7 +335,7 @@ struct
 end
 
 module Make_with_hash_consing
-    (X : Signature.S)
+    (X : Algebraic_signature.S)
     (Micheline : Micheline_sig.S
                    with type head = X.t
                     and type label = Micheline_with_hash_consing.hcons_info)
