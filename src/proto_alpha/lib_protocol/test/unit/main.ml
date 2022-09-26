@@ -85,5 +85,6 @@ let () =
       Unit_test.spec "zk rollup storage" Test_zk_rollup_storage.tests;
       Unit_test.spec "compare operations" Test_compare_operations.tests;
       Unit_test.spec "Delegate_consensus_key.ml" Test_consensus_key.tests;
+      Unit_test.spec "local_contexts" Test_local_contexts.tests;
     ]
   |> Lwt_main.run

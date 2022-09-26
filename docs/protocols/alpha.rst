@@ -379,4 +379,6 @@ Internal
   API allowing a light validation of operations. This as well as
   maintaining a commutative set of operations that may also be
   efficiently merged with another. This enables the implementation of
-  a parallelized shell's mempool. (MR :gl:`!6274`)
+
+- Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
+- Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)

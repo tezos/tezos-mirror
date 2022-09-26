@@ -188,6 +188,10 @@ module Contract = struct
 
   let list = Indexed_context.keys
 
+  type local_context = Indexed_context.local_context
+
+  let with_local_context = Indexed_context.with_local_context
+
   module Spendable_balance =
     Indexed_context.Make_map
       (Registered)

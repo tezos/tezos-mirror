@@ -276,6 +276,55 @@ module type Indexed_data_storage = sig
     'a Lwt.t
 end
 
+module type Indexed_data_storage_with_local_context = sig
+  include Indexed_data_storage
+
+  type local_context
+
+  module Local : sig
+    type context = local_context
+
+    (** Tells if the data is already defined *)
+    val mem : context -> bool Lwt.t
+
+    (** Retrieves the value from the storage bucket; returns a
+        {!Storage_error} if the key is not set or if the deserialisation
+        fails *)
+    val get : context -> value tzresult Lwt.t
+
+    (** Retrieves the value from the storage bucket ; returns [None] if
+        the data is not initialized, or {!Storage_helpers.Storage_error}
+        if the deserialisation fails *)
+    val find : context -> value option tzresult Lwt.t
+
+    (** Allocates the storage bucket and initializes it ; returns a
+        {!Storage_error Existing_key} if the bucket exists *)
+    val init : context -> value -> context tzresult Lwt.t
+
+    (** Updates the content of the bucket; returns a {!Storage_Error
+        Missing_key} if the value does not exist *)
+    val update : context -> value -> context tzresult Lwt.t
+
+    (** Allocates the data and initializes it with a value ; just
+        updates it if the bucket exists *)
+    val add : context -> value -> context Lwt.t
+
+    (** When the value is [Some v], allocates the data and initializes
+        it with [v] ; just updates it if the bucket exists. When the
+        value is [None], deletes the storage bucket; it does
+        nothing if the bucket does not exists. *)
+    val add_or_remove : context -> value option -> context Lwt.t
+
+    (** Delete the storage bucket ; returns a {!Storage_error
+        Missing_key} if the bucket does not exists *)
+    val remove_existing : context -> context tzresult Lwt.t
+
+    (** Removes the storage bucket and its contents; does nothing if
+        the bucket does not exist *)
+    val remove : context -> context Lwt.t
+  end
+end
+
 module type Indexed_data_snapshotable_storage = sig
   type snapshot
 
@@ -400,6 +449,8 @@ module type Indexed_raw_context = sig
 
   type 'a ipath
 
+  type local_context
+
   val clear : context -> Raw_context.t Lwt.t
 
   val fold_keys :
@@ -415,11 +466,21 @@ module type Indexed_raw_context = sig
 
   val copy : context -> from:key -> to_:key -> context tzresult Lwt.t
 
+  val with_local_context :
+    context ->
+    key ->
+    (local_context -> (local_context * 'a) tzresult Lwt.t) ->
+    (context * 'a) tzresult Lwt.t
+
   module Make_set (_ : REGISTER) (_ : NAME) :
     Data_set_storage with type t = t and type elt = key
 
   module Make_map (_ : REGISTER) (_ : NAME) (V : VALUE) :
-    Indexed_data_storage with type t = t and type key = key and type value = V.t
+    Indexed_data_storage_with_local_context
+      with type t = t
+       and type key = key
+       and type value = V.t
+       and type local_context = local_context
 
   module Make_carbonated_map (_ : REGISTER) (_ : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage

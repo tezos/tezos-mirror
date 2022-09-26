@@ -183,6 +183,8 @@ type value = bytes
 
 type tree
 
+type local_context
+
 module type T =
   Raw_context_intf.T
     with type root := root
@@ -190,7 +192,7 @@ module type T =
      and type value := value
      and type tree := tree
 
-include T with type t := t
+include T with type t := t and type local_context := local_context
 
 (** Initialize the local nonce used for preventing a script to
     duplicate an internal operation to replay it. *)

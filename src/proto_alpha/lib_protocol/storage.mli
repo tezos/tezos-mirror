@@ -69,15 +69,26 @@ module Contract : sig
 
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
+  (** see {!Raw_context_intf.T.local_context} *)
+  type local_context
+
+  (** see {!Raw_context_intf.T.with_local_context} *)
+  val with_local_context :
+    Raw_context.t ->
+    Contract_repr.t ->
+    (local_context -> (local_context * 'a) tzresult Lwt.t) ->
+    (Raw_context.t * 'a) tzresult Lwt.t
+
   (** The tez possessed by a contract and that can be used. A contract
      may also possess tez in frozen deposits. Empty balances (of zero
      tez) are only allowed for originated contracts, not for implicit
      ones. *)
   module Spendable_balance :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t
+       and type local_context := local_context
 
   (** If the value is not set, the delegate didn't miss any endorsing
      opportunity.  If it is set, this value is a record of type
@@ -99,10 +110,11 @@ module Contract : sig
 
   (** The manager of a contract *)
   module Manager :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Manager_repr.t
        and type t := Raw_context.t
+       and type local_context := local_context
 
   (** The active consensus key of a delegate *)
   module Consensus_key :
@@ -162,10 +174,11 @@ module Contract : sig
        and type t := Raw_context.t
 
   module Counter :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Z.t
        and type t := Raw_context.t
+       and type local_context := local_context
 
   module Code :
     Non_iterable_indexed_carbonated_data_storage
@@ -260,7 +273,7 @@ module Big_map : sig
   end
 
   module Total_bytes :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = id
        and type value = Z.t
        and type t := Raw_context.t
