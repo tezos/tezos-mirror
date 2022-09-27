@@ -311,10 +311,27 @@ let store_copy_type =
   let output_types = Vector.of_list [] in
   Types.FuncType (input_types, output_types)
 
+let store_copy_aux durable memories from_key_offset from_key_length
+    to_key_offset to_key_length =
+  let open Lwt_syntax in
+  let from_key_length = Int32.to_int from_key_length in
+  let to_key_length = Int32.to_int to_key_length in
+  if from_key_length > Durable.max_key_length then
+    raise (Key_too_large from_key_length) ;
+  if to_key_length > Durable.max_key_length then
+    raise (Key_too_large to_key_length) ;
+  let* memory = retrieve_memory memories in
+  let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
+  let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
+  let tree = Durable.of_storage_exn durable in
+  let from_key = Durable.key_of_string_exn from_key in
+  let to_key = Durable.key_of_string_exn to_key in
+  let+ tree = Durable.copy_tree_exn tree from_key to_key in
+  (Durable.to_storage tree, [])
+
 let store_copy =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
-      let open Lwt.Syntax in
       match inputs with
       | [
        Values.(Num (I32 from_key_offset));
@@ -322,22 +339,13 @@ let store_copy =
        Values.(Num (I32 to_key_offset));
        Values.(Num (I32 to_key_length));
       ] ->
-          let from_key_length = Int32.to_int from_key_length in
-          let to_key_length = Int32.to_int to_key_length in
-          if from_key_length > Durable.max_key_length then
-            raise (Key_too_large from_key_length) ;
-          if to_key_length > Durable.max_key_length then
-            raise (Key_too_large to_key_length) ;
-          let* memory = retrieve_memory memories in
-          let* from_key =
-            Memory.load_bytes memory from_key_offset from_key_length
-          in
-          let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
-          let tree = Durable.of_storage_exn durable in
-          let from_key = Durable.key_of_string_exn from_key in
-          let to_key = Durable.key_of_string_exn to_key in
-          let+ tree = Durable.copy_tree_exn tree from_key to_key in
-          (Durable.to_storage tree, [])
+          store_copy_aux
+            durable
+            memories
+            from_key_offset
+            from_key_length
+            to_key_offset
+            to_key_length
       | _ -> raise Bad_input)
 
 let lookup_opt name =
