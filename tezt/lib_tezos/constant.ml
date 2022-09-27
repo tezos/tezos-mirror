@@ -30,7 +30,7 @@ let tezos_admin_client = "./octez-admin-client"
 
 let tezos_node = "./octez-node"
 
-let tezos_proxy_server = "./tezos-proxy-server"
+let tezos_proxy_server = "./octez-proxy-server"
 
 let tezos_codec = "./octez-codec"
 

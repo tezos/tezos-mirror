@@ -354,7 +354,7 @@ module Location = struct
   type alt_mode =
     | Vanilla_proxy_server
         (** A vanilla client ([--mode client]) but whose [--endpoint] is
-        a [tezos-proxy-server] *)
+        a [octez-proxy-server] *)
     | Light  (** A light client ([--mode light]) *)
     | Proxy  (** A proxy client ([--mode proxy]) *)
 
