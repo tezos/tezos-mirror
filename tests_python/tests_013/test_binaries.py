@@ -16,7 +16,7 @@ PROTO_BINARIES = [
 ]
 
 BINARIES = [
-    "tezos-codec",
+    "octez-codec",
     "octez-client",
     "octez-admin-client",
     "tezos-protocol-compiler",
