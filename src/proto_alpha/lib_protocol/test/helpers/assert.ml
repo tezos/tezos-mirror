@@ -214,27 +214,60 @@ open Context
 
 (* Some asserts for account operations *)
 
-(** [balance_is b c amount] checks that the current balance of contract [c] is
-    [amount].
-    Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
-    [Rewards] for the others. *)
-let balance_is ~loc b contract expected =
-  Contract.balance b contract >>=? fun balance ->
-  equal_tez ~loc balance expected
+let contract_property_is property ~loc b contract expected =
+  property b contract >>=? fun balance -> equal_tez ~loc balance expected
 
-(** [balance_was_operated ~operand b c old_balance amount] checks that the
-    current balance of contract [c] is [operand old_balance amount] and
-    returns the current balance.
-    Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
-    [Rewards] for the others. *)
-let balance_was_operated ~operand ~loc b contract old_balance amount =
+(** [balance_is b c amount] checks that the current balance [b] of contract [c]
+    is [amount].
+*)
+let balance_is = contract_property_is Contract.balance
+
+(** [frozen_bonds_is b c amount] checks that the current frozen bonds of
+    contract [c] is [amount].
+*)
+let frozen_bonds_is = contract_property_is Contract.frozen_bonds
+
+let balance_or_frozen_bonds_was_operated ~is_balance ~operand ~loc b contract
+    old_balance amount =
   operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
-  balance_is ~loc b contract expected
+  let f = if is_balance then balance_is else frozen_bonds_is in
+  f ~loc b contract expected
 
+(** [balance_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s balance was credited [amount] tez in comparison to
+    [old_balance].
+*)
 let balance_was_credited =
-  balance_was_operated ~operand:Alpha_context.Tez.( +? )
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:true
+    ~operand:Alpha_context.Tez.( +? )
 
-let balance_was_debited = balance_was_operated ~operand:Alpha_context.Tez.( -? )
+(** [balance_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s balance was debited [amount] tez in comparison to
+    [old_balance].
+*)
+let balance_was_debited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:true
+    ~operand:Alpha_context.Tez.( -? )
+
+(** [frozen_bonds_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s frozen bonds was credited [amount] tez in comparison to
+    [old_balance].
+*)
+let frozen_bonds_was_credited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:false
+    ~operand:Alpha_context.Tez.( +? )
+
+(** [frozen_bonds_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s frozen bonds was credited [amount] tez in comparison to
+    [old_balance].
+*)
+let frozen_bonds_was_debited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:false
+    ~operand:Alpha_context.Tez.( -? )
 
 let pp_print_list pp out xs =
   let list_pp fmt =

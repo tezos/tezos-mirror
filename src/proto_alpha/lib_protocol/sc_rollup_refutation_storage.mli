@@ -155,7 +155,8 @@ val get_timeout :
 (** [apply_game_result ctxt rollup game_result] takes a [game_result] produced
     by [timeout] or [game_move] and performs the necessary end-of-game
     cleanup: remove the game itself from the store and punish the losing
-    player by removing their stake.
+    player by removing their stake. In the case where the game ended in
+    a draw, both players are slashed.
 
     This is mostly just calling [remove_staker], so it can fail with the
     same errors as that. However, if it is called on an [game_result]
