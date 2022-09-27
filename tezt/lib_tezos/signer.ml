@@ -34,7 +34,7 @@ module Parameters = struct
 
   type session_state = {mutable ready : bool}
 
-  let signer_path = "./tezos-signer"
+  let signer_path = "./octez-signer"
 
   let base_default_name = "signer"
 
