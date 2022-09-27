@@ -9,6 +9,12 @@ tezos-sc-rollup-node-alpha
 tezos-sc-rollup-client-alpha
 tezos-accuser-alpha
 tezos-baker-alpha
+tezos-tx-rollup-node-015-PtLimaPt
+tezos-tx-rollup-client-015-PtLimaPt
+tezos-sc-rollup-node-015-PtLimaPt
+tezos-sc-rollup-client-015-PtLimaPt
+tezos-accuser-015-PtLimaPt
+tezos-baker-015-PtLimaPt
 tezos-tx-rollup-node-014-PtKathma
 tezos-tx-rollup-client-014-PtKathma
 tezos-sc-rollup-node-014-PtKathma

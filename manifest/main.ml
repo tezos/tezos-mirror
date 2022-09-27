@@ -4965,6 +4965,8 @@ module Protocol = Protocol
 
   let _014_PtKathma = active (Name.v "PtKathma" 014)
 
+  let _015_PtLimaPt = active (Name.v "PtLimaPt" 015)
+
   let alpha = active Name.alpha
 
   let all = List.rev !all_rev

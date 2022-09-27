@@ -104,6 +104,11 @@ KATHMANDU_DAEMON = "014-PtKathma"
 KATHMANDU_FOLDER = "proto_014_PtKathma"
 KATHMANDU_PARAMETERS = get_parameters(KATHMANDU_FOLDER)
 
+LIMA = "PtLimaPt5HZrSMR4TB1qM7Ed8riGUqozU7qcbZNbpZgMPuVUweD"
+LIMA_DAEMON = "015-PtLimaPt"
+LIMA_FOLDER = "proto_015_PtLimaPt"
+LIMA_PARAMETERS = get_parameters(LIMA_FOLDER)
+
 TEZOS_CRT = """
 Certificate:
     Data:

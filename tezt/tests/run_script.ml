@@ -164,7 +164,7 @@ let test_source_and_sender =
   let expected_source =
     match protocol with
     | Jakarta | Kathmandu -> Format.sprintf "%S" bootstrap1.public_key_hash
-    | Alpha -> "0x00000000000000000000000000000000000000000000"
+    | Lima | Alpha -> "0x00000000000000000000000000000000000000000000"
   in
   let* _storage =
     Client.run_script

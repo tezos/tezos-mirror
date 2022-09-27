@@ -158,6 +158,15 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
+   :caption: Lima Protocol doc:
+
+   lima/protocol
+   lima/glossary
+   lima/cli-commands
+   lima/rpc
+
+.. toctree::
+   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/protocol
@@ -211,6 +220,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/012_ithaca
    protocols/013_jakarta
    protocols/014_kathmandu
+   protocols/015_lima
    protocols/alpha
 
 .. toctree::

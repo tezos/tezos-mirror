@@ -1,0 +1,72 @@
+tests_015/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[emit.tz-Unit-Unit-Unit]
+
+storage
+  Unit
+emitted operations
+  Internal Event:
+    From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
+    Type: (or nat string)
+    Tag: event
+    Payload: (Left 10)
+  Internal Event:
+    From: KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi
+    Type: (or (nat %number) (string %words))
+    Tag: event
+    Payload: (Right "lorem ipsum")
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039986.865 units remaining)
+    [ (Pair Unit Unit) ]
+  - location: 7 (remaining gas: 1039986.855 units remaining)
+    [  ]
+  - location: 8 (remaining gas: 1039986.845 units remaining)
+    [ Unit ]
+  - location: 9 (remaining gas: 1039986.835 units remaining)
+    [ 10
+      Unit ]
+  - location: 12 (remaining gas: 1039986.825 units remaining)
+    [ (Left 10)
+      Unit ]
+  - location: 14 (remaining gas: 1039986.378 units remaining)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 15 (remaining gas: 1039986.368 units remaining)
+    [ "lorem ipsum"
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 18 (remaining gas: 1039986.358 units remaining)
+    [ (Right "lorem ipsum")
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 20 (remaining gas: 1039985.826 units remaining)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 24 (remaining gas: 1039985.816 units remaining)
+    [ {}
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 26 (remaining gas: 1039985.806 units remaining)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
+      {}
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 27 (remaining gas: 1039985.796 units remaining)
+    [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
+      0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      Unit ]
+  - location: 28 (remaining gas: 1039985.786 units remaining)
+    [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
+      { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
+      Unit ]
+  - location: 29 (remaining gas: 1039985.776 units remaining)
+    [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a ;
+        0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
+      Unit ]
+  - location: 30 (remaining gas: 1039985.766 units remaining)
+    [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a ;
+              0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
+            Unit) ]
+

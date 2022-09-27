@@ -221,7 +221,7 @@ Breaking Changes
 ----------------
 
 - Deprecate timelock functionality, that is the `CHEST_OPEN`
-  instruction, in michelson to prevent origination of new contracts using. A
+  instruction, in Michelson to prevent origination of new contracts using it. A
   safer version of timelock will come in a future procotol.  (MRs :gl:`!6260`,
   :gl:`!6327`)
 

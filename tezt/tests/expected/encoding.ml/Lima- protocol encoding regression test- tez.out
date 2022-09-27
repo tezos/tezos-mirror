@@ -1,0 +1,12 @@
+
+./tezos-codec encode 015-PtLimaPt.tez from '"7322135"'
+97f4be03
+
+./tezos-codec decode 015-PtLimaPt.tez from 97f4be03
+"7322135"
+
+./tezos-codec encode 015-PtLimaPt.tez from '"0"'
+00
+
+./tezos-codec decode 015-PtLimaPt.tez from 00
+"0"
