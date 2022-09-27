@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_registerer)
- (public_name tezos-protocol-compiler.registerer)
+ (public_name octez-protocol-compiler.registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -19,7 +19,7 @@ depends: [
   "tezos-shell"
   "tezos-store"
   "tezos-context"
-  "tezos-validator"
+  "octez-validator"
   "tezos-validation"
   "tezos-shell-context"
   "tezos-workers"
@@ -70,4 +70,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-node` binary"
+synopsis: "Tezos: `octez-node` binary"

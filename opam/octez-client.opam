@@ -63,4 +63,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-client` binary"
+synopsis: "Tezos: `octez-client` binary"

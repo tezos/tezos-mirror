@@ -3,8 +3,8 @@
 
 (executable
  (name main_accuser_012_Psithaca)
- (public_name tezos-accuser-012-Psithaca)
- (package tezos-accuser-012-Psithaca)
+ (public_name octez-accuser-012-Psithaca)
+ (package octez-accuser-012-Psithaca)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

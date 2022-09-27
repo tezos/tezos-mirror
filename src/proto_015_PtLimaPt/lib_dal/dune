@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-compiler.registerer
+  octez-protocol-compiler.registerer
   tezos_dal_node_lib
   tezos-client-015-PtLimaPt
   tezos-embedded-protocol-015-PtLimaPt

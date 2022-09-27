@@ -3,8 +3,8 @@
 
 (executables
  (names main_client main_admin)
- (public_names tezos-client tezos-admin-client)
- (package tezos-client)
+ (public_names octez-client octez-admin-client)
+ (package octez-client)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -140,16 +140,16 @@
    (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))
 
 (install
- (package tezos-client)
+ (package octez-client)
  (section bin)
- (files (tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))
+ (files (octez-init-sandboxed-client.sh as octez-init-sandboxed-client.sh)))
 
 (rule
  (alias runtest_compile_protocol)
  (deps (source_tree test/proto_test_injection))
  (action
   (run
-   %{bin:tezos-protocol-compiler}
+   %{bin:octez-protocol-compiler}
    -no-hash-check
    -warn-error +a
    test/proto_test_injection/)))

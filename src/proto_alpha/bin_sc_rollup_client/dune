@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_client_alpha)
- (public_name tezos-sc-rollup-client-alpha)
- (package tezos-sc-rollup-client-alpha)
+ (public_name octez-sc-rollup-client-alpha)
+ (package octez-sc-rollup-client-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_node_alpha)
- (public_name tezos-tx-rollup-node-alpha)
- (package tezos-tx-rollup-node-alpha)
+ (public_name octez-tx-rollup-node-alpha)
+ (package octez-tx-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

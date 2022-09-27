@@ -3,8 +3,8 @@
 
 (executable
  (name main_baker_015_PtLimaPt)
- (public_name tezos-baker-015-PtLimaPt)
- (package tezos-baker-015-PtLimaPt)
+ (public_name octez-baker-015-PtLimaPt)
+ (package octez-baker-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

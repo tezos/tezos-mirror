@@ -3,8 +3,8 @@
 
 (executable
  (name main_proxy_server)
- (public_name tezos-proxy-server)
- (package tezos-proxy-server)
+ (public_name octez-proxy-server)
+ (package octez-proxy-server)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

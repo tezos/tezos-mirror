@@ -12,28 +12,19 @@ depends: [
   "tezos-base"
   "tezos-clic"
   "tezos-client-base"
-  "tezos-client-base-unix"
+  "tezos-client-013-PtJakart"
   "tezos-client-commands"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-protocol-updater"
-  "tezos-rpc-http-client-unix"
   "tezos-stdlib-unix"
-  "tezos-stdlib"
-  "tezos-dal-node-lib"
-  "tezos-dal-node-services"
-  "tezos-layer2-store"
-  "tezos-crypto-dal"
-  "irmin-pack" { >= "3.4.0" & < "3.5.0" }
-  "irmin" { >= "3.4.0" & < "3.5.0" }
-  "tezos-dal-015-PtLimaPt"
-]
-depopts: [
-  "tezos-dal-alpha"
+  "tezos-client-base-unix"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-protocol-013-PtJakart"
+  "tezos-sc-rollup-013-PtJakart"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-dal-node` binary"
+synopsis: "Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"

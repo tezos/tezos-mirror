@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ppx_expect"
   "tezos-base"
-  "tezos-protocol-compiler"
+  "octez-protocol-compiler"
   "tezos-dal-node-lib"
   "tezos-client-015-PtLimaPt"
   "tezos-embedded-protocol-015-PtLimaPt"

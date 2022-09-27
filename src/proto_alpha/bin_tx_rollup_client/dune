@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_client_alpha)
- (public_name tezos-tx-rollup-client-alpha)
- (package tezos-tx-rollup-client-alpha)
+ (public_name octez-tx-rollup-client-alpha)
+ (package octez-tx-rollup-client-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

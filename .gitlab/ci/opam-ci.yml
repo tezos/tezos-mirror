@@ -5,9 +5,13 @@
 
 # Ignoring package lazy-containers-tests, it only contains tests or private targets
 
-# Ignoring package tezos-benchmark-tests, it only contains tests or private targets
+# Ignoring package octez-dal-node, it only contains tests or private targets
 
-# Ignoring package tezos-dal-node, it only contains tests or private targets
+# Ignoring package octez-proxy-server, it only contains tests or private targets
+
+# Ignoring package octez-snoop, it only contains tests or private targets
+
+# Ignoring package tezos-benchmark-tests, it only contains tests or private targets
 
 # Ignoring package tezos-dal-node-lib, it only contains tests or private targets
 
@@ -35,13 +39,9 @@
 
 # Ignoring package tezos-protocol-plugin-alpha-tests, it only contains tests or private targets
 
-# Ignoring package tezos-proxy-server, it only contains tests or private targets
-
 # Ignoring package tezos-scoru-wasm-test, it only contains tests or private targets
 
 # Ignoring package tezos-shell-context-test, it only contains tests or private targets
-
-# Ignoring package tezos-snoop, it only contains tests or private targets
 
 # Ignoring package tezos-tps-evaluation, it only contains tests or private targets
 
@@ -304,6 +304,230 @@ opam:lazy-containers:
   variables:
     package: lazy-containers
 
+opam:octez-accuser-012-Psithaca:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-accuser-012-Psithaca
+
+opam:octez-accuser-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-accuser-013-PtJakart
+
+opam:octez-accuser-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-accuser-014-PtKathma
+
+opam:octez-accuser-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-accuser-015-PtLimaPt
+
+opam:octez-accuser-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-accuser-alpha
+
+opam:octez-baker-012-Psithaca:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-baker-012-Psithaca
+
+opam:octez-baker-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-baker-013-PtJakart
+
+opam:octez-baker-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-baker-014-PtKathma
+
+opam:octez-baker-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-baker-015-PtLimaPt
+
+opam:octez-baker-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-baker-alpha
+
+opam:octez-client:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-client
+
+opam:octez-codec:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-codec
+
+opam:octez-node:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-node
+
+opam:octez-protocol-compiler:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_6
+  variables:
+    package: octez-protocol-compiler
+
+opam:octez-sc-rollup-client-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-client-013-PtJakart
+
+opam:octez-sc-rollup-client-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-client-014-PtKathma
+
+opam:octez-sc-rollup-client-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-client-015-PtLimaPt
+
+opam:octez-sc-rollup-client-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-client-alpha
+
+opam:octez-sc-rollup-node-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-node-013-PtJakart
+
+opam:octez-sc-rollup-node-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-node-014-PtKathma
+
+opam:octez-sc-rollup-node-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-node-015-PtLimaPt
+
+opam:octez-sc-rollup-node-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_2
+  variables:
+    package: octez-sc-rollup-node-alpha
+
+opam:octez-signer:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_3
+  variables:
+    package: octez-signer
+
+opam:octez-tx-rollup-client-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-client-013-PtJakart
+
+opam:octez-tx-rollup-client-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-client-014-PtKathma
+
+opam:octez-tx-rollup-client-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-client-015-PtLimaPt
+
+opam:octez-tx-rollup-client-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-client-alpha
+
+opam:octez-tx-rollup-node-013-PtJakart:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-node-013-PtJakart
+
+opam:octez-tx-rollup-node-014-PtKathma:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-node-014-PtKathma
+
+opam:octez-tx-rollup-node-015-PtLimaPt:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-node-015-PtLimaPt
+
+opam:octez-tx-rollup-node-alpha:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_1
+  variables:
+    package: octez-tx-rollup-node-alpha
+
+opam:octez-validator:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_3
+  variables:
+    package: octez-validator
+
 opam:tezos-012-Psithaca-test-helpers:
   extends:
     - .opam_template
@@ -332,41 +556,6 @@ opam:tezos-015-PtLimaPt-test-helpers:
   variables:
     package: tezos-015-PtLimaPt-test-helpers
 
-opam:tezos-accuser-012-Psithaca:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-accuser-012-Psithaca
-
-opam:tezos-accuser-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-accuser-013-PtJakart
-
-opam:tezos-accuser-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-accuser-014-PtKathma
-
-opam:tezos-accuser-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-accuser-015-PtLimaPt
-
-opam:tezos-accuser-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-accuser-alpha
-
 opam:tezos-alpha-test-helpers:
   extends:
     - .opam_template
@@ -374,45 +563,10 @@ opam:tezos-alpha-test-helpers:
   variables:
     package: tezos-alpha-test-helpers
 
-opam:tezos-baker-012-Psithaca:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-baker-012-Psithaca
-
-opam:tezos-baker-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-baker-013-PtJakart
-
-opam:tezos-baker-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-baker-014-PtKathma
-
-opam:tezos-baker-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-baker-015-PtLimaPt
-
-opam:tezos-baker-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-baker-alpha
-
 opam:tezos-baking-012-Psithaca:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-baking-012-Psithaca
 
@@ -426,7 +580,7 @@ opam:tezos-baking-012-Psithaca-commands:
 opam:tezos-baking-013-PtJakart:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-baking-013-PtJakart
 
@@ -440,7 +594,7 @@ opam:tezos-baking-013-PtJakart-commands:
 opam:tezos-baking-014-PtKathma:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-baking-014-PtKathma
 
@@ -454,7 +608,7 @@ opam:tezos-baking-014-PtKathma-commands:
 opam:tezos-baking-015-PtLimaPt:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-baking-015-PtLimaPt
 
@@ -468,7 +622,7 @@ opam:tezos-baking-015-PtLimaPt-commands:
 opam:tezos-baking-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-baking-alpha
 
@@ -618,13 +772,6 @@ opam:tezos-clic:
     - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-clic
-
-opam:tezos-client:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-client
 
 opam:tezos-client-000-Ps9mPmXa:
   extends:
@@ -779,13 +926,6 @@ opam:tezos-client-genesis:
     - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-client-genesis
-
-opam:tezos-codec:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: tezos-codec
 
 opam:tezos-context:
   extends:
@@ -1109,13 +1249,6 @@ opam:tezos-mockup-registration:
   variables:
     package: tezos-mockup-registration
 
-opam:tezos-node:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-node
-
 opam:tezos-openapi:
   extends:
     - .opam_template
@@ -1270,13 +1403,6 @@ opam:tezos-protocol-alpha:
   variables:
     package: tezos-protocol-alpha
 
-opam:tezos-protocol-compiler:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_6
-  variables:
-    package: tezos-protocol-compiler
-
 opam:tezos-protocol-demo-counter:
   extends:
     - .opam_template
@@ -1427,7 +1553,7 @@ opam:tezos-protocol-plugin-015-PtLimaPt:
 opam:tezos-protocol-plugin-015-PtLimaPt-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-015-PtLimaPt-registerer
 
@@ -1441,7 +1567,7 @@ opam:tezos-protocol-plugin-alpha:
 opam:tezos-protocol-plugin-alpha-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-protocol-plugin-alpha-registerer
 
@@ -1543,62 +1669,6 @@ opam:tezos-sc-rollup-alpha:
   variables:
     package: tezos-sc-rollup-alpha
 
-opam:tezos-sc-rollup-client-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-sc-rollup-client-013-PtJakart
-
-opam:tezos-sc-rollup-client-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-sc-rollup-client-014-PtKathma
-
-opam:tezos-sc-rollup-client-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-sc-rollup-client-015-PtLimaPt
-
-opam:tezos-sc-rollup-client-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_3
-  variables:
-    package: tezos-sc-rollup-client-alpha
-
-opam:tezos-sc-rollup-node-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: tezos-sc-rollup-node-013-PtJakart
-
-opam:tezos-sc-rollup-node-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: tezos-sc-rollup-node-014-PtKathma
-
-opam:tezos-sc-rollup-node-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: tezos-sc-rollup-node-015-PtLimaPt
-
-opam:tezos-sc-rollup-node-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_2
-  variables:
-    package: tezos-sc-rollup-node-alpha
-
 opam:tezos-scoru-wasm:
   extends:
     - .opam_template
@@ -1640,13 +1710,6 @@ opam:tezos-shell-services-test-helpers:
     - .rules_template__trigger_opam_batch_7
   variables:
     package: tezos-shell-services-test-helpers
-
-opam:tezos-signer:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_4
-  variables:
-    package: tezos-signer
 
 opam:tezos-signer-backends:
   extends:
@@ -1732,75 +1795,12 @@ opam:tezos-tx-rollup-alpha:
   variables:
     package: tezos-tx-rollup-alpha
 
-opam:tezos-tx-rollup-client-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-client-013-PtJakart
-
-opam:tezos-tx-rollup-client-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-client-014-PtKathma
-
-opam:tezos-tx-rollup-client-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-client-015-PtLimaPt
-
-opam:tezos-tx-rollup-client-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-client-alpha
-
-opam:tezos-tx-rollup-node-013-PtJakart:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-node-013-PtJakart
-
-opam:tezos-tx-rollup-node-014-PtKathma:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-node-014-PtKathma
-
-opam:tezos-tx-rollup-node-015-PtLimaPt:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-node-015-PtLimaPt
-
-opam:tezos-tx-rollup-node-alpha:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_1
-  variables:
-    package: tezos-tx-rollup-node-alpha
-
 opam:tezos-validation:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-validation
-
-opam:tezos-validator:
-  extends:
-    - .opam_template
-    - .rules_template__trigger_opam_batch_4
-  variables:
-    package: tezos-validator
 
 opam:tezos-version:
   extends:

@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_client_013_PtJakart)
- (public_name tezos-tx-rollup-client-013-PtJakart)
- (package tezos-tx-rollup-client-013-PtJakart)
+ (public_name octez-tx-rollup-client-013-PtJakart)
+ (package octez-tx-rollup-client-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

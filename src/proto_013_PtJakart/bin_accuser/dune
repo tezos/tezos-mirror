@@ -3,8 +3,8 @@
 
 (executable
  (name main_accuser_013_PtJakart)
- (public_name tezos-accuser-013-PtJakart)
- (package tezos-accuser-013-PtJakart)
+ (public_name octez-accuser-013-PtJakart)
+ (package octez-accuser-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

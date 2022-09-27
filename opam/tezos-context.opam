@@ -28,4 +28,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: on-disk context abstraction for `tezos-node`"
+synopsis: "Tezos: on-disk context abstraction for `octez-node`"

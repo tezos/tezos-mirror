@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_compiler)
- (public_name tezos-protocol-compiler)
+ (name octez_protocol_compiler)
+ (public_name octez-protocol-compiler)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -55,20 +55,20 @@
    "let warnings = \"+a-4-40..42-44-45-48-60-67-69-70\"")))
 
 (library
- (name tezos_protocol_compiler_native)
- (public_name tezos-protocol-compiler.native)
+ (name octez_protocol_compiler_native)
+ (public_name octez-protocol-compiler.native)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-compiler
+  octez-protocol-compiler
   compiler-libs.optcomp)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_compiler)
+  -open Octez_protocol_compiler)
  (modules Native))
 
 (install
- (package tezos-protocol-compiler)
+ (package octez-protocol-compiler)
  (section libexec)
  (files final_protocol_versions))

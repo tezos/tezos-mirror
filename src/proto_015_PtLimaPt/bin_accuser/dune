@@ -3,8 +3,8 @@
 
 (executable
  (name main_accuser_015_PtLimaPt)
- (public_name tezos-accuser-015-PtLimaPt)
- (package tezos-accuser-015-PtLimaPt)
+ (public_name octez-accuser-015-PtLimaPt)
+ (package octez-accuser-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

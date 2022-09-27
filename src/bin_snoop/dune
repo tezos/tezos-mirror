@@ -3,8 +3,8 @@
 
 (executable
  (name main_snoop)
- (public_name tezos-snoop)
- (package tezos-snoop)
+ (public_name octez-snoop)
+ (package octez-snoop)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -29,4 +29,4 @@
   -open Tezos_clic
   -open Tezos_benchmark))
 
-(cram (deps main_snoop.exe) (package tezos-snoop))
+(cram (deps main_snoop.exe) (package octez-snoop))

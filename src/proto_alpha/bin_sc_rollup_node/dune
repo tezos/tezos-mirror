@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_node_alpha)
- (public_name tezos-sc-rollup-node-alpha)
- (package tezos-sc-rollup-node-alpha)
+ (public_name octez-sc-rollup-node-alpha)
+ (package octez-sc-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

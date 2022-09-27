@@ -3,8 +3,8 @@
 
 (executable
  (name main_baker_alpha)
- (public_name tezos-baker-alpha)
- (package tezos-baker-alpha)
+ (public_name octez-baker-alpha)
+ (package octez-baker-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
