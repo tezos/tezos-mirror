@@ -19,7 +19,7 @@ BINARIES = [
     "octez-codec",
     "octez-client",
     "octez-admin-client",
-    "tezos-protocol-compiler",
+    "octez-protocol-compiler",
     "octez-node",
     "octez-snoop",
     "octez-validator",
