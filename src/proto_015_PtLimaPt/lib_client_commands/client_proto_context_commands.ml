@@ -730,7 +730,7 @@ let commands_ro () =
    read-write (or RW for short) the commands that are removed.
 
    There are some exceptions to this rule however, for example the command
-   "tezos-client wait for <op> to be included" is classified as RW despite having
+   "octez-client wait for <op> to be included" is classified as RW despite having
    no effect on the context because it has no use case once all RW commands are
    removed.
 

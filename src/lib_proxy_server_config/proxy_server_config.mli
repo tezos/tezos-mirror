@@ -30,7 +30,7 @@
 type t = private {
   endpoint : Uri.t option;
       (** The node to delegate RPCs to. Name was chosen
-          to be the same as in [tezos-client] *)
+          to be the same as in [octez-client] *)
   rpc_addr : Uri.t option;
       (** The address that the proxy server serves. Name
           was chosen to be the same as in [tezos-node run] *)

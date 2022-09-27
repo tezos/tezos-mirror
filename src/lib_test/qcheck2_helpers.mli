@@ -168,7 +168,7 @@ val bytes_gen : bytes QCheck2.Gen.t
 val bytes_fixed_gen : int -> bytes QCheck2.Gen.t
 
 (** [endpoint_gen] is a [QCheck2.Gen.t] for endpoints (such as
-    [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
+    [octez-client]'s [--endpoint] flag). It returns URLs of the form:
     [(http|https)://(string\.)+(:port)?]. It is by no means the most
     general [Uri.t] generator. Generalize it if needed. *)
 val endpoint_gen : Uri.t QCheck2.Gen.t

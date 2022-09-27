@@ -199,7 +199,7 @@ let main_promise (config_file : string option)
   (* Now we build the function that the proxy server can use to build a proxy
      delegate later, using [Tezos_shell_context.Proxy_delegate_maker.*] functions.
      This lets it not depend directly on [Tezos_shell_context]: if it did, it
-     would break compilation of tezos-client to JavaScript. *)
+     would break compilation of octez-client to JavaScript. *)
   let on_disk_proxy_builder =
     Option.map
       (fun index ctx_hash ->
