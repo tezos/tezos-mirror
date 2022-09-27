@@ -46,7 +46,7 @@ let tx_rollup_node = "./octez-tx-rollup-node"
 
 let tx_rollup_client = "./octez-tx-rollup-client"
 
-let dal_node = "./tezos-dal-node"
+let dal_node = "./octez-dal-node"
 
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)

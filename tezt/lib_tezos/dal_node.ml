@@ -34,7 +34,7 @@ module Parameters = struct
 
   type session_state = {mutable ready : bool}
 
-  let base_default_name = "tezos-dal-node"
+  let base_default_name = "octez-dal-node"
 
   let default_colors = Log.Color.[|FG.gray; FG.magenta; FG.yellow; FG.green|]
 end
