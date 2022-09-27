@@ -108,3 +108,5 @@ module V7 = struct
   module Array = V7_array
   module Plonk = V7_plonk
 end
+
+module V8 = V7
