@@ -722,7 +722,7 @@ let module_instances_encoding =
   conv
     Instance.ModuleMap.of_immutable
     Instance.ModuleMap.snapshot
-    (scope ["modules"] (ModuleMap.lazy_map module_instance_encoding))
+    (ModuleMap.lazy_map module_instance_encoding)
 
 let frame_encoding =
   conv
@@ -1197,13 +1197,15 @@ let output_buffer_encoding =
 
 let config_encoding ~host_funcs =
   conv
-    (fun (step_kont, stack_size_limit) ->
-      Eval.{step_kont; host_funcs; stack_size_limit})
-    (fun Eval.{step_kont; stack_size_limit; _} -> (step_kont, stack_size_limit))
-    (tup2
+    (fun (step_kont, stack_size_limit, module_reg) ->
+      Eval.{step_kont; host_funcs; stack_size_limit; module_reg})
+    (fun Eval.{step_kont; stack_size_limit; module_reg; _} ->
+      (step_kont, stack_size_limit, module_reg))
+    (tup3
        ~flatten:true
        (scope ["step_kont"] step_kont_encoding)
-       (value ["stack_size_limit"] Data_encoding.int31))
+       (value ["stack_size_limit"] Data_encoding.int31)
+       (scope ["modules"] module_instances_encoding))
 
 let buffers_encoding =
   conv

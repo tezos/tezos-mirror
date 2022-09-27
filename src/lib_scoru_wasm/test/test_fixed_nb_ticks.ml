@@ -57,6 +57,10 @@ let noop_module =
   )
 |}
 
+let origination_tick = Z.one
+
+let snapshot_tick = Z.one
+
 let test_looping_kernel () =
   let open Lwt_result_syntax in
   let max_nb_ticks = 5000L in
@@ -77,7 +81,11 @@ let test_noop_kernel () =
   let*! tree = eval_until_input_requested noop_module_tree in
   let*! info = Wasm.get_info tree in
   (* off-by-one introduced by Gather_floppies*)
-  return (assert (Z.(info.current_tick = of_int64 max_nb_ticks + Z.one)))
+  return
+    (assert (
+       Z.(
+         info.current_tick
+         = of_int64 max_nb_ticks + origination_tick + snapshot_tick)))
 
 let test_stuck_in_decode_kernel () =
   let open Lwt_result_syntax in
@@ -89,7 +97,8 @@ let test_stuck_in_decode_kernel () =
   assert (stuck = Too_many_ticks) ;
   let*! info = Wasm.get_info tree in
   (* off-by-one introduced by Gather_floppies*)
-  return (assert (Z.(info.current_tick = of_int64 max_nb_ticks + Z.one)))
+  return
+    (assert (Z.(info.current_tick = of_int64 max_nb_ticks + origination_tick)))
 
 let test_stuck_in_init_kernel () =
   let open Lwt_result_syntax in
@@ -113,7 +122,7 @@ let test_stuck_in_init_kernel () =
   let*! stuck = Wasm.Internal_for_tests.is_stuck tree in
   assert (stuck = Some Too_many_ticks) ;
   (* off-by-one introduced by Gather_floppies*)
-  return (assert (Z.(info.current_tick = new_max_nb_ticks + Z.one)))
+  return (assert (Z.(info.current_tick = new_max_nb_ticks + origination_tick)))
 
 let tests =
   [

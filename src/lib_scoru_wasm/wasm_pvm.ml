@@ -50,9 +50,11 @@ type tick_state =
       self : Wasm.Instance.module_key;
       ast_module : Tezos_webassembly_interpreter.Ast.module_;
       init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
+      module_reg : Wasm.Instance.module_reg;
     }
   | Eval of Wasm.Eval.config
   | Stuck of Wasm_pvm_errors.t
+  | Snapshot
 
 type computation_status = Starting | Restarting | Running | Failing
 
@@ -61,8 +63,6 @@ type pvm_state = {
       (** Info about last read input. *)
   current_tick : Z.t;  (** Current tick of the PVM. *)
   durable : Durable.t;  (** The durable storage of the PVM. *)
-  module_reg : Wasm.Instance.module_reg;
-      (** Module registry of the loaded kernel. *)
   buffers : Wasm.Eval.buffers;
       (** Input and outut buffers used by the PVM host functions. *)
   tick_state : tick_state;  (** The current tick state. *)
@@ -123,20 +123,21 @@ struct
               Link {ast_module; externs; imports_offset});
           case
             "init"
-            (tup3
+            (tup4
                ~flatten:true
                (scope ["self"] Wasm_encoding.module_key_encoding)
                (scope ["ast_module"]
                @@ Parsing.(no_region_encoding Module.module_encoding))
                (scope
                   ["init_kont"]
-                  (Init_encodings.init_kont_encoding ~host_funcs)))
+                  (Init_encodings.init_kont_encoding ~host_funcs))
+               (scope ["modules"] Wasm_encoding.module_instances_encoding))
             (function
-              | Init {self; ast_module; init_kont} ->
-                  Some (self, ast_module, init_kont)
+              | Init {self; ast_module; init_kont; module_reg} ->
+                  Some (self, ast_module, init_kont, module_reg)
               | _ -> None)
-            (fun (self, ast_module, init_kont) ->
-              Init {self; ast_module; init_kont});
+            (fun (self, ast_module, init_kont, module_reg) ->
+              Init {self; ast_module; init_kont; module_reg});
           case
             "eval"
             (Wasm_encoding.config_encoding ~host_funcs)
@@ -147,6 +148,11 @@ struct
             (value [] Wasm_pvm_errors.encoding)
             (function Stuck err -> Some err | _ -> None)
             (fun err -> Stuck err);
+          case
+            "snapshot"
+            (value [] Data_encoding.unit)
+            (function Snapshot -> Some () | _ -> None)
+            (fun () -> Snapshot);
         ]
 
     let input_request_encoding =
@@ -168,7 +174,6 @@ struct
         (fun ( last_input_info,
                current_tick,
                durable,
-               module_reg,
                buffers,
                tick_state,
                input_request,
@@ -178,7 +183,6 @@ struct
             last_input_info;
             current_tick;
             durable;
-            module_reg;
             buffers =
               (*`Gather_floppies` uses `get_info`, that decodes the state of the
                 PVM, which at the start of the rollup doesn't exist. *)
@@ -194,7 +198,6 @@ struct
                last_input_info;
                current_tick;
                durable;
-               module_reg;
                buffers;
                tick_state;
                input_request;
@@ -204,18 +207,16 @@ struct
           ( last_input_info,
             current_tick,
             durable,
-            module_reg,
             Some buffers,
             tick_state,
             input_request,
             last_top_level_call,
             max_nb_ticks ))
-        (tup9
+        (tup8
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
            (scope ["durable"] Durable.encoding)
-           (scope ["modules"] Wasm_encoding.module_instances_encoding)
            (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
            (scope ["input"; "consuming"] input_request_encoding)
@@ -233,24 +234,27 @@ struct
     let link_finished (ast : Wasm.Ast.module_) offset =
       offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
-    let is_time_for_restart {current_tick; last_top_level_call; max_nb_ticks; _}
-        =
+    let is_time_for_snapshot
+        {current_tick; last_top_level_call; max_nb_ticks; _} =
       let open Z in
       current_tick - last_top_level_call >= max_nb_ticks - Z.one
+    (* The max number of tick is offsetted by 1, which corresponds to the input
+       tick. *)
 
-    let unsafe_next_tick_state
-        ({module_reg; buffers; durable; tick_state; _} as pvm_state) =
+    let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state)
+        =
       let open Lwt_syntax in
       let return ?(status = Running) ?(durable = durable) state =
         Lwt.return (durable, state, status)
       in
       match tick_state with
       | Stuck e -> return ~status:Failing (Stuck e)
+      | Snapshot -> return ~status:Restarting tick_state
       | Eval {step_kont = Wasm.Eval.(SK_Result _); _}
-        when is_time_for_restart pvm_state ->
+        when is_time_for_snapshot pvm_state ->
           (* We have an empty set of admin instructions *)
-          return ~status:Restarting tick_state
-      | _ when is_time_for_restart pvm_state ->
+          return ~status:Running Snapshot
+      | _ when is_time_for_snapshot pvm_state ->
           (* Execution took too many ticks *)
           return ~status:Failing (Stuck Too_many_ticks)
       | Decode {module_kont = MKStop ast_module; _} ->
@@ -268,9 +272,11 @@ struct
       | Link {ast_module; externs; imports_offset}
         when link_finished ast_module imports_offset ->
           let self = Wasm.Instance.Module_key wasm_main_module_name in
-          (* The module instance is registered in [self] that contains the
-             module registry, why we can ignore the result here. *)
-          return (Init {self; ast_module; init_kont = IK_Start externs})
+          let module_reg = Wasm.Instance.ModuleMap.create () in
+          (* The module instance will be registered as [self] in
+             [module_reg] during the initialization. *)
+          return
+            (Init {self; ast_module; init_kont = IK_Start externs; module_reg})
       | Link {ast_module; externs; imports_offset} -> (
           let* {it = {module_name; item_name; _}; _} =
             Wasm.Ast.Vector.get imports_offset ast_module.it.imports
@@ -296,7 +302,7 @@ struct
                 (Stuck
                    (Wasm_pvm_errors.link_error `Module ~module_name ~item_name))
           )
-      | Init {self; ast_module = _; init_kont = IK_Stop} -> (
+      | Init {self; ast_module = _; init_kont = IK_Stop; module_reg} -> (
           let* module_inst =
             Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
           in
@@ -316,6 +322,7 @@ struct
                 Wasm.Eval.config
                   host_funcs
                   self
+                  module_reg
                   (Lazy_containers.Lazy_vector.Int32Vector.empty ())
                   (Lazy_containers.Lazy_vector.Int32Vector.singleton
                      admin_instr)
@@ -329,7 +336,7 @@ struct
                 (Stuck
                    (Invalid_state "Invalid_module: no `main` function exported"))
           )
-      | Init {self; ast_module; init_kont} ->
+      | Init {self; ast_module; init_kont; module_reg} ->
           let* init_kont =
             Wasm.Eval.init_step
               ~filter_exports:true
@@ -341,7 +348,7 @@ struct
               ast_module
               init_kont
           in
-          return (Init {self; ast_module; init_kont})
+          return (Init {self; ast_module; init_kont; module_reg})
       | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
           (* We have an empty set of admin instructions, but need to wait until we can restart *)
           return tick_state
@@ -358,7 +365,7 @@ struct
           (* Continue execution. *)
           let store = Durable.to_storage durable in
           let* store', eval_config =
-            Wasm.Eval.step ~durable:store module_reg eval_config buffers
+            Wasm.Eval.step ~durable:store eval_config buffers
           in
           let durable' = Durable.of_storage ~default:durable store' in
           return ~durable:durable' (Eval eval_config)
@@ -374,7 +381,7 @@ struct
               | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
               | Init _ -> Init_error error
               | Eval _ -> Eval_error error
-              | Stuck _ -> Unknown_error error.raw_exception)
+              | Stuck _ | Snapshot -> Unknown_error error.raw_exception)
           | `Unknown raw_exception -> Unknown_error raw_exception
         in
         Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
@@ -484,7 +491,7 @@ struct
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* tick_state =
         match pvm_state.tick_state with
-        | Eval _ ->
+        | Snapshot ->
             let+ () =
               Wasm.Input_buffer.(
                 enqueue
@@ -498,9 +505,8 @@ struct
                     payload = String.to_bytes message;
                   })
             in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3608
-               The goal is to (1) clean-up correctly the PVM state,
-               and (2) to read a complete inbox. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
+               The goal is to read a complete inbox. *)
             (* Go back to decoding *)
             Decode
               (Tezos_webassembly_interpreter.Decode.initial_decode_kont
@@ -513,6 +519,9 @@ struct
         | Init _ ->
             Lwt.return
               (Stuck (Invalid_state "No input required during initialization"))
+        | Eval _ ->
+            Lwt.return
+              (Stuck (Invalid_state "No input required during evaluation"))
         | Stuck _ -> Lwt.return pvm_state.tick_state
       in
       (* See {{Note tick state clean-up}} *)

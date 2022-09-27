@@ -229,12 +229,14 @@ let test_set_input () =
       tree
   in
   let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  let module_reg = Tezos_webassembly_interpreter.Instance.ModuleMap.create () in
   let tick_state =
     Eval.
       {
         host_funcs;
         step_kont = SK_Result (Vector.empty ());
         stack_size_limit = 1000;
+        module_reg;
       }
   in
   let* tree = encode_tick_state ~host_funcs tick_state tree in

@@ -478,14 +478,17 @@ let start_gen =
   let+ sfunc = var_gen in
   no_region Ast.{sfunc}
 
+let module_key_gen =
+  let+ module_name = string_printable in
+  Instance.Module_key module_name
+
 let module_key_and_instance_gen ?module_reg () =
   let module_reg =
     match module_reg with
     | None -> Instance.ModuleMap.create ()
     | Some module_reg -> module_reg
   in
-  let* module_name = string_printable in
-  let module_key = Instance.Module_key module_name in
+  let* module_key = module_key_gen in
   let* types = vector_gen func_type_gen in
   let* funcs = vector_gen @@ func_gen module_key in
   let* tables = vector_gen table_gen in
@@ -514,12 +517,12 @@ let module_key_and_instance_gen ?module_reg () =
 let module_gen ?module_reg () =
   map snd (module_key_and_instance_gen ?module_reg ())
 
-let frame_gen ~module_reg =
-  let* inst, _ = module_key_and_instance_gen ~module_reg () in
+let frame_gen ~module_reg:_ =
+  let* inst = module_key_gen in
   let+ locals = small_vector_gen value_gen in
   Eval.{inst; locals}
 
-let rec admin_instr'_gen ~module_reg =
+let rec admin_instr'_gen ~module_reg:_ =
   let open Eval in
   let from_block_gen =
     let* block = block_label_gen in
@@ -535,7 +538,7 @@ let rec admin_instr'_gen ~module_reg =
     Refer ref_
   in
   let invoke_gen =
-    let* inst, _ = module_key_and_instance_gen ~module_reg () in
+    let* inst = module_key_gen in
     let+ func = func_gen inst in
     Invoke func
   in
@@ -859,4 +862,4 @@ let buffers_gen =
 let config_gen ~host_funcs ~module_reg =
   let* stack_size_limit = small_int in
   let+ step_kont = step_kont_gen ~module_reg in
-  Eval.{step_kont; host_funcs; stack_size_limit}
+  Eval.{step_kont; host_funcs; stack_size_limit; module_reg}

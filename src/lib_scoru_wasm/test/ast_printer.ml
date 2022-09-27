@@ -623,10 +623,17 @@ let pp_buffers out Eval.{input; output} =
     pp_output_buffer
     output
 
-let pp_config out Eval.{step_kont; host_funcs = _; stack_size_limit} =
+let pp_module_registry out reg =
+  let reg = Instance.ModuleMap.snapshot reg in
+  Instance.ModuleMap.Map.pp pp_module out reg
+
+let pp_config out Eval.{step_kont; host_funcs = _; stack_size_limit; module_reg}
+    =
   Format.fprintf
     out
-    "@[<v 2>{frame_kont = %a;@;budget = %i;@;}@]"
+    "@[<v 2>{frame_kont = %a;@;budget = %i;@;module_registry = %a;@;}@]"
     pp_step_kont
     step_kont
     stack_size_limit
+    pp_module_registry
+    module_reg
