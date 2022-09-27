@@ -61,101 +61,95 @@ module Encodings = struct
   let hex_string = conv Bytes.of_string Bytes.to_string bytes
 end
 
+module Arg = struct
+  type block_id = [`Head | `Hash of Block_hash.t | `Level of Int32.t]
+
+  let construct_block_id = function
+    | `Head -> "head"
+    | `Hash h -> Block_hash.to_b58check h
+    | `Level l -> Int32.to_string l
+
+  let destruct_block_id h =
+    match h with
+    | "head" -> Ok `Head
+    | _ -> (
+        match Int32.of_string_opt h with
+        | Some l -> Ok (`Level l)
+        | None -> (
+            match Block_hash.of_b58check_opt h with
+            | Some b -> Ok (`Hash b)
+            | None -> Error "Cannot parse block id"))
+
+  let block_id : block_id RPC_arg.t =
+    RPC_arg.make
+      ~descr:"An L1 block identifier."
+      ~name:"block_id"
+      ~construct:construct_block_id
+      ~destruct:destruct_block_id
+      ()
+end
+
+module type PREFIX = sig
+  type prefix
+
+  val prefix : (unit, prefix) RPC_path.t
+end
+
+module Make_services (P : PREFIX) = struct
+  include P
+
+  let path : prefix RPC_path.context = RPC_path.open_root
+
+  let make_call s = RPC_context.make_call (RPC_service.prefix prefix s)
+
+  let make_call1 s = RPC_context.make_call1 (RPC_service.prefix prefix s)
+
+  let make_call2 s = RPC_context.make_call2 (RPC_service.prefix prefix s)
+end
+
 module Global = struct
   open RPC_path
 
-  let prefix = root / "global"
+  include Make_services (struct
+    type prefix = unit
+
+    let prefix = open_root / "global"
+  end)
 
   let sc_rollup_address =
     RPC_service.get_service
       ~description:"Smart-contract rollup address"
       ~query:RPC_query.empty
       ~output:Sc_rollup.Address.encoding
-      (prefix / "sc_rollup_address")
+      (path / "sc_rollup_address")
 
   let current_tezos_head =
     RPC_service.get_service
       ~description:"Tezos head known to the smart-contract rollup node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Block_hash.encoding)
-      (prefix / "tezos_head")
+      (path / "tezos_head")
 
   let current_tezos_level =
     RPC_service.get_service
       ~description:"Tezos level known to the smart-contract rollup node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Data_encoding.int32)
-      (prefix / "tezos_level")
-
-  let current_inbox =
-    RPC_service.get_service
-      ~description:"Current inbox"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Sc_rollup.Inbox.encoding)
-      (prefix / "inbox")
-
-  let current_ticks =
-    RPC_service.get_service
-      ~description:"Current number of ticks for current level"
-      ~query:RPC_query.empty
-      ~output:Data_encoding.z
-      (prefix / "ticks")
-
-  let current_total_ticks =
-    RPC_service.get_service
-      ~description:"Current total number of ticks"
-      ~query:RPC_query.empty
-      ~output:Sc_rollup.Tick.encoding
-      (prefix / "total_ticks")
-
-  let current_num_messages =
-    RPC_service.get_service
-      ~description:"Current number of messages"
-      ~query:RPC_query.empty
-      ~output:Data_encoding.z
-      (prefix / "current_num_messages")
-
-  let current_state_hash =
-    RPC_service.get_service
-      ~description:"Current state hash"
-      ~query:RPC_query.empty
-      ~output:Sc_rollup.State_hash.encoding
-      (prefix / "state_hash")
+      (path / "tezos_level")
 
   let last_stored_commitment =
     RPC_service.get_service
       ~description:"Last commitment computed by the node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
-      (prefix / "last_stored_commitment")
+      (path / "last_stored_commitment")
 
-  let current_status =
+  let outbox =
     RPC_service.get_service
-      ~description:"Current PVM status"
-      ~query:RPC_query.empty
-      ~output:Data_encoding.string
-      (prefix / "status")
-
-  let current_outbox =
-    RPC_service.get_service
-      ~description:"Current outbox"
+      ~description:"Outbox at block"
       ~query:RPC_query.empty
       ~output:Data_encoding.(list Sc_rollup.output_encoding)
-      (prefix / "outbox")
-
-  let dal_slot_subscriptions =
-    RPC_service.get_service
-      ~description:"Current data availability layer slot subscriptions"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.list Dal.Slot_index.encoding)
-      (prefix / "dal" / "slot_subscriptions")
-
-  let dal_slots =
-    RPC_service.get_service
-      ~description:"Data availability slots for a given block hash"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.list Dal.Slot.Header.encoding)
-      (prefix / "dal" / "slot_headers")
+      (path / "outbox")
 
   let outbox_proof_query =
     let open RPC_query in
@@ -207,63 +201,149 @@ module Global = struct
           obj2
             (req "commitment" Sc_rollup.Commitment.Hash.encoding)
             (req "proof" Encodings.hex_string))
-      (prefix / "proofs" / "outbox")
+      (path / "proofs" / "outbox")
 
-  let dal_slot_pages =
-    RPC_service.get_service
-      ~description:
-        "Data availability downloaded slot pages for a given block hash"
-      ~query:RPC_query.empty
-      ~output:
-        (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
-             Estimate size of binary encoding and add a check_size to the
-           encoding. *)
-        Data_encoding.(
-          list
-          @@ obj2
-               (req "index" Dal.Slot_index.encoding)
-               (req "contents" (list @@ option Dal.Page.content_encoding)))
-      (prefix / "dal" / "slot_pages")
+  module Block = struct
+    include Make_services (struct
+      type prefix = unit * Arg.block_id
 
-  type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
+      let prefix = prefix / "block" /: Arg.block_id
+    end)
 
-  let dal_slot_page_query =
-    let open RPC_query in
-    let req name f = function
-      | None ->
-          raise (Invalid (Format.sprintf "Query parameter %s is required" name))
-      | Some arg -> f arg
-    in
-    let invalid_parameter i =
-      raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
-    in
-    query (fun raw_index raw_page ->
-        let index = req "index" Dal.Slot_index.of_int raw_index in
-        let page = req "page" (fun p -> p) raw_page in
-        match index with
-        | None -> invalid_parameter @@ Option.value ~default:0 raw_index
-        | Some index ->
-            if page < 0 then invalid_parameter page else {index; page})
-    |+ opt_field "index" RPC_arg.int (fun q ->
-           Some (Dal.Slot_index.to_int q.index))
-    |+ opt_field "slot_page" RPC_arg.int (fun q -> Some q.page)
-    |> seal
+    let inbox =
+      RPC_service.get_service
+        ~description:"Rollup inbox for block"
+        ~query:RPC_query.empty
+        ~output:Sc_rollup.Inbox.encoding
+        (path / "inbox")
 
-  let dal_slot_page =
-    RPC_service.get_service
-      ~description:
-        "Data availability downloaded slot pages for a given block hash"
-      ~query:dal_slot_page_query
-      ~output:
-        Data_encoding.(
-          obj2 (req "result" string) (opt "contents" Dal.Page.content_encoding))
-      (prefix / "dal" / "slot_page")
+    let ticks =
+      RPC_service.get_service
+        ~description:"Number of ticks for specified level"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.z
+        (path / "ticks")
+
+    let total_ticks =
+      RPC_service.get_service
+        ~description:"Total number of ticks at specified block"
+        ~query:RPC_query.empty
+        ~output:Sc_rollup.Tick.encoding
+        (path / "total_ticks")
+
+    let num_messages =
+      RPC_service.get_service
+        ~description:"Number of messages for specified block"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.z
+        (path / "num_messages")
+
+    let state_hash =
+      RPC_service.get_service
+        ~description:"State hash for this block"
+        ~query:RPC_query.empty
+        ~output:Sc_rollup.State_hash.encoding
+        (path / "state_hash")
+
+    type state_value_query = {key : string}
+
+    let state_value_query : state_value_query RPC_query.t =
+      let open RPC_query in
+      query (fun key -> {key})
+      |+ field "key" RPC_arg.string "" (fun t -> t.key)
+      |> seal
+
+    let state_value =
+      RPC_service.get_service
+        ~description:"Retrieve value from key is PVM state of specified block"
+        ~query:state_value_query
+        ~output:Data_encoding.bytes
+        (path / "state")
+
+    let status =
+      RPC_service.get_service
+        ~description:"PVM status at block"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.string
+        (path / "status")
+
+    let dal_slot_subscriptions =
+      RPC_service.get_service
+        ~description:"Data availability layer slot subscriptions at block"
+        ~query:RPC_query.empty
+        ~output:Data_encoding.(option @@ list Dal.Slot_index.encoding)
+        (path / "dal" / "slot_subscriptions")
+
+    let dal_slots =
+      RPC_service.get_service
+        ~description:"Availability slots for a given block"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.list Dal.Slot.Header.encoding)
+        (path / "dal" / "slot_headers")
+
+    let dal_slot_pages =
+      RPC_service.get_service
+        ~description:
+          "Data availability downloaded slot pages for a given block hash"
+        ~query:RPC_query.empty
+        ~output:
+          (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
+               Estimate size of binary encoding and add a check_size to the
+             encoding. *)
+          Data_encoding.(
+            list
+            @@ obj2
+                 (req "index" Dal.Slot_index.encoding)
+                 (req "contents" (list @@ option Dal.Page.content_encoding)))
+        (path / "dal" / "slot_pages")
+
+    type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
+
+    let dal_slot_page_query =
+      let open RPC_query in
+      let req name f = function
+        | None ->
+            raise
+              (Invalid (Format.sprintf "Query parameter %s is required" name))
+        | Some arg -> f arg
+      in
+      let invalid_parameter i =
+        raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
+      in
+      query (fun raw_index raw_page ->
+          let index = req "index" Dal.Slot_index.of_int raw_index in
+          let page = req "page" (fun p -> p) raw_page in
+          match index with
+          | None -> invalid_parameter @@ Option.value ~default:0 raw_index
+          | Some index ->
+              if page < 0 then invalid_parameter page else {index; page})
+      |+ opt_field "index" RPC_arg.int (fun q ->
+             Some (Dal.Slot_index.to_int q.index))
+      |+ opt_field "slot_page" RPC_arg.int (fun q -> Some q.page)
+      |> seal
+
+    let dal_slot_page =
+      RPC_service.get_service
+        ~description:
+          "Data availability downloaded slot pages for a given block hash"
+        ~query:dal_slot_page_query
+        ~output:
+          Data_encoding.(
+            obj2
+              (req "result" string)
+              (opt "contents" Dal.Page.content_encoding))
+        (path / "dal" / "slot_page")
+  end
 end
 
 module Local = struct
   open RPC_path
 
-  let prefix = root / "local"
+  include Make_services (struct
+    type prefix = unit
+
+    let prefix = open_root / "local"
+  end)
 
   (* commitments are published only if their inbox level is above the last
      cemented commitment level inbox level. Because this information is
@@ -280,20 +360,5 @@ module Local = struct
       ~description:"Last commitment published by the node"
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
-      (prefix / "last_published_commitment")
-
-  type state_value_query = {key : string}
-
-  let state_value_query : state_value_query RPC_query.t =
-    let open RPC_query in
-    query (fun key -> {key})
-    |+ field "key" RPC_arg.string "" (fun t -> t.key)
-    |> seal
-
-  let current_state_value =
-    RPC_service.get_service
-      ~description:"Current state value"
-      ~query:state_value_query
-      ~output:Data_encoding.bytes
-      RPC_path.(root / "state")
+      (path / "last_published_commitment")
 end

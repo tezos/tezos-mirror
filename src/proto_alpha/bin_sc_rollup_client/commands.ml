@@ -44,7 +44,7 @@ let get_state_value_command () =
     @@ string ~name:"key" ~desc:"The key of the state value"
     @@ stop)
     (fun () key (cctxt : #Configuration.sc_client_context) ->
-      RPC.get_state_value_command cctxt key >>=? fun bytes ->
+      RPC.get_state_value_command cctxt `Head key >>=? fun bytes ->
       cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
 
 (** [display_answer cctxt answer] prints an RPC answer. *)
