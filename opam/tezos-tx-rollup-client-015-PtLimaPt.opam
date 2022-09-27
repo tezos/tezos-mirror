@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
+  "tezos-clic"
   "tezos-protocol-015-PtLimaPt"
   "tezos-client-015-PtLimaPt"
   "tezos-client-base-unix"
