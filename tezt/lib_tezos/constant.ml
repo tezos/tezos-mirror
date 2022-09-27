@@ -32,7 +32,7 @@ let tezos_node = "./tezos-node"
 
 let tezos_proxy_server = "./tezos-proxy-server"
 
-let tezos_codec = "./tezos-codec"
+let tezos_codec = "./octez-codec"
 
 let tezos_snoop = "./tezos-snoop"
 

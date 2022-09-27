@@ -1,5 +1,5 @@
 
-./tezos-codec encode 013-PtJakart.level from '{
+./octez-codec encode 013-PtJakart.level from '{
   "level": 1331,
   "level_position": 2147483647,
   "cycle": 300,
@@ -8,6 +8,6 @@
 }'
 000005337fffffff0000012c00000258ff
 
-./tezos-codec decode 013-PtJakart.level from 000005337fffffff0000012c00000258ff
+./octez-codec decode 013-PtJakart.level from 000005337fffffff0000012c00000258ff
 { "level": 1331, "level_position": 2147483647, "cycle": 300,
   "cycle_position": 600, "expected_commitment": true }
