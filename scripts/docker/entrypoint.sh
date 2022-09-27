@@ -41,7 +41,7 @@ case $command in
     octez-node|tezos-node)
         launch_node "$@"
         ;;
-    tezos-upgrade-storage)
+    octez-upgrade-storage|tezos-upgrade-storage)
         upgrade_node_storage
         ;;
     tezos-snapshot-import)
@@ -104,7 +104,7 @@ Clients:
 - octez-admin-client
 
 Commands:
-  - tezos-upgrade-storage
+  - octez-upgrade-storage
   - tezos-snapshot-import [args]
     Import a snapshot. The snapshot must be available in the file /snapshot
     Using docker run, you can make it available using the command :
