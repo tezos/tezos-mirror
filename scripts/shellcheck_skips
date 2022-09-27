@@ -14,6 +14,6 @@ scripts/update_opam_repo.sh
 scripts/user_activated_upgrade.sh
 src/bin_client/bash-completion.sh
 src/bin_client/tezos-init-sandboxed-client.sh
-src/bin_node/tezos-sandboxed-node.sh
+src/bin_node/octez-sandboxed-node.sh
 src/lib_store/unix/test/generate_locator_plot.sh
 src/lib_webassembly/bin/test/meta/noderun.sh
