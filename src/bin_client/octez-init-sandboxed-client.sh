@@ -133,10 +133,10 @@ main () {
 
     else
         # we assume a clean install with tezos-(admin-)client in the path
-        local_client="${local_client:-$(which tezos-client)}"
-        local_admin_client="${local_admin_client:-$(which tezos-admin-client)}"
-        local_signer="${local_signer:-$(which tezos-signer)}"
-        local_compiler="${local_compiler:-$(which tezos-protocol-compiler)}"
+        local_client="${local_client:-$(which octez-client)}"
+        local_admin_client="${local_admin_client:-$(which octez-admin-client)}"
+        local_signer="${local_signer:-$(which octez-signer)}"
+        local_compiler="${local_compiler:-$(which octez-protocol-compiler)}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
@@ -150,13 +150,13 @@ main () {
 
     mkdir -p $client_dir/bin
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-client
-    echo "exec $client \"\$@\"" >> $client_dir/bin/tezos-client
-    chmod +x $client_dir/bin/tezos-client
+    echo '#!/bin/sh' > $client_dir/bin/octez-client
+    echo "exec $client \"\$@\"" >> $client_dir/bin/octez-client
+    chmod +x $client_dir/bin/octez-client
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-admin-client
-    echo "exec $admin_client \"\$@\""  >> $client_dir/bin/tezos-admin-client
-    chmod +x $client_dir/bin/tezos-admin-client
+    echo '#!/bin/sh' > $client_dir/bin/octez-admin-client
+    echo "exec $admin_client \"\$@\""  >> $client_dir/bin/octez-admin-client
+    chmod +x $client_dir/bin/octez-admin-client
 
     for protocol in $(cat $bin_dir/../../script-inputs/active_protocol_versions); do
         protocol_underscore=$(echo $protocol | tr -- - _)
@@ -187,27 +187,27 @@ main () {
         chmod +x $client_dir/bin/tezos-accuser-$protocol
     done
 
-    echo '#!/bin/sh' > $client_dir/bin/tezos-signer
-    echo "exec $signer \"\$@\""  >> $client_dir/bin/tezos-signer
-    chmod +x $client_dir/bin/tezos-signer
+    echo '#!/bin/sh' > $client_dir/bin/octez-signer
+    echo "exec $signer \"\$@\""  >> $client_dir/bin/octez-signer
+    chmod +x $client_dir/bin/octez-signer
 
     cat <<EOF
-if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
+if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
 alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
-alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
+alias octez-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha octez-client-reset" ;
 alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
-trap tezos-client-reset EXIT ;
+trap octez-client-reset EXIT ;
 
 EOF
 
     (cat | sed -e 's/^/## /') 1>&2 <<EOF
 
 The client is now properly initialized. In the rest of this shell
-session, you might now run \`tezos-client\` to communicate with a
+session, you might now run \`octez-client\` to communicate with a
 tezos node launched with \`launch-sandboxed-node $1\`. For instance:
 
-  tezos-client rpc get /chains/main/blocks/head/metadata
+  octez-client rpc get /chains/main/blocks/head/metadata
 
 Note: if the current protocol version, as reported by the previous
 command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
