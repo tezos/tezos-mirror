@@ -135,25 +135,10 @@ simple procedure which has as its initial state: the level, the
 :ref:`random seed<random_seed_lima>` for the cycle to which the
 level belongs, and the slot.
 
-
-.. _protocol_constants_lima:
-
-Protocol constants
-------------------
-
-Protocols are parameterized by several parameters called *protocol constants*, which may vary from one protocol to another or from one network to another (for instance, test networks move faster).
-
-The list of protocol constants can be found in the API of the `Constants module <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`__.
-
-The values of protocol constants can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
-
-In particular, the protocol constants related to the proof-of-stake mechanism are detailed :ref:`below <ps_constants_lima>`.
-Other important subsystems of the protocol have their own list of protocol constants, such as the :ref:`consensus-related parameters <cs_constants_lima>` and the :ref:`randomness generation parameters <rg_constants_lima>`.
-
 .. _ps_constants_lima:
 
 Proof-of-stake parameters
-^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------
 
 .. list-table::
    :widths: 55 25
