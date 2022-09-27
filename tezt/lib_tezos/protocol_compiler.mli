@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Run tezos-protocol-compiler commands. *)
+(** Run octez-protocol-compiler commands. *)
 
 (** In all functions below, [path] can be used to override the path
-    to [tezos-protocol-compiler], which is [Constant.tezos_protocol_compiler]
+    to [octez-protocol-compiler], which is [Constant.tezos_protocol_compiler]
     by default. *)
 
-(** Run [tezos-protocol-compiler <protocol_dir>] and return the hash
+(** Run [octez-protocol-compiler <protocol_dir>] and return the hash
     of the compiled protocol.
 
     If [hash_only] is set, then pass [-hash-only] to the protocol

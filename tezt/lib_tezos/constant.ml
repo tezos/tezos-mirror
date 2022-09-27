@@ -36,7 +36,7 @@ let tezos_codec = "./octez-codec"
 
 let tezos_snoop = "./octez-snoop"
 
-let tezos_protocol_compiler = "./tezos-protocol-compiler"
+let tezos_protocol_compiler = "./octez-protocol-compiler"
 
 let sc_rollup_node = "./octez-sc-rollup-node-alpha"
 
