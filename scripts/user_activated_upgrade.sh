@@ -87,10 +87,10 @@ else {
 }}' src/bin_node/node_config_file.ml > tmp_file
     mv tmp_file src/bin_node/node_config_file.ml
 
-    sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/tezos-init-sandboxed-client.sh
-    sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/tezos-init-sandboxed-client.sh
-    sed -i.old "s/tezos-activate-alpha/tezos-activate-${pred}-${pred_short_hash}/" src/bin_client/tezos-init-sandboxed-client.sh
-    sed -i.old "s/activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK/activate protocol $pred_full_hash/" src/bin_client/tezos-init-sandboxed-client.sh
-    rm src/bin_client/tezos-init-sandboxed-client.sh.old
+    sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/octez-init-sandboxed-client.sh
+    sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/octez-init-sandboxed-client.sh
+    sed -i.old "s/tezos-activate-alpha/tezos-activate-${pred}-${pred_short_hash}/" src/bin_client/octez-init-sandboxed-client.sh
+    sed -i.old "s/activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK/activate protocol $pred_full_hash/" src/bin_client/octez-init-sandboxed-client.sh
+    rm src/bin_client/octez-init-sandboxed-client.sh.old
     echo "The sandbox will now switch to $full_hash at level $level."
 fi

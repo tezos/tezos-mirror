@@ -302,7 +302,7 @@ The script detected that you will do a migration on the sandbox."
         echo "
 Use the following commands to start the sandboxed node:
 $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
-$ eval \`./src/bin_client/tezos-init-sandboxed-client.sh 1\`
+$ eval \`./src/bin_client/octez-init-sandboxed-client.sh 1\`
 $ tezos-activate-${pred_proto_version}-${pred_short_hash}
 
 Then bake blocks until the chain reaches level $mig_level with:
