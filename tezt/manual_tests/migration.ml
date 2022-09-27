@@ -114,7 +114,7 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     protocol
     context ;
   Log.info "Copying context into a temporary directory" ;
-  let data_dir = Temp.dir "tezos-node-test" in
+  let data_dir = Temp.dir "octez-node-test" in
   let* () = Process.run "cp" ["-R"; context ^ "/."; data_dir] in
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
@@ -180,7 +180,7 @@ let protocol =
 let context =
   let default =
     let home = Sys.getenv "HOME" in
-    home ^ "/tezos-node-test"
+    home ^ "/octez-node-test"
   in
   Option.value ~default (Sys.getenv_opt "TEZT_MIGRATION_TEST_CONTEXT")
 

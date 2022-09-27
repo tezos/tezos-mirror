@@ -37,7 +37,7 @@ let protocol_path = "src/bin_client/test/proto_test_injection"
 let is_static_binary execname =
   let* output = Process.run_and_read_stdout "file" [execname] in
   (* Example of line returned by "file": *)
-  (* tezos-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), *)
+  (* octez-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), *)
   (* statically linked, no section header *)
   return (output =~ rex "statically linked")
 

@@ -28,7 +28,7 @@ let tezos_client = "./octez-client"
 
 let tezos_admin_client = "./tezos-admin-client"
 
-let tezos_node = "./tezos-node"
+let tezos_node = "./octez-node"
 
 let tezos_proxy_server = "./tezos-proxy-server"
 

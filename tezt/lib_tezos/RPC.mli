@@ -64,7 +64,7 @@ include module type of RPC_legacy
 
 (** {2 RPC Definitions} *)
 
-(** RPCs for [tezos-node] *)
+(** RPCs for [octez-node] *)
 type 'a t = (Node.t, 'a) RPC_core.t
 
 (** RPC: [GET /config] *)
