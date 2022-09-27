@@ -20,7 +20,7 @@ BINARIES = [
     "tezos-client",
     "tezos-admin-client",
     "tezos-protocol-compiler",
-    "tezos-node",
+    "octez-node",
     "tezos-snoop",
     "tezos-validator",
 ] + PROTO_BINARIES

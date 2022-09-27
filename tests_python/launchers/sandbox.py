@@ -8,7 +8,7 @@ from daemons.endorser import Endorser
 from daemons.accuser import Accuser
 from daemons.node import Node
 
-NODE = 'tezos-node'
+NODE = 'octez-node'
 CLIENT = 'tezos-client'
 CLIENT_ADMIN = 'tezos-admin-client'
 BAKER = 'tezos-baker'
@@ -120,7 +120,7 @@ class Sandbox:
         This node isn't run yet, but is "prepared" with the following
         parameters.
 
-        tezos-node run
+        octez-node run
            --data-dir TMP_DIR
            --no-bootstrap-peers
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
@@ -337,7 +337,7 @@ class Sandbox:
         This registers a node and a client for the given id. It initializes
         both the client and the node, and run the node.
 
-        tezos-node run
+        octez-node run
            --data-dir TMP_DIR
            --no-bootstrap-peers
            --peer TRUSTED_PEER_1 ... --peer TRUSTED_PEER_n #
