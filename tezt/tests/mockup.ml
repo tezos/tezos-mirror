@@ -879,6 +879,38 @@ let test_config_init_mockup_fail =
   Check.file_not_exists ~__LOC__ bootstrap_accounts ;
   unit
 
+(* Variant of test_transfer that uses RPCs to get the balances. *)
+let test_transfer_rpc =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup transfer RPC."
+    ~tags:["mockup"; "client"; "transfer"; "rpc"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let get_balance (key : Account.key) =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance ~id:key.public_key_hash ()
+  in
+  let giver = Account.Bootstrap.keys.(0) in
+  let receiver = Account.Bootstrap.keys.(1) in
+  let amount = Tez.one in
+  let* giver_balance_before = get_balance giver in
+  let* receiver_balance_before = get_balance receiver in
+  let* () =
+    Client.transfer ~amount ~giver:giver.alias ~receiver:receiver.alias client
+  in
+  let* giver_balance_after = get_balance giver in
+  let* receiver_balance_after = get_balance receiver in
+  Check.(giver_balance_after < Tez.(giver_balance_before - amount))
+    Tez.typ
+    ~__LOC__
+    ~error_msg:"Expected giver balance < %R, got %L" ;
+  Check.(receiver_balance_after = Tez.(receiver_balance_before + amount))
+    Tez.typ
+    ~__LOC__
+    ~error_msg:"Expected receiver balance = %R, got %L" ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -900,7 +932,8 @@ let register ~protocols =
   test_config_show_mockup protocols ;
   test_config_show_mockup_fail protocols ;
   test_config_init_mockup protocols ;
-  test_config_init_mockup_fail protocols
+  test_config_init_mockup_fail protocols ;
+  test_transfer_rpc protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
