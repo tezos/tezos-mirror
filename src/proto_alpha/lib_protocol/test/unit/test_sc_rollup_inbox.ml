@@ -905,6 +905,7 @@ let tests =
          result"
       (let open QCheck2.Gen in
       let* origination_level = small_nat in
+      let origination_level = succ origination_level in
       let* offset = small_nat in
       let snapshot_level = origination_level + offset + 1 in
       return (origination_level, snapshot_level))
