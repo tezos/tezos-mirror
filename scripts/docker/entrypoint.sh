@@ -56,7 +56,7 @@ case $command in
     tezos-endorser)
         launch_endorser "$@"
         ;;
-    tezos-endorser-test)
+    octez-endorser-test|tezos-endorser-test)
         launch_endorser_test "$@"
         ;;
     tezos-accuser)
@@ -96,7 +96,7 @@ Daemons:
 - octez-baker [keys]
 - octez-baker-test [keys]
 - tezos-endorser [keys]
-- tezos-endorser-test [keys]
+- octez-endorser-test [keys]
 
 Clients:
 - octez-client [args]
