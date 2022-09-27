@@ -387,7 +387,3 @@ Internal
 
 - Make Micheline serialization gas accounting consistent by construction.
   (MR :gl:`!6403`)
-
-- Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
-
-- Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
