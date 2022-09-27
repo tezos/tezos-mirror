@@ -82,10 +82,24 @@ clean_private_rpc () {
 }
 
 # Convert the RPC descriptions.
-dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $api_json | clean_private_rpc "$@" > $openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+     "$version" \
+     "Octez RPC" \
+     "The RPC API served by the Octez node." \
+     $api_json \
+    | clean_private_rpc "$@" > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $proto_api_json | clean_private_rpc "$@" > $proto_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+     "$version" \
+     "Octez Protocol $protocol_name RPC" \
+     "The RPC API for protocol $protocol_name served by the Octez node." \
+     $proto_api_json \
+    | clean_private_rpc "$@" > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $mempool_api_json | clean_private_rpc "$@" > $mempool_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- \
+     "$version" \
+     "Octez Mempool RPC" "The RPC API for the mempool served by the Octez node." \
+     $mempool_api_json \
+    | clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"
