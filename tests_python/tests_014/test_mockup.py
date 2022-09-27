@@ -1,4 +1,4 @@
-""" This file tests the mockup mode (tezos-client --mode mockup).
+""" This file tests the mockup mode (octez-client --mode mockup).
     In this mode the client does not need a node running.
 
     Make sure to either use the fixture mockup_client or
@@ -44,7 +44,7 @@ _PC_FLAG = "protocol-constants"
 def test_create_mockup_custom_constants(
     sandbox: Sandbox, chain_id: str, initial_timestamp: str
 ):
-    """Tests `tezos-client create mockup` --protocols-constants  argument
+    """Tests `octez-client create mockup` --protocols-constants  argument
     The call must succeed.
 
     Args:
@@ -54,7 +54,7 @@ def test_create_mockup_custom_constants(
     """
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir, tempfile.NamedTemporaryFile(
         prefix='tezos-custom-constants', mode='w+t'
     ) as json_file:
@@ -106,14 +106,14 @@ def _create_accounts_list():
 
 @pytest.mark.client
 def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
-    """Tests `tezos-client create mockup` --bootstrap-accounts argument
+    """Tests `octez-client create mockup` --bootstrap-accounts argument
     The call must succeed.
     """
     accounts_list = _create_accounts_list()
 
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir, tempfile.NamedTemporaryFile(
         prefix='tezos-bootstrap-accounts', mode='w+t'
     ) as json_file:
@@ -134,7 +134,7 @@ def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
 
 @pytest.mark.client
 def test_transfer_bad_base_dir(sandbox: Sandbox):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
+    """Executes `octez-client --base-dir /tmp/mdir create mockup`
     when /tmp/mdir looks like a dubious base directory.
     Checks that a warning is printed.
     """
@@ -172,7 +172,7 @@ def test_transfer_bad_base_dir(sandbox: Sandbox):
 
 @pytest.mark.client
 def test_config_show_mockup(mockup_client: Client):
-    """Executes `tezos-client --mode mockup config show` in
+    """Executes `octez-client --mode mockup config show` in
     a state where it should succeed.
     """
     mockup_client.run_generic(["--protocol", protocol.HASH, "config", "show"])
@@ -180,7 +180,7 @@ def test_config_show_mockup(mockup_client: Client):
 
 @pytest.mark.client
 def test_config_show_mockup_fail(mockup_client: Client):
-    """Executes `tezos-client --mode mockup config show` when
+    """Executes `octez-client --mode mockup config show` when
     base dir is NOT a mockup. It should fail as this is dangerous
     (the default base directory could contain sensitive data,
      such as private keys)
@@ -198,7 +198,7 @@ def test_config_show_mockup_fail(mockup_client: Client):
 
 @pytest.mark.client
 def test_config_init_mockup(mockup_client: Client):
-    """Executes `tezos-client config init mockup` in
+    """Executes `octez-client config init mockup` in
     a state where it should succeed.
     """
     # We cannot use NamedTemporaryFile because `config init mockup`
@@ -233,7 +233,7 @@ def test_config_init_mockup(mockup_client: Client):
 
 @pytest.mark.client
 def test_config_init_mockup_fail(mockup_client: Client):
-    """Executes `tezos-client config init mockup` when
+    """Executes `octez-client config init mockup` when
     base dir is NOT a mockup. It should fail as this is dangerous
     (the default base directory could contain sensitive data,
      such as private keys)
@@ -426,7 +426,7 @@ def _test_create_mockup_init_show_roundtrip(
             with open(ba_file, 'w') as handle:
                 handle.write(bootstrap_json)
 
-        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
@@ -470,19 +470,19 @@ def _test_create_mockup_init_show_roundtrip(
 
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir, tempfile.NamedTemporaryFile(
         prefix='tezos-bootstrap-accounts', mode='w+t'
     ) as ba_json_file, tempfile.NamedTemporaryFile(
         prefix='tezos-proto-consts', mode='w+t'
     ) as pc_json_file, tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir:
 
         write_file(ba_json_file, ba_str)
         write_file(pc_json_file, pc_str)
 
-        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
@@ -709,7 +709,7 @@ def test_proto_mix(
     """
     proto1 = protos[0]
     proto2 = protos[1]
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+    with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
         # Follow pattern of mockup_client fixture:
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(protocol=proto1)

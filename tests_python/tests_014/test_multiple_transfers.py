@@ -1,4 +1,4 @@
-"""Test the multiple transfer feature of tezos-client"""
+"""Test the multiple transfer feature of octez-client"""
 import os
 import json
 import pytest

@@ -197,11 +197,11 @@ class TestConfigInit:
         works and yields valid json.
         """
         try:
-            out_file = tempfile.mktemp(prefix='tezos-client.config_file')
+            out_file = tempfile.mktemp(prefix='octez-client.config_file')
             in_file = None
 
             if config_dict is not None:
-                in_file = tempfile.mktemp(prefix='tezos-client.config_file')
+                in_file = tempfile.mktemp(prefix='octez-client.config_file')
                 _write_config_file(nodeless_client, in_file, config_dict)
 
             cmd = _with_config_file_cmd(
@@ -220,8 +220,8 @@ class TestConfigInit:
         self, nodeless_client: Client, config_dict: Optional[dict]
     ):
         """Tests that calling `config init -o tmp_file` and
-        feeding its result to `tezos-client --config-file` works
-        and yields the same result (i.e. calling `tezos-client
+        feeding its result to `octez-client --config-file` works
+        and yields the same result (i.e. calling `octez-client
         --config-file tmp_file config init -o tmp_file2 yields
         a `tmp_file2` that is similar to `tmp_file`).
 
@@ -232,7 +232,7 @@ class TestConfigInit:
             if config_dict is None:
                 # Take initial json from default output of `config init`
 
-                tmp_file1 = tempfile.mktemp(prefix='tezos-client.config_file')
+                tmp_file1 = tempfile.mktemp(prefix='octez-client.config_file')
                 cmd = ["config", "init", "-o", tmp_file1]
                 nodeless_client.run(cmd)
                 with open(tmp_file1) as handle:
@@ -248,13 +248,13 @@ class TestConfigInit:
                 # Take initial json from config_dict
 
                 # Write config_dict to a file
-                tmp_file1 = tempfile.mktemp(prefix='tezos-client.config_file')
+                tmp_file1 = tempfile.mktemp(prefix='octez-client.config_file')
                 json1 = _write_config_file(
                     nodeless_client, tmp_file1, config_dict
                 )
 
             # Execute `config init -o`
-            tmp_file2 = tempfile.mktemp(prefix='tezos-client.config_file')
+            tmp_file2 = tempfile.mktemp(prefix='octez-client.config_file')
             cmd = _with_config_file_cmd(
                 tmp_file1, ["config", "init", "-o", tmp_file2]
             )
@@ -287,7 +287,7 @@ def _cmd_line_flag_to_json_field(cmd_line_flag: str):
 @pytest.mark.client
 @pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
 class TestConfigShow:
-    """Tests of `tezos-client config show`"""
+    """Tests of `octez-client config show`"""
 
     def test_config_show(
         self, nodeless_client: Client, config_dict: Optional[dict]
@@ -299,7 +299,7 @@ class TestConfigShow:
         try:
             tmp_file = None
             if config_dict is not None:
-                tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
+                tmp_file = tempfile.mktemp(prefix='octez-client.config_file')
                 _write_config_file(nodeless_client, tmp_file, config_dict)
 
             cmd = _with_config_file_cmd(tmp_file, ["config", "show"])
@@ -331,7 +331,7 @@ class TestConfigShow:
             in_file1 = None
             in_file2 = None
             if config_dict is not None:
-                in_file1 = tempfile.mktemp(prefix='tezos-client.config_file')
+                in_file1 = tempfile.mktemp(prefix='octez-client.config_file')
                 _write_config_file(nodeless_client, in_file1, config_dict)
 
             cmd = []
@@ -356,7 +356,7 @@ class TestConfigShow:
                     f" config show yielded {output_value}"
                 )
                 assert output_value == input_value, err_msg
-            in_file2 = tempfile.mktemp(prefix='tezos-client.config_file')
+            in_file2 = tempfile.mktemp(prefix='octez-client.config_file')
             # Write output of first call to `config show` to disk,
             # to pass it to second call below
             with open(in_file2, 'w') as handle:
@@ -380,7 +380,7 @@ class TestConfigShow:
 
 @pytest.mark.client
 class TestConfigValid:
-    """Tests of validity of tezos-client config"""
+    """Tests of validity of octez-client config"""
 
     def test_config_node_port(self, nodeless_client: Client):
         """
@@ -424,7 +424,7 @@ class TestConfigValid:
         self, nodeless_client: Client, config_dict: dict
     ):
         try:
-            tmp_file = tempfile.mktemp(prefix='tezos-client.config_file')
+            tmp_file = tempfile.mktemp(prefix='octez-client.config_file')
             _write_config_file(nodeless_client, tmp_file, config_dict)
 
             cmd = _with_config_file_cmd(tmp_file, ["config", "show"])

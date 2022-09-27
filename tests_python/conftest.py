@@ -154,7 +154,7 @@ def _wrap_path(binary: str) -> str:
     return res
 
 
-CLIENT = 'tezos-client'
+CLIENT = 'octez-client'
 CLIENT_ADMIN = 'tezos-admin-client'
 
 

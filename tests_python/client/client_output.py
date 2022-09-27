@@ -473,7 +473,7 @@ class ListMockupProtocols:
 @unique
 class CreateMockupResult(Enum):
     """
-    Possible behaviors of `tezos-client create mockup`
+    Possible behaviors of `octez-client create mockup`
     """
 
     ALREADY_INITIALIZED = auto()

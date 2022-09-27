@@ -20,7 +20,7 @@ class Client:
     """Client to a Tezos node.
 
     Manage the persistent client state and provides methods to call
-    tezos-client/tezos-admin-client commands, and return structured
+    octez-client/tezos-admin-client commands, and return structured
     representation of the client output.
 
     The most generic method to call the client is `run`. It calls the client
@@ -79,7 +79,7 @@ class Client:
         self._is_tmp_dir = base_dir is None
 
         if base_dir is None:
-            base_dir = tempfile.mkdtemp(prefix='tezos-client.')
+            base_dir = tempfile.mkdtemp(prefix='octez-client.')
             assert base_dir
         self.base_dir = base_dir
 
@@ -135,8 +135,8 @@ class Client:
         """Run an arbitrary command
 
         Args:
-            params (list): list of parameters given to the tezos-client,
-            admin (bool): False to call tezos-client, True to call
+            params (list): list of parameters given to the octez-client,
+            admin (bool): False to call octez-client, True to call
                           tezos-admin-client
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs

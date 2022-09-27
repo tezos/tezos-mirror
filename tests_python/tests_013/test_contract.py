@@ -1830,7 +1830,7 @@ class TestBadAnnotation:
         name = 'bad_annot.tz'
         contract = session[name]
 
-        # This was produced by running "tezos-client hash data '{ UNIT
+        # This was produced by running "octez-client hash data '{ UNIT
         # ; PAIR ; CAR %faa }' of type 'lambda unit unit'" and
         # replacing the two last bytes (that correspond to the two
         # 'a's at the end of the annotation) by the 0xff byte which is
@@ -1910,7 +1910,7 @@ class TestScriptHashOrigination:
 
 @pytest.mark.contract
 class TestScriptHashMultiple:
-    """Test tezos-client hash script with diffent number and type of
+    """Test octez-client hash script with diffent number and type of
     arguments"""
 
     def test_contract_hashes_empty(self, client: Client):

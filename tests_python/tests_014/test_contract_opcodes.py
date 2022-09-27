@@ -1481,7 +1481,7 @@ class TestContractOpcodes:
         assert run_script_res.storage == str(int(1000000 * balance))
 
     def test_now(self, client_regtest: ClientRegression):
-        """Test that the --now flag of 'tezos-client run script' affects the
+        """Test that the --now flag of 'octez-client run script' affects the
         value returned by the NOW instruction. See also
         test_contract_onchain_opcodes.py for a complementary test of the NOW
         instruction."""
@@ -1500,7 +1500,7 @@ class TestContractOpcodes:
         assert run_script_res.storage == f'"{now}"'
 
     def test_level(self, client_regtest: ClientRegression):
-        """Test that the --level flag of 'tezos-client run script' affects the
+        """Test that the --level flag of 'octez-client run script' affects the
         value returned by the LEVEL instruction. See also
         test_contract_onchain_opcodes.py for a complementary test of the LEVEL
         instuction."""

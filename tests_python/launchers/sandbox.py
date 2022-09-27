@@ -9,7 +9,7 @@ from daemons.accuser import Accuser
 from daemons.node import Node
 
 NODE = 'octez-node'
-CLIENT = 'tezos-client'
+CLIENT = 'octez-client'
 CLIENT_ADMIN = 'tezos-admin-client'
 BAKER = 'tezos-baker'
 ENDORSER = 'tezos-endorser'
