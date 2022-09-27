@@ -34,4 +34,4 @@ let register ((module Bench) : Benchmark.t) =
   Registration.register (module B)
 
 let register_for_codegen name model =
-  Registration.register_for_codegen (name ^ "_" ^ Protocol.name) model
+  Registration.register_for_codegen (name ^ "__" ^ Protocol.name) model

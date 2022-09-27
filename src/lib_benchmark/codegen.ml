@@ -219,6 +219,11 @@ let codegen (Model.For_codegen model) (sol : solution)
   match model with
   | Model.Preapplied _ -> None
   | Model.Packaged {conv = _; model} ->
+      let name =
+        (* This renaming is a short-term workaround
+           until we have proper namespaces for model registration. *)
+        Option.value (String.remove_suffix ~suffix:"__alpha" name) ~default:name
+      in
       let module M = (val model) in
       let comments =
         let module Sub =
