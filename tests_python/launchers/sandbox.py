@@ -13,7 +13,7 @@ CLIENT = 'octez-client'
 CLIENT_ADMIN = 'octez-admin-client'
 BAKER = 'octez-baker'
 ENDORSER = 'tezos-endorser'
-ACCUSER = 'tezos-accuser'
+ACCUSER = 'octez-accuser'
 
 
 class Sandbox:
