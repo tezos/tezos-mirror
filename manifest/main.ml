@@ -2913,8 +2913,14 @@ let octez_benchmark_examples =
       ]
 
 let _octez_benchmark_tests =
-  test
-    "main_ci"
+  tests
+    [
+      "test_sparse_vec";
+      "test_costlang";
+      "test_probe";
+      "test_measure";
+      "test_benchmark_helpers";
+    ]
     ~path:"src/lib_benchmark/test"
     ~opam:"tezos-benchmark-tests"
     ~synopsis:"Tezos: tests for lib-benchmarks"

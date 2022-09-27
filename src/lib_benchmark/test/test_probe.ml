@@ -147,3 +147,5 @@ let do_bench () =
   true
 
 let tests = [Test.tztest_assert "probing bench" `Quick do_bench]
+
+let () = Alcotest_lwt.run "tezos-benchmark" [("probe", tests)] |> Lwt_main.run

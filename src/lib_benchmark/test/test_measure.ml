@@ -51,3 +51,5 @@ let tests =
       `Quick
       test_parse_config;
   ]
+
+let () = Alcotest_lwt.run "tezos-benchmark" [("measure", tests)] |> Lwt_main.run

@@ -73,3 +73,6 @@ let tests =
     ( Test.tztest_assert "eval_absent" `Quick @@ fun () ->
       V.eval vec0 "lentilles" = 0.0 );
   ]
+
+let () =
+  Alcotest_lwt.run "tezos-benchmark" [("sparse_vec", tests)] |> Lwt_main.run
