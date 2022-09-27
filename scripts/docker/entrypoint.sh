@@ -50,7 +50,7 @@ case $command in
     tezos-baker)
         launch_baker "$@"
         ;;
-    tezos-baker-test)
+    octez-baker-test|tezos-baker-test)
         launch_baker_test "$@"
         ;;
     tezos-endorser)
@@ -94,7 +94,7 @@ Daemons:
   Initialize a new identity and run the tezos node.
 
 - tezos-baker [keys]
-- tezos-baker-test [keys]
+- octez-baker-test [keys]
 - tezos-endorser [keys]
 - tezos-endorser-test [keys]
 
