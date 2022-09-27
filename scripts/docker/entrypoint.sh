@@ -62,7 +62,7 @@ case $command in
     tezos-accuser)
         launch_accuser "$@"
         ;;
-    tezos-accuser-test)
+    octez-accuser-test|tezos-accuser-test)
         launch_accuser_test "$@"
         ;;
     octez-client|tezos-client)
