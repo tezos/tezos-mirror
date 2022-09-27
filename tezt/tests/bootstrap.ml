@@ -69,7 +69,7 @@ let bootstrapped_event =
    b) Otherwise, we check that both nodes synchronize. In full mode, we also check
    that the savepoint is higher than when Node 2 was killed. *)
 let check_bootstrap_with_history_modes hmode1 hmode2 =
-  (* Number of calls to [tezos-client bake for] once the protocol is activated,
+  (* Number of calls to [octez-client bake for] once the protocol is activated,
      before we kill [node_2]. *)
   let bakes_before_kill = 9 in
 
@@ -78,7 +78,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* TODO-TB: update the doc strings below, written for
      max_operations_ttl = 0. *)
 
-  (* Number of calls to [tezos-client bake for] while [node_2] is not
+  (* Number of calls to [octez-client bake for] while [node_2] is not
      running. This number is high enough so that it is bigger than the
      Last-Allowed-Fork-Level or the caboose.
 

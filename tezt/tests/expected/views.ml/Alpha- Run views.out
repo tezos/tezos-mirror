@@ -1,5 +1,5 @@
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none originate contract register_calls transferring 0 from bootstrap1 running '
+./octez-client --mode mockup --base-dir '<masked>' --wait none originate contract register_calls transferring 0 from bootstrap1 running '
 parameter unit;
 storage (list address);
 code {
@@ -19,7 +19,7 @@ Operation successfully injected in the node.
 Operation hash is 'ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -60,7 +60,7 @@ This sequence of operations was run:
 New contract KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 originated.
 Contract memorized as register_calls.
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none originate contract check_caller transferring 0 from bootstrap1 running '
+./octez-client --mode mockup --base-dir '<masked>' --wait none originate contract check_caller transferring 0 from bootstrap1 running '
 parameter address ;
 storage (option address) ;
 code {
@@ -94,7 +94,7 @@ Operation successfully injected in the node.
 Operation hash is 'oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -143,7 +143,7 @@ This sequence of operations was run:
 New contract KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 originated.
 Contract memorized as check_caller.
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
+./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
 Node is bootstrapped.
 Estimated gas: 4413.444 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -151,7 +151,7 @@ Operation successfully injected in the node.
 Operation hash is 'opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -177,7 +177,7 @@ This sequence of operations was run:
         KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 ... +ꜩ1
 
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 --burn-cap 1
+./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 2117.191 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
@@ -185,7 +185,7 @@ Operation successfully injected in the node.
 Operation hash is 'onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -213,7 +213,7 @@ This sequence of operations was run:
         KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 ... +ꜩ1
 
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
+./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
 Node is bootstrapped.
 Estimated gas: 4417.021 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
@@ -221,7 +221,7 @@ Operation successfully injected in the node.
 Operation hash is 'oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  octez-client wait for oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

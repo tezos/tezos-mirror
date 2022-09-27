@@ -231,13 +231,13 @@ module Spawn : sig
     JSON.t Runnable.process
 end
 
-(** Run [tezos-client rpc list]. *)
+(** Run [octez-client rpc list]. *)
 val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
 
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
 
-(** Run [tezos-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
+(** Run [octez-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
 val shell_header :
   ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> string Lwt.t
 
@@ -320,16 +320,16 @@ end
 
 (** {2 Regular Client Commands} *)
 
-(** Run [tezos-client --version]. *)
+(** Run [octez-client --version]. *)
 val version : t -> unit Lwt.t
 
 (** Same as [version], but do not wait for the process to exit. *)
 val spawn_version : t -> Process.t
 
-(** Run [tezos-client import secret key]. *)
+(** Run [octez-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
 
-(** Run [tezos-client import secret key] for remote signer. *)
+(** Run [octez-client import secret key] for remote signer. *)
 val import_signer_key :
   ?endpoint:endpoint -> ?force:bool -> t -> Account.key -> Uri.t -> unit Lwt.t
 
@@ -342,7 +342,7 @@ val spawn_import_signer_key :
 val spawn_import_secret_key :
   ?endpoint:endpoint -> t -> Account.key -> Process.t
 
-(** Run [tezos-client activate protocol].
+(** Run [octez-client activate protocol].
 
     If [timestamp] is not specified explicitely, it is set to [Ago
     timestamp_delay], where [timestamp_delay] is 365 days, which
@@ -407,7 +407,7 @@ val spawn_activate_protocol :
    will contain no operations. *)
 val empty_mempool_file : ?filename:string -> unit -> string
 
-(** Run [tezos-client bake for].
+(** Run [octez-client bake for].
 
     Default [key] is {!Constant.bootstrap1.alias}.
 
@@ -469,7 +469,7 @@ val spawn_bake_for :
   t ->
   Process.t
 
-(** Run [tezos-client endorse for].
+(** Run [octez-client endorse for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val endorse_for :
@@ -489,7 +489,7 @@ val spawn_endorse_for :
   t ->
   Process.t
 
-(** Run [tezos-client preendorse for].
+(** Run [octez-client preendorse for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val preendorse_for :
@@ -509,7 +509,7 @@ val spawn_preendorse_for :
   t ->
   Process.t
 
-(** Run [tezos-client propose for].
+(** Run [octez-client propose for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val spawn_propose_for :
@@ -534,7 +534,7 @@ val propose_for :
   t ->
   unit Lwt.t
 
-(** Run [tezos-client show address <alias> --show-secret] and parse
+(** Run [octez-client show address <alias> --show-secret] and parse
     the output into an [Account.key].
     E.g. for [~alias:"bootstrap1"] the command yields:
 {v
@@ -556,7 +556,7 @@ val show_address : alias:string -> t -> Account.key Lwt.t
     (which also implies that there is no output key to parse). *)
 val spawn_show_address : alias:string -> t -> Process.t
 
-(** Run [tezos-client list known addresses] and parse the output into
+(** Run [octez-client list known addresses] and parse the output into
     a association list from aliases to public key hashes. *)
 val list_known_addresses : t -> (string * string) list Lwt.t
 
@@ -564,27 +564,27 @@ val list_known_addresses : t -> (string * string) list Lwt.t
     exit. *)
 val spawn_list_known_addresses : t -> Process.t
 
-(** Run [tezos-client gen keys] and return the key alias.
+(** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
 val gen_keys : ?alias:string -> t -> string Lwt.t
 
-(** A helper to run [tezos-client gen keys] followed by
-    [tezos-client show address] to get the generated key. *)
+(** A helper to run [octez-client gen keys] followed by
+    [octez-client show address] to get the generated key. *)
 val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
-(** Run [tezos-client bls gen keys <alias>]. *)
+(** Run [octez-client bls gen keys <alias>]. *)
 val bls_gen_keys :
   ?hooks:Process.hooks -> ?force:bool -> ?alias:string -> t -> string Lwt.t
 
-(** Run [tezos-client bls list keys].
+(** Run [octez-client bls list keys].
 
     Returns the known BLS aliases associated to their public key hash.
 
     Fails if the format is not of the form [<alias>: <public key hash>]. *)
 val bls_list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
 
-(** Run [tezos-client bls show address <alias>] and parse
+(** Run [octez-client bls show address <alias>] and parse
     the output into an [Account.aggregate_key].
     E.g. for [~alias:"bls_account"] the command yields:
 {v
@@ -606,11 +606,11 @@ v}
 val bls_show_address :
   ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
 
-(** A helper to run [tezos-client bls gen keys] followed by
-    [tezos-client bls show address] to get the generated key. *)
+(** A helper to run [octez-client bls gen keys] followed by
+    [octez-client bls show address] to get the generated key. *)
 val bls_gen_and_show_keys : ?alias:string -> t -> Account.aggregate_key Lwt.t
 
-(** Run [tezos-client bls import secret key <account.aggregate_alias>
+(** Run [octez-client bls import secret key <account.aggregate_alias>
     <account.aggregate_secret_key>]. *)
 val bls_import_secret_key :
   ?hooks:Process.hooks ->
@@ -619,7 +619,7 @@ val bls_import_secret_key :
   t ->
   unit Lwt.t
 
-(** Run [tezos-client transfer amount from giver to receiver]. *)
+(** Run [octez-client transfer amount from giver to receiver]. *)
 val transfer :
   ?hooks:Process.hooks ->
   ?log_output:bool ->
@@ -662,7 +662,7 @@ val spawn_transfer :
   t ->
   Process.t
 
-(** Run [tezos-client multiple transfers from giver using json_batch]. *)
+(** Run [octez-client multiple transfers from giver using json_batch]. *)
 val multiple_transfers :
   ?log_output:bool ->
   ?endpoint:endpoint ->
@@ -679,11 +679,11 @@ val multiple_transfers :
   t ->
   unit Runnable.process
 
-(** Run tezos-client get delegate for <src>. Returns [Some address] if delegate
+(** Run octez-client get delegate for <src>. Returns [Some address] if delegate
     is set or [None] otherwise. *)
 val get_delegate : ?endpoint:endpoint -> src:string -> t -> string option Lwt.t
 
-(** Run [tezos-client set delegate for <src> to <delegate>]. *)
+(** Run [octez-client set delegate for <src> to <delegate>]. *)
 val set_delegate :
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -696,7 +696,7 @@ val set_delegate :
   t ->
   unit Runnable.process
 
-(** Run [tezos-client reveal key for <src>]. *)
+(** Run [octez-client reveal key for <src>]. *)
 val reveal :
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -707,7 +707,7 @@ val reveal :
   t ->
   unit Runnable.process
 
-(** Run [tezos-client withdraw delegate from <src>]. *)
+(** Run [octez-client withdraw delegate from <src>]. *)
 val withdraw_delegate :
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -720,14 +720,14 @@ val withdraw_delegate :
 val spawn_withdraw_delegate :
   ?endpoint:endpoint -> ?wait:string -> src:string -> t -> Process.t
 
-(** Run [tezos-client get balance for]. *)
+(** Run [octez-client get balance for]. *)
 val get_balance_for : ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
 
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for :
   ?endpoint:endpoint -> account:string -> t -> Process.t
 
-(** Run [tezos-client create mockup]. *)
+(** Run [octez-client create mockup]. *)
 val create_mockup :
   ?sync_mode:mockup_sync_mode ->
   ?parameter_file:string ->
@@ -743,7 +743,7 @@ val spawn_create_mockup :
   t ->
   Process.t
 
-(** Run [tezos-client submit proposals for].
+(** Run [octez-client submit proposals for].
 
     If both [proto_hash] and [proto_hashes] are specified,
     the list of protocols which are proposed is [proto_hash :: proto_hashes].
@@ -771,7 +771,7 @@ val spawn_submit_proposals :
 
 type ballot = Nay | Pass | Yay
 
-(** Run [tezos-client submit ballot for].
+(** Run [octez-client submit ballot for].
 
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val submit_ballot :
@@ -781,7 +781,7 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
-(** Run [tezos-client set deposits limit for <src> to <limit>]. *)
+(** Run [octez-client set deposits limit for <src> to <limit>]. *)
 val set_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -791,7 +791,7 @@ val set_deposits_limit :
   t ->
   string Lwt.t
 
-(** Run [tezos-client unset deposits limit for <src>]. *)
+(** Run [octez-client unset deposits limit for <src>]. *)
 val unset_deposits_limit :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -800,7 +800,7 @@ val unset_deposits_limit :
   t ->
   string Lwt.t
 
-(** Run [tezos-client increase the paid storage of <contract> by <amount> bytes from <payer>]. *)
+(** Run [octez-client increase the paid storage of <contract> by <amount> bytes from <payer>]. *)
 val increase_paid_storage :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -811,7 +811,7 @@ val increase_paid_storage :
   t ->
   string Lwt.t
 
-(** Run [tezos-client get contract used storage space for <contract>]. *)
+(** Run [octez-client get contract used storage space for <contract>]. *)
 val used_storage_space :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -820,7 +820,7 @@ val used_storage_space :
   t ->
   string Lwt.t
 
-(** Run [tezos-client get contract paid storage space for <contract>]. *)
+(** Run [octez-client get contract paid storage space for <contract>]. *)
 val paid_storage_space :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -829,7 +829,7 @@ val paid_storage_space :
   t ->
   string Lwt.t
 
-(** Run [tezos-client use <pk> as consensus key for delegate <src>] *)
+(** Run [octez-client use <pk> as consensus key for delegate <src>] *)
 val update_consensus_key :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -841,7 +841,7 @@ val update_consensus_key :
   t ->
   unit Lwt.t
 
-(** Run [tezos-client drain delegate with consensus key <src>] *)
+(** Run [octez-client drain delegate with consensus key <src>] *)
 val drain_delegate :
   ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
@@ -858,7 +858,7 @@ val drain_delegate :
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
    [src] should be named [from] and probably have type [Account.t] *)
 
-(** Run [tezos-client originate contract alias transferring amount from src
+(** Run [octez-client originate contract alias transferring amount from src
     running prg]. Returns the originated contract hash. *)
 val originate_contract :
   ?hooks:Process.hooks ->
@@ -911,7 +911,7 @@ type stresstest_contract_parameters = {
       (** Gas limit to use for invocations during the stress test *)
 }
 
-(** Run [tezos-client stresstest transfer using <sources>].
+(** Run [octez-client stresstest transfer using <sources>].
 
     [sources] is a string containing all the [source_aliases],
     [source_pkhs], and [source_accounts] in JSON format as expected by
@@ -988,7 +988,7 @@ val stresstest_estimate_gas :
 val stresstest_originate_smart_contracts :
   ?endpoint:endpoint -> Account.key -> t -> unit Lwt.t
 
-(** Run [tezos-client run script .. on storage .. and input ..].
+(** Run [octez-client run script .. on storage .. and input ..].
 
     Returns the new storage as a string.
 
@@ -1018,7 +1018,7 @@ val spawn_run_script :
   t ->
   Process.t
 
-(** Run [tezos-client register global constant value from src].
+(** Run [octez-client register global constant value from src].
     Returns the address hash of the new constant. *)
 val register_global_constant :
   ?wait:string ->
@@ -1037,9 +1037,9 @@ val spawn_register_global_constant :
   t ->
   Process.t
 
-(** Run [tezos-client hash data .. of type ...]
+(** Run [octez-client hash data .. of type ...]
 
-    Given that the output of [tezos-client] is:
+    Given that the output of [octez-client] is:
 
     [Raw packed data: 0x050303
      Script-expression-ID-Hash: exprvDnoPjyKeR9FSnvwYg5a1v6mDyB6TmnATwWySSP6VmJxrzQb9E
@@ -1073,14 +1073,14 @@ val hash_data :
 val spawn_hash_data :
   ?hooks:Process.hooks -> data:string -> typ:string -> t -> Process.t
 
-(** Run [tezos-client hash script ..]*)
+(** Run [octez-client hash script ..]*)
 val hash_script : ?hooks:Process_hooks.t -> script:string -> t -> string Lwt.t
 
 (** Same as [hash_script], but do not wait for the process to exit. *)
 val spawn_hash_script :
   ?hooks:Process_hooks.t -> script:string -> t -> Process.t
 
-(** Run [tezos-client normalize data .. of type ...]*)
+(** Run [octez-client normalize data .. of type ...]*)
 val normalize_data :
   ?mode:normalize_mode ->
   ?legacy:bool ->
@@ -1098,7 +1098,7 @@ val spawn_normalize_data :
   t ->
   Process.t
 
-(** Run [tezos-client normalize script ..]*)
+(** Run [octez-client normalize script ..]*)
 val normalize_script :
   ?mode:normalize_mode -> script:string -> t -> string Lwt.t
 
@@ -1106,7 +1106,7 @@ val normalize_script :
 val spawn_normalize_script :
   ?mode:normalize_mode -> script:string -> t -> Process.t
 
-(** Run [tezos-client typecheck script ..]*)
+(** Run [octez-client typecheck script ..]*)
 val typecheck_script :
   script:string ->
   ?details:bool ->
@@ -1142,12 +1142,12 @@ val spawn_run_view :
   t ->
   Process.t
 
-(** Run [tezos-client run view .. on contract .. with input ..].
+(** Run [octez-client run view .. on contract .. with input ..].
 
     Returns the value returned by a view as a string.
 
     Fails if the view or the contract does not exist. If [input] is [None], it
-    runs [tezos-client run view .. on contract ..]. *)
+    runs [octez-client run view .. on contract ..]. *)
 val run_view :
   ?hooks:Process.hooks ->
   ?source:string ->
@@ -1161,7 +1161,7 @@ val run_view :
   t ->
   string Lwt.t
 
-(** Run [tezos-client list mode protocols].
+(** Run [octez-client list mode protocols].
 
     Note: the [list protocols] command (without mode) is an admin command
     (see {!Admin.list_protocols}). *)
@@ -1171,20 +1171,20 @@ val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
     and do not process stdout. *)
 val spawn_list_protocols : [< `Light | `Mockup | `Proxy] -> t -> Process.t
 
-(** Run [tezos-client migrate mockup to]. *)
+(** Run [octez-client migrate mockup to]. *)
 val migrate_mockup : next_protocol:Protocol.t -> t -> unit Lwt.t
 
 (** Same as [migrate_mockup], but do not wait for the process to exit. *)
 val spawn_migrate_mockup : next_protocol:Protocol.t -> t -> Process.t
 
-(** Run [tezos-client sign block <hexdata> for <delegate>]. *)
+(** Run [octez-client sign block <hexdata> for <delegate>]. *)
 val sign_block : t -> string -> delegate:string -> string Lwt.t
 
 (** Same as [sign_block], but do not wait for the process to exit. *)
 val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
 module Tx_rollup : sig
-  (** Run [tezos-client originate tx rollup from <src>]. *)
+  (** Run [octez-client originate tx rollup from <src>]. *)
   val originate :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1196,7 +1196,7 @@ module Tx_rollup : sig
     t ->
     string Runnable.process
 
-  (** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
+  (** Run [octez-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
   val submit_batch :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1210,7 +1210,7 @@ module Tx_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
+  (** Run [octez-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
   val submit_commitment :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1225,7 +1225,7 @@ module Tx_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit tx rollup finalize commitment to <tx_rollup> from <src>]. *)
+  (** Run [octez-client submit tx rollup finalize commitment to <tx_rollup> from <src>]. *)
   val submit_finalize_commitment :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1236,7 +1236,7 @@ module Tx_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit tx rollup remove commitment to <tx_rollup> from <src>]. *)
+  (** Run [octez-client submit tx rollup remove commitment to <tx_rollup> from <src>]. *)
   val submit_remove_commitment :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1247,7 +1247,7 @@ module Tx_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit tx rollup rejection commitment at level
+  (** Run [octez-client submit tx rollup rejection commitment at level
      <level> message <message> at <position> with <proof> with agreed
      context hash <context_hash> and withdraw list
      <withdraw_list_hash> to <tx_rollup> from <src>]. *)
@@ -1271,7 +1271,7 @@ module Tx_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit tx rollup return bond to <tx_rollup> from <src>]. *)
+  (** Run [octez-client submit tx rollup return bond to <tx_rollup> from <src>]. *)
   val submit_return_bond :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1312,14 +1312,14 @@ module Tx_rollup : sig
     unit Runnable.process
 end
 
-(** Run [tezos-client show voting period] and return the period name. *)
+(** Run [octez-client show voting period] and return the period name. *)
 val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 
 (** Same as [show_voting_period], but do not wait for the process to exit. *)
 val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
 module Sc_rollup : sig
-  (** Run [tezos-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
+  (** Run [octez-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
   val originate :
     ?hooks:Process.hooks ->
     ?wait:string ->
@@ -1343,7 +1343,7 @@ module Sc_rollup : sig
     t ->
     Process.t
 
-  (** Run [tezos-client send rollup message <msg> from <src> to <dst>]. *)
+  (** Run [octez-client send rollup message <msg> from <src> to <dst>]. *)
   val send_message :
     ?hooks:Process.hooks ->
     ?wait:string ->
@@ -1365,7 +1365,7 @@ module Sc_rollup : sig
     t ->
     Process.t
 
-  (** Run [tezos-client publish commitment from <src> for sc rollup <sc_rollup>
+  (** Run [octez-client publish commitment from <src> for sc rollup <sc_rollup>
       with compressed state <compressed_state> at inbox level <inbox_level>
       and predecessor <predecessor> and number of ticks <number_of_ticks>. *)
   val publish_commitment :
@@ -1381,7 +1381,7 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client cement commitment <hash> from <src> for sc rollup <rollup>]. *)
+  (** Run [octez-client cement commitment <hash> from <src> for sc rollup <rollup>]. *)
   val cement_commitment :
     ?hooks:Process.hooks ->
     ?wait:string ->
@@ -1392,7 +1392,7 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client timeout dispute on sc rollup <dst> with <staker> from
+  (** Run [octez-client timeout dispute on sc rollup <dst> with <staker> from
            <src>]. *)
   val timeout :
     ?expect_failure:bool ->
@@ -1405,7 +1405,7 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
+  (** Run [octez-client submit sc rollup recover bond to <sc_rollup> from <src>]. *)
   val submit_recover_bond :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -1417,7 +1417,7 @@ module Sc_rollup : sig
     t ->
     unit Runnable.process
 
-  (** Run [tezos-client execute outbox message of sc rollup <rollup> from <src>
+  (** Run [octez-client execute outbox message of sc rollup <rollup> from <src>
       for commitment hash <hash> and output proof <proof>]. *)
   val execute_outbox_message :
     ?wait:string ->
@@ -1505,7 +1505,7 @@ val init_with_protocol :
 (** Create a client with mode [Mockup] and run [create mockup].
 
     Contrary to [init], this does not import any secret key, because
-   [tezos-client create mockup] already initializes the mockup with bootstrap
+   [octez-client create mockup] already initializes the mockup with bootstrap
    keys.
 *)
 val init_mockup :
@@ -1586,7 +1586,7 @@ val contract_code :
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
 
-(** Use tezos-client to convert a script between given forms. *)
+(** Use octez-client to convert a script between given forms. *)
 val convert_script :
   script:string ->
   src_format:[`Michelson | `Json | `Binary] ->
@@ -1594,5 +1594,5 @@ val convert_script :
   t ->
   string Lwt.t
 
-(** Run [tezos-client bootstrapped]. *)
+(** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t

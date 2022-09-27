@@ -1,25 +1,25 @@
 
-./tezos-client --wait none submit tx rollup batch 0x to 'this is an invalid tx rollup address' from '[PUBLIC_KEY_HASH]'
+./octez-client --wait none submit tx rollup batch 0x to 'this is an invalid tx rollup address' from '[PUBLIC_KEY_HASH]'
 Error:
   Erroneous command line argument 7 (this is an invalid tx rollup address).
   Parameter 'this is an invalid tx rollup address' is an invalid transaction rollup address encoded in a base58 string.
 
 Usage:
-  tezos-client [global options] command [command options]
-  tezos-client --help (for global options)
-  tezos-client [global options] command --help (for command options)
-  tezos-client --version (for version information)
+  octez-client [global options] command [command options]
+  octez-client --help (for global options)
+  octez-client [global options] command --help (for command options)
+  octez-client --version (for version information)
 
 To browse the documentation:
-  tezos-client [global options] man (for a list of commands)
-  tezos-client [global options] man -v 3 (for the full manual)
+  octez-client [global options] man (for a list of commands)
+  octez-client [global options] man -v 3 (for the full manual)
 
 Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
   --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the context associated with the specified chain). Possible tags are 'main' and 'test'.
-  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent on the context associated with the specified block). Possible tags include 'head' and 'genesis' +/- an optional offset (e.g. "tezos-client -b head-1 get timestamp"). Note that block queried must exist in node's storage.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent on the context associated with the specified block). Possible tags include 'head' and 'genesis' +/- an optional offset (e.g. "octez-client -b head-1 get timestamp"). Note that block queried must exist in node's storage.
   -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is considered included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node

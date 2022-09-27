@@ -1,5 +1,5 @@
 
-./tezos-client rpc get /chains/main/blocks/head/context/constants
+./octez-client rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
@@ -45,7 +45,7 @@
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_max_available_messages": 1000000 }
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
+./octez-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 0, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
@@ -57,11 +57,11 @@
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 10, "estimated_time": "[TIMESTAMP]" } ]
 
-./tezos-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
+./octez-client rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
+./octez-client rpc get /chains/main/blocks/head/helpers/endorsing_rights
 [ { "level": 1,
     "delegates":
       [ { "delegate": "[PUBLIC_KEY_HASH]",
@@ -75,5 +75,5 @@
         { "delegate": "[PUBLIC_KEY_HASH]",
           "first_slot": 0, "endorsing_power": 58 } ] } ]
 
-./tezos-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
+./octez-client rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
 { "first": 1, "last": 8 }

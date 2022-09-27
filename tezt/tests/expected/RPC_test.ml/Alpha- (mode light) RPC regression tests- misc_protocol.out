@@ -1,5 +1,5 @@
 
-./tezos-client --mode light rpc get /chains/main/blocks/head/context/constants
+./octez-client --mode light rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
@@ -63,7 +63,7 @@
   "zk_rollup_min_pending_to_process": 10 }
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
-./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "round": 0, "estimated_time": "[TIMESTAMP]",
     "consensus_key": "[PUBLIC_KEY_HASH]" },
@@ -81,12 +81,12 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
     "consensus_key": "[PUBLIC_KEY_HASH]" } ]
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
-./tezos-client --mode light rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
+./octez-client --mode light rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
-./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/endorsing_rights
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/endorsing_rights
 [ { "level": 1,
     "delegates":
       [ { "delegate": "[PUBLIC_KEY_HASH]",
@@ -106,6 +106,6 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
           "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
-./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
 { "first": 1, "last": 8 }
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

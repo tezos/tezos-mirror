@@ -1737,7 +1737,7 @@ let show_voting_period ?endpoint client =
   match output =~* rex "Current period: \"([a-z]+)\"" with
   | None ->
       Test.fail
-        "tezos-client show voting period did not print the current period"
+        "octez-client show voting period did not print the current period"
   | Some period -> return period
 
 module Sc_rollup = struct
@@ -1902,7 +1902,7 @@ module Sc_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  (** Run [tezos-client execute outbox message of sc rollup <rollup> from <src>
+  (** Run [octez-client execute outbox message of sc rollup <rollup> from <src>
       for commitment hash <hash> and output proof <proof>]. *)
   let execute_outbox_message ?(wait = "none") ?burn_cap ?storage_limit ?fee
       ?hooks ~rollup ~src ~commitment_hash ~proof client =

@@ -245,7 +245,7 @@ let test_context_suffix_no_rpc ~protocols =
     [protocol]
 
 (** Test.
-    Test that [tezos-client --mode proxy --protocol P] fails
+    Test that [octez-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
 let wrong_proto protocol client =
@@ -273,7 +273,7 @@ let wrong_proto protocol client =
   else Test.fail "Did not fail as expected: %s" stderr
 
 (** Test.
-    Test that [tezos-client --mode proxy --protocol P] fails
+    Test that [octez-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
 let test_wrong_proto =

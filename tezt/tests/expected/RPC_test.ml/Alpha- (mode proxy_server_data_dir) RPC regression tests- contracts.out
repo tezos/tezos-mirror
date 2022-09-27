@@ -1,5 +1,5 @@
 
-./tezos-client rpc get /chains/main/blocks/head/context/contracts
+./octez-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
@@ -9,110 +9,110 @@
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get /chains/main/blocks/head/context/delegates
+./octez-client rpc get /chains/main/blocks/head/context/delegates
 [ "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "3800000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3800000000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "100000000", "counter": "1" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "100000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "1"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "99999393"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -128,24 +128,24 @@ Error:
       "storage":
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -155,10 +155,10 @@ Error:
 }'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints": {} }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -170,10 +170,10 @@ null
               { "prim": "PAIR" } ] ] } ],
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -339,24 +339,24 @@ null
       "storage":
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
      - error: The client does not support following HTTP redirects yet.
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -366,7 +366,7 @@ Error:
 }'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -397,7 +397,7 @@ null
                 "args": [ { "prim": "string" }, { "prim": "nat" } ],
                 "annots": [ "%add_right" ] } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "storage",
         "args":
@@ -551,10 +551,10 @@ null
                       { "prim": "PAIR" } ] ] } ] ] } ],
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "test"
   },
@@ -564,7 +564,7 @@ null
 }'
 null
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "dup"
   },

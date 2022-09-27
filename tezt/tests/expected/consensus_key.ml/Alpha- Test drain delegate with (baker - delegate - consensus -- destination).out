@@ -1,5 +1,5 @@
 
-./tezos-client --wait none set consensus key for bootstrap1 to dummy_account_0
+./octez-client --wait none set consensus key for bootstrap1 to dummy_account_0
 Node is bootstrapped.
 Estimated gas: 1000 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -25,7 +25,7 @@ This sequence of operations was run:
       Consumed gas: 1000
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "4000000000000", "current_frozen_deposits": "200000000000",
   "frozen_deposits": "200000000000", "staking_balance": "4000000000000",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
@@ -33,7 +33,7 @@ This sequence of operations was run:
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "4000000333333", "current_frozen_deposits": "200000000000",
   "frozen_deposits": "200000000000", "staking_balance": "4000000333333",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
@@ -43,7 +43,7 @@ This sequence of operations was run:
   "pending_consensus_keys":
     [ { "cycle": 2, "pkh": "[PUBLIC_KEY_HASH]" } ] }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "4000004170240", "current_frozen_deposits": "200000208512",
   "frozen_deposits": "200000208512", "staking_balance": "4000004170240",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
@@ -51,7 +51,7 @@ This sequence of operations was run:
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "4000004170240", "current_frozen_deposits": "200000208512",
   "frozen_deposits": "200000208512", "staking_balance": "4000004170240",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
@@ -59,22 +59,22 @@ This sequence of operations was run:
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3800003961728"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "0"
 
-./tezos-client --wait none drain delegate bootstrap1 to dummy_account_1 with dummy_account_0
+./octez-client --wait none drain delegate bootstrap1 to dummy_account_1 with dummy_account_0
 Node is bootstrapped.
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Drain delegate:
@@ -90,7 +90,7 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... +ꜩ38000.038974
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "full_balance": "238000580819", "current_frozen_deposits": "200000208512",
   "frozen_deposits": "200000208512", "staking_balance": "238000580819",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
@@ -98,11 +98,11 @@ This sequence of operations was run:
   "voting_power": "4000000000000", "remaining_proposals": 20,
   "active_consensus_key": "[PUBLIC_KEY_HASH]" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "38000372307"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3762003858504"

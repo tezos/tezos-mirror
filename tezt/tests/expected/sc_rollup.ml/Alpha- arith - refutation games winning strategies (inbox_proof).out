@@ -1,5 +1,5 @@
 
-./tezos-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
+./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 3110.449 units (will add 100 for safety)
 Estimated storage: 6655 bytes added (will add 20 for safety)
@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -33,7 +33,7 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.66375
 
 
-./tezos-client --wait none send sc rollup message 'text:["3 3 +","1","1 1 x","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["3 3 +","1","1 1 x","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1878.919 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -41,7 +41,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -72,7 +72,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","3 3 +","1 1 x","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","3 3 +","1 1 x","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.269 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -80,7 +80,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -112,7 +112,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 3 +","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 3 +","3 7 8 + * y","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.348 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -120,7 +120,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -152,7 +152,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","3 3 +","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","3 3 +","2 2 out"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.491 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -160,7 +160,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -193,7 +193,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.555 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -201,7 +201,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -234,7 +234,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.570 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -242,7 +242,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -275,7 +275,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.570 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -283,7 +283,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -316,7 +316,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.698 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -324,7 +324,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -358,7 +358,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.762 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -366,7 +366,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -400,7 +400,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["1","1 1 x","3 7 8 + * y","2 2 out","3 3 +"]' from bootstrap3 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 Estimated gas: 1879.777 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -408,7 +408,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

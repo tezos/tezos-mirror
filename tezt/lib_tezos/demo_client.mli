@@ -27,7 +27,7 @@ module Time = Tezos_base.Time.System
 
 (** Run Tezos client with commands related to `demo_protocol`. *)
 
-(** Run [tezos-client activate protocol] with `demo_protocol`.
+(** Run [octez-client activate protocol] with `demo_protocol`.
 
     If [timestamp] is not specified explicitely, it is set to [Ago
     timestamp_delay], where [timestamp_delay] is 365 days, which
@@ -42,22 +42,22 @@ val activate :
   Client.t ->
   unit Lwt.t
 
-(** Run [tezos-client bake]. *)
+(** Run [octez-client bake]. *)
 val bake : ?msg:string -> Client.t -> unit Lwt.t
 
-(** Run [tezos-client get a], get the current value of counter `a`. *)
+(** Run [octez-client get a], get the current value of counter `a`. *)
 val get_a : Client.t -> int Lwt.t
 
-(** Run [tezos-client get a], get the current value of counter `b`. *)
+(** Run [octez-client get a], get the current value of counter `b`. *)
 val get_b : Client.t -> int Lwt.t
 
-(** Run [tezos-client increment a], add one to counter `a`. *)
+(** Run [octez-client increment a], add one to counter `a`. *)
 val increment_a : Client.t -> unit Lwt.t
 
-(** Run [tezos-client increment b], add one to counter `a`.. *)
+(** Run [octez-client increment b], add one to counter `a`.. *)
 val increment_b : Client.t -> unit Lwt.t
 
-(** Run [tezos-client transfer amount], when [amount] is positive,
+(** Run [octez-client transfer amount], when [amount] is positive,
     transfer [amount] from counter `a` to counter `b. When [amount] is
     negative, transfer [-amount] from `b` to `a`. *)
 val transfer : Client.t -> int -> unit Lwt.t

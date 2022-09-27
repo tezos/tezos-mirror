@@ -5,7 +5,7 @@ Operation successfully injected in the node.
 Operation hash is 'opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
+  octez-client wait for opFGw9Xy4JKvdK9jeKNTUhb5zyZJ4phdTUDP33yG8GPXb17q8ov to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

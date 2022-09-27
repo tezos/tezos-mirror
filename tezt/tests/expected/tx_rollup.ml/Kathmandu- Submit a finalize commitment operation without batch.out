@@ -1,12 +1,12 @@
 
-./tezos-client --wait none originate tx rollup tx_rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
+./octez-client --wait none originate tx rollup tx_rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.
 Estimated gas: 1420.108 units (will add 100 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -29,7 +29,7 @@ This sequence of operations was run:
 
 Transaction rollup memorized as tx_rollup
 
-./tezos-client --wait none finalize commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./octez-client --wait none finalize commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 This simulation failed:
   Manager signed operations:

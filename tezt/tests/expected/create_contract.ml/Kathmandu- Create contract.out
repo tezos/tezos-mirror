@@ -1,5 +1,5 @@
 
-./tezos-client --mode mockup --wait none originate contract originate_contract.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/originate_contract.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract originate_contract.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/originate_contract.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1425.182 units (will add 100 for safety)
 Estimated storage: 350 bytes added (will add 20 for safety)
@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -53,7 +53,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as originate_contract.tz.
 
-./tezos-client --mode mockup --wait none transfer 1 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg Unit
+./octez-client --mode mockup --wait none transfer 1 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg Unit
 Node is bootstrapped.
 Estimated gas: 3523.902 units (will add 100 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
@@ -61,7 +61,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

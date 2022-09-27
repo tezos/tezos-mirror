@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./tezos-client"
+let tezos_client = "./octez-client"
 
 let tezos_admin_client = "./tezos-admin-client"
 

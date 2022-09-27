@@ -34,19 +34,19 @@
                first to remove unused files in case some paths change.
    Subject: Tests of the client's `hash data ... of type` command.
 
-            Regression capture the output of tezos-client calls and compare it
+            Regression capture the output of octez-client calls and compare it
             with the output from the previous run. The test passes only if the
             outputs match exactly. It is important that return values
             of `hash data` remain constant over time.
 *)
 
 (* These hooks must be attached to every process that should be captured for
-   regression testing. Not plugged for negative tests, since tezos-client
+   regression testing. Not plugged for negative tests, since octez-client
    shows its manpage, which will change overtime. *)
 let hooks = Tezos_regression.hooks
 
 (** Test.
-    Call `tezos-client hash data ... of type ...` with data on which
+    Call `octez-client hash data ... of type ...` with data on which
     it must return 0. In addition, regression is activated.
     to check that returned values remain constant over time. *)
 let test_good_hash_data =
@@ -143,7 +143,7 @@ let test_good_hash_data =
   Lwt_list.iter_s hash_data data_n_type
 
 (** Test.
-    Call `tezos-client hash data ... of type ...` with data on which it
+    Call `octez-client hash data ... of type ...` with data on which it
     must fail (non-zero exit code). *)
 let test_bad_hash_data =
   Protocol.register_regression_test
@@ -169,7 +169,7 @@ let test_bad_hash_data =
   Lwt_list.iter_s hash_data data_n_type
 
 (** Test.
-    Call `tezos-client hash data ... of type ...` with data on which it
+    Call `octez-client hash data ... of type ...` with data on which it
     fails in a somewhat unstructued manner, and prints in manpage.
 
     We therefore do not do regression on this test, because
