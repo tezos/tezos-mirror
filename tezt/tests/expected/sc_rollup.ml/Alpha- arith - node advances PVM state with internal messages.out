@@ -37,152 +37,152 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "0"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\007"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "19"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "19"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\n"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "37"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "37"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\r"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "56"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "56"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\016"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "75"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "75"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\019"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "94"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "94"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\022"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "113"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "113"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\025"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "132"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "132"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\028"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "151"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "151"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\031"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "170"
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "170"
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\""
 
-./tezos-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./tezos-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/total_ticks
 "190"

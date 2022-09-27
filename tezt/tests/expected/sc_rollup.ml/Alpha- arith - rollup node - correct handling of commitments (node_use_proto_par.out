@@ -656,7 +656,7 @@ This sequence of operations was run:
                                }
 
 
-./tezos-sc-rollup-client-alpha rpc get /global/last_stored_commitment
+./octez-sc-rollup-client-alpha rpc get /global/last_stored_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_PVM_STATE_HASH]",
@@ -665,7 +665,7 @@ This sequence of operations was run:
       "number_of_ticks": "1321" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_PVM_STATE_HASH]",

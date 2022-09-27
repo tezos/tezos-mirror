@@ -37,7 +37,7 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_PVM_STATE_HASH]",
@@ -46,7 +46,7 @@ This sequence of operations was run:
       "number_of_ticks": "0" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_PVM_STATE_HASH]",
@@ -56,7 +56,7 @@ This sequence of operations was run:
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }
 
-./tezos-sc-rollup-client-alpha rpc get /local/last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /local/last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_PVM_STATE_HASH]",

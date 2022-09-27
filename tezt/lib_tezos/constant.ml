@@ -40,7 +40,7 @@ let tezos_protocol_compiler = "./tezos-protocol-compiler"
 
 let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
 
-let sc_rollup_client = "./tezos-sc-rollup-client-alpha"
+let sc_rollup_client = "./octez-sc-rollup-client-alpha"
 
 let tx_rollup_node = "./tezos-tx-rollup-node"
 

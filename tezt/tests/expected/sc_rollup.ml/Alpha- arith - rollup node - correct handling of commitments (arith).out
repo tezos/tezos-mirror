@@ -76,5 +76,5 @@ This sequence of operations was run:
                                }
 
 
-./tezos-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\128\000"
