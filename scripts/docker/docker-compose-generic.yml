@@ -21,7 +21,7 @@ services:
     hostname: baker-alpha
     environment:
       - PROTOCOL=alpha
-    command: tezos-baker
+    command: octez-baker
     links:
       - node
     volumes:

@@ -16,7 +16,7 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 export node="$BIN_DIR/octez-node"
 export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/octez-admin-client"
-export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
+export baker="$BIN_DIR/octez-baker-$PROTOCOL"
 export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
 export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
 export signer="$BIN_DIR/octez-signer"
@@ -47,7 +47,7 @@ case $command in
     octez-snapshot-import|tezos-snapshot-import)
         snapshot_import "$@"
         ;;
-    tezos-baker)
+    octez-baker|tezos-baker)
         launch_baker "$@"
         ;;
     octez-baker-test|tezos-baker-test)
@@ -93,7 +93,7 @@ Daemons:
 - octez-node [args]
   Initialize a new identity and run the tezos node.
 
-- tezos-baker [keys]
+- octez-baker [keys]
 - octez-baker-test [keys]
 - tezos-endorser [keys]
 - tezos-endorser-test [keys]
