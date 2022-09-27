@@ -20,7 +20,7 @@ class Client:
     """Client to a Tezos node.
 
     Manage the persistent client state and provides methods to call
-    octez-client/tezos-admin-client commands, and return structured
+    octez-client/octez-admin-client commands, and return structured
     representation of the client output.
 
     The most generic method to call the client is `run`. It calls the client
@@ -137,7 +137,7 @@ class Client:
         Args:
             params (list): list of parameters given to the octez-client,
             admin (bool): False to call octez-client, True to call
-                          tezos-admin-client
+                          octez-admin-client
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs
             stdin (string): string that will be passed as standard

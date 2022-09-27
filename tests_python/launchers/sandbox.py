@@ -10,7 +10,7 @@ from daemons.node import Node
 
 NODE = 'octez-node'
 CLIENT = 'octez-client'
-CLIENT_ADMIN = 'tezos-admin-client'
+CLIENT_ADMIN = 'octez-admin-client'
 BAKER = 'tezos-baker'
 ENDORSER = 'tezos-endorser'
 ACCUSER = 'tezos-accuser'

@@ -155,7 +155,7 @@ def _wrap_path(binary: str) -> str:
 
 
 CLIENT = 'octez-client'
-CLIENT_ADMIN = 'tezos-admin-client'
+CLIENT_ADMIN = 'octez-admin-client'
 
 
 @pytest.fixture(scope="class")
