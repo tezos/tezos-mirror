@@ -18,7 +18,7 @@ export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/octez-admin-client"
 export baker="$BIN_DIR/octez-baker-$PROTOCOL"
 export endorser="$BIN_DIR/octez-endorser-$PROTOCOL"
-export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
+export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
 export signer="$BIN_DIR/octez-signer"
 
 export client_dir="$DATA_DIR/client"
@@ -59,7 +59,7 @@ case $command in
     octez-endorser-test|tezos-endorser-test)
         launch_endorser_test "$@"
         ;;
-    tezos-accuser)
+    octez-accuser|tezos-accuser)
         launch_accuser "$@"
         ;;
     octez-accuser-test|tezos-accuser-test)

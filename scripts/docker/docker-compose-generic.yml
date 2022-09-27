@@ -33,7 +33,7 @@ services:
     hostname: accuser-alpha
     environment:
       - PROTOCOL=alpha
-    command: tezos-accuser
+    command: octez-accuser
     links:
       - node
     volumes:
