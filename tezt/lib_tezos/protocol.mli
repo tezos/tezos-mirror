@@ -71,7 +71,7 @@ val demo_counter_hash : string
     directory of the protocol, relative to the root of the repository. *)
 val parameter_file : ?constants:constants -> t -> string
 
-(** Get the path of the accuser of a protocol, such as ["./tezos-accuser-alpha"]. *)
+(** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
 val accuser : t -> string
 
 (** Get the path of the baker of a protocol, such as ["./tezos-baker-alpha"]. *)

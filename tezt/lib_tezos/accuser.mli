@@ -45,7 +45,7 @@ type event = {name : string; value : JSON.t}
     events can be received.
 
     [base_dir] corresponds to the (useless) "--base-dir" argument of
-    the tezos-accuser command.
+    the octez-accuser command.
 
     The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
@@ -74,7 +74,7 @@ val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
 
-(** Spawn [tezos-accuser run].
+(** Spawn [octez-accuser run].
 
     The resulting promise is fulfilled as soon as the accuser has been spawned.
     It continues running in the background. *)
@@ -133,7 +133,7 @@ val log_events : t -> unit
     events can be received.
 
     [base_dir] corresponds to the (useless) "--base-dir" argument of
-    the tezos-accuser command.
+    the octez-accuser command.
 
     The [Node.t] parameter is the accuser's node target. The accuser
     will be configured to be synchronised with the given node, and
