@@ -17,7 +17,7 @@ export node="$BIN_DIR/octez-node"
 export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/octez-admin-client"
 export baker="$BIN_DIR/octez-baker-$PROTOCOL"
-export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
+export endorser="$BIN_DIR/octez-endorser-$PROTOCOL"
 export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
 export signer="$BIN_DIR/octez-signer"
 
@@ -53,7 +53,7 @@ case $command in
     octez-baker-test|tezos-baker-test)
         launch_baker_test "$@"
         ;;
-    tezos-endorser)
+    octez-endorser|tezos-endorser)
         launch_endorser "$@"
         ;;
     octez-endorser-test|tezos-endorser-test)
@@ -95,7 +95,7 @@ Daemons:
 
 - octez-baker [keys]
 - octez-baker-test [keys]
-- tezos-endorser [keys]
+- octez-endorser [keys]
 - octez-endorser-test [keys]
 
 Clients:
