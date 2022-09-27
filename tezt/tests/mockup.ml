@@ -632,7 +632,7 @@ let test_create_mockup_dir_exists_nonempty =
     ~tags:["mockup"; "client"; "base_dir"]
   @@ fun protocol ->
   let base_dir = Temp.dir "mockup_dir" in
-  Base.write_file ~contents:"" (base_dir ^ "/" ^ "whatever") ;
+  write_file ~contents:"" (base_dir // "whatever") ;
   let client = Client.create_with_mode ~base_dir Client.Mockup in
   let* () =
     Client.spawn_create_mockup client ~protocol
