@@ -911,6 +911,54 @@ let test_transfer_rpc =
     ~error_msg:"Expected receiver balance = %R, got %L" ;
   unit
 
+let test_proto_mix =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup mixed protocols."
+    ~tags:["mockup"; "client"; "transfer"; "rpc"]
+  @@ fun protocol ->
+  let protos1, protos2 =
+    match Protocol.previous_protocol protocol with
+    | Some previous_protocol ->
+        ( [protocol; previous_protocol],
+          [Some protocol; Some previous_protocol; None] )
+    | None -> ([protocol], [Some protocol; None])
+  in
+  Fun.flip Lwt_list.iter_s protos1 @@ fun proto1 ->
+  Fun.flip Lwt_list.iter_s protos2 @@ fun proto2 ->
+  (* This test covers 3 cases:
+
+     1/ When [proto2] equals [Some proto1]: it tests that the command works.
+
+     2/ When [proto2] is [None]: it tests that the correct
+       mockup implementation is picked (i.e. the one of [proto1])
+       and that the command works.
+
+     3/ When [proto2] is [Some proto] such that [proto <> proto1]:
+       it tests that creating a mockup with a protocol and
+       using it with another protocol fails. *)
+  let* client1 = Client.init_mockup ~protocol:proto1 () in
+  let client2 =
+    Client.create_with_mode ~base_dir:(Client.base_dir client1) Mockup
+  in
+  Fun.flip
+    Lwt_list.iter_s
+    [
+      ["config"; "show"];
+      ["config"; "init"];
+      ["list"; "known"; "addresses"];
+      ["get"; "balance"; "for"; "bootstrap1"];
+    ]
+  @@ fun cmd ->
+  match (proto1, proto2) with
+  | _, Some proto2 when proto1 = proto2 ->
+      Client.spawn_command ~protocol_hash:(Protocol.hash proto2) client2 cmd
+      |> Process.check
+  | _, None -> Client.spawn_command client2 cmd |> Process.check
+  | _, Some proto2 ->
+      Client.spawn_command ~protocol_hash:(Protocol.hash proto2) client2 cmd
+      |> Process.check_error
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -933,7 +981,8 @@ let register ~protocols =
   test_config_show_mockup_fail protocols ;
   test_config_init_mockup protocols ;
   test_config_init_mockup_fail protocols ;
-  test_transfer_rpc protocols
+  test_transfer_rpc protocols ;
+  test_proto_mix protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
