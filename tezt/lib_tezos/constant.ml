@@ -34,7 +34,7 @@ let tezos_proxy_server = "./tezos-proxy-server"
 
 let tezos_codec = "./octez-codec"
 
-let tezos_snoop = "./tezos-snoop"
+let tezos_snoop = "./octez-snoop"
 
 let tezos_protocol_compiler = "./tezos-protocol-compiler"
 
