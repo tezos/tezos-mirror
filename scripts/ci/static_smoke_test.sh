@@ -28,7 +28,7 @@ bin_dir="$src_dir/tezos-binaries/$ARCH"
 test_version() {
     echo "Testing version of static binaries"
 
-    for binary in octez-client tezos-signer; do
+    for binary in octez-client octez-signer; do
         printf "Checking version of %s..." "$binary"
 
         cmd="$bin_dir/$binary --version"

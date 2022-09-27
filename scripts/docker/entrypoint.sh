@@ -19,7 +19,7 @@ export admin_client="$BIN_DIR/octez-admin-client"
 export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
 export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
 export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
-export signer="$BIN_DIR/tezos-signer"
+export signer="$BIN_DIR/octez-signer"
 
 export client_dir="$DATA_DIR/client"
 export node_dir="$DATA_DIR/node"
@@ -73,7 +73,7 @@ case $command in
         configure_client
         exec "$admin_client" "$@"
         ;;
-    tezos-signer)
+    octez-signer|tezos-signer)
         exec "$signer" "$@"
         ;;
     *)
@@ -100,7 +100,7 @@ Daemons:
 
 Clients:
 - octez-client [args]
-- tezos-signer [args]
+- octez-signer [args]
 - octez-admin-client
 
 Commands:
