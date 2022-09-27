@@ -55,13 +55,13 @@ The context in ${context_dir} will be used for the test."
 Importing context from $f_snapshot_path into $context_dir."
         # $f_snapshot_path might be empty
         # shellcheck disable=SC2086
-        ./tezos-node snapshot import "$f_snapshot_path" --data-dir "$context_dir" $f_blockhash_opt
+        ./octez-node snapshot import "$f_snapshot_path" --data-dir "$context_dir" $f_blockhash_opt
     fi
 }
 
 generate_identities (){
     f_context_dir="$1"
-    ./tezos-node identity generate --data-dir "$f_context_dir"
+    ./octez-node identity generate --data-dir "$f_context_dir"
 }
 
 patch_yes_node () {
@@ -253,7 +253,7 @@ $tmp_dir/tezt-XXXXXX, where XXXXXX are six random decimal figures.
 
 Use the following commands to start the node in the resulting context after
 migration, replacing the XXXXXX below with the value that you noted down before:
-$ ./tezos-node run --connections 0 --data-dir $tmp_dir/tezt-XXXXXX/tezos-node-test --rpc-addr localhost &
+$ ./octez-node run --connections 0 --data-dir $tmp_dir/tezt-XXXXXX/tezos-node-test --rpc-addr localhost &
 
 You can then inspect the storage, or bake blocks with the command:
 $ ./tezos-client -d $tmp_dir/tezt-XXXXXX/yes-wallet bake for foundation1 --minimal-timestamp
@@ -329,15 +329,15 @@ commands above (the script needs not to be run again)."
 No snapshot file provided. Please use the following commands to import a context
 manually:
 
-$ ./tezos-node snapshot import <snapshot_file> --data-dir <new/context/dir>
-$ ./tezos-node identity generate --data-dir <new/context/dir>"
+$ ./octez-node snapshot import <snapshot_file> --data-dir <new/context/dir>
+$ ./octez-node identity generate --data-dir <new/context/dir>"
         fi
 
 
         echo "
 Use the following commands to start the node with the imported context:
 $ test_directory=\$(mktemp -d -t \"${context_dir##*/}-XXXX\") && cp -r \"$context_dir/.\" \"\$test_directory\"
-$ ./tezos-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
+$ ./octez-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
 
 Then bake blocks until the chain reaches level $mig_level with:
 $ ./tezos-client -d $yes_wallet bake for foundation1 --minimal-timestamp

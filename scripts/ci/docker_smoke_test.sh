@@ -27,7 +27,7 @@ test_version() {
     echo "Testing version of binaries in Docker image"
 
     binaries=$(docker run --entrypoint ls "$IMAGE" /usr/local/bin/)
-    for bin in tezos-client tezos-node; do
+    for bin in tezos-client octez-node; do
         if ! echo "$binaries" | grep -q "^${bin}$" ; then
             echo "Could not find binary $bin in Docker image."
             exit 1

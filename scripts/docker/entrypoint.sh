@@ -13,7 +13,7 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 : "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 
 # export all these variables to be used in the inc script
-export node="$BIN_DIR/tezos-node"
+export node="$BIN_DIR/octez-node"
 export client="$BIN_DIR/tezos-client"
 export admin_client="$BIN_DIR/tezos-admin-client"
 export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
@@ -28,7 +28,7 @@ export node_data_dir="$node_dir/data"
 # shellcheck source=./scripts/docker/entrypoint.inc.sh
 . "$bin_dir/entrypoint.inc.sh"
 
-command=${1:-tezos-node}
+command=${1:-octez-node}
 shift 1
 
 case $command in
@@ -38,7 +38,7 @@ case $command in
 esac
 
 case $command in
-    tezos-node)
+    octez-node|tezos-node)
         launch_node "$@"
         ;;
     tezos-upgrade-storage)
@@ -90,7 +90,7 @@ You can specify the network with argument --network, for instance:
 (default is mainnet).
 
 Daemons:
-- tezos-node [args]
+- octez-node [args]
   Initialize a new identity and run the tezos node.
 
 - tezos-baker [keys]
