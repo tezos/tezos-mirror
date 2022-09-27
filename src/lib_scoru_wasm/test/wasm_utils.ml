@@ -196,3 +196,55 @@ let make_module_inst list_key_vals src =
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
   (module_reg, module_key, host_funcs_registry)
+
+module Kernels = struct
+  (* Kernel failing at `kernel_next` invocation. *)
+  let unreachable_kernel = "unreachable"
+
+  (* Kernel writing `"hello"` to debug output. *)
+  let test_write_debug_kernel = "test-write-debug"
+
+  (* Kernel checking the return of the store_has host func.
+
+     This kernel expects a collection of values to exist:
+     - `/durable/hi/bye`
+     - `/durable/hello`
+     - `/durable/hello/universe`
+     and asserts that `store_has` returns the correct type for each.
+  *)
+  let test_store_has_kernel = "test-store-has"
+
+  (* Kernel checking the return value of store_list_size host func.
+
+     This kernel expects a collection of values to exist:
+     - `/durable/one/two`
+     - `/durable/one/three`
+     - `/durable/one/four`
+     and asserts that `store_list_size(/one) = 3`.
+  *)
+  let test_store_list_size_kernel = "test-store-list-size"
+
+  (* Kernel checking the behaviour value of store_delete host func.
+
+     This kernel deletes the following paths:
+     - `/durable/one`
+     - `/durable/three/four`
+  *)
+  let test_store_delete_kernel = "test-store-delete"
+end
+
+let test_with_kernel kernel test () =
+  let open Lwt_result_syntax in
+  let open Tezt.Base in
+  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
+     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
+  let kernel_file =
+    project_root // Filename.dirname __FILE__ // "wasm_kernels"
+    // (kernel ^ ".wasm")
+  in
+  let*! () =
+    Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
+        let*! kernel = Lwt_io.read channel in
+        test kernel)
+  in
+  return_unit

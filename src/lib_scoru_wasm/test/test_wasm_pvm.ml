@@ -36,40 +36,6 @@ open Tztest
 open Tezos_scoru_wasm
 open Wasm_utils
 
-(* Kernel failing at `kernel_next` invocation. *)
-let unreachable_kernel = "unreachable"
-
-(* Kernel writing `"hello"` to debug output. *)
-let test_write_debug_kernel = "test-write-debug"
-
-(* Kernel checking the return of the store_has host func.
-
-   This kernel expects a collection of values to exist:
-   - `/durable/hi/bye`
-   - `/durable/hello`
-   - `/durable/hello/universe`
-   and asserts that `store_has` returns the correct type for each.
-*)
-let test_store_has_kernel = "test-store-has"
-
-(* Kernel checking the return value of store_list_size host func.
-
-   This kernel expects a collection of values to exist:
-   - `/durable/one/two`
-   - `/durable/one/three`
-   - `/durable/one/four`
-   and asserts that `store_list_size(/one) = 3`.
-*)
-let test_store_list_size_kernel = "test-store-list-size"
-
-(* Kernel checking the behaviour value of store_delete host func.
-
-   This kernel deletes the following paths:
-   - `/durable/one`
-   - `/durable/three/four`
-*)
-let test_store_delete_kernel = "test-store-delete"
-
 let set_input_step message message_counter tree =
   let input_info =
     Wasm_pvm_sig.
@@ -244,22 +210,6 @@ let should_run_store_delete_kernel kernel =
   assert (Option.is_none result) ;
   let+ result = Tree.find_tree tree ["durable"; "three"] in
   assert (Option.is_some result)
-
-let test_with_kernel kernel test () =
-  let open Lwt_result_syntax in
-  let open Tezt.Base in
-  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
-     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
-  let kernel_file =
-    project_root // Filename.dirname __FILE__ // "wasm_kernels"
-    // (kernel ^ ".wasm")
-  in
-  let*! () =
-    Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
-        let*! kernel = Lwt_io.read channel in
-        test kernel)
-  in
-  return_unit
 
 (* This function can build snapshotable state out of a tree. It currently
    assumes it follows a tree resulting from `set_input_step`.*)
@@ -466,38 +416,42 @@ let tests =
       "Test unreachable kernel (tick per tick)"
       `Quick
       (test_with_kernel
-         unreachable_kernel
+         Kernels.unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:1L));
     tztest
       "Test unreachable kernel (10 ticks at a time)"
       `Quick
       (test_with_kernel
-         unreachable_kernel
+         Kernels.unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:10L));
     tztest
       "Test unreachable kernel (in one go)"
       `Quick
       (test_with_kernel
-         unreachable_kernel
+         Kernels.unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
     tztest
       "Test write_debug kernel"
       `Quick
-      (test_with_kernel test_write_debug_kernel should_run_debug_kernel);
+      (test_with_kernel Kernels.test_write_debug_kernel should_run_debug_kernel);
     tztest
       "Test store-has kernel"
       `Quick
-      (test_with_kernel test_store_has_kernel should_run_store_has_kernel);
+      (test_with_kernel
+         Kernels.test_store_has_kernel
+         should_run_store_has_kernel);
     tztest
       "Test store-list-size kernel"
       `Quick
       (test_with_kernel
-         test_store_list_size_kernel
+         Kernels.test_store_list_size_kernel
          should_run_store_list_size_kernel);
     tztest
       "Test store-delete kernel"
       `Quick
-      (test_with_kernel test_store_delete_kernel should_run_store_delete_kernel);
+      (test_with_kernel
+         Kernels.test_store_delete_kernel
+         should_run_store_delete_kernel);
     tztest "Test snapshotable state" `Quick test_snapshotable_state;
     tztest
       "Test rebuild snapshotable state"

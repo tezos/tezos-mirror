@@ -33,8 +33,8 @@ module Context = Tezos_context_memory.Context_binary
    (^1): Executing in one decoding-encoding loop N ticks.
    (^2): Executing one decoding-encoding loop per ticks. *)
 let test_execution_correspondance skip count () =
-  Test_wasm_pvm.test_with_kernel
-    "unreachable"
+  test_with_kernel
+    Kernels.unreachable_kernel
     (fun kernel ->
       let open Lwt_syntax in
       let* tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
