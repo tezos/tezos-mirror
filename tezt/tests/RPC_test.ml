@@ -1114,6 +1114,65 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
   in
   unit
 
+let test_deprecated _test_mode_tag _protocol ?endpoint client =
+  let check_rpc_not_found rpc =
+    let*? process = RPC.Client.spawn ?endpoint ~hooks client @@ rpc in
+    Process.check_error
+      ~msg:
+        (rex
+           "(No service found at this URL|Did not find service|Rpc request \
+            failed)")
+      process
+  in
+
+  let implicit_account = Account.Bootstrap.keys.(0).public_key_hash in
+  let make path =
+    RPC.make ~get_host:Node.rpc_host ~get_port:Node.rpc_port GET path Fun.id
+  in
+  let* () =
+    check_rpc_not_found
+    @@ make
+         [
+           "chains";
+           "main";
+           "blocks";
+           "head";
+           "context";
+           "contracts";
+           implicit_account;
+           "delegatable";
+         ]
+  in
+
+  let* originated_account =
+    Client.originate_contract
+      ~alias:"originated_contract_simple"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/str_id.tz"
+      ~init:"Some \"initial storage\""
+      ~burn_cap:Tez.(of_int 3)
+      client
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun contract_id ->
+        check_rpc_not_found
+        @@ make
+             [
+               "chains";
+               "main";
+               "blocks";
+               "head";
+               "contracts";
+               contract_id;
+               "spendable";
+             ])
+      [originated_account; implicit_account]
+  in
+
+  unit
+
 (* Test access to RPC regulated with an ACL. *)
 let test_whitelist address () =
   let whitelist =
@@ -1311,14 +1370,15 @@ let register protocols =
           "misc_shell"
           ~test_function:test_misc_shell
           ~parameter_overrides:consensus_threshold) ;
-    match test_mode_tag with
+    (match test_mode_tag with
     (* No chain RPCs in these modes *)
     | `Client_data_dir_proxy_server | `Client_rpc_proxy_server -> ()
     | _ ->
         check_rpc
           "chain"
           ~test_function:test_chain
-          ~parameter_overrides:consensus_threshold
+          ~parameter_overrides:consensus_threshold) ;
+    check_rpc "deprecated" ~test_function:test_deprecated
   in
   List.iter
     (register protocols)
