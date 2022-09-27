@@ -14,7 +14,7 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 # export all these variables to be used in the inc script
 export node="$BIN_DIR/octez-node"
-export client="$BIN_DIR/tezos-client"
+export client="$BIN_DIR/octez-client"
 export admin_client="$BIN_DIR/tezos-admin-client"
 export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
 export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
@@ -65,7 +65,7 @@ case $command in
     tezos-accuser-test)
         launch_accuser_test "$@"
         ;;
-    tezos-client)
+    octez-client|tezos-client)
         configure_client
         exec "$client" "$@"
         ;;
@@ -99,7 +99,7 @@ Daemons:
 - tezos-endorser-test [keys]
 
 Clients:
-- tezos-client [args]
+- octez-client [args]
 - tezos-signer [args]
 - tezos-admin-client
 

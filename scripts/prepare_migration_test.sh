@@ -256,7 +256,7 @@ migration, replacing the XXXXXX below with the value that you noted down before:
 $ ./octez-node run --connections 0 --data-dir $tmp_dir/tezt-XXXXXX/tezos-node-test --rpc-addr localhost &
 
 You can then inspect the storage, or bake blocks with the command:
-$ ./tezos-client -d $tmp_dir/tezt-XXXXXX/yes-wallet bake for foundation1 --minimal-timestamp
+$ ./octez-client -d $tmp_dir/tezt-XXXXXX/yes-wallet bake for foundation1 --minimal-timestamp
 
 In order to re-run the migration test, kill any node that may be running and use
 the command for running the test above (the script needs not to be run again).
@@ -306,7 +306,7 @@ $ eval \`./src/bin_client/octez-init-sandboxed-client.sh 1\`
 $ tezos-activate-${pred_proto_version}-${pred_short_hash}
 
 Then bake blocks until the chain reaches level $mig_level with:
-$ tezos-client bake for bootstrap1 --minimal-timestamp
+$ octez-client bake for bootstrap1 --minimal-timestamp
 
 In order to re-run the migration test, kill the sandboxed node and run the
 commands above (the script needs not to be run again)."
@@ -340,7 +340,7 @@ $ test_directory=\$(mktemp -d -t \"${context_dir##*/}-XXXX\") && cp -r \"$contex
 $ ./octez-node run --connections 0 --data-dir \"\$test_directory\" --rpc-addr localhost &
 
 Then bake blocks until the chain reaches level $mig_level with:
-$ ./tezos-client -d $yes_wallet bake for foundation1 --minimal-timestamp
+$ ./octez-client -d $yes_wallet bake for foundation1 --minimal-timestamp
 
 In order to re-run the migration test, kill the node and delete spurious fil
 by using:
