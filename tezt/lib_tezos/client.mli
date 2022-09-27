@@ -252,7 +252,7 @@ val level :
 (** {2 Admin Client Commands} *)
 
 module Admin : sig
-  (** Run tezos-admin-client commands. *)
+  (** Run octez-admin-client commands. *)
 
   (** Ask a node to trust the address and port of another node. *)
   val trust_address : ?endpoint:endpoint -> peer:Node.t -> t -> unit Lwt.t
@@ -292,7 +292,7 @@ module Admin : sig
   (** Same as [ban_peer], but do not wait for the process to exit. *)
   val spawn_ban_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
 
-  (** Run [tezos-admin-client inject protocol <protocol_path>].
+  (** Run [octez-admin-client inject protocol <protocol_path>].
 
       Returns the hash of the injected protocol. *)
   val inject_protocol :
@@ -302,13 +302,13 @@ module Admin : sig
   val spawn_inject_protocol :
     ?endpoint:endpoint -> protocol_path:string -> t -> Process.t
 
-  (** Run [tezos-admin-client list protocols] and return the list of protocol hashes. *)
+  (** Run [octez-admin-client list protocols] and return the list of protocol hashes. *)
   val list_protocols : ?endpoint:endpoint -> t -> string list Lwt.t
 
   (** Same as [list_protocols], but do not wait for the process to exit. *)
   val spawn_list_protocols : ?endpoint:endpoint -> t -> Process.t
 
-  (** Run [tezos-admin-client protocol environment] on a protocol hash.
+  (** Run [octez-admin-client protocol environment] on a protocol hash.
 
       Return its environment version as a string such as ["V1"]. *)
   val protocol_environment : ?endpoint:endpoint -> t -> string -> string Lwt.t

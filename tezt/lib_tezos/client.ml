@@ -398,7 +398,7 @@ module Admin = struct
     match output =~* rex "Injected protocol ([^ ]+) successfully" with
     | None ->
         Test.fail
-          "tezos-admin-client inject protocol did not answer \"Injected \
+          "octez-admin-client inject protocol did not answer \"Injected \
            protocol ... successfully\""
     | Some hash -> return hash
 
@@ -422,7 +422,7 @@ module Admin = struct
     match output =~* rex "Protocol [^ ]+ uses environment (V\\d+)" with
     | None ->
         Test.fail
-          "tezos-admin-client protocol environment did not answer \"Protocol \
+          "octez-admin-client protocol environment did not answer \"Protocol \
            ... uses environment V...\""
     | Some version -> return version
 end
