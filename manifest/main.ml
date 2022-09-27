@@ -290,7 +290,11 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 let resto_directory =
   external_lib ~js_compatible:true "resto-directory" resto_version
 
-let ringo = external_lib ~js_compatible:true "ringo" V.(at_least "0.9")
+let ringo =
+  external_lib
+    ~js_compatible:true
+    "ringo"
+    V.(at_least "0.9" && less_than "1.0.0")
 
 let ringo_lwt = external_lib "ringo-lwt" V.(at_least "0.9")
 
