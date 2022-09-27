@@ -44,7 +44,7 @@ let sc_rollup_client = "./octez-sc-rollup-client-alpha"
 
 let tx_rollup_node = "./octez-tx-rollup-node"
 
-let tx_rollup_client = "./tezos-tx-rollup-client"
+let tx_rollup_client = "./octez-tx-rollup-client"
 
 let dal_node = "./tezos-dal-node"
 
