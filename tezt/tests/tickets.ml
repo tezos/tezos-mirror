@@ -37,7 +37,7 @@ let protocol_dependent_path protocol contract =
     match protocol with
     (* We use separate contracts because we introduced a backward incompatible change
        for tickets in Lima: https://gitlab.com/tezos/tezos/-/merge_requests/5963/ *)
-    | Protocol.Alpha -> "proto_alpha"
+    | Protocol.Alpha | Lima -> "proto_alpha"
     | Jakarta | Kathmandu -> "proto_current_mainnet"
   in
   sf "file:./tezt/tests/contracts/%s/%s" directory_name contract
