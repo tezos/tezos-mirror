@@ -39,6 +39,12 @@ include Test_encodings_util
 module Wasm = Wasm_pvm.Make (Tree)
 module Wrapped_tree_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
 
+let equal_chunks c1 c2 =
+  let open Lwt.Syntax in
+  let* c1 = Chunked_byte_vector.to_string c1 in
+  let* c2 = Chunked_byte_vector.to_string c2 in
+  Lwt.return @@ assert (String.equal c1 c2)
+
 let wrap_as_durable_storage tree =
   let open Lwt.Syntax in
   let* tree =
@@ -72,7 +78,6 @@ let test_store_has_missing_key () =
   in
   let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
   Host_funcs.register_host_funcs host_funcs_registry ;
-
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
@@ -449,6 +454,105 @@ let test_durable_count_subtrees () =
   let* () = assert_subtree_count tree 0 "/bye" in
   Lwt.return_ok ()
 
+(* Test checking that [store_copy from_key to_key] copies the subtree at
+   [from_key] to [to_key] in the durable storage.  This should overwrite
+   the tree that existed previously at [to_key] *)
+let test_store_copy () =
+  let open Lwt_syntax in
+  let* tree = empty_tree () in
+  let value () = Chunked_byte_vector.of_string "a very long value" in
+  (*
+  Store the following tree:
+    /durable/a/short/path/_ = "a very long value"
+    /durable/a/short/path/one/_ = "a very long value"
+    /durable/a/long/path/two/_ = "a very long value"
+  *)
+  let key_steps = ["a"; "short"; "path"] in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ("durable" :: List.append key_steps ["_"])
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ("durable" :: List.append key_steps ["one"; "_"])
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.scope
+         ["durable"; "a"; "long"; "path"; "two"; "_"]
+         Tree_encoding.chunked_byte_vector)
+      (value ())
+      tree
+  in
+  let* durable = wrap_as_durable_storage tree in
+
+  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
+  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  let from_key = "/a/short/path/one" in
+  let to_key = "/a/long/path" in
+  let wrong_key = "/a/long/path/two" in
+  let durable_st = Durable.of_storage_exn durable in
+  let* old_value_from_key =
+    Durable.find_value_exn durable_st @@ Durable.key_of_string_exn from_key
+  in
+  let* old_value_at_two =
+    Durable.find_value_exn durable_st @@ Durable.key_of_string_exn wrong_key
+  in
+  let* () = equal_chunks old_value_at_two (value ()) in
+  let from_offset = 20l in
+  let to_offset = 40l in
+  let _ = Memory.store_bytes memory from_offset from_key in
+  let _ = Memory.store_bytes memory to_offset to_key in
+  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
+  let module_inst = {module_inst with memories} in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+  let module_reg = Instance.ModuleMap.create () in
+  let module_key = Instance.Module_key "test" in
+  Instance.update_module_ref module_reg module_key module_inst ;
+  let values =
+    Values.
+      [
+        Num (I32 from_offset);
+        Num (I32 (Int32.of_int @@ String.length from_key));
+        Num (I32 to_offset);
+        Num (I32 (Int32.of_int @@ String.length to_key));
+      ]
+  in
+  let* durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_copy
+      values
+  in
+  assert (result = []) ;
+  let durable = Durable.of_storage_exn durable in
+
+  let* new_value_at_two =
+    Durable.find_value durable @@ Durable.key_of_string_exn wrong_key
+  in
+  let* new_value_from_key =
+    Durable.find_value_exn durable @@ Durable.key_of_string_exn from_key
+  in
+  let* new_value_to_key =
+    Durable.find_value_exn durable @@ Durable.key_of_string_exn to_key
+  in
+  assert (new_value_at_two = None) ;
+  let* () = equal_chunks new_value_from_key new_value_to_key in
+  let* () = equal_chunks old_value_from_key new_value_from_key in
+  Lwt.return_ok ()
+
 (* Test invalid key encodings are rejected. *)
 let test_durable_invalid_keys () =
   let open Lwt.Syntax in
@@ -481,6 +585,7 @@ let tests =
     tztest "store_has key too long key" `Quick test_store_has_key_too_long;
     tztest "store_list_size counts subtrees" `Quick test_store_list_size;
     tztest "store_delete removes subtree" `Quick test_store_delete;
+    tztest "store_copy" `Quick test_store_copy;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;

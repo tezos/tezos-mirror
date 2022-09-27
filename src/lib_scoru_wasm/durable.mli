@@ -67,6 +67,10 @@ val find_value : t -> key -> Lazy_containers.Chunked_byte_vector.t option Lwt.t
 (** raise @Not_found *)
 val find_value_exn : t -> key -> Lazy_containers.Chunked_byte_vector.t Lwt.t
 
+(** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of 
+    the entire subtree at from_key is copied at  to_key.*)
+val copy_tree_exn : t -> key -> key -> t Lwt.t
+
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
 
