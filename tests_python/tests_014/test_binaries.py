@@ -22,7 +22,7 @@ BINARIES = [
     "tezos-protocol-compiler",
     "octez-node",
     "tezos-snoop",
-    "tezos-validator",
+    "octez-validator",
 ] + PROTO_BINARIES
 
 
