@@ -411,7 +411,17 @@ let reveal_preimage_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let reveal_preimage = Host_funcs.Reveal_tick Preimage
+let reveal_preimage_parse_args memories args =
+  let open Lwt_syntax in
+  match args with
+  | Values.[Num (I32 hash_addr); Num (I32 base); Num (I32 max_bytes)] ->
+      let* memory = retrieve_memory memories in
+      let+ hash = Memory.load_bytes memory hash_addr 32 in
+      ( Reveal.(Reveal_raw_data (input_hash_from_string_exn hash)),
+        Host_funcs.{base; max_bytes} )
+  | _ -> raise Bad_input
+
+let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
 
 let lookup_opt name =
   match name with

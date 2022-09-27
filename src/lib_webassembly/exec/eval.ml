@@ -525,62 +525,34 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
           Lwt.catch
             (fun () ->
               let host_func = Host_funcs.lookup ~global_name c.host_funcs in
+              let* args = Vector.to_list args in
+              let args = List.rev args in
+              let* inst = resolve_module_ref c.module_reg frame.inst in
+              let available_memories =
+                if not init then Host_funcs.Available_memories inst.memories
+                else Host_funcs.No_memories_during_init
+              in
               match host_func with
               | Host_func f ->
-                  let* inst = resolve_module_ref c.module_reg frame.inst in
-                  let* args = Vector.to_list args in
-                  let available_memories =
-                    if not init then Host_funcs.Available_memories inst.memories
-                    else Host_funcs.No_memories_during_init
-                  in
                   let+ durable, res =
                     f
                       buffers.input
                       buffers.output
                       durable
                       available_memories
-                      (List.rev args)
+                      args
                   in
                   let vs' = Vector.prepend_list res vs' in
                   (durable, Inv_stop {code = (vs', es); fresh_frame = None})
-              | Reveal_tick kind ->
-                  (* Reminder: the arguments are put on a stack, and must be
-                     read in reverse order from the function definition. *)
-                  let* max_bytes, args =
-                    vector_pop_map args num_i32 no_region
-                  in
-                  let* base_destination, args =
-                    vector_pop_map args num_i32 no_region
-                  in
-                  let* args, reveal =
-                    match kind with
-                    | Preimage ->
-                        let* offset, args =
-                          vector_pop_map args num_i32 no_region
-                        in
-                        let* inst =
-                          resolve_module_ref c.module_reg frame.inst
-                        in
-                        let* mem = memory inst (0l @@ no_region) in
-                        let+ hash = Memory.load_bytes mem offset 32 in
-                        ( args,
-                          Reveal.(
-                            Reveal_raw_data (input_hash_from_string_exn hash))
-                        )
-                  in
-                  if Vector.num_elements args <> 0l then
-                    raise
-                      (Evaluation_step_error
-                         (Invoke_step
-                            "The number of passed arguments to \
-                             \"reveal_preimage\" is inconsistent")) ;
+              | Reveal_func f ->
+                  let* reveal, {base; max_bytes} = f available_memories args in
                   Lwt.return
                     ( durable,
                       Inv_reveal_tick
                         {
                           reveal;
                           max_bytes;
-                          base_destination;
+                          base_destination = base;
                           code = (vs', es);
                           revealed_bytes = None;
                         } ))
