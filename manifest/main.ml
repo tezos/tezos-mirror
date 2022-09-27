@@ -3594,6 +3594,7 @@ end = struct
             (3, "test_refutation_game", N.(number >= 014));
             (3, "test_carbonated_map", N.(number >= 013));
             (3, "test_zk_rollup_encoding", N.(number >= 015));
+            (3, "test_dal_slot_proof", N.(number >= 016));
           ]
           |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
         in
@@ -3634,6 +3635,8 @@ end = struct
               benchmark |> if_some |> open_;
               benchmark_type_inference |> if_some |> open_;
               sc_rollup |> if_some |> if_ N.(number >= 015) |> open_;
+              octez_crypto_dal |> if_ N.(number >= 016) |> open_;
+              octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
             ]
           ~dune
       in
@@ -3658,6 +3661,7 @@ end = struct
               test_helpers |> if_some |> open_;
               alcotest_lwt;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
+              octez_crypto_dal |> if_ N.(number >= 016) |> open_;
             ]
           ~dune:
             Dune.
@@ -4193,6 +4197,7 @@ module Protocol = Protocol
             plugin |> if_some |> open_;
             octez_shell_services |> open_;
             plompiler |> if_ N.(number >= 015);
+            octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in
     let _plugin_tests =

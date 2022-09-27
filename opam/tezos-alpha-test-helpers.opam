@@ -21,6 +21,7 @@ depends: [
   "tezos-protocol-plugin-alpha"
   "tezos-shell-services"
   "tezos-plompiler" { >= "0.1.2" }
+  "tezos-crypto-dal"
 ]
 build: [
   ["rm" "-r" "vendors"]

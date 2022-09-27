@@ -16,7 +16,8 @@
   test_sc_rollup_encoding
   test_refutation_game
   test_carbonated_map
-  test_zk_rollup_encoding)
+  test_zk_rollup_encoding
+  test_dal_slot_proof)
  (libraries
   tezos-base
   tezos-micheline
@@ -30,7 +31,9 @@
   tezos-benchmark
   tezos-benchmark-alpha
   tezos-benchmark-type-inference-alpha
-  tezos-sc-rollup-alpha)
+  tezos-sc-rollup-alpha
+  tezos-crypto-dal
+  tezos-base-test-helpers)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -40,7 +43,9 @@
   -open Tezos_alpha_test_helpers
   -open Tezos_benchmark_alpha
   -open Tezos_benchmark_type_inference_alpha
-  -open Tezos_sc_rollup_alpha))
+  -open Tezos_sc_rollup_alpha
+  -open Tezos_crypto_dal
+  -open Tezos_base_test_helpers))
 
 (rule
  (alias runtest)
@@ -112,6 +117,11 @@
  (package tezos-protocol-alpha-tests)
  (action (run %{dep:./test_zk_rollup_encoding.exe})))
 
+(rule
+ (alias runtest)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{dep:./test_dal_slot_proof.exe})))
+
 (rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
 
 (rule (alias runtest1) (action (run %{exe:saturation_fuzzing.exe})))
@@ -139,3 +149,5 @@
 (rule (alias runtest3) (action (run %{exe:test_carbonated_map.exe})))
 
 (rule (alias runtest3) (action (run %{exe:test_zk_rollup_encoding.exe})))
+
+(rule (alias runtest3) (action (run %{exe:test_dal_slot_proof.exe})))

@@ -86,5 +86,6 @@ let () =
       Unit_test.spec "compare operations" Test_compare_operations.tests;
       Unit_test.spec "Delegate_consensus_key.ml" Test_consensus_key.tests;
       Unit_test.spec "local_contexts" Test_local_contexts.tests;
+      Unit_test.spec "dal slot proof" Test_dal_slot_proof.tests;
     ]
   |> Lwt_main.run
