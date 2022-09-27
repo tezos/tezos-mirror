@@ -21,7 +21,7 @@ BINARIES = [
     "octez-admin-client",
     "tezos-protocol-compiler",
     "octez-node",
-    "tezos-snoop",
+    "octez-snoop",
     "octez-validator",
 ] + PROTO_BINARIES
 
