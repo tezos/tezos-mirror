@@ -1,14 +1,11 @@
 Protocol Lima
 =============
 
-This page contains all the relevant information for protocol Lima
-(see :ref:`naming_convention`).
+This page documents the changes brought by protocol Lima with respect
+to Kathmandu (see :ref:`naming_convention`).
 
 The code can be found in the :src:`src/proto_015_PtLimaPt` directory of the
 ``master`` branch of Tezos.
-
-This page documents the changes brought by protocol Lima with respect
-to Kathmandu.
 
 .. contents::
 
@@ -44,6 +41,8 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
 
 - Introduce a new protocol API adapted to pipelined validation.
   (MR :gl:`!6335`)
+
+- Add missing list functions. (MR :gl:`!6316`)
 
 Consensus key
 -------------
@@ -174,7 +173,7 @@ Two new operations have been added:
           "first_slot": 0, "endorsing_power": 58,
           "consensus_key": "[PUBLIC_KEY_HASH]" } ] } ]
 
-MRs: :gl:`!5936`, :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
+MRs: :gl:`!5936`, :gl:`!5961`, :gl:`!5970`
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -193,20 +192,24 @@ Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
 :gl:`!6050`, :gl:`!6030`, :gl:`!6060`, :gl:`!5891`, :gl:`!6071`, :gl:`!5926`,
 :gl:`!6104`, :gl:`!6102`, :gl:`!5973`, :gl:`!6132`, :gl:`!6146`, :gl:`!6185`,
 :gl:`!6197`, :gl:`!6230`, :gl:`!6237`, :gl:`!6236`, :gl:`!6056`, :gl:`!6186`,
-:gl:`!6249`, :gl:`!6182`, :gl:`!6243`, :gl:`!6234`, :gl:`!6254`, :gl:`!6280`)
+:gl:`!6249`, :gl:`!6182`, :gl:`!6243`, :gl:`!6234`, :gl:`!6254`, :gl:`!6280`,
+:gl:`!6250`, :gl:`!6258`, :gl:`!6130`, :gl:`!6305`, :gl:`!6290`, :gl:`!6303`,
+:gl:`!6315`, :gl:`!6177`, :gl:`!6294`, :gl:`!6263`, :gl:`!6361`, :gl:`!6278`,
+:gl:`!6358`, :gl:`!6231`, :gl:`!6400`)
 
 Zero Knowledge Rollups (ongoing)
 --------------------------------
 
 Rollups supporting cryptographic proofs of correct execution. (MRs :gl:`!6044`,
-:gl:`!6184`)
+:gl:`!6184`, :gl:`!6045`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!5711`, :gl:`!5938`,
 :gl:`!6024`, :gl:`!5959`, :gl:`!6062`, :gl:`!6210`, :gl:`!6216`, :gl:`!6033`,
-:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`)
+:gl:`!6022`, :gl:`!6265`, :gl:`!6266`, :gl:`!6273`, :gl:`!6272`, :gl:`!6328`,
+:gl:`!6279`, :gl:`!6348`, :gl:`!6256`, :gl:`!6321`)
 
 Liquidity Baking
 ------------------
@@ -218,10 +221,12 @@ Breaking Changes
 ----------------
 
 - Deprecate timelock functionality, that is the `CHEST_OPEN`
-  instruction, in michelson to prevent origination of new contracts using. A
-  safer version of timelock will come in a future procotol.  (MR :gl: `!6260`)
+  instruction, in Michelson to prevent origination of new contracts using it. A
+  safer version of timelock will come in a future procotol.  (MRs :gl:`!6260`,
+  :gl:`!6327`)
 
 - Rename the parameter ``tokens_per_roll`` to ``minimal_stake``. (MR :gl:`!5897`)
+
 - Disallow creation, transfer and storage of tickets with zero amounts.
   ``TICKET`` instruction now returns ``option ticket 'a`` instead of ``ticket 'a``.
   For contracts already originated, their ``TICKET`` instructions are renamed to ``TICKET_DEPRECATED``.
@@ -377,3 +382,12 @@ Internal
   maintaining a commutative set of operations that may also be
   efficiently merged with another. This enables the implementation of
   a parallelized shell's mempool. (MR :gl:`!6274`)
+
+- Add more functions in Bitset. (MRs :gl:`!6352`, :gl:`!6376`)
+
+- Make Micheline serialization gas accounting consistent by construction.
+  (MR :gl:`!6403`)
+
+- Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
+
+- Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
