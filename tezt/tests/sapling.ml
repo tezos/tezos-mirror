@@ -241,11 +241,11 @@ module Helpers = struct
       return @@ Re.balance_diff ~dst:contract client_output
 
   let balance_tz1 (client, _contract) pkh =
-    let* json_bal =
+    let* balance_tez =
       RPC.Client.call client
       @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
     in
-    return (JSON.as_int json_bal)
+    return (Tez.to_mutez balance_tez)
 end
 
 let contract = "sapling_contract.tz"

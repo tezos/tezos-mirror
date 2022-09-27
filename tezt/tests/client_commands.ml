@@ -179,11 +179,8 @@ end
 
 module Transfer = struct
   let get_balance pkh client =
-    let* json =
-      RPC.Client.call client
-      @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
-    in
-    return (Tez.of_mutez_int (JSON.as_int json))
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
 
   let alias_pkh_destination =
     Protocol.register_test

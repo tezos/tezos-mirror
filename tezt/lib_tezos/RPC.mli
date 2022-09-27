@@ -649,7 +649,7 @@ val get_chain_block_context_contract :
     [block] defaults to ["head"].
 *)
 val get_chain_block_context_contract_balance :
-  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> id:string -> unit -> Tez.t t
 
 (** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/frozen_bonds]
 
@@ -657,7 +657,7 @@ val get_chain_block_context_contract_balance :
     [block] defaults to ["head"].
 *)
 val get_chain_block_context_contract_frozen_bonds :
-  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> id:string -> unit -> Tez.t t
 
 (** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/balance_and_frozen_bonds]
 
@@ -665,7 +665,7 @@ val get_chain_block_context_contract_frozen_bonds :
     [block] defaults to ["head"].
 *)
 val get_chain_block_context_contract_balance_and_frozen_bonds :
-  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> id:string -> unit -> Tez.t t
 
 (** RPC [POST /chains/<chain>/blocks/<block>/context/contracts/<id>/big_map_get]
 
@@ -775,7 +775,7 @@ val get_chain_block_context_delegate :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_current_frozen_deposits :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/deactivated]
 
@@ -803,7 +803,7 @@ val get_chain_block_context_delegate_frozen_balance_by_cycle :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_delegated_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/delegated_contracts]
 
@@ -824,14 +824,14 @@ val get_chain_block_context_delegate_frozen_deposits :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_frozen_deposits_limit :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t option t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/full_balance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_full_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/grace_period]
 
@@ -852,14 +852,14 @@ val get_chain_block_context_delegate_participation :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/staking_balance]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_staking_balance :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> Tez.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/voting_info]
 
