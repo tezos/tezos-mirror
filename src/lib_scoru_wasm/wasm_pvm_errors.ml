@@ -27,6 +27,8 @@ open Tezos_webassembly_interpreter
 
 type interpreter_error = {raw_exception : string; explanation : string option}
 
+let messages_maximum_size = 128
+
 type t =
   | Decode_error of interpreter_error
   | Link_error of string
@@ -57,7 +59,12 @@ let eval_state_to_string = function
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
 
-let extract_interpreter_error exn =
+let truncate_message msg =
+  if String.length msg > messages_maximum_size then
+    String.sub msg 0 messages_maximum_size
+  else msg
+
+let extract_interpreter_error_raw exn =
   let open Lazy_containers in
   let raw_exception = Printexc.to_string exn in
   match exn with
@@ -91,6 +98,16 @@ let extract_interpreter_error exn =
       `Interpreter
         {raw_exception; explanation = Some "Module must export memory 0"}
   | _ -> `Unknown raw_exception
+
+let extract_interpreter_error exn =
+  match extract_interpreter_error_raw exn with
+  | `Interpreter {raw_exception; explanation} ->
+      `Interpreter
+        {
+          raw_exception = truncate_message raw_exception;
+          explanation = Option.map truncate_message explanation;
+        }
+  | `Unknown raw_exception -> `Unknown (truncate_message raw_exception)
 
 let encoding =
   let open Data_encoding in
@@ -152,6 +169,9 @@ let link_error kind ~module_name ~item_name =
   match kind with
   | `Item ->
       Link_error
-        (Format.sprintf "Unexpected import: %s.%s" module_name item_name)
+        (Format.sprintf "Unexpected import: %s.%s" module_name item_name
+        |> truncate_message)
   | `Module ->
-      Link_error (Format.sprintf "Unexpected module import: %s" module_name)
+      Link_error
+        (Format.sprintf "Unexpected module import: %s" module_name
+        |> truncate_message)

@@ -31,7 +31,14 @@ type raw_exception := string
 (** Embedded message in the exception. *)
 type explanation := string
 
-(** Wrapped exceptions from the interpreter.  *)
+(* Stuck messages are purely informational, but can be arbitrary long since they
+   come from error messages from the interpreter or caught exceptions. To ensure
+   they fit in an L1 operation, we truncate them after
+   [messages_maximum_size]. *)
+val messages_maximum_size : int
+
+(** Wrapped exceptions from the interpreter. Both labels are truncated after
+    [messages_maximum_size]. *)
 type interpreter_error = {
   raw_exception : raw_exception;
   explanation : string option;
@@ -60,7 +67,9 @@ val link_error :
   [`Item | `Module] -> module_name:string -> item_name:string -> t
 
 (** [extract_interpreter_error exn] returns the source of the exception (either
-    a known interpreter error or an unknown one) and its encodable representation. *)
+    a known interpreter error or an unknown one) and its encodable
+    representation. [raw_exception] is truncated after
+    [messages_maximum_size]. *)
 val extract_interpreter_error :
   exn -> [`Interpreter of interpreter_error | `Unknown of raw_exception]
 
