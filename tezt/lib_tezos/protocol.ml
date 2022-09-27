@@ -81,7 +81,7 @@ let daemon_name = function
 
 let accuser proto = "./octez-accuser-" ^ daemon_name proto
 
-let baker proto = "./tezos-baker-" ^ daemon_name proto
+let baker proto = "./octez-baker-" ^ daemon_name proto
 
 let encoding_prefix = daemon_name
 
