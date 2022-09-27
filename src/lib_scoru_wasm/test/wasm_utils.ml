@@ -160,12 +160,10 @@ let make_durable list_key_vals =
     List.fold_left
       (fun acc (key, value) ->
         let* tree = acc in
-        let key_steps = Durable.(key_of_string_exn ("/durable/" ^ key)) in
+        let key_steps = String.split_on_char '/' ("durable/" ^ key ^ "/_") in
         let* tree =
           Tree_encoding_runner.encode
-            (Tree_encoding.scope
-               (Durable.to_value_key key_steps)
-               Tree_encoding.chunked_byte_vector)
+            (Tree_encoding.scope key_steps Tree_encoding.chunked_byte_vector)
             (Chunked_byte_vector.of_string value)
             tree
         in
