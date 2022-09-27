@@ -114,7 +114,7 @@ val wait : t -> Unix.process_status Lwt.t
     a SIGKILL is sent instead of a SIGTERM. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Run [tezos-sc-rollup-node-alpha config init ?loser_mode rollup_address].
+(** Run [octez-sc-rollup-node-alpha config init ?loser_mode rollup_address].
     Returns the name of the resulting configuration file. *)
 val config_init : t -> ?loser_mode:string -> string -> string Lwt.t
 
