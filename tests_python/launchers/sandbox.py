@@ -12,7 +12,7 @@ NODE = 'octez-node'
 CLIENT = 'octez-client'
 CLIENT_ADMIN = 'octez-admin-client'
 BAKER = 'octez-baker'
-ENDORSER = 'tezos-endorser'
+ENDORSER = 'octez-endorser'
 ACCUSER = 'octez-accuser'
 
 
