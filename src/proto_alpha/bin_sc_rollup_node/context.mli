@@ -56,6 +56,9 @@ val pp_hash : Format.formatter -> hash -> unit
     information contained in the configuration [config]. *)
 val load : Configuration.t -> index Lwt.t
 
+(** [index context] is the repository of the context [context]. *)
+val index : t -> index
+
 (** [close ctxt] closes the context index [ctxt]. *)
 val close : index -> unit Lwt.t
 

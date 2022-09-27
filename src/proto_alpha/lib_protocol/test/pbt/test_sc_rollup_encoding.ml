@@ -51,6 +51,12 @@ let gen_inbox_level =
   let level = if level = 0l then 1l else level in
   return (Raw_level_repr.of_int32_exn level)
 
+let gen_start_level =
+  let open Gen in
+  let* level = map Int32.abs int32 in
+  let start_level = Raw_level_repr.of_int32_exn level in
+  return start_level
+
 let gen_commitment_hash =
   let open Gen in
   let* bytes = bytes_fixed_gen Sc_rollup_commitment_repr.Hash.size in
@@ -157,13 +163,14 @@ let gen_game =
   let open Gen in
   let* turn = gen_player in
   let* inbox_level = gen_inbox_level in
+  let* start_level = gen_start_level in
   let* rollup = gen_rollup in
   let* inbox_snapshot = gen_inbox_history_proof rollup inbox_level in
   let* pvm_name = gen_pvm_name in
   let* game_state = gen_game_state in
   return
     Sc_rollup_game_repr.
-      {turn; inbox_snapshot; level = inbox_level; pvm_name; game_state}
+      {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state}
 
 let gen_conflict =
   let open Gen in

@@ -61,7 +61,8 @@ module V1 = struct
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
-    level : Raw_level_repr.t;
+    start_level : Raw_level_repr.t;
+    inbox_level : Raw_level_repr.t;
     pvm_name : string;
     game_state : game_state;
   }
@@ -130,20 +131,23 @@ module V1 = struct
       {
         turn = turn1;
         inbox_snapshot = inbox_snapshot1;
-        level = level1;
+        start_level = start_level1;
+        inbox_level = inbox_level1;
         pvm_name = pvm_name1;
         game_state = game_state1;
       }
       {
         turn = turn2;
         inbox_snapshot = inbox_snapshot2;
-        level = level2;
+        start_level = start_level2;
+        inbox_level = inbox_level2;
         pvm_name = pvm_name2;
         game_state = game_state2;
       } =
     player_equal turn1 turn2
     && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
-    && Raw_level_repr.equal level1 level2
+    && Raw_level_repr.equal start_level1 start_level2
+    && Raw_level_repr.equal inbox_level1 inbox_level2
     && String.equal pvm_name1 pvm_name2
     && game_state_equal game_state1 game_state2
 
@@ -202,14 +206,23 @@ module V1 = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {turn; inbox_snapshot; level; pvm_name; game_state} ->
-        (turn, inbox_snapshot, level, pvm_name, game_state))
-      (fun (turn, inbox_snapshot, level, pvm_name, game_state) ->
-        {turn; inbox_snapshot; level; pvm_name; game_state})
-      (obj5
+      (fun {
+             turn;
+             inbox_snapshot;
+             start_level;
+             inbox_level;
+             pvm_name;
+             game_state;
+           } ->
+        (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state))
+      (fun (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state)
+           ->
+        {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state})
+      (obj6
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
-         (req "level" Raw_level_repr.encoding)
+         (req "start_level" Raw_level_repr.encoding)
+         (req "inbox_level" Raw_level_repr.encoding)
          (req "pvm_name" string)
          (req "game_state" game_state_encoding))
 
@@ -242,14 +255,16 @@ module V1 = struct
   let pp ppf game =
     Format.fprintf
       ppf
-      "%a playing; inbox snapshot = %a; level = %a; pvm_name = %s; game_state \
-       = %a"
+      "%a playing; inbox snapshot = %a; start level = %a; inbox level = %a; \
+       pvm_name = %s; game_state = %a"
       pp_player
       game.turn
       Sc_rollup_inbox_repr.pp_history_proof
       game.inbox_snapshot
       Raw_level_repr.pp
-      game.level
+      game.start_level
+      Raw_level_repr.pp
+      game.inbox_level
       game.pvm_name
       pp_game_state
       game.game_state
@@ -330,7 +345,7 @@ end
 
 let make_chunk state_hash tick = {state_hash; tick}
 
-let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
+let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
     ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
@@ -359,7 +374,8 @@ let initial inbox ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
-    level = child.inbox_level;
+    start_level;
+    inbox_level = child.inbox_level;
     pvm_name;
     game_state;
   }
@@ -950,9 +966,9 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
 let validity_final_move ~first_move ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
   let*! res =
-    let {inbox_snapshot; level; pvm_name; _} = game in
+    let {inbox_snapshot; inbox_level; pvm_name; _} = game in
     let*! valid =
-      Sc_rollup_proof_repr.valid inbox_snapshot level ~pvm_name proof
+      Sc_rollup_proof_repr.valid inbox_snapshot inbox_level ~pvm_name proof
     in
     let* () =
       if first_move then
@@ -1047,7 +1063,8 @@ let play ~stakers game refutation =
              {
                turn = opponent game.turn;
                inbox_snapshot = game.inbox_snapshot;
-               level = game.level;
+               start_level = game.start_level;
+               inbox_level = game.inbox_level;
                pvm_name = game.pvm_name;
                game_state = new_game_state;
              })
@@ -1074,7 +1091,8 @@ let play ~stakers game refutation =
                {
                  turn = opponent game.turn;
                  inbox_snapshot = game.inbox_snapshot;
-                 level = game.level;
+                 start_level = game.start_level;
+                 inbox_level = game.inbox_level;
                  pvm_name = game.pvm_name;
                  game_state = new_game_state;
                })

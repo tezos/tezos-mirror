@@ -1292,6 +1292,9 @@ let operation_publish_commitment ctxt rollup predecessor inbox_level
     [start_tick]. *)
 let build_proof ~player_client start_tick (game : Game.t) =
   let open Lwt_result_syntax in
+  (* No messages are added between [game.start_level] and the current level
+     so we can take the existing inbox of players. Otherwise, we should find the
+     inbox of [start_level]. *)
   let inbox_context, messages_tree, history, inbox = player_client.inbox in
   let* history, history_proof =
     Lwt.map Environment.wrap_tzresult
@@ -1324,7 +1327,7 @@ let build_proof ~player_client start_tick (game : Game.t) =
       let inbox = history_proof
     end
   end in
-  let*! proof = Sc_rollup.Proof.produce (module P) game.level in
+  let*! proof = Sc_rollup.Proof.produce (module P) game.inbox_level in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
 
 (** [next_move ~number_of_sections ~player_client game] produces

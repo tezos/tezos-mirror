@@ -511,18 +511,13 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
    the Tezos node. Then we can observe that the messages are included in the
    inbox.
 *)
-let send_message client sc_rollup msg =
+let send_message ?(src = Constant.bootstrap2.alias) client sc_rollup msg =
   let* () =
-    Client.Sc_rollup.send_message
-      ~hooks
-      ~src:Constant.bootstrap2.alias
-      ~dst:sc_rollup
-      ~msg
-      client
+    Client.Sc_rollup.send_message ~hooks ~src ~dst:sc_rollup ~msg client
   in
   Client.bake_for_and_wait client
 
-let send_messages ?batch_size n sc_rollup client =
+let send_messages ?src ?batch_size n sc_rollup client =
   let messages =
     List.map
       (fun i ->
@@ -533,14 +528,14 @@ let send_messages ?batch_size n sc_rollup client =
         "text:" ^ Ezjsonm.to_string json)
       (range 1 n)
   in
-  Lwt_list.iter_s (fun msg -> send_message client sc_rollup msg) messages
+  Lwt_list.iter_s (fun msg -> send_message ?src client sc_rollup msg) messages
 
 let to_text_messages_arg msgs =
   let json = Ezjsonm.list Ezjsonm.string msgs in
   "text:" ^ Ezjsonm.to_string ~minify:true json
 
-let send_text_messages client sc_rollup msgs =
-  send_message client sc_rollup (to_text_messages_arg msgs)
+let send_text_messages ?src client sc_rollup msgs =
+  send_message ?src client sc_rollup (to_text_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -2496,7 +2491,12 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
           consume_inputs (i + 1) all
         else
           let* () =
-            Lwt_list.iter_s (send_text_messages client sc_rollup_address) inputs
+            Lwt_list.iter_s
+              (send_text_messages
+                 ~src:Constant.bootstrap3.alias
+                 client
+                 sc_rollup_address)
+              inputs
           in
           let* () = Client.bake_for_and_wait client in
           consume_inputs (i + 1) next_batches
@@ -2543,10 +2543,15 @@ let inputs_for n =
 
 let test_refutation protocols ~kind =
   let challenge_window = 10 in
+  let commitment_period = 10 in
   [
     ("inbox_proof_at_genesis", ("3 0 0", inputs_for 10, 80, [], []));
     ("pvm_proof_at_genesis", ("3 0 1", inputs_for 10, 80, [], []));
     ("inbox_proof", ("5 0 0", inputs_for 10, 80, [], []));
+    ("inbox_proof_with_new_content", ("5 0 0", inputs_for 30, 80, [], []));
+    (* In "inbox_proof_with_new_content" we add messages after the commitment
+       period so the current inbox is not equal to the inbox snapshot-ted at the
+       game creation. *)
     ("inbox_proof_one_empty_level", ("6 0 0", inputs_for 10, 80, [2], []));
     ( "inbox_proof_many_empty_levels",
       ("9 0 0", inputs_for 10, 80, [2; 3; 4], []) );
@@ -2560,6 +2565,7 @@ let test_refutation protocols ~kind =
          test_refutation_scenario
            ~kind
            ~challenge_window
+           ~commitment_period
            variant
            inputs
            protocols)
