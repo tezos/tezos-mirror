@@ -148,15 +148,20 @@ let generate_let_binding =
         expr
         args
     in
-    let expr = let_open_in "S_syntax" expr in
+    let expr = let_open_in "S.Syntax" expr in
     let expr = restore_funcs (args, expr) in
     Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
 
 let make_module structure_items =
   let open Ast_helper in
+  let open Codegen_helpers in
+  let rename_saturation_repr =
+    Str.module_
+      (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")))
+  in
   Str.module_
     (Mb.mk (Codegen_helpers.loc (Some "Generated"))
-    @@ Mod.structure structure_items)
+    @@ Mod.structure (rename_saturation_repr :: structure_items))
 
 let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
 
