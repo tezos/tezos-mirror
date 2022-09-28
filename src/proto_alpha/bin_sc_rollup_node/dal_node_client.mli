@@ -48,3 +48,8 @@ val get_slot :
 
 val get_shard :
   #cctxt -> Dal.Slot.Header.t -> int -> Cryptobox.shard tzresult Lwt.t
+
+(** [get_slot_pages cctxt header ] fetches from the dal node the pages
+    of the slot with header [header]. *)
+val get_slot_pages :
+  #cctxt -> Dal.Slot.Header.t -> Dal.Page.content list tzresult Lwt.t

@@ -273,6 +273,17 @@ let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
   in
   publish_slot ~source ?fee ~index ~header
 
+let publish_slot_header ~source ?(fee = 1200) ~index ~header node client =
+  let level = Node.get_level node in
+  let header = Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt header in
+  match header with
+  | None -> assert false
+  | Some header ->
+      Operation.Manager.(
+        inject
+          [make ~source ~fee @@ dal_publish_slot_header ~index ~level ~header]
+          client)
+
 let slot_availability ~signer availability client =
   (* FIXME/DAL: fetch the constant from protocol parameters. *)
   let default_size = 256 in
@@ -527,9 +538,8 @@ let test_dal_node_slot_management =
   let* received_slot_content =
     RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
   in
-  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3804
-     Only check that the function to retrieve pages succeeds, actual
-     contents will be checked in a test upcoming. *)
+  (* Only check that the function to retrieve pages succeeds, actual
+     contents are checked in the test `rollup_node_stores_dal_slots`. *)
   let* _slots_as_pages =
     RPC.call dal_node (Rollup.Dal.RPC.slot_pages slot_header)
   in
@@ -622,24 +632,38 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
-let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
-    client =
-  (* Check that the rollup node stores the slots published in a block,
-     along with slot headers:
-
-     1. Run rollup node for an originated rollup
-     2. Subscribe rollup node to slot 0, bake one level
-     3. Subscribe rollup node to slot 1, bake one level
-     4. Execute a client command to publish a slot header for slot 0,
-        bake one level
-     5. Execute a client command to publish a slot header for slot 1,
-        bake one level
-     4. Get the list of slot headers subscribed and confirmed for the
-        rollup node
-     5. Determine that the list contains only the header for slot 1.
+let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
+    sc_rollup_address node client =
+  (* Check that the rollup node stores the slots published in a block, along with slot headers:
+     0. Run dal node
+     1. Send three slots to dal node and obtain corresponding headers
+     2. Run rollup node for an originated rollup
+     3. Subscribe rollup node to slots 0 and 1
+     4. Publish the three slot headers for slots 0, 1, 2
+     5. Check that the rollup node fetched the slot headers from L1
+     6. After lag levels, endorse only slots 1 and 2
+     7. Wait for the rollup node to download the slots
+     8. Verify that rollup node has downloaded slot 1, slot 0 is
+        unconfirmed, and slot 2 has not been downloaded
   *)
-  let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make parameters in
+
+  (* 0. run dl node. *)
+  let* () = Dal_node.run dal_node in
+
+  (* 1. Send three slots to dal node and obtain corresponding headers. *)
+  let slot_contents_0 = "DEADC0DE" in
+  let* slot_header_0 =
+    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_0)
+  in
+  let slot_contents_1 = "CAFEDEAD" in
+  let* slot_header_1 =
+    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_1)
+  in
+  let slot_contents_2 = "C0FFEE" in
+  let* slot_header_2 =
+    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_2)
+  in
+  (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
     @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
@@ -654,6 +678,7 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
   let* (`OpHash _) =
     subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
   in
+  (* 3. Subscribe rollup node to slots 0 and 1. *)
   let* first_subscription_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
   in
@@ -663,39 +688,32 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
   let* second_subscription_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
   in
-  let* _ =
-    publish_dummy_slot
+  (* 4. Publish the three slot headers for slots with indexes 0, 1 and 2. *)
+  let* _op_hash =
+    publish_slot_header
       ~source:Constant.bootstrap1
-      ~fee:1_200
       ~index:0
-      ~message:"CAFEBABE"
-      parameters
-      cryptobox
+      ~header:slot_header_0
       node
       client
   in
-  let* _ =
-    publish_dummy_slot
+  let* _op_hash =
+    publish_slot_header
       ~source:Constant.bootstrap2
-      ~fee:1_200
       ~index:1
-      ~message:"CAFEDEAD"
-      parameters
-      cryptobox
+      ~header:slot_header_1
       node
       client
   in
-  let* _ =
-    publish_dummy_slot
+  let* _op_hash =
+    publish_slot_header
       ~source:Constant.bootstrap3
-      ~fee:1_200
       ~index:2
-      ~message:"C0FFEE"
-      parameters
-      cryptobox
+      ~header:slot_header_2
       node
       client
   in
+  (* 5. Check that the slot_headers are fetched by the rollup node. *)
   let* () = Client.bake_for_and_wait client in
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (second_subscription_level + 1)
@@ -704,22 +722,20 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
     Sc_rollup_client.dal_slots_metadata ~hooks sc_rollup_client
   in
   let slot_headers = slots_metadata |> List.map header_of_slot_metadata in
-  let expected_slot_headers =
-    List.map
-      (fun msg ->
-        Tezos_crypto_dal.Cryptobox.Commitment.to_b58check
-        @@ Rollup.Dal.Commitment.dummy_commitment parameters cryptobox msg)
-      ["CAFEBABE"; "CAFEDEAD"; "C0FFEE"]
-  in
+  let expected_slot_headers = [slot_header_0; slot_header_1; slot_header_2] in
   Check.(slot_headers = expected_slot_headers)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
-  (* Endorse only slots 1 and 2. *)
-  let* _ = slot_availability ~signer:Constant.bootstrap1 [2; 1; 0] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap2 [2; 1; 0] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap3 [2; 1] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap4 [2; 1] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap5 [2; 1] client in
+  (* 6. endorse only slots 1 and 2. *)
+  let* _op_hash =
+    slot_availability ~signer:Constant.bootstrap1 [2; 1; 0] client
+  in
+  let* _op_hash =
+    slot_availability ~signer:Constant.bootstrap2 [2; 1; 0] client
+  in
+  let* _op_hash = slot_availability ~signer:Constant.bootstrap3 [2; 1] client in
+  let* _op_hash = slot_availability ~signer:Constant.bootstrap4 [2; 1] client in
+  let* _op_hash = slot_availability ~signer:Constant.bootstrap5 [2; 1] client in
   let* () = Client.bake_for_and_wait client in
   let* level =
     Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)
@@ -727,21 +743,42 @@ let rollup_node_stores_dal_slots _protocol sc_rollup_node sc_rollup_address node
   Check.(level = slots_published_level + 1)
     Check.int
     ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
-  let* confirmed_slots_metadata =
-    Sc_rollup_client.dal_confirmed_slots_metadata ~hooks sc_rollup_client
+  (* 7. Wait for the rollup node to download the endorsed slots. *)
+  let* downloaded_slots =
+    Sc_rollup_client.dal_downloaded_slots ~hooks sc_rollup_client
   in
-  let confirmed_slot_headers =
-    confirmed_slots_metadata |> List.map header_of_slot_metadata
+  (* 8. Verify that rollup node has downloaded slot 1, slot 0 is
+        unconfirmed, and slot 2 has not been downloaded *)
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
+  Check.(
+    List.length downloaded_slots
+    = expected_number_of_downloaded_or_unconfirmed_slots)
+    Check.int
+    ~error_msg:
+      "Unexpected number of slots that have been either downloaded or \
+       unconfirmed (%L = %R)" ;
+  let slot_0_index, slot_0_pages = List.nth downloaded_slots 0 in
+  Check.(slot_0_index = 0)
+    Check.int
+    ~error_msg:"Slot is not as expected(%L = %R)" ;
+
+  List.iter
+    (fun page ->
+      Check.(page = None)
+        (Check.option @@ Check.string)
+        ~error_msg:"Contents of slot 0 are not as expected (%L = %R)")
+    slot_0_pages ;
+  let confirmed_slot_index, confirmed_slot_contents =
+    List.nth downloaded_slots 1
   in
-  (* Slot 0 was subscribed to, but not confirmed.
-     Slot 1 was subscribed to and confirmed.
-     Slot 2 was confirmed, but not subscribed to.
-     Only the slot header for slot 1 will appear in the list
-     of confirmed slots for the rollup. *)
-  let expected_confirmed_slot_headers = [List.nth expected_slot_headers 1] in
-  Check.(confirmed_slot_headers = expected_confirmed_slot_headers)
-    (Check.list Check.string)
-    ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
+  Check.(confirmed_slot_index = 1)
+    Check.int
+    ~error_msg:"Index of confirmed slot is not as expected (%L = %R)" ;
+  let relevant_slot = Option.get @@ List.nth confirmed_slot_contents 0 in
+  let message = String.sub relevant_slot 0 (String.length slot_contents_1) in
+  Check.(message = slot_contents_1)
+    Check.string
+    ~error_msg:"unexpected message in slot (%L = %R)" ;
   return ()
 
 let register ~protocols =
@@ -755,8 +792,8 @@ let register ~protocols =
   test_dal_node_slot_management protocols ;
   test_dal_node_slots_headers_tracking protocols ;
   test_dal_node_startup protocols ;
-  test_dal_scenario
+  test_dal_rollup_scenario
     ~dal_enable:true
-    "rollup_node_dal_headers_storage"
+    "rollup_node_downloads_slots"
     rollup_node_stores_dal_slots
     protocols

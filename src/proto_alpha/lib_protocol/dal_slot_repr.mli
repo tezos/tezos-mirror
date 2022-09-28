@@ -120,6 +120,9 @@ module Page : sig
     val equal : int -> int -> bool
   end
 
+  (** Encoding for page contents. *)
+  val content_encoding : content Data_encoding.t
+
   (** A page is identified by its slots index and by its own index in the list
      of pages of the slot. *)
   type t = {slot_index : slot_index; page_index : Index.t}

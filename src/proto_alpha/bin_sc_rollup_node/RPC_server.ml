@@ -50,14 +50,57 @@ let get_dal_slot_subscriptions_exn store =
 let get_dal_slots store =
   let open Lwt_result_syntax in
   let* head = get_head store in
-  let*! slot_headers = Store.Dal_slots.list_values store ~primary_key:head in
+  let*! slot_headers =
+    Store.Dal_slots_headers.list_values store ~primary_key:head
+  in
   return slot_headers
 
-let get_dal_confirmed_slots store =
+module Slot_pages_map = struct
+  open Protocol
+  open Alpha_context
+  include Map.Make (Dal.Slot_index)
+end
+
+let get_dal_slot_pages store =
   let open Lwt_result_syntax in
   let* head = get_head store in
-  let*! l = Store.Dal_confirmed_slots.list_values store ~primary_key:head in
-  return l
+  let*! slot_pages =
+    Store.Dal_slot_pages.list_secondary_keys_with_values store ~primary_key:head
+  in
+  (* Slot pages are sorted in lexicographic order of slot index and page
+     number.*)
+  let slot_rev_pages_map =
+    List.fold_left
+      (fun map ((index, _page), page) ->
+        Slot_pages_map.update
+          index
+          (function None -> Some [page] | Some pages -> Some (page :: pages))
+          map)
+      Slot_pages_map.empty
+      slot_pages
+  in
+  let slot_pages_map =
+    Slot_pages_map.map (fun pages -> List.rev pages) slot_rev_pages_map
+  in
+  return @@ Slot_pages_map.bindings slot_pages_map
+
+let get_dal_slot_page store slot_index slot_page =
+  let open Lwt_result_syntax in
+  let* head = get_head store in
+  let*! contents_opt_opt =
+    Store.Dal_slot_pages.find
+      store
+      ~primary_key:head
+      ~secondary_key:(slot_index, slot_page)
+  in
+  return
+  @@
+  match contents_opt_opt with
+  | None -> ("Slot page has not been downloaded", None)
+  | Some contents_opt -> (
+      match contents_opt with
+      | None -> ("Slot was not confirmed", None)
+      | Some contents -> ("Slot page is available", Some contents))
 
 let commitment_with_hash commitment =
   ( Protocol.Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment,
@@ -259,12 +302,6 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.dal_slots ())
       (fun () () -> get_dal_slots store)
 
-  let register_dal_confirmed_slots store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.dal_confirmed_slots ())
-      (fun () () -> get_dal_confirmed_slots store)
-
   let register_current_outbox node_ctxt dir =
     RPC_directory.register0
       dir
@@ -288,6 +325,18 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       (Sc_rollup_services.Global.outbox_proof ())
       (fun output () -> Outbox.proof_of_output node_ctxt output)
 
+  let register_dal_slot_pages store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.dal_slot_pages ())
+      (fun () () -> get_dal_slot_pages store)
+
+  let register_dal_slot_page store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.Global.dal_slot_page ())
+      (fun {index; page} () -> get_dal_slot_page store index page)
+
   let register (node_ctxt : Node_context.t) configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
@@ -303,9 +352,10 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     |> register_last_published_commitment node_ctxt.store
     |> register_dal_slot_subscriptions node_ctxt.store
     |> register_dal_slots node_ctxt.store
-    |> register_dal_confirmed_slots node_ctxt.store
     |> register_current_outbox node_ctxt
     |> register_outbox_proof node_ctxt
+    |> register_dal_slot_pages node_ctxt.store
+    |> register_dal_slot_page node_ctxt.store
 
   let start node_ctxt configuration =
     Common.start configuration (register node_ctxt configuration)

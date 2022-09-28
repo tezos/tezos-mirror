@@ -133,10 +133,10 @@ val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
     head seen by the rollup node. *)
 val dal_slots_metadata : ?hooks:Process.hooks -> t -> slot_metadata list Lwt.t
 
-(** [dal_confirmed_slots_metadata client] returns the dal confirmed slot
-    metadata of the last tezos head seen by the rollup node. *)
-val dal_confirmed_slots_metadata :
-  ?hooks:Process.hooks -> t -> slot_metadata list Lwt.t
+(** [dal_downloaded_slots client] returns the slots downloaded after processing
+    the last tezos head seen by the rollup node. *)
+val dal_downloaded_slots :
+  ?hooks:Process.hooks -> t -> (int * string option list) list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

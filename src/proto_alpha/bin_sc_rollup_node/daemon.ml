@@ -122,7 +122,7 @@ module Make (PVM : Pvm.S) = struct
            We do not have the information about DAL slots subscribed to
            at this time. *)
         let*! () =
-          Store.Dal_slots.add
+          Store.Dal_slots_headers.add
             node_ctxt.store
             ~primary_key:head
             ~secondary_key:index

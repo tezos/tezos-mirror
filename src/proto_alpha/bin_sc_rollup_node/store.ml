@@ -264,7 +264,52 @@ module Contexts = Make_append_only_map (struct
   let value_encoding = Context.hash_encoding
 end)
 
-module Block_slot_map_parameter = struct
+(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3715
+   Adding a new slot index requires reading up to 256 MB of data. *)
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+module Dal_slot_pages = Make_nested_map (struct
+  let path = ["dal"; "slot_pages"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
+
+  let compare_secondary_keys (i1, p1) (i2, p2) =
+    Compare.or_else (Dal.Slot_index.compare i1 i2) (fun () ->
+        Dal.Page.Index.compare p1 p2)
+
+  type value = Dal.Page.content option
+
+  let secondary_key_encoding =
+    Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page.Index.encoding)
+
+  let secondary_key_name = "slot_index"
+
+  let value_encoding = Data_encoding.option Dal.Page.content_encoding
+
+  let value_name = "slot_pages"
+end)
+
+(* Published slot headers per block hash, stored as a list of bindings from
+   `Dal_slot_index.t` to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. Note that the block_hash
+   refers to the block where slots headers have been confirmed, not
+   the block where they have been published.
+*)
+module Dal_slots_headers = Make_nested_map (struct
+  let path = ["dal"; "slot_headers"]
+
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+     This value is currently not used, but required by the module type. *)
+  let keep_last_n_entries_in_memory = 10
+
   type key = Block_hash.t
 
   let string_of_key = Block_hash.to_b58check
@@ -281,41 +326,7 @@ module Block_slot_map_parameter = struct
 
   let value_encoding = Dal.Slot.encoding
 
-  let value_name = "slots_metadata"
-end
-
-(* Published slot headers per block hash,
-   stored as a list of bindings from `Dal_slot_index.t`
-   to `Dal.Slot.t`. The encoding function converts this
-   list into a `Dal.Slot_index.t`-indexed map. *)
-module Dal_slots = Make_nested_map (struct
-  let path = ["dal"; "slot_headers"]
-
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-     This value is currently not used, but required by the module type. *)
-  let keep_last_n_entries_in_memory = 10
-
-  include Block_slot_map_parameter
-end)
-
-(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3515
-   temporary - this is used for test purposes only.
-   Remove this piece of storage once we download blocks from the dal node.
-*)
-(* Published slot headers per block hash, stored as a list of bindings from
-   `Dal_slot_index.t` to `Dal.Slot.t`. The encoding function converts this
-   list into a `Dal.Slot_index.t`-indexed map. Note that the block_hash
-   refers to the block where slots headers have been confirmed, not
-   the block where they have been published.
-*)
-module Dal_confirmed_slots = Make_nested_map (struct
-  let path = ["dal"; "confirmed_slots"]
-
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-     This value is currently not used, but required by the module type. *)
-  let keep_last_n_entries_in_memory = 10
-
-  include Block_slot_map_parameter
+  let value_name = "slot_metadata"
 end)
 
 (** Confirmed DAL slots history. See documentation of

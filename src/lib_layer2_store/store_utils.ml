@@ -276,6 +276,17 @@ module type Nested_map = sig
   val get :
     t -> primary_key:primary_key -> secondary_key:secondary_key -> value Lwt.t
 
+  (** [find store ~primary_key ~secondary_key] is the same as
+      [get store ~primary_key ~secondary_key], except that no error is thrown
+      and an optional value is returned instead. The returned value is
+      [None] if there is not a value bound to [primary_key] and [seconary_key]
+      in the [store] for the [Nested_map]. *)
+  val find :
+    t ->
+    primary_key:primary_key ->
+    secondary_key:secondary_key ->
+    value option Lwt.t
+
   (** [list secondary_keys store ~primary_key] retrieves from [store] the list
       of bindings of the nested map that share the same [~primary_key]. For
       each of these bindings, both the secondary_key and value are returned. *)
@@ -413,6 +424,14 @@ module Make_nested_map (K : DoubleKeyValue) = struct
         (* value for primary and secondary key does not exist *)
         assert false
     | Some value -> value
+
+  let find store ~primary_key ~secondary_key =
+    let open Lwt_syntax in
+    let* binding_exists = mem store ~primary_key ~secondary_key in
+    if binding_exists then
+      let+ value = get store ~primary_key ~secondary_key in
+      Some value
+    else return_none
 
   (* Returns the set of keys from the bindings of
      ~primary_key in the store. *)

@@ -232,17 +232,21 @@ let dal_slots_metadata ?hooks sc_client =
              index = obj |> get "index" |> as_int;
            }))
 
-let dal_confirmed_slots_metadata ?hooks sc_client =
+let dal_downloaded_slots ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "confirmed_slots"] in
-  JSON.(
-    as_list json
-    |> List.map (fun obj ->
-           {
-             level = obj |> get "level" |> as_int;
-             header = obj |> get "header" |> as_string;
-             index = obj |> get "index" |> as_int;
-           }))
+  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slot_pages"] in
+  JSON.as_list json
+  |> List.map (fun obj ->
+         let index = obj |> JSON.get "index" |> JSON.as_int in
+         let contents =
+           obj |> JSON.get "contents" |> JSON.as_list
+           |> List.map (fun pages ->
+                  pages |> JSON.as_opt
+                  |> Option.map (fun page ->
+                         page |> JSON.as_string |> fun s ->
+                         Hex.to_string (`Hex s)))
+         in
+         (index, contents))
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

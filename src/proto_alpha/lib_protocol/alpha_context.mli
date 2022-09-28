@@ -2817,6 +2817,8 @@ module Dal : sig
 
     type t = {slot_index : Slot_index.t; page_index : Index.t}
 
+    val content_encoding : content Data_encoding.t
+
     val encoding : t Data_encoding.t
 
     val pp : Format.formatter -> t -> unit
