@@ -688,7 +688,7 @@ def succ(obj: Optional[object], schema: dict) -> object:
             assert isinstance(obj, str)
             obj = int(obj)
         return str(succ_numeric(obj, minimum=-(2**63) + 1, maximum=2**63))
-    if typ == "#/definitions/015.mutez":
+    if re.match(r"\#/definitions/(.*)\.mutez", typ):
         if obj is not None:
             assert isinstance(obj, str)
             obj = int(obj)
