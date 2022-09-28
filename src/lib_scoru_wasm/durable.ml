@@ -34,7 +34,7 @@ exception Invalid_key of string
 
 exception Not_found
 
-exception Durable_empty
+exception Durable_empty = Storage.Durable_empty
 
 let encoding = E.wrapped_tree
 

@@ -59,6 +59,13 @@ let eval_state_to_string = function
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
 
+let durable_exn_explanation = function
+  | Durable.Invalid_key path -> Some ("Invalid_key: " ^ path)
+  | Durable.Not_found -> Some "Value not found"
+  | Durable.Durable_empty | Durable_storage.Durable_empty ->
+      Some "Empty durable storage"
+  | _ -> None
+
 let truncate_message msg =
   if String.length msg > messages_maximum_size then
     String.sub msg 0 messages_maximum_size
@@ -97,6 +104,9 @@ let extract_interpreter_error_raw exn =
   | Eval.Missing_memory_0_export ->
       `Interpreter
         {raw_exception; explanation = Some "Module must export memory 0"}
+  | Durable.Invalid_key _ | Durable.Not_found | Durable.Durable_empty
+  | Durable_storage.Durable_empty ->
+      `Interpreter {raw_exception; explanation = durable_exn_explanation exn}
   | _ -> `Unknown raw_exception
 
 let extract_interpreter_error exn =
