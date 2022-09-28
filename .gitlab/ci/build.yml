@@ -69,7 +69,7 @@ build_get_contracts:
 
   artifacts:
     paths:
-      - "tezos-binaries/$ARCH/*"
+      - "octez-binaries/$ARCH/*"
 
 # x86_64 static binaries are necessary for development branches, as we want to make
 # sure the build does not break. We also need it for release tags, to as its artifacts

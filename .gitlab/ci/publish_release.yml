@@ -63,7 +63,7 @@ docker:promote_to_latest:
     AWS_BUCKET_REGION: "eu-west-1"
     PACKAGE_FORMAT: "deb"
     ARCH: "amd64"
-    TEZOS_BINARIES: "tezos-binaries/x86_64"
+    TEZOS_BINARIES: "octez-binaries/x86_64"
   script:
     - ./scripts/ci/create_linux_package.sh
     - ./scripts/ci/upload_linux_package.sh
@@ -82,7 +82,7 @@ docker:promote_to_latest:
     AWS_BUCKET_REGION: "eu-west-1"
     PACKAGE_FORMAT: "rpm"
     ARCH: "amd64"
-    TEZOS_BINARIES: "tezos-binaries/x86_64"
+    TEZOS_BINARIES: "octez-binaries/x86_64"
   script:
     - ./scripts/ci/create_linux_package.sh
     - ./scripts/ci/upload_linux_package.sh

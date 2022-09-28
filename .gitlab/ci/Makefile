@@ -16,7 +16,7 @@ test-protocol-compiles:
 .PHONY: test-static-binaries
 test-static-binaries:
 	cd ${CI_PROJECT_DIR}/tests_python && \
-		sudo cp -a ../tezos-binaries/x86_64/* ../ && \
+		sudo cp -a ../octez-binaries/x86_64/* ../ && \
 		$(MAKE) -C ../ build-parameters && \
 		poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
 
