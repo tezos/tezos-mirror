@@ -281,9 +281,6 @@ let build_snapshot_wasm_state_from_set_input
         ])
   in
   (* Serves to encode the `Input_requested` status. *)
-  let input_request_encoding =
-    Tree_encoding.value ~default:true [] Data_encoding.bool
-  in
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tree_encoding.scope ["wasm"] state_encoding)
@@ -297,26 +294,16 @@ let build_snapshot_wasm_state_from_set_input
       (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       tree
   in
-  let snapshot_tick =
-    Z.(max_tick + current_tick + Z.one)
-    (* Offsetted by one since the snapshot is a tick in itself. *)
-  in
+  let snapshot_tick = Z.(max_tick + current_tick) in
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
       snapshot_tick
       tree
   in
-  let* tree =
-    Test_encodings_util.Tree_encoding_runner.encode
-      (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
-      snapshot_tick
-      tree
-  in
-  (* A snapshot should always be in input state *)
   Test_encodings_util.Tree_encoding_runner.encode
-    (Tree_encoding.scope ["input"; "consuming"] input_request_encoding)
-    true
+    (Tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+    snapshot_tick
     tree
 
 let test_snapshotable_state () =
