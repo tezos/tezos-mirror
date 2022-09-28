@@ -132,7 +132,7 @@ main () {
         parameters_file="$bin_dir/../../_build/default/src/proto_alpha/lib_parameters/sandbox-parameters.json"
 
     else
-        # we assume a clean install with tezos-(admin-)client in the path
+        # we assume a clean install with octez-(admin-)client in the path
         local_client="${local_client:-$(which octez-client)}"
         local_admin_client="${local_admin_client:-$(which octez-admin-client)}"
         local_signer="${local_signer:-$(which octez-signer)}"
@@ -174,17 +174,17 @@ main () {
             accuser="$local_accuser -base-dir $client_dir -endpoint http://$host:$rpc"
         fi
 
-        echo '#!/bin/sh' > $client_dir/bin/tezos-baker-$protocol
-        echo "exec $baker \"\$@\""  >> $client_dir/bin/tezos-baker-$protocol
-        chmod +x $client_dir/bin/tezos-baker-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-baker-$protocol
+        echo "exec $baker \"\$@\""  >> $client_dir/bin/octez-baker-$protocol
+        chmod +x $client_dir/bin/octez-baker-$protocol
 
-        echo '#!/bin/sh' > $client_dir/bin/tezos-endorser-$protocol
-        echo "exec $endorser \"\$@\""  >> $client_dir/bin/tezos-endorser-$protocol
-        chmod +x $client_dir/bin/tezos-endorser-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-endorser-$protocol
+        echo "exec $endorser \"\$@\""  >> $client_dir/bin/octez-endorser-$protocol
+        chmod +x $client_dir/bin/octez-endorser-$protocol
 
-        echo '#!/bin/sh' > $client_dir/bin/tezos-accuser-$protocol
-        echo "exec $accuser \"\$@\""  >> $client_dir/bin/tezos-accuser-$protocol
-        chmod +x $client_dir/bin/tezos-accuser-$protocol
+        echo '#!/bin/sh' > $client_dir/bin/octez-accuser-$protocol
+        echo "exec $accuser \"\$@\""  >> $client_dir/bin/octez-accuser-$protocol
+        chmod +x $client_dir/bin/octez-accuser-$protocol
     done
 
     echo '#!/bin/sh' > $client_dir/bin/octez-signer
@@ -194,9 +194,9 @@ main () {
     cat <<EOF
 if type octez-client-reset >/dev/null 2>&1 ; then octez-client-reset; fi ;
 PATH="$client_dir/bin:\$PATH" ; export PATH ;
-alias tezos-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
-alias octez-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha octez-client-reset" ;
-alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
+alias octez-activate-alpha="$client  -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key activator and parameters $parameters_file" ;
+alias octez-client-reset="rm -rf \"$client_dir\"; unalias octez-activate-alpha octez-client-reset" ;
+alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap octez-client-reset EXIT ;
 
 EOF
@@ -214,14 +214,14 @@ command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
 may have to activate in your "sandboxed network" the same economic
 protocol as used by the alphanet by running:
 
-  tezos-activate-alpha
+  octez-activate-alpha
 
 Warning: all the client data will be removed when you close this shell
 or if you run this command a second time.
 
 Activate tab completion by running:
 
-  tezos-autocomplete
+  octez-autocomplete
 
 EOF
 

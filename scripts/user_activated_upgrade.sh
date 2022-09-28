@@ -9,10 +9,10 @@ Inserts a user-activated upgrade for the snapshot protocol with the given
 version number at the given level.
 
 When passing a low level (less or equal than 28082) it assumes that migration is
-on the sandbox, and it renames the sandbox command tezos-activate-alpha that
+on the sandbox, and it renames the sandbox command octez-activate-alpha that
 activates the Alpha protocol to the command
 
-  tezos-activate-<predecessor_version>_<predecessor_short_hash>
+  octez-activate-<predecessor_version>_<predecessor_short_hash>
 
 which activates the predecessor of the Alpha protocol. The <predecessor_version>
 coincides with <protocol_version> minus one, and the <predecessor_short_hash>
@@ -89,7 +89,7 @@ else {
 
     sed -i.old "s/\$bin_dir\/..\/proto_alpha\/parameters\/sandbox-parameters.json/\$bin_dir\/..\/proto_${pred}_${pred_short_hash}\/parameters\/sandbox-parameters.json/" src/bin_client/octez-init-sandboxed-client.sh
     sed -i.old "s/activate_alpha()/activate_${pred}_${pred_short_hash}()/" src/bin_client/octez-init-sandboxed-client.sh
-    sed -i.old "s/tezos-activate-alpha/tezos-activate-${pred}-${pred_short_hash}/" src/bin_client/octez-init-sandboxed-client.sh
+    sed -i.old "s/octez-activate-alpha/octez-activate-${pred}-${pred_short_hash}/" src/bin_client/octez-init-sandboxed-client.sh
     sed -i.old "s/activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK/activate protocol $pred_full_hash/" src/bin_client/octez-init-sandboxed-client.sh
     rm src/bin_client/octez-init-sandboxed-client.sh.old
     echo "The sandbox will now switch to $full_hash at level $level."

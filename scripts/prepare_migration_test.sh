@@ -122,9 +122,9 @@ migration is run on the sandbox:
 
 When the optional parameter <protocol_name>_<protocol_version> is provided, then
 the script snapshots the Alpha protocol and renames the sandbox command
-tezos-activate-alpha that activates the Alpha protocol to the command
+octez-activate-alpha that activates the Alpha protocol to the command
 
-  tezos-activate-<predecessor_version>_<predecessor_short_hash>
+  octez-activate-<predecessor_version>_<predecessor_short_hash>
 
 which activates the predecessor of the Alpha protocol. The <predecessor_version>
 coincides with <protocol_version> minus one, and the <predecessor_short_hash>
@@ -303,7 +303,7 @@ The script detected that you will do a migration on the sandbox."
 Use the following commands to start the sandboxed node:
 $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 $ eval \`./src/bin_client/octez-init-sandboxed-client.sh 1\`
-$ tezos-activate-${pred_proto_version}-${pred_short_hash}
+$ octez-activate-${pred_proto_version}-${pred_short_hash}
 
 Then bake blocks until the chain reaches level $mig_level with:
 $ octez-client bake for bootstrap1 --minimal-timestamp
