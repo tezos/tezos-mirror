@@ -5276,6 +5276,17 @@ let _git_gas_diff =
     ~static:false
     ~bisect_ppx:false
 
+let _gas_parameter_diff =
+  public_exe
+    "gas_parameter_diff"
+    ~path:"devtools/gas_parameter_diff/bin"
+    ~synopsis:"Internal dev tools"
+    ~internal_name:"main"
+    ~opam:"internal-devtools"
+    ~deps:[]
+    ~static:false
+    ~bisect_ppx:false
+
 let remove_if_exists fname = if Sys.file_exists fname then Sys.remove fname
 
 let get_contracts_lib =
