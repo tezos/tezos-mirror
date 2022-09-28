@@ -36,6 +36,8 @@ let protocols = Protocol.[Kathmandu; Lima; Alpha]
 
 let migrate_to = Protocol.Alpha
 
+let alpha_can_stitch_from_its_predecessor = false
+
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
    as functions to be called here. *)
@@ -61,17 +63,13 @@ let register_protocol_migration_tests () =
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
-  (* TODO #3380
-     Alpha cannot stitch from Jakarta yet, but when it can, we can
-     add a voting test from Jakarta to Alpha. *)
-  (* Voting.register
-       ~from_protocol:migrate_from
-       ~to_protocol:(Known migrate_to)
-       ~loser_protocols:[migrate_to] ;
-     Voting.register
-       ~from_protocol:migrate_from
-       ~to_protocol:Injected_test
-       ~loser_protocols:[migrate_to; migrate_from] ; *)
+  (if alpha_can_stitch_from_its_predecessor then
+   Protocol.previous_protocol Alpha
+   |> Option.iter @@ fun from_protocol ->
+      Voting.register
+        ~from_protocol
+        ~to_protocol:(Known Alpha)
+        ~loser_protocols:[]) ;
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Injected_test
