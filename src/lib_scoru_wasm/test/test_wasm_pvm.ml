@@ -426,6 +426,54 @@ let test_rebuild_snapshotable_state () =
     Context_hash.equal hash_input_tree_after_eval hash_input_rebuilded_tree) ;
   return_unit
 
+let test_invalid_key_truncated () =
+  let open Lwt_result_syntax in
+  let key =
+    "durable/key/that/should/be/eventually/truncated/in/the/stuck/state"
+    ^ "/for/being/too/long/and/not/fitting/into/the/expected/bytes"
+    ^ "/invalid/because/of/missing/root/slash"
+  in
+  let key_offset = 100 in
+  let key_length = String.length key in
+  (* Let's ensure the key will not fit in the Stuck message. *)
+  assert (key_length > Wasm_pvm_errors.messages_maximum_size) ;
+  (* This module initializes the memory with the key starting at [key_offset].
+     It will fail on `store_has` during `kernel_next` because the key doesn't
+     start with '/'. *)
+  let module_ =
+    Format.sprintf
+      {|
+        (module
+          (import "rollup_safe_core" "store_has"
+            (func $store_has (param i32 i32) (result i32))
+          )
+          (memory 1)
+          (data (i32.const %d) "%s")
+          (export "mem" (memory 0))
+          (func (export "kernel_next")
+            (call $store_has (i32.const %d) (i32.const %d))
+            (unreachable)
+          )
+        )
+    |}
+      key_offset
+      key
+      key_offset
+      key_length
+  in
+  (* Let's first init the tree to compute. *)
+  let*! tree = initial_tree ~from_binary:false module_ in
+  (* We eval *)
+  let*! tree_stuck = eval_until_input_requested tree in
+  let*! state = Wasm.Internal_for_tests.get_tick_state tree_stuck in
+  (* The final reason for being stuck should be truncated after
+     [Wasm_pvm_errors.messages_maximum_size]. *)
+  let reason =
+    String.sub ("Invalid_key: " ^ key) 0 Wasm_pvm_errors.messages_maximum_size
+  in
+  assert (is_stuck ~step:`Eval ~reason state) ;
+  return_unit
+
 let tests =
   [
     tztest
@@ -469,4 +517,8 @@ let tests =
       "Test rebuild snapshotable state"
       `Quick
       test_rebuild_snapshotable_state;
+    tztest
+      "Test Stuck state is truncated on long messages"
+      `Quick
+      test_invalid_key_truncated;
   ]
