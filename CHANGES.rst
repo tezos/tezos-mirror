@@ -72,6 +72,10 @@ Node
 - The ``config`` and ``identity`` node commands no longer try to
   update the data directory version (``version.json``).
 
+- Fixed a bug in the store that was generating an incorrect protocol
+  table during a branch switch containing a user activated protocol
+  upgrade.
+
 Client
 ------
 
