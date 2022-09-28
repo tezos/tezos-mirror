@@ -213,9 +213,19 @@ val pp : Format.formatter -> _ t -> unit
 module Syntax : sig
   val log2 : _ t -> may_saturate t
 
+  val sqrt : _ t -> may_saturate t
+
   val ( + ) : _ t -> _ t -> may_saturate t
+
+  val ( - ) : _ t -> _ t -> may_saturate t
 
   val ( * ) : _ t -> _ t -> may_saturate t
 
+  val ( < ) : _ t -> _ t -> bool
+
+  val ( = ) : _ t -> _ t -> bool
+
   val ( lsr ) : 'a t -> int -> 'a t
+
+  val ( lsl ) : 'a t -> int -> 'a t
 end

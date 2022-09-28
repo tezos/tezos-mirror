@@ -180,9 +180,19 @@ module Syntax = struct
   (* This is a good enough approximation. S.log2 0 = 1 *)
   let log2 x = safe_int (1 + numbits x)
 
+  let sqrt = sqrt
+
   let ( + ) = add
+
+  let ( - ) = sub
 
   let ( * ) = mul
 
+  let ( < ) = ( < )
+
+  let ( = ) = ( = )
+
   let ( lsr ) = shift_right
+
+  let ( lsl ) = shift_left
 end

@@ -259,9 +259,9 @@ let cost_N_IDupN size =
 
 let cost_div_int size1 size2 =
   (* Allocates at most [size1] bytes *)
+  let q = size1 - size2 in
   let open S_syntax in
   let v1 = S.safe_int size1 in
-  let q = size1 - size2 in
   if Compare.Int.(q < 0) then S.safe_int 105 + (v1 lsr 1)
   else
     let v0 = S.safe_int q * S.safe_int size2 in
