@@ -359,7 +359,6 @@ type invoke_step_kont =
       base_destination : int32;
       max_bytes : int32;
       code : code;
-      revealed_bytes : int32 option;
     }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
 
@@ -554,7 +553,6 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                           max_bytes;
                           base_destination = base;
                           code = (vs', es);
-                          revealed_bytes = None;
                         } ))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
@@ -635,16 +633,12 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                         };
                   };
             } )
-  | Inv_reveal_tick {revealed_bytes = None; _} ->
+  | Inv_reveal_tick _ ->
       (* This is a reveal tick, not an evaluation tick. The PVM should
          prevent this execution path. *)
       raise
         (Evaluation_step_error
            (Invoke_step "The reveal tick cannot be evaluated as is"))
-  | Inv_reveal_tick {revealed_bytes = Some revealed_bytes; code; _} ->
-      let vs, es = code in
-      let vs = Vector.cons (Num (I32 revealed_bytes)) vs in
-      Lwt.return (durable, Inv_stop {code = (vs, es); fresh_frame = None})
   | Inv_concat tick ->
       let+ concat_kont = concat_step tick.concat_kont in
       (durable, Inv_concat {tick with concat_kont})
@@ -1549,12 +1543,7 @@ exception Reveal_error of reveal_error
 
 let is_reveal_tick = function
   | {
-      step_kont =
-        SK_Next
-          ( _,
-            _,
-            LS_Craft_frame
-              (_, Inv_reveal_tick {reveal; revealed_bytes = None; _}) );
+      step_kont = SK_Next (_, _, LS_Craft_frame (_, Inv_reveal_tick {reveal; _}));
       _;
     } ->
       Some reveal
@@ -1586,11 +1575,7 @@ let reveal_step module_reg payload =
   function
   | {
       step_kont =
-        SK_Next
-          ( frame,
-            top,
-            LS_Craft_frame
-              (label, Inv_reveal_tick ({revealed_bytes = None; _} as inv)) );
+        SK_Next (frame, top, LS_Craft_frame (label, Inv_reveal_tick inv));
       _;
     } as config ->
       let+ bytes_count =
@@ -1601,6 +1586,8 @@ let reveal_step module_reg payload =
           frame.frame_specs
           payload
       in
+      let vs, es = inv.code in
+      let vs = Vector.cons (Num (I32 bytes_count)) vs in
       {
         config with
         step_kont =
@@ -1608,9 +1595,7 @@ let reveal_step module_reg payload =
             ( frame,
               top,
               LS_Craft_frame
-                ( label,
-                  Inv_reveal_tick {inv with revealed_bytes = Some bytes_count}
-                ) );
+                (label, Inv_stop {code = (vs, es); fresh_frame = None}) );
       }
   | _ -> raise (Reveal_error Reveal_step)
 

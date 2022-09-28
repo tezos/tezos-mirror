@@ -94,14 +94,13 @@ let test_reveal_preimage_gen preimage max_bytes =
         Tezos_webassembly_interpreter.Eval.
           {
             step_kont =
-              SK_Next
-                ( _,
-                  _,
-                  LS_Craft_frame
-                    (_, Inv_reveal_tick {revealed_bytes = Some size; _}) );
+              SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
             _;
-          } ->
-        return size
+          } -> (
+        let*! hd = Lazy_containers.Lazy_vector.Int32Vector.get 0l vs in
+        match hd with
+        | Num (I32 size) -> return size
+        | _ -> failwith "Incorrect stack")
     | _ -> failwith "The tick after reveal_step is not consistent"
   in
   (* Let's check the preimage in memory. *)

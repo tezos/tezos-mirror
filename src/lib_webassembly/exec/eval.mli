@@ -119,7 +119,6 @@ type invoke_step_kont =
       base_destination : int32;
       max_bytes : int32;
       code : code;
-      revealed_bytes : int32 option;
     }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
 

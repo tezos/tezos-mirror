@@ -767,15 +767,13 @@ let inv_reveal_tick ~module_reg =
   let* base_destination = Int32.of_int <$> small_nat in
   let* max_bytes = Int32.of_int <$> small_nat in
   let* vs = small_vector_gen value_gen in
-  let* es = small_vector_gen (admin_instr_gen ~module_reg) in
-  let+ revealed_bytes = option int32 in
+  let+ es = small_vector_gen (admin_instr_gen ~module_reg) in
   Eval.Inv_reveal_tick
     {
       reveal = Reveal_raw_data hash;
       base_destination;
       max_bytes;
       code = (vs, es);
-      revealed_bytes;
     }
 
 let inv_stop_gen ~module_reg =

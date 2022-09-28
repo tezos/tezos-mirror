@@ -512,14 +512,12 @@ let pp_invoke_step_kont out = function
         func
         (pp_concat_kont Values.pp_value)
         concat_kont
-  | Inv_reveal_tick
-      {reveal; base_destination; max_bytes; code = vs, es; revealed_bytes} ->
+  | Inv_reveal_tick {reveal; base_destination; max_bytes; code = vs, es} ->
       Format.fprintf
         out
         "@[<v 2>Inv_reveal_tick {instructions = %a;@;\
          values = %a;@;\
          reveal = %a;@;\
-         revealed_bytes = %a;@;\
          base_destination = %ld;@;\
          max_bytes = %ld;@;\
          }@]"
@@ -529,8 +527,6 @@ let pp_invoke_step_kont out = function
         vs
         pp_reveal
         reveal
-        (pp_opt pp_int32)
-        revealed_bytes
         base_destination
         max_bytes
   | Inv_stop {code = vs, es; fresh_frame} ->

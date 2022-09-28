@@ -1088,34 +1088,20 @@ let invoke_step_kont_encoding =
           Inv_concat {arity; vs; instructions; inst; func; concat_kont});
       case
         "Inv_reveal_tick"
-        (tup6
+        (tup5
            ~flatten:true
            (scope ["reveal"] reveal_encoding)
            (value ["base_destination"] Data_encoding.int32)
            (value ["max_bytes"] Data_encoding.int32)
            (lazy_vector_encoding "values" value_encoding)
-           (lazy_vector_encoding "instructions" admin_instr_encoding)
-           (option (value ["revealed_bytes"] Data_encoding.int32)))
+           (lazy_vector_encoding "instructions" admin_instr_encoding))
         (function
           | Eval.Inv_reveal_tick
-              {
-                reveal;
-                base_destination;
-                max_bytes;
-                code = vs, es;
-                revealed_bytes;
-              } ->
-              Some (reveal, base_destination, max_bytes, vs, es, revealed_bytes)
+              {reveal; base_destination; max_bytes; code = vs, es} ->
+              Some (reveal, base_destination, max_bytes, vs, es)
           | _ -> None)
-        (fun (reveal, base_destination, max_bytes, vs, es, revealed_bytes) ->
-          Inv_reveal_tick
-            {
-              reveal;
-              base_destination;
-              max_bytes;
-              code = (vs, es);
-              revealed_bytes;
-            });
+        (fun (reveal, base_destination, max_bytes, vs, es) ->
+          Inv_reveal_tick {reveal; base_destination; max_bytes; code = (vs, es)});
       case
         "Inv_stop"
         (tup3
