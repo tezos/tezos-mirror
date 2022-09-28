@@ -29,7 +29,8 @@
 module S = Saturation_repr
 module S_syntax = S.Syntax
 
-(* Automatically generated costs functions. *)
+(* This file is planned to be automatically generated. *)
+(* If you want to update the following functions, update the gas model instead. *)
 
 (* model N_IAbs_int *)
 (* Allocates [size] bytes. *)
@@ -94,10 +95,6 @@ let cost_N_IAnd_nat size1 size2 =
   let open S_syntax in
   let v0 = S.safe_int (Compare.Int.min size1 size2) in
   S.safe_int 35 + (v0 lsr 1)
-
-(* model N_IApply *)
-let cost_N_IApply rec_flag =
-  if rec_flag then S.safe_int 220 else S.safe_int 140
 
 (* model N_IBalance *)
 let cost_N_IBalance = S.safe_int 10
@@ -277,9 +274,6 @@ let cost_N_IEdiv_nat = cost_div_int
 
 (* model N_IEdiv_tez *)
 let cost_N_IEdiv_tez = S.safe_int 80
-
-(* model N_IEdiv_teznat *)
-let cost_N_IEdiv_teznat = S.safe_int 70
 
 (* model N_IEmpty_big_map *)
 let cost_N_IEmpty_big_map = S.safe_int 300
@@ -485,12 +479,6 @@ let cost_N_IMul_int = cost_mul
 (* Approximating 0.861823 x term *)
 let cost_N_IMul_nat = cost_mul
 
-(* model N_IMul_nattez *)
-let cost_N_IMul_nattez = S.safe_int 50
-
-(* model N_IMul_teznat *)
-let cost_N_IMul_teznat = S.safe_int 50
-
 (* model N_INeg_bls12_381_fr *)
 (* when benchmarking, compile bls12-381 without ADX *)
 let cost_N_INeg_bls12_381_fr = S.safe_int 25
@@ -559,15 +547,6 @@ let cost_N_IRight = S.safe_int 10
 
 (* model N_ISapling_empty_state *)
 let cost_N_ISapling_empty_state = S.safe_int 300
-
-(* model N_ISapling_verify_update *)
-let cost_N_ISapling_verify_update size1 size2 bound_data =
-  let open S_syntax in
-  let v1 = S.safe_int size1 in
-  let v2 = S.safe_int size2 in
-  cost_N_IBlake2b bound_data + S.safe_int 310_000
-  + (S.safe_int 5_575_000 * v1)
-  + (S.safe_int 5_075_000 * v2)
 
 (* model N_ISelf_address *)
 let cost_N_ISelf_address = S.safe_int 10
@@ -683,19 +662,6 @@ let cost_N_IXor_nat = cost_linear_op_int
 (* model N_KCons *)
 let cost_N_KCons = S.safe_int 10
 
-(* model N_KIter *)
-let cost_N_KIter = S.safe_int 10
-
-(* model N_KList_enter_body *)
-(* Approximating 1.672196 x term *)
-let cost_N_KList_enter_body xs size_ys =
-  match xs with
-  | [] ->
-      let open S_syntax in
-      let v0 = S.safe_int size_ys in
-      S.safe_int 25 + (v0 + (v0 lsr 1) + (v0 lsr 3))
-  | _ :: _ -> S.safe_int 25
-
 (* model N_KList_exit_body *)
 let cost_N_KList_exit_body = S.safe_int 10
 
@@ -704,9 +670,6 @@ let cost_N_KLoop_in = S.safe_int 10
 
 (* model N_KLoop_in_left *)
 let cost_N_KLoop_in_left = S.safe_int 10
-
-(* model N_KMap_enter_body *)
-let cost_N_KMap_enter_body = S.safe_int 80
 
 (* model N_KNil *)
 let cost_N_KNil = S.safe_int 15
@@ -901,56 +864,6 @@ let cost_TIMESTAMP_READABLE_ENCODING = S.safe_int 820
 let cost_CHECK_PRINTABLE size =
   let open S_syntax in
   S.safe_int 14 + (S.safe_int 10 * S.safe_int size)
-
-(* model TY_EQ
-   This is the estimated cost of one iteration of ty_eq, extracted
-   and copied manually from the parameter fit for the TY_EQ benchmark
-   (the model is parametric on the size of the type, which we don't have
-   access to in O(1)). *)
-let cost_TY_EQ = S.safe_int 60
-
-(* model TYPECHECKING_CODE
-   This is the cost of one iteration of parse_instr, extracted by hand from the
-   parameter fit for the TYPECHECKING_CODE benchmark. *)
-let cost_TYPECHECKING_CODE = S.safe_int 220
-
-(* model UNPARSING_CODE
-   This is the cost of one iteration of unparse_instr, extracted by hand from the
-   parameter fit for the UNPARSING_CODE benchmark. *)
-let cost_UNPARSING_CODE = S.safe_int 115
-
-(* model TYPECHECKING_DATA
-   This is the cost of one iteration of parse_data, extracted by hand from the
-   parameter fit for the TYPECHECKING_DATA benchmark. *)
-let cost_TYPECHECKING_DATA = S.safe_int 100
-
-(* model UNPARSING_DATA
-   This is the cost of one iteration of unparse_data, extracted by hand from the
-   parameter fit for the UNPARSING_DATA benchmark. *)
-let cost_UNPARSING_DATA = S.safe_int 65
-
-(* model PARSE_TYPE
-   This is the cost of one iteration of parse_ty, extracted by hand from the
-   parameter fit for the PARSE_TYPE benchmark. *)
-let cost_PARSE_TYPE = S.safe_int 60
-
-(* model UNPARSE_TYPE
-   This is the cost of one iteration of unparse_ty, extracted by hand from the
-   parameter fit for the UNPARSE_TYPE benchmark. *)
-let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
-   Benchmark.
-   Currently approximated by 2 comparisons of the longest entrypoint. *)
-let cost_FIND_ENTRYPOINT = cost_N_ICompare 31 31
-
-(* model SAPLING_TRANSACTION_ENCODING *)
-let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data =
-  S.safe_int (1500 + (inputs * 160) + (outputs * 320) + (bound_data lsr 3))
-
-(* model SAPLING_DIFF_ENCODING *)
-let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
-  S.safe_int ((nfs * 22) + (cms * 215))
 
 (* model IEmit *)
 let cost_N_IEmit = S.safe_int 30
