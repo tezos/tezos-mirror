@@ -126,6 +126,8 @@ module Page = struct
     Slot_index.equal page.slot_index page'.slot_index
     && Index.equal page.page_index page'.page_index
 
+  let content_encoding = Data_encoding.bytes
+
   let pp fmt {slot_index; page_index} =
     Format.fprintf
       fmt
