@@ -363,15 +363,6 @@ let store_move_type =
 let store_move_aux durable memories from_key_offset from_key_length
     to_key_offset to_key_length =
   let open Lwt.Syntax in
-  let* durable, _ =
-    store_copy_aux
-      durable
-      memories
-      from_key_offset
-      from_key_length
-      to_key_offset
-      to_key_length
-  in
   let from_key_length = Int32.to_int from_key_length in
   let to_key_length = Int32.to_int to_key_length in
   if from_key_length > Durable.max_key_length then
@@ -384,7 +375,7 @@ let store_move_aux durable memories from_key_offset from_key_length
   let tree = Durable.of_storage_exn durable in
   let from_key = Durable.key_of_string_exn from_key in
   let to_key = Durable.key_of_string_exn to_key in
-  let+ tree = Durable.movep_tree_exn tree from_key to_key in
+  let+ tree = Durable.move_tree_exn tree from_key to_key in
   (Durable.to_storage tree, [])
 
 let store_move =
