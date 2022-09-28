@@ -116,6 +116,11 @@ let count_subtrees tree key =
 
 let delete tree key = T.remove tree key
 
+let move_tree_exn tree from_key to_key =
+  let open Lwt.Syntax in
+  let* tree = copy_tree_exn tree from_key to_key in
+  delete tree from_key
+
 let hash_exn tree key =
   let open Lwt.Syntax in
   let+ opt = T.find_tree tree (to_value_key key) in
