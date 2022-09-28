@@ -324,7 +324,7 @@ let cost_N_IIf_left = S.safe_int 10
 let cost_N_IIf_none = S.safe_int 10
 
 (* model N_IOpt_map *)
-let cost_opt_map = S.safe_int 10
+let cost_N_IOpt_map = S.safe_int 10
 
 (* model N_IImplicit_account *)
 let cost_N_IImplicit_account = S.safe_int 10
@@ -359,10 +359,10 @@ let cost_N_ILeft = S.safe_int 10
 let cost_N_ILevel = S.safe_int 10
 
 (* model N_IList_iter *)
-let cost_N_IList_iter _ = S.safe_int 20
+let cost_N_IList_iter = S.safe_int 20
 
 (* model N_IList_map *)
-let cost_N_IList_map _ = S.safe_int 20
+let cost_N_IList_map = S.safe_int 20
 
 (* model N_IList_size *)
 let cost_N_IList_size = S.safe_int 10
@@ -394,6 +394,8 @@ let cost_N_ILt = S.safe_int 10
 (* Approximating 0.048359 x term *)
 let cost_N_IMap_get size1 size2 =
   let open S_syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
   let v0 = size1 * log2 size2 in
   S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
 
@@ -401,6 +403,8 @@ let cost_N_IMap_get size1 size2 =
 (* Approximating 0.145661 x term *)
 let cost_N_IMap_get_and_update size1 size2 =
   let open S_syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
   let v0 = size1 * log2 size2 in
   S.safe_int 75 + (v0 lsr 3) + (v0 lsr 6)
 
@@ -422,6 +426,8 @@ let cost_N_IMap_map size =
 (* Approximating 0.048446 x term *)
 let cost_N_IMap_mem size1 size2 =
   let open S_syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
   let v0 = size1 * log2 size2 in
   S.safe_int 45 + (v0 lsr 5) + (v0 lsr 6)
 
@@ -432,6 +438,8 @@ let cost_N_IMap_size = S.safe_int 10
 (* Approximating 0.097072 x term *)
 let cost_N_IMap_update size1 size2 =
   let open S_syntax in
+  let size1 = S.safe_int size1 in
+  let size2 = S.safe_int size2 in
   let v0 = size1 * log2 size2 in
   S.safe_int 55 + (v0 lsr 4) + (v0 lsr 5)
 
@@ -525,7 +533,7 @@ let cost_N_IMin_block_time = S.safe_int 20
 
 (* model N_IOpen_chest *)
 (* 612000 + chest * 19 + time * 19050 *)
-let cost_N_IOpen_chest ~chest ~time =
+let cost_N_IOpen_chest time chest =
   let open S_syntax in
   let v0 = S.safe_int chest in
   let v1 = S.safe_int time in
@@ -833,7 +841,7 @@ let cost_DECODING_Chest_key = S.safe_int 5900
 
 (* model DECODING_Chest *)
 (* Approximating 0.039349 x term *)
-let cost_DECODING_Chest ~bytes =
+let cost_DECODING_Chest bytes =
   let open S_syntax in
   let v0 = S.safe_int bytes in
   S.safe_int 7400 + (v0 lsr 5) + (v0 lsr 7)
@@ -873,14 +881,14 @@ let cost_ENCODING_Chest_key = S.safe_int 10_000
 
 (* model ENCODING_Chest *)
 (* Approximating 0.120086 x term *)
-let cost_ENCODING_Chest ~plaintext_size =
+let cost_ENCODING_Chest plaintext_size =
   let open S_syntax in
   let v0 = S.safe_int plaintext_size in
   S.safe_int 12_200 + (v0 lsr 3)
 
 (* model TIMESTAMP_READABLE_DECODING *)
 (* Approximating 0.045400 x term *)
-let cost_TIMESTAMP_READABLE_DECODING ~bytes =
+let cost_TIMESTAMP_READABLE_DECODING bytes =
   let open S_syntax in
   let b = S.safe_int bytes in
   let v0 = S.mul (S.sqrt b) b in

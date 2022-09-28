@@ -56,7 +56,7 @@ module Cost_of = struct
 
     let if_none = atomic_step_cost cost_N_IIf_none
 
-    let opt_map = atomic_step_cost cost_opt_map
+    let opt_map = atomic_step_cost cost_N_IOpt_map
 
     let cons_pair = atomic_step_cost cost_N_ICons_pair
 
@@ -79,12 +79,12 @@ module Cost_of = struct
     let if_cons = atomic_step_cost cost_N_IIf_cons
 
     let list_map : 'a Script_typed_ir.boxed_list -> Gas.cost =
-     fun {length; _} -> atomic_step_cost (cost_N_IList_map length)
+     fun _ -> atomic_step_cost cost_N_IList_map
 
     let list_size = atomic_step_cost cost_N_IList_size
 
     let list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost =
-     fun {length; _} -> atomic_step_cost (cost_N_IList_iter length)
+     fun _ -> atomic_step_cost cost_N_IList_iter
 
     let empty_set = atomic_step_cost cost_N_IEmpty_set
 
@@ -106,20 +106,19 @@ module Cost_of = struct
 
     let map_size = atomic_step_cost cost_N_IMap_size
 
-    let big_map_elt_size = S.safe_int Script_expr_hash.size
+    let big_map_elt_size = Script_expr_hash.size
 
     let big_map_mem ({size; _} : _ Script_typed_ir.big_map_overlay) =
-      atomic_step_cost (cost_N_IMap_mem big_map_elt_size (S.safe_int size))
+      atomic_step_cost (cost_N_IMap_mem big_map_elt_size size)
 
     let big_map_get ({size; _} : _ Script_typed_ir.big_map_overlay) =
-      atomic_step_cost (cost_N_IMap_get big_map_elt_size (S.safe_int size))
+      atomic_step_cost (cost_N_IMap_get big_map_elt_size size)
 
     let big_map_update ({size; _} : _ Script_typed_ir.big_map_overlay) =
-      atomic_step_cost (cost_N_IMap_update big_map_elt_size (S.safe_int size))
+      atomic_step_cost (cost_N_IMap_update big_map_elt_size size)
 
     let big_map_get_and_update ({size; _} : _ Script_typed_ir.big_map_overlay) =
-      atomic_step_cost
-        (cost_N_IMap_get_and_update big_map_elt_size (S.safe_int size))
+      atomic_step_cost (cost_N_IMap_get_and_update big_map_elt_size size)
 
     let add_seconds_timestamp :
         'a Script_int.num -> Script_timestamp.t -> Gas.cost =
@@ -397,7 +396,7 @@ module Cost_of = struct
         Script_typed_ir.Script_timelock.get_plaintext_size chest
       in
       let log_time = Z.log2 Z.(add one time) in
-      atomic_step_cost (cost_N_IOpen_chest ~chest:plaintext ~time:log_time)
+      atomic_step_cost (cost_N_IOpen_chest log_time plaintext)
 
     (* --------------------------------------------------------------------- *)
     (* Semi-hand-crafted models *)
@@ -763,8 +762,7 @@ module Cost_of = struct
     let unit = free
 
     let timestamp_readable s =
-      atomic_step_cost
-        (cost_TIMESTAMP_READABLE_DECODING ~bytes:(String.length s))
+      atomic_step_cost (cost_TIMESTAMP_READABLE_DECODING (String.length s))
 
     (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
         Refine the gas model *)
@@ -781,7 +779,7 @@ module Cost_of = struct
 
     let chest_key = atomic_step_cost cost_DECODING_Chest_key
 
-    let chest ~bytes = atomic_step_cost (cost_DECODING_Chest ~bytes)
+    let chest ~bytes = atomic_step_cost (cost_DECODING_Chest bytes)
   end
 
   module Unparsing = struct
@@ -900,7 +898,7 @@ module Cost_of = struct
     let chest_key = atomic_step_cost cost_ENCODING_Chest_key
 
     let chest ~plaintext_size =
-      atomic_step_cost (cost_ENCODING_Chest ~plaintext_size)
+      atomic_step_cost (cost_ENCODING_Chest plaintext_size)
   end
 end
 
