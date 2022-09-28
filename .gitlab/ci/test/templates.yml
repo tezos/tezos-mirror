@@ -27,5 +27,3 @@
   # Start immediately after 'build_x86_64' and don't wait for
   # intermediate stages to succeed
   needs: ["build_x86_64"]
-  before_script:
-    - if [ ! -f octez-node ] || [ ! -f octez-client ] || [ ! -f octez-codec ]; then make all build-unreleased; fi
