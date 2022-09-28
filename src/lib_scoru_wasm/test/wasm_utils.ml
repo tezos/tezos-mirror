@@ -139,12 +139,6 @@ let is_stuck ?step ?reason = function
 
 let wrap_as_durable_storage tree =
   let open Lwt.Syntax in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
-      true
-      tree
-  in
   let+ tree =
     Tree_encoding_runner.decode
       (Tree_encoding.scope ["durable"] Tree_encoding.wrapped_tree)
@@ -156,6 +150,12 @@ let wrap_as_durable_storage tree =
 let make_durable list_key_vals =
   let open Lwt_syntax in
   let* tree = empty_tree () in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
+      true
+      tree
+  in
   let* tree =
     List.fold_left
       (fun acc (key, value) ->

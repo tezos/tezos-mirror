@@ -46,26 +46,10 @@ let equal_chunks c1 c2 =
   let* c2 = Chunked_byte_vector.to_string c2 in
   Lwt.return @@ assert (String.equal c1 c2)
 
-let wrap_as_durable_storage tree =
-  let open Lwt.Syntax in
-  let* tree =
-    Tree_encoding_runner.encode
-      (Tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
-      true
-      tree
-  in
-  let+ tree =
-    Tree_encoding_runner.decode
-      (Tree_encoding.scope ["durable"] Tree_encoding.wrapped_tree)
-      tree
-  in
-  Tezos_webassembly_interpreter.Durable_storage.of_tree
-  @@ Tree_encoding.Wrapped.wrap tree
-
 (* Test checking that if [key] is missing, [store_has key] returns [false] *)
 let test_store_has_missing_key () =
   let open Lwt.Syntax in
-  let* durable = make_durable [("keepme", "true")] in
+  let* durable = make_durable [] in
   let key = "/test/path" in
   let src = 10l in
   let module_reg, module_key, host_funcs_registry =
@@ -101,7 +85,7 @@ let assert_invalid_key run =
 (* Test checking that if [key] is too large, [store_has key] traps. *)
 let test_store_has_key_too_long () =
   let open Lwt_syntax in
-  let* durable = make_durable [("keepme", "true")] in
+  let* durable = make_durable [] in
   (* Together with the '/durable' prefix, and '/_' this key is too long *)
   let src = 10l in
   let key = List.repeat 240 "a" |> String.concat "" |> ( ^ ) "/" in
@@ -244,32 +228,15 @@ let test_store_has_existing_key () =
     make_durable
       [(root, "true"); (root ^ "/one", "true"); (root ^ "/two/three", "true")]
   in
-
-  (* let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-     let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in *)
   let src = 20l in
   let key = "/" ^ root in
-  (* let _ = Memory.store_bytes memory src key in *)
   let src_one = Int32.add src @@ Int32.of_int @@ String.length key in
   let key_one = key ^ "/one" in
-  (* let _ = Memory.store_bytes memory src_one key_one in *)
   let src_two = Int32.add src_one @@ Int32.of_int @@ String.length key_one in
   let key_two = key ^ "/two" in
-
-  (* let _ = Memory.store_bytes memory src_two key_two in *)
-  (* let src = 20l in *)
   let module_reg, module_key, host_funcs_registry =
     make_module_inst [key; key_one; key_two] src
   in
-
-  (* let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-     let module_inst = {module_inst with memories} in
-     let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-     Host_funcs.register_host_funcs host_funcs_registry ;
-
-     let module_reg = Instance.ModuleMap.create () in
-     let module_key = Instance.Module_key "test" in
-     Instance.update_module_ref module_reg module_key module_inst ; *)
   let check src key expected =
     let values =
       Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
@@ -350,7 +317,6 @@ let test_durable_count_subtrees () =
    the tree that existed previously at [to_key] *)
 let test_store_copy () =
   let open Lwt_syntax in
-  (* let* tree = empty_tree () in *)
   let value () = Chunked_byte_vector.of_string "a very long value" in
   (*
   Store the following tree:
@@ -387,31 +353,6 @@ let test_store_copy () =
     Durable.find_value_exn durable_st @@ Durable.key_of_string_exn wrong_key
   in
   let* () = equal_chunks old_value_at_two (value ()) in
-
-  (* let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
-     let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
-     let from_key = "/a/short/path/one" in
-     let to_key = "/a/long/path" in
-     let wrong_key = "/a/long/path/two" in
-     let durable_st = Durable.of_storage_exn durable in
-     let* old_value_from_key =
-       Durable.find_value_exn durable_st @@ Durable.key_of_string_exn from_key
-     in
-     let* old_value_at_two =
-       Durable.find_value_exn durable_st @@ Durable.key_of_string_exn wrong_key
-     in
-     let* () = equal_chunks old_value_at_two (value ()) in
-     let from_offset = 20l in
-     let to_offset = 40l in
-     let _ = Memory.store_bytes memory from_offset from_key in
-     let _ = Memory.store_bytes memory to_offset to_key in
-     let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
-     let module_inst = {module_inst with memories} in
-     let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-     Host_funcs.register_host_funcs host_funcs_registry ;
-     let module_reg = Instance.ModuleMap.create () in
-     let module_key = Instance.Module_key "test" in
-     Instance.update_module_ref module_reg module_key module_inst ; *)
   let values =
     Values.
       [
