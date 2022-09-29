@@ -184,7 +184,6 @@ if [ -z "$prev_upcased_label" ]; then
 fi
 
 sed -i.old -e "s/constants\.ALPHA/constants\.${upcased_label}/" "tests_${version}/protocol.py"
-sed -i.old -e "s/constants\.${prev_upcased_label}/constants\.${upcased_label}/" "tests_alpha/protocol.py"
 cd ../
 
 # move daemons to a tmp directory to avoid editing lib_protocol
