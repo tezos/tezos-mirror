@@ -987,6 +987,23 @@ let packed_frame_stack_encoding =
        (scope ["frame"] frame_encoding)
        (scope ["label_kont"] packed_label_kont_encoding))
 
+let input_hash_encoding =
+  conv
+    Reveal.input_hash_from_string_exn
+    Reveal.input_hash_to_string
+    (value [] (Data_encoding.Fixed.string 32))
+
+let reveal_encoding =
+  tagged_union
+    string_tag
+    [
+      case
+        "Reveal_raw_data"
+        input_hash_encoding
+        (function Reveal.Reveal_raw_data hash -> Some hash)
+        (fun hash -> Reveal_raw_data hash);
+    ]
+
 let invoke_step_kont_encoding =
   tagged_union
     string_tag
@@ -1069,6 +1086,22 @@ let invoke_step_kont_encoding =
           | _ -> None)
         (fun (arity, vs, instructions, inst, func, concat_kont) ->
           Inv_concat {arity; vs; instructions; inst; func; concat_kont});
+      case
+        "Inv_reveal_tick"
+        (tup5
+           ~flatten:true
+           (scope ["reveal"] reveal_encoding)
+           (value ["base_destination"] Data_encoding.int32)
+           (value ["max_bytes"] Data_encoding.int32)
+           (lazy_vector_encoding "values" value_encoding)
+           (lazy_vector_encoding "instructions" admin_instr_encoding))
+        (function
+          | Eval.Inv_reveal_tick
+              {reveal; base_destination; max_bytes; code = vs, es} ->
+              Some (reveal, base_destination, max_bytes, vs, es)
+          | _ -> None)
+        (fun (reveal, base_destination, max_bytes, vs, es) ->
+          Inv_reveal_tick {reveal; base_destination; max_bytes; code = (vs, es)});
       case
         "Inv_stop"
         (tup3

@@ -413,7 +413,7 @@ let rec eval_until_set_input context s =
   | Computing ->
       let* s = checked_eval ~loc:__LOC__ context s in
       eval_until_set_input context s
-  | Waiting_for_input_message -> return s
+  | Waiting_for_reveal _ | Waiting_for_input_message -> return s
 
 let should_boot_computation_kernel () =
   let open Lwt_result_syntax in

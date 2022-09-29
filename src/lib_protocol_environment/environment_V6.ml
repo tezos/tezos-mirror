@@ -1112,7 +1112,8 @@ struct
                 input_request =
                   (match input_request with
                   | No_input_required -> No_input_required
-                  | Input_required -> Input_required);
+                  | Input_required -> Input_required
+                  | Reveal_required _ -> No_input_required);
               }
     end
   end

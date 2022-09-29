@@ -369,6 +369,8 @@ module Make
             Tree_encoding_runner.encode state_merklizer state tree
         | Not_gathering_floppies -> Wasm.set_input_step input message tree)
 
+  let reveal_step = Wasm.reveal_step
+
   let get_output = Wasm.get_output
 
   let get_info tree =

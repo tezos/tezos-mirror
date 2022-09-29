@@ -67,18 +67,8 @@ let current_tick_encoding =
 
 (* Replicates the encoder in [Wasm_pvm]. Used here for artificially encode
    input info in the tree. *)
-let input_request_encoding =
-  Tree_encoding.conv
-    (function
-      | true -> Wasm_pvm_sig.Input_required
-      | false -> Wasm_pvm_sig.No_input_required)
-    (function
-      | Wasm_pvm_sig.Input_required -> true
-      | Wasm_pvm_sig.No_input_required -> false)
-    (Tree_encoding.value
-       ~default:false
-       ["input"; "consuming"]
-       Data_encoding.bool)
+let input_requested_encoding =
+  Tree_encoding.value ~default:false ["input"; "consuming"] Data_encoding.bool
 
 let floppy_encoding =
   Tree_encoding.value
@@ -122,12 +112,7 @@ let initialise_tree () =
       Gather_floppies.Not_gathering_floppies
       tree
   in
-  let* tree =
-    Tree_encoding_runner.encode
-      input_request_encoding
-      Wasm_pvm_sig.Input_required
-      tree
-  in
+  let* tree = Tree_encoding_runner.encode input_requested_encoding true tree in
   Tree_encoding_runner.encode
     buffers_encoding
     (Tezos_webassembly_interpreter.Eval.buffers ())
@@ -216,18 +201,7 @@ let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
-  let* tree =
-    Tree_encoding_runner.encode
-      input_request_encoding
-      Wasm_pvm_sig.No_input_required
-      tree
-  in
-  let* tree =
-    Tree_encoding_runner.encode
-      input_request_encoding
-      Wasm_pvm_sig.Input_required
-      tree
-  in
+  let* tree = Tree_encoding_runner.encode input_requested_encoding true tree in
   let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
   let module_reg = Tezos_webassembly_interpreter.Instance.ModuleMap.create () in
   let tick_state =
@@ -248,7 +222,7 @@ let test_set_input () =
   in
   let* result_input = Tree_encoding_runner.decode inp_encoding tree in
   let* waiting_for_input =
-    Tree_encoding_runner.decode input_request_encoding tree
+    Tree_encoding_runner.decode input_requested_encoding tree
   in
   let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
@@ -265,7 +239,7 @@ let test_set_input () =
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
-  assert (waiting_for_input = Wasm_pvm_sig.No_input_required) ;
+  assert (waiting_for_input = false) ;
   assert (result_input = "hello") ;
   Lwt_result_syntax.return_unit
 

@@ -69,6 +69,11 @@ module Impl : Pvm.S = struct
 
   let string_of_status : status -> string = function
     | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
+        Format.asprintf
+          "Waiting for preimage reveal %a"
+          Sc_rollup.Input_hash.pp
+          hash
     | Computing -> "Computing"
 end
 

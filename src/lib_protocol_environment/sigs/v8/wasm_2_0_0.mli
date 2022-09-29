@@ -27,7 +27,16 @@ type input = {inbox_level : Bounded.Non_negative_int32.t; message_counter : Z.t}
 
 type output = {outbox_level : Bounded.Non_negative_int32.t; message_index : Z.t}
 
-type input_request = No_input_required | Input_required
+type input_hash
+
+val input_hash_to_string : input_hash -> string
+
+type reveal = Reveal_raw_data of input_hash
+
+type input_request =
+  | No_input_required
+  | Input_required
+  | Reveal_required of reveal
 
 type info = {
   current_tick : Z.t;
@@ -40,6 +49,8 @@ module Make
   val compute_step : Tree.tree -> Tree.tree Lwt.t
 
   val set_input_step : input -> string -> Tree.tree -> Tree.tree Lwt.t
+
+  val reveal_step : bytes -> Tree.tree -> Tree.tree Lwt.t
 
   val get_output : output -> Tree.tree -> string Lwt.t
 

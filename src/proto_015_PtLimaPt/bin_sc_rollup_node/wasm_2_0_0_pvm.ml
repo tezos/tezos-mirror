@@ -61,6 +61,24 @@ module Make_backend (Tree : TreeS) = struct
 
     let wrap t = PVM_tree t
   end)
+
+  (* We need to deal with the introduction of new constructors post V7
+     freeze. *)
+  let get_info tree =
+    let open Lwt_syntax in
+    let+ Tezos_scoru_wasm.Wasm_pvm_sig.
+           {current_tick; last_input_read; input_request} =
+      get_info tree
+    in
+    Environment.Wasm_2_0_0.
+      {
+        current_tick;
+        last_input_read;
+        input_request =
+          (match input_request with
+          | Reveal_required _ | No_input_required -> No_input_required
+          | Input_required -> Input_required);
+      }
 end
 
 module Impl : Pvm.S = struct

@@ -79,6 +79,7 @@ let rec eval_until_input_requested ?(max_steps = Int64.max_int) tree =
       let* tree = Wasm.compute_step_many ~max_steps tree in
       eval_until_input_requested tree
   | Input_required -> return tree
+  | Reveal_required _ -> return tree
 
 let rec eval_until_init tree =
   let open Lwt_syntax in

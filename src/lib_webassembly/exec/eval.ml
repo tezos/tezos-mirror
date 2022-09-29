@@ -104,6 +104,10 @@ type init_state =
 
 exception Init_step_error of init_state
 
+type eval_state = Invoke_step of string
+
+exception Evaluation_step_error of eval_state
+
 let table_error at = function
   | Table.Bounds -> "out of bounds table access"
   | Table.SizeOverflow -> "table size overflow"
@@ -350,7 +354,31 @@ type invoke_step_kont =
       func : func;
       concat_kont : value concat_kont;
     }
+  | Inv_reveal_tick of {
+      reveal : Reveal.reveal;
+      base_destination : int32;
+      max_bytes : int32;
+      code : code;
+    }
   | Inv_stop of {code : code; fresh_frame : ongoing frame_stack option}
+
+let vector_pop_map v f at =
+  if 1l <= Vector.num_elements v then
+    let+ hd, v = Vector.pop v in
+    match f hd with
+    | Some r -> (r, v)
+    | None -> Crash.error at "missing or ill-typed operand on stack"
+  else Crash.error at "missing or ill-typed operand on stack"
+
+let num = function Num n -> Some n | _ -> None
+
+let num_i32 = function Num (I32 i) -> Some i | _ -> None
+
+let ref_ = function Ref r -> Some r | _ -> None
+
+let vec = function Vec v -> Some v | _ -> None
+
+let vec_v128 = function Vec (V128 v) -> Some v | _ -> None
 
 type label_step_kont =
   | LS_Start : ongoing label_kont -> label_step_kont
@@ -470,7 +498,8 @@ let vmtake n vs = match n with Some n -> Vector.split vs n |> fst | None -> vs
 
 let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
   function
-  | Inv_stop _ -> assert false
+  | Inv_stop _ ->
+      raise (Evaluation_step_error (Invoke_step "Inv_stop cannot reduce"))
   | Inv_start {func; code = vs, es} -> (
       let (FuncType (ins, out)) = func_type_of func in
       let n1, n2 =
@@ -494,25 +523,37 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
       | Func.HostFunc (_, global_name) ->
           Lwt.catch
             (fun () ->
-              let (Host_funcs.Host_func f) =
-                Host_funcs.lookup ~global_name c.host_funcs
-              in
-              let* inst = resolve_module_ref c.module_reg frame.inst in
+              let host_func = Host_funcs.lookup ~global_name c.host_funcs in
               let* args = Vector.to_list args in
+              let args = List.rev args in
+              let* inst = resolve_module_ref c.module_reg frame.inst in
               let available_memories =
                 if not init then Host_funcs.Available_memories inst.memories
                 else Host_funcs.No_memories_during_init
               in
-              let+ durable, res =
-                f
-                  buffers.input
-                  buffers.output
-                  durable
-                  available_memories
-                  (List.rev args)
-              in
-              let vs' = Vector.prepend_list res vs' in
-              (durable, Inv_stop {code = (vs', es); fresh_frame = None}))
+              match host_func with
+              | Host_func f ->
+                  let+ durable, res =
+                    f
+                      buffers.input
+                      buffers.output
+                      durable
+                      available_memories
+                      args
+                  in
+                  let vs' = Vector.prepend_list res vs' in
+                  (durable, Inv_stop {code = (vs', es); fresh_frame = None})
+              | Reveal_func f ->
+                  let* reveal, {base; max_bytes} = f available_memories args in
+                  Lwt.return
+                    ( durable,
+                      Inv_reveal_tick
+                        {
+                          reveal;
+                          max_bytes;
+                          base_destination = base;
+                          code = (vs', es);
+                        } ))
             (function Crash (_, msg) -> Crash.error at msg | exn -> raise exn))
   | Inv_prepare_locals
       {
@@ -592,6 +633,12 @@ let invoke_step ~init ?(durable = Durable_storage.empty) c buffers frame at =
                         };
                   };
             } )
+  | Inv_reveal_tick _ ->
+      (* This is a reveal tick, not an evaluation tick. The PVM should
+         prevent this execution path. *)
+      raise
+        (Evaluation_step_error
+           (Invoke_step "The reveal tick cannot be evaluated as is"))
   | Inv_concat tick ->
       let+ concat_kont = concat_step tick.concat_kont in
       (durable, Inv_concat {tick with concat_kont})
@@ -635,24 +682,6 @@ let elem_oob module_reg frame x i n =
   I64.gt_u
     (I64.add (I64_convert.extend_i32_u i) (I64_convert.extend_i32_u n))
     (Int64.of_int32 (Instance.Vector.num_elements !elem))
-
-let vector_pop_map v f at =
-  if 1l <= Vector.num_elements v then
-    let+ hd, v = Vector.pop v in
-    match f hd with
-    | Some r -> (r, v)
-    | None -> Crash.error at "missing or ill-typed operand on stack"
-  else Crash.error at "missing or ill-typed operand on stack"
-
-let num = function Num n -> Some n | _ -> None
-
-let num_i32 = function Num (I32 i) -> Some i | _ -> None
-
-let ref_ = function Ref r -> Some r | _ -> None
-
-let vec = function Vec v -> Some v | _ -> None
-
-let vec_v128 = function Vec (V128 v) -> Some v | _ -> None
 
 (** [step_instr module_reg label vs at e es stack] returns the new
     state of the label stack [label, stack] for a given [frame], by
@@ -1504,6 +1533,71 @@ let rec eval durable module_reg (c : config) buffers :
   | _ ->
       let* durable, c = step ~init:false ~durable c buffers in
       eval durable module_reg c buffers
+
+type reveal_error =
+  | Reveal_step
+  | Reveal_hash_decoding of string
+  | Reveal_payload_decoding of string
+
+exception Reveal_error of reveal_error
+
+let is_reveal_tick = function
+  | {
+      step_kont = SK_Next (_, _, LS_Craft_frame (_, Inv_reveal_tick {reveal; _}));
+      _;
+    } ->
+      Some reveal
+  | _ -> None
+
+let reveal module_reg base_destination max_bytes frame payload =
+  let open Lwt.Syntax in
+  Lwt.catch
+    (fun () ->
+      let* inst = resolve_module_ref module_reg frame.inst in
+      let* mem = memory inst (0l @@ no_region) in
+      let payload_size = Bytes.length payload in
+      let revealed_bytes = min payload_size (Int32.to_int max_bytes) in
+      let payload = Bytes.sub payload 0 revealed_bytes in
+      let+ () =
+        Memory.store_bytes mem base_destination (Bytes.to_string payload)
+      in
+      Int32.of_int revealed_bytes)
+    (function
+      | ( Memory.Bounds (* Memory.store_bytes *)
+        | Lazy_map.UnexpectedAccess (* resolve_module_ref *) ) as exn ->
+          raise exn
+      | exn ->
+          let raw_exn = Printexc.to_string exn in
+          raise (Reveal_error (Reveal_payload_decoding raw_exn)))
+
+let reveal_step module_reg payload =
+  let open Lwt.Syntax in
+  function
+  | {
+      step_kont =
+        SK_Next (frame, top, LS_Craft_frame (label, Inv_reveal_tick inv));
+      _;
+    } as config ->
+      let+ bytes_count =
+        reveal
+          module_reg
+          inv.base_destination
+          inv.max_bytes
+          frame.frame_specs
+          payload
+      in
+      let vs, es = inv.code in
+      let vs = Vector.cons (Num (I32 bytes_count)) vs in
+      {
+        config with
+        step_kont =
+          SK_Next
+            ( frame,
+              top,
+              LS_Craft_frame
+                (label, Inv_stop {code = (vs, es); fresh_frame = None}) );
+      }
+  | _ -> raise (Reveal_error Reveal_step)
 
 (* Functions & Constants *)
 

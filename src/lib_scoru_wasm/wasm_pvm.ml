@@ -66,8 +66,7 @@ type pvm_state = {
   buffers : Wasm.Eval.buffers;
       (** Input and outut buffers used by the PVM host functions. *)
   tick_state : tick_state;  (** The current tick state. *)
-  input_request : Wasm_pvm_sig.input_request;
-      (** Signals whether or not the PVM needs input. *)
+  input_requested : bool;  (** Signals whether or not the PVM needs input. *)
   last_top_level_call : Z.t;
       (** Last tick corresponding to a top-level call. *)
   max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
@@ -155,15 +154,8 @@ struct
             (fun () -> Snapshot);
         ]
 
-    let input_request_encoding =
-      Tree_encoding.conv
-        (function
-          | true -> Wasm_pvm_sig.Input_required
-          | false -> Wasm_pvm_sig.No_input_required)
-        (function
-          | Wasm_pvm_sig.Input_required -> true
-          | Wasm_pvm_sig.No_input_required -> false)
-        (Tree_encoding.value ~default:false [] Data_encoding.bool)
+    let input_requested_encoding =
+      Tree_encoding.value ~default:false [] Data_encoding.bool
 
     let durable_buffers_encoding =
       Tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
@@ -176,7 +168,7 @@ struct
                durable,
                buffers,
                tick_state,
-               input_request,
+               input_requested,
                last_top_level_call,
                max_nb_ticks ) ->
           {
@@ -190,7 +182,7 @@ struct
                 ~default:Tezos_webassembly_interpreter.Eval.buffers
                 buffers;
             tick_state;
-            input_request;
+            input_requested;
             last_top_level_call;
             max_nb_ticks;
           })
@@ -200,7 +192,7 @@ struct
                durable;
                buffers;
                tick_state;
-               input_request;
+               input_requested;
                last_top_level_call;
                max_nb_ticks;
              } ->
@@ -209,7 +201,7 @@ struct
             durable,
             Some buffers,
             tick_state,
-            input_request,
+            input_requested,
             last_top_level_call,
             max_nb_ticks ))
         (tup8
@@ -219,7 +211,7 @@ struct
            (scope ["durable"] Durable.encoding)
            (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
-           (scope ["input"; "consuming"] input_request_encoding)
+           (scope ["input"; "consuming"] input_requested_encoding)
            (value
               ~default:Z.zero
               ["pvm"; "last_top_level_call"]
@@ -389,9 +381,9 @@ struct
       in
       Lwt.catch (fun () -> unsafe_next_tick_state pvm_state) to_stuck
 
-    let next_input_request = function
-      | Restarting | Failing -> Wasm_pvm_sig.Input_required
-      | Starting | Running -> Wasm_pvm_sig.No_input_required
+    let next_input_requested = function
+      | Restarting | Failing -> true
+      | Starting | Running -> false
 
     let next_last_top_level_call {current_tick; last_top_level_call; _} =
       function
@@ -402,14 +394,14 @@ struct
       let open Lwt_syntax in
       (* Calculate the next tick state. *)
       let* durable, tick_state, status = next_tick_state pvm_state in
-      let input_request = next_input_request status in
+      let input_requested = next_input_requested status in
       let current_tick = Z.succ pvm_state.current_tick in
       let last_top_level_call = next_last_top_level_call pvm_state status in
       let pvm_state =
         {
           pvm_state with
           tick_state;
-          input_request;
+          input_requested;
           durable;
           current_tick;
           last_top_level_call;
@@ -422,8 +414,11 @@ struct
       assert (max_steps > 0L) ;
 
       let should_continue pvm_state =
-        match (pvm_state.input_request, pvm_state.tick_state) with
-        | Wasm_pvm_sig.Input_required, _ -> false
+        match (pvm_state.input_requested, pvm_state.tick_state) with
+        | true, _ -> false
+        | _, Eval config ->
+            Option.is_none
+              (Tezos_webassembly_interpreter.Eval.is_reveal_tick config)
         | _, Stuck _ -> false
         | _ -> true
       in
@@ -475,12 +470,27 @@ struct
 
     let get_info tree =
       let open Lwt_syntax in
-      let* {current_tick; last_input_info; input_request; _} =
+      let* {current_tick; last_input_info; input_requested; tick_state; _} =
         Tree_encoding_runner.decode pvm_state_encoding tree
       in
-      Lwt.return
-        Wasm_pvm_sig.
-          {current_tick; last_input_read = last_input_info; input_request}
+      let input_request =
+        if input_requested then Wasm_pvm_sig.Input_required
+        else No_input_required
+      in
+      let+ input_request =
+        match tick_state with
+        | Eval config ->
+            let maybe_reveal =
+              Tezos_webassembly_interpreter.Eval.is_reveal_tick config
+            in
+            Lwt.return
+              (match maybe_reveal with
+              | Some reveal -> Wasm_pvm_sig.Reveal_required reveal
+              | None -> input_request)
+        | _ -> Lwt.return input_request
+      in
+      Wasm_pvm_sig.
+        {current_tick; last_input_read = last_input_info; input_request}
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
@@ -548,10 +558,51 @@ struct
           pvm_state with
           tick_state;
           current_tick = Z.succ pvm_state.current_tick;
-          input_request = Wasm_pvm_sig.No_input_required;
+          input_requested = false;
         }
       in
       (* Encode the new pvm-state in the tree. *)
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let reveal_step payload tree =
+      let open Lwt_syntax in
+      let open Tezos_webassembly_interpreter in
+      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+      let* pvm_state =
+        let return tick_state =
+          Lwt.return
+            {
+              pvm_state with
+              current_tick = Z.succ pvm_state.current_tick;
+              tick_state;
+            }
+        in
+        match pvm_state.tick_state with
+        | Eval config ->
+            let* config = Eval.reveal_step config.module_reg payload config in
+            return (Eval config)
+        | Decode _ ->
+            return
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No reveal expected during decoding"))
+        | Link _ ->
+            return
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No reveal expected during link"))
+        | Init _ ->
+            return
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No reveal expected during initialization"))
+        | Snapshot ->
+            return
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No reveal expected during snapshotting"))
+        | Stuck _ -> return pvm_state.tick_state
+      in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
     module Internal_for_tests = struct
@@ -559,6 +610,14 @@ struct
         let open Lwt_syntax in
         let+ pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         pvm_state.tick_state
+
+      let get_module_instance_exn tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        match pvm_state.tick_state with
+        | Eval config ->
+            Wasm.Instance.ModuleMap.get wasm_main_module_name config.module_reg
+        | _ -> raise (Invalid_argument "get_module_instance")
 
       let is_stuck tree =
         let open Lwt.Syntax in
