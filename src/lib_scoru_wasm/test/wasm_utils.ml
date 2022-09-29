@@ -26,6 +26,7 @@
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Test_encodings_util
+open Lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
 
 let parse_module code =
@@ -135,3 +136,59 @@ let check_error expected_kind expected_reason error =
 let is_stuck ?step ?reason = function
   | Wasm_pvm.Stuck err -> check_error step reason err
   | _ -> false
+
+let wrap_as_durable_storage tree =
+  let open Lwt.Syntax in
+  let+ tree =
+    Tree_encoding_runner.decode
+      (Tree_encoding.scope ["durable"] Tree_encoding.wrapped_tree)
+      tree
+  in
+  Tezos_webassembly_interpreter.Durable_storage.of_tree
+  @@ Tree_encoding.Wrapped.wrap tree
+
+let make_durable list_key_vals =
+  let open Lwt_syntax in
+  let* tree = empty_tree () in
+  let* tree =
+    Tree_encoding_runner.encode
+      (Tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
+      true
+      tree
+  in
+  let* tree =
+    List.fold_left
+      (fun acc (key, value) ->
+        let* tree = acc in
+        let key_steps = String.split_on_char '/' ("durable/" ^ key ^ "/_") in
+        let* tree =
+          Tree_encoding_runner.encode
+            (Tree_encoding.scope key_steps Tree_encoding.chunked_byte_vector)
+            (Chunked_byte_vector.of_string value)
+            tree
+        in
+        Lwt.return tree)
+      (Lwt.return tree)
+      list_key_vals
+  in
+  wrap_as_durable_storage tree
+
+let make_module_inst list_key_vals src =
+  let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
+  let memory = Memory.alloc (MemoryType Types.{min = 20l; max = Some 3600l}) in
+  let _ =
+    List.fold_left
+      (fun acc key ->
+        let _ = Memory.store_bytes memory acc key in
+        Int32.add acc @@ Int32.of_int (String.length key))
+      src
+      list_key_vals
+  in
+  let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
+  let module_inst = {module_inst with memories} in
+  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  Host_funcs.register_host_funcs host_funcs_registry ;
+  let module_reg = Instance.ModuleMap.create () in
+  let module_key = Instance.Module_key "test" in
+  Instance.update_module_ref module_reg module_key module_inst ;
+  (module_reg, module_key, host_funcs_registry)
