@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_clic
 
 let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
@@ -602,8 +603,15 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     return ()
 end
 
-let ensure_target_dir_exists () =
-  let dir = try Sys.argv.(2) with Invalid_argument _ -> "." in
+let ensure_target_dir_exists list_target_dir =
+  let dir =
+    match list_target_dir with
+    | [] -> "."
+    | [dir] -> dir
+    | _ :: _ ->
+        Printf.printf "Got more than one target dir!" ;
+        exit 1
+  in
   try
     if Sys.is_directory dir then dir
     else (
@@ -618,31 +626,87 @@ let ensure_target_dir_exists () =
         dir
     | _ -> exit 0)
 
-let run (module Main : Sigs.MAIN) =
-  let open Lwt_result_syntax in
-  let data_dir = Sys.argv.(1) in
-  let output_dir = ensure_target_dir_exists () in
-  Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
-  let* store =
-    Tezos_store.Store.init
-      ~store_dir:(Filename.concat data_dir "store")
-      ~context_dir:(Filename.concat data_dir "context")
-      ~allow_testchains:true
-      ~readonly:true
-      Config.mainnet_genesis
-  in
-  Printf.printf "Getting main chain storage and head...\n%!" ;
-  let chain_store = Tezos_store.Store.main_chain_store store in
-  let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
-  Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
-  let*! head = Tezos_store.Store.Chain.current_head chain_store in
-  let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
-  Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
-  let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
-  print_endline "Pre-preparing raw context..." ;
-  Main.main ~output_dir ctxt ~head
+let get_main proto_hash =
+  match
+    List.find
+      (fun (module Proto : Sigs.PROTOCOL) ->
+        Protocol_hash.(Proto.hash = proto_hash))
+      (Known_protocols.get_all ())
+  with
+  | None ->
+      Format.kasprintf
+        invalid_arg
+        "Unknown protocol: %a"
+        Protocol_hash.pp
+        proto_hash
+  | Some (module Proto) ->
+      let module Main = Make (Proto) in
+      (module Main : Sigs.MAIN)
 
-let main (module Main : Sigs.MAIN) =
-  match Lwt_main.run (run (module Main)) with
+let data_dir_param = Clic.string ~name:"data-dir" ~desc:"Path to context"
+
+let list_target_dir_param =
+  Clic.seq_of_param @@ Clic.string ~name:"target-dir" ~desc:"Output path"
+
+let network_parameter =
+  Clic.parameter (fun () network_name ->
+      match
+        List.assoc ~equal:String.equal network_name Config.known_networks
+      with
+      | None -> failwith "Unknown network name"
+      | Some n -> Lwt_result_syntax.return n)
+
+let network_arg =
+  Clic.default_arg
+    ~doc:"Network to use"
+    ~long:"network"
+    ~placeholder:"network name"
+    ~default:"mainnet"
+    network_parameter
+
+let commands =
+  let open Clic in
+  [
+    command
+      ~desc:"Extracts all contracts from the storage"
+      (args1 network_arg)
+      (data_dir_param @@ list_target_dir_param)
+      (fun genesis data_dir list_target_dir () ->
+        let open Lwt_result_syntax in
+        let output_dir = ensure_target_dir_exists list_target_dir in
+        Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
+        let* store =
+          Tezos_store.Store.init
+            ~store_dir:(Filename.concat data_dir "store")
+            ~context_dir:(Filename.concat data_dir "context")
+            ~allow_testchains:true
+            ~readonly:true
+            genesis
+        in
+        Printf.printf "Getting main chain storage and head...\n%!" ;
+        let chain_store = Tezos_store.Store.main_chain_store store in
+        let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
+        Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
+        let*! head = Tezos_store.Store.Chain.current_head chain_store in
+        Format.printf
+          "Head block: %a\n%!"
+          Block_hash.pp
+          (Tezos_store.Store.Block.hash head) ;
+        let* proto_hash =
+          Tezos_store.Store.Block.protocol_hash chain_store head
+        in
+        Format.printf "Protocol hash: %a\n%!" Protocol_hash.pp proto_hash ;
+        let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
+        print_endline "Pre-preparing raw context..." ;
+        let (module Main : Sigs.MAIN) = get_main proto_hash in
+        Main.main ~output_dir ctxt ~head);
+  ]
+
+let run () =
+  let argv = Sys.argv |> Array.to_list |> List.tl |> Option.value ~default:[] in
+  Clic.dispatch commands () argv
+
+let () =
+  match Lwt_main.run (run ()) with
   | Ok () -> ()
   | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace

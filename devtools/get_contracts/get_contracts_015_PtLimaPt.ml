@@ -23,7 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_015_PtLimaPt
+open Tezos_client_015_PtLimaPt
+open Protocol
+
 module Proto = struct
+  let hash = hash
+
   let wrap_tzresult = Environment.wrap_tzresult
 
   module Context = struct
@@ -256,6 +262,4 @@ module Proto = struct
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
 end
 
-module Main = Get_contracts.Make (Proto)
-
-let () = Get_contracts.main (module Main)
+let () = Known_protocols.register (module Proto)
