@@ -40,6 +40,14 @@ type commitment = {
 
 type slot_header = {level : int; commitment : string; index : int}
 
+type simulation_result = {
+  state_hash : string;
+  status : string;
+  output : JSON.t;
+  inbox_level : int;
+  num_ticks : int;
+}
+
 let commitment_from_json json =
   if JSON.is_null json then None
   else
@@ -181,6 +189,16 @@ let rpc_get ?hooks sc_client path =
   let* output = Process.check_and_read_stdout process in
   return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
 
+let rpc_post ?hooks sc_client path data =
+  let process =
+    spawn_command
+      ?hooks
+      sc_client
+      ["rpc"; "post"; Client.string_of_path path; "with"; JSON.encode data]
+  in
+  let* output = Process.check_and_read_stdout process in
+  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+
 let ticks ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
   let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
@@ -251,6 +269,40 @@ let dal_downloaded_confirmed_slot_pages ?hooks ?(block = "head") sc_client =
                   page |> JSON.as_string |> fun s -> Hex.to_string (`Hex s))
          in
          (index, contents))
+
+let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
+  let open Lwt.Syntax in
+  let messages_json =
+    `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
+  in
+  let reveal_json =
+    match reveal_pages with
+    | [] -> []
+    | pages ->
+        [
+          ( "reveal_pages",
+            `A (List.map (fun s -> `String Hex.(of_string s |> show)) pages) );
+        ]
+  in
+  let data =
+    `O (("messages", messages_json) :: reveal_json)
+    |> JSON.annotate ~origin:"simulation data"
+  in
+  let+ obj =
+    rpc_post
+      ?hooks
+      sc_client
+      ["global"; "block"; block; "simulate"]
+      data
+  in
+  JSON.
+    {
+      state_hash = obj |> get "state_hash" |> as_string;
+      status = obj |> get "status" |> as_string;
+      output = obj |> get "output";
+      inbox_level = obj |> get "inbox_level" |> as_int;
+      num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
+    }
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

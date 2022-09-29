@@ -35,6 +35,14 @@ type commitment = {
 
 type slot_header = {level : int; commitment : string; index : int}
 
+type simulation_result = {
+  state_hash : string;
+  status : string;
+  output : JSON.t;
+  inbox_level : int;
+  num_ticks : int;
+}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -141,6 +149,18 @@ val dal_slot_headers :
     slots downloaded after processing the [block] (default ["head"]). *)
 val dal_downloaded_confirmed_slot_pages :
   ?hooks:Process.hooks -> ?block:string -> t -> (int * string list) list Lwt.t
+
+(** [simulate ?block client ?reveal_pages messages] simulates the evaluation of
+    input [messages] for the rollup PVM at [block] (default
+    ["head"]). [reveal_pages] can be used to provide data to be used for the
+    revelation ticks. *)
+val simulate :
+  ?hooks:Process_hooks.t ->
+  ?block:string ->
+  t ->
+  ?reveal_pages:string list ->
+  string list ->
+  simulation_result Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :
