@@ -23,19 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let get_value ~what ~getter ~pp ctxt x =
-  let open Lwt_syntax in
-  let+ value = getter ctxt x in
-  match value with
-  | Ok x -> Ok x
-  | Error err ->
-      (* Should not happen *)
-      Format.eprintf
-        "Failed getting %s for %a:\n%a\n"
-        what
-        pp
-        x
-        Error_monad.pp_print_trace
-        err ;
-      assert (not Config.fatal) ;
-      Error `AlreadyWarned
+let collect_storage = true
+
+let collect_lambdas = true
+
+let collect_gas = true
+
+let measure_code_size = true
+
+let print_contracts = true
+
+let fatal = true
+
+let mainnet_genesis =
+  {
+    Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
+    block =
+      Block_hash.of_b58check_exn
+        "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
+    protocol =
+      Protocol_hash.of_b58check_exn
+        "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+  }
+
+let hangzhounet_genesis =
+  {
+    Genesis.time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
+    block =
+      Block_hash.of_b58check_exn
+        "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
+    protocol =
+      Protocol_hash.of_b58check_exn
+        "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+  }

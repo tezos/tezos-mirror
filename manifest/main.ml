@@ -5121,7 +5121,8 @@ let get_contracts_lib =
         octez_client_base_unix;
         octez_store;
       ]
-    ~modules:["get_contracts"; "sigs"; "storage_helpers"; "contract_size"]
+    ~modules:
+      ["config"; "get_contracts"; "sigs"; "storage_helpers"; "contract_size"]
     ~bisect_ppx:false
 
 let _get_contracts =

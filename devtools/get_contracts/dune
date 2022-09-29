@@ -14,7 +14,7 @@
   -open Tezos_micheline
   -open Tezos_base.TzPervasives
   -open Tezos_stdlib_unix)
- (modules get_contracts sigs storage_helpers contract_size))
+ (modules config get_contracts sigs storage_helpers contract_size))
 
 (executable
  (name get_contracts_012_Psithaca)

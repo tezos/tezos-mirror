@@ -58,6 +58,16 @@ module Proto = struct
     module Hash = Script_expr_hash
 
     let print_expr = Michelson_v1_printer.print_expr
+
+    let decode_and_costs lazy_expr =
+      let open Result_syntax in
+      let decode_cost = Script_repr.stable_force_decode_cost lazy_expr in
+      let+ expr = wrap_tzresult @@ Script_repr.force_decode lazy_expr in
+      let encode_cost =
+        let decoded_lazy_expr = Script_repr.lazy_expr expr in
+        Script_repr.force_bytes_cost decoded_lazy_expr
+      in
+      (expr, (decode_cost :> int), (encode_cost :> int))
   end
 
   module Translator = struct
@@ -68,7 +78,7 @@ module Proto = struct
     type ex_code = Script_ir_translator.ex_code
 
     let expected_code_size Script_ir_translator.(Ex_code {code_size; _}) =
-      Obj.magic code_size
+      (code_size :> int)
 
     let actual_code_size Script_ir_translator.(Ex_code {code; _}) =
       8 * Obj.(reachable_words @@ repr code)
