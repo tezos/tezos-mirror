@@ -130,6 +130,7 @@ let register_protocol_agnostic_tests () =
   Run_script.register ~protocols:[Alpha] ;
   Runtime_script_failure.register ~protocols ;
   Sapling.register ~protocols:[Alpha] ;
+  Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
