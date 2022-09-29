@@ -787,6 +787,32 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 5 in
   unit
 
+(* Simulation of messages *)
+let sc_rollup_node_simulate sc_rollup_node sc_rollup_client _sc_rollup node
+    client =
+  let level = Node.get_level node in
+  let* () = Sc_rollup_node.run sc_rollup_node [] in
+  let msg1 = "3 3 + out" in
+  let* sim_result =
+    Sc_rollup_client.simulate
+      sc_rollup_client
+      ~reveal_pages:
+        (List.init 12 (fun j ->
+             String.init 1024 (fun i -> Char.chr (i * j mod 256))))
+      [msg1]
+  in
+  let* () = send_message client (to_text_messages_arg [msg1]) in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + 1)
+  in
+  let* real_state_hash = Sc_rollup_client.state_hash sc_rollup_client in
+  let* real_outbox = Sc_rollup_client.outbox sc_rollup_client ~block:"head" in
+  Check.((sim_result.state_hash = real_state_hash) string)
+    ~error_msg:"Simulated resulting state hash is %L but should have been %R" ;
+  Check.((JSON.encode sim_result.output = real_outbox) string)
+    ~error_msg:"Simulated resulting outbox is %L but should have been %R" ;
+  return ()
+
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
@@ -3248,6 +3274,11 @@ let register ~kind ~protocols =
     ~kind
     ~variant:"handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
+    protocols ;
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    "simulation"
+    sc_rollup_node_simulate
     protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state protocols ~kind ~internal:false ;
