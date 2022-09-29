@@ -31,7 +31,7 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7
+and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8
 
 let compare_version = Stdlib.compare
 
@@ -60,6 +60,7 @@ let module_name_of_env_version = function
   | V5 -> "V5"
   | V6 -> "V6"
   | V7 -> "V7"
+  | V8 -> "V8"
 
 let env_version_encoding =
   let open Data_encoding in
@@ -73,7 +74,8 @@ let env_version_encoding =
          | V4 -> 4
          | V5 -> 5
          | V6 -> 6
-         | V7 -> 7)
+         | V7 -> 7
+         | V8 -> 8)
        (function
          | 0 -> V0
          | 1 -> V1
@@ -83,6 +85,7 @@ let env_version_encoding =
          | 5 -> V5
          | 6 -> V6
          | 7 -> V7
+         | 8 -> V8
          | _ -> failwith "unexpected environment version")
        uint16
 
