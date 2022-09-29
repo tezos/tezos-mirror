@@ -132,6 +132,15 @@ val put : string * t -> t -> t
     @raise Error if [obj] is not an object. *)
 val update : string -> (t -> t) -> t -> t
 
+(** Non-recursively merges two objects.
+
+   [merge_objects o1 o2] returns an object containing all fields of [o1]
+   and [o2]. If a key exists in both [o1] and [o2], then it will be
+   bound to its value in [o2].
+
+   @raise Error if [o1] or [o2] is not an object. *)
+val merge_objects : t -> t -> t
+
 (** Test whether a JSON value is [`Null]. *)
 val is_null : t -> bool
 

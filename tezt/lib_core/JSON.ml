@@ -299,3 +299,9 @@ let put (key, value) json =
 let update key f json =
   let v = json |-> key in
   put (key, f v) json
+
+let merge_objects obj1 obj2 =
+  List.fold_left
+    (fun obj1' (key, value) -> put (key, value) obj1')
+    obj1
+    (as_object obj2)
