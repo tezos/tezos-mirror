@@ -497,6 +497,13 @@ let get_chain_block_context_constants_errors ?(chain = "main") ?(block = "head")
     ["chains"; chain; "blocks"; block; "context"; "constants"; "errors"]
     Fun.id
 
+let get_chain_block_context_constants_parametric ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "constants"; "parametric"]
+    Fun.id
+
 let get_chain_block_context_contract_storage_used_space ?(chain = "main")
     ?(block = "head") contract =
   make
