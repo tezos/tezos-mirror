@@ -320,3 +320,23 @@ let filter_map_object json f =
 let filter_object json f =
   filter_map_object json (fun key value ->
       if f key value then Some value else None)
+
+let rec equal_u (a : u) (b : u) =
+  match (a, b) with
+  | `O object_a, `O object_b ->
+      let sort_object =
+        List.sort (fun (key_a, _) (key_b, _) -> compare key_a key_b)
+      in
+      List.equal
+        (fun (k, v) (k', v') -> String.equal k k' && equal_u v v')
+        (sort_object object_a)
+        (sort_object object_b)
+  | `Bool b, `Bool b' -> Bool.equal b b'
+  | `Float f, `Float f' -> Float.equal f f'
+  | `A ls, `A ls' -> List.equal equal_u ls ls'
+  | `Null, `Null -> true
+  | `String s, `String s' -> String.equal s s'
+  | `O _, _ | `Bool _, _ | `Float _, _ | `A _, _ | `Null, _ | `String _, _ ->
+      false
+
+let equal j j' = equal_u (unannotate j) (unannotate j')

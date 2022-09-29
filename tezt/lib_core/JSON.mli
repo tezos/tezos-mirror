@@ -265,3 +265,20 @@ val as_object_opt : t -> (string * t) list option
 
 (** Test whether [as_object] would succeed. *)
 val is_object : t -> bool
+
+(** Equality for JSON unannotated ASTs.
+
+    Objects are equal only when they have the exact same number of
+    fields with the same contents (their order does not
+    matter). Consequently, e.g. [{"a": 1}] is not equal to [{"a": 1,
+    "a": 1}].
+
+    Arrays are equal when they contain the same number of pair-wise
+    equal elements. *)
+val equal_u : u -> u -> bool
+
+(** Equality for JSON annotated ASTs.
+
+    Annotations are stripped, then the unannotated AST is compared
+    with {!equal_u}. *)
+val equal : t -> t -> bool
