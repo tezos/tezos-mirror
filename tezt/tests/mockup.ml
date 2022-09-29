@@ -726,12 +726,12 @@ let test_accounts : mockup_bootstrap_account list =
     {
       name = "bootstrap0";
       sk_uri = "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
-      amount = Tez.of_int 2000000000000;
+      amount = Tez.of_mutez_int 2000000000000;
     };
     {
       name = "bootstrap1";
       sk_uri = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-      amount = Tez.of_int 1000000000000;
+      amount = Tez.of_mutez_int 1000000000000;
     };
   ]
 
@@ -740,7 +740,7 @@ let mockup_bootstrap_account_to_json {name; sk_uri; amount} : JSON.u =
     [
       ("name", `String name);
       ("sk_uri", `String ("unencrypted:" ^ sk_uri));
-      ("amount", `String (Tez.to_string amount));
+      ("amount", `String (Tez.to_mutez amount |> string_of_int));
     ]
 
 (* Tests [tezos-client create mockup --bootstrap-accounts]
