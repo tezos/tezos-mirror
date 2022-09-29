@@ -53,10 +53,10 @@ type mode =
       predecessor_round : Round.t;
     }
   | Full_construction of {
-      predecessor : Block_hash.t;
+      block_data_contents : Block_header.contents;
+      predecessor_hash : Block_hash.t;
       payload_producer : Consensus_key.t;
       block_producer : Consensus_key.t;
-      block_data_contents : Block_header.contents;
       round : Round.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
@@ -98,7 +98,7 @@ val begin_full_construction :
   predecessor_timestamp:Time.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
-  predecessor:Block_hash.t ->
+  predecessor_hash:Block_hash.t ->
   timestamp:Time.t ->
   Block_header.contents ->
   application_state tzresult Lwt.t
