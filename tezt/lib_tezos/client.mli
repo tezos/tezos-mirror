@@ -1694,7 +1694,7 @@ val convert_script :
 val bootstrapped : t -> unit Lwt.t
 
 (** Run [tezos-client config show]. *)
-val config_show : ?protocol:Protocol.t -> t -> unit Lwt.t
+val config_show : ?protocol:Protocol.t -> t -> string Lwt.t
 
 (** Same as [config_show], but do not wait for the process to exit. *)
 val spawn_config_show : ?protocol:Protocol.t -> t -> Process.t

@@ -2273,7 +2273,7 @@ let spawn_config_show ?protocol client =
   @ ["config"; "show"]
 
 let config_show ?protocol client =
-  spawn_config_show ?protocol client |> Process.check
+  spawn_config_show ?protocol client |> Process.check_and_read_stdout
 
 let spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
   spawn_command client
