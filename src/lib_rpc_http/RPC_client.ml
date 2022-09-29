@@ -139,7 +139,17 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   let generic_call ?headers ?accept ?body ?media meth uri :
       (content, content) RPC_context.rest_result Lwt.t =
     let open Lwt_syntax in
-    let* r = Client.generic_call meth ?headers ?accept ?body ?media uri in
+    let* r =
+      Client.generic_call
+        meth
+        ?headers
+        ?accept
+        ?body
+        ?media
+        ~redirect_behaviour:
+          (Resto_cohttp_client.Client.Follow_redirects {limit = 20})
+        uri
+    in
     match r with
     | `Ok (Some v) -> return_ok (`Ok v)
     | `Ok None -> request_failed meth uri Empty_answer

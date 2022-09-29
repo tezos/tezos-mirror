@@ -48,39 +48,23 @@
 null
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
@@ -100,30 +84,18 @@ Error:
 "[PUBLIC_KEY_HASH]"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
@@ -146,21 +118,13 @@ Error:
 "0"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
@@ -361,21 +325,13 @@ null
 "0"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: Unexpected error 301:
-                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key"
+Fatal error:
+  No service found at this URL
   
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
