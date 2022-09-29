@@ -33,6 +33,10 @@ esac
 ## of a command:
 $opam_depext_command
 
+# Follow up of the previous explanation: We make opam acknowledge
+# that we have a rust compiler we installed by our own.
+OPAMASSUMEDEPEXTS=true opam install conf-rust
+
 ## In an ideal world, `--with-test` should be present only when using
 ## `--dev`. But this would probably break the CI, so we postponed this
 ## change until someone have some spare time. (@pirbo, @hnrgrgr)
