@@ -26,7 +26,7 @@
 let patch_env_loading () =
   let open Tezos_base.TzPervasives in
   let preloaded_cmis : Persistent_env.Persistent_signature.t String.Hashtbl.t =
-    Tezos_protocol_compiler.Compiler.preloaded_cmis
+    Octez_protocol_compiler.Compiler.preloaded_cmis
   in
   Persistent_env.Persistent_signature.load :=
     fun ~unit_name ->
@@ -34,7 +34,7 @@ let patch_env_loading () =
         String.Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name)
       with
       | Some v -> Some v
-      | None -> Tezos_protocol_compiler.Compiler.default_load ~unit_name
+      | None -> Octez_protocol_compiler.Compiler.default_load ~unit_name
 
 let directive_string_fn fn_name =
   match Toploop.get_directive fn_name with
