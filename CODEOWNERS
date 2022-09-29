@@ -18,19 +18,25 @@
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_openapi             @romain.nl
+/src/bin_snoop               @lrand
 /src/lib_base                @raphael-proust
+/src/lib_benchmark           @lrand
 /src/lib_error_monad         @raphael-proust
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
 /src/lib_openapi             @romain.nl
 /src/lib_protocol_environment   @raphael-proust
+/src/lib_shell_benchmarks    @lrand
 /src/lib_stdlib              @raphael-proust
 /src/lib_stdlib_unix         @raphael-proust
 /src/lib_version             @romain.nl
+/src/proto_*/lib_benchmark   @lrand
+/src/proto_*/lib_benchmarks_proto @lrand
 
 /scripts                     @romain.nl
 
 /tests_python                @arvidnl
+
 /tezt/lib*                   @romain.nl
 /tezt/records                @romain.nl
 
