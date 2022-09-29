@@ -132,6 +132,22 @@ val put : string * t -> t -> t
     @raise Error if [obj] is not an object. *)
 val update : string -> (t -> t) -> t -> t
 
+(** [filter_map_object obj f] maps [f] over each field in [obj].
+
+    If [f key value] is [None] then the [key] is removed from [obj].
+    If [f key value] is [Some value'] then the [key] is overwritten with [value'].
+
+    @raise Error if [obj] is not an object. *)
+val filter_map_object : t -> (string -> t -> t option) -> t
+
+(** [filter_object obj f] filters the bindings in [obj].
+
+    [filter_object obj f] removes each binding [key, value] in [obj]
+    for which [f key value] is [false].
+
+    @raise Error if [obj] is not an object. *)
+val filter_object : t -> (string -> t -> bool) -> t
+
 (** Non-recursively merges two objects.
 
    [merge_objects o1 o2] returns an object containing all fields of [o1]

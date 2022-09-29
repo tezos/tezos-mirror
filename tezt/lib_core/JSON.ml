@@ -305,3 +305,18 @@ let merge_objects obj1 obj2 =
     (fun obj1' (key, value) -> put (key, value) obj1')
     obj1
     (as_object obj2)
+
+let filter_map_object json f =
+  let new_fields =
+    List.filter_map
+      (fun (key, value) ->
+        match f key value with
+        | Some {node; _} -> Some (key, node)
+        | None -> None)
+      (as_object json)
+  in
+  {json with node = `O new_fields}
+
+let filter_object json f =
+  filter_map_object json (fun key value ->
+      if f key value then Some value else None)
