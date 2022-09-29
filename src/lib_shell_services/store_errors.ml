@@ -1170,7 +1170,7 @@ type corruption_kind =
   | Cannot_find_floating_caboose
   | Cannot_find_caboose_candidate
   | Cannot_find_block_with_metadata
-  | Cannot_find_activation_block of Block_hash.t * int
+  | Cannot_find_activation_block of int
   | Missing_genesis
 
 let corruption_kind_encoding =
@@ -1217,13 +1217,11 @@ let corruption_kind_encoding =
       case
         (Tag 6)
         ~title:"Cannot_find_activation_block"
-        (obj2 (req "block_hash" Block_hash.encoding) (req "proto_level" int31))
+        (obj1 (req "proto_level" int31))
         (function
-          | Cannot_find_activation_block (block_hash, proto_level) ->
-              Some (block_hash, proto_level)
+          | Cannot_find_activation_block proto_level -> Some proto_level
           | _ -> None)
-        (fun (block_hash, proto_level) ->
-          Cannot_find_activation_block (block_hash, proto_level));
+        (fun proto_level -> Cannot_find_activation_block proto_level);
       case
         (Tag 7)
         ~title:"Missing_genesis"
@@ -1256,14 +1254,11 @@ let pp_corruption_kind ppf = function
         ppf
         "cannot find block with metadata in the store. At least the head must \
          have metadata"
-  | Cannot_find_activation_block (block_hash, proto_level) ->
+  | Cannot_find_activation_block proto_level ->
       Format.fprintf
         ppf
-        "failed to find a valid activation block for protocol %d of the \
-         current head (%a)"
+        "failed to find a valid activation block for protocol %d"
         proto_level
-        Block_hash.pp
-        block_hash
   | Missing_genesis ->
       Format.fprintf ppf "the genesis block is not available in the store"
 

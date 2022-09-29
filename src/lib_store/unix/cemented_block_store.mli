@@ -272,11 +272,19 @@ val trigger_gc : t -> History_mode.t -> unit Lwt.t
 
 (** [iter_cemented_file ~cemented_block_dir f block_file] reads from
     the cemented [block_file] located in [cemented_block_dir] and
-    applies [f] on every block. *)
+    applies [f] on every block.
+
+    {b Warning}: in this version, exceptions are caught. Use [raw_iter_cemented_file]
+    for manual exception management. *)
 val iter_cemented_file :
   (Block_repr.block -> unit Lwt.t) ->
   cemented_blocks_file ->
   unit tzresult Lwt.t
+
+(** Unsafe version of [iter_cemented_file] where internal exceptions/errors
+    are not caught. *)
+val raw_iter_cemented_file :
+  (Block_repr.block -> unit Lwt.t) -> cemented_blocks_file -> unit Lwt.t
 
 (** [check_indexes_consistency ?post_step ?genesis_hash cemented_store
     history_mode] iterates over a partially initialized
