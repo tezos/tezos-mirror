@@ -102,6 +102,13 @@ This filtering strategy is implemented in the ``prefilter`` (see
 Prechecking of manager operations
 .................................
 
+.. FIXME tezos/tezos#3938:
+
+   This section doesn't make much sense after the pipelining project
+   has plugged validate into the plugin for Lima. Parts of this
+   section be integrated into plugin.rst, and the relevant definitions
+   should point to the validation entry.
+
 The aim of the ``precheck`` filter is to avoid fully executing manager operations
 before deciding whether to gossip them to the network.
 
@@ -119,11 +126,6 @@ also ensure that, since the last head update (the last valid block which
 increased the chain's fitness), only one operation per manager is propagated.
 All other received operations originating from the same manager will be classified
 as ``Branch_delayed`` and will not be propagated.
-
-This criterion is used only by the prevalidator to decide the propagation of
-operations. A baker can still include several operations originating from the same
-manager in a single block, provided that it gets them in time (note that they can be
-propagated by nodes using different versions or implementations).
 
 Alternatively, a user can inject an operation with the same
 manager and the same counter, but with a higher fee to replace an already existing

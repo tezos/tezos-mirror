@@ -124,11 +124,6 @@ increased the chain's fitness), only one operation per manager is propagated.
 All other received operations originating from the same manager will be classified
 as ``Branch_delayed`` and will not be propagated.
 
-This criterion is used only by the prevalidator to decide the propagation of
-operations. A baker can still include several operations originating from the same
-manager in a single block, provided that it gets them in time (note that they can be
-propagated by nodes using different versions or implementations).
-
 Alternatively, a user can inject an operation with the same
 manager and the same counter, but with a higher fee to replace an already existing
 operation in the prevalidator. Only one of the two operations will be eventually
@@ -156,7 +151,7 @@ In addition to quick detection of operations that have no chance to be
 prechecked or applied in the current context, the mempool's ``prefilter`` provides
 a priority for each successfully filtered operation. Concretely, the priority is
 either ``High``, ``Medium`` or ``Low`` in the current implementation, depending
-on the :ref:`validation pass<validation_passes_kathmandu>`.Some extra information (like the fees, or the gas/fees
+on their :ref:`validation pass<validation_passes_kathmandu>`.Some extra information (like the fees, or the gas/fees
 ratio of manager operations) are also provided along the priorities to enable
 fine-grained operations ordering.
 This extra information is similar to the one used by the baker's
