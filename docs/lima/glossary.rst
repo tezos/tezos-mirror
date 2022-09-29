@@ -128,7 +128,7 @@ _`Implicit account`
 Michelson
     The built-in language used by a `smart contract`_.
 
-.. _glossary_minimal_stake:
+.. _glossary_minimal_stake_lima:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
