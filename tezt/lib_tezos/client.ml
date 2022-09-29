@@ -308,6 +308,40 @@ let spawn_rpc_list ?endpoint client =
 let rpc_list ?endpoint client =
   spawn_rpc_list ?endpoint client |> Process.check_and_read_stdout
 
+let spawn_rpc_schema ?log_command ?log_status_on_exit ?log_output
+    ?(better_errors = false) ?endpoint ?hooks ?env ?protocol_hash meth path
+    client =
+  spawn_command
+    ?log_command
+    ?log_status_on_exit
+    ?log_output
+    ?endpoint
+    ?hooks
+    ?env
+    ?protocol_hash
+    client
+    (optional_switch "better-errors" better_errors
+    @ ["rpc"; "schema"; string_of_meth meth; string_of_path path])
+
+let rpc_schema ?log_command ?log_status_on_exit ?log_output ?better_errors
+    ?endpoint ?hooks ?env ?protocol_hash meth path client =
+  let* json_schema =
+    spawn_rpc_schema
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?protocol_hash
+      meth
+      path
+      client
+    |> Process.check_and_read_stdout
+  in
+  return (JSON.parse ~origin:"rpc_schema" json_schema)
+
 let spawn_shell_header ?endpoint ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "header"; "shell"] in
   spawn_rpc ?endpoint GET path client

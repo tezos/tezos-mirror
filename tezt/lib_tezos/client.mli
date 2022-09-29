@@ -237,6 +237,36 @@ val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
 
+(** Run [octez-client rpc schema]. *)
+val rpc_schema :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?better_errors:bool ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
+  ?protocol_hash:string ->
+  meth ->
+  path ->
+  t ->
+  JSON.t Lwt.t
+
+(** Same as [rpc_schema], but do not wait for the process to exit. *)
+val spawn_rpc_schema :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?better_errors:bool ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
+  ?protocol_hash:string ->
+  meth ->
+  path ->
+  t ->
+  Process.t
+
 (** Run [octez-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
 val shell_header :
   ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> string Lwt.t
