@@ -172,7 +172,7 @@ distributing snapshots through `IPFS <https://ipfs.io/>`_.
 Export capabilities
 ~~~~~~~~~~~~~~~~~~~
 
-The following table recapitulate the different kind of snapshot that
+The following table recapitulates the different kinds of snapshots that
 can be exported from a given history mode node.
 
 +---------+---------------+-----------------+
