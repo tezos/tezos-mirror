@@ -284,22 +284,63 @@ let source_encoding =
 
 let source_list_encoding = Data_encoding.list source_encoding
 
-(** Generate an array of accounts for testing purposes and output them to
-    stdout in the JSON format. It is essential that this command lives here
-    and not in the protocol-specific code because it should be available
-    before a protocol is activated. *)
+(* Simple helpers used to manage wallet files a raw way. *)
+module Wallet_helpers = struct
+  let write_file path str =
+    let open Lwt_syntax in
+    let* fd = Lwt_unix.openfile path Unix.[O_CREAT; O_TRUNC; O_RDWR] 0o644 in
+    let* _written_bytes =
+      Lwt.catch
+        (fun () -> Lwt_unix.write_string fd str 0 (String.length str))
+        (fun exn ->
+          let* () = Lwt_unix.close fd in
+          Lwt.fail exn)
+    in
+    Lwt_unix.close fd
+
+  module Aliases = struct
+    let encoding = list (obj1 (req "alias" Data_encoding.string))
+
+    let name = "aliases"
+  end
+end
+
+(** Generate an array of accounts for testing purposes, store them
+    into a wallet and output them to stdout in the JSON
+    format.
+
+    It is essential that this command lives here and not in the
+    protocol-specific code because it should be available before a
+    protocol is activated. *)
 let generate_test_keys =
   let open Clic in
+  let alias_prefix_param =
+    let open Clic in
+    arg
+      ~long:"alias-prefix"
+      ~placeholder:"PREFIX"
+      ~doc:
+        "use a custom alias prefix (default: bootstrap). Keys will be \
+         generated with alias \"PREFIX<ID>\" where ID is unique for all key"
+      (parameter (fun _ s -> Lwt_result_syntax.return s))
+  in
   command
     ~group
     ~desc:"Generate an array of accounts for testing purposes."
-    no_options
+    (args1 alias_prefix_param)
     (prefixes ["stresstest"; "gen"; "keys"] @@ keys_count_param @@ stop)
-    (fun () n (cctxt : Client_context.full) ->
+    (fun alias_prefix n (cctxt : Client_context.full) ->
       let open Lwt_result_syntax in
+      (* By default, the alias prefix matches the bootstrap<idx>
+         pattern used in sandboxed mode.*)
+      let alias_prefix =
+        match alias_prefix with
+        | None -> fun i -> Format.sprintf "bootstrap%d" (i + 6)
+        | Some alias_prefix -> Format.sprintf "%s%06d" alias_prefix
+      in
       let* source_list =
         List.init_es ~when_negative_length:[] n (fun i ->
-            let alias = Format.sprintf "bootstrap%d" (i + 6) in
+            let alias = alias_prefix i in
             let pkh, pk, sk =
               Signature.generate_key ~algo:Signature.Ed25519 ()
             in
@@ -307,20 +348,30 @@ let generate_test_keys =
             let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
             return ({pkh; pk; sk}, pk_uri, sk_uri, alias))
       in
+      (* All keys are registered into a single wallet. *)
       let* () =
         register_keys
           cctxt
-          (List.map
+          (List.rev_map
              (fun (x, pk_uri, sk_uri, alias) ->
                (alias, x.pkh, x.pk, pk_uri, sk_uri))
              source_list)
+      in
+      (* Extract and write wallet aliases *)
+      let aliases = List.rev_map (fun (_, _, _, alias) -> alias) source_list in
+      let wallet_path = cctxt#get_base_dir in
+      let*! () =
+        Wallet_helpers.(
+          write_file
+            (Filename.concat wallet_path Aliases.name)
+            Data_encoding.Json.(to_string (construct Aliases.encoding aliases)))
       in
       let json =
         Data_encoding.Json.construct
           source_list_encoding
           (List.map (fun (x, _, _, _) -> x) source_list)
       in
-      Format.printf "%a@." Data_encoding.Json.pp json ;
+      let*! () = cctxt#message "%a@." Data_encoding.Json.pp json in
       return_unit)
 
 let aggregate_fail_if_already_registered cctxt force pk_uri name =

@@ -1298,6 +1298,20 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
     ["stresstest"; "originate"; "smart"; "contracts"; "from"; source.alias]
   |> Process.check
 
+let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
+    ?batches_per_block ?initial_amount client =
+  spawn_command
+    ?endpoint
+    client
+    (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
+    @ optional_arg "batch-size" string_of_int batch_size
+    @ optional_arg "batches-per-block" string_of_int batches_per_block
+    @ optional_arg
+        "initial-amount"
+        (fun v -> string_of_int (Tez.to_mutez v))
+        initial_amount)
+  |> Process.check
+
 let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
     client =
   let* client_output =
@@ -2026,12 +2040,13 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
-let stresstest_gen_keys ?endpoint n client =
+let stresstest_gen_keys ?endpoint ?alias_prefix n client =
   let* output =
     spawn_command
       ?endpoint
       client
-      ["stresstest"; "gen"; "keys"; Int.to_string n]
+      (["stresstest"; "gen"; "keys"; Int.to_string n]
+      @ optional_arg "alias-prefix" Fun.id alias_prefix)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in

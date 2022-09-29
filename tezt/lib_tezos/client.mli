@@ -926,8 +926,7 @@ type stresstest_contract_parameters = {
     corresponding optional argument is not provided to the function,
     then a new random seed is generated.
 
-    Optional parameters (provided only if the function is called with
-    the corresponding optional argument):
+    Optional parameters:
     - [seed] is the seed used for the random number generator
     - [fee] is the custom fee to pay instead of the default one
     - [gas_limit] is the custom gas limit
@@ -974,6 +973,22 @@ val spawn_stresstest :
   t ->
   Process.t
 
+(** Run [tezos-client stresstest gen keys <nb_keys>].
+
+    [nb_keys] contains the number of new keys to be generated.
+
+    Optional parameters:
+    - alias_prefix: allows to use a dedicated alias prefix for
+      generated keys (default: bootstrap<key_index>),
+
+    [endpoint]: cf {!create}*)
+val stresstest_gen_keys :
+  ?endpoint:endpoint ->
+  ?alias_prefix:string ->
+  int ->
+  t ->
+  Account.key list Lwt.t
+
 (** Costs of every kind of transaction used in the stress test. *)
 type stresstest_gas_estimation = {
   regular : int;  (** Cost of a regular transaction. *)
@@ -987,6 +1002,28 @@ val stresstest_estimate_gas :
 (** Originate all smart contracts for use in the stress test. *)
 val stresstest_originate_smart_contracts :
   ?endpoint:endpoint -> Account.key -> t -> unit Lwt.t
+
+(** Run [octez-client stresstest fund accounts from <source_key_pkh>].
+
+    [source_key_pkh] is the address from which the funds will be withdraw.
+
+    Optional parameters:
+    - batch_size: maximum number of operations that can be put into a
+      single batch,
+    - batches_per_block: maximum number of batches that can be put
+      into a single block,
+    - initial_amount: number of token, in μtz, that will be funded on
+      each of the accounts to fund.
+
+     [endpoint]: cf {!create} *)
+val stresstest_fund_accounts_from_source :
+  ?endpoint:endpoint ->
+  source_key_pkh:string ->
+  ?batch_size:int ->
+  ?batches_per_block:int ->
+  ?initial_amount:Tez.t ->
+  t ->
+  unit Lwt.t
 
 (** Run [octez-client run script .. on storage .. and input ..].
 
