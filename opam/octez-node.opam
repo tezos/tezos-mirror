@@ -31,10 +31,6 @@ depends: [
   "lwt-exit"
   "uri" { >= "2.2.0" }
   "tezos-embedded-protocol-000-Ps9mPmXa"
-  "tezos-embedded-protocol-012-Psithaca"
-  "tezos-protocol-plugin-012-Psithaca-registerer"
-  "tezos-embedded-protocol-013-PtJakart"
-  "tezos-protocol-plugin-013-PtJakart-registerer"
   "tezos-embedded-protocol-014-PtKathma"
   "tezos-protocol-plugin-014-PtKathma-registerer"
   "tezos-embedded-protocol-015-PtLimaPt"
@@ -62,6 +58,10 @@ depopts: [
   "tezos-protocol-plugin-010-PtGRANAD-registerer"
   "tezos-embedded-protocol-011-PtHangz2"
   "tezos-protocol-plugin-011-PtHangz2-registerer"
+  "tezos-embedded-protocol-012-Psithaca"
+  "tezos-protocol-plugin-012-Psithaca-registerer"
+  "tezos-embedded-protocol-013-PtJakart"
+  "tezos-protocol-plugin-013-PtJakart-registerer"
   "tezos-embedded-protocol-alpha"
   "tezos-protocol-plugin-alpha-registerer"
 ]

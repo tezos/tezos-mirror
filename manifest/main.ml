@@ -4640,7 +4640,7 @@ module Protocol = Protocol
           ]
     in
     let tx_rollup =
-      only_if N.(number >= 013) @@ fun () ->
+      only_if active @@ fun () ->
       public_lib
         (sf "tezos-tx-rollup-%s" name_dash)
         ~path:(path // "lib_tx_rollup")
@@ -4959,9 +4959,9 @@ module Protocol = Protocol
 
   let _011_PtHangz2 = frozen (Name.v "PtHangz2" 011)
 
-  let _012_Psithaca = active (Name.v "Psithaca" 012)
+  let _012_Psithaca = frozen (Name.v "Psithaca" 012)
 
-  let _013_PtJakart = active (Name.v "PtJakart" 013)
+  let _013_PtJakart = frozen (Name.v "PtJakart" 013)
 
   let _014_PtKathma = active (Name.v "PtKathma" 014)
 

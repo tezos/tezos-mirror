@@ -62,7 +62,7 @@ let () =
   Qcheck_rpc.register_for_alpha ~executors:default_executors () ;
   Prt_client.register ~executors:default_executors ~protocols:[Alpha] ;
   Sc_rollup.register ~executors:default_executors ~protocols:[Alpha] ;
-  Script_cache.register ~executors:default_executors ~protocols:[Jakarta; Alpha] ;
+  Script_cache.register ~executors:default_executors ~protocols:[Alpha] ;
   Block_validation.register ~executors:default_executors () ;
   Block_validation.register_semantic_regression_test
     ~executors:[Long_test.block_replay_executor]

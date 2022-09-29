@@ -197,18 +197,6 @@ let test_batch_inconsistent_sources protocols =
         call_run_operation_and_check_response node batch_json)
   in
   register_inconsistent_sources
-    ~supports:Protocol.(Until_protocol (number Jakarta))
-    ~title:"Run_operation inconsistent sources ok"
-    (fun node batch_json ->
-      Log.info
-        "Call the [run_operation] RPC on this batch and check that it succeeds." ;
-      let* _run_operation_output =
-        RPC.(
-          call node (post_chain_block_helpers_scripts_run_operation batch_json))
-      in
-      unit)
-    protocols ;
-  register_inconsistent_sources
     ~supports:(Protocol.From_protocol 014)
     ~title:"Run_operation inconsistent sources ko"
     (fun node batch_json ->

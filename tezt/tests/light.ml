@@ -296,8 +296,7 @@ let test_compare_light =
 let register_protocol_independent () =
   test_no_endpoint () ;
   test_endpoint_not_in_sources () ;
-  Proxy.test_supported_protocols_like_mockup `Light ;
-  Proxy.test_support_four_protocols `Light
+  Proxy.test_supported_protocols_like_mockup `Light
 
 let register ~protocols =
   test_transfer protocols ;

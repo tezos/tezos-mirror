@@ -198,11 +198,7 @@ let test_run_view_fail_generic ~protocol ~view ~contract ~input ~msg () =
 
 (* Runs view `add_v` on an implicit account and fails *)
 let test_run_view_implicit_account ~protocol () =
-  let msg =
-    if protocol = Protocol.Jakarta then
-      rex "A view was called on a contract with no script."
-    else rex "Erroneous command line argument 6 \\(tz1"
-  in
+  let msg = rex "Erroneous command line argument 6 \\(tz1" in
   test_run_view_fail_generic
     ~protocol
     ~view:"add_v"

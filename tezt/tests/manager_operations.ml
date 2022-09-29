@@ -865,7 +865,7 @@ module Deserialisation = struct
 
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
-    | Protocol.Jakarta | Kathmandu | Lima | Alpha -> 2109
+    | Protocol.Kathmandu | Lima | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -913,18 +913,18 @@ module Deserialisation = struct
     in
     unit
 
-  let test_not_enough_gas_deserialization ~supports ~manager_operation_cost =
+  let test_not_enough_gas_deserialization =
     Protocol.register_test
       ~__FILE__
       ~title:"Contract call with not enough gas to deserialize argument"
-      ~supports
+      ~supports:(Protocol.From_protocol 14)
       ~tags:["precheck"; "gas"; "deserialization"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* contract = originate_noop_contract nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas =
-      manager_operation_cost + deserialization_gas ~size_kB
+      Constant.manager_operation_gas_cost + deserialization_gas ~size_kB
     in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
@@ -936,16 +936,6 @@ module Deserialisation = struct
         nodes.main.client
     in
     unit
-
-  let test_not_enough_gas_deserialization protocols =
-    test_not_enough_gas_deserialization
-      ~supports:(Protocol.Until_protocol 13)
-      ~manager_operation_cost:0
-      protocols ;
-    test_not_enough_gas_deserialization
-      ~supports:(Protocol.From_protocol 14)
-      ~manager_operation_cost:Constant.manager_operation_gas_cost
-      protocols
 
   let test_deserialization_gas_accounting =
     Protocol.register_test
@@ -1134,37 +1124,22 @@ module Reveal = struct
     in
     unit
 
-  let revealed_twice_in_batch ~supports decide_error =
+  let revealed_twice_in_batch =
     Protocol.register_test
       ~__FILE__
       ~title:"Correct public key revealed twice in a batch"
       ~tags:["reveal"; "revelation"; "batch"]
-      ~supports
+      ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      decide_error nodes @@ fun () ->
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       mk_reveal_twice nodes.main key key.public_key key.public_key
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
-
-  (* After the work in !5182, which enforces that reveal operations
-      can only be placed at the head of the batch, this test should
-      fail with a permanent, Apply.Incorrect_reveal_position error (see
-      #2774). For Jakarta, we leave the original behaviour
-      which resulted in an Branch Refused error. *)
-  let revealed_twice_in_batch protocols =
-    revealed_twice_in_batch
-      ~supports:(Protocol.Until_protocol 13)
-      (Memchecks.with_branch_refused_checks ~__LOC__)
-      protocols ;
-    revealed_twice_in_batch
-      ~supports:(Protocol.From_protocol 14)
-      (Memchecks.with_refused_checks ~__LOC__)
-      protocols
 
   (* After the work in !5182, which enforces that reveal operations
      can only be placed at the head of the batch, this test should
@@ -1190,18 +1165,18 @@ module Reveal = struct
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
-  let revealed_twice_in_batch_bad_second_key ~supports decide_error =
+  let revealed_twice_in_batch_bad_second_key =
     Protocol.register_test
       ~__FILE__
       ~title:"Two reveals in a batch. Second key is wrong"
       ~tags:["reveal"; "revelation"]
-      ~supports
+      ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* key = Helpers.init_fresh_account ~protocol nodes ~amount ~fee in
     Log.section "Make the revelation" ;
     let* _ =
-      decide_error nodes @@ fun () ->
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       mk_reveal_twice
         nodes.main
         key
@@ -1210,21 +1185,6 @@ module Reveal = struct
     in
     let* () = Memchecks.check_balance ~__LOC__ nodes.main key amount in
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
-
-  (* After the work in !5182, which enforces that reveal operations
-     can only be placed at the head of the batch, this test should
-     fail with a permanent, Apply.Incorrect_reveal_position error (see
-     #2774). For Jakarta, we leave the original behaviour
-     which resulted in an Branch Refused error. *)
-  let revealed_twice_in_batch_bad_second_key protocols =
-    revealed_twice_in_batch_bad_second_key
-      ~supports:(Protocol.Until_protocol 13)
-      (Memchecks.with_branch_refused_checks ~__LOC__)
-      protocols ;
-    revealed_twice_in_batch_bad_second_key
-      ~supports:(Protocol.From_protocol 14)
-      (Memchecks.with_refused_checks ~__LOC__)
-      protocols
 
   let register ~protocols =
     simple_reveal_bad_pk protocols ;
@@ -1426,16 +1386,16 @@ module Simple_transfers = struct
       Constant.bootstrap2
       ~revealed:true
 
-  let test_simple_transfer_not_enough_gas ~supports decide_error =
+  let test_simple_transfer_not_enough_gas =
     Protocol.register_test
       ~__FILE__
       ~title:"Simple transfer with not enough gas"
       ~tags:["transaction"; "transfer"]
-      ~supports
+      ~supports:(Protocol.From_protocol 14)
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
     let* _ =
-      decide_error nodes @@ fun () ->
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
@@ -1447,22 +1407,6 @@ module Simple_transfers = struct
       (* Gas too small *)
     in
     unit
-
-  let test_simple_transfer_not_enough_gas protocols =
-    test_simple_transfer_not_enough_gas
-      ~supports:(Protocol.From_protocol 14)
-      (fun nodes -> Memchecks.with_refused_checks ~__LOC__ nodes)
-      protocols ;
-    test_simple_transfer_not_enough_gas
-      ~supports:(Protocol.Until_protocol 13)
-      (fun nodes f ->
-        Memchecks.with_applied_checks
-          ~__LOC__
-          nodes
-          ~expected_statuses:["failed"]
-          ~expected_errors:[["gas_exhausted.operation"]]
-          f)
-      protocols
 
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2077
      Once this issue is fixed change the test to check that the operation is refused
@@ -1611,11 +1555,11 @@ module Simple_transfers = struct
     in
     unit
 
-  let test_simple_transfers_successive_wrong_counters ~supports decide_error =
+  let test_simple_transfers_successive_wrong_counters =
     Protocol.register_test
       ~__FILE__
       ~title:"Test succesive injections with same manager"
-      ~supports
+      ~supports:(Protocol.From_protocol 14)
       ~tags:["transaction"; "transfer"; "counters"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
@@ -1667,84 +1611,17 @@ module Simple_transfers = struct
         nodes.main.client
     in
     let* _ =
-      decide_error nodes @@ fun () ->
+      Memchecks.with_branch_delayed_checks
+        ~__LOC__ (* ~classification_after_flush:`Branch_delayed *)
+        ~classification_after_flush:`Applied
+        ~should_include:false (* applied after flush *)
+        nodes
+      @@ fun () ->
       Operation.inject_transfer
         ~protocol
         ~source:Constant.bootstrap2
         ~dest:Constant.bootstrap3
         ~counter:(counter + 3)
-        ~amount:2
-        nodes.main.client
-    in
-    unit
-
-  let test_simple_transfers_successive_wrong_counters protocols =
-    test_simple_transfers_successive_wrong_counters
-      ~supports:(Protocol.Until_protocol 13)
-      (Memchecks.with_branch_delayed_checks
-         ~__LOC__
-         ~classification_after_flush:`Absent
-         ~should_include:true (* applied after flush *))
-      protocols ;
-    test_simple_transfers_successive_wrong_counters
-      ~supports:(Protocol.From_protocol 14)
-      (Memchecks.with_branch_delayed_checks
-         ~__LOC__ (* ~classification_after_flush:`Branch_delayed *)
-         ~classification_after_flush:`Applied
-         ~should_include:false (* applied after flush *))
-      protocols
-
-  let test_simple_transfers_successive_wrong_counters_no_op_pre =
-    Protocol.register_test
-      ~__FILE__
-      ~supports:(Protocol.Until_protocol 13)
-        (* This test can be run until proto 14, because the manager
-           restriction 1M is enabled with proto 14 *)
-      ~title:
-        "Test successive injections with same manager (no operation precheck)"
-      ~tags:["transaction"; "transfer"; "counters"; "no_operation_precheck"]
-    @@ fun protocol ->
-    let* nodes = Helpers.init ~disable_operation_precheck:true ~protocol () in
-    let* counter =
-      Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
-    in
-    let* _ =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:[]
-        ~bake:false
-      @@ fun () ->
-      Operation.inject_transfer
-        ~protocol
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 1)
-        ~amount:1
-        nodes.main.client
-    in
-    let* _ =
-      Memchecks.with_applied_checks
-        ~__LOC__
-        nodes
-        ~expected_statuses:[]
-        ~bake:false
-      @@ fun () ->
-      Operation.inject_transfer
-        ~protocol
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2)
-        ~amount:1
-        nodes.main.client
-    in
-    let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
-      Operation.inject_transfer
-        ~protocol
-        ~source:Constant.bootstrap2
-        ~dest:Constant.bootstrap3
-        ~counter:(counter + 2) (* Reuse counter: wrong *)
         ~amount:2
         nodes.main.client
     in
@@ -1811,7 +1688,6 @@ module Simple_transfers = struct
     test_simple_transfer_low_balance_to_pay_allocation_2 protocols ;
     test_simple_transfer_of_the_whole_balance protocols ;
     test_simple_transfers_successive_wrong_counters protocols ;
-    test_simple_transfers_successive_wrong_counters_no_op_pre protocols ;
     test_batch_simple_transfers_wrong_counters protocols ;
     test_batch_simple_transfers_wrong_counters_2 protocols
 end
