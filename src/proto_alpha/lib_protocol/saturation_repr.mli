@@ -99,6 +99,9 @@ val max : 'a t -> 'a t -> 'a t
 
 val compare : 'a t -> 'b t -> int
 
+(** [a >! b] is [a > b]. Avoids using [to_int]. *)
+val ( >! ) : _ t -> int -> bool
+
 (** [numbits x] returns the number of bits used in the binary representation
     of [x]. *)
 val numbits : 'a t -> int

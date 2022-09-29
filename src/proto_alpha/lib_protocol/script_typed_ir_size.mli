@@ -45,7 +45,8 @@ val lambda_size :
    of [root] in bytes. This is an over-approximation of the memory
    actually consumed by [root] since no sharing is taken into
    account. *)
-val node_size : Script_repr.node -> Cache_memory_helpers.nodes_and_size
+val node_size :
+  ('loc, 'prim) Micheline.node -> Cache_memory_helpers.nodes_and_size
 
 (** Pointwise addition (reexport from {!Cache_memory_helpers}) *)
 val ( ++ ) :
