@@ -91,7 +91,7 @@ let should_boot_unreachable_kernel ~max_steps kernel =
       ~step:`Eval
       ~reason:"unreachable executed"
       state_after_second_message) ;
-  return_unit
+  return_ok_unit
 
 let should_run_debug_kernel kernel =
   let open Lwt_syntax in
@@ -104,11 +104,12 @@ let should_run_debug_kernel kernel =
   let* tree = set_input_step "test" 0 tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
-  let+ state_after_first_message =
+  let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   (* The kernel should not fail. *)
-  assert (not @@ is_stuck state_after_first_message)
+  assert (not @@ is_stuck state_after_first_message) ;
+  return_ok_unit
 
 let add_value tree key_steps =
   let open Tezos_lazy_containers in
@@ -142,11 +143,12 @@ let should_run_store_has_kernel kernel =
     Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "_"]
   in
   let* tree = eval_until_input_requested tree in
-  let+ state_after_first_message =
+  let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   (* The kernel is now expected to fail, the PVM should be in stuck state. *)
-  assert (is_stuck state_after_first_message)
+  assert (is_stuck state_after_first_message) ;
+  return_ok_unit
 
 let should_run_store_list_size_kernel kernel =
   let open Lwt_syntax in
@@ -174,11 +176,12 @@ let should_run_store_list_size_kernel kernel =
   let* tree = set_input_step "test" 1 tree in
   let* tree = add_value tree ["one"; "five"] in
   let* tree = eval_until_input_requested tree in
-  let+ state_after_second_message =
+  let* state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   (* The kernel is now expected to fail, the PVM should be in stuck state. *)
-  assert (is_stuck state_after_second_message)
+  assert (is_stuck state_after_second_message) ;
+  return_ok_unit
 
 let should_run_store_delete_kernel kernel =
   let open Lwt_syntax in
@@ -208,8 +211,9 @@ let should_run_store_delete_kernel kernel =
   assert (Option.is_none result) ;
   let* result = Tree.find_tree tree ["durable"; "three"; "four"] in
   assert (Option.is_none result) ;
-  let+ result = Tree.find_tree tree ["durable"; "three"] in
-  assert (Option.is_some result)
+  let* result = Tree.find_tree tree ["durable"; "three"] in
+  assert (Option.is_some result) ;
+  return_ok_unit
 
 (* This function can build snapshotable state out of a tree. It currently
    assumes it follows a tree resulting from `set_input_step`.*)

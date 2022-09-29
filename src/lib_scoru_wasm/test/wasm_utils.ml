@@ -233,16 +233,16 @@ module Kernels = struct
   let test_store_delete_kernel = "test-store-delete"
 end
 
-let test_with_kernel kernel test () =
-  let open Lwt_result_syntax in
+let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
   let open Tezt.Base in
+  let open Lwt_result_syntax in
   (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
      issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
   let kernel_file =
     project_root // Filename.dirname __FILE__ // "wasm_kernels"
     // (kernel ^ ".wasm")
   in
-  let*! () =
+  let* () =
     Lwt_io.with_file ~mode:Lwt_io.Input kernel_file (fun channel ->
         let*! kernel = Lwt_io.read channel in
         test kernel)

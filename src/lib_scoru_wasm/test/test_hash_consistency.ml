@@ -36,15 +36,15 @@ let test_execution_correspondance skip count () =
   test_with_kernel
     Kernels.unreachable_kernel
     (fun kernel ->
-      let open Lwt_syntax in
-      let* tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
-      let* tree =
+      let open Lwt_result_syntax in
+      let*! tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
+      let*! tree =
         if skip = 0L then Lwt.return tree
         else Wasm.compute_step_many ~max_steps:skip tree
       in
       let rec explore tree' n =
-        let* tree_ref = Wasm.compute_step_many ~max_steps:n tree in
-        let* tree' = Wasm.compute_step tree' in
+        let*! tree_ref = Wasm.compute_step_many ~max_steps:n tree in
+        let*! tree' = Wasm.compute_step tree' in
         assert (
           Context_hash.(Context.Tree.hash tree_ref = Context.Tree.hash tree')) ;
         if n < count then explore tree' (Int64.succ n) else return_unit
