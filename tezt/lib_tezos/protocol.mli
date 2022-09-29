@@ -77,12 +77,12 @@ val accuser : t -> string
 (** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string
 
-(** Get the part of the daemon name that is specific to a protocol (e.g. ["008-PtEdo2Zk"]). *)
+(** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
+
+    This should not be used for anything except to compute the name of executables. *)
 val daemon_name : t -> string
 
-(** Get the part which is added at the beginning of all encoding names.
-
-    It turns out this is equal to what the [daemon_name] function returns. *)
+(** Get the part which is added at the beginning of all encoding names. *)
 val encoding_prefix : t -> string
 
 (** Values to override in protocol parameters.

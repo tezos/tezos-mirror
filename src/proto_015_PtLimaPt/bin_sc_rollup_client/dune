@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_client_015_PtLimaPt)
- (public_name octez-sc-rollup-client-015-PtLimaPt)
- (package octez-sc-rollup-client-015-PtLimaPt)
+ (public_name octez-sc-rollup-client-PtLimaPt)
+ (package octez-sc-rollup-client-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

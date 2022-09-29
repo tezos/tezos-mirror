@@ -61,7 +61,7 @@ let test_cache_at_most_once ?query_string path =
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
+    [("TEZOS_LOG", Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")]
     |> List.to_seq |> String_map.of_seq
   in
   let* stderr =
@@ -179,7 +179,7 @@ let test_context_suffix_no_rpc ?query_string path =
   let env =
     String_map.singleton
       "TEZOS_LOG"
-      (Protocol.daemon_name protocol ^ ".proxy_rpc->debug")
+      (Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client

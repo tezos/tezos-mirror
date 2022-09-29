@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_node_015_PtLimaPt)
- (public_name octez-tx-rollup-node-015-PtLimaPt)
- (package octez-tx-rollup-node-015-PtLimaPt)
+ (public_name octez-tx-rollup-node-PtLimaPt)
+ (package octez-tx-rollup-node-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

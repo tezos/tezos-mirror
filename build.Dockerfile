@@ -12,8 +12,8 @@ WORKDIR /home/tezos
 RUN mkdir -p /home/tezos/tezos/scripts /home/tezos/tezos/script-inputs /home/tezos/tezos/parameters
 COPY --chown=tezos:nogroup Makefile tezos
 COPY --chown=tezos:nogroup script-inputs/active_protocol_versions tezos/script-inputs/
-COPY --chown=tezos:nogroup script-inputs/tx_rollup_protocol_versions tezos/script-inputs/
-COPY --chown=tezos:nogroup script-inputs/sc_rollup_protocol_versions tezos/script-inputs/
+COPY --chown=tezos:nogroup script-inputs/active_protocol_versions_without_number tezos/script-inputs/
+COPY --chown=tezos:nogroup script-inputs/sc_rollup_protocol_versions_without_number tezos/script-inputs/
 COPY --chown=tezos:nogroup dune tezos
 COPY --chown=tezos:nogroup scripts/version.sh tezos/scripts/
 COPY --chown=tezos:nogroup src tezos/src

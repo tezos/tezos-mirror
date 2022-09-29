@@ -66,16 +66,15 @@ let parameter_file ?(constants = default_constants) protocol =
   in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function
-  | Alpha -> "alpha"
-  | Kathmandu -> "014-PtKathma"
-  | Lima -> "015-PtLimaPt"
+let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
 
 let accuser proto = "./octez-accuser-" ^ daemon_name proto
 
 let baker proto = "./octez-baker-" ^ daemon_name proto
 
-let encoding_prefix = daemon_name
+let encoding_prefix = function
+  | Alpha -> "alpha"
+  | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
 type parameter_overrides =
   (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list

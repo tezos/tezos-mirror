@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_client_014_PtKathma)
- (public_name octez-sc-rollup-client-014-PtKathma)
- (package octez-sc-rollup-client-014-PtKathma)
+ (public_name octez-sc-rollup-client-PtKathma)
+ (package octez-sc-rollup-client-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

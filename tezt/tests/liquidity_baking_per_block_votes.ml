@@ -105,7 +105,7 @@ let test_all_per_block_votes =
     ~supports:(Protocol.From_protocol 012)
   @@ fun protocol ->
   let ( >|= ) = Lwt.( >|= ) in
-  let error_prefix = "client." ^ Protocol.daemon_name protocol ^ "." in
+  let error_prefix = "client." ^ Protocol.encoding_prefix protocol ^ "." in
 
   if Sys.file_exists default_votefile then
     Test.fail
