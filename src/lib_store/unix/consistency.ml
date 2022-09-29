@@ -90,34 +90,43 @@ let is_block_stored block_store (descriptor, expected_metadata, block_name) =
         | Some _ -> return_unit
       else return_unit
 
-let check_protocol_levels block_store ~caboose protocol_levels =
+(* Checks that the activation blocks above the caboose can be read and
+   that the caboose, savepoint and checkpoint have a protocol
+   associtated to them. *)
+let check_protocol_levels block_store ~savepoint ~current_head protocol_levels =
   let open Lwt_result_syntax in
-  Protocol_levels.iter_es
-    (fun proto_level
-         {Protocol_levels.block = hash, activation_level; protocol; _} ->
-      if Compare.Int32.(activation_level < snd caboose) then
-        (* Cannot say anything *)
-        return_unit
-      else if (* Do not check the fake protocol *)
-              proto_level = 0 then return_unit
-      else
-        let* o =
-          let*! r =
-            Block_store.read_block
-              ~read_metadata:false
-              block_store
-              (Block (hash, 0))
-          in
-          match r with
-          | Error _ -> return_none
-          | Ok block_opt -> return block_opt
-        in
-        match o with
-        | Some _ -> return_unit
+  let* savepoint =
+    Block_store.read_block
+      ~read_metadata:false
+      block_store
+      (Block (fst savepoint, 0))
+  in
+  let* current_head =
+    Block_store.read_block
+      ~read_metadata:false
+      block_store
+      (Block (fst current_head, 0))
+  in
+  (* We already checked that those blocks are present, it is safe to
+     unopt them. *)
+  let savepoint = WithExceptions.Option.get ~loc:__LOC__ savepoint in
+  let current_head = WithExceptions.Option.get ~loc:__LOC__ current_head in
+  let savepoint_proto_level = Block_repr.proto_level savepoint in
+  let current_head_proto_level = Block_repr.proto_level current_head in
+  let available_proto_levels =
+    savepoint_proto_level -- current_head_proto_level
+  in
+  let* () =
+    List.iter_es
+      (fun protocol_level ->
+        match Protocol_levels.find protocol_level protocol_levels with
         | None ->
-            tzfail
-              (Unexpected_missing_activation_block {block = hash; protocol}))
-    protocol_levels
+            (* We don't have it, we should... *)
+            tzfail (Unexpected_missing_protocol {protocol_level})
+        | Some _ -> return_unit)
+      available_proto_levels
+  in
+  return_unit
 
 let check_invariant ~genesis ~caboose ~savepoint ~cementing_highwatermark
     ~checkpoint ~current_head ~alternate_heads =
@@ -221,7 +230,13 @@ let check_consistency chain_dir genesis =
         check_cementing_highwatermark ~cementing_highwatermark block_store
       in
       let*! protocol_levels = Stored_data.get protocol_levels_data in
-      let* () = check_protocol_levels block_store ~caboose protocol_levels in
+      let* () =
+        check_protocol_levels
+          block_store
+          ~savepoint
+          ~current_head
+          protocol_levels
+      in
       let* () =
         check_invariant
           ~genesis:genesis_descr

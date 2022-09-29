@@ -962,6 +962,7 @@ type error +=
       block : Block_hash.t;
       protocol : Protocol_hash.t;
     }
+  | Unexpected_missing_protocol of {protocol_level : int}
   | Inconsistent_genesis of {expected : Block_hash.t; got : Block_hash.t}
   | Inconsistent_cementing_highwatermark of {
       highest_cemented_level : Int32.t;
@@ -1031,6 +1032,21 @@ let () =
       | _ -> None)
     (fun (block, protocol) ->
       Unexpected_missing_activation_block {block; protocol}) ;
+  register_error_kind
+    `Permanent
+    ~id:"store.unexpected_missing_protocol"
+    ~title:"Unexpected missing protocol"
+    ~description:"A protocol is unexpectedly missing from the store."
+    ~pp:(fun ppf protocol_level ->
+      Format.fprintf
+        ppf
+        "The protocol %d is unexpectedly missing from the store."
+        protocol_level)
+    Data_encoding.(obj1 (req "protocol_level" int31))
+    (function
+      | Unexpected_missing_protocol {protocol_level} -> Some protocol_level
+      | _ -> None)
+    (fun protocol_level -> Unexpected_missing_protocol {protocol_level}) ;
   register_error_kind
     `Permanent
     ~id:"store.inconsistent_genesis"
