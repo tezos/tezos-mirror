@@ -24,29 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezos_client = "./tezos-client"
+let tezos_client = "./octez-client"
 
-let tezos_admin_client = "./tezos-admin-client"
+let tezos_admin_client = "./octez-admin-client"
 
-let tezos_node = "./tezos-node"
+let tezos_node = "./octez-node"
 
-let tezos_proxy_server = "./tezos-proxy-server"
+let tezos_proxy_server = "./octez-proxy-server"
 
-let tezos_codec = "./tezos-codec"
+let tezos_codec = "./octez-codec"
 
-let tezos_snoop = "./tezos-snoop"
+let tezos_snoop = "./octez-snoop"
 
-let tezos_protocol_compiler = "./tezos-protocol-compiler"
+let tezos_protocol_compiler = "./octez-protocol-compiler"
 
-let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
+let sc_rollup_node = "./octez-sc-rollup-node-alpha"
 
-let sc_rollup_client = "./tezos-sc-rollup-client-alpha"
+let sc_rollup_client = "./octez-sc-rollup-client-alpha"
 
-let tx_rollup_node = "./tezos-tx-rollup-node"
+let tx_rollup_node = "./octez-tx-rollup-node"
 
-let tx_rollup_client = "./tezos-tx-rollup-client"
+let tx_rollup_client = "./octez-tx-rollup-client"
 
-let dal_node = "./tezos-dal-node"
+let dal_node = "./octez-dal-node"
 
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)

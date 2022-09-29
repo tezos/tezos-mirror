@@ -178,7 +178,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
   let open Lwt_syntax in
   match (mode, raw_hash_of_block block) with
   | Light_client _, _ | Proxy_client, _ | _, Some _ ->
-      (* - If tezos-client executes: don't clear anything, because the client
+      (* - If octez-client executes: don't clear anything, because the client
            is short-lived and should not observe chain reorganization
          - If raw_hash_of_blocks returns [Some]: don't clear anything, because
            block is identified by its hash, hence it doesn't deprecate.

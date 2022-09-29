@@ -15,7 +15,7 @@ depends: [
   "tezos-shell-services"
   "tezos-protocol-environment"
   "tezos-shell-context"
-  "tezos-protocol-compiler"
+  "octez-protocol-compiler"
   "tezos-context"
   "lwt-exit"
 ]
@@ -24,4 +24,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: economic-protocol dynamic loading for `tezos-node`"
+synopsis: "Tezos: economic-protocol dynamic loading for `octez-node`"

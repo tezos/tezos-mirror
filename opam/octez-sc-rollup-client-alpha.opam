@@ -12,19 +12,19 @@ depends: [
   "tezos-base"
   "tezos-clic"
   "tezos-client-base"
-  "tezos-client-base-unix"
+  "tezos-client-alpha"
   "tezos-client-commands"
-  "tezos-signer-services"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
-  "tezos-rpc-http-client-unix"
   "tezos-stdlib-unix"
-  "tezos-stdlib"
-  "tezos-signer-backends"
+  "tezos-client-base-unix"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-protocol-alpha"
+  "tezos-sc-rollup-alpha"
+  "uri" { >= "2.2.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-signer` binary"
+synopsis: "Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"

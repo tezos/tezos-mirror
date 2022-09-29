@@ -135,12 +135,12 @@ val call_json :
 module Client : sig
   type nonrec 'result t = (Node.t, 'result) t
 
-  (** Perform RPC calls using [tezos-client]. *)
+  (** Perform RPC calls using [octez-client]. *)
 
   (** RPC calls performed this way are slower and should only be used to test
       the [rpc] command of the client. *)
 
-  (** Call an RPC using [tezos-client rpc].
+  (** Call an RPC using [octez-client rpc].
 
       The response body is parsed as JSON, then decoded using the decode function
       of the RPC description.

@@ -23,7 +23,7 @@ def get_parameters(folder: str, network='test') -> dict:
 
 
 # The protocol compiler location
-COMPILER = f'{paths.TEZOS_HOME}/tezos-protocol-compiler'
+COMPILER = f'{paths.TEZOS_HOME}/octez-protocol-compiler'
 
 
 # This is the secret key used to activate a protocol from genesis in sandbox

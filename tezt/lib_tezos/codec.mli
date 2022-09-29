@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Run tezos-codec commands. *)
+(** Run octez-codec commands. *)
 
 (** In all functions below, [path] can be used to override the path
-    to [tezos-codec], which is [Constant.tezos_codec] by default. *)
+    to [octez-codec], which is [Constant.tezos_codec] by default. *)
 
-(** Run [tezos-codec encode <name> from <json>]. *)
+(** Run [octez-codec encode <name> from <json>]. *)
 val encode :
   ?path:string -> ?hooks:Process.hooks -> name:string -> JSON.u -> string Lwt.t
 
@@ -36,7 +36,7 @@ val encode :
 val spawn_encode :
   ?path:string -> ?hooks:Process.hooks -> name:string -> JSON.u -> Process.t
 
-(** Run [tezos-codec decode <name> from <binary>]. *)
+(** Run [octez-codec decode <name> from <binary>]. *)
 val decode :
   ?path:string -> ?hooks:Process.hooks -> name:string -> string -> JSON.t Lwt.t
 
@@ -44,7 +44,7 @@ val decode :
 val spawn_decode :
   ?path:string -> ?hooks:Process.hooks -> name:string -> string -> Process.t
 
-(** Run [tezos-codec dump encodings]. *)
+(** Run [octez-codec dump encodings]. *)
 val dump_encodings : ?path:string -> unit -> JSON.t Lwt.t
 
 (** Same as [dump_encodings], but do not wait for the process to exit. *)

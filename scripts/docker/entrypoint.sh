@@ -13,13 +13,13 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 : "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 
 # export all these variables to be used in the inc script
-export node="$BIN_DIR/tezos-node"
-export client="$BIN_DIR/tezos-client"
-export admin_client="$BIN_DIR/tezos-admin-client"
-export baker="$BIN_DIR/tezos-baker-$PROTOCOL"
-export endorser="$BIN_DIR/tezos-endorser-$PROTOCOL"
-export accuser="$BIN_DIR/tezos-accuser-$PROTOCOL"
-export signer="$BIN_DIR/tezos-signer"
+export node="$BIN_DIR/octez-node"
+export client="$BIN_DIR/octez-client"
+export admin_client="$BIN_DIR/octez-admin-client"
+export baker="$BIN_DIR/octez-baker-$PROTOCOL"
+export endorser="$BIN_DIR/octez-endorser-$PROTOCOL"
+export accuser="$BIN_DIR/octez-accuser-$PROTOCOL"
+export signer="$BIN_DIR/octez-signer"
 
 export client_dir="$DATA_DIR/client"
 export node_dir="$DATA_DIR/node"
@@ -28,46 +28,52 @@ export node_data_dir="$node_dir/data"
 # shellcheck source=./scripts/docker/entrypoint.inc.sh
 . "$bin_dir/entrypoint.inc.sh"
 
-command=${1:-tezos-node}
+command=${1:-octez-node}
 shift 1
 
 case $command in
-    tezos-node)
+    tezos-*)
+        >&2 echo "Warning: The executable with name $command has been renamed to $(echo "$command" | sed 's/^tezos-/octez-/'). The name $command is now deprecated, and it will be removed in a future release. Please update your scripts to use the new name."
+        ;;
+esac
+
+case $command in
+    octez-node|tezos-node)
         launch_node "$@"
         ;;
-    tezos-upgrade-storage)
+    octez-upgrade-storage|tezos-upgrade-storage)
         upgrade_node_storage
         ;;
-    tezos-snapshot-import)
+    octez-snapshot-import|tezos-snapshot-import)
         snapshot_import "$@"
         ;;
-    tezos-baker)
+    octez-baker|tezos-baker)
         launch_baker "$@"
         ;;
-    tezos-baker-test)
+    octez-baker-test|tezos-baker-test)
         launch_baker_test "$@"
         ;;
-    tezos-endorser)
+    octez-endorser|tezos-endorser)
         launch_endorser "$@"
         ;;
-    tezos-endorser-test)
+    octez-endorser-test|tezos-endorser-test)
         launch_endorser_test "$@"
         ;;
-    tezos-accuser)
+    octez-accuser|tezos-accuser)
         launch_accuser "$@"
         ;;
-    tezos-accuser-test)
+    octez-accuser-test|tezos-accuser-test)
         launch_accuser_test "$@"
         ;;
-    tezos-client)
+    octez-client|tezos-client)
         configure_client
         exec "$client" "$@"
         ;;
-    tezos-admin-client)
+    octez-admin-client|tezos-admin-client)
         configure_client
         exec "$admin_client" "$@"
         ;;
-    tezos-signer)
+    octez-signer|tezos-signer)
         exec "$signer" "$@"
         ;;
     *)
@@ -84,25 +90,25 @@ You can specify the network with argument --network, for instance:
 (default is mainnet).
 
 Daemons:
-- tezos-node [args]
+- octez-node [args]
   Initialize a new identity and run the tezos node.
 
-- tezos-baker [keys]
-- tezos-baker-test [keys]
-- tezos-endorser [keys]
-- tezos-endorser-test [keys]
+- octez-baker [keys]
+- octez-baker-test [keys]
+- octez-endorser [keys]
+- octez-endorser-test [keys]
 
 Clients:
-- tezos-client [args]
-- tezos-signer [args]
-- tezos-admin-client
+- octez-client [args]
+- octez-signer [args]
+- octez-admin-client
 
 Commands:
-  - tezos-upgrade-storage
-  - tezos-snapshot-import [args]
+  - octez-upgrade-storage
+  - octez-snapshot-import [args]
     Import a snapshot. The snapshot must be available in the file /snapshot
     Using docker run, you can make it available using the command :
-       docker run -v <yourfilename>:/snapshot tezos/tezos tezos-snapshot-import
+       docker run -v <yourfilename>:/snapshot tezos/tezos octez-snapshot-import
     <yourfilename> must be an absolute path.
 EOF
         ;;

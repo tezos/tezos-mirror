@@ -40,4 +40,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, ...)"
+synopsis: "Tezos: core of `octez-node` (gossip, validation scheduling, mempool, ...)"

@@ -11,11 +11,15 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-clic"
-  "tezos-protocol-014-PtKathma"
-  "tezos-client-014-PtKathma"
-  "tezos-client-base-unix"
+  "tezos-client-base"
+  "tezos-client-015-PtLimaPt"
+  "tezos-client-commands"
   "tezos-stdlib-unix"
-  "tezos-tx-rollup-014-PtKathma"
+  "tezos-client-base-unix"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-protocol-015-PtLimaPt"
+  "tezos-sc-rollup-015-PtLimaPt"
   "uri" { >= "2.2.0" }
 ]
 build: [
@@ -23,4 +27,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+synopsis: "Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"

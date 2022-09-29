@@ -43,10 +43,10 @@ let decode ?path ?hooks ~name binary =
     |> spawn_decode ?path ?hooks ~name
     |> Process.check_and_read_stdout
   in
-  return (JSON.parse ~origin:("tezos-codec encode " ^ name) json)
+  return (JSON.parse ~origin:("octez-codec encode " ^ name) json)
 
 let spawn_dump_encodings ?path () = spawn_command ?path ["dump"; "encodings"]
 
 let dump_encodings ?path () =
   let* json = spawn_dump_encodings ?path () |> Process.check_and_read_stdout in
-  return (JSON.parse ~origin:"tezos-codec dump encodings" json)
+  return (JSON.parse ~origin:"octez-codec dump encodings" json)

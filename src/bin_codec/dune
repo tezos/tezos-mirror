@@ -3,8 +3,8 @@
 
 (executable
  (name codec)
- (public_name tezos-codec)
- (package tezos-codec)
+ (public_name octez-codec)
+ (package octez-codec)
  (instrumentation (backend bisect_ppx))
  (libraries
   data-encoding

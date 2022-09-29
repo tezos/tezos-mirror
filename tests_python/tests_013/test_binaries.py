@@ -12,17 +12,17 @@ from . import protocol
 
 PROTO_BINARIES = [
     binary + "-" + protocol.DAEMON
-    for binary in ["tezos-baker", "tezos-accuser"]
+    for binary in ["octez-baker", "octez-accuser"]
 ]
 
 BINARIES = [
-    "tezos-codec",
-    "tezos-client",
-    "tezos-admin-client",
-    "tezos-protocol-compiler",
-    "tezos-node",
-    "tezos-snoop",
-    "tezos-validator",
+    "octez-codec",
+    "octez-client",
+    "octez-admin-client",
+    "octez-protocol-compiler",
+    "octez-node",
+    "octez-snoop",
+    "octez-validator",
 ] + PROTO_BINARIES
 
 

@@ -3,8 +3,8 @@
 
 (executable
  (name main_signer)
- (public_name tezos-signer)
- (package tezos-signer)
+ (public_name octez-signer)
+ (package octez-signer)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -23,12 +23,12 @@ SHA=$(git rev-parse --short=8 HEAD)
 ci_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 script_dir="$(dirname "$ci_dir")"
 src_dir="$(dirname "$script_dir")"
-bin_dir="$src_dir/tezos-binaries/$ARCH"
+bin_dir="$src_dir/octez-binaries/$ARCH"
 
 test_version() {
     echo "Testing version of static binaries"
 
-    for binary in tezos-client tezos-signer; do
+    for binary in octez-client octez-signer; do
         printf "Checking version of %s..." "$binary"
 
         cmd="$bin_dir/$binary --version"
@@ -52,7 +52,7 @@ test_node_run() {
 
     "$script_dir/install_sapling_parameters.sh"
 
-    if ! timeout 20 "$bin_dir/tezos-node" run --expected-pow=-0.0 | grep 'Tezos node is now running'; then
+    if ! timeout 20 "$bin_dir/octez-node" run --expected-pow=-0.0 | grep 'Tezos node is now running'; then
         echo "Could not verify that node is running."
         exit 1
     fi

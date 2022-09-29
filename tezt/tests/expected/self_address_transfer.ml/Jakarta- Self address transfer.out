@@ -1,5 +1,5 @@
 
-./tezos-client --mode mockup --wait none originate contract self_address_sender.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_sender.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_sender.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_sender.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1419.932 units (will add 100 for safety)
 Estimated storage: 339 bytes added (will add 20 for safety)
@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -49,7 +49,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as self_address_sender.tz.
 
-./tezos-client --mode mockup --wait none originate contract self_address_receiver.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_receiver.tz --init Unit --burn-cap 1
+./octez-client --mode mockup --wait none originate contract self_address_receiver.tz transferring 0 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/self_address_receiver.tz --init Unit --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1420.416 units (will add 100 for safety)
 Estimated storage: 340 bytes added (will add 20 for safety)
@@ -57,7 +57,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -99,7 +99,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as self_address_receiver.tz.
 
-./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '"[CONTRACT_HASH]"'
+./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --arg '"[CONTRACT_HASH]"'
 Node is bootstrapped.
 Estimated gas: 4695.311 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -107,7 +107,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

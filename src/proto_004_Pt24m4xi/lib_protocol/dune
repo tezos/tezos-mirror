@@ -209,7 +209,7 @@
   (:src_dir TEZOS_PROTOCOL))
  (action
   (run
-   %{bin:tezos-protocol-compiler}
+   %{bin:octez-protocol-compiler}
    -warning -6-7-9-16-29-32-51-68
    -warn-error +a
    .)))
@@ -301,7 +301,7 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+    (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
  (name tezos_embedded_protocol_004_Pt24m4xi)
@@ -393,4 +393,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} 004_Pt24m4xi)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 004_Pt24m4xi)))))

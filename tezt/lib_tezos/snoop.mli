@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Run tezos-snoop commands. *)
+(** Run octez-snoop commands. *)
 
-(** tezos-snoop states. *)
+(** octez-snoop states. *)
 type t
 
-(** Create a tezos-snoop state *)
+(** Create a octez-snoop state *)
 val create : ?path:string -> ?color:Log.Color.t -> unit -> t
 
 (** Runs the benchmark command.
@@ -38,7 +38,7 @@ val create : ?path:string -> ?color:Log.Color.t -> unit -> t
     The result of benchmarking is saved to [save_to].
 
     For the meaning of the other optional parameters, see the documentation
-    of [tezos-snoop].
+    of [octez-snoop].
  *)
 val benchmark :
   bench_name:string ->

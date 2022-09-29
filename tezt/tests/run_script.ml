@@ -27,7 +27,7 @@
    -------
    Component:    Client
    Invocation:   dune exec tezt/tests/main.exe -- --file run_script.ml
-   Subject:      Check that run script command to tezos-client behaves correctly
+   Subject:      Check that run script command to octez-client behaves correctly
 *)
 
 (* This script checks result of some arbitrary instruction against the

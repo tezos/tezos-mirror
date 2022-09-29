@@ -3,8 +3,8 @@
 
 (executable
  (name main_baker_014_PtKathma)
- (public_name tezos-baker-014-PtKathma)
- (package tezos-baker-014-PtKathma)
+ (public_name octez-baker-014-PtKathma)
+ (package octez-baker-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

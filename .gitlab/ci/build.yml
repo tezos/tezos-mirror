@@ -20,6 +20,7 @@
   artifacts:
     name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
     paths:
+      - octez-*
       - tezos-*
       - src/proto_*/parameters/*.json
       - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -68,7 +69,7 @@ build_get_contracts:
 
   artifacts:
     paths:
-      - "tezos-binaries/$ARCH/*"
+      - "octez-binaries/$ARCH/*"
 
 # x86_64 static binaries are necessary for development branches, as we want to make
 # sure the build does not break. We also need it for release tags, to as its artifacts

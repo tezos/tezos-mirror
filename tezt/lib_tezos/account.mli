@@ -78,9 +78,9 @@ val sign_bytes :
   bytes ->
   Tezos_crypto.Signature.t
 
-(** [write keys ~base_dir] writes the keys into the [tezos-client]'s data
+(** [write keys ~base_dir] writes the keys into the [octez-client]'s data
    directory [base_dir]. This function has the same effect
-   as importing all the keys manually  via [tezos-client] but is
+   as importing all the keys manually  via [octez-client] but is
    faster. *)
 val write : key list -> base_dir:string -> unit
 

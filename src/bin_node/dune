@@ -3,8 +3,8 @@
 
 (executable
  (name main)
- (public_name tezos-node)
- (package tezos-node)
+ (public_name octez-node)
+ (package octez-node)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -20,7 +20,7 @@
   tezos-store.unix-reconstruction
   tezos-store.unix-snapshots
   tezos-context
-  tezos-validator
+  octez-validator
   tezos-validation
   tezos-shell-context
   tezos-workers
@@ -127,7 +127,7 @@
   -open Tezos_store_unix_reconstruction
   -open Tezos_store_unix_snapshots
   -open Tezos_context
-  -open Tezos_validator
+  -open Octez_validator
   -open Tezos_validation
   -open Tezos_shell_context
   -open Tezos_workers
@@ -161,6 +161,6 @@
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 
 (install
- (package tezos-node)
+ (package octez-node)
  (section bin)
- (files (tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))
+ (files (octez-sandboxed-node.sh as octez-sandboxed-node.sh)))

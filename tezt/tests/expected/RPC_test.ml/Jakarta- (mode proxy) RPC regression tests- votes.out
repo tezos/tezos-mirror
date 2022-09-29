@@ -1,26 +1,26 @@
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 []
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
 { "yay": "0", "nay": "0", "pass": "0" }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 1, "remaining": 2 }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
 null
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
 5500
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 [ { "pkh": "[PUBLIC_KEY_HASH]",
     "voting_power": "4000000000000" },
   { "pkh": "[PUBLIC_KEY_HASH]",
@@ -33,43 +33,43 @@ protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqH
     "voting_power": "4000000000000" } ]
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 [ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", "4000000000000" ] ]
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 2, "remaining": 1 }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
 "20000000000000"
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 [ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
 { "yay": "4000001978209", "nay": "4000000000000", "pass": "4000000000000" }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 0, "remaining": 3 }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
 "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
 5500
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 [ { "pkh": "[PUBLIC_KEY_HASH]",
     "voting_power": "4000000000000" },
   { "pkh": "[PUBLIC_KEY_HASH]",
@@ -82,15 +82,15 @@ protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqH
     "voting_power": "4000001978209" } ]
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 []
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 1, "remaining": 2 }
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
 
-./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
+./octez-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
 "20000001978209"
 protocol of proxy unspecified, using the node's protocol: PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY

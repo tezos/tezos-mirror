@@ -24,6 +24,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let warn_if_argv0_name_not_octez () =
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let prefix = "tezos-" in
+  if TzString.has_prefix executable_name ~prefix then
+    let expected_name =
+      let len_prefix = String.length prefix in
+      "octez-"
+      ^ String.sub
+          executable_name
+          len_prefix
+          (String.length executable_name - len_prefix)
+    in
+    Format.eprintf
+      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+       The executable with name %s has been renamed to %s. The name %s is now@,\
+       deprecated, and it will be removed in a future release. Please update@,\
+       your scripts to use the new name.@]@\n\
+       @."
+      executable_name
+      expected_name
+      executable_name
+  else ()
+
 let () =
   Printexc.register_printer @@ function
   | Unix.Unix_error (code, "", _) -> Some (Unix.error_message code)
@@ -63,19 +86,21 @@ let () =
     prerr_endline "Non-64 bit architectures are not supported." ;
     exit 1)
 
+let () = warn_if_argv0_name_not_octez ()
+
 let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then (
     try
-      Tezos_protocol_compiler.Compiler.main
-        Tezos_protocol_compiler_native.Native.driver ;
+      Octez_protocol_compiler.Compiler.main
+        Octez_protocol_compiler_native.Native.driver ;
       Stdlib.exit 0
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn ;
       Stdlib.exit 1)
 
 let () =
-  if Filename.basename Sys.argv.(0) = "tezos-validator" then
-    Tezos_validator.Command_line.run ()
+  if Filename.basename Sys.argv.(0) = "octez-validator" then
+    Octez_validator.Command_line.run ()
 
 let term =
   let open Cmdliner.Term in
@@ -99,7 +124,7 @@ let man = description @ Node_run_command.Manpage.examples
 
 let info =
   let version = Tezos_version.Bin_version.version_string in
-  Cmdliner.Cmd.info ~doc:"The Tezos node" ~man ~version "tezos-node"
+  Cmdliner.Cmd.info ~doc:"The Octez node" ~man ~version "octez-node"
 
 module Node_metrics_command = struct
   let dump_metrics () =

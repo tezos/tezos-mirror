@@ -34,18 +34,22 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
-    $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
-    $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
+RAW_BIN=node validator client admin-client signer codec protocol-compiler snoop proxy-server \
+    $(foreach p, $(active_protocol_versions), baker-$(p)) \
+    $(foreach p, $(active_protocol_versions), accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo tezos-endorser-$(p); fi)) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
+		             echo endorser-$(p); fi)) \
+    $(foreach p, $(tx_rollup_protocol_versions), tx-rollup-node-$p) \
+    $(foreach p, $(tx_rollup_protocol_versions), tx-rollup-client-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-node-$p) \
+    $(foreach p, $(sc_rollup_protocol_versions), sc-rollup-client-$p)
+OCTEZ_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */octez-&/g')
+TEZOS_BIN=$(shell echo "$(RAW_BIN)" | sed 's/[^ ]* */tezos-&/g')
 
-UNRELEASED_TEZOS_BIN=tezos-dal-node
+UNRELEASED_RAW_BIN=dal-node
+UNRELEASED_OCTEZ_BIN=$(shell echo "$(UNRELEASED_RAW_BIN)" | sed 's/[^ ]* */octez-&/g')
+UNRELEASED_TEZOS_BIN=$(shell echo "$(UNRELEASED_RAW_BIN)" | sed 's/[^ ]* */tezos-&/g')
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -77,15 +81,17 @@ release:
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
-.PHONY: $(TEZOS_BIN)
-$(TEZOS_BIN):
+.PHONY: $(OCTEZ_BIN)
+$(OCTEZ_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
+	name=$$(echo "$@" | sed 's/^octez-//'); rm -f "tezos-$$name"; ln -s octez-$$name tezos-$$name
 
-.PHONY: $(UNRELEASED_TEZOS_BIN)
-$(UNRELEASED_TEZOS_BIN):
+.PHONY: $(UNRELEASED_OCTEZ_BIN)
+$(UNRELEASED_OCTEZ_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
+	@name=$$(echo "$@" | sed 's/^octez-//'); rm -f "tezos-$$name"; ln -s octez-$$name tezos-$$name
 
 .PHONY: build
 build:
@@ -93,9 +99,10 @@ ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@$(foreach b, $(RAW_BIN), rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b};)
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
@@ -336,9 +343,10 @@ ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@$(foreach b, $(RAW_BIN) $(UNRELEASED_RAW_BIN), rm -f ./tezos-${b}; ln -s octez-${b} tezos-${b};)
 
 .PHONY: docker-image-build
 docker-image-build:
@@ -402,7 +410,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN}
+	@-rm -f ${OCTEZ_BIN} ${TEZOS_BIN} ${UNRELEASED_OCTEZ_BIN} ${UNRELEASED_TEZOS_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html

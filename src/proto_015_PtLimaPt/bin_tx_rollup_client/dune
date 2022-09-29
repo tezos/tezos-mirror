@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_client_015_PtLimaPt)
- (public_name tezos-tx-rollup-client-015-PtLimaPt)
- (package tezos-tx-rollup-client-015-PtLimaPt)
+ (public_name octez-tx-rollup-client-015-PtLimaPt)
+ (package octez-tx-rollup-client-015-PtLimaPt)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

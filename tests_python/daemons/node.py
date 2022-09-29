@@ -28,16 +28,16 @@ def _run_and_print(cmd):
 
 
 class Node:
-    """Wrapper for the tezos-node command.
+    """Wrapper for the octez-node command.
 
-    This class manages the persistent state of a tezos-node
+    This class manages the persistent state of a octez-node
     (the node directory) and provides an API which wraps the node commands.
 
     Most commands are intended to be used synchronously, for instance:
-    - tezos-node identity generate
-    - tezos-node upgrade storage
+    - octez-node identity generate
+    - octez-node upgrade storage
 
-    tezos-node run is intended to be used asynchronously and forks a
+    octez-node run is intended to be used asynchronously and forks a
     subprocess.
 
     Typical use.
@@ -53,7 +53,7 @@ class Node:
     node.snapshot_import(snapshot) # optional, use a snapshot
     node.init_id() # generate node id
     node.init_config() # generate config file based on parameters
-    node.run() # run tezos-node process
+    node.run() # run octez-node process
     node.terminate() # terminate process
     node.run() # re-run using same process
     node.terminate() # or node.kill()
@@ -77,7 +77,7 @@ class Node:
         env: Dict[str, str] = None,
     ):
 
-        """Creates a new Popen instance for a tezos-node, and manages context.
+        """Creates a new Popen instance for a octez-node, and manages context.
 
         args:
             use_tls (tuple): None if no tls, else couple of strings
@@ -101,7 +101,7 @@ class Node:
         self.log_file = log_file
         self._temp_dir = node_dir is None
         if node_dir is None:
-            node_dir = tempfile.mkdtemp(prefix='tezos-node.')
+            node_dir = tempfile.mkdtemp(prefix='octez-node.')
         self.node_dir = node_dir
         self.p2p_port = p2p_port
         self.rpc_port = rpc_port

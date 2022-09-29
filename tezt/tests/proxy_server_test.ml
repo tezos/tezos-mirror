@@ -33,7 +33,7 @@
    Dependencies: tezt/tests/proxy.ml
 *)
 
-(** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
+(** Creates a client that uses a [octez-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ~protocol () =
   let* node, client =

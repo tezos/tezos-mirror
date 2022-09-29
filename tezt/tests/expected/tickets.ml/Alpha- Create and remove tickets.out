@@ -1,5 +1,5 @@
 
-./tezos-client --mode mockup --wait none originate contract add_clear_tickets.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/add_clear_tickets.tz --init '{}' --burn-cap 1
+./octez-client --mode mockup --wait none originate contract add_clear_tickets.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/add_clear_tickets.tz --init '{}' --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 1437.760 units (will add 100 for safety)
 Estimated storage: 398 bytes added (will add 20 for safety)
@@ -7,7 +7,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -56,7 +56,7 @@ This sequence of operations was run:
 New contract [CONTRACT_HASH] originated.
 Contract memorized as add_clear_tickets.tz.
 
-./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "A"'
+./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "A"'
 Node is bootstrapped.
 Estimated gas: 2582.458 units (will add 100 for safety)
 Estimated storage: 105 bytes added (will add 20 for safety)
@@ -64,7 +64,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -99,7 +99,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +1
 
 
-./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint clear --arg Unit
+./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint clear --arg Unit
 Node is bootstrapped.
 Estimated gas: 2772.454 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -107,7 +107,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -136,7 +136,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... -1
 
 
-./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "B"'
+./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "B"'
 Node is bootstrapped.
 Estimated gas: 2582.458 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -144,7 +144,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -175,7 +175,7 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... +1
 
 
-./tezos-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "C"'
+./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "C"'
 Node is bootstrapped.
 Estimated gas: 3264.087 units (will add 100 for safety)
 Estimated storage: 105 bytes added (will add 20 for safety)
@@ -183,7 +183,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:

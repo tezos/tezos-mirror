@@ -79,9 +79,9 @@ let daemon_name = function
   | Kathmandu -> "014-PtKathma"
   | Lima -> "015-PtLimaPt"
 
-let accuser proto = "./tezos-accuser-" ^ daemon_name proto
+let accuser proto = "./octez-accuser-" ^ daemon_name proto
 
-let baker proto = "./tezos-baker-" ^ daemon_name proto
+let baker proto = "./octez-baker-" ^ daemon_name proto
 
 let encoding_prefix = daemon_name
 

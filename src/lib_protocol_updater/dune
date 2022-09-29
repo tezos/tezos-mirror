@@ -12,8 +12,8 @@
   tezos-shell-services
   tezos-protocol-environment
   tezos-shell-context
-  tezos-protocol-compiler.registerer
-  tezos-protocol-compiler.native
+  octez-protocol-compiler.registerer
+  octez-protocol-compiler.native
   tezos-context
   lwt-exit
   dynlink)

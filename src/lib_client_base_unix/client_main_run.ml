@@ -317,6 +317,42 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.printer)
           setup_non_mockup_rpc_client_config m
       | `Mode_mockup -> setup_mockup_rpc_client_config cctxt args base_dir)
 
+let warn_if_argv0_name_not_octez () =
+  let keep_version_number = true in
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let expected_name =
+    match TzString.split '-' executable_name with
+    | prefix :: (("endorser" | "accuser" | "baker") as bin) :: arg :: rest ->
+        let has_version_number = int_of_string_opt arg <> None in
+        if String.equal prefix "tezos" || has_version_number then
+          if has_version_number then
+            if keep_version_number then
+              Some (String.concat "-" ("octez" :: bin :: arg :: rest))
+            else Some (String.concat "-" ("octez" :: bin :: rest))
+          else Some (String.concat "-" ("octez" :: bin :: arg :: rest))
+        else None
+    | "tezos" :: rest -> Some (String.concat "-" ("octez" :: rest))
+    | _ -> None
+  in
+  let expected_name =
+    Option.bind expected_name (fun expected_name ->
+        if String.equal executable_name expected_name then None
+        else Some expected_name)
+  in
+  match expected_name with
+  | None -> ()
+  | Some expected_name ->
+      Format.eprintf
+        "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+         The executable with name %s has been renamed to %s. The name %s is \
+         now@,\
+         deprecated, and it will be removed in a future release. Please update@,\
+         your scripts to use the new name.@]@\n\
+         @."
+        executable_name
+        expected_name
+        executable_name
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
   let open Lwt_result_syntax in
@@ -348,6 +384,7 @@ let main (module C : M) ~select_commands =
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
+  warn_if_argv0_name_not_octez () ;
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! retcode =
     Lwt.catch

@@ -1,23 +1,23 @@
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
     "batch": "4b6f75726f756b6f756b6f75"
   }
 }'
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
     "batch": "726f756b6f756b6f75"
   }
 }'
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
     "batch": "7374616368"
   }
 }'
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
     "batch": "7374616368"
   }
@@ -27,7 +27,7 @@
 { "hash": "[TX_ROLLUP_MESSAGE_HASH]" }
 { "hash": "[TX_ROLLUP_MESSAGE_HASH]" }
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
   "message_hashes": [
     "[TX_ROLLUP_MESSAGE_HASH]",
     "[TX_ROLLUP_MESSAGE_HASH]",
@@ -40,7 +40,7 @@
     [ "[TX_ROLLUP_INBOX_HASH]",
       "[TX_ROLLUP_INBOX_HASH]" ] }
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
   "message_hashes": [
     "[TX_ROLLUP_MESSAGE_HASH]",
     "[TX_ROLLUP_MESSAGE_HASH]",
@@ -53,7 +53,7 @@
     [ "[TX_ROLLUP_INBOX_HASH]",
       "[TX_ROLLUP_INBOX_HASH]" ] }
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/merkle_tree_path with '{
   "message_hashes": [
     "[TX_ROLLUP_MESSAGE_HASH]",
     "[TX_ROLLUP_MESSAGE_HASH]",

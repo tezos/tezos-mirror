@@ -8,7 +8,7 @@
 ## . "$script_dir"/version.sh
 
 ## `ocaml-version` should be in sync with `README.rst` and
-## `lib.protocol-compiler/tezos-protocol-compiler.opam`
+## `lib.protocol-compiler/octez-protocol-compiler.opam`
 ##
 ## This script is also sourced in the Makefile, as such it should be compatible
 ## with both the make and sh syntax

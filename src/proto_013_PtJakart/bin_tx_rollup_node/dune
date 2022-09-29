@@ -3,8 +3,8 @@
 
 (executable
  (name main_tx_rollup_node_013_PtJakart)
- (public_name tezos-tx-rollup-node-013-PtJakart)
- (package tezos-tx-rollup-node-013-PtJakart)
+ (public_name octez-tx-rollup-node-013-PtJakart)
+ (package octez-tx-rollup-node-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

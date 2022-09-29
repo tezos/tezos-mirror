@@ -143,7 +143,7 @@ let with_fresh_rollup ?kind ~boot_sector f tezos_node tezos_client operator =
   in
   f sc_rollup sc_rollup_node configuration_filename
 
-(** This helper injects an SC rollup origination via tezos-client. Then it
+(** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))

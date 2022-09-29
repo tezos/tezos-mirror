@@ -197,7 +197,7 @@ let sc_rollup_node_rpc sc_node service =
 
 type test = {variant : string; tags : string list; description : string}
 
-(** This helper injects an SC rollup origination via tezos-client. Then it
+(** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))

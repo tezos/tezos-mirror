@@ -10,17 +10,19 @@ license: "MIT"
 depends: [
   "dune" { >= "3.0" }
   "tezos-base"
-  "tezos-clic"
-  "tezos-protocol-015-PtLimaPt"
-  "tezos-client-015-PtLimaPt"
-  "tezos-client-base-unix"
   "tezos-stdlib-unix"
-  "tezos-tx-rollup-015-PtLimaPt"
-  "uri" { >= "2.2.0" }
+  "tezos-clic"
+  "tezos-benchmark"
+  "tezos-benchmark-examples"
+  "tezos-shell-benchmarks"
+  "tezos-benchmarks-proto-alpha"
+  "ocamlgraph"
+  "pyml"
+  "prbnmcn-stats" { = "0.0.4" }
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+synopsis: "Tezos: `octez-snoop` binary"

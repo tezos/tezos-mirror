@@ -1,18 +1,18 @@
 
-./tezos-codec encode alpha.vote.ballot from '"nay"'
+./octez-codec encode alpha.vote.ballot from '"nay"'
 01
 
-./tezos-codec decode alpha.vote.ballot from 01
+./octez-codec decode alpha.vote.ballot from 01
 "nay"
 
-./tezos-codec encode alpha.vote.ballot from '"pass"'
+./octez-codec encode alpha.vote.ballot from '"pass"'
 02
 
-./tezos-codec decode alpha.vote.ballot from 02
+./octez-codec decode alpha.vote.ballot from 02
 "pass"
 
-./tezos-codec encode alpha.vote.ballot from '"yay"'
+./octez-codec encode alpha.vote.ballot from '"yay"'
 00
 
-./tezos-codec decode alpha.vote.ballot from 00
+./octez-codec decode alpha.vote.ballot from 00
 "yay"

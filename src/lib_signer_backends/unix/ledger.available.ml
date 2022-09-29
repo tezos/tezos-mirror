@@ -763,7 +763,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
        where:\n\
       \ - <animals> is the identifier of the ledger of the form \
        'crouching-tiger-hidden-dragon' and can be obtained with the command \
-       `tezos-client list connected ledgers` (which also provides full \
+       `octez-client list connected ledgers` (which also provides full \
        examples).\n\
        - <curve> is the signing curve, e.g. `ed1551`\n\
        - <path> is a BIP32 path anchored at m/%s. The ledger does not yet \
@@ -906,7 +906,7 @@ let generic_commands group =
                           (fun curve ->
                             fprintf
                               ppf
-                              "  tezos-client import secret key ledger_%s \
+                              "  octez-client import secret key ledger_%s \
                                \"ledger://%a/%a/0h/0h\""
                               (Sys.getenv_opt "USER"
                               |> Option.value ~default:"user")

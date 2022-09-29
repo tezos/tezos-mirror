@@ -4,7 +4,7 @@ services:
   node:
     image: tezos/tezos:latest
     hostname: node
-    command: tezos-node
+    command: octez-node
     ports:
       - 9732:9732
     expose:
@@ -21,7 +21,7 @@ services:
     hostname: baker-alpha
     environment:
       - PROTOCOL=alpha
-    command: tezos-baker
+    command: octez-baker
     links:
       - node
     volumes:
@@ -33,7 +33,7 @@ services:
     hostname: accuser-alpha
     environment:
       - PROTOCOL=alpha
-    command: tezos-accuser
+    command: octez-accuser
     links:
       - node
     volumes:

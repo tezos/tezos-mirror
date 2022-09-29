@@ -1,5 +1,5 @@
 
-./tezos-client rpc get /chains/main/blocks/head/context/contracts
+./octez-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
   "[CONTRACT_HASH]",
@@ -9,96 +9,96 @@
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get /chains/main/blocks/head/context/delegates
+./octez-client rpc get /chains/main/blocks/head/context/delegates
 [ "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]",
   "[PUBLIC_KEY_HASH]" ]
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "3800000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "3800000000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "0", "counter": "0" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "100000000", "counter": "1" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "100000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "1"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 "99999393"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/manager_key'
 "[PUBLIC_KEY]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
 "[PUBLIC_KEY_HASH]"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -114,20 +114,20 @@ Fatal error:
       "storage":
         { "prim": "Some", "args": [ { "string": "initial storage" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -137,10 +137,10 @@ Fatal error:
 }'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints": {} }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "parameter", "args": [ { "prim": "string" } ] },
       { "prim": "storage",
@@ -152,10 +152,10 @@ null
               { "prim": "PAIR" } ] ] } ],
   "storage": { "prim": "Some", "args": [ { "string": "initial storage" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Some", "args": [ { "string": "initial storage" } ] }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
   "script":
     { "code":
@@ -321,20 +321,20 @@ null
       "storage":
         { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/balance'
 "0"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Fatal error:
   No service found at this URL
   
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "int": "0"
   },
@@ -344,7 +344,7 @@ Fatal error:
 }'
 null
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/entrypoints'
 { "entrypoints":
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
@@ -375,7 +375,7 @@ null
                 "args": [ { "prim": "string" }, { "prim": "nat" } ],
                 "annots": [ "%add_right" ] } ] } } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'
 { "code":
     [ { "prim": "storage",
         "args":
@@ -529,10 +529,10 @@ null
                       { "prim": "PAIR" } ] ] } ] ] } ],
   "storage": { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] } }
 
-./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
+./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/storage'
 { "prim": "Pair", "args": [ { "int": "4" }, { "int": "5" } ] }
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "test"
   },
@@ -542,7 +542,7 @@ null
 }'
 null
 
-./tezos-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
+./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
     "string": "dup"
   },

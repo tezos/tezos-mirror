@@ -302,7 +302,7 @@
   },
   {
     "file": "encoding.ml",
-    "title": "tezos-codec dump encodings",
+    "title": "octez-codec dump encodings",
     "tags": [
       "codec",
       "dump"

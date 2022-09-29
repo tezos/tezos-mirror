@@ -37,4 +37,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: `tezos-codec` binary to encode and decode values"
+synopsis: "Tezos: `octez-codec` binary to encode and decode values"

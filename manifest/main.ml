@@ -1707,7 +1707,7 @@ let octez_context =
   public_lib
     "tezos-context"
     ~path:"src/lib_context"
-    ~synopsis:"Tezos: on-disk context abstraction for `tezos-node`"
+    ~synopsis:"Tezos: on-disk context abstraction for `octez-node`"
     ~deps:[octez_context_disk; octez_context_memory]
 
 let _octez_context_tests =
@@ -1946,7 +1946,7 @@ let octez_shell_context =
     "tezos-shell-context"
     ~path:"src/lib_protocol_environment/shell_context"
     ~synopsis:
-      "Tezos: economic-protocols environment implementation for `tezos-node`"
+      "Tezos: economic-protocols environment implementation for `octez-node`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2001,7 +2001,7 @@ let _octez_protocol_shell_context_tests =
 
 let octez_protocol_compiler_registerer =
   public_lib
-    "tezos-protocol-compiler.registerer"
+    "octez-protocol-compiler.registerer"
     ~path:"src/lib_protocol_compiler/registerer"
     ~internal_name:"tezos_protocol_registerer"
     ~deps:
@@ -2012,13 +2012,13 @@ let _octez_protocol_compiler_cmis_of_cma =
   private_exe
     "cmis_of_cma"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~deps:[compiler_libs_common]
     ~modules:["cmis_of_cma"]
 
 let octez_protocol_compiler_lib =
   public_lib
-    "tezos-protocol-compiler"
+    "octez-protocol-compiler"
     ~path:"src/lib_protocol_compiler"
     ~synopsis:"Tezos: economic-protocol compiler"
     ~ocaml:
@@ -2114,7 +2114,7 @@ let octez_protocol_compiler_lib =
 
 let octez_protocol_compiler_native =
   public_lib
-    "tezos-protocol-compiler.native"
+    "octez-protocol-compiler.native"
     ~path:"src/lib_protocol_compiler"
     ~deps:
       [
@@ -2128,7 +2128,7 @@ let octez_protocol_compiler_native =
         [
           install
             [V [S "final_protocol_versions"]]
-            ~package:"tezos-protocol-compiler"
+            ~package:"octez-protocol-compiler"
             ~section:"libexec";
         ]
 
@@ -2136,7 +2136,7 @@ let octez_protocol_updater =
   public_lib
     "tezos-protocol-updater"
     ~path:"src/lib_protocol_updater"
-    ~synopsis:"Tezos: economic-protocol dynamic loading for `tezos-node`"
+    ~synopsis:"Tezos: economic-protocol dynamic loading for `octez-node`"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -2267,7 +2267,7 @@ let octez_store =
   public_lib
     "tezos-store"
     ~path:"src/lib_store"
-    ~synopsis:"Tezos: store for `tezos-node`"
+    ~synopsis:"Tezos: store for `octez-node`"
     ~description:
       {|This library provides abstraction for storing and iterating over blocks.
 tezos-store is a virtual library that provides two implementations:
@@ -2344,7 +2344,7 @@ let octez_shell =
     "tezos-shell"
     ~path:"src/lib_shell"
     ~synopsis:
-      "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, \
+      "Tezos: core of `octez-node` (gossip, validation scheduling, mempool, \
        ...)"
     ~documentation:[Dune.[S "package"; S "tezos-shell"]]
     ~inline_tests:ppx_expect
@@ -2463,10 +2463,10 @@ let _octez_context_merkle_proof_tests =
 
 let octez_validator_lib =
   public_lib
-    "tezos-validator"
+    "octez-validator"
     ~path:"src/bin_validation"
     ~synopsis:
-      "Tezos: `tezos-validator` binary for external validation of blocks"
+      "Tezos: `octez-validator` binary for external validation of blocks"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -3051,9 +3051,9 @@ let octez_openapi =
 
 let _octez_protocol_compiler_bin =
   public_exe
-    "tezos-protocol-compiler"
+    "octez-protocol-compiler"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_native"
     ~modes:[Native]
     ~deps:[octez_protocol_compiler_native]
@@ -3062,9 +3062,9 @@ let _octez_protocol_compiler_bin =
 
 let octez_protocol_compiler_tezos_protocol_packer =
   public_exe
-    "tezos-protocol-compiler.tezos-protocol-packer"
+    "octez-protocol-compiler.octez-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_packer"
     ~deps:
       [
@@ -3076,9 +3076,9 @@ let octez_protocol_compiler_tezos_protocol_packer =
 
 let _octez_embedded_protocol_packer =
   public_exe
-    "tezos-embedded-protocol-packer"
+    "octez-embedded-protocol-packer"
     ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
+    ~opam:"octez-protocol-compiler"
     ~internal_name:"main_embedded_packer"
     ~modes:[Native]
     ~deps:
@@ -3840,7 +3840,7 @@ module Protocol = Protocol
                   ~action:
                     [
                       S "run";
-                      S "%{bin:tezos-protocol-compiler}";
+                      S "%{bin:octez-protocol-compiler}";
                       (if
                        String_set.mem
                          tezos_protocol.Tezos_protocol.hash
@@ -3903,7 +3903,7 @@ module Protocol = Protocol
                         [
                           S "run";
                           S
-                            "%{bin:tezos-protocol-compiler.tezos-protocol-packer}";
+                            "%{bin:octez-protocol-compiler.octez-protocol-packer}";
                           S "%{src_dir}";
                         ];
                       ];
@@ -3920,16 +3920,16 @@ module Protocol = Protocol
             | V _ as number when N.(number <= 003) ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
-                   in `tezos-node`)"
+                   in `octez-node`)"
                   (if N.(number == 000) then name_dash else name_underscore)
             | Other ->
                 sf
                   "Tezos/Protocol: %s (economic-protocol definition, embedded \
-                   in `tezos-node`)"
+                   in `octez-node`)"
                   name_underscore
             | Alpha | V _ ->
                 "Tezos/Protocol: economic-protocol definition, embedded in \
-                 `tezos-node`")
+                 `octez-node`")
           ~modules:["Registerer"]
           ~linkall:true
           ~flags:(Flags.standard ~disable_warnings ())
@@ -3949,7 +3949,7 @@ module Protocol = Protocol
                         S "%{workspace_root}";
                         [
                           S "run";
-                          S "%{bin:tezos-embedded-protocol-packer}";
+                          S "%{bin:octez-embedded-protocol-packer}";
                           S "%{src_dir}";
                           S name_underscore;
                         ];
@@ -4494,7 +4494,7 @@ module Protocol = Protocol
     let daemon daemon =
       only_if active @@ fun () ->
       public_exe
-        (sf "tezos-%s-%s" daemon name_dash)
+        (sf "octez-%s-%s" daemon name_dash)
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
@@ -4576,10 +4576,10 @@ module Protocol = Protocol
     let _sc_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-sc-rollup-client-%s" name_dash)
+        (sf "octez-sc-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
-        ~synopsis:"Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"
+        ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
         ~release:true
         ~deps:
           [
@@ -4601,7 +4601,7 @@ module Protocol = Protocol
     let _sc_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-sc-rollup-node-%s" name_dash)
+        (sf "octez-sc-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
@@ -4678,10 +4678,10 @@ module Protocol = Protocol
     let _tx_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-tx-rollup-client-%s" name_dash)
+        (sf "octez-tx-rollup-client-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
-        ~synopsis:"Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+        ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
         ~release:true
         ~deps:
           [
@@ -4700,7 +4700,7 @@ module Protocol = Protocol
     let _tx_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "tezos-tx-rollup-node-%s" name_dash)
+        (sf "octez-tx-rollup-node-%s" name_dash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
@@ -5254,9 +5254,9 @@ let _ppinclude =
 
 let _octez_validator_bin =
   public_exe
-    "tezos-validator"
+    "octez-validator"
     ~path:"src/bin_validation/bin"
-    ~opam:"tezos-validator"
+    ~opam:"octez-validator"
     ~internal_name:"main_validator"
     ~deps:
       [
@@ -5298,10 +5298,10 @@ let _octez_node =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "tezos-node"
+    "octez-node"
     ~path:"src/bin_node"
     ~internal_name:"main"
-    ~synopsis:"Tezos: `tezos-node` binary"
+    ~synopsis:"Tezos: `octez-node` binary"
     ~release:true
     ~deps:
       ([
@@ -5337,8 +5337,8 @@ let _octez_node =
       Dune.
         [
           install
-            [as_ "tezos-sandboxed-node.sh" "tezos-sandboxed-node.sh"]
-            ~package:"tezos-node"
+            [as_ "octez-sandboxed-node.sh" "octez-sandboxed-node.sh"]
+            ~package:"octez-node"
             ~section:"bin";
         ]
 
@@ -5367,11 +5367,11 @@ let _octez_client =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exes
-    ["tezos-client"; "tezos-admin-client"]
+    ["octez-client"; "octez-admin-client"]
     ~path:"src/bin_client"
     ~internal_names:["main_client"; "main_admin"]
-    ~opam:"tezos-client"
-    ~synopsis:"Tezos: `tezos-client` binary"
+    ~opam:"octez-client"
+    ~synopsis:"Tezos: `octez-client` binary"
     ~release:true
     ~deps:
       ([
@@ -5397,10 +5397,10 @@ let _octez_client =
           install
             [
               as_
-                "tezos-init-sandboxed-client.sh"
-                "tezos-init-sandboxed-client.sh";
+                "octez-init-sandboxed-client.sh"
+                "octez-init-sandboxed-client.sh";
             ]
-            ~package:"tezos-client"
+            ~package:"octez-client"
             ~section:"bin";
           alias_rule
             "runtest_compile_protocol"
@@ -5408,7 +5408,7 @@ let _octez_client =
             ~action:
               [
                 S "run";
-                S "%{bin:tezos-protocol-compiler}";
+                S "%{bin:octez-protocol-compiler}";
                 S "-no-hash-check";
                 H [S "-warn-error"; S "+a"];
                 S "test/proto_test_injection/";
@@ -5417,10 +5417,10 @@ let _octez_client =
 
 let _octez_codec =
   public_exe
-    "tezos-codec"
+    "octez-codec"
     ~path:"src/bin_codec"
     ~internal_name:"codec"
-    ~synopsis:"Tezos: `tezos-codec` binary to encode and decode values"
+    ~synopsis:"Tezos: `octez-codec` binary to encode and decode values"
     ~release:true
     ~deps:
       ([
@@ -5449,10 +5449,10 @@ let _octez_codec =
 
 let _octez_proxy_server =
   public_exe
-    "tezos-proxy-server"
+    "octez-proxy-server"
     ~path:"src/bin_proxy_server"
     ~internal_name:"main_proxy_server"
-    ~synopsis:"Tezos: `tezos-proxy-server` binary"
+    ~synopsis:"Octez: `octez-proxy-server` binary"
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives" |> open_;
@@ -5475,10 +5475,10 @@ let _octez_proxy_server =
 
 let _octez_snoop =
   public_exe
-    "tezos-snoop"
+    "octez-snoop"
     ~path:"src/bin_snoop"
     ~internal_name:"main_snoop"
-    ~synopsis:"Tezos: `tezos-snoop` binary"
+    ~synopsis:"Tezos: `octez-snoop` binary"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
@@ -5500,7 +5500,7 @@ let _octez_snoop =
         [
           S "cram"
           :: G [S "deps" :: [S "main_snoop.exe"]]
-          :: [S "package" :: [S "tezos-snoop"]];
+          :: [S "package" :: [S "octez-snoop"]];
         ]
 
 (* We use Dune's select statement and keep uTop optional *)
@@ -5533,10 +5533,10 @@ let _tztop =
 
 let _octez_signer =
   public_exe
-    "tezos-signer"
+    "octez-signer"
     ~path:"src/bin_signer"
     ~internal_name:"main_signer"
-    ~synopsis:"Tezos: `tezos-signer` binary"
+    ~synopsis:"Tezos: `octez-signer` binary"
     ~release:true
     ~deps:
       [
@@ -5629,10 +5629,10 @@ let _octez_dal_node =
     List.map deps_for_protocol Protocol.all |> List.flatten
   in
   public_exe
-    "tezos-dal-node"
+    "octez-dal-node"
     ~path:"src/bin_dal_node"
     ~internal_name:"main_dal"
-    ~synopsis:"Tezos: `tezos-dal-node` binary"
+    ~synopsis:"Tezos: `octez-dal-node` binary"
     ~deps:
       ([
          octez_base |> open_ ~m:"TzPervasives";

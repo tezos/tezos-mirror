@@ -53,7 +53,7 @@ let print_raw_context = Format.asprintf "%a" Proof.pp_raw_context
 
 (** Strings that are valid Irmin hashes. Taken from the output of:
 
-   [tezos-client rpc get /chains/main/blocks/head/context/merkle_tree/active_delegates_with_rolls]
+   [octez-client rpc get /chains/main/blocks/head/context/merkle_tree/active_delegates_with_rolls]
  *)
 let irmin_hashes =
   [

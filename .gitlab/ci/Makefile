@@ -16,7 +16,7 @@ test-protocol-compiles:
 .PHONY: test-static-binaries
 test-static-binaries:
 	cd ${CI_PROJECT_DIR}/tests_python && \
-		sudo cp -a ../tezos-binaries/x86_64/* ../ && \
+		sudo cp -a ../octez-binaries/x86_64/* ../ && \
 		$(MAKE) -C ../ build-parameters && \
 		poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
 
@@ -81,7 +81,7 @@ integration-test-prepare-migration-test: gitlab-take-ownership
 .PHONY: integration-test-snapshot-alpha-and-link
 integration-test-snapshot-alpha-and-link: gitlab-take-ownership
 	cd ${CI_PROJECT_DIR} && \
-		$(MAKE) tezos-protocol-compiler && \
+		$(MAKE) octez-protocol-compiler && \
 		./scripts/snapshot_alpha_and_link.sh "${new_proto_version}" next && \
 		$(MAKE) && \
 		dune build src/proto_"${new_proto_version}"_*/

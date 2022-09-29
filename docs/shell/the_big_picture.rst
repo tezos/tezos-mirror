@@ -189,7 +189,7 @@ protocol in an alternative environment possible.
     are dummy ones which can be used when only the types and noncontextual
     functions of the protocol are needed.
 
-  - :package:`tezos-protocol-compiler` is the compiler for economic
+  - :package:`octez-protocol-compiler` is the compiler for economic
     protocols: an alternative driver to the OCaml
     :opam:`ocaml-compiler-libs` that typechecks within the protocol
     environment, and performs some more checks on the protocol code.
@@ -306,22 +306,22 @@ run them.
 The Final Executables
 ~~~~~~~~~~~~~~~~~~~~~
 
-  - :package:`tezos-node` provides the node launcher binary
-    ``tezos-node``. All the algorithmic being implemented in the
+  - :package:`octez-node` provides the node launcher binary
+    ``octez-node``. All the algorithmic being implemented in the
     shell, this package only implements the node's CLI. It also
     provides the sandboxed node shell script launcher (see the main
     readme).
-  - :package:`tezos-client` provides the ``tezos-client`` and
-    ``tezos-admin-client`` binaries. The former contains a small
+  - :package:`octez-client` provides the ``octez-client`` and
+    ``octez-admin-client`` binaries. The former contains a small
     command line wallet, the latter an administration tool for the
     node. It also provides a shell script that configures a shell
     environment to interact with a sandboxed node.
-  - :package:`tezos-baker-alpha` provides the ``tezos-baker-alpha``
+  - :package:`octez-baker-alpha` provides the ``octez-baker-alpha``
     binary.
-  - :package:`tezos-accuser-alpha` provides the ``tezos-accuser-alpha``
+  - :package:`octez-accuser-alpha` provides the ``octez-accuser-alpha``
     binary.
-  - :package:`tezos-protocol-compiler` provides the
-    ``tezos-protocol-compiler`` binary that is used by the node to
+  - :package:`octez-protocol-compiler` provides the
+    ``octez-protocol-compiler`` binary that is used by the node to
     compile new protocols on the fly, and that can be used for
     developing new protocols.
 

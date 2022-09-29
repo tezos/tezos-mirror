@@ -465,7 +465,7 @@ let block_arg () =
     ~doc:
       "block on which to apply contextual commands (commands dependent on the \
        context associated with the specified block). Possible tags include \
-       'head' and 'genesis' +/- an optional offset (e.g. \"tezos-client -b \
+       'head' and 'genesis' +/- an optional offset (e.g. \"octez-client -b \
        head-1 get timestamp\"). Note that block queried must exist in node's \
        storage."
     ~default:(Block_services.to_string default_cli_args.block)
@@ -642,7 +642,7 @@ let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
       failwith
         "base directory at %s should be a mockup directory for this operation \
          to be allowed (it may contain sensitive data otherwise). What you \
-         likely want is calling `tezos-client --mode mockup --base-dir \
+         likely want is calling `octez-client --mode mockup --base-dir \
          /some/dir create mockup` where `/some/dir` is **fresh** and **empty** \
          and redo this operation, specifying `--base-dir /some/dir` this time."
         base_dir
@@ -937,7 +937,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
       let show_cmd ppf () =
         Format.fprintf
           ppf
-          "./tezos-client --mode mockup --base-dir %s create mockup"
+          "./octez-client --mode mockup --base-dir %s create mockup"
           base_dir
       in
       match base_dir_class with

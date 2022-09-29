@@ -82,7 +82,7 @@ val is_running_not_ready : t -> bool
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Run [tezos-dal-node init-config]. Returns the name of the resulting
+(** Run [octez-dal-node init-config]. Returns the name of the resulting
     configuration file.
 
     If [use_unsafe_srs] is [true], the dal node runs with unsafe computed SRS

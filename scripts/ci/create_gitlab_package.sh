@@ -55,17 +55,17 @@ do
   # Loop over binaries
   for binary in ${binaries}
   do
-    gitlab_upload "tezos-binaries/${architecture}/${binary}" "${architecture}-${binary}"
+    gitlab_upload "octez-binaries/${architecture}/${binary}" "${architecture}-${binary}"
   done
 
   echo "Upload tarball with all binaries (${architecture})"
 
-  mkdir -pv "tezos-binaries/tezos-${architecture}"
-  cp -a tezos-binaries/"${architecture}"/* "tezos-binaries/tezos-${architecture}/"
+  mkdir -pv "octez-binaries/octez-${architecture}"
+  cp -a octez-binaries/"${architecture}"/* "octez-binaries/octez-${architecture}/"
 
-  cd tezos-binaries/
-  tar -czf "tezos-${architecture}.tar.gz" "tezos-${architecture}/"
-  gitlab_upload "tezos-${architecture}.tar.gz" "${gitlab_package_name}-linux-${architecture}.tar.gz"
+  cd octez-binaries/
+  tar -czf "octez-${architecture}.tar.gz" "octez-${architecture}/"
+  gitlab_upload "octez-${architecture}.tar.gz" "${gitlab_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
 

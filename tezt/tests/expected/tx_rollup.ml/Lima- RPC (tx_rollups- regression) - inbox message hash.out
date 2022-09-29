@@ -1,5 +1,5 @@
 
-./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+./octez-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
     "batch": "626c6f62"
   }

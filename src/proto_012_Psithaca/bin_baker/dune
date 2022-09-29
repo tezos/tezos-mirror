@@ -3,8 +3,8 @@
 
 (executable
  (name main_baker_012_Psithaca)
- (public_name tezos-baker-012-Psithaca)
- (package tezos-baker-012-Psithaca)
+ (public_name octez-baker-012-Psithaca)
+ (package octez-baker-012-Psithaca)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

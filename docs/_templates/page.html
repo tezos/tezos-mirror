@@ -1,0 +1,11 @@
+{% block header %}
+  <div id="rename-warning" style="background-color: #BAFFBA; color: #6A0E0E;">
+    <p style="margin-left: 310px">
+      Starting from Octez release 15.0, the Octez binaries will be named "octez-*" (e.g. "octez-client", "octez-node" instead of "tezos-client", "tezos-node").
+      These renamings are already in place on the "master" branch.
+      The legacy names ("tezos-*") are still used in the documentation for now and will be supported through symbolic links until the majority of users will upgrade to releases >= 15.0.
+    </p>
+  </div>
+{% endblock %}
+
+{% extends "!page.html" %}

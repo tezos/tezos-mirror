@@ -376,7 +376,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   let* () = check_listings_not_empty client in
   let* period = Client.show_voting_period client in
   Check.((period = "proposal") string)
-    ~error_msg:"expected tezos-client show voting period to return %R, got %L" ;
+    ~error_msg:"expected octez-client show voting period to return %R, got %L" ;
   (* Inject test protocol, or use known protocol. *)
   let* to_protocol_hash =
     match to_protocol with

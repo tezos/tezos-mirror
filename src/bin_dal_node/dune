@@ -3,8 +3,8 @@
 
 (executable
  (name main_dal)
- (public_name tezos-dal-node)
- (package tezos-dal-node)
+ (public_name octez-dal-node)
+ (package octez-dal-node)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -477,7 +477,7 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler} -warn-error +a .)))
+ (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
  (name tezos_protocol_014_PtKathma_functor)
@@ -702,7 +702,7 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+    (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
  (name tezos_embedded_protocol_014_PtKathma)
@@ -928,4 +928,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} 014_PtKathma)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} 014_PtKathma)))))

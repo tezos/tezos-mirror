@@ -148,7 +148,7 @@ val of_option_shrink : 'a QCheck.Shrink.t option -> 'a QCheck.Shrink.t
 val bytes_arb : bytes QCheck.arbitrary
 
 (** [endpoint_arb] is a [QCheck.arbitrary] for endpoints (such as
-    [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
+    [octez-client]'s [--endpoint] flag). It returns URLs of the form:
     [(http|https)://(string\.)+(:port)?]. It is by no means the most
     general [Uri.t] generator. Generalize it if needed. *)
 val endpoint_arb : Uri.t QCheck.arbitrary

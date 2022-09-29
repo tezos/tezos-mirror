@@ -3,8 +3,8 @@
 
 (executable
  (name main_accuser_014_PtKathma)
- (public_name tezos-accuser-014-PtKathma)
- (package tezos-accuser-014-PtKathma)
+ (public_name octez-accuser-014-PtKathma)
+ (package octez-accuser-014-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
