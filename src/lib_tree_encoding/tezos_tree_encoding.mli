@@ -272,6 +272,9 @@ module type TREE = sig
   val hash : tree -> Context_hash.t
 
   val length : tree -> key -> int Lwt.t
+
+  val list :
+    tree -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
 end
 
 type wrapped_tree

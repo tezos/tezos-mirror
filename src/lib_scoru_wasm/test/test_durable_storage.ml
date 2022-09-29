@@ -165,6 +165,159 @@ let test_store_list_size () =
   assert (result = Values.[Num (I64 (I64.of_int_s 3))]) ;
   Lwt.return_ok ()
 
+(* Test checking that [store_get_nth_key key index dst max_size] returns the size
+   of the name of the immediate subtree at [index]. *)
+let test_store_get_nth_key () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+
+    /durable/a/short/path/_ = "..."
+    /durable/a/short/path/one/_ = "..."
+    /durable/a/short/path/three/_ = "..."
+
+  We expect that the  result at "/a/short/path/one" is 3 and at 
+  /durable/a/short/path/three 5. We also expect the truncated at 3 
+  result at /durable/a/short/path/three to be 3 
+  *)
+  let* durable =
+    make_durable
+      [
+        ("/a/short/path", "true");
+        ("/a/short/path/one", "true");
+        ("/a/short/path/three", "true");
+      ]
+  in
+  let key = "/a/short/path" in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
+  let key_length = Int32.of_int @@ String.length key in
+  let dst_zero = 20l in
+  let expected_string_at_zero = "" in
+  let dst_one = 70l in
+  let expected_string_at_one = "one" in
+  let dst_two = 80l in
+  let expected_string_at_two = "three" in
+  let truncated_dst_two = 100l in
+  let expected_truncated_string_at_two = "thr" in
+
+  let wrong_value =
+    Values.
+      [
+        Num (I32 0l);
+        Num (I32 2l);
+        Num (I64 0L);
+        Num (I32 dst_zero);
+        Num (I32 3600l);
+      ]
+  in
+  let _ =
+    try
+      let _ =
+        Eval.invoke
+          ~module_reg
+          ~caller:module_key
+          ~durable
+          host_funcs_registry
+          Host_funcs.Internal_for_tests.store_get_nth_key
+          wrong_value
+      in
+      ()
+    with e -> ( match e with Not_found -> () | _ -> assert false)
+  in
+  let value_at_zero =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 key_length);
+        Num (I64 0L);
+        Num (I32 dst_zero);
+        Num (I32 3600l);
+      ]
+  in
+  let* _, result_at_zero =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_get_nth_key
+      value_at_zero
+  in
+  let value_at_one =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 key_length);
+        Num (I64 1L);
+        Num (I32 dst_one);
+        Num (I32 3600l);
+      ]
+  in
+  let* _, result_at_one =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_get_nth_key
+      value_at_one
+  in
+  let value_at_two =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 key_length);
+        Num (I64 2L);
+        Num (I32 dst_two);
+        Num (I32 3600l);
+      ]
+  in
+  let* _, result_at_two =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_get_nth_key
+      value_at_two
+  in
+  let truncated_value_at_two =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 key_length);
+        Num (I64 2L);
+        Num (I32 truncated_dst_two);
+        Num (I32 3l);
+      ]
+  in
+  let* _, truncated_result_at_two =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_get_nth_key
+      truncated_value_at_two
+  in
+  let* memory = retrieve_memory module_reg in
+  let* string_at_zero = Memory.load_bytes memory dst_zero 0 in
+  let* string_at_one = Memory.load_bytes memory dst_one 3 in
+  let* string_at_two = Memory.load_bytes memory dst_two 5 in
+  let* truncated_string_at_two = Memory.load_bytes memory truncated_dst_two 3 in
+  assert (result_at_zero = Values.[Num (I32 (I32.of_int_s 0))]) ;
+  assert (string_at_zero = expected_string_at_zero) ;
+  assert (result_at_one = Values.[Num (I32 (I32.of_int_s 3))]) ;
+  assert (string_at_one = expected_string_at_one) ;
+  assert (result_at_two = Values.[Num (I32 (I32.of_int_s 5))]) ;
+  assert (string_at_two = expected_string_at_two) ;
+  assert (truncated_result_at_two = Values.[Num (I32 (I32.of_int_s 3))]) ;
+  assert (truncated_string_at_two = expected_truncated_string_at_two) ;
+  Lwt.return_ok ()
+
 (* Test checking that [store_delete key] deletes the subtree at [key] from the
    durable storage. *)
 let test_store_delete () =
@@ -342,7 +495,6 @@ let test_store_copy () =
   in
   let from_offset = src in
   let from_length = Int32.of_int @@ String.length from_key in
-  Printf.printf "fl= %li" from_length ;
   let to_offset = Int32.(add from_offset from_length) in
   let to_length = Int32.of_int @@ String.length to_key in
   let durable_st = Durable.of_storage_exn durable in
@@ -623,6 +775,7 @@ let tests =
     tztest "store_has existing key" `Quick test_store_has_existing_key;
     tztest "store_has key too long key" `Quick test_store_has_key_too_long;
     tztest "store_list_size counts subtrees" `Quick test_store_list_size;
+    tztest "store_get_nth_key produces subtrees" `Quick test_store_get_nth_key;
     tztest "store_delete removes subtree" `Quick test_store_delete;
     tztest "store_copy" `Quick test_store_copy;
     tztest "store_move" `Quick test_store_move;
