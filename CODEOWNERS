@@ -25,6 +25,7 @@
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
 /src/lib_openapi             @romain.nl
+/src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment   @raphael-proust
 /src/lib_shell_benchmarks    @lrand
 /src/lib_stdlib              @raphael-proust
