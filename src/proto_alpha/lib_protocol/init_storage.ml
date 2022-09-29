@@ -102,7 +102,27 @@ let patch_script (address, hash, patched_code) ctxt =
         address ;
       return ctxt
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
+module Patch_ghostnet = struct
+  let ghostnet_id =
+    let id = Chain_id.of_b58check_exn "NetXnHfVqm9iesp" in
+    if Chain_id.equal id Constants_repr.mainnet_id then assert false else id
+
+  let patch chain_id ctxt level =
+    if Chain_id.equal chain_id ghostnet_id then
+      Raw_context.patch_constants ctxt (fun c ->
+          {c with vdf_difficulty = Int64.div c.vdf_difficulty 4L})
+      >>= fun ctxt ->
+      Voting_period_storage.get_current ctxt >>=? fun current ->
+      let level = Raw_level_repr.to_int32 level in
+      if Compare.Int32.equal current.start_position level then
+        (* do nothing; the migration happens at the end of a voting
+           period, so the period has already been reset *)
+        return ctxt
+      else Voting_period_storage.reset ctxt
+    else return ctxt
+end
+
+let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -166,7 +186,7 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Delegate_cycles.Migration_from_Kathmandu.update ctxt >>=? fun ctxt ->
-      return (ctxt, []))
+      Patch_ghostnet.patch chain_id ctxt level >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->

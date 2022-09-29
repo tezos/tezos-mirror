@@ -53,7 +53,7 @@ let check_dictator client expected_dictator =
   unit
 
 let init chain_id ~from_protocol ~to_protocol =
-  let user_activated_upgrades = [(3, to_protocol)] in
+  let user_activated_upgrades = [(11, to_protocol)] in
   let patch_config, timestamp =
     match chain_id with
     | Chain_id_mainnet ->
@@ -107,33 +107,46 @@ let register_migration_test chain_id =
   @@ fun to_protocol ->
   may_apply (Protocol.previous_protocol to_protocol) @@ fun from_protocol ->
   let* node, client = init chain_id ~from_protocol ~to_protocol in
-  let* () = bake node client in
-  let* () = bake node client in
+  let* () = repeat 10 (fun () -> bake node client) in
   Log.info "Checking that migration occurred..." ;
   let* () =
     Voting.check_protocols
       client
       (Protocol.hash from_protocol, Protocol.hash to_protocol)
   in
-  let expected_dictator, expected_remaining =
+  let expected_dictator, expected_period =
     match chain_id with
     | Chain_id_ghostnet when to_protocol = Kathmandu ->
-        (Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8", 1)
-    | _ -> (None, 5)
+        ( Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8",
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 8;
+            position = 2;
+            remaining = 1;
+          } )
+    | Chain_id_ghostnet when to_protocol = Alpha ->
+        ( None,
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 3;
+            position = 7;
+            remaining = 0;
+          } )
+    | _ ->
+        ( None,
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 8;
+            position = 2;
+            remaining = 5;
+          } )
   in
 
   let* () = check_dictator client expected_dictator in
-  let* () =
-    Voting.check_current_period
-      client
-      {
-        Voting.index = 0;
-        kind = Proposal;
-        start_position = 0;
-        position = 2;
-        remaining = expected_remaining;
-      }
-  in
+  let* () = Voting.check_current_period client expected_period in
   return ()
 
 let register ~protocols =
