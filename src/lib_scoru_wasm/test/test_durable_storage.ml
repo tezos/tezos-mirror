@@ -388,6 +388,77 @@ let test_store_copy () =
   let* () = equal_chunks old_value_from_key new_value_from_key in
   Lwt.return_ok ()
 
+let test_store_move () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+    /durable/a/short/path/_ = "..."
+    /durable/a/long/path/_ = "..."
+    /durable/a/long/path/one/_ = "..." 
+
+  We expect that moving "/a/short/path" to "a/long/path" is leaves only
+   "/durable/a/long/path".
+  *)
+  let* durable =
+    make_durable
+      [
+        ("a/short/path", "a very long value");
+        ("a/long/path", "a very long value");
+        ("a/long/path/one", "a very long value");
+      ]
+  in
+  let from_key = "/a/short/path" in
+  let to_key = "/a/long/path" in
+  let bad_key = "/a/long/path/one" in
+  let durable_st = Durable.of_storage_exn durable in
+
+  let* from_tree =
+    Durable.find_value_exn durable_st @@ Durable.key_of_string_exn from_key
+  in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [from_key; to_key; bad_key] src
+  in
+
+  let from_offset = src in
+  let from_length = Int32.of_int @@ String.length from_key in
+  Printf.printf "fl= %li" from_length ;
+  let to_offset = Int32.(add from_offset from_length) in
+  let to_length = Int32.of_int @@ String.length to_key in
+  let values =
+    Values.
+      [
+        Num (I32 from_offset);
+        Num (I32 from_length);
+        Num (I32 to_offset);
+        Num (I32 to_length);
+      ]
+  in
+  let* durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_move
+      values
+  in
+  assert (result = []) ;
+  let durable = Durable.of_storage_exn durable in
+  let* empty_from_tree_opt =
+    Durable.find_value durable @@ Durable.key_of_string_exn from_key
+  in
+  let* to_tree =
+    Durable.find_value_exn durable @@ Durable.key_of_string_exn to_key
+  in
+  let* empty_bad_key_tree_opt =
+    Durable.find_value durable @@ Durable.key_of_string_exn bad_key
+  in
+  assert (empty_from_tree_opt = None) ;
+  assert (empty_bad_key_tree_opt = None) ;
+  let* () = equal_chunks from_tree to_tree in
+  Lwt.return_ok ()
+
 (* Test invalid key encodings are rejected. *)
 let test_durable_invalid_keys () =
   let open Lwt.Syntax in
@@ -421,6 +492,7 @@ let tests =
     tztest "store_list_size counts subtrees" `Quick test_store_list_size;
     tztest "store_delete removes subtree" `Quick test_store_delete;
     tztest "store_copy" `Quick test_store_copy;
+    tztest "store_move" `Quick test_store_move;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
