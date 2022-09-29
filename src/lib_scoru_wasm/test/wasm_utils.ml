@@ -109,11 +109,13 @@ let pp_state fmt state =
 
     - If [reason] is [None], it simply check the given kind, otherwise it
     actually check the reason in the error. *)
-let check_error expected_kind expected_reason error =
+let check_error ?expected_kind ?expected_reason error =
   let check_reason actual_reason =
     match expected_reason with
     | None -> true
-    | _ -> expected_reason = actual_reason
+    | _ ->
+        Option.map Wasm_pvm_errors.truncate_message expected_reason
+        = actual_reason
   in
   match (expected_kind, error) with
   | Some `Decode, Wasm_pvm_errors.Decode_error {explanation; _} ->
@@ -134,7 +136,8 @@ let check_error expected_kind expected_reason error =
   | None, _ -> true
 
 let is_stuck ?step ?reason = function
-  | Wasm_pvm.Stuck err -> check_error step reason err
+  | Wasm_pvm.Stuck err ->
+      check_error ?expected_kind:step ?expected_reason:reason err
   | _ -> false
 
 let wrap_as_durable_storage tree =

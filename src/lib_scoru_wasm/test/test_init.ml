@@ -34,12 +34,11 @@ let test_memory0_export () =
     (module (memory 1))
   |} in
   let* stuck, _ = eval_until_stuck bad_module_tree in
-  let* () =
-    match stuck with
-    | Init_error {explanation = Some "Module must export memory 0"; _} ->
-        Lwt_result.return ()
-    | _ -> failwith "Unexpected stuck state!"
-  in
+  assert (
+    check_error
+      ~expected_kind:`Init
+      ~expected_reason:"Module must export memory 0"
+      stuck) ;
 
   (* This module exports its memory should therefore reach the "unreachable"
      trap which is treated below. *)
@@ -55,10 +54,12 @@ let test_memory0_export () =
         )
       |}
   in
-  let* stuck, _ = eval_until_stuck good_module_tree in
-  match stuck with
-  | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
-  | _ -> failwith "Unexpected stuck state!"
+  let+ stuck, _ = eval_until_stuck good_module_tree in
+  assert (
+    check_error
+      ~expected_kind:`Eval
+      ~expected_reason:"unreachable executed"
+      stuck)
 
 let test_module_name_size () =
   let open Lwt_result_syntax in
@@ -86,17 +87,18 @@ let test_module_name_size () =
   in
   let*! bad_module_tree = initial_tree (build_module 513) in
   let* stuck, _ = eval_until_stuck bad_module_tree in
-  let* () =
-    match stuck with
-    | Decode_error {explanation = Some "Names cannot exceed 512 bytes"; _} ->
-        Lwt_result.return ()
-    | _ -> failwith "Unexpected stuck state!"
-  in
+  assert (
+    check_error
+      ~expected_kind:`Decode
+      ~expected_reason:"Names cannot exceed 512 bytes"
+      stuck) ;
   let*! good_module_tree = initial_tree (build_module 512) in
-  let* stuck, _ = eval_until_stuck good_module_tree in
-  match stuck with
-  | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
-  | _ -> failwith "Unexpected stuck state!"
+  let+ stuck, _ = eval_until_stuck good_module_tree in
+  assert (
+    check_error
+      ~expected_kind:`Eval
+      ~expected_reason:"unreachable executed"
+      stuck)
 
 let test_imports () =
   let open Lwt_result_syntax in
@@ -152,10 +154,12 @@ let test_imports () =
   let*! good_module_tree =
     initial_tree (build_module good_module_name good_item_name)
   in
-  let* stuck, _ = eval_until_stuck good_module_tree in
-  match stuck with
-  | Eval_error {explanation = Some "unreachable executed"; _} -> return_unit
-  | _ -> failwith "Unexpected stuck state!"
+  let+ stuck, _ = eval_until_stuck good_module_tree in
+  assert (
+    check_error
+      ~expected_kind:`Eval
+      ~expected_reason:"unreachable executed"
+      stuck)
 
 let test_host_func_start_restriction () =
   let open Lwt_result_syntax in
@@ -178,16 +182,13 @@ let test_host_func_start_restriction () =
         )
     |}
   in
-  let* stuck, _ = eval_until_stuck state in
-  match stuck with
-  | Init_error
-      {
-        explanation =
-          Some "host functions must not access memory during initialisation";
-        _;
-      } ->
-      return_unit
-  | _ -> failwith "Unexpected stuck state!"
+  let+ stuck, _ = eval_until_stuck state in
+  assert (
+    check_error
+      ~expected_kind:`Init
+      ~expected_reason:
+        "host functions must not access memory during initialisation"
+      stuck)
 
 let tests =
   [

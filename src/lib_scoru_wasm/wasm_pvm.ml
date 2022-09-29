@@ -334,8 +334,8 @@ struct
               return
                 ~status:Failing
                 (Stuck
-                   (Invalid_state "Invalid_module: no `main` function exported"))
-          )
+                   (Wasm_pvm_errors.invalid_state
+                      "Invalid_module: no `main` function exported")))
       | Init {self; ast_module; init_kont; module_reg} ->
           let* init_kont =
             Wasm.Eval.init_step
@@ -358,8 +358,9 @@ struct
             (Stuck
                (Wasm_pvm_errors.Eval_error
                   {
-                    raw_exception = "trapped execution";
-                    explanation = Some msg.it;
+                    raw_exception =
+                      Wasm_pvm_errors.truncate_message "trapped execution";
+                    explanation = Some (Wasm_pvm_errors.truncate_message msg.it);
                   }))
       | Eval eval_config ->
           (* Continue execution. *)
@@ -513,15 +514,23 @@ struct
                  ~name:wasm_main_module_name)
         | Decode _ ->
             Lwt.return
-              (Stuck (Invalid_state "No input required during decoding"))
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No input required during decoding"))
         | Link _ ->
-            Lwt.return (Stuck (Invalid_state "No input required during link"))
+            Lwt.return
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state "No input required during link"))
         | Init _ ->
             Lwt.return
-              (Stuck (Invalid_state "No input required during initialization"))
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No input required during initialization"))
         | Eval _ ->
             Lwt.return
-              (Stuck (Invalid_state "No input required during evaluation"))
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "No input required during evaluation"))
         | Stuck _ -> Lwt.return pvm_state.tick_state
       in
       (* See {{Note tick state clean-up}} *)

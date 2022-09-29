@@ -25,23 +25,31 @@
 
 (** Representation of errors of the WASM PVM. *)
 
-(** Raw exception as printed by `Printexc.to_string`. *)
-type raw_exception := string
-
-(** Embedded message in the exception. *)
-type explanation := string
-
-(* Stuck messages are purely informational, but can be arbitrary long since they
+(** Stuck messages are purely informational, but can be arbitrary long since they
    come from error messages from the interpreter or caught exceptions. To ensure
    they fit in an L1 operation, we truncate them after
    [messages_maximum_size]. *)
 val messages_maximum_size : int
 
+(** Representation of truncated strings of maximum length
+    [messages_maximum_size]. Can only be built through [truncate_message]. *)
+type truncated_string = private Truncated of string [@@ocaml.unboxed]
+
+(**  [truncate_message m] builds a truncated message out of a given message
+     [m]. *)
+val truncate_message : string -> truncated_string
+
+(** Raw exception as printed by `Printexc.to_string`, possibly truncated. *)
+type raw_exception := truncated_string
+
+(** Embedded message in the exception, possibly truncated. *)
+type explanation := truncated_string
+
 (** Wrapped exceptions from the interpreter. Both labels are truncated after
     [messages_maximum_size]. *)
 type interpreter_error = {
   raw_exception : raw_exception;
-  explanation : string option;
+  explanation : explanation option;
 }
 
 type t =
@@ -59,6 +67,9 @@ type t =
       (** Wraps unexpected exceptions raised by the interpreter. *)
   | Too_many_ticks
       (** The maximum number of ticks was reached before the end of current top level call *)
+
+(* [invalid_state msg] builds an `Invalid_state` error out of a message. *)
+val invalid_state : string -> t
 
 (* [link_error kind ~module_name ~item_name] returns the link error for a given
    [module_name] and [item_name], and the kind of error (whether an unkown

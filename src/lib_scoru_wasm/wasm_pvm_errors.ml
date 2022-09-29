@@ -25,20 +25,30 @@
 
 open Tezos_webassembly_interpreter
 
-type interpreter_error = {raw_exception : string; explanation : string option}
+type truncated_string = Truncated of string [@@ocaml.unboxed]
 
 let messages_maximum_size = 128
 
+let truncate_message msg =
+  if String.length msg > messages_maximum_size then
+    Truncated (String.sub msg 0 messages_maximum_size)
+  else Truncated msg
+
+type interpreter_error = {
+  raw_exception : truncated_string;
+  explanation : truncated_string option;
+}
+
 type t =
   | Decode_error of interpreter_error
-  | Link_error of string
+  | Link_error of truncated_string
   | Init_error of interpreter_error
   | Eval_error of interpreter_error
-  | Invalid_state of string
-  | Unknown_error of string
+  | Invalid_state of truncated_string
+  | Unknown_error of truncated_string
   | Too_many_ticks
 
-let decode_state_to_string = function
+let decode_state_to_string_raw = function
   | Decode.Byte_vector_step -> "Byte_vector_step"
   | Instr_step -> "Instr_step"
   | Instr_block_step -> "Instr_block_step"
@@ -52,28 +62,31 @@ let decode_state_to_string = function
   | Data_step -> "Data_step"
   | Module_step -> "Module_step"
 
-let eval_state_to_string = function
+let decode_state_to_string exn =
+  decode_state_to_string_raw exn |> truncate_message
+
+let eval_state_to_string_raw = function
   | Eval.Init_step -> "Init_step"
   | Map_step -> "Map_step"
   | Map_concat_step -> "Map_concat_step"
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
 
-let durable_exn_explanation = function
+let eval_state_to_string exn = eval_state_to_string_raw exn |> truncate_message
+
+let durable_exn_explanation_raw = function
   | Durable.Invalid_key path -> Some ("Invalid_key: " ^ path)
   | Durable.Not_found -> Some "Value not found"
   | Durable.Durable_empty | Durable_storage.Durable_empty ->
       Some "Empty durable storage"
   | _ -> None
 
-let truncate_message msg =
-  if String.length msg > messages_maximum_size then
-    String.sub msg 0 messages_maximum_size
-  else msg
+let durable_exn_explanation exn =
+  durable_exn_explanation_raw exn |> Option.map truncate_message
 
-let extract_interpreter_error_raw exn =
+let extract_interpreter_error exn =
   let open Lazy_containers in
-  let raw_exception = Printexc.to_string exn in
+  let raw_exception = Printexc.to_string exn |> truncate_message in
   match exn with
   (* The locations are removed during encoding, they won't be usable in practice. *)
   | Binary_exn.Decode_error.Error (_, explanation)
@@ -84,7 +97,8 @@ let extract_interpreter_error_raw exn =
   | Eval.Crash (_, explanation)
   | Eval.Exhaustion (_, explanation)
   | Import.Unknown (_, explanation) ->
-      `Interpreter {raw_exception; explanation = Some explanation}
+      `Interpreter
+        {raw_exception; explanation = Some (truncate_message explanation)}
   | Values.TypeError _ | Binary_exn.EOS | Binary_exn.Utf8
   | Lazy_map.UnexpectedAccess | Lazy_vector.Bounds | Lazy_vector.SizeOverflow
   | Chunked_byte_vector.Bounds | Chunked_byte_vector.SizeOverflow | Table.Type
@@ -103,21 +117,19 @@ let extract_interpreter_error_raw exn =
         {raw_exception; explanation = Some (eval_state_to_string state)}
   | Eval.Missing_memory_0_export ->
       `Interpreter
-        {raw_exception; explanation = Some "Module must export memory 0"}
+        {
+          raw_exception;
+          explanation = Some (truncate_message "Module must export memory 0");
+        }
   | Durable.Invalid_key _ | Durable.Not_found | Durable.Durable_empty
   | Durable_storage.Durable_empty ->
       `Interpreter {raw_exception; explanation = durable_exn_explanation exn}
   | _ -> `Unknown raw_exception
 
-let extract_interpreter_error exn =
-  match extract_interpreter_error_raw exn with
-  | `Interpreter {raw_exception; explanation} ->
-      `Interpreter
-        {
-          raw_exception = truncate_message raw_exception;
-          explanation = Option.map truncate_message explanation;
-        }
-  | `Unknown raw_exception -> `Unknown (truncate_message raw_exception)
+let invalid_state m = Invalid_state (truncate_message m)
+
+let truncated_string_encoding =
+  Data_encoding.(conv (fun (Truncated s) -> s) (fun s -> Truncated s) string)
 
 let encoding =
   let open Data_encoding in
@@ -126,8 +138,8 @@ let encoding =
       (fun {raw_exception; explanation} -> (raw_exception, explanation))
       (fun (raw_exception, explanation) -> {raw_exception; explanation})
       (obj2
-         (req (prefix ^ "_raw_exception") string)
-         (req (prefix ^ "_explanation") (option string)))
+         (req (prefix ^ "_raw_exception") truncated_string_encoding)
+         (req (prefix ^ "_explanation") (option truncated_string_encoding)))
   in
   union
     [
@@ -140,7 +152,7 @@ let encoding =
       case
         (Tag 1)
         ~title:"Link_error"
-        (obj1 (req "link" string))
+        (obj1 (req "link" truncated_string_encoding))
         (function Link_error err -> Some err | _ -> None)
         (fun err -> Link_error err);
       case
@@ -158,13 +170,13 @@ let encoding =
       case
         (Tag 4)
         ~title:"Invalid_state"
-        (obj1 (req "invalid_state" string))
+        (obj1 (req "invalid_state" truncated_string_encoding))
         (function Invalid_state msg -> Some msg | _ -> None)
         (fun msg -> Invalid_state msg);
       case
         (Tag 5)
         ~title:"Unknown_error"
-        (obj1 (req "unknown_error" string))
+        (obj1 (req "unknown_error" truncated_string_encoding))
         (function Unknown_error exn -> Some exn | _ -> None)
         (fun exn -> Unknown_error exn);
       case

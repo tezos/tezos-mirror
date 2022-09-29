@@ -155,6 +155,10 @@ let error_state_gen =
     | `Unknown _ -> assert false
   in
   let open QCheck2.Gen in
+  let truncated_string =
+    let+ s = string in
+    Wasm_pvm_errors.truncate_message s
+  in
   let decode_error =
     let+ exn = exn_gen in
     let error =
@@ -163,7 +167,7 @@ let error_state_gen =
     Wasm_pvm_errors.Decode_error error
   in
   let link_error =
-    let+ error = string in
+    let+ error = truncated_string in
     Wasm_pvm_errors.Link_error error
   in
   let init_error =
@@ -181,11 +185,11 @@ let error_state_gen =
     Wasm_pvm_errors.Eval_error error
   in
   let unknown_error =
-    let+ err = string in
+    let+ err = truncated_string in
     Wasm_pvm_errors.Unknown_error err
   in
   let invalid_state =
-    let+ err = string in
+    let+ err = truncated_string in
     Wasm_pvm_errors.Invalid_state err
   in
   oneof
@@ -198,25 +202,28 @@ let error_state_gen =
       unknown_error;
     ]
 
-let pp_interpreter_error out Wasm_pvm_errors.{raw_exception; explanation} =
+let pp_interpreter_error out
+    Wasm_pvm_errors.{raw_exception = Truncated raw_exception; explanation} =
   Format.fprintf
     out
     "@[<hv 2>{ raw_exception: %s; explanation: %s }@]"
     raw_exception
-    (match explanation with None -> "None" | Some s -> "Some: " ^ s)
+    (match explanation with
+    | None -> "None"
+    | Some (Truncated s) -> "Some: " ^ s)
 
 let pp_error_state out = function
   | Wasm_pvm_errors.Eval_error error ->
       Format.fprintf out "@[<hv 2>Eval_error %a@]" pp_interpreter_error error
   | Wasm_pvm_errors.Decode_error error ->
       Format.fprintf out "@[<hv 2>Decode_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Link_error error ->
+  | Wasm_pvm_errors.Link_error (Truncated error) ->
       Format.fprintf out "@[<hv 2>Link_error %s@]" error
   | Wasm_pvm_errors.Init_error error ->
       Format.fprintf out "@[<hv 2>Init_error %a@]" pp_interpreter_error error
-  | Wasm_pvm_errors.Invalid_state err ->
+  | Wasm_pvm_errors.Invalid_state (Truncated err) ->
       Format.fprintf out "@[<hv 2>Invalid_state (%s)@]" err
-  | Wasm_pvm_errors.Unknown_error err ->
+  | Wasm_pvm_errors.Unknown_error (Truncated err) ->
       Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
   | Wasm_pvm_errors.Too_many_ticks ->
       Format.fprintf out "@[<hv 2>Too_many_ticks@]"
