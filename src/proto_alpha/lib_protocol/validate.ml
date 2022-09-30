@@ -48,10 +48,10 @@ type expected_preendorsement =
   | Expected_preendorsement of {
       expected_features : expected_features;
       block_round : Round.t option;
+          (** During block validation or construction, we must also check that
+              the preendorsement round is lower than the block round. In
+              mempool mode, this field is [None]. *)
     }
-      (** During block validation or construction, we must also check
-          that the preendorsement round is lower than the block
-          round. In mempool mode, this field is [None]. *)
   | No_locked_round_for_block_validation_preendorsement
       (** A preexisting block whose fitness indicates no locked round
           should contain no preendorsements. *)
@@ -191,9 +191,10 @@ let init_consensus_state ~predecessor_level =
 
 type voting_state = {
   proposals_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
-      (** Summary of all Proposals operations validated in the current
-          block/mempool, indexed by the operation's source aka
-          proposer. This includes Testnet dictators proposals. *)
+      (** To each delegate that has submitted a Proposals operation in a
+          previously validated operation, associates the hash of this
+          operation. This includes Proposals from a potential Testnet
+          Dictator. *)
   ballots_seen : Operation_hash.t Signature.Public_key_hash.Map.t;
       (** To each delegate that has submitted a ballot in a previously
           validated operation, associates the hash of this operation.  *)
@@ -386,24 +387,27 @@ type block_finalization_info = {
   block_data_contents : Block_header.contents;
 }
 
-(** Circumstances in which operations are validated:
+(** Circumstances in which operations are validated, and corresponding
+    information.
 
-    - [Application] is used for the validation of preexisting block.
-   Corresponds to [Application] of {!Main.validation_mode}.
+    - [Application] is used for the validation of a preexisting block,
+      often in preparation for its future application.
 
-    - [Partial_validation] is used to partially validate preexisting
-   block. Corresponds to [Partial_validation] of
-   {!Main.validation_mode}.
+    - [Partial_validation] is used to quickly but partially validate a
+      preexisting block, e.g. to quickly decide whether an alternate
+      branch seems viable. In this mode, the initial {!type:context} may
+      come from an ancestor block instead of the predecessor block. Only
+      consensus operations are validated in this mode.
 
     - [Construction] is used for the construction of a new block.
-   Corresponds to [Full_construction] of {!Main.validation_mode}.
 
-    - [Mempool] is used by the mempool (either directly or through the
-   plugin). Corresponds to [Partial_construction] of
-   {!Main.validation_mode}.
+    - [Mempool] is used by the {!module:Mempool} and by the
+      [Partial_construction] mode in {!module:Main}, which may itself be
+      used by RPCs or by another mempool implementation. (The [Mempool]
+      mode is also used by the plugin.)
 
     If you add a new mode, please make sure that it has a way to bound
-   the size of the map {!recfield:managers_seen}. *)
+    the size of the map {!recfield:manager_state.managers_seen}. *)
 type mode =
   | Application of block_finalization_info
   | Partial_validation of block_finalization_info
@@ -516,6 +520,8 @@ module Consensus = struct
       payload_hash;
     }
 
+  (** Expected endorsement features for all modes in which a block is
+      considered: application, partial validation, and construction. *)
   let expected_endorsement_for_block ctxt ~predecessor_level ~predecessor_round
       : expected_endorsement =
     match Consensus.endorsement_branch ctxt with
@@ -530,6 +536,8 @@ module Consensus = struct
         in
         Expected_endorsement {expected_features}
 
+  (** Retrieve the expected consensus features for both application and
+      partial validation modes. *)
   let expected_features_for_application ctxt fitness payload_hash
       ~predecessor_level ~predecessor_round ~predecessor_hash =
     let expected_preendorsement =
@@ -789,12 +797,11 @@ module Consensus = struct
           match block_state.locked_round_evidence with
           | None -> Some (consensus_content.round, voting_power)
           | Some (_stored_round, evidences) ->
-              (* [_stored_round] is always equal to
-                 [consensus_content.round]: this is ensured by
-                 {!check_round_equal} in application and partial
-                 application modes, and by
-                 {!check_locked_round_evidence} in construction
-                 mode. *)
+              (* [_stored_round] is always equal to [consensus_content.round].
+                 Indeed, this is ensured by {!check_round_equal} in
+                 application and partial validation modes, and by
+                 {!check_construction_preendorsement_round_consistency} in
+                 construction mode. *)
               Some (consensus_content.round, evidences + voting_power))
     in
     {block_state with locked_round_evidence}
@@ -1125,7 +1132,7 @@ module Consensus = struct
     match expected_features.round with
     | Some _ ->
         (* When [expected_features.round] has a value (ie. in
-           application and partial application modes when the block
+           application and partial validation modes when the block
            fitness has a [locked_round], and always in mempool mode),
            [check_preendorsement] already checks that all
            preendorsements have this expected round, so checking
@@ -1266,21 +1273,23 @@ module Voting = struct
         fail_when already_proposed (Already_proposed {proposal}))
       proposals
 
-  (** Check that [record_proposals] below will not fail.
+  (** Check that the [apply_testnet_dictator_proposals] function in
+      {!module:Amendment} will not fail.
 
-      This function is designed to be exclusively called by
-      [validate_proposals] further down this file.
+      The current function is designed to be exclusively called by
+      [check_proposals] right below.
 
-      @return [Error Multiple_proposals] if [proposals] has more than
-      one element. *)
+      @return [Error Testnet_dictator_multiple_proposals] if
+      [proposals] has more than one element. *)
   let check_testnet_dictator_proposals chain_id proposals =
     (* This assertion should be ensured by the fact that
-       {!is_testnet_dictator} cannot be [true] on mainnet, but we
-       double check it because it is critical. *)
+       {!Amendment.is_testnet_dictator} cannot be [true] on mainnet
+       (so the current function cannot be called there). However, we
+       still double check it because of its criticality. *)
     assert (Chain_id.(chain_id <> Constants.mainnet_id)) ;
     match proposals with
     | [] | [_] ->
-        (* In [record_proposals] below, the call to
+        (* In [Amendment.apply_testnet_dictator_proposals], the call to
            {!Vote.init_current_proposal} (in the singleton list case)
            cannot fail because {!Vote.clear_current_proposal} is called
            right before.
@@ -1288,52 +1297,46 @@ module Voting = struct
            The calls to
            {!Voting_period.Testnet_dictator.overwrite_current_kind} may
            usually fail when the voting period is not
-           initialized. However, this cannot happen because the current
-           function is only called in [validate_proposals] after a
+           initialized. However, this cannot happen here because the
+           current function is only called in [check_proposals] after a
            successful call to {!Voting_period.get_current}. *)
         ok_unit
     | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
 
   (** Check that a Proposals operation can be safely applied.
 
-    @return [Error Wrong_voting_period_index] if the operation's
-    period and the [context]'s current period do not have the same
-    index.
+      @return [Error Wrong_voting_period_index] if the operation's
+      period and the current period in the {!type:context} do not have
+      the same index.
 
-    @return [Error Proposals_from_unregistered_delegate] if the
-    source is not a registered delegate.
+      @return [Error Proposals_from_unregistered_delegate] if the
+      source is not a registered delegate.
 
-    @return [Error Empty_proposals] if the list of proposals is empty.
+      @return [Error Empty_proposals] if the list of proposals is empty.
 
-    @return [Error Proposals_contain_duplicate] if the list of
-    proposals contains a duplicate element.
+      @return [Error Proposals_contain_duplicate] if the list of
+      proposals contains a duplicate element.
 
-    @return [Error Wrong_voting_period_kind] if the voting period is
-    not of the Proposal kind.
+      @return [Error Wrong_voting_period_kind] if the voting period is
+      not of the Proposal kind.
 
-    @return [Error Source_not_in_vote_listings] if the source is not
-    in the vote listings.
+      @return [Error Source_not_in_vote_listings] if the source is not
+      in the vote listings.
 
-    @return [Error Already_proposed] if one of the proposals has
-    already been proposed by the source.
+      @return [Error Too_many_proposals] if the operation causes the
+      source's total number of proposals during the current voting
+      period to exceed {!Constants.max_proposals_per_delegate}.
 
-    @return [Error Too_many_proposals] if the total count of
-    proposals submitted by the source in previous blocks, in previously
-    validated operations of the current block/mempool, and in the
-    operation to validate, exceeds
-    {!Constants.max_proposals_per_delegate}.
+      @return [Error Already_proposed] if one of the proposals has
+      already been proposed by the source in the current voting period.
 
-    @return [Error Conflict_already_proposed] if one of the
-    operation's proposals has already been submitted by the source in
-    the current block/mempool.
+      @return [Error Testnet_dictator_multiple_proposals] if the
+      source is a testnet dictator and the operation contains more than
+      one proposal.
 
-    @return [Error Testnet_dictator_multiple_proposals] if the source
-    is a testnet dictator and the operation contains more than one
-    proposal.
-
-    @return [Error Operation.Missing_signature] or [Error
-    Operation.Invalid_signature] if the operation is unsigned or
-    incorrectly signed. *)
+      @return [Error Operation.Missing_signature] or [Error
+      Operation.Invalid_signature] if the operation is unsigned or
+      incorrectly signed. *)
   let check_proposals vi ~check_signature (operation : Kind.proposals operation)
       =
     let open Lwt_tzresult_syntax in
@@ -1366,11 +1369,12 @@ module Voting = struct
     else return_unit
 
   (** Check that a Proposals operation is compatible with previously
-      validated voting operations in the current block/mempool..
+      validated operations in the current block/mempool.
 
-      @return [Error Conflicting_proposals] if the current
-      block/mempool already contains a same source Proposals
-      operation. *)
+      @return [Error Operation_conflict] if the current block/mempool
+      already contains a Proposals operation from the same source
+      (regardless of whether this source is a testnet dictator or an
+      ordinary manager). *)
   let check_proposals_conflict vs oph (operation : Kind.proposals operation) =
     let open Tzresult_syntax in
     let (Single (Proposals {source; _})) = operation.protocol_data.contents in
@@ -1434,31 +1438,28 @@ module Voting = struct
 
   (** Check that a Ballot operation can be safely applied.
 
-    @return [Error Ballot_from_unregistered_delegate] if the
-    source is not a registered delegate.
+      @return [Error Ballot_from_unregistered_delegate] if the source
+      is not a registered delegate.
 
-    @return [Error Conflicting_ballot] if the source has already
-    submitted a ballot in the current block/mempool.
+      @return [Error Wrong_voting_period_index] if the operation's
+      period and the current period in the {!type:context} do not have
+      the same index.
 
-    @return [Error Wrong_voting_period_index] if the operation's
-    period and the [context]'s current period do not have the same
-    index.
+      @return [Error Wrong_voting_period_kind] if the voting period is
+      not of the Exploration or Promotion kind.
 
-    @return [Error Wrong_voting_period_kind] if the voting period is
-    not of the Exploration or Promotion kind.
+      @return [Error Ballot_for_wrong_proposal] if the operation's
+      proposal is different from the current proposal in the context.
 
-    @return [Error Ballot_for_wrong_proposal] if the operation's
-    proposal is different from the [context]'s current proposal.
+      @return [Error Already_submitted_a_ballot] if the source has
+      already voted during the current voting period.
 
-    @return [Error Already_submitted_a_ballot] if the source has
-    already voted.
+      @return [Error Source_not_in_vote_listings] if the source is not
+      in the vote listings.
 
-    @return [Error Source_not_in_vote_listings] if the source is not
-    in the vote listings.
-
-    @return [Error Operation.Missing_signature] or [Error
-    Operation.Invalid_signature] if the operation is unsigned or
-    incorrectly signed. *)
+      @return [Error Operation.Missing_signature] or [Error
+      Operation.Invalid_signature] if the operation is unsigned or
+      incorrectly signed. *)
   let check_ballot vi ~check_signature (operation : Kind.ballot operation) =
     let open Lwt_tzresult_syntax in
     let (Single (Ballot {source; period; proposal; ballot = _})) =
@@ -1479,10 +1480,10 @@ module Voting = struct
         Lwt.return (Operation.check_signature public_key vi.chain_id operation))
 
   (** Check that a Ballot operation is compatible with previously
-      validated voting operations in the current block/mempool.
+      validated operations in the current block/mempool.
 
-      @return [Error Conflicting_ballot] if the [delegate] has already
-      submitted a ballot in the current block/mempool. *)
+      @return [Error Operation_conflict] if the current block/mempool
+      already contains a Ballot operation from the same source. *)
   let check_ballot_conflict vs oph (operation : Kind.ballot operation) =
     let (Single (Ballot {source; _})) = operation.protocol_data.contents in
     match
@@ -2446,7 +2447,7 @@ module Manager = struct
     (* Gas should no longer be consumed below this point, because it
        would not take into account any gas consumed during the pattern
        matching right above. If you really need to consume gas here, then you
-       need to make this pattern matching return the [remaining_gas].*)
+       must make this pattern matching return the [remaining_gas].*)
     let* balance, is_allocated =
       Contract.simulate_spending
         vi.ctxt
