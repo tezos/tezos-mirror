@@ -14,6 +14,20 @@ gitlab:release:
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci gitlab-release
 
+opam:release:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__release_tag
+  stage: publish_release
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false
+  dependencies:
+    - gitlab:release
+  script:
+    # create opam release and push to github (also pushes latest master branch)
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-release
+
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,

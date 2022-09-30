@@ -72,4 +72,5 @@ branch="octez-""$(echo "$version" | tr '~' -)"
 git checkout -b "$branch"
 git add packages
 git commit -am "Octez $version packages"
+
 log "A branch named $branch has been created in $opam_dir."
