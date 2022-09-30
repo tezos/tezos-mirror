@@ -2464,12 +2464,6 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-let compute_payload_hash (ctxt : context) ~(predecessor : Block_hash.t)
-    ~(payload_round : Round.t) : Block_payload_hash.t =
-  let non_consensus_operations = non_consensus_operations ctxt in
-  let operations_hash = Operation_list_hash.compute non_consensus_operations in
-  Block_payload.hash ~predecessor payload_round operations_hash
-
 let are_endorsements_required ctxt ~level =
   First_level_of_protocol.get ctxt >|=? fun first_level ->
   (* NB: the first level is the level of the migration block. There
@@ -2636,10 +2630,10 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     are_endorsements_required ctxt ~level:level.level
   in
   let block_payload_hash =
-    compute_payload_hash
-      ctxt
-      ~predecessor:predecessor_hash
+    Block_payload.hash
+      ~predecessor_hash
       ~payload_round:block_data_contents.Block_header.payload_round
+      (non_consensus_operations ctxt)
   in
   (* from this point nothing should fail *)
   (* We mark the endorsement branch as the grand parent branch when

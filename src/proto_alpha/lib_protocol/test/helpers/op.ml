@@ -44,17 +44,13 @@ let sign ?(watermark = Signature.Generic_operation) sk ctxt contents =
 (** Generates the block payload hash based on the hash [pred_hash] of
     the predecessor block and the hash of non-consensus operations of
     the current block [b]. *)
-let mk_block_payload_hash pred_hash payload_round (b : Block.t) =
+let mk_block_payload_hash predecessor_hash payload_round (b : Block.t) =
   let ops = Block.Forge.classify_operations b.operations in
   let non_consensus_operations =
     List.concat (match List.tl ops with None -> [] | Some l -> l)
   in
   let hashes = List.map Operation.hash_packed non_consensus_operations in
-  let non_consensus_operations_hash = Operation_list_hash.compute hashes in
-  Block_payload.hash
-    ~predecessor:pred_hash
-    payload_round
-    non_consensus_operations_hash
+  Block_payload.hash ~predecessor_hash ~payload_round hashes
 
 (* ctxt is used for getting the branch in sign *)
 let endorsement ?delegate ?slot ?level ?round ?block_payload_hash

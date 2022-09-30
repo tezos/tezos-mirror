@@ -3247,14 +3247,11 @@ let finalize_validate_block_header vi vs checkable_payload_hash
     ~consensus_threshold:(Constants.consensus_threshold vi.ctxt)
 
 let compute_payload_hash block_state
-    (block_header_contents : Alpha_context.Block_header.contents) predecessor =
-  let operations_hash =
-    Operation_list_hash.compute (List.rev block_state.recorded_operations_rev)
-  in
+    (block_header_contents : Block_header.contents) ~predecessor_hash =
   Block_payload.hash
-    ~predecessor
-    block_header_contents.payload_round
-    operations_hash
+    ~predecessor_hash
+    ~payload_round:block_header_contents.payload_round
+    (List.rev block_state.recorded_operations_rev)
 
 let finalize_block {info; block_state; _} =
   let open Lwt_tzresult_syntax in
@@ -3267,7 +3264,7 @@ let finalize_block {info; block_state; _} =
         else ok_unit
       in
       let block_payload_hash =
-        compute_payload_hash block_state block_data_contents predecessor_hash
+        compute_payload_hash block_state block_data_contents ~predecessor_hash
       in
       let round = Fitness.round fitness in
       let*? () =
@@ -3291,7 +3288,7 @@ let finalize_block {info; block_state; _} =
   | Construction
       {predecessor_round; predecessor_hash; round; block_data_contents; _} ->
       let block_payload_hash =
-        compute_payload_hash block_state block_data_contents predecessor_hash
+        compute_payload_hash block_state block_data_contents ~predecessor_hash
       in
       let locked_round_evidence = block_state.locked_round_evidence in
       let checkable_payload_hash =
