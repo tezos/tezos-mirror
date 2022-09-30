@@ -165,21 +165,21 @@ let make_module structure_items =
     Str.module_
       (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")))
   in
-  ("Generated", ([], suppress_unused_open_warning) ::
-  ([], rename_saturation_repr) :: structure_items)
+  ([], suppress_unused_open_warning) ::
+  ([], rename_saturation_repr) :: structure_items
 
 let pp_model fmtr (comments, item) =
   List.iter (fun comment -> Format.printf "(* %s *)@;" comment) comments ;
   Pprintast.structure_item fmtr item
 
-let pp_module fmtr (name, items) =
-  Format.fprintf fmtr "@[<hv 0>@[<hv 2>module %s = struct@;" name ;
+let pp_module fmtr items =
+  Format.fprintf fmtr "@[<hv 0>" ;
   Format.pp_print_list
     ~pp_sep:(fun fmtr () -> Format.fprintf fmtr "@;@;")
     (fun fmtr d -> pp_model fmtr d)
     fmtr
     items ;
-  Format.fprintf fmtr "@]@;end@]@;"
+  Format.fprintf fmtr "@]@;"
 
 (* ------------------------------------------------------------------------- *)
 
@@ -342,11 +342,9 @@ let%expect_test "module_generation" =
   Format.printf "%a" pp_module module_ ;
   [%expect
     {|
-    module Generated = struct
-      [@@@warning "-33"]
+    [@@@warning "-33"]
 
-      module S = Saturation_repr
+    module S = Saturation_repr
 
-      (* comment *)
-      let func_name x = let open S.Syntax in let x = S.safe_int x in x
-    end |}]
+    (* comment *)
+    let func_name x = let open S.Syntax in let x = S.safe_int x in x |}]
