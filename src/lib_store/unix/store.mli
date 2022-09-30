@@ -898,10 +898,10 @@ module Chain : sig
     unit tzresult Lwt.t
 
   (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-      find the activation block of the [head]'s protocol, checks that
-      its an ancestor and tries to update it if that's not the case. If
-      the registered activation block is not reachable (already
-      pruned), this function does nothing. *)
+     find the activation block of the [head]'s protocol, checks that
+     its an ancestor and tries to update it if that's not the case. If
+     the registered activation block is not reachable (already
+     pruned), this function does nothing. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 

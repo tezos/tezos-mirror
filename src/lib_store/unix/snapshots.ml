@@ -1979,13 +1979,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_protocols snapshot_exporter export_block all_protocol_levels
       protocol_store_dir progress_display_mode =
     let open Lwt_syntax in
-    let export_level = Store.Block.level export_block in
-    (* Filter protocols to only export the protocols with an activation
-       block below the block target. *)
+    let export_proto_level = Store.Block.proto_level export_block in
+    (* Export only the protocols with a protocol level below the
+       protocol's level of the targeted export block. *)
     let protocol_levels =
       Protocol_levels.filter
-        (fun _ {Protocol_levels.block = _, activation_level; _} ->
-          activation_level < export_level)
+        (fun proto_level _ -> proto_level <= export_proto_level)
         all_protocol_levels
     in
     let* () =

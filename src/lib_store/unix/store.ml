@@ -2394,7 +2394,34 @@ module Chain = struct
       find_activation_block chain_store ~protocol_level:head_proto_level
     in
     match o with
-    | None -> return_unit
+    | None ->
+        (* If no activation block is registered for a given protocol
+           level, we search for the activation block. This activation
+           block is expected to be found above the savepoint. If not,
+           the savepoint will be considered as the activation
+           block. *)
+        let*! _, savepoint_level = savepoint chain_store in
+        let rec find_activation_block lower_bound block =
+          let*! pred = Block.read_predecessor_opt chain_store block in
+          match pred with
+          | None -> return block
+          | Some pred ->
+              let pred_proto_level = Block.proto_level pred in
+              if Compare.Int.(pred_proto_level <= Int.pred head_proto_level)
+              then return block
+              else if Compare.Int32.(Block.level pred <= lower_bound) then
+                return pred
+              else find_activation_block lower_bound pred
+        in
+        let* activation_block = find_activation_block savepoint_level head in
+        let protocol_level = Block.proto_level head in
+        (* The head must have an associated context stored. *)
+        let* context = Block.context chain_store head in
+        let*! activated_protocol = Context_ops.get_protocol context in
+        set_protocol_level
+          chain_store
+          ~protocol_level
+          (activation_block, activated_protocol)
     | Some {block; protocol; _} -> (
         let*! _, savepoint_level = savepoint chain_store in
         if Compare.Int32.(savepoint_level > snd block) then
