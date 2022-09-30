@@ -939,19 +939,26 @@ let get_balance_for ?endpoint ~account client =
   in
   return @@ Tez.parse_floating output
 
-let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
-    client =
+let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file
+    ?bootstrap_accounts_file ~protocol client =
   let cmd =
     let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
     (match sync_mode with
     | Synchronous -> common
     | Asynchronous -> common @ ["--asynchronous"])
     @ optional_arg "protocol-constants" Fun.id parameter_file
+    @ optional_arg "bootstrap-accounts" Fun.id bootstrap_accounts_file
   in
   spawn_command client cmd
 
-let create_mockup ?sync_mode ?parameter_file ~protocol client =
-  spawn_create_mockup ?sync_mode ?parameter_file ~protocol client
+let create_mockup ?sync_mode ?parameter_file ?bootstrap_accounts_file ~protocol
+    client =
+  spawn_create_mockup
+    ?sync_mode
+    ?parameter_file
+    ?bootstrap_accounts_file
+    ~protocol
+    client
   |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")

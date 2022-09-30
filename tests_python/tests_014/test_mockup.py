@@ -25,53 +25,6 @@ _BA_FLAG = "bootstrap-accounts"
 _PC_FLAG = "protocol-constants"
 
 
-# It's impossible to guess values of chain_id, these ones have been
-# obtained by looking at the output of `compute chain id from seed`
-@pytest.mark.parametrize(
-    'chain_id',
-    [
-        "NetXcqTGZX74DxG",
-        "NetXaFDF7xZQCpR",
-        "NetXkKbtqncJcAz",
-        "NetXjjE5cZUeWPy",
-        "NetXi7C1pyLhQNe",
-    ],
-)
-@pytest.mark.parametrize(
-    'initial_timestamp', ["2020-07-21T17:11:10+02:00", "1970-01-01T00:00:00Z"]
-)
-@pytest.mark.client
-def test_create_mockup_custom_constants(
-    sandbox: Sandbox, chain_id: str, initial_timestamp: str
-):
-    """Tests `octez-client create mockup` --protocols-constants  argument
-    The call must succeed.
-
-    Args:
-        mockup_client: the client to use
-        chain_id (str): the string to pass for field `chain_id`
-        initial_timestamp(str): an ISO-8601 formatted date string
-    """
-    # Use another directory so that the constants change takes effect
-    with tempfile.TemporaryDirectory(
-        prefix='octez-client.'
-    ) as base_dir, tempfile.NamedTemporaryFile(
-        prefix='tezos-custom-constants', mode='w+t'
-    ) as json_file:
-        json_data = {
-            "hard_gas_limit_per_operation": "400000",
-            "chain_id": chain_id,
-            "initial_timestamp": initial_timestamp,
-        }
-        json.dump(json_data, json_file)
-        json_file.flush()
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, protocol_constants_file=json_file.name
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-
-
 def _create_accounts_list():
     """
     Returns a list of dictionary with 3 entries, that are
@@ -102,34 +55,6 @@ def _create_accounts_list():
     )
 
     return accounts_list
-
-
-@pytest.mark.client
-def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
-    """Tests `octez-client create mockup` --bootstrap-accounts argument
-    The call must succeed.
-    """
-    accounts_list = _create_accounts_list()
-
-    # Use another directory so that the constants change takes effect
-    with tempfile.TemporaryDirectory(
-        prefix='octez-client.'
-    ) as base_dir, tempfile.NamedTemporaryFile(
-        prefix='tezos-bootstrap-accounts', mode='w+t'
-    ) as json_file:
-        json.dump(accounts_list, json_file)
-        json_file.flush()
-        # Follow pattern of mockup_client fixture:
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, bootstrap_accounts_file=json_file.name
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        addresses_result = mock_client.get_known_addresses()
-        names_sent = sorted([account["name"] for account in accounts_list])
-        names_witnessed = sorted(list(addresses_result.wallet.keys()))
-        assert names_sent == names_witnessed
 
 
 @pytest.mark.client

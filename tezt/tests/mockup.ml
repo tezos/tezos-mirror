@@ -677,6 +677,100 @@ let test_create_mockup_already_initialized =
   in
   unit
 
+(* Tests [tezos-client create mockup]s [--protocols-constants]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_constants =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom protocol constants."
+    ~tags:["mockup"; "client"; "mockup_protocol_constants"]
+  @@ fun protocol ->
+  let iter = Fun.flip Lwt_list.iter_s in
+  (* [chain_id] is the string to pass for field [chain_id]. It's
+     impossible to guess values of [chain_id], these ones have been *
+     obtained by looking at the output of [compute chain id from
+     seed]. *)
+  iter
+    [
+      "NetXcqTGZX74DxG";
+      "NetXaFDF7xZQCpR";
+      "NetXkKbtqncJcAz";
+      "NetXjjE5cZUeWPy";
+      "NetXi7C1pyLhQNe";
+    ]
+  @@ fun chain_id ->
+  (* initial_timestamp is an ISO-8601 formatted date string *)
+  iter ["2020-07-21T17:11:10+02:00"; "1970-01-01T00:00:00Z"]
+  @@ fun initial_timestamp ->
+  let parameter_file = Temp.file "tezos-custom-constants.json" in
+  let json_fields =
+    [
+      ("hard_gas_limit_per_operation", `String "400000");
+      ("chain_id", `String chain_id);
+      ("initial_timestamp", `String initial_timestamp);
+    ]
+  in
+  let json_data : JSON.u = `O json_fields in
+  JSON.encode_to_file_u parameter_file json_data ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~parameter_file client in
+  unit
+
+(* A [mockup_bootstrap_account] represents a bootstrap accounts as
+   taken by the [--bootstrap-accounts] option of mockup mode *)
+type mockup_bootstrap_account = {name : string; sk_uri : string; amount : Tez.t}
+
+let test_accounts : mockup_bootstrap_account list =
+  [
+    {
+      name = "bootstrap0";
+      sk_uri = "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
+      amount = Tez.of_int 2000000000000;
+    };
+    {
+      name = "bootstrap1";
+      sk_uri = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+      amount = Tez.of_int 1000000000000;
+    };
+  ]
+
+let mockup_bootstrap_account_to_json {name; sk_uri; amount} : JSON.u =
+  `O
+    [
+      ("name", `String name);
+      ("sk_uri", `String ("unencrypted:" ^ sk_uri));
+      ("amount", `String (Tez.to_string amount));
+    ]
+
+(* Tests [tezos-client create mockup --bootstrap-accounts]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_bootstrap_accounts =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom bootstrap accounts."
+    ~tags:["mockup"; "client"; "mockup_bootstrap_accounts"]
+  @@ fun protocol ->
+  let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
+  JSON.encode_to_file_u
+    bootstrap_accounts_file
+    (`A (List.map mockup_bootstrap_account_to_json test_accounts)) ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~bootstrap_accounts_file client in
+
+  let names_sent =
+    test_accounts |> List.map (fun {name; _} -> name) |> List.rev
+  in
+  let* accounts_witnessed = Client.list_known_addresses client in
+  let names_witnessed = List.map fst accounts_witnessed in
+  Check.(
+    (names_witnessed = names_sent)
+      ~__LOC__
+      (list string)
+      ~error_msg:"Expected names %R, got %L") ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -691,7 +785,9 @@ let register ~protocols =
   test_storage_from_file protocols ;
   test_create_mockup_dir_exists_nonempty protocols ;
   test_retrieve_addresses protocols ;
-  test_create_mockup_already_initialized protocols
+  test_create_mockup_already_initialized protocols ;
+  test_create_mockup_custom_constants protocols ;
+  test_create_mockup_custom_bootstrap_accounts protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
