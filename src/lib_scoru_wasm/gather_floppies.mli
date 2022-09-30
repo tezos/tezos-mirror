@@ -69,6 +69,8 @@ module type S = sig
         with type tree := tree
          and type tick_state := tick_state
 
+    val get_internal_status : tree -> internal_status option Lwt.t
+
     val initial_tree_from_boot_sector : empty_tree:tree -> string -> tree Lwt.t
   end
 end
