@@ -399,7 +399,7 @@ If you plan to contribute to the Tezos codebase, the way to go is to set up a
 complete development environment, by cloning the repository and compiling the
 sources using the provided makefile.
 
-**TL;DR**: From a fresh Debian Buster x86_64, you typically want to select a source branch, e.g.:
+**TL;DR**: From a fresh Debian Buster x86_64, you typically want to select a source branch in the Octez repository, e.g.:
 
 .. literalinclude:: compile-sources.sh
   :language: shell

@@ -9,16 +9,18 @@
 usage () {
     cat >&2 <<!EOF
 usage:
-  $0 [<branch>]
+  $0 [<repo> <branch>]
 !EOF
 }
 
-if [ $# -eq 1 ]
+if [ $# -eq 2 ]
 then
-  BRANCH=$1
-elif [ $# -eq 0 ]
+  REPO=$1
+  BRANCH=$2
+elif [ $# -eq 0 ]  # don't remove this branch used for an example in the doc!
 then
   # [select branch]
+  REPO="tezos/tezos"
   BRANCH="latest-release"
   # [end]
 else
@@ -45,7 +47,7 @@ chmod +x rustup-init.sh
 # [source cargo]
 . $HOME/.cargo/env
 # [get sources]
-git clone https://gitlab.com/tezos/tezos.git
+git clone https://gitlab.com/"$REPO".git tezos
 cd tezos
 git checkout $BRANCH
 # [install Tezos dependencies]
