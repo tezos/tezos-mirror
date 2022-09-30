@@ -92,6 +92,18 @@ let rec eval_until_init tree =
       let* tree = Wasm.compute_step tree in
       eval_until_init tree
 
+let set_input_step message message_counter tree =
+  let input_info =
+    Wasm_pvm_sig.
+      {
+        inbox_level =
+          Option.value_f ~default:(fun () -> assert false)
+          @@ Tezos_base.Bounded.Non_negative_int32.of_value 0l;
+        message_counter = Z.of_int message_counter;
+      }
+  in
+  Wasm.set_input_step input_info message tree
+
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with

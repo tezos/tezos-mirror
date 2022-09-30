@@ -33,6 +33,7 @@ let test_memory0_export () =
   let*! bad_module_tree = initial_tree {|
     (module (memory 1))
   |} in
+  let*! bad_module_tree = set_input_step "dummy_input" 0 bad_module_tree in
   let* stuck, _ = eval_until_stuck bad_module_tree in
   assert (
     check_error
@@ -54,6 +55,7 @@ let test_memory0_export () =
         )
       |}
   in
+  let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
   let+ stuck, _ = eval_until_stuck good_module_tree in
   assert (
     check_error
@@ -86,6 +88,7 @@ let test_module_name_size () =
       (build size)
   in
   let*! bad_module_tree = initial_tree (build_module 513) in
+  let*! bad_module_tree = set_input_step "dummy_input" 0 bad_module_tree in
   let* stuck, _ = eval_until_stuck bad_module_tree in
   assert (
     check_error
@@ -93,6 +96,7 @@ let test_module_name_size () =
       ~expected_reason:"Names cannot exceed 512 bytes"
       stuck) ;
   let*! good_module_tree = initial_tree (build_module 512) in
+  let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
   let+ stuck, _ = eval_until_stuck good_module_tree in
   assert (
     check_error
@@ -124,6 +128,7 @@ let test_imports () =
   let*! bad_module_tree =
     initial_tree (build_module bad_module_name bad_item_name)
   in
+  let*! bad_module_tree = set_input_step "dummy_input" 0 bad_module_tree in
   let* stuck, _ = eval_until_stuck bad_module_tree in
   let* () =
     let expected_error =
@@ -138,6 +143,9 @@ let test_imports () =
   let good_module_name = "rollup_safe_core" in
   let*! bad_host_func_tree =
     initial_tree (build_module good_module_name bad_item_name)
+  in
+  let*! bad_host_func_tree =
+    set_input_step "dummy_input" 0 bad_host_func_tree
   in
   let* stuck, _ = eval_until_stuck bad_host_func_tree in
   let* () =
@@ -154,6 +162,7 @@ let test_imports () =
   let*! good_module_tree =
     initial_tree (build_module good_module_name good_item_name)
   in
+  let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
   let+ stuck, _ = eval_until_stuck good_module_tree in
   assert (
     check_error
@@ -182,6 +191,7 @@ let test_host_func_start_restriction () =
         )
     |}
   in
+  let*! state = set_input_step "dummy_input" 0 state in
   let+ stuck, _ = eval_until_stuck state in
   assert (
     check_error
