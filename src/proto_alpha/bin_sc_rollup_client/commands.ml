@@ -23,13 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
+open Tezos_clic
 open Protocol.Alpha_context
 
 let possible_block_ids = ["head"; "finalized"; "cemented"; "<hash>"; "<level>"]
 
 let block_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"block"
     ~short:'B'
     ~placeholder:"block"
@@ -39,7 +39,7 @@ let block_arg =
          "The block identifier for which the command applies (possible values: \
           %s)."
          (String.concat ", " possible_block_ids))
-    (Clic.parameter
+    (Tezos_clic.parameter
        (fun _ s ->
          match Sc_rollup_services.Arg.destruct_block_id s with
          | Ok b -> return b

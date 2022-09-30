@@ -797,7 +797,8 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   return_unit
 
 let group =
-  Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}
+  Tezos_clic.
+    {name = "stresstest"; title = "Commands for stress-testing the network"}
 
 type pool_source =
   | From_string of {json : Ezjsonm.value}
@@ -807,7 +808,7 @@ let json_of_pool_source = function
   | From_string {json} | From_file {json; _} -> json
 
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
@@ -823,7 +824,7 @@ let json_file_or_text_parameter =
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let seed_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"seed"
     ~placeholder:"int"
@@ -836,7 +837,7 @@ let seed_arg =
          | i -> return i))
 
 let tps_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"tps"
     ~placeholder:"float"
@@ -851,7 +852,7 @@ let tps_arg =
          | f -> return f))
 
 let fresh_probability_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"fresh-probability"
     ~placeholder:"float in [0;1]"
@@ -875,7 +876,7 @@ let fresh_probability_arg =
          | f -> return f))
 
 let smart_contract_parameters_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"smart-contract-parameters"
     ~placeholder:"JSON file with smart contract parameters"
@@ -897,7 +898,7 @@ let smart_contract_parameters_arg =
                s))
 
 let strategy_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"strategy"
     ~placeholder:"fixed:mutez | evaporation:[0;1]"
@@ -908,7 +909,7 @@ let strategy_arg =
          | Ok strategy -> return strategy))
 
 let gas_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let gas_limit_kind =
     parameter (fun _ s ->
         try
@@ -929,7 +930,7 @@ let gas_limit_arg =
     gas_limit_kind
 
 let storage_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let storage_limit_kind =
     parameter (fun _ s ->
         try
@@ -952,7 +953,7 @@ let storage_limit_arg =
     storage_limit_kind
 
 let transfers_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"transfers"
     ~placeholder:"integer"
@@ -966,7 +967,7 @@ let transfers_arg =
          | i -> return i))
 
 let level_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"level-limit"
     ~placeholder:"integer | +integer"
@@ -982,14 +983,14 @@ let level_limit_arg =
          | i -> if String.get s 0 = '+' then return (Rel i) else return (Abs i)))
 
 let verbose_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose"
     ~short:'v'
     ~doc:"Display detailed logs of the injected operations"
     ()
 
 let debug_arg =
-  Clic.switch ~long:"debug" ~short:'V' ~doc:"Display debug logs" ()
+  Tezos_clic.switch ~long:"debug" ~short:'V' ~doc:"Display debug logs" ()
 
 let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
@@ -1022,7 +1023,7 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
       Lwt_utils_unix.Json.write_file path json >>= catch_write_error
 
 let generate_random_transactions =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Generate random transactions"
@@ -1234,8 +1235,9 @@ let estimate_transaction_cost ?smart_contracts
             Operation_result.pp_operation_result
             (op.protocol_data.contents, result.contents))
 
-let estimate_transaction_costs : Protocol_client_context.full Clic.command =
-  let open Clic in
+let estimate_transaction_costs : Protocol_client_context.full Tezos_clic.command
+    =
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Output gas estimations for transactions that stresstest uses"
@@ -1421,7 +1423,7 @@ let load_wallet cctxt ~source_pkh =
   aux [] keys
 
 let source_key_arg =
-  let open Clic in
+  let open Tezos_clic in
   param
     ~name:"source_key_arg"
     ~desc:
@@ -1438,7 +1440,7 @@ let source_key_arg =
                e))
 
 let batch_size_arg =
-  let open Clic in
+  let open Tezos_clic in
   default_arg
     ~long:"batch-size"
     ~placeholder:"integer"
@@ -1453,7 +1455,7 @@ let batch_size_arg =
          | None -> failwith "Cannot read integer"))
 
 let batches_per_block_arg =
-  let open Clic in
+  let open Tezos_clic in
   default_arg
     ~long:"batches-per-block"
     ~placeholder:"integer"
@@ -1468,7 +1470,7 @@ let batches_per_block_arg =
          | None -> failwith "Cannot read integer"))
 
 let initial_amount_arg =
-  let open Clic in
+  let open Tezos_clic in
   default_arg
     ~long:"initial-amount"
     ~placeholder:"integer"
@@ -1677,8 +1679,9 @@ let inject_funding_batches cctxt
    It also allows to define additional parameters, such as fee, gas
    and storage limit.
 *)
-let fund_accounts_from_source : Protocol_client_context.full Clic.command =
-  let open Clic in
+let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
+    =
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Funds all the given accounts"

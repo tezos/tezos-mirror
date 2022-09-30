@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 (** {2 Cryptographic keys tables } *)
 
 type pk_uri = private Uri.t
@@ -39,29 +37,30 @@ type aggregate_pk_uri = private Uri.t
 
 type aggregate_sk_uri = private Uri.t
 
-val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
+val pk_uri_parameter : unit -> (pk_uri, 'a) Tezos_clic.parameter
 
 val pk_uri_param :
   ?name:string ->
   ?desc:string ->
-  ('a, 'b) Clic.params ->
-  (pk_uri -> 'a, 'b) Clic.params
+  ('a, 'b) Tezos_clic.params ->
+  (pk_uri -> 'a, 'b) Tezos_clic.params
 
-val sk_uri_parameter : unit -> (sk_uri, 'a) Clic.parameter
+val sk_uri_parameter : unit -> (sk_uri, 'a) Tezos_clic.parameter
 
 val sk_uri_param :
   ?name:string ->
   ?desc:string ->
-  ('a, 'b) Clic.params ->
-  (sk_uri -> 'a, 'b) Clic.params
+  ('a, 'b) Tezos_clic.params ->
+  (sk_uri -> 'a, 'b) Tezos_clic.params
 
-val aggregate_sk_uri_parameter : unit -> (aggregate_sk_uri, 'a) Clic.parameter
+val aggregate_sk_uri_parameter :
+  unit -> (aggregate_sk_uri, 'a) Tezos_clic.parameter
 
 val aggregate_sk_uri_param :
   ?name:string ->
   ?desc:string ->
-  ('a, 'b) Clic.params ->
-  (aggregate_sk_uri -> 'a, 'b) Clic.params
+  ('a, 'b) Tezos_clic.params ->
+  (aggregate_sk_uri -> 'a, 'b) Tezos_clic.params
 
 type error += Unregistered_key_scheme of string
 
@@ -331,7 +330,7 @@ val get_keys :
   (string * Public_key_hash.t * Signature.Public_key.t * sk_uri) list tzresult
   Lwt.t
 
-val force_switch : unit -> (bool, 'ctx) Clic.arg
+val force_switch : unit -> (bool, 'ctx) Tezos_clic.arg
 
 val aggregate_neuterize : aggregate_sk_uri -> aggregate_pk_uri tzresult Lwt.t
 

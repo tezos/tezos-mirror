@@ -25,17 +25,17 @@
 (*****************************************************************************)
 
 let sc_rollup_address_param =
-  Clic.param
+  Tezos_clic.param
     ~name:"sc-rollup-address"
     ~desc:"The smart-contract rollup address"
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          match Protocol.Alpha_context.Sc_rollup.Address.of_b58check_opt s with
          | None -> failwith "Invalid smart-contract rollup address"
          | Some addr -> return addr))
 
 let sc_rollup_node_operator_param =
   let open Lwt_result_syntax in
-  Clic.param
+  Tezos_clic.param
     ~name:"operator"
     ~desc:
       (Printf.sprintf
@@ -45,7 +45,7 @@ let sc_rollup_node_operator_param =
           The possible purposes are: %s."
          (String.concat ", "
          @@ Configuration.(List.map string_of_purpose purposes)))
-  @@ Clic.parameter
+  @@ Tezos_clic.parameter
   @@ fun cctxt s ->
   let parse_pkh s =
     let from_alias s = Client_keys.Public_key_hash.find cctxt s in
@@ -78,12 +78,12 @@ let sc_rollup_node_operator_param =
 let possible_modes = List.map Configuration.string_of_mode Configuration.modes
 
 let mode_parameter =
-  Clic.parameter
+  Tezos_clic.parameter
     ~autocomplete:(fun _ -> return possible_modes)
     (fun _ m -> Lwt.return (Configuration.mode_of_string m))
 
 let mode_param =
-  Clic.param
+  Tezos_clic.param
     ~name:"mode"
     ~desc:
       (Format.asprintf
@@ -100,7 +100,7 @@ let mode_param =
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-addr"
     ~placeholder:"rpc-address|ip"
     ~doc:
@@ -113,7 +113,7 @@ let rpc_addr_arg =
 
 let dal_node_addr_arg =
   let default = Configuration.default_dal_node_addr in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"dal-node-addr"
     ~placeholder:"dal-node-address|ip"
     ~doc:
@@ -126,7 +126,7 @@ let dal_node_addr_arg =
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-port"
     ~placeholder:"rpc-port"
     ~doc:
@@ -139,7 +139,7 @@ let rpc_port_arg =
 
 let dal_node_port_arg =
   let default = Configuration.default_dal_node_port |> string_of_int in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"dal-node-port"
     ~placeholder:"dal-node-port"
     ~doc:
@@ -152,7 +152,7 @@ let dal_node_port_arg =
 
 let data_dir_arg =
   let default = Configuration.default_data_dir in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
     ~doc:
@@ -164,12 +164,12 @@ let data_dir_arg =
     Client_proto_args.string_parameter
 
 let loser_mode =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"loser-mode"
     ~placeholder:"mode"
     ~default:""
     ~doc:"Set the rollup node failure points (for test only!)."
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          match Loser_mode.make s with
          | Some t -> return t
          | None -> failwith "Invalid syntax for failure points"))
@@ -186,16 +186,16 @@ let reconnection_delay_arg =
        (capped to 1.5h): [1.5^reconnection_attempt * delay ± 50%%]."
       default
   in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"reconnection-delay"
     ~placeholder:"delay"
     ~doc
     ~default
-    (Clic.parameter (fun _ p ->
+    (Tezos_clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
 let filename_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"filename"
     ~placeholder:"filename"
     ~doc:"The path to the file to import."
@@ -203,7 +203,7 @@ let filename_arg =
     Client_proto_args.string_parameter
 
 let pvm_name_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"pvm-name"
     ~placeholder:"pvm_name"
     ~doc:"The name of the PVM."
@@ -212,13 +212,13 @@ let pvm_name_arg =
 
 let group =
   {
-    Clic.name = "sc_rollup.node";
+    Tezos_clic.name = "sc_rollup.node";
     title = "Commands related to the smart-contract rollup node.";
   }
 
 let config_init_command =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Configure the smart-contract rollup node."
@@ -288,7 +288,7 @@ let config_init_command =
       >>= fun _ -> return ())
 
 let run_command =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Run the rollup daemon."
@@ -297,7 +297,7 @@ let run_command =
     (fun data_dir cctxt -> Daemon.run ~data_dir cctxt >>=? fun () -> return ())
 
 let import_command =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Run the rollup daemon."
@@ -310,7 +310,7 @@ let import_command =
 
 let sc_rollup_commands () =
   List.map
-    (Clic.map_command (new Protocol_client_context.wrap_full))
+    (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
     [config_init_command; run_command; import_command]
 
 let select_commands _ _ =

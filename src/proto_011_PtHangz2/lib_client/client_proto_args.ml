@@ -27,7 +27,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Clic
+open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -168,7 +168,7 @@ let init_arg =
     string_parameter
 
 let global_constant_param ~name ~desc next =
-  Clic.param ~name ~desc string_parameter next
+  Tezos_clic.param ~name ~desc string_parameter next
 
 let arg_arg =
   arg
@@ -250,7 +250,7 @@ let tez_arg ~default ~parameter ~doc =
     (tez_parameter ("--" ^ parameter))
 
 let tez_param ~name ~desc next =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)

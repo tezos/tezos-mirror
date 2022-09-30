@@ -47,30 +47,30 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> Lwt.return_some data
 
 let data_parameter =
-  Clic.parameter (fun _ data ->
+  Tezos_clic.parameter (fun _ data ->
       Lwt.return
         (Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression data))
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -133,9 +133,9 @@ let commands () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -156,13 +156,13 @@ let commands () =
       ~desc:"Get a value in a big map."
       no_options
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -207,7 +207,7 @@ let commands () =
       ~desc:"Get the type of an entrypoint  of a contract."
       no_options
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ Tezos_clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)

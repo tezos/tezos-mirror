@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Clic
+open Tezos_clic
 
 module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 

@@ -735,13 +735,14 @@ let get_main proto_hash =
       let module Main = Make (Proto) in
       (module Main : Sigs.MAIN)
 
-let data_dir_param = Clic.string ~name:"data-dir" ~desc:"Path to context"
+let data_dir_param = Tezos_clic.string ~name:"data-dir" ~desc:"Path to context"
 
 let list_target_dir_param =
-  Clic.seq_of_param @@ Clic.string ~name:"target-dir" ~desc:"Output path"
+  Tezos_clic.seq_of_param
+  @@ Tezos_clic.string ~name:"target-dir" ~desc:"Output path"
 
 let network_parameter =
-  Clic.parameter (fun () network_name ->
+  Tezos_clic.parameter (fun () network_name ->
       match
         List.assoc ~equal:String.equal network_name Config.known_networks
       with
@@ -749,7 +750,7 @@ let network_parameter =
       | Some n -> Lwt_result_syntax.return n)
 
 let network_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"Network to use"
     ~long:"network"
     ~placeholder:"network name"
@@ -757,7 +758,7 @@ let network_arg =
     network_parameter
 
 let commands =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~desc:"Extracts all contracts from the storage"
@@ -796,7 +797,7 @@ let commands =
 
 let run () =
   let argv = Sys.argv |> Array.to_list |> List.tl |> Option.value ~default:[] in
-  Clic.dispatch commands () argv
+  Tezos_clic.dispatch commands () argv
 
 let () =
   match Lwt_main.run (run ()) with

@@ -23,10 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 let group =
-  {Clic.name = "mockup"; title = "Commands for creating mockup environments"}
+  {
+    Tezos_clic.name = "mockup";
+    title = "Commands for creating mockup environments";
+  }
 
 let list_mockup_command_handler _ _ =
   let available = Registration.get_registered_environments () in
@@ -37,8 +38,9 @@ let list_mockup_command_handler _ _ =
     available ;
   Lwt_result_syntax.return_unit
 
-let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
-  let open Clic in
+let list_mockup_command :
+    Tezos_client_base.Client_context.full Tezos_clic.command =
+  let open Tezos_clic in
   command
     ~group
     ~desc:"List available protocols available for mockup construction."
@@ -53,9 +55,9 @@ let migrate_mockup_command_handler () next_protococol_hash
   | Ok next_protocol_hash ->
       Migration.migrate_mockup ~cctxt ~protocol_hash:None ~next_protocol_hash
 
-let migrate_mockup_command : Tezos_client_base.Client_context.full Clic.command
-    =
-  let open Clic in
+let migrate_mockup_command :
+    Tezos_client_base.Client_context.full Tezos_clic.command =
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Migrates an on-disk mockup context from a protocol to another."

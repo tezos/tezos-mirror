@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
+open Tezos_clic
 open Lwt_result_syntax
 module Base = Tezos_client_base
 
@@ -73,7 +73,7 @@ let base_dir_arg () =
          default_base_dir)
     (parameter valid_base_dir)
 
-let global_options () = Clic.args2 (base_dir_arg ()) (endpoint_arg ())
+let global_options () = Tezos_clic.args2 (base_dir_arg ()) (endpoint_arg ())
 
 let make (base_dir, endpoint) =
   {
@@ -83,7 +83,7 @@ let make (base_dir, endpoint) =
 
 let parse argv =
   let* opts, argv =
-    Clic.parse_global_options (global_options ()) default argv
+    Tezos_clic.parse_global_options (global_options ()) default argv
   in
   return (make opts, argv)
 

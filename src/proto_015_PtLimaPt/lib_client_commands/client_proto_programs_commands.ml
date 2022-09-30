@@ -28,7 +28,7 @@ open Protocol
 
 let group =
   {
-    Clic.name = "scripts";
+    Tezos_clic.name = "scripts";
     title = "Commands for managing the library of known scripts";
   }
 
@@ -51,7 +51,7 @@ let safe_decode_json (cctxt : Protocol_client_context.full) encoding json =
   | expr -> Lwt_result_syntax.return expr
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let show_types_switch =
     switch
       ~long:"details"

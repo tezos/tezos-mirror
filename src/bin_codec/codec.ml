@@ -58,7 +58,7 @@ let home = try Sys.getenv "HOME" with Not_found -> "/tmp"
 let default_base_dir = Filename.concat home ".tezos-client"
 
 let base_dir_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"base-dir"
     ~short:'d'
@@ -69,14 +69,16 @@ let base_dir_arg =
         By default: '" ^ default_base_dir ^ "'.")
     (parameter (fun _ctxt x -> Lwt.return_ok x))
 
-let global_options = Clic.args1 base_dir_arg
+let global_options = Tezos_clic.args1 base_dir_arg
 
 let parse_config_args argv =
   let open Lwt_result_syntax in
   (* The context used during argument parsing. We switch to a real context
      that is created based on some of the parsed arguments. *)
   let ctxt = Client_context.null_printer in
-  let* base_dir, argv = Clic.parse_global_options global_options ctxt argv in
+  let* base_dir, argv =
+    Tezos_clic.parse_global_options global_options ctxt argv
+  in
   let* base_dir =
     match base_dir with
     | None ->
@@ -117,14 +119,14 @@ let main commands =
     in
     Random.self_init () ;
     ignore
-      Clic.(
+      Tezos_clic.(
         setup_formatter
           Format.std_formatter
           (if Unix.isatty Unix.stdout then Ansi else Plain)
           Short) ;
     warn_if_argv0_name_not_octez () ;
     ignore
-      Clic.(
+      Tezos_clic.(
         setup_formatter
           Format.err_formatter
           (if Unix.isatty Unix.stderr then Ansi else Plain)
@@ -133,17 +135,17 @@ let main commands =
     let* base_dir, argv = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in
     let commands =
-      Clic.add_manual
+      Tezos_clic.add_manual
         ~executable_name
         ~global_options
-        (if Unix.isatty Unix.stdout then Clic.Ansi else Clic.Plain)
+        (if Unix.isatty Unix.stdout then Tezos_clic.Ansi else Tezos_clic.Plain)
         Format.std_formatter
         commands
     in
     match autocomplete with
     | Some (prev_arg, cur_arg, script) ->
         let* completions =
-          Clic.autocompletion
+          Tezos_clic.autocompletion
             ~script
             ~cur_arg
             ~prev_arg
@@ -154,7 +156,7 @@ let main commands =
         in
         List.iter print_endline completions ;
         return_unit
-    | None -> Clic.dispatch commands ctxt argv
+    | None -> Tezos_clic.dispatch commands ctxt argv
   in
   Stdlib.exit
     (Lwt_main.run
@@ -166,19 +168,19 @@ let main commands =
           in
           match r with
           | Ok () -> Lwt.return 0
-          | Error [Clic.Version] ->
+          | Error [Tezos_clic.Version] ->
               let version = Tezos_version.Bin_version.version_string in
               Format.printf "%s\n" version ;
               Lwt.return 0
-          | Error [Clic.Help command] ->
-              Clic.usage
+          | Error [Tezos_clic.Help command] ->
+              Tezos_clic.usage
                 Format.std_formatter
                 ~executable_name
                 ~global_options
                 (match command with None -> [] | Some c -> [c]) ;
               Lwt.return 0
           | Error errs ->
-              Clic.pp_cli_errors
+              Tezos_clic.pp_cli_errors
                 Format.err_formatter
                 ~executable_name
                 ~global_options

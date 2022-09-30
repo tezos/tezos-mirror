@@ -23,12 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
 open Michelson_generation
 
 let group =
   {
-    Clic.name = "Michelson generation";
+    Tezos_clic.name = "Michelson generation";
     title = "Command for generating random Michelson code and data";
   }
 
@@ -50,7 +49,7 @@ module Michelson_concat_cmd = struct
     return_unit
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes [Protocol.name; "michelson"; "concat"; "files"]
       @@ string ~name:"FILENAME" ~desc:"First file"
       @@ prefixes ["and"]
@@ -60,10 +59,10 @@ module Michelson_concat_cmd = struct
       @@ stop)
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"Michelson generation"
-      Clic.no_options
+      Tezos_clic.no_options
       params
       handler
 end
@@ -134,13 +133,13 @@ module Michelson_gen_cmd = struct
 
   let min_size_arg =
     let min_size =
-      Clic.parameter (fun (_ : unit) parsed ->
+      Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
             Printf.eprintf "Error while parsing --min-size argument." ;
             exit 1)
     in
-    Clic.arg
+    Tezos_clic.arg
       ~doc:"Lower bound for target size of terms"
       ~long:"min-size"
       ~placeholder:"int"
@@ -148,13 +147,13 @@ module Michelson_gen_cmd = struct
 
   let max_size_arg =
     let max_size =
-      Clic.parameter (fun (_ : unit) parsed ->
+      Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
             Printf.eprintf "Error while parsing --max-size argument." ;
             exit 1)
     in
-    Clic.arg
+    Tezos_clic.arg
       ~doc:"Lower bound for target size of terms"
       ~long:"max-size"
       ~placeholder:"int"
@@ -162,13 +161,13 @@ module Michelson_gen_cmd = struct
 
   let burn_in_arg =
     let target_size =
-      Clic.parameter (fun (_ : unit) parsed ->
+      Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
             Printf.eprintf "Error while parsing --burn-in argument." ;
             exit 1)
     in
-    Clic.arg
+    Tezos_clic.arg
       ~doc:"Burn-in multiplier"
       ~long:"burn-in"
       ~placeholder:"int"
@@ -176,18 +175,18 @@ module Michelson_gen_cmd = struct
 
   let seed_arg =
     let seed =
-      Clic.parameter (fun (_ : unit) parsed ->
+      Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
             Printf.eprintf "Error while parsing --seed argument." ;
             exit 1)
     in
-    Clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
+    Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
-  let options = Clic.args4 min_size_arg max_size_arg burn_in_arg seed_arg
+  let options = Tezos_clic.args4 min_size_arg max_size_arg burn_in_arg seed_arg
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes [Protocol.name; "michelson"; "generate"]
       @@ string ~name:"TERMS-COUNT" ~desc:"Number of terms to generate"
       @@ prefixes ["terms"; "of"; "kind"]
@@ -197,7 +196,12 @@ module Michelson_gen_cmd = struct
       @@ stop)
 
   let command =
-    Clic.command ~group ~desc:"Michelson generation" options params handler
+    Tezos_clic.command
+      ~group
+      ~desc:"Michelson generation"
+      options
+      params
+      handler
 end
 
 let () = Registration.add_command Michelson_gen_cmd.command

@@ -27,7 +27,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Clic
+open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 

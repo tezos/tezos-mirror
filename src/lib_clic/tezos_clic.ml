@@ -375,7 +375,7 @@ let group_commands commands =
             | None -> ((group, ref [command]) :: grouped, ungrouped)
             | Some ({title; _}, r) ->
                 if title <> group.title then
-                  invalid_arg "Clic.usage: duplicate group name" ;
+                  invalid_arg "Tezos_clic.usage: duplicate group name" ;
                 r := command :: !r ;
                 (grouped, ungrouped)))
       ([], [])
@@ -439,7 +439,7 @@ let setup_formatter ppf format verbosity =
      | _ :: level :: rest ->
          levels := level :: rest ;
          setup_level level
-     | [_] | [] -> Stdlib.failwith "Clic: unclosed verbosity tag"
+     | [_] | [] -> Stdlib.failwith "Tezos_clic: unclosed verbosity tag"
    in
    push_level (Terse, ( <= )) ;
    let push_level_tag = function
@@ -451,14 +451,14 @@ let setup_formatter ppf format verbosity =
            | "terse" -> push_level (Terse, op)
            | tag ->
                Stdlib.failwith
-                 ("Clic: invalid semantic string tag <" ^ tag ^ ">")
+                 ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
          in
          if String.length tag > 0 && tag.[0] = '=' then
            push ( = ) (String.sub tag 1 (String.length tag - 1))
          else if String.length tag > 0 && tag.[0] = '-' then
            push ( > ) (String.sub tag 1 (String.length tag - 1))
          else push ( <= ) tag
-     | _stag -> Stdlib.failwith "Clic: invalid semantic tag"
+     | _stag -> Stdlib.failwith "Tezos_clic: invalid semantic tag"
    in
    let pop_level_tag = function
      | Format.String_tag "full"
@@ -475,8 +475,9 @@ let setup_formatter ppf format verbosity =
      | Format.String_tag "=terse" ->
          pop_level ()
      | Format.String_tag tag ->
-         Stdlib.failwith ("Clic: invalid semantic string tag <" ^ tag ^ ">")
-     | _stag -> Stdlib.failwith "Clic: invalid semantic tag"
+         Stdlib.failwith
+           ("Tezos_clic: invalid semantic string tag <" ^ tag ^ ">")
+     | _stag -> Stdlib.failwith "Tezos_clic: invalid semantic tag"
    in
    match format with
    | Ansi ->
@@ -526,7 +527,7 @@ let setup_formatter ppf format verbosity =
          | _ :: format :: rest ->
              ansi_stack := format :: rest ;
              Format.fprintf ppf "@<0>%a" ansi_format format
-         | [_] | [] -> Stdlib.failwith "Clic: unclosed ansi format"
+         | [_] | [] -> Stdlib.failwith "Tezos_clic: unclosed ansi format"
        in
        Format.pp_set_formatter_stag_functions
          ppf
@@ -1037,14 +1038,14 @@ let param ~name ~desc kind next = Param (name, desc, kind, next)
 let seq_of_param param =
   match param Stop with
   | Param (n, desc, parameter, Stop) -> Seq (n, desc, parameter)
-  | _ -> invalid_arg "Clic.seq_of_param"
+  | _ -> invalid_arg "Tezos_clic.seq_of_param"
 
 let non_terminal_seq ~suffix param next =
   match (suffix, param Stop) with
-  | [], _ -> invalid_arg "Clic.non_terminal_seq: empty suffix"
+  | [], _ -> invalid_arg "Tezos_clic.non_terminal_seq: empty suffix"
   | _, Param (n, desc, parameter, Stop) ->
       NonTerminalSeq (n, desc, parameter, suffix, next)
-  | _ -> invalid_arg "Clic.non_terminal_seq"
+  | _ -> invalid_arg "Tezos_clic.non_terminal_seq"
 
 let prefix keyword next = Prefix (keyword, next)
 
@@ -1258,7 +1259,7 @@ let insert_in_dispatch_tree : type ctx. ctx tree -> ctx command -> ctx tree =
     | _, _ ->
         Stdlib.failwith
           (Format.asprintf
-             "Clic.Command_tree.insert: conflicting commands \"%a\""
+             "Tezos_clic.Command_tree.insert: conflicting commands \"%a\""
              (fun ppf (Command {params; options; _}) ->
                print_commandline ppf ([], options, params))
              command)

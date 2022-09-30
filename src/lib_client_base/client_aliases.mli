@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 (** Allows to parse an argument taking one of many forms. Accepts a
     list of alternative parsers and an input string. Each alternative
     consists of a string being the name of the format and a function
@@ -94,27 +92,27 @@ module type Alias = sig
   val to_source : t -> string tzresult Lwt.t
 
   val alias_parameter :
-    unit -> (string * t, #Client_context.wallet) Clic.parameter
+    unit -> (string * t, #Client_context.wallet) Tezos_clic.parameter
 
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'b)) Clic.params ->
-    (string * t -> 'a, 'b) Clic.params
+    ('a, (#Client_context.wallet as 'b)) Tezos_clic.params ->
+    (string * t -> 'a, 'b) Tezos_clic.params
 
   val aliases_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'b)) Clic.params ->
-    ((string * t) list -> 'a, 'b) Clic.params
+    ('a, (#Client_context.wallet as 'b)) Tezos_clic.params ->
+    ((string * t) list -> 'a, 'b) Tezos_clic.params
 
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (< .. > as 'obj)) Clic.params ->
-    (fresh_param -> 'a, 'obj) Clic.params
+    ('a, (< .. > as 'obj)) Tezos_clic.params ->
+    (fresh_param -> 'a, 'obj) Tezos_clic.params
 
-  val force_switch : unit -> (bool, _) Clic.arg
+  val force_switch : unit -> (bool, _) Tezos_clic.arg
 
   val of_fresh :
     #Client_context.wallet -> bool -> fresh_param -> string tzresult Lwt.t
@@ -122,15 +120,15 @@ module type Alias = sig
   val source_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_context.wallet as 'obj)) Clic.params ->
-    (t -> 'a, 'obj) Clic.params
+    ('a, (#Client_context.wallet as 'obj)) Tezos_clic.params ->
+    (t -> 'a, 'obj) Tezos_clic.params
 
   val source_arg :
     ?long:string ->
     ?placeholder:string ->
     ?doc:string ->
     unit ->
-    (t option, (#Client_context.wallet as 'obj)) Clic.arg
+    (t option, (#Client_context.wallet as 'obj)) Tezos_clic.arg
 
   val autocomplete : #Client_context.wallet -> string list tzresult Lwt.t
 end

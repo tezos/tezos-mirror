@@ -27,7 +27,7 @@
 open Protocol_client_context
 open Protocol
 open Alpha_context
-open Clic
+open Tezos_clic
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
 
@@ -188,7 +188,7 @@ let init_arg =
     string_parameter
 
 let global_constant_param ~name ~desc next =
-  Clic.param ~name ~desc string_parameter next
+  Tezos_clic.param ~name ~desc string_parameter next
 
 let arg_arg =
   arg
@@ -283,7 +283,7 @@ let tez_opt_arg ~parameter ~doc =
     (tez_parameter ("--" ^ parameter))
 
 let tez_param ~name ~desc next =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)
@@ -298,7 +298,7 @@ let non_negative_z_parameter =
       with _ -> failwith "Invalid number, must be a non negative number.")
 
 let non_negative_z_param ~name ~desc next =
-  Clic.param ~name ~desc non_negative_z_parameter next
+  Tezos_clic.param ~name ~desc non_negative_z_parameter next
 
 let fee_arg =
   arg
@@ -602,7 +602,7 @@ let display_names_flag =
     ()
 
 let json_parameter =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Data_encoding.Json.from_string s with
       | Ok json -> return json
       | Error err -> failwith "'%s' is not a valid JSON-encoded valie: %s" s err)
@@ -620,7 +620,7 @@ end
 
 module Tx_rollup = struct
   let tx_rollup_address_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Tx_rollup.of_b58check_opt s with
         | Some c -> return c
         | None ->
@@ -631,7 +631,7 @@ module Tx_rollup = struct
 
   let tx_rollup_address_param ?(name = "transaction rollup address") ~usage next
       =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -642,7 +642,7 @@ module Tx_rollup = struct
       next
 
   let level_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Int32.of_string_opt s with
         | Some i when i >= 0l ->
             Lwt.return @@ Environment.wrap_tzresult (Tx_rollup_level.of_int32 i)
@@ -653,7 +653,7 @@ module Tx_rollup = struct
               s)
 
   let level_param ?(name = "tx rollup level") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -664,7 +664,7 @@ module Tx_rollup = struct
       next
 
   let context_hash_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Context_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None ->
@@ -674,7 +674,7 @@ module Tx_rollup = struct
               s)
 
   let context_hash_param ?(name = "context hash") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -684,7 +684,7 @@ module Tx_rollup = struct
       next
 
   let message_result_path_parameter =
-    Clic.map_parameter
+    Tezos_clic.map_parameter
       ~f:(fun json ->
         try
           Data_encoding.Json.destruct
@@ -699,7 +699,7 @@ module Tx_rollup = struct
       json_parameter
 
   let message_result_path_param ?(name = "message result path") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -712,7 +712,7 @@ module Tx_rollup = struct
       next
 
   let tickets_dispatch_info_parameter =
-    Clic.map_parameter
+    Tezos_clic.map_parameter
       ~f:(fun json ->
         try Data_encoding.Json.destruct Tx_rollup_reveal.encoding json
         with Data_encoding.Json.Cannot_destruct (_path, exn) ->
@@ -724,7 +724,7 @@ module Tx_rollup = struct
       json_parameter
 
   let tickets_dispatch_info_param ?(name = "tickets information") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -738,14 +738,14 @@ module Tx_rollup = struct
       next
 
   let message_result_hash_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Tx_rollup_message_result_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None ->
             failwith "%s is not a valid notation for a withdraw list hash" s)
 
   let message_result_hash_param ?(name = "message result hash") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -755,14 +755,14 @@ module Tx_rollup = struct
       next
 
   let withdraw_list_hash_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Tx_rollup_withdraw_list_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None ->
             failwith "%s is not a valid notation for a withdraw list hash" s)
 
   let withdraw_list_hash_param ?(name = "withdraw list hash") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -772,13 +772,13 @@ module Tx_rollup = struct
       next
 
   let commitment_hash_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Tx_rollup_commitment_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None -> failwith "%s is not a valid notation for a commitment hash" s)
 
   let commitment_hash_param ?(name = "commitment hash") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -789,7 +789,7 @@ module Tx_rollup = struct
 
   let commitment_hash_arg ?(long = "commitment-hash")
       ?(placeholder = "commitment hash") ~usage () =
-    Clic.arg
+    Tezos_clic.arg
       ~long
       ~doc:
         (Format.sprintf
@@ -799,7 +799,7 @@ module Tx_rollup = struct
       commitment_hash_parameter
 
   let message_parameter =
-    Clic.map_parameter
+    Tezos_clic.map_parameter
       ~f:(fun json ->
         try Data_encoding.Json.destruct Tx_rollup_message.encoding json
         with Data_encoding.Json.Cannot_destruct (_path, exn) ->
@@ -811,7 +811,7 @@ module Tx_rollup = struct
       json_parameter
 
   let message_param ?(name = "message") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -825,7 +825,7 @@ module Tx_rollup = struct
       next
 
   let message_path_parameter =
-    Clic.map_parameter
+    Tezos_clic.map_parameter
       ~f:(fun json ->
         try
           Data_encoding.Json.destruct Tx_rollup_inbox.Merkle.path_encoding json
@@ -838,7 +838,7 @@ module Tx_rollup = struct
       json_parameter
 
   let message_path_param ?(name = "message path") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -850,7 +850,7 @@ module Tx_rollup = struct
       next
 
   let proof_parameter =
-    Clic.map_parameter
+    Tezos_clic.map_parameter
       ~f:(fun json ->
         try Data_encoding.Json.destruct Tx_rollup_l2_proof.encoding json
         with Data_encoding.Json.Cannot_destruct (_path, exn) ->
@@ -862,7 +862,7 @@ module Tx_rollup = struct
       json_parameter
 
   let proof_param ?(name = "rejection proof") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf
@@ -873,7 +873,7 @@ module Tx_rollup = struct
       next
 
   let inbox_root_hash_parameter =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match Tx_rollup_inbox.Merkle.root_of_b58check_opt s with
         | Some hash -> return hash
         | None ->
@@ -882,7 +882,7 @@ module Tx_rollup = struct
               s)
 
   let inbox_root_hash_param ?(name = "inbox root hash") ~usage next =
-    Clic.param
+    Tezos_clic.param
       ~name
       ~desc:
         (Format.sprintf

@@ -23,23 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 type error += Bad_amount_param of (string * string)
 
-let msg_parameter _param = Clic.parameter (fun _ s -> return s)
+let msg_parameter _param = Tezos_clic.parameter (fun _ s -> return s)
 
 let amount_parameter param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match Int32.of_string_opt s with
       | Some amount -> return amount
       | None -> fail (Bad_amount_param (param, s)))
 
 let amount_param ~name ~desc next =
-  Clic.param ~name ~desc (amount_parameter name) next
+  Tezos_clic.param ~name ~desc (amount_parameter name) next
 
 let msg_param ~name ~desc next =
-  Clic.param ~name ~desc (msg_parameter name) next
+  Tezos_clic.param ~name ~desc (msg_parameter name) next
 
 let () =
   register_error_kind

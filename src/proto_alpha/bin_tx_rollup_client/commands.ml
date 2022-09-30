@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
+open Tezos_clic
 open Tezos_client_base
 
 let l1_destination_parameter =
@@ -206,7 +206,7 @@ let ticket_hash_parameter =
       | None -> failwith "cannot parse %s to get a valid ticket_hash" s)
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
@@ -894,7 +894,7 @@ let call_with_file_or_json meth url maybe_file
 
 let rpc_commands () =
   let group =
-    {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
+    {Tezos_clic.name = "rpc"; title = "Commands for the low level RPC layer"}
   in
   [
     command

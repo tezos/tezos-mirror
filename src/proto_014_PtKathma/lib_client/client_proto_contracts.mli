@@ -25,7 +25,7 @@
 
 open Protocol
 open Alpha_context
-open Clic
+open Tezos_clic
 
 module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
@@ -44,7 +44,7 @@ module OriginatedContractAlias : sig
     ?name:string ->
     ?doc:string ->
     unit ->
-    (Contract_hash.t option, #Client_context.wallet) Clic.arg
+    (Contract_hash.t option, #Client_context.wallet) Tezos_clic.arg
 end
 
 module ContractAlias : sig
@@ -70,7 +70,7 @@ module ContractAlias : sig
     ?name:string ->
     ?doc:string ->
     unit ->
-    (Contract.t option, #Client_context.wallet) Clic.arg
+    (Contract.t option, #Client_context.wallet) Tezos_clic.arg
 
   val rev_find :
     #Client_context.wallet -> Contract.t -> string option tzresult Lwt.t

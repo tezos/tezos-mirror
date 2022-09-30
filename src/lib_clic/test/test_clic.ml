@@ -26,9 +26,9 @@
 
 (** Testing
     -------
-    Component:    Clic library
+    Component:    Tezos_clic library
     Invocation:   dune build @src/lib_clic/runtest
-    Subject:      Test the functionality of the Clic library, such as CLI
+    Subject:      Test the functionality of the Tezos_clic library, such as CLI
                   command dispatch, parameters and auto-completion.
 *)
 
@@ -46,7 +46,7 @@ let keywords words =
     | Some v -> return v
   in
   let autocomplete _ = return (fst (List.split words)) in
-  Clic.parameter ~autocomplete matcher
+  Tezos_clic.parameter ~autocomplete matcher
 
 type abcd = A | B | C | D | The
 
@@ -66,17 +66,17 @@ let string_of_efgh = function
   | H -> "H"
   | End -> "end"
 
-let abcd_parameter : (abcd, unit) Clic.parameter =
+let abcd_parameter : (abcd, unit) Tezos_clic.parameter =
   keywords [("A", A); ("B", B); ("C", C); ("D", D); ("the", The)]
 
-let efgh_parameter : (efgh, unit) Clic.parameter =
+let efgh_parameter : (efgh, unit) Tezos_clic.parameter =
   keywords [("E", E); ("F", F); ("G", G); ("H", H); ("end", End)]
 
 let abcd_param ~name =
-  Clic.param ~name ~desc:"must be A,B,C,D, or \"the\"" abcd_parameter
+  Tezos_clic.param ~name ~desc:"must be A,B,C,D, or \"the\"" abcd_parameter
 
 let efgh_param ~name =
-  Clic.param ~name ~desc:"must be E,F,G,H, or \"end\"" efgh_parameter
+  Tezos_clic.param ~name ~desc:"must be E,F,G,H, or \"end\"" efgh_parameter
 
 (* instrumentation *)
 
@@ -88,7 +88,7 @@ let dispatch cmds argv () =
     return ()
   in
   let cmds = List.map (fun cmd -> cmd cmd_return) cmds in
-  let* () = Clic.dispatch cmds () argv in
+  let* () = Tezos_clic.dispatch cmds () argv in
   return !res
 
 let expect_result line pr exp got =
@@ -125,15 +125,18 @@ let expect_result line pr exp got =
 let test_dispatch_basic () =
   let open Lwt_syntax in
   let empty return =
-    Clic.command ~desc:"empty" Clic.no_options Clic.stop (fun () () ->
-        return "empty")
+    Tezos_clic.command
+      ~desc:"empty"
+      Tezos_clic.no_options
+      Tezos_clic.stop
+      (fun () () -> return "empty")
   in
   let prefixes words return =
     let name = String.concat "-" words in
-    Clic.command
+    Tezos_clic.command
       ~desc:name
-      Clic.no_options
-      (Clic.prefixes words @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes words @@ Tezos_clic.stop)
       (fun () () -> return name)
   in
   let expect line = expect_result line Format.pp_print_string in
@@ -165,50 +168,60 @@ let test_dispatch_basic () =
 (** Test the dispatch of commands with non-terminal sequence parameters. *)
 let test_dispatch_advanced () =
   let en return =
-    Clic.command
+    Tezos_clic.command
       ~desc:"seq-abcd-en"
-      Clic.no_options
-      (Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.non_terminal_seq
+         ~suffix:["the"; "end"]
+         (abcd_param ~name:"item")
+      @@ Tezos_clic.stop)
       (fun () l () ->
         return ("E" ^ String.concat "" (List.map string_of_abcd l)))
   in
   let enp return =
-    Clic.command
+    Tezos_clic.command
       ~desc:"seq-abcd-en"
-      Clic.no_options
-      (Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.prefix "of" @@ efgh_param ~name:"last" @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.non_terminal_seq
+         ~suffix:["the"; "end"]
+         (abcd_param ~name:"item")
+      @@ Tezos_clic.prefix "of" @@ efgh_param ~name:"last" @@ Tezos_clic.stop)
       (fun () l p () ->
         return
           ("E" ^ String.concat "" (List.map string_of_abcd l) ^ string_of_efgh p))
   in
   let fr return =
-    Clic.command
+    Tezos_clic.command
       ~desc:"seq-abcd-fr"
-      Clic.no_options
-      (Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
-      @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.non_terminal_seq
+         ~suffix:["la"; "fin"]
+         (abcd_param ~name:"item")
+      @@ Tezos_clic.stop)
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
   let prefixed_en return =
-    Clic.command
+    Tezos_clic.command
       ~desc:"en-seq-abcd"
-      Clic.no_options
-      (Clic.prefix "en"
-      @@ Clic.non_terminal_seq ~suffix:["the"; "end"] (abcd_param ~name:"item")
-      @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefix "en"
+      @@ Tezos_clic.non_terminal_seq
+           ~suffix:["the"; "end"]
+           (abcd_param ~name:"item")
+      @@ Tezos_clic.stop)
       (fun () l () ->
         return ("E" ^ String.concat "" (List.map string_of_abcd l)))
   in
   let prefixed_fr return =
-    Clic.command
+    Tezos_clic.command
       ~desc:"fr-seq-abcd"
-      Clic.no_options
-      (Clic.prefix "fr"
-      @@ Clic.non_terminal_seq ~suffix:["la"; "fin"] (abcd_param ~name:"item")
-      @@ Clic.stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefix "fr"
+      @@ Tezos_clic.non_terminal_seq
+           ~suffix:["la"; "fin"]
+           (abcd_param ~name:"item")
+      @@ Tezos_clic.stop)
       (fun () l () ->
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
@@ -314,7 +327,7 @@ let test_dispatch_advanced () =
   expect __LINE__ expected_error (dispatch [fr; en] ["a"; "la"; "fin"])
 
 let string_param ~autocomplete next =
-  Clic.(
+  Tezos_clic.(
     param
       ~name:"string"
       ~desc:"string"
@@ -322,7 +335,7 @@ let string_param ~autocomplete next =
       next)
 
 let int_param ~autocomplete next =
-  Clic.(
+  Tezos_clic.(
     param
       ~name:"int"
       ~desc:"int"
@@ -338,10 +351,10 @@ let test_autocompletion_case ~commands ~args ~expected () =
     | [cur_arg] -> (script, cur_arg)
     | cur_arg :: prev_arg :: _ -> (prev_arg, cur_arg)
   in
-  let global_options = Clic.no_options in
+  let global_options = Tezos_clic.no_options in
   let ctxt = () in
   let* next =
-    Clic.autocompletion
+    Tezos_clic.autocompletion
       ~script
       ~cur_arg
       ~prev_arg
@@ -365,7 +378,7 @@ let test_autocompletion_case ~commands ~args ~expected () =
 let test_parameters_autocompletion =
   let open Lwt_result_syntax in
   let param_commands =
-    Clic.
+    Tezos_clic.
       [
         command
           ~desc:"command with a param"
@@ -404,7 +417,7 @@ let test_parameters_autocompletion =
     ]
   in
   let prefix_commands =
-    Clic.
+    Tezos_clic.
       [
         command
           ~desc:"command with prefixes"
@@ -460,7 +473,7 @@ let test_parameters_autocompletion =
     ]
   in
   let seq_commands =
-    Clic.
+    Tezos_clic.
       [
         command
           ~desc:"command with a seq"
@@ -503,7 +516,7 @@ let test_parameters_autocompletion =
     ]
   in
   let non_terminal_seq_commands =
-    Clic.
+    Tezos_clic.
       [
         command
           ~desc:"command with a non-terminal-seq"
@@ -548,10 +561,10 @@ let test_parameters_autocompletion =
           return
           @@ Alcotest.check_raises
                "Expected [Invalid_argument] exception"
-               (Invalid_argument "Clic.non_terminal_seq: empty suffix")
+               (Invalid_argument "Tezos_clic.non_terminal_seq: empty suffix")
                (fun () ->
                  let _failing_param =
-                   Clic.(
+                   Tezos_clic.(
                      non_terminal_seq
                        ~suffix:[]
                        (int_param ~autocomplete:(fun _ctxt -> return []))
@@ -627,7 +640,7 @@ let wrap (n, f) =
 
 let () =
   Alcotest_lwt.run
-    "Clic"
+    "Tezos_clic"
     [
       ( "dispatch",
         [

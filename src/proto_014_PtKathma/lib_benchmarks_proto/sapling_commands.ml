@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 module Sapling_gen_cmd = struct
   let lift_opt f opt_arg state =
     match opt_arg with None -> state | Some arg -> f arg state
@@ -34,11 +32,11 @@ module Sapling_gen_cmd = struct
 
   (* Generic max-%s argument *)
   let max name =
-    Clic.arg
+    Tezos_clic.arg
       ~doc:(Printf.sprintf "Maximum number of %s" name)
       ~long:(Printf.sprintf "max-%s" name)
       ~placeholder:"integer"
-      (Clic.parameter (fun (_ : unit) parsed ->
+      (Tezos_clic.parameter (fun (_ : unit) parsed ->
            match int_of_string parsed with
            | exception Failure _ ->
                Format.eprintf
@@ -55,16 +53,16 @@ module Sapling_gen_cmd = struct
   (* Integer argument --seed *)
   let seed_arg =
     let seed =
-      Clic.parameter (fun (_ : unit) parsed ->
+      Tezos_clic.parameter (fun (_ : unit) parsed ->
           try return (int_of_string parsed)
           with _ ->
             Printf.eprintf "Error while parsing --seed argument." ;
             exit 1)
     in
-    Clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
+    Tezos_clic.arg ~doc:"RNG seed" ~long:"seed" ~placeholder:"int" seed
 
   let positive_param =
-    Clic.parameter (fun _ s ->
+    Tezos_clic.parameter (fun _ s ->
         match int_of_string_opt s with
         | Some i when i > 0 -> return i
         | _ -> failwith "Parameter should be a positive integer literal")
@@ -98,7 +96,7 @@ module Sapling_gen_cmd = struct
     return ()
 
   let options =
-    Clic.args5
+    Tezos_clic.args5
       (max "inputs")
       (max "outputs")
       (max "nullifiers")
@@ -106,7 +104,7 @@ module Sapling_gen_cmd = struct
       seed_arg
 
   let params =
-    Clic.(
+    Tezos_clic.(
       prefixes [Protocol.name; "sapling"; "generate"]
       @@ param
            ~name:"SAPLING-TX-COUNT"
@@ -120,12 +118,12 @@ module Sapling_gen_cmd = struct
 
   let group =
     {
-      Clic.name = "Sapling tx generation";
+      Tezos_clic.name = "Sapling tx generation";
       title = "Command for generating random sapling transactions";
     }
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~group
       ~desc:"Sapling transaction generation"
       options

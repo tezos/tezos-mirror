@@ -30,106 +30,109 @@ open Protocol_client_context
 
 val tez_sym : string
 
-val init_arg : (string, full) Clic.arg
+val init_arg : (string, full) Tezos_clic.arg
 
-val fee_arg : (Tez.t option, full) Clic.arg
+val fee_arg : (Tez.t option, full) Tezos_clic.arg
 
-val default_fee_arg : (Tez.t option, full) Clic.arg
+val default_fee_arg : (Tez.t option, full) Tezos_clic.arg
 
-val counter_arg : (Z.t option, full) Clic.arg
+val counter_arg : (Z.t option, full) Tezos_clic.arg
 
-val gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+val gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 
-val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+val default_gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 
-val run_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
+val run_gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 
-val storage_limit_arg : (Z.t option, full) Clic.arg
+val storage_limit_arg : (Z.t option, full) Tezos_clic.arg
 
-val default_storage_limit_arg : (Z.t option, full) Clic.arg
+val default_storage_limit_arg : (Z.t option, full) Tezos_clic.arg
 
-val arg_arg : (string option, full) Clic.arg
+val arg_arg : (string option, full) Tezos_clic.arg
 
-val default_arg_arg : (string option, full) Clic.arg
+val default_arg_arg : (string option, full) Tezos_clic.arg
 
-val source_arg : (string option, full) Clic.arg
+val source_arg : (string option, full) Tezos_clic.arg
 
-val entrypoint_arg : (string option, full) Clic.arg
+val entrypoint_arg : (string option, full) Tezos_clic.arg
 
-val default_entrypoint_arg : (string option, full) Clic.arg
+val default_entrypoint_arg : (string option, full) Tezos_clic.arg
 
-val delegate_arg : (Signature.Public_key_hash.t option, full) Clic.arg
+val delegate_arg : (Signature.Public_key_hash.t option, full) Tezos_clic.arg
 
-val max_priority_arg : (int option, full) Clic.arg
+val max_priority_arg : (int option, full) Tezos_clic.arg
 
-val minimal_fees_arg : (Tez.tez, full) Clic.arg
+val minimal_fees_arg : (Tez.tez, full) Tezos_clic.arg
 
-val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Clic.arg
+val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Tezos_clic.arg
 
-val minimal_nanotez_per_byte_arg : (Q.t, full) Clic.arg
+val minimal_nanotez_per_byte_arg : (Q.t, full) Tezos_clic.arg
 
-val force_low_fee_arg : (bool, full) Clic.arg
+val force_low_fee_arg : (bool, full) Tezos_clic.arg
 
-val fee_cap_arg : (Tez.t, full) Clic.arg
+val fee_cap_arg : (Tez.t, full) Tezos_clic.arg
 
-val burn_cap_arg : (Tez.t, full) Clic.arg
+val burn_cap_arg : (Tez.t, full) Tezos_clic.arg
 
-val force_switch : (bool, full) Clic.arg
+val force_switch : (bool, full) Tezos_clic.arg
 
-val no_endorse_switch : (bool, full) Clic.arg
+val no_endorse_switch : (bool, full) Tezos_clic.arg
 
-val minimal_timestamp_switch : (bool, full) Clic.arg
+val minimal_timestamp_switch : (bool, full) Tezos_clic.arg
 
-val preserved_levels_arg : (int, full) Clic.arg
+val preserved_levels_arg : (int, full) Tezos_clic.arg
 
-val no_print_source_flag : (bool, full) Clic.arg
+val no_print_source_flag : (bool, full) Tezos_clic.arg
 
-val no_confirmation : (bool, full) Clic.arg
+val no_confirmation : (bool, full) Tezos_clic.arg
 
 val tez_arg :
-  default:string -> parameter:string -> doc:string -> (Tez.t, full) Clic.arg
+  default:string ->
+  parameter:string ->
+  doc:string ->
+  (Tez.t, full) Tezos_clic.arg
 
 val tez_param :
   name:string ->
   desc:string ->
-  ('a, full) Clic.params ->
-  (Tez.t -> 'a, full) Clic.params
+  ('a, full) Tezos_clic.params ->
+  (Tez.t -> 'a, full) Tezos_clic.params
 
 val global_constant_param :
   name:string ->
   desc:string ->
-  ('a, full) Clic.params ->
-  (string -> 'a, full) Clic.params
+  ('a, full) Tezos_clic.params ->
+  (string -> 'a, full) Tezos_clic.params
 
-val signature_parameter : (Signature.t, full) Clic.parameter
+val signature_parameter : (Signature.t, full) Tezos_clic.parameter
 
 module Daemon : sig
-  val baking_switch : (bool, full) Clic.arg
+  val baking_switch : (bool, full) Tezos_clic.arg
 
-  val endorsement_switch : (bool, full) Clic.arg
+  val endorsement_switch : (bool, full) Tezos_clic.arg
 
-  val denunciation_switch : (bool, full) Clic.arg
+  val denunciation_switch : (bool, full) Tezos_clic.arg
 end
 
-val int_parameter : (int, full) Clic.parameter
+val int_parameter : (int, full) Tezos_clic.parameter
 
-val uri_parameter : (Uri.t, full) Clic.parameter
+val uri_parameter : (Uri.t, full) Tezos_clic.parameter
 
-val string_parameter : (string, full) Clic.parameter
+val string_parameter : (string, full) Tezos_clic.parameter
 
 val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
-val bytes_parameter : (Bytes.t, full) Clic.parameter
+val bytes_parameter : (Bytes.t, full) Tezos_clic.parameter
 
-val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
+val data_parameter : (Michelson_v1_parser.parsed, full) Tezos_clic.parameter
 
 val unparsing_mode_arg :
-  default:string -> (Script_ir_translator.unparsing_mode, full) Clic.arg
+  default:string -> (Script_ir_translator.unparsing_mode, full) Tezos_clic.arg
 
-val enforce_indentation_flag : (bool, full) Clic.arg
+val enforce_indentation_flag : (bool, full) Tezos_clic.arg
 
-val display_names_flag : (bool, full) Clic.arg
+val display_names_flag : (bool, full) Tezos_clic.arg
 
-val level_arg : (Script_int.n Script_int.num option, full) Clic.arg
+val level_arg : (Script_int.n Script_int.num option, full) Tezos_clic.arg
 
-val now_arg : (Script_timestamp.t option, full) Clic.arg
+val now_arg : (Script_timestamp.t option, full) Tezos_clic.arg

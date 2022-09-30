@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 module Signer_implementation : Client_keys.SIGNER
 
-val commands : unit -> Client_context.full Clic.command list
+val commands : unit -> Client_context.full Tezos_clic.command list

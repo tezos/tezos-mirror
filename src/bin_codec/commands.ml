@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
+open Tezos_clic
 
 let group = {name = "encoding"; title = "Commands to handle encodings"}
 
