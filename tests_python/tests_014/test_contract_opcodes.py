@@ -22,7 +22,7 @@ class TestContractOpcodes:
     """Tests for individual opcodes that do not require origination."""
 
     @pytest.mark.parametrize(
-        "contract,param,storage,expected",
+        "contract,storage,param,expected",
         [  # FORMAT: assert_output contract_file storage input expected_result
             # TODO add tests for map_car.tz, subset.tz
             # NB: noop.tz is tested in test_basic.sh
@@ -1456,8 +1456,8 @@ class TestContractOpcodes:
         self,
         client_regtest: ClientRegression,
         contract: str,
-        param: str,
         storage: str,
+        param: str,
         expected: str,
     ):
         client = client_regtest
@@ -1466,7 +1466,7 @@ class TestContractOpcodes:
         ), "test contract should have .tz extension"
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
         run_script_res = client.run_script(
-            contract, param, storage, trace_stack=True
+            contract, storage, param, trace_stack=True
         )
         assert run_script_res.storage == expected
 
