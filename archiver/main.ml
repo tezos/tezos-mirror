@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Lwt_result_syntax
+open Tezos_clic
 
-let group =
-  {Clic.name = "generic"; Clic.title = "Protocol agnostic teztale command"}
+let group = {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
 
 let user_arg =
   Clic.default_arg
@@ -171,7 +171,7 @@ let select_commands _ctxt Client_config.{chain; _} =
         (fun () prefix cctxt -> main_json cctxt prefix);
       Clic.command
         ~group
-        ~desc:"upload a file hierarchy to a server"
+        ~desc:"upload a file hierarchy to a teztale_server"
         (Clic.args2
            (Clic.default_arg
               ~doc:"Name of the feeder"
@@ -251,7 +251,7 @@ let select_commands _ctxt Client_config.{chain; _} =
           return out);
       Clic.command
         ~group
-        ~desc:"run the archiver and feed an aggregator"
+        ~desc:"run the archiver to a teztale_server"
         (Clic.args2 user_arg password_arg)
         (Clic.prefixes ["feed"] @@ endpoint_param @@ Clic.stop)
         (fun auth endpoint cctxt ->
