@@ -63,82 +63,34 @@ module Ring =
       let equal = Int32.equal
     end)
 
-module type TABLES = sig
-  val registered_rights_levels : Ring.t
+let registered_rights_levels = Ring.create 120
 
-  val rights_machine :
-    (Client_context.full -> int32 -> Consensus_ops.rights tzresult Lwt.t)
-    Protocol_hash.Table.t
+let rights_machine = Protocol_hash.Table.create 10
 
-  val block_machine :
-    (Client_context.full ->
-    int32 ->
-    ( Data.Block.t
-      * (Consensus_ops.block_op trace * Consensus_ops.block_op trace),
-      tztrace )
-    result
-    Lwt.t)
-    Protocol_hash.Table.t
+let block_machine = Protocol_hash.Table.create 10
 
-  val endorsement_machine :
-    (Client_context.full -> int32 -> (unit, tztrace) result Lwt.t)
-    Protocol_hash.Table.t
+let endorsement_machine = Protocol_hash.Table.create 10
 
-  val live_block_machine :
-    ((Client_context.full -> int32 -> Consensus_ops.rights tzresult Lwt.t)
-    * (Client_context.full ->
-      Block_hash.t ->
-      Block_header.t ->
-      Ptime.t ->
-      ( Data.Block.t
-        * (Consensus_ops.block_op trace * Consensus_ops.block_op trace),
-        tztrace )
-      result
-      Lwt.t))
-    Protocol_hash.Table.t
-end
-
-module Tables (Archiver : Archiver.S) = struct
-  let registered_rights_levels = Ring.create 120
-
-  let rights_machine = Protocol_hash.Table.create 10
-
-  let block_machine = Protocol_hash.Table.create 10
-
-  let endorsement_machine = Protocol_hash.Table.create 10
-
-  let live_block_machine = Protocol_hash.Table.create 10
-end
-
-module Db_tables = Tables (Db_archiver)
-module Json_tables = Tables (Json_archiver)
-module Server_tables = Tables (Server_archiver)
-
-let tables (module A : Archiver.S) =
-  match A.name with
-  | "db-archiver" -> (module Db_tables : TABLES)
-  | "json-archiver" -> (module Json_tables : TABLES)
-  | "remote-archiver" -> (module Server_tables : TABLES)
-  | _ -> Stdlib.failwith "unknown archiver"
+let live_block_machine = Protocol_hash.Table.create 10
 
 let maybe_add_rights (module A : Archiver.S) level rights wallet =
-  let module T = (val tables (module A)) in
-  if Ring.mem T.registered_rights_levels level then ()
+  if Ring.mem registered_rights_levels level then ()
   else
-    let () = Ring.add T.registered_rights_levels level in
+    let () = Ring.add registered_rights_levels level in
     A.add_rights ~level rights wallet
 
-module Define
-    (Services : Protocol_machinery.PROTOCOL_SERVICES)
-    (Archiver : Archiver.S) =
-struct
-  module Tables = (val tables (module Archiver))
+let dump_my_current_endorsements (module A : Archiver.S) wallet ~unaccurate
+    ~level rights endorsements =
+  let () = maybe_add_rights (module A) level rights wallet in
+  let () = A.add_mempool ~unaccurate ~level endorsements in
+  return_unit
 
+module Define (Services : Protocol_machinery.PROTOCOL_SERVICES) = struct
   let rights_of ctxt level =
     let cctx = Services.wrap_full ctxt in
     Services.endorsing_rights cctx ~reference_level:level level
 
-  let () = Protocol_hash.Table.add Tables.rights_machine Services.hash rights_of
+  let () = Protocol_hash.Table.add rights_machine Services.hash rights_of
 
   let block_data cctx (delegate, timestamp, round, hash) reception_time =
     let* operations = Services.consensus_ops_info_of_block cctx hash in
@@ -160,7 +112,7 @@ struct
     let* block_info = Services.get_block_info cctx level in
     block_data cctx block_info None
 
-  let () = Protocol_hash.Table.add Tables.block_machine Services.hash block_of
+  let () = Protocol_hash.Table.add block_machine Services.hash block_of
 
   let get_block ctxt hash header reception_time =
     let cctx = Services.wrap_full ctxt in
@@ -171,7 +123,7 @@ struct
 
   let () =
     Protocol_hash.Table.add
-      Tables.live_block_machine
+      live_block_machine
       Services.hash
       (rights_of, get_block)
 
@@ -180,20 +132,7 @@ struct
         if Int.equal i i' then (i, e :: l) :: t else x :: pack_by_slot i e t
     | [] -> [(i, [e])]
 
-  let dump_my_current_endorsements cctx' wallet ~full reference_level level ops
-      =
-    let* rights = Services.endorsing_rights cctx' ~reference_level level in
-    let () = maybe_add_rights (module Archiver) level rights wallet in
-    let (items, missing) = Services.couple_ops_to_rights ops rights in
-    let endorsements =
-      if full then
-        List.fold_left (fun acc delegate -> (delegate, []) :: acc) items missing
-      else items
-    in
-    let () = Archiver.add_mempool ~unaccurate:(not full) ~level endorsements in
-    return_unit
-
-  let endorsements_recorder cctx current_level =
+  let endorsements_recorder (module A : Archiver.S) cctx current_level =
     let*! wallet = wallet cctx in
     let cctx' = Services.wrap_full cctx in
     let* (op_stream, _stopper) = Services.consensus_operation_stream cctx' in
@@ -215,74 +154,53 @@ struct
     in
     Services.BlockIdMap.iter_ep
       (fun _ (level, endorsements) ->
+        let* rights =
+          Services.endorsing_rights cctx' ~reference_level:current_level level
+        in
+        let (items, missing) =
+          Services.couple_ops_to_rights endorsements rights
+        in
         let full = Compare.Int32.(current_level = level) in
+        let endorsements =
+          if full then
+            List.fold_left
+              (fun acc delegate -> (delegate, []) :: acc)
+              items
+              missing
+          else items
+        in
         dump_my_current_endorsements
-          cctx'
+          (module A)
           wallet
-          ~full
-          current_level
-          level
+          ~unaccurate:(not full)
+          ~level
+          rights
           endorsements)
       out
 
   let () =
     Protocol_hash.Table.add
-      Tables.endorsement_machine
+      endorsement_machine
       Services.hash
       endorsements_recorder
 end
 
-(* Db modules *)
-module DM001 = Define (PtCJ7pwo_machine.Services) (Db_archiver)
-module DM002 = Define (PsYLVpVv_machine.Services) (Db_archiver)
-module DM003 = Define (PsddFKi3_machine.Services) (Db_archiver)
-module DM004 = Define (Pt24m4xi_machine.Services) (Db_archiver)
-module DM005 = Define (PsBabyM1_machine.Services) (Db_archiver)
-module DM006 = Define (PsCARTHA_machine.Services) (Db_archiver)
-module DM007 = Define (PsDELPH1_machine.Services) (Db_archiver)
-module DM008 = Define (PtEdo2Zk_machine.Services) (Db_archiver)
-module DM009 = Define (PsFLoren_machine.Services) (Db_archiver)
-module DM010 = Define (PtGRANAD_machine.Services) (Db_archiver)
-module DM011 = Define (PtHangz2_machine.Services) (Db_archiver)
-module DM012 = Define (Psithaca_machine.Services) (Db_archiver)
-module DM013 = Define (PtJakart_machine.Services) (Db_archiver)
-module DM014 = Define (PtKathma_machine.Services) (Db_archiver)
-
-(* Json modules *)
-module JM001 = Define (PtCJ7pwo_machine.Services) (Json_archiver)
-module JM002 = Define (PsYLVpVv_machine.Services) (Json_archiver)
-module JM003 = Define (PsddFKi3_machine.Services) (Json_archiver)
-module JM004 = Define (Pt24m4xi_machine.Services) (Json_archiver)
-module JM005 = Define (PsBabyM1_machine.Services) (Json_archiver)
-module JM006 = Define (PsCARTHA_machine.Services) (Json_archiver)
-module JM007 = Define (PsDELPH1_machine.Services) (Json_archiver)
-module JM008 = Define (PtEdo2Zk_machine.Services) (Json_archiver)
-module JM009 = Define (PsFLoren_machine.Services) (Json_archiver)
-module JM010 = Define (PtGRANAD_machine.Services) (Json_archiver)
-module JM011 = Define (PtHangz2_machine.Services) (Json_archiver)
-module JM012 = Define (Psithaca_machine.Services) (Json_archiver)
-module JM013 = Define (PtJakart_machine.Services) (Json_archiver)
-module JM014 = Define (PtKathma_machine.Services) (Json_archiver)
-
-(* Server modules *)
-module SM001 = Define (PtCJ7pwo_machine.Services) (Server_archiver)
-module SM002 = Define (PsYLVpVv_machine.Services) (Server_archiver)
-module SM003 = Define (PsddFKi3_machine.Services) (Server_archiver)
-module SM004 = Define (Pt24m4xi_machine.Services) (Server_archiver)
-module SM005 = Define (PsBabyM1_machine.Services) (Server_archiver)
-module SM006 = Define (PsCARTHA_machine.Services) (Server_archiver)
-module SM007 = Define (PsDELPH1_machine.Services) (Server_archiver)
-module SM008 = Define (PtEdo2Zk_machine.Services) (Server_archiver)
-module SM009 = Define (PsFLoren_machine.Services) (Server_archiver)
-module SM010 = Define (PtGRANAD_machine.Services) (Server_archiver)
-module SM011 = Define (PtHangz2_machine.Services) (Server_archiver)
-module SM012 = Define (Psithaca_machine.Services) (Server_archiver)
-module SM013 = Define (PtJakart_machine.Services) (Server_archiver)
-module SM014 = Define (PtKathma_machine.Services) (Server_archiver)
+module M001 = Define (PtCJ7pwo_machine.Services)
+module M002 = Define (PsYLVpVv_machine.Services)
+module M003 = Define (PsddFKi3_machine.Services)
+module M004 = Define (Pt24m4xi_machine.Services)
+module M005 = Define (PsBabyM1_machine.Services)
+module M006 = Define (PsCARTHA_machine.Services)
+module M007 = Define (PsDELPH1_machine.Services)
+module M008 = Define (PtEdo2Zk_machine.Services)
+module M009 = Define (PsFLoren_machine.Services)
+module M010 = Define (PtGRANAD_machine.Services)
+module M011 = Define (PtHangz2_machine.Services)
+module M012 = Define (Psithaca_machine.Services)
+module M013 = Define (PtJakart_machine.Services)
+module M014 = Define (PtKathma_machine.Services)
 
 module Loops (Archiver : Archiver.S) = struct
-  module Tables = (val tables (module Archiver))
-
   let mecanism chain starting ctxt f =
     let rec loop current ending =
       if current > ending then
@@ -317,7 +235,7 @@ module Loops (Archiver : Archiver.S) = struct
   let rights chain starting cctx =
     let*! wallet = wallet cctx in
     mecanism chain starting cctx (fun {next_protocol; _} level ->
-        match Protocol_hash.Table.find Tables.rights_machine next_protocol with
+        match Protocol_hash.Table.find rights_machine next_protocol with
         | Some deal_with ->
             let* rights = deal_with cctx level in
             let () = maybe_add_rights (module Archiver) level rights wallet in
@@ -327,9 +245,7 @@ module Loops (Archiver : Archiver.S) = struct
   let blocks chain starting cctx =
     mecanism chain starting cctx (fun {current_protocol; next_protocol} level ->
         if Protocol_hash.equal current_protocol next_protocol then
-          match
-            Protocol_hash.Table.find Tables.block_machine current_protocol
-          with
+          match Protocol_hash.Table.find block_machine current_protocol with
           | Some deal_with ->
               let* block_data = deal_with cctx level in
               let () = Archiver.add_block ~level block_data in
@@ -367,7 +283,7 @@ module Loops (Archiver : Archiver.S) = struct
                     | Ok Shell_services.Blocks.{next_protocol; _} -> (
                         let recorder =
                           Protocol_hash.Table.find
-                            Tables.endorsement_machine
+                            endorsement_machine
                             next_protocol
                         in
                         match recorder with
@@ -382,9 +298,9 @@ module Loops (Archiver : Archiver.S) = struct
                             Lwt.return ((fun _ _ -> return_unit), None)
                         | Some recorder ->
                             Lwt.return
-                              ( recorder,
+                              ( recorder (module Archiver),
                                 Some
-                                  ( recorder,
+                                  ( recorder (module Archiver),
                                     header.Block_header.shell
                                       .Block_header.proto_level ) )))
               in
@@ -433,7 +349,7 @@ module Loops (Archiver : Archiver.S) = struct
                         then
                           let recorder =
                             Protocol_hash.Table.find
-                              Tables.live_block_machine
+                              live_block_machine
                               next_protocol
                           in
                           match recorder with
