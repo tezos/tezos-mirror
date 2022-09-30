@@ -2028,33 +2028,6 @@ class TestNormalize:
 
 
 @pytest.mark.contract
-class TestTZIP4View:
-    """Tests for the "run tzip4 view" command."""
-
-    def test_run_view(self, client: Client, session: dict):
-
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios', 'tzip4_view.tz')
-        originate(
-            client,
-            session,
-            contract=path,
-            init_storage='Unit',
-            amount=1000,
-            contract_name='view_contract',
-        )
-        utils.bake(client, bake_for='bootstrap5')
-
-        const_view_res = client.run_view(
-            "view_const", "view_contract", "Unit", []
-        )
-        add_view_res = client.run_view(
-            "view_add", "view_contract", "Pair 1 3", []
-        )
-
-        assert const_view_res.result == "5\n" and add_view_res.result == "4\n"
-
-
-@pytest.mark.contract
 @pytest.mark.incremental
 class TestContractTypeChecking:
     """Typechecking tests for the address and (contract _) types."""

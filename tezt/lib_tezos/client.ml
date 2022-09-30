@@ -1447,6 +1447,37 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
     client
   |> Process.check_and_read_stdout
 
+let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
+    ~contract ?input ?(unlimited_gas = false) client =
+  let input_params =
+    match input with None -> [] | Some input -> ["with"; "input"; input]
+  in
+  spawn_command
+    ?hooks
+    client
+    (["run"; "tzip4"; "view"; entrypoint; "on"; "contract"; contract]
+    @ input_params
+    @ optional_arg "payer" Fun.id payer
+    @ optional_arg "source" Fun.id source
+    @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode
+    @ optional_arg "gas" Int.to_string gas
+    @ optional_switch "unlimited-gas" unlimited_gas)
+
+let run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
+    ~contract ?input ?unlimited_gas client =
+  spawn_run_tzip4_view
+    ?hooks
+    ?source
+    ?payer
+    ?gas
+    ?unparsing_mode
+    ~entrypoint
+    ~contract
+    ?input
+    ?unlimited_gas
+    client
+  |> Process.check_and_read_stdout
+
 let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
     ?input ?(unlimited_gas = false) client =
   let input_params =
