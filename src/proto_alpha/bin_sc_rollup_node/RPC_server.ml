@@ -243,12 +243,49 @@ module Make (Interpreter : Interpreter.S) = struct
   let simulate_messages node_ctxt block messages =
     let open Lwt_result_syntax in
     let open Alpha_context in
+    let*? () =
+      error_when
+        (messages = [])
+        (Environment.wrap_tzerror Sc_rollup_errors.Sc_rollup_add_zero_messages)
+    in
     let messages =
       List.map (fun m -> Sc_rollup.Inbox_message.External m) messages
     in
     let* state = get_state node_ctxt block in
     let* level = State.level_of_hash node_ctxt.store block in
     let inbox_level = Raw_level.of_int32_exn (Int32.succ level) in
+    let* inbox = Inbox.inbox_of_hash node_ctxt block in
+    let max_messages =
+      node_ctxt.protocol_constants.parametric.sc_rollup
+        .max_number_of_messages_per_commitment_period |> Int64.of_int
+    in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+       The number of messages during commitment period is broken with the
+       unique inbox. *)
+    (*
+       let commitment_period =
+         node_ctxt.protocol_constants.parametric.sc_rollup
+           .commitment_period_in_blocks |> Int32.of_int
+       in
+       let inbox =
+         Sc_rollup.Inbox.refresh_commitment_period
+           ~commitment_period
+           ~level:inbox_level
+           inbox
+       in
+    *)
+    let inbox_nb_messages =
+      Int64.add
+        (Sc_rollup.Inbox.number_of_messages_during_commitment_period inbox)
+        (Int64.of_int (List.length messages))
+    in
+    let*? () =
+      error_when
+        Compare.Int64.(inbox_nb_messages > max_messages)
+        (Environment.wrap_tzerror
+           Sc_rollup_errors
+           .Sc_rollup_max_number_of_messages_reached_for_commitment_period)
+    in
     let* Free_pvm.{state; num_ticks; _} =
       Free_pvm.eval_messages
         ~fuel:(Fuel.Free.of_ticks 0L)
