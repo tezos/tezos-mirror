@@ -190,26 +190,27 @@ module Lazy_map_encoding : sig
 
   (** [Make (YouMap)] creates a module with the [lazy_map]
       combinator which can be used to decode [YouMap] specifically. *)
-  module Make (Map : Lazy_containers.Lazy_map.S) :
+  module Make (Map : Tezos_lazy_containers.Lazy_map.S) :
     S with type 'a map := 'a Map.t
 end
 
 val int_lazy_vector :
-  int t -> 'a t -> 'a Lazy_containers.Lazy_vector.IntVector.t t
+  int t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.IntVector.t t
 
 val int32_lazy_vector :
-  int32 t -> 'a t -> 'a Lazy_containers.Lazy_vector.Int32Vector.t t
+  int32 t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.Int32Vector.t t
 
 val int64_lazy_vector :
-  int64 t -> 'a t -> 'a Lazy_containers.Lazy_vector.Int64Vector.t t
+  int64 t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.Int64Vector.t t
 
-val z_lazy_vector : Z.t t -> 'a t -> 'a Lazy_containers.Lazy_vector.ZVector.t t
+val z_lazy_vector :
+  Z.t t -> 'a t -> 'a Tezos_lazy_containers.Lazy_vector.ZVector.t t
 
 (** [chunk] is an encoder for the chunks used by [chunked_by_vector]. *)
-val chunk : Lazy_containers.Chunked_byte_vector.Chunk.t t
+val chunk : Tezos_lazy_containers.Chunked_byte_vector.Chunk.t t
 
 (** [chunked_byte_vector] is an encoder for [chunked_byte_vector]. *)
-val chunked_byte_vector : Lazy_containers.Chunked_byte_vector.t t
+val chunked_byte_vector : Tezos_lazy_containers.Chunked_byte_vector.t t
 
 (** [case tag enc inj proj] returns a partial encoder that represents a case
     in a sum-type. The encoder hides the (existentially bound) type of the
@@ -254,9 +255,9 @@ module type TREE = sig
   type value := bytes
 
   (** @raise Incorrect_tree_type *)
-  val select : Lazy_containers.Lazy_map.tree -> tree
+  val select : Tezos_lazy_containers.Lazy_map.tree -> tree
 
-  val wrap : tree -> Lazy_containers.Lazy_map.tree
+  val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
 
   val remove : tree -> key -> tree Lwt.t
 

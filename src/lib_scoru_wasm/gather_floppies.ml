@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Wasm_pvm_sig
-open Lazy_containers
+open Tezos_lazy_containers
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/3361
     Increase the SCORU message size limit, and bump value to be 4,096. *)
@@ -116,14 +116,14 @@ module type S = sig
 end
 
 module Make
-    (T : Tree_encoding.TREE)
+    (T : Tezos_tree_encoding.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
   S with type tree = T.tree and type tick_state = Wasm.tick_state = struct
   type tree = Wasm.tree
 
   type tick_state = Wasm.tick_state
 
-  module Tree_encoding_runner = Tree_encoding.Runner.Make (T)
+  module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
   (** The tick state of the [Gathering_floppies] instrumentation. *)
   type state = {
@@ -140,11 +140,11 @@ module Make
             PVM. *)
   }
 
-  let boot_sector_merklizer : string Tree_encoding.t =
-    Tree_encoding.(value ["boot-sector"] Data_encoding.string)
+  let boot_sector_merklizer : string Tezos_tree_encoding.t =
+    Tezos_tree_encoding.(value ["boot-sector"] Data_encoding.string)
 
-  let state_merklizer : state Tree_encoding.t =
-    let open Tree_encoding in
+  let state_merklizer : state Tezos_tree_encoding.t =
+    let open Tezos_tree_encoding in
     conv
       (fun (internal_status, last_input_info, internal_tick, kernel) ->
         {internal_status; last_input_info; internal_tick; kernel})
@@ -182,7 +182,9 @@ module Make
       It only tries to fetch the current tick (with the same key as
       the one used in [state_merklizer]. *)
   let broken_merklizer =
-    Tree_encoding.value ["gather-floppies"; "internal-tick"] Data_encoding.n
+    Tezos_tree_encoding.value
+      ["gather-floppies"; "internal-tick"]
+      Data_encoding.n
 
   (** [read_state tree] fetches the current state of the PVM from
       [tree]. *)

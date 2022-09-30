@@ -4,18 +4,18 @@
 (executable
  (name main)
  (libraries
-  lazy-containers
+  tezos-lazy-containers
   qcheck-core
   qcheck-alcotest
   alcotest
   lwt.unix)
  (flags
   (:standard)
-  -open Lazy_containers))
+  -open Tezos_lazy_containers))
 
 (rule
  (alias runtest)
- (package lazy-containers-tests)
+ (package tezos-lazy-containers-tests)
  (action (run %{dep:./main.exe})))
 
 (include_subdirs no)

@@ -25,9 +25,9 @@
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
-include Tree_encoding
+include Tezos_tree_encoding
 
-type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
 
 module Tree = struct
   type t = Context.t
@@ -42,12 +42,12 @@ module Tree = struct
 
   let select = function
     | Tree t -> t
-    | _ -> raise Tree_encoding.Incorrect_tree_type
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
   let wrap t = Tree t
 end
 
-module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
+module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (Tree)
 
 let empty_tree () =
   let open Lwt_syntax in

@@ -25,7 +25,7 @@
 
 open Tezos_webassembly_interpreter.Eval
 module Parser = Binary_parser_encodings
-open Tree_encoding
+open Tezos_tree_encoding
 open Kont_encodings
 
 let tag_encoding = value [] Data_encoding.string

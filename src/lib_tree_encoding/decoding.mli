@@ -87,7 +87,7 @@ val scope : key -> 'a t -> 'a t
 val lazy_mapping :
   ('i -> key) ->
   'a t ->
-  (Lazy_containers.Lazy_map.tree option * ('i -> 'a Lwt.t)) t
+  (Tezos_lazy_containers.Lazy_map.tree option * ('i -> 'a Lwt.t)) t
 
 (** [delayed f] produces a tree decoder that delays evaluation of [f ()] until
     the decoder is actually needed. This is required to allow for directly

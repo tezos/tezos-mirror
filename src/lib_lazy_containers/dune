@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name lazy_containers)
- (public_name lazy-containers)
+ (name tezos_lazy_containers)
+ (public_name tezos-lazy-containers)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-lwt-result-stdlib

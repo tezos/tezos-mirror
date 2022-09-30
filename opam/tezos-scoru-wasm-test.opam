@@ -12,7 +12,7 @@ depends: [
   "ppx_import" {with-test}
   "ppx_deriving" {with-test}
   "tezos-base" {with-test}
-  "tree-encoding" {with-test}
+  "tezos-tree-encoding" {with-test}
   "tezos-context" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}

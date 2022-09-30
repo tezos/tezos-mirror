@@ -1054,14 +1054,14 @@ struct
     module Make
         (Tree : Context.TREE with type key = string list and type value = bytes) =
     struct
-      type Lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
+      type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
 
       module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
 
         let select = function
           | PVM_tree t -> t
-          | _ -> raise Tree_encoding.Incorrect_tree_type
+          | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
         let wrap t = PVM_tree t
       end)

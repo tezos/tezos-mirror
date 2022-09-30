@@ -135,7 +135,7 @@ let test_values_tree =
     ~gen:(fun ~host_funcs:_ ~module_reg:_ ->
       QCheck2.Gen.(
         map
-          Lazy_containers.Lazy_vector.Int32Vector.of_list
+          Tezos_lazy_containers.Lazy_vector.Int32Vector.of_list
           (list Ast_generators.value_gen)))
     ~encoding:(fun ~host_funcs:_ -> Wasm_encoding.values_encoding)
 

@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-webassembly-interpreter"
   "lwt" { >= "5.6.0" }
-  "lazy-containers"
+  "tezos-lazy-containers"
 ]
 build: [
   ["rm" "-r" "vendors"]

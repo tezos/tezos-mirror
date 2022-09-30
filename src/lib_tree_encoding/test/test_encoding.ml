@@ -32,21 +32,21 @@
 *)
 
 open Tztest
-open Lazy_containers
+open Tezos_lazy_containers
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
 
-type Lazy_containers.Lazy_map.tree += Tree of Context.tree
+type Tezos_lazy_containers.Lazy_map.tree += Tree of Context.tree
 
-module Tree : Tree_encoding.TREE with type tree = Context.tree = struct
+module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
   type tree = Context.tree
 
   include Context.Tree
 
   let select = function
     | Tree t -> t
-    | _ -> raise Tree_encoding.Incorrect_tree_type
+    | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
   let wrap t = Tree t
 end
@@ -60,10 +60,11 @@ module Map = Lazy_map.Make (struct
 end)
 
 module Tree_encoding = struct
-  include Tree_encoding
+  include Tezos_tree_encoding
   include Lazy_map_encoding.Make (Map)
-  include Tree_encoding.Runner.Make (Tree)
-  module Wrapped_runner = Tree_encoding.Runner.Make (Tree_encoding.Wrapped)
+  include Tezos_tree_encoding.Runner.Make (Tree)
+  module Wrapped_runner =
+    Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 end
 
 let empty_tree () =
@@ -493,16 +494,16 @@ let test_swap_vectors () =
   let enc = tup2 ~flatten:false int_vec_enc int_vec_enc in
   let*! tree = empty_tree () in
   let assert_value_at_index ~ix vec expected =
-    let*! value = Lazy_containers.Lazy_vector.IntVector.get ix vec in
+    let*! value = Tezos_lazy_containers.Lazy_vector.IntVector.get ix vec in
     assert (value = expected) ;
     return_unit
   in
   (* Create a pair of vectors. *)
   let vec_pair =
-    ( Lazy_containers.Lazy_vector.IntVector.create
+    ( Tezos_lazy_containers.Lazy_vector.IntVector.create
         ~produce_value:(fun ix -> Lwt.return ix)
         10,
-      Lazy_containers.Lazy_vector.IntVector.create
+      Tezos_lazy_containers.Lazy_vector.IntVector.create
         ~produce_value:(fun ix -> Lwt.return (100 + ix))
         10 )
   in

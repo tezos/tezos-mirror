@@ -8,13 +8,13 @@
   tezos-webassembly-interpreter
   tezos-webassembly-interpreter-extra
   lwt.unix
-  tree-encoding
-  lazy-containers)
+  tezos-tree-encoding
+  tezos-lazy-containers)
  (flags
   (:standard)
   -open Tezos_webassembly_interpreter
   -open Tezos_webassembly_interpreter_extra
-  -open Tree_encoding
-  -open Lazy_containers))
+  -open Tezos_tree_encoding
+  -open Tezos_lazy_containers))
 
 (include dune.inc)

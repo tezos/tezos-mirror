@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lazy_containers
+open Tezos_lazy_containers
 include Tree
 
 exception Uninitialized_self_ref
@@ -198,7 +198,7 @@ module Lazy_map_encoding = struct
   end
 end
 
-module Make_lazy_vector_encoding (Vector : Lazy_containers.Lazy_vector.S) =
+module Make_lazy_vector_encoding (Vector : Tezos_lazy_containers.Lazy_vector.S) =
 struct
   let lazy_vector with_key value =
     let open Vector in

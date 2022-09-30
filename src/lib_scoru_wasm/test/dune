@@ -5,7 +5,7 @@
  (name test_scoru_wasm)
  (libraries
   tezos-base
-  tree-encoding
+  tezos-tree-encoding
   tezos-base.unix
   tezos-context.disk
   tezos-base-test-helpers

@@ -32,7 +32,7 @@
 *)
 
 open Tztest
-open Lazy_containers
+open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 

@@ -83,7 +83,7 @@ val scope : key -> 'a t -> 'a t
 val lazy_mapping :
   ('k -> key) ->
   'v t ->
-  (Lazy_containers.Lazy_map.tree option * ('k * 'v) list) t
+  (Tezos_lazy_containers.Lazy_map.tree option * ('k * 'v) list) t
 
 (** [case tag enc f] return a partial encoder that represents a case in a
     sum-type. The encoder hides the (existentially bound) type of the

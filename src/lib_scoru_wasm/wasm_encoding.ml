@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_webassembly_interpreter
-open Lazy_containers
+open Tezos_lazy_containers
 open Kont_encodings
 
 exception Uninitialized_current_module
@@ -32,7 +32,7 @@ exception Uninitialized_current_module
 module V = Instance.Vector
 module M = Instance.NameMap
 module C = Chunked_byte_vector
-open Tree_encoding
+open Tezos_tree_encoding
 module NameMap = Lazy_map_encoding.Make (Instance.NameMap)
 module ModuleMap = Lazy_map_encoding.Make (Instance.ModuleMap.Map)
 

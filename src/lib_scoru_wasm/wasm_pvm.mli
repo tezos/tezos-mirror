@@ -44,5 +44,5 @@ type tick_state =
 
 (** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
 
-module Make (T : Tree_encoding.TREE) :
+module Make (T : Tezos_tree_encoding.TREE) :
   Gather_floppies.S with type tree = T.tree and type tick_state = tick_state

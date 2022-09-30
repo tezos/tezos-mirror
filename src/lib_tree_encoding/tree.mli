@@ -37,9 +37,9 @@ module type S = sig
   type tree
 
   (** @raise Incorrect_tree_type *)
-  val select : Lazy_containers.Lazy_map.tree -> tree
+  val select : Tezos_lazy_containers.Lazy_map.tree -> tree
 
-  val wrap : tree -> Lazy_containers.Lazy_map.tree
+  val wrap : tree -> Tezos_lazy_containers.Lazy_map.tree
 
   val remove : tree -> key -> tree Lwt.t
 
@@ -58,9 +58,9 @@ end
 
 type 'tree backend = (module S with type tree = 'tree)
 
-val select : 'tree backend -> Lazy_containers.Lazy_map.tree -> 'tree
+val select : 'tree backend -> Tezos_lazy_containers.Lazy_map.tree -> 'tree
 
-val wrap : 'tree backend -> 'tree -> Lazy_containers.Lazy_map.tree
+val wrap : 'tree backend -> 'tree -> Tezos_lazy_containers.Lazy_map.tree
 
 val remove : 'tree backend -> 'tree -> key -> 'tree Lwt.t
 

@@ -97,7 +97,7 @@ let test_reveal_preimage_gen preimage max_bytes =
               SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
             _;
           } -> (
-        let*! hd = Lazy_containers.Lazy_vector.Int32Vector.get 0l vs in
+        let*! hd = Tezos_lazy_containers.Lazy_vector.Int32Vector.get 0l vs in
         match hd with
         | Num (I32 size) -> return size
         | _ -> failwith "Incorrect stack")

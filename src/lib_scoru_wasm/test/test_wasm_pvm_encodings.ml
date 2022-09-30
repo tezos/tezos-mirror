@@ -78,7 +78,7 @@ let reveal_error_gen =
 
 let exn_gen =
   let open QCheck2.Gen in
-  let open Lazy_containers in
+  let open Tezos_lazy_containers in
   let value_type_error =
     let* i = int in
     let* num = Ast_generators.(value_op_gen int32 int64) in
@@ -282,7 +282,7 @@ let tests =
       `Quick
       (Test_encodings_util.make_test
          ~print:print_error_state
-         (Tree_encoding.value [] Wasm_pvm_errors.encoding)
+         (Tezos_tree_encoding.value [] Wasm_pvm_errors.encoding)
          error_state_gen
          error_state_check);
   ]
