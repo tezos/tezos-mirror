@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Runnable.Syntax
+
 type t = {
   name : string;
   path : string;
@@ -95,29 +97,27 @@ let endpoint_arg sc_client =
   ["--endpoint"; Sc_rollup_node.endpoint sc_client.sc_node]
 
 let spawn_command ?hooks sc_client command =
-  Process.spawn
-    ~name:sc_client.name
-    ~color:sc_client.color
-    ?hooks
-    sc_client.path
-    (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
+  let process =
+    Process.spawn
+      ~name:sc_client.name
+      ~color:sc_client.color
+      ?hooks
+      sc_client.path
+      (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
+  in
+  Runnable.{value = process; run = Process.check_and_read_stdout}
 
 let sc_rollup_address ?hooks sc_client =
-  let* out =
-    spawn_command ?hooks sc_client ["get"; "sc"; "rollup"; "address"]
-    |> Process.check_and_read_stdout
-  in
-  return (String.trim out)
+  spawn_command ?hooks sc_client ["get"; "sc"; "rollup"; "address"]
+  |> Runnable.map String.trim
 
 let state_value ?hooks ?(block = "head") sc_client ~key =
-  let* out =
-    spawn_command
-      ?hooks
-      sc_client
-      ["get"; "state"; "value"; "for"; key; "--block"; block]
-    |> Process.check_and_read_stdout
-  in
-  return (Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes)
+  spawn_command
+    ?hooks
+    sc_client
+    ["get"; "state"; "value"; "for"; key; "--block"; block]
+  |> Runnable.map @@ fun out ->
+     Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes
 
 type transaction = {
   destination : string;
@@ -141,7 +141,7 @@ type outbox_proof = {commitment_hash : string; proof : string}
 
 let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
     ~outbox_level batch =
-  let process =
+  let*? process =
     spawn_command
       ?hooks
       sc_client
@@ -183,95 +183,75 @@ let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
     [{destination; entrypoint; parameters}]
 
 let rpc_get ?hooks sc_client path =
-  let process =
-    spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
-  in
-  let* output = Process.check_and_read_stdout process in
-  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+  spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
+  |> Runnable.map @@ fun output ->
+     JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
 let rpc_post ?hooks sc_client path data =
-  let process =
-    spawn_command
-      ?hooks
-      sc_client
-      ["rpc"; "post"; Client.string_of_path path; "with"; JSON.encode data]
-  in
-  let* output = Process.check_and_read_stdout process in
-  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+  spawn_command
+    ?hooks
+    sc_client
+    ["rpc"; "post"; Client.string_of_path path; "with"; JSON.encode data]
+  |> Runnable.map @@ fun output ->
+     JSON.parse ~origin:(Client.string_of_path path ^ " response") output
 
 let ticks ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
-  JSON.as_int res
+  let res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
+  Runnable.map JSON.as_int res
 
 let total_ticks ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ res =
-    rpc_get ?hooks sc_client ["global"; "block"; block; "total_ticks"]
-  in
-  JSON.as_int res
+  rpc_get ?hooks sc_client ["global"; "block"; block; "total_ticks"]
+  |> Runnable.map JSON.as_int
 
 let state_hash ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ res =
-    rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
-  in
-  JSON.as_string res
+  rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
+  |> Runnable.map JSON.as_string
 
 let status ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "status"] in
-  JSON.as_string res
+  rpc_get ?hooks sc_client ["global"; "block"; block; "status"]
+  |> Runnable.map JSON.as_string
 
 let outbox ?hooks ?(block = "cemented") sc_client =
-  let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "outbox"] in
-  JSON.encode res
+  rpc_get ?hooks sc_client ["global"; "block"; block; "outbox"]
 
 let last_stored_commitment ?hooks sc_client =
-  let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "last_stored_commitment"] in
-  commitment_with_hash_and_level_from_json json
+  rpc_get ?hooks sc_client ["global"; "last_stored_commitment"]
+  |> Runnable.map commitment_with_hash_and_level_from_json
 
 let last_published_commitment ?hooks sc_client =
-  let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["local"; "last_published_commitment"] in
-  commitment_with_hash_and_level_from_json json
+  rpc_get ?hooks sc_client ["local"; "last_published_commitment"]
+  |> Runnable.map commitment_with_hash_and_level_from_json
 
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ json =
-    rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
-  in
-  JSON.(
-    as_list json
-    |> List.map (fun obj ->
-           {
-             level = obj |> get "level" |> as_int;
-             commitment = obj |> get "commitment" |> as_string;
-             index = obj |> get "index" |> as_int;
-           }))
+  rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
+  |> Runnable.map (fun json ->
+         JSON.(
+           as_list json
+           |> List.map (fun obj ->
+                  {
+                    level = obj |> get "level" |> as_int;
+                    commitment = obj |> get "commitment" |> as_string;
+                    index = obj |> get "index" |> as_int;
+                  })))
 
 let dal_downloaded_confirmed_slot_pages ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ json =
-    rpc_get
-      ?hooks
-      sc_client
-      ["global"; "block"; block; "dal"; "confirmed_slot_pages"]
-  in
-  JSON.as_list json
-  |> List.map (fun obj ->
-         let index = obj |> JSON.get "index" |> JSON.as_int in
-         let contents =
-           obj |> JSON.get "contents" |> JSON.as_list
-           |> List.map (fun page ->
-                  page |> JSON.as_string |> fun s -> Hex.to_string (`Hex s))
-         in
-         (index, contents))
+  rpc_get
+    ?hooks
+    sc_client
+    ["global"; "block"; block; "dal"; "confirmed_slot_pages"]
+  |> Runnable.map (fun json ->
+         JSON.as_list json
+         |> List.map (fun obj ->
+                let index = obj |> JSON.get "index" |> JSON.as_int in
+                let contents =
+                  obj |> JSON.get "contents" |> JSON.as_list
+                  |> List.map (fun page ->
+                         page |> JSON.as_string |> fun s ->
+                         Hex.to_string (`Hex s))
+                in
+                (index, contents)))
 
 let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
-  let open Lwt.Syntax in
   let messages_json =
     `A (List.map (fun s -> `String Hex.(of_string s |> show)) messages)
   in
@@ -288,21 +268,16 @@ let simulate ?hooks ?(block = "head") sc_client ?(reveal_pages = []) messages =
     `O (("messages", messages_json) :: reveal_json)
     |> JSON.annotate ~origin:"simulation data"
   in
-  let+ obj =
-    rpc_post
-      ?hooks
-      sc_client
-      ["global"; "block"; block; "simulate"]
-      data
-  in
-  JSON.
-    {
-      state_hash = obj |> get "state_hash" |> as_string;
-      status = obj |> get "status" |> as_string;
-      output = obj |> get "output";
-      inbox_level = obj |> get "inbox_level" |> as_int;
-      num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
-    }
+  rpc_post ?hooks sc_client ["global"; "block"; block; "simulate"] data
+  |> Runnable.map (fun obj ->
+         JSON.
+           {
+             state_hash = obj |> get "state_hash" |> as_string;
+             status = obj |> get "status" |> as_string;
+             output = obj |> get "output";
+             inbox_level = obj |> get "inbox_level" |> as_int;
+             num_ticks = obj |> get "num_ticks" |> as_string |> int_of_string;
+           })
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command
@@ -311,7 +286,8 @@ let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
     (["gen"; "unencrypted"; "keys"; alias] @ if force then ["--force"] else [])
 
 let generate_keys ?hooks ?force ~alias sc_client =
-  spawn_generate_keys ?hooks ?force ~alias sc_client |> Process.check
+  let*? process = spawn_generate_keys ?hooks ?force ~alias sc_client in
+  Process.check process
 
 let spawn_list_keys ?hooks sc_client =
   spawn_command ?hooks sc_client ["list"; "keys"]
@@ -334,18 +310,14 @@ let parse_list_keys output =
   | Some l -> l
 
 let list_keys ?hooks sc_client =
-  let* out =
-    spawn_list_keys ?hooks sc_client |> Process.check_and_read_stdout
-  in
+  let*! out = spawn_list_keys ?hooks sc_client in
   return (parse_list_keys out)
 
 let spawn_show_address ?hooks ~alias sc_client =
   spawn_command ?hooks sc_client ["show"; "address"; alias]
 
 let show_address ?hooks ~alias sc_client =
-  let* out =
-    spawn_show_address ?hooks ~alias sc_client |> Process.check_and_read_stdout
-  in
+  let*! out = spawn_show_address ?hooks ~alias sc_client in
   return (Account.parse_client_output_aggregate ~alias ~client_output:out)
 
 let spawn_import_secret_key ?hooks ?(force = false)
@@ -361,4 +333,5 @@ let spawn_import_secret_key ?hooks ?(force = false)
     @ if force then ["--force"] else [])
 
 let import_secret_key ?hooks ?force key sc_client =
-  spawn_import_secret_key ?hooks ?force key sc_client |> Process.check
+  let*? process = spawn_import_secret_key ?hooks ?force key sc_client in
+  Process.check process
