@@ -1206,34 +1206,6 @@ end
 module Voting = struct
   open Validate_errors.Voting
 
-  (** Check that [record_proposals] below will not fail.
-
-      This function is designed to be exclusively called by
-      [validate_proposals] further down this file.
-
-      @return [Error Multiple_proposals] if [proposals] has more than
-      one element. *)
-  let check_testnet_dictator_proposals chain_id proposals =
-    (* This assertion should be ensured by the fact that
-       {!is_testnet_dictator} cannot be [true] on mainnet, but we
-       double check it because it is critical. *)
-    assert (Chain_id.(chain_id <> Constants.mainnet_id)) ;
-    match proposals with
-    | [] | [_] ->
-        (* In [record_proposals] below, the call to
-           {!Vote.init_current_proposal} (in the singleton list case)
-           cannot fail because {!Vote.clear_current_proposal} is called
-           right before.
-
-           The calls to
-           {!Voting_period.Testnet_dictator.overwrite_current_kind} may
-           usually fail when the voting period is not
-           initialized. However, this cannot happen because the current
-           function is only called in [validate_proposals] after a
-           successful call to {!Voting_period.get_current}. *)
-        ok_unit
-    | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
-
   let check_period_index ~expected period_index =
     error_unless
       Compare.Int32.(expected = period_index)
@@ -1294,31 +1266,33 @@ module Voting = struct
         fail_when already_proposed (Already_proposed {proposal}))
       proposals
 
-  let check_period_kind_for_ballot current_period =
-    match current_period.Voting_period.kind with
-    | Exploration | Promotion -> ok_unit
-    | (Cooldown | Proposal | Adoption) as current ->
-        error
-          (Wrong_voting_period_kind
-             {current; expected = [Exploration; Promotion]})
+  (** Check that [record_proposals] below will not fail.
 
-  let check_current_proposal ctxt op_proposal =
-    let open Lwt_tzresult_syntax in
-    let* current_proposal = Vote.get_current_proposal ctxt in
-    fail_unless
-      (Protocol_hash.equal op_proposal current_proposal)
-      (Ballot_for_wrong_proposal
-         {current = current_proposal; submitted = op_proposal})
+      This function is designed to be exclusively called by
+      [validate_proposals] further down this file.
 
-  let check_source_has_not_already_voted ctxt source =
-    let open Lwt_tzresult_syntax in
-    let*! has_ballot = Vote.has_recorded_ballot ctxt source in
-    fail_when has_ballot Already_submitted_a_ballot
+      @return [Error Multiple_proposals] if [proposals] has more than
+      one element. *)
+  let check_testnet_dictator_proposals chain_id proposals =
+    (* This assertion should be ensured by the fact that
+       {!is_testnet_dictator} cannot be [true] on mainnet, but we
+       double check it because it is critical. *)
+    assert (Chain_id.(chain_id <> Constants.mainnet_id)) ;
+    match proposals with
+    | [] | [_] ->
+        (* In [record_proposals] below, the call to
+           {!Vote.init_current_proposal} (in the singleton list case)
+           cannot fail because {!Vote.clear_current_proposal} is called
+           right before.
 
-  let check_ballot_source_is_registered ctxt source =
-    let open Lwt_tzresult_syntax in
-    let*! is_registered = Delegate.registered ctxt source in
-    fail_unless is_registered (Ballot_from_unregistered_delegate source)
+           The calls to
+           {!Voting_period.Testnet_dictator.overwrite_current_kind} may
+           usually fail when the voting period is not
+           initialized. However, this cannot happen because the current
+           function is only called in [validate_proposals] after a
+           successful call to {!Voting_period.get_current}. *)
+        ok_unit
+    | _ :: _ :: _ -> error Testnet_dictator_multiple_proposals
 
   (** Check that a Proposals operation can be safely applied.
 
@@ -1431,6 +1405,32 @@ module Voting = struct
       Signature.Public_key_hash.Map.remove source vs.voting_state.proposals_seen
     in
     {vs with voting_state = {vs.voting_state with proposals_seen}}
+
+  let check_ballot_source_is_registered ctxt source =
+    let open Lwt_tzresult_syntax in
+    let*! is_registered = Delegate.registered ctxt source in
+    fail_unless is_registered (Ballot_from_unregistered_delegate source)
+
+  let check_period_kind_for_ballot current_period =
+    match current_period.Voting_period.kind with
+    | Exploration | Promotion -> ok_unit
+    | (Cooldown | Proposal | Adoption) as current ->
+        error
+          (Wrong_voting_period_kind
+             {current; expected = [Exploration; Promotion]})
+
+  let check_current_proposal ctxt op_proposal =
+    let open Lwt_tzresult_syntax in
+    let* current_proposal = Vote.get_current_proposal ctxt in
+    fail_unless
+      (Protocol_hash.equal op_proposal current_proposal)
+      (Ballot_for_wrong_proposal
+         {current = current_proposal; submitted = op_proposal})
+
+  let check_source_has_not_already_voted ctxt source =
+    let open Lwt_tzresult_syntax in
+    let*! has_ballot = Vote.has_recorded_ballot ctxt source in
+    fail_when has_ballot Already_submitted_a_ballot
 
   (** Check that a Ballot operation can be safely applied.
 
