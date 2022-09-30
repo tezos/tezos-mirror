@@ -50,13 +50,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"20"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"20"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\n"
@@ -65,13 +65,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"38"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"38"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\r"
@@ -80,13 +80,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"57"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"57"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\016"
@@ -95,13 +95,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"76"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"76"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\019"
@@ -110,13 +110,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"95"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"95"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\022"
@@ -125,13 +125,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"114"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"114"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\025"
@@ -140,13 +140,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"133"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"133"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\028"
@@ -155,13 +155,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"152"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"152"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\031"
@@ -170,13 +170,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"171"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"171"
 
 ./octez-sc-rollup-client-alpha get state value for vars/value
 "\000\000\000\""
@@ -185,4 +185,4 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"190"
+"191"

@@ -89,13 +89,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"20"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"19"
+"20"
 
 ./octez-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -144,13 +144,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"38"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"37"
+"38"
 
 ./octez-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -199,13 +199,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"57"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"56"
+"57"
 
 ./octez-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -255,13 +255,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"76"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"75"
+"76"
 
 ./octez-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -311,13 +311,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"95"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"94"
+"95"
 
 ./octez-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -367,13 +367,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"114"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"113"
+"114"
 
 ./octez-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -423,13 +423,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"133"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"132"
+"133"
 
 ./octez-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -480,13 +480,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"152"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"151"
+"152"
 
 ./octez-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -537,13 +537,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"171"
 
 ./octez-sc-rollup-client-alpha rpc get /global/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"170"
+"171"
 
 ./octez-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -594,4 +594,4 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/total_ticks
-"190"
+"191"
