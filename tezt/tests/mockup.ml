@@ -721,6 +721,12 @@ let test_create_mockup_custom_constants =
    taken by the [--bootstrap-accounts] option of mockup mode *)
 type mockup_bootstrap_account = {name : string; sk_uri : string; amount : Tez.t}
 
+let mockup_bootstrap_account_typ =
+  Check.(
+    convert
+      (fun {name; sk_uri; amount} -> (name, sk_uri, amount))
+      (tuple3 string string Tez.typ))
+
 let test_accounts : mockup_bootstrap_account list =
   [
     {
@@ -735,13 +741,31 @@ let test_accounts : mockup_bootstrap_account list =
     };
   ]
 
-let mockup_bootstrap_account_to_json {name; sk_uri; amount} : JSON.u =
+let mockup_bootstrap_account_to_json {name; sk_uri; amount} =
   `O
     [
       ("name", `String name);
       ("sk_uri", `String ("unencrypted:" ^ sk_uri));
       ("amount", `String (Tez.to_mutez amount |> string_of_int));
     ]
+
+let mockup_bootstrap_accounts_to_json accounts =
+  `A (List.map mockup_bootstrap_account_to_json accounts)
+
+let mockup_bootstrap_account_of_json json : mockup_bootstrap_account =
+  JSON.
+    {
+      name = json |-> "name" |> as_string;
+      sk_uri =
+        ( json |-> "sk_uri" |> as_string |> fun sk_uri ->
+          match String.split_on_char ':' sk_uri with
+          | ["unencrypted"; s] -> s
+          | _ -> Test.fail "Could not parse [sk_uri] %s" sk_uri );
+      amount = json |-> "amount" |> as_int |> Tez.of_mutez_int;
+    }
+
+let mockup_bootstrap_accounts_of_json json =
+  List.map mockup_bootstrap_account_of_json (JSON.as_list json)
 
 (* Tests [tezos-client create mockup --bootstrap-accounts]
    argument. The call must succeed. *)
@@ -754,8 +778,7 @@ let test_create_mockup_custom_bootstrap_accounts =
   let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
   JSON.encode_to_file_u
     bootstrap_accounts_file
-    (`A (List.map mockup_bootstrap_account_to_json test_accounts)) ;
-
+    (mockup_bootstrap_accounts_to_json test_accounts) ;
   let client = Client.create_with_mode Client.Mockup in
   let* () = Client.create_mockup ~protocol ~bootstrap_accounts_file client in
 
@@ -959,6 +982,484 @@ let test_proto_mix =
       Client.spawn_command ~protocol_hash:(Protocol.hash proto2) client2 cmd
       |> Process.check_error
 
+type mockup_config_state = {
+  bootstrap_accounts : mockup_bootstrap_account list;
+  protocol_constants : JSON.t;
+}
+
+let parametrize ls f = List.iter f ls
+
+let param_name = fst
+
+let param_value = snd
+
+let test_create_mockup_config_show_init_roundtrip protocols =
+  (* Given the [obj] of JSON schema [schema], attempt to return a
+     value of the same schema that is not equal to [obj].
+
+     If [obj] does not correspond to [schema], return an arbitrary
+     value that respects [schema]. *)
+  let rec distinct_sample (value : JSON.t) (schema : JSON.t) : JSON.u =
+    (* Returns an integer different from [n_opt]. If [minimum] and/or
+       [maximum] is given, then a value greater or equal than minimum
+       and/or greater or equal than maximum is returned. *)
+    let distinct_sample_numeric ?minimum ?maximum n_opt =
+      let n =
+        match (n_opt, minimum, maximum) with
+        | Some n, _, _ -> n
+        | None, Some minimum, _ -> minimum
+        | None, None, Some maximum -> maximum
+        | _ -> 0
+      in
+      let () =
+        (* sanity checks *)
+        let max = Option.value ~default:Int.max_int maximum in
+        let min = Option.value ~default:Int.min_int minimum in
+        assert (min < max && min <= n && n <= max)
+      in
+      match (maximum, minimum) with
+      | None, _ -> n + 1
+      | _, None -> n - 1
+      | Some min, Some max -> min + ((n - min + 1) mod (max - min + 1))
+    in
+    (* Returns an element from [candidates] distinct from [value_opt].
+       If [value_opt] is [None], return first element in [candidates]. *)
+    let distinct_sample_list ~equal candidates value_opt =
+      match value_opt with
+      | None -> List.hd candidates
+      | Some value -> (
+          match List.find_opt (Fun.negate (equal value)) candidates with
+          | Some res -> res
+          | None ->
+              Test.fail "distinct_sample_list: could not find a distinct value")
+    in
+    let typ =
+      match JSON.(schema |-> "type" |> as_string_opt) with
+      | Some s -> s
+      | None -> (
+          match JSON.(schema |-> "$ref" |> as_string_opt) with
+          | Some r -> r
+          | None ->
+              Test.fail
+                "Schema %s is missing both [type] and [$ref] field"
+                (JSON.encode schema))
+    in
+    let numerical_of_string ~typ value =
+      JSON.(
+        value |> as_string_opt
+        |> Option.map @@ fun s ->
+           mandatory
+             (sf
+                "distinct_sample: no support for %s outside of int's range"
+                typ)
+             (int_of_string_opt s))
+    in
+    match typ with
+    | "object" ->
+        assert (JSON.is_object value) ;
+        `O
+          (List.map
+             (fun (key, key_schema) ->
+               (key, distinct_sample JSON.(value |-> key) key_schema))
+             JSON.(schema |-> "properties" |> as_object))
+    | "integer" ->
+        let n_opt = JSON.(value |> as_int_opt) in
+        let minimum = JSON.(schema |-> "minimum" |> as_int_opt) in
+        let maximum = JSON.(schema |-> "maximum" |> as_int_opt) in
+        `Float (distinct_sample_numeric ?minimum ?maximum n_opt |> float_of_int)
+    | "boolean" ->
+        let b = JSON.(value |> as_bool_opt |> Option.value ~default:false) in
+        `Bool (not b)
+    | "#/definitions/bignum" ->
+        let n_opt = numerical_of_string ~typ value in
+        `String (distinct_sample_numeric n_opt |> string_of_int)
+    | "#/definitions/int64" ->
+        let n_opt = numerical_of_string ~typ value in
+        let minimum = Int.min_int in
+        let maximum = Int.max_int in
+        `String
+          (distinct_sample_numeric ~minimum ~maximum n_opt |> string_of_int)
+    | typ when typ =~ rex "#/definitions/.*\\.mutez" ->
+        let n_opt = numerical_of_string ~typ value in
+        `String (distinct_sample_numeric ~minimum:0 n_opt |> string_of_int)
+    | "#/definitions/Signature.Public_key_hash" ->
+        let value' =
+          distinct_sample_list
+            ~equal:String.equal
+            (List.map
+               (fun (acct : Account.key) -> acct.public_key_hash)
+               (Array.to_list Account.Bootstrap.keys))
+            JSON.(value |> as_string_opt)
+        in
+        `String value'
+    | "#/definitions/random" ->
+        let value' =
+          distinct_sample_list
+            ~equal:String.equal
+            [
+              "rngFtAUcm1EneHCCrxxSWAaxSukwEhSPvpTnFjVdKLEjgkapUy1pP";
+              "rngGPSm87ZqWxJmZu7rewiLiyKY72ffCQQvxDuWmFBw59dWAL5VTB";
+            ]
+            JSON.(value |> as_string_opt)
+        in
+        `String value'
+    | typ ->
+        Test.fail
+          "[distinct_sample] is not implemented for types [%s] (value: %s)"
+          typ
+          (JSON.encode value)
+  in
+  (* Create a protocol constant value adapted for the mockup client
+     initialization, while attempting to change each parameter from
+     the default in order to verify that config initialization
+     respects all fields of the input. *)
+  let protocol_constants_fixture_rpc protocol =
+    (* create a temporary client used to call RPC in the given
+       protocol *)
+    let client = Client.create_with_mode Client.Mockup in
+    let* () = Client.create_mockup ~protocol client in
+
+    (* Fetch default values *)
+    let* parametric_constants =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_constants_parametric ()
+    in
+    (* Fetch schema, used to move from default values *)
+    let* parametric_constants_schema =
+      let* json =
+        RPC.Client.schema client
+        @@ RPC.get_chain_block_context_constants_parametric ()
+      in
+      return JSON.(json |-> "output")
+    in
+    (* Move from default values *)
+    let parametric_constants_succ : JSON.t =
+      JSON.annotate ~origin:"parametric_constants_succ"
+      @@ distinct_sample parametric_constants parametric_constants_schema
+    in
+    (* Some constants are very constant. *)
+    let constant_parametric_constants : JSON.t =
+      JSON.annotate ~origin:"constant_parametric_constants"
+      @@ `O
+           [
+             (* DO NOT EDIT the value consensus_threshold this is actually a constant, not a parameter *)
+             ("consensus_threshold", `Float 0.0);
+           ]
+    in
+    (* These are the mockup specific protocol parameters as per [src/proto_alpha/lib_client/mockup.ml] *)
+    let mockup_constants : JSON.t =
+      JSON.annotate ~origin:"mockup_constants"
+      @@ `O
+           [
+             ("initial_timestamp", `String "2021-02-03T12:34:56Z");
+             ("chain_id", `String "NetXaFDF7xZQCpR");
+           ]
+    in
+    return
+      JSON.(
+        merge_objects
+          (merge_objects
+             parametric_constants_succ
+             constant_parametric_constants)
+          mockup_constants)
+  in
+  (* To fetch a distinct sample of protocol constants, we rely on the
+     RPC [/chains/main/blocks/head/context/constants/parametric]
+     introduced in Lima. For earlier protocols, we rely on hardcoded
+     samples stored in the folder [mockup_protocol_constants]. *)
+  let protocol_constants_fixture (protocol : Protocol.t) =
+    match protocol with
+    | Kathmandu ->
+        return
+        @@ JSON.parse_file
+             (sf
+                "./tezt/tests/mockup_protocol_constants/protocol_constants-%d.json"
+                (Protocol.number protocol))
+    | Lima | Alpha ->
+        (* This function should work on all protocols since Lima.  *)
+        protocol_constants_fixture_rpc protocol
+  in
+
+  let get_state_using_config_show_mockup ~protocol mockup_client =
+    (* Calls `config init mockup` on a mockup client and returns the
+       strings of the bootstrap accounts and the protocol constants
+
+       Note that because this a mockup specific operation, the
+       [mockup_client] parameter must be in mockup mode; do not give a
+       vanilla client. *)
+    let* config = Client.config_show ~protocol mockup_client in
+    let lines = String.split_on_char '\n' config in
+    let split_lines line lines =
+      let rec split_list_opt acc pred = function
+        | [] -> None
+        | x :: xs when pred x -> Some (List.rev acc, xs)
+        | x :: xs -> split_list_opt (x :: acc) pred xs
+      in
+      match split_list_opt [] (( = ) line) lines with
+      | Some v -> v
+      | None -> Test.fail "mockup config does not contain the line '%s'" line
+    in
+    let ba_line = "Default value of --bootstrap-accounts:" in
+    let pc_line = "Default value of --protocol-constants:" in
+    let ba_lines, pc_lines =
+      let _, after = split_lines ba_line lines in
+      split_lines pc_line after
+    in
+    let origin = "Client.config_show" in
+    return
+      {
+        bootstrap_accounts =
+          JSON.parse ~origin (String.concat "\n" ba_lines)
+          |> mockup_bootstrap_accounts_of_json;
+        protocol_constants = JSON.parse ~origin (String.concat "\n" pc_lines);
+      }
+  in
+  let get_state_using_config_init_mockup ~protocol mockup_client =
+    (* Calls `config init mockup` on a mockup client and returns the
+       strings of the bootstrap accounts and the protocol constants
+
+       Note that because this a mockup specific operation, the
+       `mock_client` parameter must be in mockup mode; do not give a
+       vanilla client. *)
+    let bootstrap_accounts =
+      (* Prefix temp file names to avoid reusing the same file name
+         for two different clients since mockup refuses to overwrite
+         existing files. *)
+      Temp.file (Client.name mockup_client ^ "-tezos-bootstrap-accounts.json")
+    in
+    let protocol_constants =
+      Temp.file (Client.name mockup_client ^ "-tezos-proto-consts.json")
+    in
+    let* () =
+      Client.config_init
+        ~protocol
+        ~bootstrap_accounts
+        ~protocol_constants
+        mockup_client
+    in
+    return
+      {
+        bootstrap_accounts =
+          JSON.parse_file bootstrap_accounts
+          |> mockup_bootstrap_accounts_of_json;
+        protocol_constants = JSON.parse_file protocol_constants;
+      }
+  in
+  let compute_expected_amounts bootstrap_accounts protocol_constants =
+    let frozen_deposits_percentage =
+      JSON.(protocol_constants |-> "frozen_deposits_percentage" |> as_int)
+    in
+    let pct = 100 - frozen_deposits_percentage in
+    List.map
+      (fun account ->
+        {
+          account with
+          amount = Tez.(of_mutez_int (pct * to_mutez account.amount / 100));
+        })
+      bootstrap_accounts
+  in
+  (* Check that two JSON objects are equal by pair-wise comparing
+     their fields. The result for two objects is the same as using
+     [Check.json_t] except that field ordering does not matter (on the
+     first level) and that the error messages are easier to read. *)
+  let check_json_obj_equal_per_field left right =
+    let left_fields = JSON.(left |> as_object |> List.map fst) in
+    let right_fields = JSON.(right |> as_object |> List.map fst) in
+    List.iter
+      (fun field ->
+        let lvalue, rvalue = JSON.(left |-> field, right |-> field) in
+        Check.(
+          (lvalue = rvalue)
+            json
+            ~__LOC__
+            ~error_msg:
+              ("The expected protocol constants in mockup was %L, got %R, \
+                field: " ^ field)))
+      (left_fields @ right_fields |> List.sort_uniq String.compare)
+  in
+  parametrize [("None", None); ("test_accounts", Some test_accounts)]
+  @@ fun param_initial_bootstrap_accounts_opt ->
+  parametrize
+    [("None", None); ("protocol_constants", Some protocol_constants_fixture)]
+  @@ fun param_protocol_constants ->
+  parametrize
+    [
+      ("show", get_state_using_config_show_mockup);
+      ("init", get_state_using_config_init_mockup);
+    ]
+  @@ fun param_read_initial_state ->
+  parametrize
+    [
+      ("show", get_state_using_config_show_mockup);
+      ("init", get_state_using_config_init_mockup);
+    ]
+  @@ fun param_read_final_state ->
+  (let parameter_names =
+     [
+       param_name param_initial_bootstrap_accounts_opt;
+       param_name param_protocol_constants;
+       param_name param_read_initial_state;
+       param_name param_read_final_state;
+     ]
+   in
+   let parametrization_suffix = "[" ^ String.concat "," parameter_names ^ "]" in
+   let tags =
+     parameter_names
+     |> List.filter (( <> ) "None")
+     |> List.map String.lowercase_ascii
+     |> List.map (fun s -> String.(sub s 0 (Int.min (length s) 32)))
+     |> List.sort_uniq String.compare
+   in
+   (* 1/ Create a mockup, using possibly custom bootstrap_accounts (as
+      specified by [param_initial_bootstrap_accounts_opt]).
+
+      2/ Then execute either [--mode mockup config show] or [--mode
+      mockup config init] to obtain the mockup's parameters, as specified
+      by [param_read_initial_state].
+
+      3/ Recreate a mockup using the output gathered in 2/ and call
+      [param_read_final_state] to check that output received is similar to
+      output seen in 2.
+
+      This is a roundtrip test using a matrix :headexplodes: *)
+   Protocol.register_test
+     ~__FILE__
+     ~title:
+       ("(Mockup) Create mockup config show / init roundtrip "
+      ^ parametrization_suffix)
+     ~tags:(["mockup"; "client"; "base_dir"; "roundtrip"] @ tags)
+   @@ fun protocol ->
+   let* protocol_constants_opt, parameter_file_opt =
+     match param_value param_protocol_constants with
+     | Some protocol_constants_f ->
+         (* create a transient client just for accessing RPCs *)
+         let* param_protocol_constants = protocol_constants_f protocol in
+         let protocol_constants_file =
+           Temp.file "tezos-protocol-constants.json"
+         in
+         Log.info
+           "Wrote initial protocol constants file %s"
+           protocol_constants_file ;
+         JSON.encode_to_file protocol_constants_file param_protocol_constants ;
+         return (Some param_protocol_constants, Some protocol_constants_file)
+     | None ->
+         Log.info "No initial protocol constants file" ;
+         return (None, None)
+   in
+
+   let bootstrap_accounts_file =
+     match param_value param_initial_bootstrap_accounts_opt with
+     | Some bootstrap_accounts ->
+         let bootstrap_accounts_file =
+           Temp.file "tezos-bootstrap-accounts.json"
+         in
+         Log.info
+           "Wrote initial bootstrap accounts file %s"
+           bootstrap_accounts_file ;
+         JSON.encode_to_file_u
+           bootstrap_accounts_file
+           (mockup_bootstrap_accounts_to_json bootstrap_accounts) ;
+         Some bootstrap_accounts_file
+     | None ->
+         Log.info "No initial bootstrap accounts file" ;
+         None
+   in
+
+   let mockup_client = Client.create_with_mode Client.Mockup in
+   let* () =
+     Client.create_mockup
+       ~protocol
+       ?parameter_file:parameter_file_opt
+       ?bootstrap_accounts_file
+       mockup_client
+   in
+
+   (* 2a/ No need to check explicitly that the json obtained is valid:
+      [param_read_initial_state] will raise an error in that case. *)
+   Log.info "Reading initial state after first initialization" ;
+   let* initial_state =
+     param_value param_read_initial_state ~protocol mockup_client
+   in
+
+   (* Test that the initial mockup call honored the values it
+      received. If it didn't, all calls would return the default values
+      all along, and everything would seem fine; but it wouldn't
+      be. This was witnessed in
+      https://gitlab.com/tezos/tezos/-/issues/938 *)
+   Log.info "Checking that read state corresponds to configuration input" ;
+   let () =
+     match param_value param_initial_bootstrap_accounts_opt with
+     | Some initial_bootstrap_accounts ->
+         let expected_amounts =
+           compute_expected_amounts
+             initial_bootstrap_accounts
+             initial_state.protocol_constants
+         in
+         Check.(expected_amounts = initial_state.bootstrap_accounts)
+           (Check.list mockup_bootstrap_account_typ)
+           ~error_msg:"The expected bootstrap accounts in mockup was %L, got %R"
+           ~__LOC__
+     | None -> ()
+   in
+
+   (match protocol_constants_opt with
+   | Some param_protocol_constants ->
+       (* A hack? If the user-provided overrides contains a [null] for
+          an optional field (corresponding to [`Null] in Ezjsonm), then
+          that field will simply be absent in the output
+          [initial_state.param_protocol_constants]. Therefore, we filter such
+          values from the comparison. *)
+       let expected_protocol_constants =
+         JSON.filter_object param_protocol_constants @@ fun _key value ->
+         not (JSON.is_null value)
+       in
+       check_json_obj_equal_per_field
+         expected_protocol_constants
+         initial_state.protocol_constants
+   | None -> ()) ;
+
+   (* 3/ Pass obtained json to a new mockup instance, to check json
+      valid w.r.t. ocaml encoding *)
+   Log.info "Use read state from first mockup instance to create a second one" ;
+   let parameter_file = Temp.file "tezos-protocol-constants.json" in
+   JSON.encode_to_file parameter_file initial_state.protocol_constants ;
+   let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
+   JSON.encode_to_file_u
+     bootstrap_accounts_file
+     (mockup_bootstrap_accounts_to_json initial_state.bootstrap_accounts) ;
+   let mockup_client = Client.create_with_mode Client.Mockup in
+   let* () =
+     Client.create_mockup
+       ~protocol
+       ~parameter_file
+       ~bootstrap_accounts_file
+       mockup_client
+   in
+
+   (* 4/ Retrieve state again *)
+   Log.info
+     "Check that read state from second mockup equals read state from first" ;
+   let* final_state =
+     param_value param_read_final_state ~protocol mockup_client
+   in
+
+   let expected_amounts =
+     compute_expected_amounts
+       initial_state.bootstrap_accounts
+       initial_state.protocol_constants
+   in
+   Check.(expected_amounts = final_state.bootstrap_accounts)
+     (Check.list mockup_bootstrap_account_typ)
+     ~error_msg:"The expected bootstrap accounts in mockup was %L, got %R"
+     ~__LOC__ ;
+
+   check_json_obj_equal_per_field
+     initial_state.protocol_constants
+     final_state.protocol_constants ;
+
+   unit)
+    protocols
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -982,7 +1483,8 @@ let register ~protocols =
   test_config_init_mockup protocols ;
   test_config_init_mockup_fail protocols ;
   test_transfer_rpc protocols ;
-  test_proto_mix protocols
+  test_proto_mix protocols ;
+  test_create_mockup_config_show_init_roundtrip protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
