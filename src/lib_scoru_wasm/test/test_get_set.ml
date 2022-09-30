@@ -65,11 +65,6 @@ module Tree_encoding_runner = Tree_encoding.Runner.Make (Tree)
 let current_tick_encoding =
   Tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
 
-(* Replicates the encoder in [Wasm_pvm]. Used here for artificially encode
-   input info in the tree. *)
-let input_requested_encoding =
-  Tree_encoding.value ~default:false ["input"; "consuming"] Data_encoding.bool
-
 let floppy_encoding =
   Tree_encoding.value
     ["gather-floppies"; "status"]
@@ -106,16 +101,9 @@ let initialise_tree () =
   in
 
   let* tree = Tree_encoding_runner.encode current_tick_encoding Z.zero tree in
-  let* tree =
-    Tree_encoding_runner.encode
-      floppy_encoding
-      Gather_floppies.Not_gathering_floppies
-      tree
-  in
-  let* tree = Tree_encoding_runner.encode input_requested_encoding true tree in
   Tree_encoding_runner.encode
-    buffers_encoding
-    (Tezos_webassembly_interpreter.Eval.buffers ())
+    floppy_encoding
+    Gather_floppies.Not_gathering_floppies
     tree
 
 let make_inbox_info ~inbox_level ~message_counter =
@@ -164,7 +152,7 @@ let test_get_info () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
-    {current_tick = Z.one; last_input_read; input_request = Input_required}
+    {current_tick = Z.one; last_input_read; input_request = No_input_required}
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;
@@ -175,22 +163,20 @@ let test_get_info () =
   assert (actual_info = expected_info ~inbox_level:5 ~message_counter:10) ;
   Lwt_result_syntax.return_unit
 
-let encode_tick_state ~host_funcs tick_state tree =
+let encode_tick_state tree =
   let open Lwt_syntax in
   (* Encode the tag. *)
   let* tree =
     Tree_encoding_runner.encode
       (Tree_encoding.value ["wasm"; "tag"] Data_encoding.string)
-      "eval"
+      "snapshot"
       tree
   in
-  (* Encode the the value. *)
+  (* Encode the value. *)
   let* tree =
     Tree_encoding_runner.encode
-      (Tree_encoding.scope
-         ["wasm"; "value"]
-         (Wasm_encoding.config_encoding ~host_funcs))
-      tick_state
+      (Tree_encoding.value ["wasm"; "value"] Data_encoding.unit)
+      ()
       tree
   in
   return tree
@@ -201,19 +187,7 @@ let test_set_input () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
-  let* tree = Tree_encoding_runner.encode input_requested_encoding true tree in
-  let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  let module_reg = Tezos_webassembly_interpreter.Instance.ModuleMap.create () in
-  let tick_state =
-    Eval.
-      {
-        host_funcs;
-        step_kont = SK_Result (Vector.empty ());
-        stack_size_limit = 1000;
-        module_reg;
-      }
-  in
-  let* tree = encode_tick_state ~host_funcs tick_state tree in
+  let* tree = encode_tick_state tree in
   let* tree =
     Wasm.set_input_step
       {inbox_level = zero; message_counter = Z.of_int 1}
@@ -221,9 +195,6 @@ let test_set_input () =
       tree
   in
   let* result_input = Tree_encoding_runner.decode inp_encoding tree in
-  let* waiting_for_input =
-    Tree_encoding_runner.decode input_requested_encoding tree
-  in
   let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
     let open Wasm_pvm_sig in
@@ -239,7 +210,6 @@ let test_set_input () =
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
-  assert (waiting_for_input = false) ;
   assert (result_input = "hello") ;
   Lwt_result_syntax.return_unit
 

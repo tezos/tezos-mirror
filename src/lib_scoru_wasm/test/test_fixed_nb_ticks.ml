@@ -82,10 +82,7 @@ let test_noop_kernel () =
   let*! info = Wasm.get_info tree in
   (* off-by-one introduced by Gather_floppies*)
   return
-    (assert (
-       Z.(
-         info.current_tick
-         = of_int64 max_nb_ticks + origination_tick + snapshot_tick)))
+    (assert (Z.(info.current_tick = of_int64 max_nb_ticks + origination_tick)))
 
 let test_stuck_in_decode_kernel () =
   let open Lwt_result_syntax in
