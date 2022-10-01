@@ -61,10 +61,6 @@ type level = Lwt_log_core.level =
   | Error
   | Fatal
 
-let should_log ~level ~sink_level =
-  (* Same criteria as [Lwt_log_core.log] *)
-  level >= sink_level
-
 module Level = struct
   type t = level
 
@@ -1367,21 +1363,14 @@ module Lwt_log_sink = struct
           let section =
             Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in
-          (* Only call printf if the event is to be printed. *)
-          if
-            should_log
-              ~level:M.level
-              ~sink_level:(Lwt_log_core.Section.level section)
-          then
-            let* () =
-              Format.kasprintf
-                (Lwt_log_core.log ~section ~level:M.level)
-                "%a"
-                (M.pp ~short:false)
-                ev
-            in
-            return_ok_unit
-          else return_ok_unit)
+          let* () =
+            Format.kasprintf
+              (Lwt_log_core.log ~section ~level:M.level)
+              "%a"
+              (M.pp ~short:false)
+              ev
+          in
+          return_ok_unit)
 
     let close _ =
       let open Lwt_syntax in

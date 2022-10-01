@@ -211,22 +211,21 @@ end) : Internal_event.SINK with type t = t = struct
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
-    let now = Unix.gettimeofday () in
-    let forced_event = v () in
-    let level = M.level in
     let filter_run =
       match filter with
       | `Level_at_least level_at_least ->
-          Internal_event.Level.compare level level_at_least >= 0
+          Internal_event.Level.compare M.level level_at_least >= 0
       | `Per_section_prefix kvl ->
           List.exists
             (fun (prefix, lvl) ->
               Internal_event.(
                 Section.is_prefix ~prefix section
-                && Level.compare level lvl >= 0))
+                && Level.compare M.level lvl >= 0))
             kvl
     in
     if filter_run then (
+      let now = Unix.gettimeofday () in
+      let forced_event = v () in
       let wrapped_event = wrap now section forced_event in
       let to_write =
         let json () =

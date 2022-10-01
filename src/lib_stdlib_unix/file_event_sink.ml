@@ -283,12 +283,13 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
-    let now = Micro_seconds.now () in
-    let date, time = Micro_seconds.date_string now in
-    let forced = v () in
-    let level = M.level in
-    match Event_filter.run ~section ~level ~name:M.name event_filter with
+    match
+      Event_filter.run ~section ~level:M.level ~name:M.name event_filter
+    with
     | true ->
+        let now = Micro_seconds.now () in
+        let date, time = Micro_seconds.date_string now in
+        let forced = v () in
         let event_json =
           Data_encoding.Json.construct
             (wrapped_encoding M.encoding)
