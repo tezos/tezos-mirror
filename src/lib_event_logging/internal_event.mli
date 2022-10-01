@@ -457,26 +457,6 @@ end
 
 (** {3 Common Event Definitions } *)
 
-(** {!Error_event.t} is a generic event to emit values of type
-    {!Error_monad.error list}. *)
-module Error_event : sig
-  (** Errors mainly store {!Error_monad.error list} values. *)
-  type t = {message : string option; trace : Error_monad.error list}
-
-  val make : ?message:string -> Error_monad.error list -> unit -> t
-
-  include EVENT with type t := t
-
-  (** [log_error_and_recover f] calls [f ()] and emits an {!Error_event.t}
-        event if it results in an error. It then continues in the [_ Lwt.t]
-        monad (e.g. there is no call to [Lwt.fail]). *)
-  val log_error_and_recover :
-    ?section:Section.t ->
-    ?message:string ->
-    (unit -> (unit, error list) result Lwt.t) ->
-    unit Lwt.t
-end
-
 (** The debug-event is meant for emitting (temporarily)
     semi-structured data in the event stream. *)
 module Debug_event : sig

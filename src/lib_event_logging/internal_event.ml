@@ -1245,61 +1245,6 @@ module Legacy_logging = struct
   end
 end
 
-module Error_event = struct
-  type t = {message : string option; trace : Error_monad.error list}
-
-  let make ?message trace () = {message; trace}
-
-  module Definition = struct
-    let section = None
-
-    let name = "error-event"
-
-    type nonrec t = t
-
-    let encoding =
-      let open Data_encoding in
-      let v0_encoding =
-        conv
-          (fun {message; trace} -> (message, trace))
-          (fun (message, trace) -> {message; trace})
-          (obj2
-             (opt "message" string)
-             (req "trace" (list Error_monad.error_encoding)))
-      in
-      With_version.(encoding ~name (first_version v0_encoding))
-
-    let pp ~short:_ f x =
-      Format.fprintf
-        f
-        "%s:@ %s"
-        name
-        (match x.message with Some x -> x | None -> "")
-
-    let doc = "Generic event for any kind of error."
-
-    let level _ = Fatal
-  end
-
-  include (Make (Definition) : EVENT with type t := t)
-
-  let log_error_and_recover ?section ?message f =
-    let open Lwt_syntax in
-    let* r = f () in
-    match r with
-    | Ok () -> Lwt.return_unit
-    | Error el -> (
-        let* r = emit ?section (fun () -> make ?message el ()) in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error el ->
-            Format.kasprintf
-              Lwt_log_core.error
-              "Error while emitting error logging event !! %a"
-              pp_print_trace
-              el)
-end
-
 module Debug_event = struct
   type t = {message : string; attachment : Data_encoding.Json.t}
 
@@ -1400,11 +1345,53 @@ module Lwt_worker_event = struct
 
   include (Make (Definition) : EVENT with type t := t)
 
+  type error_event = {message : string; trace : Error_monad.error list}
+
+  module Error_event : EVENT with type t = error_event = Make (struct
+    type t = error_event
+
+    let section = None
+
+    let name = "error-event"
+
+    let doc = "Worker-specific error event."
+
+    let pp ~short:_ f x = Format.fprintf f "%s:@ %s" name x.message
+
+    let encoding =
+      let open Data_encoding in
+      let v0_encoding =
+        conv
+          (fun {message; trace} -> (message, trace))
+          (fun (message, trace) -> {message; trace})
+          (obj2
+             (req "message" string)
+             (req "trace" (list Error_monad.error_encoding)))
+      in
+      With_version.(encoding ~name (first_version v0_encoding))
+
+    let level _ = Fatal
+  end)
+
   let on_event name event =
+    let open Lwt_syntax in
     let section = Section.make_sanitized ["lwt-worker"; name] in
-    Error_event.log_error_and_recover
-      ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
-      (fun () -> emit ~section (fun () -> {name; event}))
+    let message = Printf.sprintf "Trying to emit worker event for %S" name in
+    let* r = emit ~section (fun () -> {name; event}) in
+    match r with
+    | Ok () -> Lwt.return_unit
+    | Error el -> (
+        let* r =
+          Error_event.emit ?section:None (fun () -> {message; trace = el})
+        in
+        match r with
+        | Ok () -> Lwt.return_unit
+        | Error el ->
+            Format.kasprintf
+              Lwt_log_core.error
+              "Error while emitting worker error logging event: %a"
+              pp_print_trace
+              el)
 
   let on_event name event =
     Lwt.catch
