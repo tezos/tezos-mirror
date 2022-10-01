@@ -111,6 +111,8 @@ let is_activated () = !activated
 
 let close (_ : t) : unit tzresult Lwt.t = Lwt_result_syntax.return_unit
 
+let should_handle ?section:_ (_ : t) _m = true
+
 let handle (type a) (_ : t) m ?section ev =
   let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
   let event =

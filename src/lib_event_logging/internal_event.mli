@@ -418,6 +418,10 @@ module type SINK = sig
       {!uri_scheme}). *)
   val configure : Uri.t -> t tzresult Lwt.t
 
+  (** Predicate deciding whether a sink should handle the event or
+      not. *)
+  val should_handle : ?section:Section.t -> t -> _ event_definition -> bool
+
   (** A sink's main function is to {!handle} incoming events from the
       code base. *)
   val handle :

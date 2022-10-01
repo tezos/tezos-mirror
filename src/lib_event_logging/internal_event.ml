@@ -203,6 +203,8 @@ module type SINK = sig
 
   val configure : Uri.t -> t tzresult Lwt.t
 
+  val should_handle : ?section:Section.t -> t -> _ event_definition -> bool
+
   val handle :
     t -> 'a event_definition -> ?section:Section.t -> 'a -> unit tzresult Lwt.t
 
@@ -340,8 +342,10 @@ module All_sinks = struct
 
   let handle def section v =
     let handle (type a) sink definition =
+      let open Lwt_result_syntax in
       let module S = (val definition : SINK with type t = a) in
-      S.handle ?section sink def v
+      if S.should_handle ?section sink def then S.handle ?section sink def v
+      else return_unit
     in
     List.iter_es
       (function Active {sink; definition; _} -> handle sink definition)
@@ -1344,6 +1348,14 @@ module Lwt_log_sink = struct
     let uri_scheme = "lwt-log"
 
     let configure _ = Lwt_result_syntax.return_unit
+
+    let should_handle (type a) ?section () m =
+      let module M = (val m : EVENT_DEFINITION with type t = a) in
+      (* Same criteria as [Lwt_log_core.log] *)
+      let section =
+        Option.fold ~none:default_section ~some:Section.to_lwt_log section
+      in
+      M.level >= Lwt_log_core.Section.level section
 
     let handle (type a) () m ?section (ev : a) =
       let open Lwt_syntax in
