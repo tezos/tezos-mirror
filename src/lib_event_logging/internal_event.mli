@@ -122,7 +122,7 @@ module type EVENT_DEFINITION = sig
   val encoding : t Data_encoding.t
 
   (** Return the preferred {!level} for a given event instance. *)
-  val level : t -> level
+  val level : level
 end
 
 (** Events created with {!Make} provide the {!EVENT} API. *)

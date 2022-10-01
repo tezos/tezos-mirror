@@ -51,7 +51,7 @@ module Attempt_logging = Internal_event.Make (struct
       delay
       text
 
-  let level _ = Internal_event.Error
+  let level = Internal_event.Error
 end)
 
 module RetryClient : Cohttp_lwt.S.Client = struct

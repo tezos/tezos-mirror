@@ -116,7 +116,7 @@ let handle (type a) (_ : t) m ?section (f : unit -> a) =
   let ev = f () in
   let event =
     {
-      level = M.level ev;
+      level = M.level;
       section;
       name = M.name;
       message = Format.asprintf "%a" (M.pp ~short:false) ev;

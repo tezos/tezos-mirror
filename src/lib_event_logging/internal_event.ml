@@ -189,7 +189,7 @@ module type EVENT_DEFINITION = sig
 
   val encoding : t Data_encoding.t
 
-  val level : t -> level
+  val level : level
 end
 
 module type EVENT = sig
@@ -780,7 +780,7 @@ module Simple = struct
 
       let encoding = with_version ~name Data_encoding.unit
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun () -> Event.emit ?section (fun () -> ())
@@ -807,7 +807,7 @@ module Simple = struct
 
       let encoding = with_version ~name f1_enc
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameter -> Event.emit ?section (fun () -> parameter)
@@ -842,7 +842,7 @@ module Simple = struct
              (Data_encoding.req f1_name f1_enc)
              (Data_encoding.req f2_name f2_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -880,7 +880,7 @@ module Simple = struct
              (Data_encoding.req f2_name f2_enc)
              (Data_encoding.req f3_name f3_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -922,7 +922,7 @@ module Simple = struct
              (Data_encoding.req f3_name f3_enc)
              (Data_encoding.req f4_name f4_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -969,7 +969,7 @@ module Simple = struct
              (Data_encoding.req f4_name f4_enc)
              (Data_encoding.req f5_name f5_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -1019,7 +1019,7 @@ module Simple = struct
              (Data_encoding.req f5_name f5_enc)
              (Data_encoding.req f6_name f6_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -1074,7 +1074,7 @@ module Simple = struct
              (Data_encoding.req f6_name f6_enc)
              (Data_encoding.req f7_name f7_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -1132,7 +1132,7 @@ module Simple = struct
              (Data_encoding.req f7_name f7_enc)
              (Data_encoding.req f8_name f8_enc)
 
-      let level _ = level
+      let level = level
     end in
     let module Event = Make (Definition) in
     fun parameters -> Event.emit ?section (fun () -> parameters)
@@ -1168,7 +1168,7 @@ module Legacy_logging = struct
 
       let doc = "Generic event legacy / string-based information logging."
 
-      let level _ = P.level
+      let level = P.level
 
       let section = Some section
     end
@@ -1273,7 +1273,7 @@ module Debug_event = struct
 
     let doc = "Generic event for semi-structured debug information."
 
-    let level _ = Debug
+    let level = Debug
   end
 
   include (Make (Definition) : EVENT with type t := t)
@@ -1293,7 +1293,7 @@ module Lwt_worker_logger = struct
 
     let doc = "Worker started event"
 
-    let level _ = Debug
+    let level = Debug
   end)
 
   module Ended_event = Make (struct
@@ -1309,7 +1309,7 @@ module Lwt_worker_logger = struct
 
     let doc = "Worker ended event"
 
-    let level _ = Debug
+    let level = Debug
   end)
 
   module Failed_event = Make (struct
@@ -1325,7 +1325,7 @@ module Lwt_worker_logger = struct
 
     let doc = "Worker failed event"
 
-    let level _ = Error
+    let level = Error
   end)
 
   let on_event name event =
@@ -1364,16 +1364,18 @@ module Lwt_log_sink = struct
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
           let ev = v () in
-          let level = M.level ev in
           let section =
             Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in
           (* Only call printf if the event is to be printed. *)
-          if should_log ~level ~sink_level:(Lwt_log_core.Section.level section)
+          if
+            should_log
+              ~level:M.level
+              ~sink_level:(Lwt_log_core.Section.level section)
           then
             let* () =
               Format.kasprintf
-                (Lwt_log_core.log ~section ~level)
+                (Lwt_log_core.log ~section ~level:M.level)
                 "%a"
                 (M.pp ~short:false)
                 ev

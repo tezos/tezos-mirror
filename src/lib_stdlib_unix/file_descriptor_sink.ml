@@ -213,7 +213,7 @@ end) : Internal_event.SINK with type t = t = struct
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Unix.gettimeofday () in
     let forced_event = v () in
-    let level = M.level forced_event in
+    let level = M.level in
     let filter_run =
       match filter with
       | `Level_at_least level_at_least ->

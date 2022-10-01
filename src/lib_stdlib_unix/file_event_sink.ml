@@ -286,7 +286,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let now = Micro_seconds.now () in
     let date, time = Micro_seconds.date_string now in
     let forced = v () in
-    let level = M.level forced in
+    let level = M.level in
     match Event_filter.run ~section ~level ~name:M.name event_filter with
     | true ->
         let event_json =
