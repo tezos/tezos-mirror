@@ -280,7 +280,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
               (Printexc.to_string e))
 
   let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
-      ?(section = Internal_event.Section.empty) (v : unit -> a) =
+      ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     match
@@ -289,11 +289,10 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     | true ->
         let now = Micro_seconds.now () in
         let date, time = Micro_seconds.date_string now in
-        let forced = v () in
         let event_json =
           Data_encoding.Json.construct
             (wrapped_encoding M.encoding)
-            (wrap now section forced)
+            (wrap now section event)
         in
         let tag =
           let hash =
@@ -313,7 +312,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
         let* () =
           output_json file_path event_json ~pp:(fun fmt () ->
-              M.pp ~short:false fmt forced)
+              M.pp ~short:false fmt event)
         in
         lwt_bad_citizen_hack :=
           List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;

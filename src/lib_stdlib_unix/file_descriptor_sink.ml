@@ -208,7 +208,7 @@ end) : Internal_event.SINK with type t = t = struct
                Lwt_utils_unix.write_string output to_write))
 
   let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
-      ?(section = Internal_event.Section.empty) (v : unit -> a) =
+      ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let filter_run =
@@ -225,8 +225,7 @@ end) : Internal_event.SINK with type t = t = struct
     in
     if filter_run then (
       let now = Unix.gettimeofday () in
-      let forced_event = v () in
-      let wrapped_event = wrap now section forced_event in
+      let wrapped_event = wrap now section event in
       let to_write =
         let json () =
           Data_encoding.Json.construct
@@ -238,7 +237,7 @@ end) : Internal_event.SINK with type t = t = struct
             let s =
               String.map
                 (function '\n' -> ' ' | c -> c)
-                (Format.asprintf "%a" (M.pp ~short:false) forced_event)
+                (Format.asprintf "%a" (M.pp ~short:false) event)
             in
             (* See https://tools.ietf.org/html/rfc5424#section-6 *)
             Format.asprintf

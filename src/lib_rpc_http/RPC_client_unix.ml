@@ -68,7 +68,7 @@ module RetryClient : Cohttp_lwt.S.Client = struct
       | `Bad_gateway ->
           let log_ansbody = clone_body ansbody in
           let* text = Cohttp_lwt.Body.to_string log_ansbody in
-          let* _ = Attempt_logging.emit (fun () -> {attempt; delay; text}) in
+          let* _ = Attempt_logging.emit {attempt; delay; text} in
           if attempt >= 10 then return (response, ansbody)
           else
             let* () = Lwt_unix.sleep delay in

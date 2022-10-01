@@ -191,7 +191,7 @@ end
 module type EVENT = sig
   include EVENT_DEFINITION
 
-  val emit : ?section:Section.t -> (unit -> t) -> unit tzresult Lwt.t
+  val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
 end
 
 type 'a event_definition = (module EVENT_DEFINITION with type t = 'a)
@@ -204,11 +204,7 @@ module type SINK = sig
   val configure : Uri.t -> t tzresult Lwt.t
 
   val handle :
-    t ->
-    'a event_definition ->
-    ?section:Section.t ->
-    (unit -> 'a) ->
-    unit tzresult Lwt.t
+    t -> 'a event_definition -> ?section:Section.t -> 'a -> unit tzresult Lwt.t
 
   val close : t -> unit tzresult Lwt.t
 end
@@ -471,11 +467,7 @@ end
 module Make (E : EVENT_DEFINITION) : EVENT with type t = E.t = struct
   include E
 
-  let emit ?section x =
-    (* In order to evaluate the event at most once, we wrap it in a
-       `Lazy.t`: *)
-    let x = lazy (x ()) in
-    All_sinks.handle (module E) section (fun () -> Lazy.force x)
+  let emit ?section x = All_sinks.handle (module E) section x
 
   let () = All_definitions.add (module E)
 end
@@ -779,7 +771,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun () -> Event.emit ?section (fun () -> ())
+    fun () -> Event.emit ?section ()
 
   let declare_1 (type a) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) =
@@ -806,7 +798,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameter -> Event.emit ?section (fun () -> parameter)
+    fun parameter -> Event.emit ?section parameter
 
   let declare_2 (type a b) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -841,7 +833,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_3 (type a b c) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -879,7 +871,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_4 (type a b c d) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -921,7 +913,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_5 (type a b c d e) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -968,7 +960,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_6 (type a b c d e f) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1018,7 +1010,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_7 (type a b c d e f g) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1073,7 +1065,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 
   let declare_8 (type a b c d e f g h) ?section ~name ~msg ?(level = Info) ?pp1
       (f1_name, (f1_enc : a Data_encoding.t)) ?pp2
@@ -1131,7 +1123,7 @@ module Simple = struct
       let level = level
     end in
     let module Event = Make (Definition) in
-    fun parameters -> Event.emit ?section (fun () -> parameters)
+    fun parameters -> Event.emit ?section parameters
 end
 
 module Legacy_logging = struct
@@ -1195,20 +1187,18 @@ module Legacy_logging = struct
       let level = Fatal
     end))
 
-    let emit_async
-        (emit : ?section:Section.t -> (unit -> string) -> unit tzresult Lwt.t)
+    let emit_async (emit : ?section:Section.t -> string -> unit tzresult Lwt.t)
         fmt =
       Format.kasprintf
-        (fun message -> Lwt.ignore_result (emit ~section (fun () -> message)))
+        (fun message -> Lwt.ignore_result (emit ~section message))
         fmt
 
-    let emit_lwt
-        (emit : ?section:Section.t -> (unit -> string) -> unit tzresult Lwt.t)
+    let emit_lwt (emit : ?section:Section.t -> string -> unit tzresult Lwt.t)
         fmt =
       let open Lwt_syntax in
       Format.kasprintf
         (fun message ->
-          let* r = emit ~section (fun () -> message) in
+          let* r = emit ~section message in
           match r with
           | Ok () -> Lwt.return_unit
           | Error el ->
@@ -1244,7 +1234,7 @@ end
 module Debug_event = struct
   type t = {message : string; attachment : Data_encoding.Json.t}
 
-  let make ?(attach = `Null) message () = {message; attachment = attach}
+  let make ?(attach = `Null) message = {message; attachment = attach}
 
   let v0_encoding =
     let open Data_encoding in
@@ -1329,9 +1319,9 @@ module Lwt_worker_logger = struct
     let section = Section.make_sanitized ["lwt-worker"; name] in
     let* r =
       match event with
-      | `Started -> Started_event.emit ~section Fun.id
-      | `Ended -> Ended_event.emit ~section Fun.id
-      | `Failed msg -> Failed_event.emit ~section (fun () -> msg)
+      | `Started -> Started_event.emit ~section ()
+      | `Ended -> Ended_event.emit ~section ()
+      | `Failed msg -> Failed_event.emit ~section msg
     in
     match r with
     | Ok () -> Lwt.return_unit
@@ -1355,11 +1345,10 @@ module Lwt_log_sink = struct
 
     let configure _ = Lwt_result_syntax.return_unit
 
-    let handle (type a) () m ?section (v : unit -> a) =
+    let handle (type a) () m ?section (ev : a) =
       let open Lwt_syntax in
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
-          let ev = v () in
           let section =
             Option.fold ~some:Section.to_lwt_log section ~none:default_section
           in

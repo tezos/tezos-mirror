@@ -131,7 +131,7 @@ module type EVENT = sig
 
   (** Output an event of type {!t}, if no sinks are listening the
       function won't be applied. *)
-  val emit : ?section:Section.t -> (unit -> t) -> unit tzresult Lwt.t
+  val emit : ?section:Section.t -> t -> unit tzresult Lwt.t
 end
 
 (** Build an event from an event-definition. *)
@@ -421,11 +421,7 @@ module type SINK = sig
   (** A sink's main function is to {!handle} incoming events from the
       code base. *)
   val handle :
-    t ->
-    'a event_definition ->
-    ?section:Section.t ->
-    (unit -> 'a) ->
-    unit tzresult Lwt.t
+    t -> 'a event_definition -> ?section:Section.t -> 'a -> unit tzresult Lwt.t
 
   (** A function to be called on graceful termination of processes
       (e.g. to flush file-descriptors, etc.). *)
@@ -462,7 +458,7 @@ end
 module Debug_event : sig
   type t = {message : string; attachment : Data_encoding.Json.t}
 
-  val make : ?attach:Data_encoding.Json.t -> string -> unit -> t
+  val make : ?attach:Data_encoding.Json.t -> string -> t
 
   include EVENT with type t := t
 end
