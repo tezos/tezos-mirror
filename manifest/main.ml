@@ -2431,8 +2431,7 @@ let octez_rpc_http_server =
         octez_rpc |> open_;
         octez_rpc_http |> open_;
       ]
-    ~modules:["RPC_server"; "RPC_logging"; "RPC_middleware"]
-    ~private_modules:["RPC_logging"]
+    ~modules:["RPC_server"; "RPC_middleware"]
 
 let _octez_rpc_http_server_tests =
   test
