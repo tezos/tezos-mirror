@@ -587,7 +587,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.Block_locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
@@ -598,7 +598,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline.validation_worker <-
@@ -609,7 +609,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          peer_id
          Block_hash.pp_short
          locator.head_hash)
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
   pipeline

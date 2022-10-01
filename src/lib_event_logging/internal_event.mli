@@ -467,15 +467,11 @@ module Debug_event : sig
   include EVENT with type t := t
 end
 
-(** The worker event is meant for use with {!Lwt_utils.worker}. *)
-module Lwt_worker_event : sig
-  type t = {name : string; event : [`Ended | `Failed of string | `Started]}
-
-  include EVENT with type t := t
-
-  (** [on_event msg status] emits an event of type [t] and matches
-        the signature required by {!Lwt_utils.worker}.  *)
-  val on_event : string -> [`Ended | `Failed of string | `Started] -> unit Lwt.t
+(** The worker logger is meant for use with {!Lwt_utils.worker}. *)
+module Lwt_worker_logger : sig
+  (** [on_event status] emits an event of type [t] and matches
+      the signature required by {!Lwt_utils.worker}. *)
+  val on_event : string -> [`Started | `Ended | `Failed of string] -> unit Lwt.t
 end
 
 (** {3 Compatibility With Legacy Logging } *)

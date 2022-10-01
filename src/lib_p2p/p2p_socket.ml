@@ -520,7 +520,7 @@ module Reader = struct
     st.worker <-
       Lwt_utils.worker
         "reader"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st None)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st
@@ -656,7 +656,7 @@ module Writer = struct
     st.worker <-
       Lwt_utils.worker
         "writer"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop st)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions st.canceler) ;
     st

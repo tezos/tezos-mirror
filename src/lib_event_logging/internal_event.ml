@@ -1279,128 +1279,72 @@ module Debug_event = struct
   include (Make (Definition) : EVENT with type t := t)
 end
 
-module Lwt_worker_event = struct
-  type t = {name : string; event : [`Started | `Ended | `Failed of string]}
-
-  let v0_encoding =
-    let open Data_encoding in
-    conv
-      (fun {name; event} -> (name, event))
-      (fun (name, event) -> {name; event})
-      (obj2
-         (req "name" string)
-         (req
-            "event"
-            (union
-               [
-                 case
-                   ~title:"started"
-                   (Tag 0)
-                   (obj1 (req "kind" (constant "started")))
-                   (function `Started -> Some () | _ -> None)
-                   (fun () -> `Started);
-                 case
-                   ~title:"ended"
-                   (Tag 1)
-                   (obj1 (req "kind" (constant "ended")))
-                   (function `Ended -> Some () | _ -> None)
-                   (fun () -> `Ended);
-                 case
-                   ~title:"failed"
-                   (Tag 2)
-                   (obj2
-                      (req "kind" (constant "failed"))
-                      (req "exception" string))
-                   (function `Failed s -> Some ((), s) | _ -> None)
-                   (fun ((), s) -> `Failed s);
-               ])))
-
-  module Definition = struct
-    let section = None
-
-    let name = "lwt-worker-event"
-
-    type nonrec t = t
-
-    let encoding =
-      Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
-
-    let pp ~short:_ ppf {name; event} =
-      let open Format in
-      fprintf
-        ppf
-        "Worker %s:@ %a"
-        name
-        (fun fmt -> function
-          | `Failed msg -> fprintf ppf "Failed with %s" msg
-          | `Ended -> fprintf fmt "Ended"
-          | `Started -> fprintf fmt "Started")
-        event
-
-    let doc = "Generic event for callers of the function Lwt_utils.worker."
-
-    let level {event; _} =
-      match event with `Failed _ -> Error | `Started | `Ended -> Debug
-  end
-
-  include (Make (Definition) : EVENT with type t := t)
-
-  type error_event = {message : string; trace : Error_monad.error list}
-
-  module Error_event : EVENT with type t = error_event = Make (struct
-    type t = error_event
+module Lwt_worker_logger = struct
+  module Started_event = Make (struct
+    type t = unit
 
     let section = None
 
-    let name = "error-event"
+    let name = "lwt-worker_started"
 
-    let doc = "Worker-specific error event."
+    let encoding = Data_encoding.constant "started"
 
-    let pp ~short:_ f x = Format.fprintf f "%s:@ %s" name x.message
+    let pp ~short:_ ppf () = Format.fprintf ppf "started"
 
-    let encoding =
-      let open Data_encoding in
-      let v0_encoding =
-        conv
-          (fun {message; trace} -> (message, trace))
-          (fun (message, trace) -> {message; trace})
-          (obj2
-             (req "message" string)
-             (req "trace" (list Error_monad.error_encoding)))
-      in
-      With_version.(encoding ~name (first_version v0_encoding))
+    let doc = "Worker started event"
 
-    let level _ = Fatal
+    let level _ = Debug
+  end)
+
+  module Ended_event = Make (struct
+    type t = unit
+
+    let section = None
+
+    let name = "lwt-worker_ended"
+
+    let encoding = Data_encoding.constant "ended"
+
+    let pp ~short:_ ppf () = Format.fprintf ppf "ended"
+
+    let doc = "Worker ended event"
+
+    let level _ = Debug
+  end)
+
+  module Failed_event = Make (struct
+    type t = string
+
+    let section = None
+
+    let name = "lwt-worker_failed"
+
+    let encoding = Data_encoding.(obj1 (req "error" string))
+
+    let pp ~short:_ ppf error = Format.fprintf ppf "failed with %s" error
+
+    let doc = "Worker failed event"
+
+    let level _ = Error
   end)
 
   let on_event name event =
     let open Lwt_syntax in
     let section = Section.make_sanitized ["lwt-worker"; name] in
-    let message = Printf.sprintf "Trying to emit worker event for %S" name in
-    let* r = emit ~section (fun () -> {name; event}) in
+    let* r =
+      match event with
+      | `Started -> Started_event.emit ~section Fun.id
+      | `Ended -> Ended_event.emit ~section Fun.id
+      | `Failed msg -> Failed_event.emit ~section (fun () -> msg)
+    in
     match r with
     | Ok () -> Lwt.return_unit
-    | Error el -> (
-        let* r =
-          Error_event.emit ?section:None (fun () -> {message; trace = el})
-        in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error el ->
-            Format.kasprintf
-              Lwt_log_core.error
-              "Error while emitting worker error logging event: %a"
-              pp_print_trace
-              el)
-
-  let on_event name event =
-    Lwt.catch
-      (fun () -> on_event name event)
-      (fun exc ->
-        Format.eprintf
-          "@[<hv 2>Failed to log event:@ %s@]@."
-          (Printexc.to_string exc) ;
-        Lwt.return_unit)
+    | Error errs ->
+        Format.kasprintf
+          Lwt_log_core.error
+          "failed to log worker event:@ %a@\n"
+          Error_monad.pp_print_trace
+          errs
 end
 
 module Lwt_log_sink = struct
