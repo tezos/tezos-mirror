@@ -460,22 +460,10 @@ end
 (** {!Error_event.t} is a generic event to emit values of type
     {!Error_monad.error list}. *)
 module Error_event : sig
-  (** Errors mainly store {!Error_monad.error list} values. One can
-      attach a message and a severity (the default is [`Recoverable]
-      which corresponds to the {!Error} {!level}, while [`Fatal]
-      corresponds to {!Fatal}). *)
-  type t = {
-    message : string option;
-    severity : [`Fatal | `Recoverable];
-    trace : Error_monad.error list;
-  }
+  (** Errors mainly store {!Error_monad.error list} values. *)
+  type t = {message : string option; trace : Error_monad.error list}
 
-  val make :
-    ?message:string ->
-    ?severity:[`Fatal | `Recoverable] ->
-    Error_monad.error list ->
-    unit ->
-    t
+  val make : ?message:string -> Error_monad.error list -> unit -> t
 
   include EVENT with type t := t
 
@@ -485,7 +473,6 @@ module Error_event : sig
   val log_error_and_recover :
     ?section:Section.t ->
     ?message:string ->
-    ?severity:[`Fatal | `Recoverable] ->
     (unit -> (unit, error list) result Lwt.t) ->
     unit Lwt.t
 end

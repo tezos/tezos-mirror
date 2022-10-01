@@ -1246,14 +1246,9 @@ module Legacy_logging = struct
 end
 
 module Error_event = struct
-  type t = {
-    message : string option;
-    severity : [`Fatal | `Recoverable];
-    trace : Error_monad.error list;
-  }
+  type t = {message : string option; trace : Error_monad.error list}
 
-  let make ?message ?(severity = `Recoverable) trace () =
-    {message; trace; severity}
+  let make ?message trace () = {message; trace}
 
   module Definition = struct
     let section = None
@@ -1266,13 +1261,10 @@ module Error_event = struct
       let open Data_encoding in
       let v0_encoding =
         conv
-          (fun {message; trace; severity} -> (message, severity, trace))
-          (fun (message, severity, trace) -> {message; severity; trace})
-          (obj3
+          (fun {message; trace} -> (message, trace))
+          (fun (message, trace) -> {message; trace})
+          (obj2
              (opt "message" string)
-             (req
-                "severity"
-                (string_enum [("fatal", `Fatal); ("recoverable", `Recoverable)]))
              (req "trace" (list Error_monad.error_encoding)))
       in
       With_version.(encoding ~name (first_version v0_encoding))
@@ -1286,19 +1278,18 @@ module Error_event = struct
 
     let doc = "Generic event for any kind of error."
 
-    let level {severity; _} =
-      match severity with `Fatal -> Fatal | `Recoverable -> Error
+    let level _ = Fatal
   end
 
   include (Make (Definition) : EVENT with type t := t)
 
-  let log_error_and_recover ?section ?message ?severity f =
+  let log_error_and_recover ?section ?message f =
     let open Lwt_syntax in
     let* r = f () in
     match r with
     | Ok () -> Lwt.return_unit
     | Error el -> (
-        let* r = emit ?section (fun () -> make ?message ?severity el ()) in
+        let* r = emit ?section (fun () -> make ?message el ()) in
         match r with
         | Ok () -> Lwt.return_unit
         | Error el ->
@@ -1413,7 +1404,6 @@ module Lwt_worker_event = struct
     let section = Section.make_sanitized ["lwt-worker"; name] in
     Error_event.log_error_and_recover
       ~message:(Printf.sprintf "Trying to emit worker event for %S" name)
-      ~severity:`Fatal
       (fun () -> emit ~section (fun () -> {name; event}))
 
   let on_event name event =
