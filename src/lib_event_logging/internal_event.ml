@@ -1165,46 +1165,9 @@ module Legacy_logging = struct
     val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
 
-  open Tezos_stdlib
-
-  type ('a, 'b) msgf =
-    (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) ->
-    ?tags:Tag.set ->
-    'b
+  type ('a, 'b) msgf = (('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b
 
   type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module type SEMLOG = sig
-    module Tag = Tag
-
-    val debug : ('a, unit) log
-
-    val log_info : ('a, unit) log
-
-    val log_notice : ('a, unit) log
-
-    val warn : ('a, unit) log
-
-    val log_error : ('a, unit) log
-
-    val fatal_error : ('a, unit) log
-
-    val lwt_debug : ('a, unit Lwt.t) log
-
-    val lwt_log_info : ('a, unit Lwt.t) log
-
-    val lwt_log_notice : ('a, unit Lwt.t) log
-
-    val lwt_warn : ('a, unit Lwt.t) log
-
-    val lwt_log_error : ('a, unit Lwt.t) log
-
-    val lwt_fatal_error : ('a, unit Lwt.t) log
-
-    val event : string Tag.def
-
-    val exn : exn Tag.def
-  end
 
   module Make_event (P : sig
     val name : string
@@ -1217,34 +1180,19 @@ module Legacy_logging = struct
     module Definition = struct
       let name = "legacy_logging_event-" ^ String.concat "-" name_split
 
-      type t = {
-        message : string;
-        section : Section.t;
-        level : level;
-        tags : Tag.set;
-      }
+      type t = {message : string; section : Section.t; level : level}
 
-      let make ?(tags = Tag.empty) level message =
-        {message; section; level; tags}
+      let make level message = {message; section; level}
 
       let v0_encoding =
         let open Data_encoding in
         conv
-          (fun {message; section; level; tags} ->
-            (message, section, level, tags))
-          (fun (message, section, level, tags) ->
-            {message; section; level; tags})
-          (obj4
+          (fun {message; section; level} -> (message, section, level))
+          (fun (message, section, level) -> {message; section; level})
+          (obj3
              (req "message" string)
              (req "section" Section.encoding)
-             (req "level" Level.encoding)
-             (dft
-                "tags"
-                (conv
-                   (fun tags -> Format.asprintf "%a" Tag.pp_set tags)
-                   (fun _ -> Tag.empty)
-                   string)
-                Tag.empty))
+             (req "level" Level.encoding))
 
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
@@ -1264,19 +1212,19 @@ module Legacy_logging = struct
 
     module Event = Make (Definition)
 
-    let emit_async level fmt ?tags =
+    let emit_async level fmt =
       Format.kasprintf
         (fun message ->
           Lwt.ignore_result
-            (Event.emit ~section (fun () -> Definition.make ?tags level message)))
+            (Event.emit ~section (fun () -> Definition.make level message)))
         fmt
 
-    let emit_lwt level fmt ?tags =
+    let emit_lwt level fmt =
       let open Lwt_syntax in
       Format.kasprintf
         (fun message ->
           let* r =
-            Event.emit ~section (fun () -> Definition.make ?tags level message)
+            Event.emit ~section (fun () -> Definition.make level message)
           in
           match r with
           | Ok () -> Lwt.return_unit
@@ -1290,7 +1238,7 @@ module Legacy_logging = struct
   struct
     include Make_event (P)
 
-    let emit_async = emit_async ?tags:None
+    let emit_async = emit_async
 
     let debug f = emit_async Debug f
 
@@ -1304,7 +1252,7 @@ module Legacy_logging = struct
 
     let fatal_error f = emit_async Fatal f
 
-    let emit_lwt = emit_lwt ?tags:None
+    let emit_lwt = emit_lwt
 
     let lwt_debug f = emit_lwt Debug f
 
@@ -1317,49 +1265,6 @@ module Legacy_logging = struct
     let lwt_log_error f = emit_lwt Error f
 
     let lwt_fatal_error f = emit_lwt Fatal f
-  end
-
-  module Make_semantic (P : sig
-    val name : string
-  end) =
-  struct
-    include Make_event (P)
-
-    let debug (f : ('a, unit) msgf) = f (emit_async Debug) ?tags:None
-
-    let log_info f = f (emit_async Info) ?tags:None
-
-    let log_notice f = f (emit_async Notice) ?tags:None
-
-    let warn f = f (emit_async Warning) ?tags:None
-
-    let log_error f = f (emit_async Error) ?tags:None
-
-    let fatal_error f = f (emit_async Fatal) ?tags:None
-
-    let lwt_debug f = f (emit_lwt Debug) ?tags:None
-
-    let lwt_log_info f = f (emit_lwt Info) ?tags:None
-
-    let lwt_log_notice f = f (emit_lwt Notice) ?tags:None
-
-    let lwt_warn f = f (emit_lwt Warning) ?tags:None
-
-    let lwt_log_error f = f (emit_lwt Error) ?tags:None
-
-    let lwt_fatal_error f = f (emit_lwt Fatal) ?tags:None
-
-    module Tag = Tag
-
-    let event =
-      Tag.def
-        ~doc:"String identifier for the class of event being logged"
-        "event"
-        Format.pp_print_text
-
-    let exn =
-      Tag.def ~doc:"Exception which was detected" "exception" (fun f e ->
-          Format.pp_print_text f (Printexc.to_string e))
   end
 end
 

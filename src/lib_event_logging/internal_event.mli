@@ -544,46 +544,9 @@ module Legacy_logging : sig
     val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   end
 
-  open Tezos_stdlib
-
-  type ('a, 'b) msgf =
-    (('a, Format.formatter, unit, 'b) format4 -> ?tags:Tag.set -> 'a) ->
-    ?tags:Tag.set ->
-    'b
+  type ('a, 'b) msgf = (('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b
 
   type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module type SEMLOG = sig
-    module Tag = Tag
-
-    val debug : ('a, unit) log
-
-    val log_info : ('a, unit) log
-
-    val log_notice : ('a, unit) log
-
-    val warn : ('a, unit) log
-
-    val log_error : ('a, unit) log
-
-    val fatal_error : ('a, unit) log
-
-    val lwt_debug : ('a, unit Lwt.t) log
-
-    val lwt_log_info : ('a, unit Lwt.t) log
-
-    val lwt_log_notice : ('a, unit Lwt.t) log
-
-    val lwt_warn : ('a, unit Lwt.t) log
-
-    val lwt_log_error : ('a, unit Lwt.t) log
-
-    val lwt_fatal_error : ('a, unit Lwt.t) log
-
-    val event : string Tag.def
-
-    val exn : exn Tag.def
-  end
 
   module Make : functor
     (_ : sig
@@ -593,16 +556,6 @@ module Legacy_logging : sig
     module Event : EVENT
 
     include LOG
-  end
-
-  module Make_semantic : functor
-    (_ : sig
-       val name : string
-     end)
-    -> sig
-    module Event : EVENT
-
-    include SEMLOG
   end
 end
 
