@@ -1215,7 +1215,8 @@ module Legacy_logging = struct
           let* r = emit ~section (fun () -> message) in
           match r with
           | Ok () -> Lwt.return_unit
-          | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
+          | Error el ->
+              Format.kasprintf Lwt_log_core.error "%a@\n" pp_print_trace el)
         fmt
 
     let debug f = emit_async Debug_event.emit f
