@@ -1139,37 +1139,7 @@ module Simple = struct
 end
 
 module Legacy_logging = struct
-  module type LOG = sig
-    val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_notice : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val log_error : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val fatal_error : ('a, Format.formatter, unit, unit) format4 -> 'a
-
-    val lwt_debug : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_info : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_notice : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-
-    val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-  end
-
-  type ('a, 'b) msgf = (('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b
-
-  type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module Make_event (P : sig
+  module Make (P : sig
     val name : string
   end) =
   struct
@@ -1177,94 +1147,100 @@ module Legacy_logging = struct
 
     let section = Section.make name_split
 
-    module Definition = struct
-      let name = "legacy_logging_event-" ^ String.concat "-" name_split
+    let name = "legacy_logging_event-" ^ String.concat "-" name_split
 
-      type t = {message : string; section : Section.t; level : level}
+    module Make_definition (P : sig
+      val level : level
+    end) =
+    struct
+      type t = string
 
-      let make level message = {message; section; level}
+      let name = Printf.sprintf "%s-%s" name (Level.to_string P.level)
 
       let v0_encoding =
         let open Data_encoding in
-        conv
-          (fun {message; section; level} -> (message, section, level))
-          (fun (message, section, level) -> {message; section; level})
-          (obj3
-             (req "message" string)
-             (req "section" Section.encoding)
-             (req "level" Level.encoding))
+        obj1 (req "message" string)
 
       let encoding =
         Data_encoding.With_version.(encoding ~name (first_version v0_encoding))
 
-      let pp ~short:_ ppf {message; _} =
-        let open Format in
-        fprintf ppf "%s" message
+      let pp ~short:_ ppf message = Format.fprintf ppf "%s" message
 
       let doc = "Generic event legacy / string-based information logging."
 
-      let level {level; _} = level
+      let level _ = P.level
 
       let section = Some section
     end
 
     let () = registered_sections := String.Set.add P.name !registered_sections
 
-    module Event = Make (Definition)
+    module Debug_event = Make (Make_definition (struct
+      let level = Debug
+    end))
 
-    let emit_async level fmt =
+    module Info_event = Make (Make_definition (struct
+      let level = Info
+    end))
+
+    module Notice_event = Make (Make_definition (struct
+      let level = Notice
+    end))
+
+    module Warning_event = Make (Make_definition (struct
+      let level = Warning
+    end))
+
+    module Error_event = Make (Make_definition (struct
+      let level = Error
+    end))
+
+    module Fatal_event = Make (Make_definition (struct
+      let level = Fatal
+    end))
+
+    let emit_async
+        (emit : ?section:Section.t -> (unit -> string) -> unit tzresult Lwt.t)
+        fmt =
       Format.kasprintf
-        (fun message ->
-          Lwt.ignore_result
-            (Event.emit ~section (fun () -> Definition.make level message)))
+        (fun message -> Lwt.ignore_result (emit ~section (fun () -> message)))
         fmt
 
-    let emit_lwt level fmt =
+    let emit_lwt
+        (emit : ?section:Section.t -> (unit -> string) -> unit tzresult Lwt.t)
+        fmt =
       let open Lwt_syntax in
       Format.kasprintf
         (fun message ->
-          let* r =
-            Event.emit ~section (fun () -> Definition.make level message)
-          in
+          let* r = emit ~section (fun () -> message) in
           match r with
           | Ok () -> Lwt.return_unit
           | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
         fmt
-  end
 
-  module Make (P : sig
-    val name : string
-  end) =
-  struct
-    include Make_event (P)
+    let debug f = emit_async Debug_event.emit f
 
-    let emit_async = emit_async
+    let log_info f = emit_async Info_event.emit f
 
-    let debug f = emit_async Debug f
+    let log_notice f = emit_async Notice_event.emit f
 
-    let log_info f = emit_async Info f
+    let warn f = emit_async Warning_event.emit f
 
-    let log_notice f = emit_async Notice f
+    let log_error f = emit_async Error_event.emit f
 
-    let warn f = emit_async Warning f
+    let fatal_error f = emit_async Fatal_event.emit f
 
-    let log_error f = emit_async Error f
+    let lwt_debug f = emit_lwt Debug_event.emit f
 
-    let fatal_error f = emit_async Fatal f
+    let lwt_log_info f = emit_lwt Info_event.emit f
 
-    let emit_lwt = emit_lwt
+    let lwt_log_notice f = emit_lwt Notice_event.emit f
 
-    let lwt_debug f = emit_lwt Debug f
+    let lwt_warn f = emit_lwt Warning_event.emit f
 
-    let lwt_log_info f = emit_lwt Info f
+    let lwt_log_error f = emit_lwt Error_event.emit f
 
-    let lwt_log_notice f = emit_lwt Notice f
-
-    let lwt_warn f = emit_lwt Warning f
-
-    let lwt_log_error f = emit_lwt Error f
-
-    let lwt_fatal_error f = emit_lwt Fatal f
+    let lwt_fatal_error f = emit_lwt Fatal_event.emit f
   end
 end
 

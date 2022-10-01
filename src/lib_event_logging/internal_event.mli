@@ -518,7 +518,11 @@ end
     into the event-logging framework.
     {b Please do not use for new modules.} *)
 module Legacy_logging : sig
-  module type LOG = sig
+  module Make : functor
+    (_ : sig
+       val name : string
+     end)
+    -> sig
     val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
     val log_info : ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -542,20 +546,6 @@ module Legacy_logging : sig
     val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
     val lwt_fatal_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
-  end
-
-  type ('a, 'b) msgf = (('a, Format.formatter, unit, 'b) format4 -> 'a) -> 'b
-
-  type ('a, 'b) log = ('a, 'b) msgf -> 'b
-
-  module Make : functor
-    (_ : sig
-       val name : string
-     end)
-    -> sig
-    module Event : EVENT
-
-    include LOG
   end
 end
 
