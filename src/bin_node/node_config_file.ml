@@ -124,42 +124,6 @@ let blockchain_network_mainnet =
       ]
     ~default_bootstrap_peers:["boot.tzbeta.net"]
 
-let blockchain_network_hangzhounet =
-  make_blockchain_network
-    ~alias:"hangzhounet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_HANGZHOUNET_2021-11-04T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(8191l, "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx")]
-    ~default_bootstrap_peers:
-      [
-        "hangzhounet.teztnets.xyz";
-        "hangzhounet.kaml.fr";
-        "hangzhounet.smartpy.io";
-        "hangzhounet.tezos.co.il";
-        "hangzhounet.boot.tez.ie";
-      ]
-
 let blockchain_network_ghostnet =
   make_blockchain_network
     ~alias:"ghostnet"
@@ -199,41 +163,6 @@ let blockchain_network_ghostnet =
         "ghostnet.kaml.fr";
         "ghostnet.stakenow.de:9733";
         "ghostnet.visualtez.com";
-      ]
-
-let blockchain_network_jakartanet =
-  make_blockchain_network
-    ~alias:"jakartanet"
-    {
-      time = Time.Protocol.of_notation_exn "2022-04-27T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisbd16dciJxo9";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_JAKARTANET_2022-04-27T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(8192l, "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY")]
-    ~default_bootstrap_peers:
-      [
-        "jakartanet.teztnets.xyz";
-        "jakartanet.boot.ecadinfra.com";
-        "jakartanet.kaml.fr";
-        "jakartanet.visualtez.com";
       ]
 
 let blockchain_network_kathmandunet =
@@ -368,8 +297,6 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (16, blockchain_network_hangzhounet);
-    (18, blockchain_network_jakartanet);
     (19, blockchain_network_ghostnet);
     (20, blockchain_network_kathmandunet);
   ]
