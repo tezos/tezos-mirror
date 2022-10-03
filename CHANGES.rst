@@ -25,6 +25,12 @@ be documented here either.
 Node
 ----
 
+- Add a `/chains/<chain>/blocks/<block>/merkle_tree_v2` RPC. This is an
+  evolution of the `../merkle_tree` RPC, using a simpler implementation of the
+  Merkle tree/proof features that works with Irmin trees and proofs underneath
+  instead of proof code internal to Octez, and is planned to eventually replace
+  the old one in a future release.
+
 - Add a field ``dal`` in the node's configuration file. This field is
   for a feature which is being developed and should not be
   modified. It should be used only for testing.
@@ -78,6 +84,12 @@ Node
 
 Client
 ------
+
+- The light client (`tezos-client --mode light`) now uses the
+  `../block/<block_id>/merkle_tree_v2` RPC introduced in this version, removing
+  a lot of delicate verification code and relying on Irmin instead. The client
+  for this version will thus not work with older node versions that do not have
+  this RPC.
 
 - Simulation returns correct errors on batches of operations where some are
   backtracked, failed and/or skipped.

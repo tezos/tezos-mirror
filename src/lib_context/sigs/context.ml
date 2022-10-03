@@ -224,24 +224,7 @@ module Proof_types = struct
   (** The type of Merkle tree used by the light mode *)
   and merkle_tree = merkle_node String.Map.t
 
-  let rec pp_merkle_node ppf = function
-    | Hash (k, h) ->
-        let k_str = match k with Contents -> "Contents" | Node -> "Node" in
-        Format.fprintf ppf "Hash(%s, %s)" k_str h
-    | Data raw_context ->
-        Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
-    | Continue tree -> Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
-
-  and pp_merkle_tree ppf mtree =
-    let pairs = String.Map.bindings mtree in
-    Format.fprintf
-      ppf
-      "{@[<v 1>@,%a@]@,}"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
-           Format.fprintf ppf "\"%s\": %a" s pp_merkle_node t))
-      pairs
-
-  and pp_raw_context ppf = function
+  let rec pp_raw_context ppf = function
     | Cut -> Format.fprintf ppf "..."
     | Key v -> Hex.pp ppf (Hex.of_bytes v)
     | Dir l ->
@@ -251,29 +234,6 @@ module Proof_types = struct
           (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
                Format.fprintf ppf "%s : %a" s pp_raw_context t))
           (String.Map.bindings l)
-
-  let rec merkle_node_eq n1 n2 =
-    match (n1, n2) with
-    | Hash (mhk1, s1), Hash (mhk2, s2) -> mhk1 = mhk2 && String.equal s1 s2
-    | Data rc1, Data rc2 -> raw_context_eq rc1 rc2
-    | Continue mtree1, Continue mtree2 -> merkle_tree_eq mtree1 mtree2
-    | _ -> false
-
-  (** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
-      that is, have the same constructors; and the constructor's content
-      are recursively equal *)
-  and merkle_tree_eq mtree1 mtree2 =
-    String.Map.equal merkle_node_eq mtree1 mtree2
-
-  (** [raw_context_eq rc1 rc2] tests whether [rc1] and [rc2] are equal,
-      that is, have the same constructors; and the constructor's content
-      are recursively equal *)
-  and raw_context_eq rc1 rc2 =
-    match (rc1, rc2) with
-    | Key bytes1, Key bytes2 -> Bytes.equal bytes1 bytes2
-    | Dir dir1, Dir dir2 -> String.Map.(equal raw_context_eq dir1 dir2)
-    | Cut, Cut -> true
-    | _ -> false
 
   (** Proofs are compact representations of trees which can be shared
       between peers.
@@ -469,6 +429,53 @@ module Proof_types = struct
     after : kinded_hash;
     state : 'a;
   }
+
+  module Internal_for_tests = struct
+    let rec tree_eq t1 t2 =
+      let rec inode_tree_eq it1 it2 =
+        match (it1, it2) with
+        | Blinded_inode h1, Blinded_inode h2 -> h1 = h2
+        | Inode_values l1, Inode_values l2 ->
+            List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+        | Inode_tree i1, Inode_tree i2 ->
+            i1.length = i2.length
+            && List.equal
+                 (fun (idx1, itree1) (idx2, itree2) ->
+                   idx1 = idx2 && inode_tree_eq itree1 itree2)
+                 i1.proofs
+                 i2.proofs
+        | Inode_extender i1, Inode_extender i2 ->
+            i1.length = i2.length
+            && List.equal ( = ) i1.segment i2.segment
+            && inode_tree_eq i1.proof i2.proof
+        | _ -> false
+      in
+      match (t1, t2) with
+      | Value v1, Value v2 -> v1 = v2
+      | Blinded_value h1, Blinded_value h2 -> h1 = h2
+      | Node l1, Node l2 ->
+          List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+      | Blinded_node h1, Blinded_node h2 -> h1 = h2
+      | Inode i1, Inode i2 ->
+          i1.length = i2.length
+          && List.equal
+               (fun (idx1, itree1) (idx2, itree2) ->
+                 idx1 = idx2 && inode_tree_eq itree1 itree2)
+               i1.proofs
+               i2.proofs
+      | Extender i1, Extender i2 ->
+          i1.length = i2.length
+          && List.equal ( = ) i1.segment i2.segment
+          && inode_tree_eq i1.proof i2.proof
+      | _ -> false
+
+    let tree_proof_eq p1 p2 =
+      p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
+      && tree_eq p1.state p2.state
+  end
+
+  let proof_hash_eq p1 p2 =
+    p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
 end
 
 module type PROOF = sig
@@ -540,6 +547,12 @@ module type TEZOS_CONTEXT = sig
 
     (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
     val of_raw : raw -> tree
+
+    (** [unshallow t] is the tree equivalent to [t] but with all subtrees evaluated,
+        i.e. without "reference" nodes.
+        Concretely, it means that no node in [t] contains just an in-memory hash,
+        but the actual value instead. *)
+    val unshallow : tree -> tree Lwt.t
 
     type repo
 
@@ -703,6 +716,17 @@ module type TEZOS_CONTEXT = sig
   val merkle_tree :
     t -> Proof_types.merkle_leaf_kind -> key -> Proof_types.merkle_tree Lwt.t
 
+  (** [merkle_tree_v2 t leaf_kind key] returns an Irmin Merkle proof for [key] (i.e.
+    a proof that *something* is in the context at [key]).
+    The proof is supposed to be produced by Irmin's [produce_proof], and consumed
+    by Irmin's [verify_proof]. The value embedded in the proof depends on [leaf_kind].
+    If [leaf_kind] is [Block_services.Raw_context], the embeded value is the complete
+    subtree in the context at [key].
+    If [leaf_kind] is [Block_services.Hole], the embedded value is the hash of the
+    subtree described above. *)
+  val merkle_tree_v2 :
+    t -> Proof_types.merkle_leaf_kind -> key -> Proof.tree Proof.t Lwt.t
+
   (** {2 Accessing and Updating Versions} *)
 
   val exists : index -> Context_hash.t -> bool Lwt.t
@@ -806,4 +830,62 @@ module type TEZOS_CONTEXT = sig
     data_merkle_root:Context_hash.t ->
     parents_contexts:Context_hash.t list ->
     bool Lwt.t
+end
+
+(** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.
+    Note that the partially applied `get_data kind key` function has the correct
+    type to be provided to {produce,verify}_tree_proof, which is its intended goal. *)
+module type Storelike = sig
+  (* The type of keys in the store *)
+  type key = string list
+
+  (* The type of internal nodes in the store *)
+  type tree
+
+  (* The type of values in the store *)
+  type value
+
+  (* [find t k] is [Some v] if [k] is associated with value [v] in [t], and
+     [None] otherwise. *)
+  val find : tree -> key -> value option Lwt.t
+
+  (* [find_tree t k] is [Some subtree] if [k] is associated with the internal
+     node [subtree] in [t], and [None] otherwise. *)
+  val find_tree : tree -> key -> tree option Lwt.t
+
+  (* Evaluate all nodes in the tree, i.e. resolve all pointers. *)
+  val unshallow : tree -> tree Lwt.t
+end
+
+let current_data_key = ["data"]
+
+(* Data in stores is prefixed by key "data".
+    It seems that the correctness of the protocol assumes that the prefix key
+    is the same in the client store and the server store, so we define it
+    centrally here for use in disk/context.ml and memory/context.ml. *)
+let data_key k = current_data_key @ k
+
+module With_get_data (Store : Storelike) = struct
+  let get_data (leaf_kind : Proof_types.merkle_leaf_kind)
+      (keys : Store.key list) (tree : Store.tree) :
+      (Store.tree
+      * (Store.key * (Store.tree, Store.value) Either.t Option.t) list)
+      Lwt.t =
+    let open Lwt_syntax in
+    let find k =
+      match leaf_kind with
+      | Proof_types.Hole -> return [(k, None)]
+      | Proof_types.Raw_context -> (
+          let key = data_key k in
+          let* val_o = Store.find tree key
+          and* tree_o = Store.find_tree tree key in
+          match (val_o, tree_o) with
+          | Some value, _ -> return [(k, Some (Either.Right value))]
+          | _, Some tree ->
+              let* tree = Store.unshallow tree in
+              return [(k, Some (Either.Left tree))]
+          | _ -> return [])
+    in
+    let* values = Lwt_list.map_p find keys in
+    return (tree, List.concat values)
 end

@@ -23,10 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Internal = Light_internal
 module Store = Local_context
-module Merkle = Internal.Merkle
 module Proof = Tezos_context_sigs.Context.Proof_types
+
+module Storelike = struct
+  include Store
+
+  type tree = Store.tree
+
+  let find = Store.Tree.find
+
+  let find_tree = Store.Tree.find_tree
+
+  let unshallow = Tree.unshallow
+end
+
+module Get_data = Tezos_context_sigs.Context.With_get_data ((
+  Storelike : Tezos_context_sigs.Context.Storelike))
 
 type input = {
   printer : Tezos_client_base.Client_context.printer;
@@ -34,9 +47,10 @@ type input = {
   chain : Tezos_shell_services.Block_services.chain;
   block : Tezos_shell_services.Block_services.block;
   key : string list;
-  mtree : Proof.merkle_tree;
-  tree : Store.tree;
+  mproof : Proof.tree Proof.t;
 }
+
+let key_to_string = String.concat ";"
 
 let min_agreeing_endpoints min_agreement nb_endpoints =
   min_agreement *. float_of_int nb_endpoints |> Float.ceil |> int_of_float
@@ -44,15 +58,9 @@ let min_agreeing_endpoints min_agreement nb_endpoints =
 module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
   type validation_result = Valid | Invalid of string
 
-  (** Checks that the data-less merkle tree [incoming_mtree]
-      provided by the endpoint [uri] meets these two conditions:
-
-      * Its shape matches the shape of the tree provided by the
-        endpoint providing data ([data_tree])
-      * It agrees with the tree at [key] in [store_tree]. *)
-  let validate uri key store_tree (data_tree : Proof.merkle_tree)
-      (incoming_mtree : Proof.merkle_tree option tzresult) =
-    match incoming_mtree with
+  let validate uri key (data_proof : Proof.tree Proof.t)
+      (incoming_mproof : Proof.tree Proof.t option tzresult) =
+    match incoming_mproof with
     | Error trace ->
         Lwt.return
         @@ Invalid
@@ -60,7 +68,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
                 "Light mode: endpoint %s failed to provide merkle tree for key \
                  %s. Error is: %a"
                 (Uri.to_string uri)
-                (Internal.key_to_string key)
+                (key_to_string key)
                 pp_print_trace
                 trace)
     | Ok None ->
@@ -69,36 +77,20 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
              (Format.asprintf
                 "Light mode: endpoint %s doesn't contain key %s"
                 (Uri.to_string uri)
-                (Internal.key_to_string key))
-    | Ok (Some mtree) -> (
-        match Internal.Merkle.trees_shape_match key data_tree mtree with
-        | Error errors ->
-            assert (errors <> []) ;
-            Lwt.return
-            @@ Invalid
-                 Format.(
-                   asprintf
-                     "@[<v 0>Shape of Merkle tree provided by endpoint %a \
-                      doesn't match shape of data tree sent by the first \
-                      endpoint:@,\
-                      %a@]"
-                     Uri.pp
-                     uri
-                     (pp_print_list pp_print_string)
-                     errors)
-        | Ok () -> (
-            let open Lwt_syntax in
-            let* r = Merkle.contains_merkle_tree store_tree mtree in
-            match r with
-            | Ok _ -> Lwt.return Valid
-            | Error err ->
-                Lwt.return
-                @@ Invalid
-                     (Format.sprintf
-                        "When checking that local in-memory tree contains the \
-                         merkle tree provided by endpoint %s: %s"
-                        (Uri.to_string uri)
-                        err)))
+                (key_to_string key))
+    | Ok (Some mproof) -> (
+        let open Lwt_syntax in
+        let* res =
+          Store.verify_tree_proof mproof (Get_data.get_data Proof.Hole [key])
+        in
+        match res with
+        | Ok _ ->
+            if Proof.proof_hash_eq mproof data_proof then return Valid
+            else return (Invalid "Light mode: proofs were not equal")
+        | Error _ ->
+            return
+              (Invalid
+                 "Light mode: proof could not be verified to derive a tree"))
 
   let count_valids validations =
     let count_valid = function Valid -> 1 | Invalid _ -> 0 in
@@ -116,8 +108,7 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
         | Invalid errmsg -> printer#warning "%s\n" errmsg)
       validations
 
-  let consensus
-      ({printer; min_agreement; chain; block; key; mtree; tree} : input)
+  let consensus ({printer; min_agreement; chain; block; key; mproof} : input)
       validating_endpoints =
     let open Lwt_syntax in
     (* + 1 because there's the endpoint that provides data, that doesn't
@@ -131,13 +122,14 @@ module Make (Light_proto : Light_proto.PROTO_RPCS) = struct
        data is, because the validating endpoints return trees that do NOT
        contain this key. *)
     let check_merkle_tree_with_endpoint (uri, rpc_context) =
-      let* other_mtree =
+      let* other_mproof =
         Light_proto.merkle_tree
-          {rpc_context; chain; block; mode = Client}
+          ({rpc_context; chain; block; mode = Client}
+            : Proxy.proxy_getter_input)
           key
           Proof.Hole
       in
-      validate uri key tree mtree other_mtree
+      validate uri key mproof other_mproof
     in
     let* validations =
       Lwt_list.map_p check_merkle_tree_with_endpoint validating_endpoints

@@ -190,6 +190,9 @@ let string_fixed n = QCheck2.Gen.(string_size (pure n))
 
 let bytes_gen = QCheck2.Gen.(map Bytes.of_string string)
 
+let small_bytes_gen =
+  QCheck2.Gen.(map Bytes.of_string @@ small_string ~gen:char)
+
 let bytes_fixed_gen size = QCheck2.Gen.map Bytes.of_string (string_fixed size)
 
 let sublist : 'a list -> 'a list QCheck2.Gen.t =

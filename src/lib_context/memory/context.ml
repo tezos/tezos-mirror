@@ -119,7 +119,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let current_test_chain_key = ["test_chain"]
 
-  let current_data_key = ["data"]
+  let current_data_key = Tezos_context_sigs.Context.current_data_key
 
   let current_predecessor_block_metadata_hash_key =
     ["predecessor_block_metadata_hash"]
@@ -210,9 +210,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Generic Store Primitives ------------------------------------------------*)
 
-  let data_key key = current_data_key @ key
-
-  let current_data_key = data_key []
+  let data_key = Tezos_context_sigs.Context.data_key
 
   let mem : t -> key -> bool Lwt.t =
    fun ctxt key -> Tree.mem ctxt.tree (data_key key)
@@ -372,6 +370,37 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       (match key with
       | `Node hash -> `Node (Hash.of_context_hash hash)
       | `Value hash -> `Value (Hash.of_context_hash hash))
+
+  module Storelike = struct
+    type key = string list
+
+    type tree = Store.tree
+
+    type value = bytes
+
+    let find = Tree.find
+
+    let find_tree = Tree.find_tree
+
+    let unshallow = Tree.unshallow
+  end
+
+  module Get_data = Tezos_context_sigs.Context.With_get_data ((
+    Storelike : Tezos_context_sigs.Context.Storelike))
+
+  let merkle_tree_v2 ctx leaf_kind key =
+    let open Lwt_syntax in
+    match Tree.kinded_key ctx.tree with
+    | None ->
+        raise (Invalid_argument "In-memory context.tree has no kinded_key")
+    | Some kinded_key ->
+        let* proof, _ =
+          produce_tree_proof
+            ctx.index
+            kinded_key
+            (Get_data.get_data leaf_kind [key])
+        in
+        return proof
 
   (*-- Predefined Fields -------------------------------------------------------*)
 
