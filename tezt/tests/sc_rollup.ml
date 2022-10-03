@@ -926,7 +926,7 @@ let test_rollup_list ~kind =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
     let* rollups =
-      RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollup ()
+      RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
     in
     let rollups = JSON.as_list rollups in
     let () =
@@ -942,7 +942,7 @@ let test_rollup_list ~kind =
       (fun scoru_addresses ->
         let* () = Client.bake_for_and_wait client in
         let+ rollups =
-          RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollup ()
+          RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
         in
         let rollups =
           JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list

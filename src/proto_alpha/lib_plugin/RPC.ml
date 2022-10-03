@@ -1971,13 +1971,6 @@ module Sc_rollup = struct
           path /: Sc_rollup.Address.rpc_arg / "dal_slot_subscriptions"
           /: Raw_level.rpc_arg)
 
-    let root =
-      RPC_service.get_service
-        ~description:"List of all originated smart contract rollups"
-        ~query:RPC_query.empty
-        ~output:(Data_encoding.list Sc_rollup.Address.encoding)
-        path
-
     let ongoing_refutation_game =
       let query =
         let open RPC_query in
@@ -2070,6 +2063,16 @@ module Sc_rollup = struct
         ~query
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "can_be_cemented")
+
+    let path_sc_rollups : RPC_context.t RPC_path.context =
+      RPC_path.(open_root / "context" / "sc_rollups")
+
+    let root =
+      RPC_service.get_service
+        ~description:"List of all originated smart contract rollups"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.list Sc_rollup.Address.encoding)
+        path_sc_rollups
   end
 
   let kind ctxt block sc_rollup_address =

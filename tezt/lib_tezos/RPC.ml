@@ -720,8 +720,8 @@ let post_chain_block_context_contract_ticket_balance ?(chain = "main")
     ~data
     JSON.as_int
 
-let get_chain_block_context_sc_rollup ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollup"] Fun.id
+let get_chain_block_context_sc_rollups ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollups"] Fun.id
 
 let get_chain_block_context_sc_rollup_inbox ?(chain = "main") ?(block = "head")
     sc_rollup =

@@ -738,8 +738,8 @@ val post_chain_block_context_contract_ticket_balance :
 
 (** {2 Smart contract rollup RPC module} *)
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup] *)
-val get_chain_block_context_sc_rollup :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups] *)
+val get_chain_block_context_sc_rollups :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/inbox] *)
