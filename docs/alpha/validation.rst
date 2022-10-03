@@ -258,12 +258,144 @@ particular, it does not validate all kinds of operations.
 Operation Validation and Application
 ====================================
 
+In the Tezos economic protocol, we dissociate the notion of *validity*
+from the notion of *applicability* for operations. A valid operation
+is an operation that can be included safely in a block without
+affecting the block's validity. Applying an operation, on the other
+hand, actually performs the operation's side-effects which can be:
+registering a new delegate, executing a smart contract, voting for a
+new protocol amendment proposal, etc.
+
+Note that an operation may fail during the application phase, even
+though it has been checked as valid. For example, a smart contract
+call that exceeds its gas limit can be included in a block even if an
+error is raised at run-time. The application (that is, the operation's
+side-effects) will not take effect, but fees will nonetheless be taken
+from the account submitting the smart contract call.
+
+In the sequel we refine the validity conditions and describe the
+application process for each of the different validation passes.
+
+.. FIXME tezos/tezos#3921:
+
+   Expand validity and application for other validation classes.
+
 .. _manager_operations_validity_alpha:
 
 Validity of Manager Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+In this sub-section, we explain the conditions for manager operations
+(and batches of managers operations) to be considered valid and hence
+suitable for inclusion in a block.
+
+Validity of Individual Manager Operations
+.........................................
+
+:ref:`Manager operation<manager_operations_alpha>` are a class of
+operations, issued by a single *manager* account which signs the
+operation and pays their fees. The different manager operation kinds
+share several common fields:
+
+- ``source``: the public key's hash of the *source* account of the
+  manager operation -- that is, the *manager*.
+- ``fee``: the amount of tez paid to the baker which decides to
+  include this operation;
+- ``counter``: the manager account's counter, incremented each time
+  this account executes a manager operation, to prevent
+  replay-attacks.
+- ``gas_limit``: the maximum amount of gas that this operation may
+  consume before failing.
+- ``storage_limit``: the maximum amount of storage that this operation
+  may require before failing.
+- ``operation``: the actual operation(s) -- e.g., transfers,
+  smart-contract calls, originations, delegations, etc.
+- ``signature``: the manager's signature used to prove its identity.
+
+A manager operation is **valid** if and only if all of the following
+conditions hold:
+
+- The operation source's public key has been previously *revealed*,
+  unless the operation is itself a ``Reveal`` operation.
+- The operation's signature is correct with regard to the manager
+  account's public key.
+- The provided ``counter`` value is the expected one for the manager.
+- Depending on the operation's kind, the ``gas_limit`` is high enough
+  to cover the minimal cost of parsing the operation and further
+  minimal treatment.
+- The manager account is solvent to pay the announced fees.
+
+Validity of Manager Operation Batches
+.....................................
+
+A :ref:`batch<manager_operations_batches_alpha>` of manager operations
+includes one or more manager operations for sequential and atomic
+execution. The atomicity property imposes that the validity of a batch
+should entail the validity of each individual operation in the batch,
+as defined above. However, it also entails some additional *global*
+constraints on manager batches.
+
+For each of the operations present in a batch, the validation process
+must check that the individual constraints above are satisfied, *with
+the exception of* the signature constraint. Given that the signature
+concerns the whole batch, as all operations in the batch are signed by
+the same manager, it suffices to verify the signature only once.
+
+The **global batch validity** constraint for this economic protocol is
+defined as the conjunction of the following conditions:
+
+- When a ``Reveal`` operation is present, **it must only occur once**,
+  and **it must be placed at the head** of the batch -- that is, the
+  ``Reveal`` operation must be the first operation in the batch.
+- Every operation in the batch should declare the same `source`.
+- Each of the individual operation counters must be incremented
+  correctly and sequentially.
+- The sum of each individual operation's declared fees must be lower
+  than the account's balance. That is, the manager account must be
+  solvent to pay the announced fees for all the operations in the
+  batch.
+
 .. _manager_operations_application_alpha:
 
 Application of Manager Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Once the validity of a manager operation (or, a batch of manager
+operations) is established, the protocol proceeds to apply the
+operation. This first step in this application phase is to transfer
+the operation's fees to the baker that included this operation. Then,
+the actual application depends on the operation kind. For instance,
+this could be a smart contract execution, enacting a delegation, or
+multiple actions executed as a batch. The application of a batch of
+manager operations consists of the sequential application of each
+operation in the batch, following their inclusion order -- the head of
+the batch being the first manager operation being applied.
+
+The application of each individual manager operation may either
+succeed -- and therefore be reported as ``Applied`` --, or indeed fail
+with an error. In both cases, the fees are taken and the counter for
+the operation's manager is incremented.
+
+When a manager operation fails, every side-effect which was previously
+performed is backtracked. Moreover, the (rest of the) batch has to be
+aborted.  Thus, depending on the position of the manager operation in
+a batch, its failure has to be propagated accordingly:
+
+- If there were other successfully applied operations in the batch
+  prior to the offending one, the effect of each of them has to be
+  reverted, and each of them will be reported as ``Backtracked``.
+
+- If there were other operations pending application after the
+  offending one, their application is aborted, and they are reported
+  as ``Skipped``.
+
+For example, let's consider a simple batch of three manager operations
+``[op1, op2, op3]``, if ``op1`` is successful but ``op2`` fails, the
+ticket result for the application of the manager operation batch will
+report:
+
+* ``op1`` -- ``Backtracked``, ```op1`` was applied successfully, but
+  after ``op2`` failed, the operation was canceled;
+* ``op2`` -- ``Failed``, the application of this particular operation failed;
+* ``op3`` -- ``Skipped``, this operation was never executed because
+  ``op2`` had previously failed.
