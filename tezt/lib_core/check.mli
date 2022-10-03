@@ -279,6 +279,21 @@ val raises :
 (** Check that a file with the given name exists. *)
 val file_exists : ?__LOC__:string -> string -> unit
 
+(** Check that a file with the given name does not exist. *)
+val file_not_exists : ?__LOC__:string -> string -> unit
+
+(** Check that a directory with the given name exists.
+
+    This [directory_exists path] succeeds if there is a file at
+    [path] and it is a directory. *)
+val directory_exists : ?__LOC__:string -> string -> unit
+
+(** Check that a directory with the given name does not exist.
+
+    This [directory_not_exists path] succeeds either if there is a
+    non-directory file at [path] or if there is no file at [path]. *)
+val directory_not_exists : ?__LOC__:string -> string -> unit
+
 (** {2 Predicates on booleans} *)
 
 (** Check that a boolean is true.

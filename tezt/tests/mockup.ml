@@ -632,7 +632,7 @@ let test_create_mockup_dir_exists_nonempty =
     ~tags:["mockup"; "client"; "base_dir"]
   @@ fun protocol ->
   let base_dir = Temp.dir "mockup_dir" in
-  Base.write_file ~contents:"" (base_dir ^ "/" ^ "whatever") ;
+  write_file ~contents:"" (base_dir // "whatever") ;
   let client = Client.create_with_mode ~base_dir Client.Mockup in
   let* () =
     Client.spawn_create_mockup client ~protocol
@@ -771,6 +771,114 @@ let test_create_mockup_custom_bootstrap_accounts =
       ~error_msg:"Expected names %R, got %L") ;
   unit
 
+let rmdir dir = Process.spawn "rm" ["-rf"; dir] |> Process.check
+
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] looks like a dubious base directory. Checks that a warning
+   is printed. *)
+let test_transfer_bad_base_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Transfer bad base dir."
+    ~tags:["mockup"; "client"; "initialization"]
+  @@ fun protocol ->
+  Log.info "First create mockup with an empty base dir" ;
+  let base_dir = Temp.dir "mockup-dir" in
+  Sys.rmdir base_dir ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () = Client.create_mockup ~protocol client in
+  let base_dir = Client.base_dir client in
+  let mockup_dir = base_dir // "mockup" in
+  Log.info "A valid mockup has a directory named [mockup], in its directory" ;
+  Check.directory_exists ~__LOC__ mockup_dir ;
+
+  Log.info "Delete this directory:" ;
+  let* () = rmdir mockup_dir in
+  Log.info "And put a file instead:" ;
+  write_file mockup_dir ~contents:"" ;
+
+  Log.info "Now execute a command" ;
+  let* () =
+    Client.spawn_transfer
+      ~amount:Tez.one
+      ~giver:"bootstrap1"
+      ~receiver:"bootstrap2"
+      client
+    |> Process.check_error
+         ~msg:(rex "Some commands .* might not work correctly.")
+  in
+  unit
+
+(* Executes [tezos-client --mode mockup config show] in a state where
+   it should succeed. *)
+let test_config_show_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = Client.config_show ~protocol client in
+  unit
+
+(* Executes [tezos-client --mode mockup config show] when base dir is
+   NOT a mockup. It should fail as this is dangerous (the default base
+   directory could contain sensitive data, such as private keys) *)
+let test_config_show_mockup_fail =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config failure."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () = rmdir (Client.base_dir client) in
+  let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
+  unit
+
+(* Executes [tezos-client config init mockup] in a state where it
+   should succeed *)
+let test_config_init_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup config initialization."
+    ~tags:["mockup"; "client"; "config"; "initialization"]
+  @@ fun protocol ->
+  let protocol_constants = Temp.file "protocol-constants.json" in
+  let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.config_init ~protocol ~bootstrap_accounts ~protocol_constants client
+  in
+  let (_ : JSON.t) = JSON.parse_file protocol_constants in
+  let (_ : JSON.t) = JSON.parse_file bootstrap_accounts in
+  unit
+
+(* Executes [tezos-client config init mockup] when base dir is NOT a
+   mockup. It should fail as this is dangerous (the default base
+   directory could contain sensitive data, such as private keys) *)
+let test_config_init_mockup_fail =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup config initialization failure."
+    ~tags:["mockup"; "client"; "config"; "initialization"]
+  @@ fun protocol ->
+  let protocol_constants = Temp.file "protocol-constants.json" in
+  let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
+  let* client = Client.init_mockup ~protocol () in
+  Log.info "remove the mockup directory to invalidate the mockup state" ;
+  let* () = rmdir (Client.base_dir client // "mockup") in
+  let* () =
+    Client.spawn_config_init
+      ~protocol
+      ~bootstrap_accounts
+      ~protocol_constants
+      client
+    |> Process.check_error
+  in
+  Check.file_not_exists ~__LOC__ protocol_constants ;
+  Check.file_not_exists ~__LOC__ bootstrap_accounts ;
+  unit
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -787,7 +895,12 @@ let register ~protocols =
   test_retrieve_addresses protocols ;
   test_create_mockup_already_initialized protocols ;
   test_create_mockup_custom_constants protocols ;
-  test_create_mockup_custom_bootstrap_accounts protocols
+  test_create_mockup_custom_bootstrap_accounts protocols ;
+  test_transfer_bad_base_dir protocols ;
+  test_config_show_mockup protocols ;
+  test_config_show_mockup_fail protocols ;
+  test_config_init_mockup protocols ;
+  test_config_init_mockup_fail protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;

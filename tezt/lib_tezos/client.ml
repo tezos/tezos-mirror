@@ -2239,3 +2239,22 @@ let convert_script ~script ~src_format ~dst_format client =
   |> Process.check_and_read_stdout
 
 let bootstrapped client = spawn_command client ["bootstrapped"] |> Process.check
+
+let spawn_config_show ?protocol client =
+  spawn_command client
+  @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
+  @ ["config"; "show"]
+
+let config_show ?protocol client =
+  spawn_config_show ?protocol client |> Process.check
+
+let spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
+  spawn_command client
+  @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
+  @ ["config"; "init"]
+  @ Cli_arg.optional_arg "bootstrap-accounts" Fun.id bootstrap_accounts
+  @ Cli_arg.optional_arg "protocol-constants" Fun.id protocol_constants
+
+let config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
+  spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client
+  |> Process.check

@@ -1668,3 +1668,25 @@ val convert_script :
 
 (** Run [octez-client bootstrapped]. *)
 val bootstrapped : t -> unit Lwt.t
+
+(** Run [tezos-client config show]. *)
+val config_show : ?protocol:Protocol.t -> t -> unit Lwt.t
+
+(** Same as [config_show], but do not wait for the process to exit. *)
+val spawn_config_show : ?protocol:Protocol.t -> t -> Process.t
+
+(** Run [tezos-client config show]. *)
+val config_init :
+  ?protocol:Protocol.t ->
+  ?bootstrap_accounts:string ->
+  ?protocol_constants:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [config_init], but do not wait for the process to exit. *)
+val spawn_config_init :
+  ?protocol:Protocol.t ->
+  ?bootstrap_accounts:string ->
+  ?protocol_constants:string ->
+  t ->
+  Process.t
