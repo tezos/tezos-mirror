@@ -1319,7 +1319,7 @@ module Cost_of = struct
 
     let hash_key _ = atomic_step_cost cost_N_IHash_key
 
-    let split_ticket _ amount_a amount_b =
+    let split_ticket amount_a amount_b =
       atomic_step_cost
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
