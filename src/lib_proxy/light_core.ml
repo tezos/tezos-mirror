@@ -134,15 +134,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
                   Lwt.return_some (mproof, tree, other_endpoints)
               | _ ->
                   (* Here we skip an endpoint that succeeded with a proof that doesn't map 'key'.
-                     It's okay. *)
-                  let* () =
-                    printer#warning
-                      "Light mode: endpoint %s does not map key %s (%s). \
-                       Skipping it."
-                      (Uri.to_string uri)
-                      (key_to_string key)
-                      (chain_n_block_to_string chain block)
-                  in
+                     This is okay. *)
                   get_first_merkle_tree
                     chain
                     block
@@ -153,15 +145,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
           | Ok None ->
               (* Here we skip an endpoint that succeeded but returned None
                  This means the endpoint's context does not map 'key'.
-                 It's okay. *)
-              let* () =
-                printer#warning
-                  "Light mode: endpoint %s does not map key %s (%s). Skipping \
-                   it."
-                  (Uri.to_string uri)
-                  (key_to_string key)
-                  (chain_n_block_to_string chain block)
-              in
+                 This is okay. *)
               get_first_merkle_tree
                 chain
                 block
