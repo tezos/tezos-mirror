@@ -215,12 +215,18 @@ struct
     let link_finished (ast : Wasm.Ast.module_) offset =
       offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
-    let is_time_for_snapshot
-        {current_tick; last_top_level_call; max_nb_ticks; _} =
+    let eval_has_finished = function
+      | Eval {step_kont = Wasm.Eval.(SK_Result _); _} -> true
+      | _ -> false
+
+    let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
       let open Z in
-      current_tick - last_top_level_call >= max_nb_ticks - Z.one
+      max_nb_ticks - one - (current_tick - last_top_level_call)
     (* The max number of tick is offsetted by 1, which corresponds to the input
        tick. *)
+
+    let is_time_for_snapshot pvm_state =
+      Z.Compare.(ticks_to_snapshot pvm_state <= Z.zero)
 
     let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state)
         =
@@ -234,8 +240,7 @@ struct
           return
             ~status:Failing
             (Stuck (Wasm_pvm_errors.invalid_state "snapshot is a tick state"))
-      | Eval {step_kont = Wasm.Eval.(SK_Result _); _}
-        when is_time_for_snapshot pvm_state ->
+      | _ when eval_has_finished tick_state && is_time_for_snapshot pvm_state ->
           (* We have an empty set of admin instructions *)
           return ~status:Restarting Snapshot
       | _ when is_time_for_snapshot pvm_state ->
@@ -333,7 +338,7 @@ struct
               init_kont
           in
           return (Init {self; ast_module; init_kont; module_reg})
-      | Eval {step_kont = Wasm.Eval.(SK_Result _); _} ->
+      | _ when eval_has_finished tick_state ->
           (* We have an empty set of admin instructions, but need to wait until we can restart *)
           return tick_state
       | Eval {step_kont = Wasm.Eval.(SK_Trapped msg); _} ->
@@ -398,20 +403,33 @@ struct
           | None -> No_input_required)
       | _ -> No_input_required
 
+    let is_top_level_padding pvm_state =
+      eval_has_finished pvm_state.tick_state
+      && not (is_time_for_snapshot pvm_state)
+
     let compute_step_many ~max_steps tree =
       let open Lwt.Syntax in
       assert (max_steps > 0L) ;
 
-      let should_continue pvm_state =
-        match input_request pvm_state with
-        | Reveal_required _ | Input_required -> false
-        | No_input_required -> true
-      in
-
       let rec go steps_left pvm_state =
-        if steps_left > 0L && should_continue pvm_state then
-          let* pvm_state = compute_step_inner pvm_state in
-          go (Int64.pred steps_left) pvm_state
+        if steps_left > 0L && input_request pvm_state = No_input_required then
+          if is_top_level_padding pvm_state then
+            (* We're in the top-level padding after the evaluation has
+               finished. That means we can skip up to the tick before the
+               snapshot in one go. *)
+            let bulk_ticks =
+              Z.(min (ticks_to_snapshot pvm_state) (of_int64 steps_left))
+            in
+            let pvm_state =
+              {
+                pvm_state with
+                current_tick = Z.add pvm_state.current_tick bulk_ticks;
+              }
+            in
+            go (Int64.sub steps_left (Z.to_int64 bulk_ticks)) pvm_state
+          else
+            let* pvm_state = compute_step_inner pvm_state in
+            go (Int64.pred steps_left) pvm_state
         else Lwt.return pvm_state
       in
 
