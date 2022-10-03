@@ -394,7 +394,7 @@ module type Merkelized_operations = sig
 
   (** [empty ctxt level] is an inbox started at some given [level] with no
       message at all. *)
-  val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
+  val empty : inbox_context -> Raw_level_repr.t -> t Lwt.t
 
   module Internal_for_tests : sig
     val eq_tree : tree -> tree -> bool

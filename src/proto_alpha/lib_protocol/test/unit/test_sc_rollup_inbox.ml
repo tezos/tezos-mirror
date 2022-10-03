@@ -72,7 +72,7 @@ let populate_inboxes ctxt level history inbox inboxes level_tree
 
 let test_empty () =
   create_context () >>=? fun ctxt ->
-  empty ctxt rollup (Raw_level_repr.of_int32_exn 42l) >>= fun inbox ->
+  empty ctxt (Raw_level_repr.of_int32_exn 42l) >>= fun inbox ->
   fail_unless
     Compare.Int64.(equal (number_of_messages_during_commitment_period inbox) 0L)
     (err "An empty inbox should have no available message.")
@@ -80,7 +80,7 @@ let test_empty () =
 let setup_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   create_context () >>=? fun ctxt ->
-  let* inbox = empty ctxt rollup first_level in
+  let* inbox = empty ctxt first_level in
   let history = History.empty ~capacity:10000L in
   populate_inboxes ctxt first_level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
@@ -282,7 +282,7 @@ let setup_node_inbox_with_messages list_of_payloads f =
   let open Lwt_syntax in
   let* index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
-  let* inbox = empty ctxt rollup first_level in
+  let* inbox = empty ctxt first_level in
   let history = History.empty ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
@@ -436,7 +436,7 @@ let test_empty_inbox_proof (level, n) =
   let open Lwt_result_syntax in
   let*! index = Tezos_context_memory.Context.init "foo" in
   let ctxt = Tezos_context_memory.Context.empty index in
-  let*! inbox = Node.empty ctxt rollup level in
+  let*! inbox = Node.empty ctxt level in
   let history = History.empty ~capacity:10000L in
   let* history, history_proof =
     Node.form_history_proof ctxt history inbox None
@@ -450,7 +450,7 @@ let test_empty_inbox_proof (level, n) =
       (* We now switch to a protocol inbox for verification. *)
       create_context ()
       >>=? fun ctxt ->
-      let*! inbox = empty ctxt rollup level in
+      let*! inbox = empty ctxt level in
       let current_level = Raw_level_repr.succ (inbox_level inbox) in
       let snapshot = take_snapshot ~current_level inbox in
       let proof = node_proof_to_protocol_proof proof in
@@ -496,7 +496,7 @@ let init_inboxes_histories_with_different_capacities
   let mk_history ?(next_index = 0L) ~capacity () =
     let open Lwt_syntax in
     create_context () >>=? fun ctxt ->
-    let* inbox = empty ctxt rollup first_level in
+    let* inbox = empty ctxt first_level in
     let history =
       Sc_rollup_inbox_repr.History.Internal_for_tests.empty
         ~capacity
@@ -670,7 +670,7 @@ let test_empty_inbox_snapshot_taking (origination_level, snapshot_level) =
     Raw_level_repr.of_int32_exn @@ Int32.of_int snapshot_level
   in
   let* ctxt = create_context () in
-  let*! inbox = empty ctxt rollup origination_level in
+  let*! inbox = empty ctxt origination_level in
   (* We take a snapshot of the whole inbox. *)
   let current_level = Raw_level_repr.succ origination_level in
   let expected_snapshot = take_snapshot ~current_level inbox in

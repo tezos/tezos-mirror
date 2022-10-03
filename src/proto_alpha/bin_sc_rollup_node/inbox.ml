@@ -59,10 +59,7 @@ module State = struct
         let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
         if block_level <= genesis_level then
           let*! inbox =
-            Context.Inbox.empty
-              node_ctxt.context
-              node_ctxt.rollup_address
-              node_ctxt.genesis_info.level
+            Context.Inbox.empty node_ctxt.context node_ctxt.genesis_info.level
           in
           return inbox
         else

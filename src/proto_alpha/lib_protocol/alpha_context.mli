@@ -3160,7 +3160,7 @@ module Sc_rollup : sig
         Raw_level.t * Z.t ->
         (proof * inbox_message option) tzresult Lwt.t
 
-      val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
+      val empty : inbox_context -> Raw_level.t -> t Lwt.t
 
       module Internal_for_tests : sig
         val eq_tree : tree -> tree -> bool

@@ -199,7 +199,6 @@ module V1 = struct
    (held by the [Raw_context.t] in the protocol).
 
    The metadata contains :
-   - [rollup] : the address of the rollup ;
    - [level] : the inbox level ;
    - [message_counter] : the number of messages in the [level]'s inbox ;
      the number of messages that have not been consumed by a commitment cementing ;
@@ -221,7 +220,6 @@ module V1 = struct
 
   *)
   type t = {
-    rollup : Sc_rollup_repr.t;
     level : Raw_level_repr.t;
     nb_messages_in_commitment_period : int64;
     starting_level_of_current_commitment_period : Raw_level_repr.t;
@@ -234,7 +232,6 @@ module V1 = struct
   let equal inbox1 inbox2 =
     (* To be robust to addition of fields in [t]. *)
     let {
-      rollup;
       level;
       nb_messages_in_commitment_period;
       starting_level_of_current_commitment_period;
@@ -244,8 +241,7 @@ module V1 = struct
     } =
       inbox1
     in
-    Sc_rollup_repr.Address.equal rollup inbox2.rollup
-    && Raw_level_repr.equal level inbox2.level
+    Raw_level_repr.equal level inbox2.level
     && Compare.Int64.(
          equal
            nb_messages_in_commitment_period
@@ -260,7 +256,6 @@ module V1 = struct
 
   let pp fmt
       {
-        rollup;
         level;
         nb_messages_in_commitment_period;
         starting_level_of_current_commitment_period;
@@ -270,16 +265,13 @@ module V1 = struct
       } =
     Format.fprintf
       fmt
-      "@[<hov 2>{ rollup = %a@;\
-       level = %a@;\
+      "@[<hov 2>{ level = %a@;\
        current messages hash  = %a@;\
        nb_messages_in_commitment_period = %s@;\
        starting_level_of_current_commitment_period = %a@;\
        message_counter = %a@;\
        old_levels_messages = %a@;\
        }@]"
-      Sc_rollup_repr.Address.pp
-      rollup
       Raw_level_repr.pp
       level
       Hash.pp
@@ -305,7 +297,6 @@ module V1 = struct
     Data_encoding.(
       conv
         (fun {
-               rollup;
                message_counter;
                nb_messages_in_commitment_period;
                starting_level_of_current_commitment_period;
@@ -313,22 +304,19 @@ module V1 = struct
                current_level_hash;
                old_levels_messages;
              } ->
-          ( rollup,
-            message_counter,
+          ( message_counter,
             nb_messages_in_commitment_period,
             starting_level_of_current_commitment_period,
             level,
             current_level_hash (),
             old_levels_messages ))
-        (fun ( rollup,
-               message_counter,
+        (fun ( message_counter,
                nb_messages_in_commitment_period,
                starting_level_of_current_commitment_period,
                level,
                current_level_hash,
                old_levels_messages ) ->
           {
-            rollup;
             message_counter;
             nb_messages_in_commitment_period;
             starting_level_of_current_commitment_period;
@@ -336,8 +324,7 @@ module V1 = struct
             current_level_hash = (fun () -> current_level_hash);
             old_levels_messages;
           })
-        (obj7
-           (req "rollup" Sc_rollup_repr.encoding)
+        (obj6
            (req "message_counter" n)
            (req "nb_messages_in_commitment_period" int64)
            (req
@@ -479,7 +466,7 @@ module type Merkelized_operations = sig
     Raw_level_repr.t * Z.t ->
     (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
-  val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
+  val empty : inbox_context -> Raw_level_repr.t -> t Lwt.t
 
   module Internal_for_tests : sig
     val eq_tree : tree -> tree -> bool
@@ -577,7 +564,6 @@ struct
         starting_level_of_current_commitment_period =
           inbox.starting_level_of_current_commitment_period;
         current_level_hash = inbox.current_level_hash;
-        rollup = inbox.rollup;
         level = inbox.level;
         old_levels_messages = inbox.old_levels_messages;
         message_counter;
@@ -675,7 +661,6 @@ struct
           starting_level_of_current_commitment_period =
             inbox.starting_level_of_current_commitment_period;
           current_level_hash = inbox.current_level_hash;
-          rollup = inbox.rollup;
           nb_messages_in_commitment_period =
             inbox.nb_messages_in_commitment_period;
           old_levels_messages;
@@ -1176,7 +1161,7 @@ struct
                     },
                   input_given ))
 
-  let empty context rollup level =
+  let empty context level =
     let open Lwt_syntax in
     assert (Raw_level_repr.(level <> Raw_level_repr.root)) ;
     let pre_genesis_level = Raw_level_repr.root in
@@ -1185,7 +1170,6 @@ struct
     let initial_hash = hash_level_tree initial_level in
     return
       {
-        rollup;
         level;
         message_counter = Z.zero;
         nb_messages_in_commitment_period = 0L;

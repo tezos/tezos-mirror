@@ -71,10 +71,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
     Store.Parameters_type.add ctxt address parameters_ty
   in
   let*! inbox =
-    Sc_rollup_inbox_repr.empty
-      (Raw_context.recover ctxt)
-      address
-      origination_level
+    Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) origination_level
   in
   let* ctxt, inbox_size_diff = Store.Inbox.init ctxt address inbox in
   let* ctxt, lcc_size_diff =

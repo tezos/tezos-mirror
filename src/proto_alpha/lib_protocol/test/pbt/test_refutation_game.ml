@@ -1140,10 +1140,10 @@ module Player_client = struct
      test/unit/test_sc_rollup_inbox. The main difference is: we use
      [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
      former. *)
-  let construct_inbox ctxt levels_and_payloads ~rollup ~origination_level =
+  let construct_inbox ctxt levels_and_payloads ~origination_level =
     let open Lwt_syntax in
     let open Store_inbox in
-    let* inbox = empty ctxt rollup origination_level in
+    let* inbox = empty ctxt origination_level in
     let history = Inbox.History.empty ~capacity:10000L in
     let rec aux history inbox level_tree = function
       | [] -> return (ctxt, level_tree, history, inbox)
@@ -1161,12 +1161,11 @@ module Player_client = struct
     aux history inbox None levels_and_payloads
 
   (** Construct an inbox based on [levels_and_inputs] in the player context. *)
-  let construct_inbox ~origination_level ctxt rollup levels_and_inputs =
+  let construct_inbox ~origination_level ctxt levels_and_inputs =
     Lwt_main.run
     @@ construct_inbox
          ~origination_level
          ctxt
-         ~rollup
          (levels_and_payloads levels_and_inputs)
 
   (** Generate [our_states] for [levels_and_inputs] based on the strategy.
@@ -1261,9 +1260,7 @@ module Player_client = struct
         ~level_max
         levels_and_inputs
     in
-    let inbox =
-      construct_inbox ~origination_level ctxt rollup levels_and_inputs
-    in
+    let inbox = construct_inbox ~origination_level ctxt levels_and_inputs in
     return
       {
         player;
