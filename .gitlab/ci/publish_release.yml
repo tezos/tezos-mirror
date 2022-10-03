@@ -81,6 +81,10 @@ docker:promote_to_latest:
   script:
     - ./scripts/ci/create_linux_package.sh
     - ./scripts/ci/upload_linux_package.sh
+  rules:
+   # NOTE: These jobs are disabled until the upstream scripts (https://github.com/serokell/tezos-packaging)
+   # provide support for the lima protocol and drop support for jakarta.
+   - when: never
 
 .build_rpm_packages:
   stage: publish_release
@@ -100,6 +104,10 @@ docker:promote_to_latest:
   script:
     - ./scripts/ci/create_linux_package.sh
     - ./scripts/ci/upload_linux_package.sh
+  rules:
+   # NOTE: These jobs are disabled until the upstream scripts (https://github.com/serokell/tezos-packaging)
+   # provide support for the lima protocol and drop support for jakarta.
+   - when: never
 
 #
 # RPM packages
