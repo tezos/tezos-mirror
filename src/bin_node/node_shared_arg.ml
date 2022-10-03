@@ -833,13 +833,26 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
           || may_override_network
         then patch_network ~cfg network_arg
         else
-          tzfail
-            (Network_configuration_mismatch
-               {
-                 configuration_file_chain_name =
-                   cfg.blockchain_network.chain_name;
-                 command_line_chain_name = network_arg.chain_name;
-               })
+          (* We assume that in the absence of store or context directories,
+             the data directory was never used to run an node.
+             Thus, the network configuration can be reset. *)
+          let*! context_dir =
+            Lwt_unix.file_exists @@ Node_data_version.context_dir
+            @@ Option.value ~default:cfg.data_dir args.data_dir
+          in
+          let*! store_dir =
+            Lwt_unix.file_exists @@ Node_data_version.store_dir
+            @@ Option.value ~default:cfg.data_dir args.data_dir
+          in
+          if context_dir || store_dir then
+            tzfail
+              (Network_configuration_mismatch
+                 {
+                   configuration_file_chain_name =
+                     cfg.blockchain_network.chain_name;
+                   command_line_chain_name = network_arg.chain_name;
+                 })
+          else patch_network ~cfg network_arg
   in
   (* Update bootstrap peers must take into account the updated config file
      with the [--network] argument, so we cannot use [Node_config_file]. *)
