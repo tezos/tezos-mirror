@@ -97,8 +97,6 @@ let sandbox_user_activated_upgrades = []
 (* END_PATCHING_ZONE_FOR_SANDBOX_USER_ACTIVATED_UPGRADES *)
 
 let blockchain_network_mainnet =
-  let giganode_1 = "116.202.172.21" in
-  let giganode_2 = "95.216.45.62" in
   make_blockchain_network
     ~alias:"mainnet"
     {
@@ -124,7 +122,7 @@ let blockchain_network_mainnet =
         ( "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
           "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
       ]
-    ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
+    ~default_bootstrap_peers:["boot.tzbeta.net"]
 
 let blockchain_network_hangzhounet =
   make_blockchain_network
