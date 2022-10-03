@@ -62,7 +62,11 @@ let replace_variables string =
     string
     replacements
 
-let hooks =
+let scrubbed_global_options =
+  ["--base-dir"; "-d"; "--endpoint"; "-E"; "--sources"]
+
+let hooks_custom ?(scrubbed_global_options = scrubbed_global_options)
+    ?(replace_variables = replace_variables) () =
   let on_spawn command arguments =
     (* Remove arguments that shouldn't be captured in regression output. *)
     let arguments, _ =
@@ -72,8 +76,7 @@ let hooks =
           else
             match arg with
             (* scrub client global options *)
-            | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
-                (acc, true)
+            | option when List.mem option scrubbed_global_options -> (acc, true)
             | _ -> (acc @ [replace_variables arg], false))
         ([], (* scrub_next *) false)
         arguments
@@ -83,3 +86,5 @@ let hooks =
   in
   let on_log output = replace_variables output |> Regression.capture in
   {Process.on_spawn; on_log}
+
+let hooks = hooks_custom ~scrubbed_global_options ~replace_variables ()
