@@ -140,9 +140,9 @@ let test_store_list_size () =
   let* durable =
     make_durable
       [
-        ("a/short/path", "true");
-        ("a/short/path/one", "true");
-        ("a/short/path/two", "true");
+        ("/a/short/path", "true");
+        ("/a/short/path/one", "true");
+        ("/a/short/path/two", "true");
       ]
   in
   let key = "/a/short/path" in
@@ -180,9 +180,9 @@ let test_store_delete () =
   let* durable =
     make_durable
       [
-        ("a/short/path", "true");
-        ("a/short/path/one", "true");
-        ("a/long/path", "true");
+        ("/a/short/path", "true");
+        ("/a/short/path/one", "true");
+        ("/a/long/path", "true");
       ]
   in
   let key = "/a/short/path" in
@@ -223,14 +223,14 @@ let test_store_delete () =
 let test_store_has_existing_key () =
   let open Lwt_syntax in
   let root =
-    "thequickbrownfoxjumpedoverthelazydog/THEQUICKBROWNFOXJUMPEDOVERTHELAZYDOG/0123456789."
+    "/thequickbrownfoxjumpedoverthelazydog/THEQUICKBROWNFOXJUMPEDOVERTHELAZYDOG/0123456789."
   in
   let* durable =
     make_durable
       [(root, "true"); (root ^ "/one", "true"); (root ^ "/two/three", "true")]
   in
   let src = 20l in
-  let key = "/" ^ root in
+  let key = root in
   let src_one = Int32.add src @@ Int32.of_int @@ String.length key in
   let key_one = key ^ "/one" in
   let src_two = Int32.add src_one @@ Int32.of_int @@ String.length key_one in
@@ -267,7 +267,7 @@ let test_store_has_existing_key () =
    chunked_byte_vector *)
 let test_durable_find_value () =
   let open Lwt_syntax in
-  let* durable = make_durable [("hello/value", "a very long value")] in
+  let* durable = make_durable [("/hello/value", "a very long value")] in
   let durable = Durable.of_storage_exn durable in
   let* r =
     Durable.find_value durable @@ Durable.key_of_string_exn "/hello/value"
@@ -295,10 +295,10 @@ let test_durable_count_subtrees () =
   let* tree =
     make_durable
       [
-        ("hello", "a very long value");
-        ("hello/world", "a very long value");
-        ("hello/you", "a very long value");
-        ("hello/you/too", "a very long value");
+        ("/hello", "a very long value");
+        ("/hello/world", "a very long value");
+        ("/hello/you", "a very long value");
+        ("/hello/you/too", "a very long value");
       ]
   in
   let assert_subtree_count t count under =
@@ -328,10 +328,10 @@ let test_store_copy () =
   let* durable =
     make_durable
       [
-        ("a/short/path", "a very long value");
-        ("a/short/path/one", "a very long value");
-        ("a/long/path/two", "a very long value");
-        ("hello/you/too", "a very long value");
+        ("/a/short/path", "a very long value");
+        ("/a/short/path/one", "a very long value");
+        ("/a/long/path/two", "a very long value");
+        ("/hello/you/too", "a very long value");
       ]
   in
   let from_key = "/a/short/path/one" in
@@ -403,9 +403,9 @@ let test_store_move () =
   let* durable =
     make_durable
       [
-        ("a/short/path", "a very long value");
-        ("a/long/path", "a very long value");
-        ("a/long/path/one", "a very long value");
+        ("/a/short/path", "a very long value");
+        ("/a/long/path", "a very long value");
+        ("/a/long/path/one", "a very long value");
       ]
   in
   let from_key = "/a/short/path" in
@@ -460,6 +460,55 @@ let test_store_move () =
   let* () = equal_chunks from_tree to_tree in
   Lwt.return_ok ()
 
+let test_store_read () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+    /durable/a/path/_ = "..."
+
+  We expect that reading from "/a/path" puts contents into memory.
+  *)
+  let key = "/a/path" in
+  let contents = "a value of sorts" in
+  let* durable = make_durable [(key, contents)] in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key] src
+  in
+
+  let length = Int32.of_int @@ String.length key in
+  let dst = 40l in
+  let read_offset = 5 in
+  let read_num_bytes = Int32.of_int @@ String.length contents in
+  let values =
+    Values.
+      [
+        Num (I32 src);
+        Num (I32 length);
+        Num (I32 (Int32.of_int read_offset));
+        Num (I32 dst);
+        Num (I32 read_num_bytes);
+      ]
+  in
+  let* _, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_read
+      values
+  in
+  let expected_read_bytes_len = String.length contents - read_offset in
+  let expected_read_bytes =
+    String.sub contents read_offset expected_read_bytes_len
+  in
+  assert (result = [Values.Num (I32 (Int32.of_int expected_read_bytes_len))]) ;
+  let* memory = retrieve_memory module_reg in
+  let* value = Memory.load_bytes memory dst expected_read_bytes_len in
+  assert (value = expected_read_bytes) ;
+  return_ok_unit
+
 (* Test invalid key encodings are rejected. *)
 let test_durable_invalid_keys () =
   let open Lwt.Syntax in
@@ -494,6 +543,7 @@ let tests =
     tztest "store_delete removes subtree" `Quick test_store_delete;
     tztest "store_copy" `Quick test_store_copy;
     tztest "store_move" `Quick test_store_move;
+    tztest "store_read" `Quick test_store_read;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
