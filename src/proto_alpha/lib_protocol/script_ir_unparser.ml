@@ -763,6 +763,12 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
       ([], ctxt)
       unparsed_datas
     >>?= fun (unparsed_datas, ctxt) -> return (List.rev unparsed_datas, ctxt)
+
+  module Internal_for_benchmarking = struct
+    let unparse_data = unparse_data_rec
+
+    let unparse_code = unparse_code_rec
+  end
 end
 
 let unparse_comparable_data ctxt mode ty v =
