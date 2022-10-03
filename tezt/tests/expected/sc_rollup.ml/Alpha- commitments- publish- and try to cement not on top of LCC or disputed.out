@@ -465,13 +465,47 @@ This simulation failed:
 Error:
   Parent is not the last cemented commitment.
 
+./octez-client --wait none timeout dispute on sc rollup '[SC_ROLLUP_HASH]' with '[PUBLIC_KEY_HASH]' from bootstrap1
+Node is bootstrapped.
+Estimated gas: 8210.876 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.001139
+    Expected counter: 8
+    Gas limit: 8311
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.001139
+      payload fees(the block proposer) ....... +ꜩ0.001139
+    Smart contract rollup refutation timeout:
+      Address: [SC_ROLLUP_HASH]
+      First staker (Alice): [PUBLIC_KEY_HASH]
+      Second staker (Bob): [PUBLIC_KEY_HASH]
+      This smart contract rollup refutation timeout was successfully applied
+      Consumed gas: 8210.876
+      Refutation game status: Game ended: [PUBLIC_KEY_HASH] lost because: timeout
+      Balance updates:
+        Frozen_bonds([PUBLIC_KEY_HASH],[SC_ROLLUP_HASH]) ... -ꜩ10000
+        sc rollup refutation punishments ........................................................... +ꜩ10000
+        sc rollup refutation rewards ............................................................... -ꜩ5000
+        [PUBLIC_KEY_HASH] ....................................................... +ꜩ5000
+
+
 ./octez-client --wait none cement commitment '[SC_ROLLUP_COMMITMENT_HASH]' from bootstrap1 for sc rollup '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
 This simulation failed:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0
-    Expected counter: 8
+    Expected counter: 9
     Gas limit: 1040000
     Storage limit: 60000 bytes
     Smart contract rollup commitment cementing:
@@ -488,7 +522,7 @@ This simulation failed:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0
-    Expected counter: 8
+    Expected counter: 9
     Gas limit: 1040000
     Storage limit: 60000 bytes
     Smart contract rollup commitment cementing:
@@ -513,7 +547,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000811
-    Expected counter: 8
+    Expected counter: 9
     Gas limit: 5136
     Storage limit: 0 bytes
     Balance updates:
@@ -541,7 +575,7 @@ This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000834
-    Expected counter: 9
+    Expected counter: 10
     Gas limit: 5366
     Storage limit: 0 bytes
     Balance updates:

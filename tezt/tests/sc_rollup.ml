@@ -2707,6 +2707,18 @@ let test_forking_scenario ~title ~scenario protocols =
 let cement_commitments client sc_rollup ?fail =
   Lwt_list.iter_s (fun hash -> cement_commitment client ~sc_rollup ~hash ?fail)
 
+let timeout ?expect_failure ~sc_rollup ~staker client =
+  let*! () =
+    Client.Sc_rollup.timeout
+      ~hooks
+      ~dst:sc_rollup
+      ~src:"bootstrap1"
+      ~staker
+      client
+      ?expect_failure
+  in
+  Client.bake_for_and_wait client
+
 (** Given a commitment tree constructed by {test_forking_scenario}, this function:
     - tests different (failing and non-failing) cementation of commitments
       and checks the returned error for each situation (in case of failure);
@@ -2760,18 +2772,13 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
         @@ M.make ~source:operator2
         @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
       in
-      (* [operator1] makes a dissection. it will lose here because the dissection
-         is ill-formed. *)
-      let refutation = M.{choice_tick = 0; refutation_step = Dissection []} in
+      (* [operator1] will not play and will be timeout-ed. *)
+      let timeout_period = constants.timeout_period_in_blocks in
       let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source:operator2
-        @@ M.sc_rollup_refute
-             ~sc_rollup
-             ~opponent:operator1.public_key_hash
-             ~refutation
-             ()
+        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
       in
+      (* He even timeout himself, what a shame. *)
+      let* () = timeout ~sc_rollup ~staker:operator1.public_key_hash client in
       (* Attempting to cement defeated branch will fail. *)
       let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
       (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
@@ -2859,18 +2866,6 @@ let test_late_rollup_node =
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
   return ()
-
-let timeout ?expect_failure ~sc_rollup ~staker client =
-  let*! () =
-    Client.Sc_rollup.timeout
-      ~hooks
-      ~dst:sc_rollup
-      ~src:"bootstrap1"
-      ~staker
-      client
-      ?expect_failure
-  in
-  Client.bake_for_and_wait client
 
 (* Testing the timeout to record gas consumption in a regression trace and
    detect when the value changes.
