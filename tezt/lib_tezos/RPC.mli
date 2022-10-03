@@ -742,9 +742,9 @@ val post_chain_block_context_contract_ticket_balance :
 val get_chain_block_context_sc_rollups :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/inbox] *)
-val get_chain_block_context_sc_rollup_inbox :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/inbox] *)
+val get_chain_block_context_sc_rollups_inbox :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
 val get_chain_block_context_sc_rollup_genesis_info :

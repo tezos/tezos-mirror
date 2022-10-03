@@ -100,8 +100,7 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
     let open Result_syntax in
     let+ accu = accu in
     match operation with
-    | Sc_rollup_add_messages {rollup; messages}
-      when Sc_rollup.Address.(rollup = rollup_address) ->
+    | Sc_rollup_add_messages {rollup = _; messages} ->
         let messages =
           List.map
             (fun message -> Sc_rollup.Inbox_message.External message)
@@ -143,9 +142,9 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in
   let head_block = `Hash (head_hash, 0) in
-  let Node_context.{cctxt; rollup_address; _} = node_ctxt in
+  let Node_context.{cctxt; _} = node_ctxt in
   let* layer1_inbox =
-    Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block) rollup_address
+    Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block)
   in
   fail_unless
     (Sc_rollup.Inbox.equal layer1_inbox inbox)

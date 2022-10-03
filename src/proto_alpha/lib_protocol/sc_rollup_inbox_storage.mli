@@ -24,14 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [get_inbox context rollup] returns the current state of the inbox,
+(** [get_inbox context] returns the current state of the inbox,
     if it exists. *)
 val get_inbox :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
+  Raw_context.t -> (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
-(** [add_external_messages context rollup msg] adds [msg] to [rollup]'s inbox.
+(** [add_external_messages context msg] adds [msg] to the smart rollups' inbox.
 
     This function returns the updated context as well as the size diff.
 

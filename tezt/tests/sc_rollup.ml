@@ -548,10 +548,9 @@ let parse_inbox json =
        (JSON.encode json)
        (Printexc.to_string exn))
 
-let get_inbox_from_tezos_node sc_rollup client =
+let get_inbox_from_tezos_node client =
   let* inbox =
-    RPC.Client.call client
-    @@ RPC.get_chain_block_context_sc_rollup_inbox sc_rollup
+    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups_inbox ()
   in
   parse_inbox inbox
 
@@ -574,7 +573,7 @@ let test_rollup_inbox_size ~kind =
         let n = 10 in
         let* () = send_messages n sc_rollup client in
         let* _, inbox_msg_during_commitment_period =
-          get_inbox_from_tezos_node sc_rollup client
+          get_inbox_from_tezos_node client
         in
         return
         @@ Check.(
@@ -689,7 +688,7 @@ let test_rollup_inbox_current_messages_hash ~kind =
         let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
         (* no messages have been sent *)
         let* pristine_hash, nb_available_messages =
-          get_inbox_from_tezos_node sc_rollup client
+          get_inbox_from_tezos_node client
         in
         let () =
           Check.((nb_available_messages = 0) int)
@@ -709,7 +708,7 @@ let test_rollup_inbox_current_messages_hash ~kind =
         *)
         let fst_batch = gen_message_batch 0 4 in
         let* () = send_message client sc_rollup @@ prepare_batch fst_batch in
-        let* fst_batch_hash, _ = get_inbox_from_tezos_node sc_rollup client in
+        let* fst_batch_hash, _ = get_inbox_from_tezos_node client in
         let () =
           Check.(
             (pristine_hash <> fst_batch_hash)
@@ -740,7 +739,7 @@ let test_rollup_inbox_current_messages_hash ~kind =
               (list string)
               ~error_msg:"expected messages:\n%R\nretrieved:\n%L")
         in
-        let* snd_batch_hash, _ = get_inbox_from_tezos_node sc_rollup client in
+        let* snd_batch_hash, _ = get_inbox_from_tezos_node client in
         let* expected =
           Sc_rollup_inbox.predict_current_messages_hash 4l snd_batch
         in
@@ -782,9 +781,7 @@ let test_rollup_inbox_of_rollup_node variant scenario ~kind =
         let* inbox_from_sc_rollup_node =
           get_inbox_from_sc_rollup_node sc_rollup_node
         in
-        let* inbox_from_tezos_node =
-          get_inbox_from_tezos_node sc_rollup client
-        in
+        let* inbox_from_tezos_node = get_inbox_from_tezos_node client in
         return
         @@ Check.(
              (inbox_from_sc_rollup_node = inbox_from_tezos_node)

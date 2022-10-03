@@ -33,12 +33,10 @@ let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
     + String.length
         (message : Sc_rollup_inbox_message_repr.serialized :> string) )
 
-let get_inbox ctxt rollup =
+let get_inbox ctxt =
   let open Lwt_tzresult_syntax in
-  let* ctxt, res = Store.Inbox.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some inbox -> return (inbox, ctxt)
+  let* inbox = Store.Inbox.get ctxt in
+  return (inbox, ctxt)
 
 let assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
   let nb_messages_in_commitment_period =
@@ -62,7 +60,7 @@ let add_messages ctxt rollup messages =
   let commitment_period =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
   in
-  let* inbox, ctxt = get_inbox ctxt rollup in
+  let* inbox, ctxt = get_inbox ctxt in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
       (fun (num_messages, total_messages_size, ctxt) message ->
@@ -124,8 +122,10 @@ let add_messages ctxt rollup messages =
   let*? ctxt =
     Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
   in
-  let* ctxt, size = Store.Inbox.update ctxt rollup inbox in
-  return (inbox, Z.of_int size, ctxt)
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3920
+     Account the size's difference with the carbonated storage. *)
+  let* ctxt = Store.Inbox.update ctxt inbox in
+  return (inbox, Z.zero, ctxt)
 
 let serialize_external_messages ctxt external_messages =
   let open Sc_rollup_inbox_message_repr in

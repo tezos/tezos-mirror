@@ -468,5 +468,4 @@ let () =
     ~description
     Data_encoding.empty
     (function Sc_rollup_address_generation -> Some () | _ -> None)
-    (fun () -> Sc_rollup_address_generation) ;
-  ()
+    (fun () -> Sc_rollup_address_generation)

@@ -292,7 +292,7 @@ let test_transfer_non_zero_amount_via_entrypoint () =
 (* Now, transfer with a zero-amount and check that the inbox has been updated correctly. *)
 let test_transfer_works () =
   let* b, c, contract, rollup = context_init "int" in
-  let* inbox_before = Context.Sc_rollup.inbox (B b) rollup in
+  let* inbox_before = Context.Sc_rollup.inbox (B b) in
   let* expected_inbox_after =
     let* inc = Incremental.begin_construction b in
     let ctxt = Incremental.alpha_ctxt inc in
@@ -310,7 +310,7 @@ let test_transfer_works () =
   in
   let param = Format.sprintf "%S" (Sc_rollup.Address.to_b58check rollup) in
   let* b = transfer b ~from:c ~to_:contract ~param ~entrypoint:"transfer_int" in
-  let* inbox_after = Context.Sc_rollup.inbox (B b) rollup in
+  let* inbox_after = Context.Sc_rollup.inbox (B b) in
   let* () =
     Assert.not_equal_with_encoding
       ~loc:__LOC__

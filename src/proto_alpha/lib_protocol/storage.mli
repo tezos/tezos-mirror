@@ -756,10 +756,11 @@ module Sc_rollup : sig
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3920
+     Use carbonated storage. *)
   module Inbox :
-    Non_iterable_indexed_carbonated_data_storage
-      with type key = Sc_rollup_repr.t
-       and type value = Sc_rollup_inbox_repr.t
+    Single_data_storage
+      with type value = Sc_rollup_inbox_repr.t
        and type t := Raw_context.t
 
   module Last_cemented_commitment :
