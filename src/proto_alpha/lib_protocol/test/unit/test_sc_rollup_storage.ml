@@ -2120,7 +2120,9 @@ let test_add_messages_from_missing_rollup () =
         ["Dummy message"])
 
 let test_inbox_of_missing_rollup () =
-  assert_fails_with_missing_rollup ~loc:__LOC__ Sc_rollup_inbox_storage.inbox
+  assert_fails_with_missing_rollup
+    ~loc:__LOC__
+    Sc_rollup_inbox_storage.get_inbox
 
 let test_refine_stake_of_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
@@ -2411,7 +2413,7 @@ let test_carbonated_memory_inbox_set_messages () =
     set_gas_limit ctxt (Gas_limit_repr.Arith.integral_of_int_exn 20_000)
   in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
-  let* inbox, ctxt = lift @@ Sc_rollup_inbox_storage.inbox ctxt rollup in
+  let* inbox, ctxt = lift @@ Sc_rollup_inbox_storage.get_inbox ctxt rollup in
   let*? current_messages, ctxt =
     Environment.wrap_tzresult
     @@ Sc_rollup_in_memory_inbox.current_messages ctxt rollup

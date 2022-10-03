@@ -24,8 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [inbox context rollup] returns the current state of the inbox. *)
-val inbox :
+(** [get_inbox context rollup] returns the current state of the inbox,
+    if it exists. *)
+val get_inbox :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t

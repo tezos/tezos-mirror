@@ -251,7 +251,7 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let* parent_info, ctxt =
     Commitment_storage.get_commitment_unsafe ctxt rollup child_info.predecessor
   in
-  let* ctxt, inbox = Store.Inbox.get ctxt rollup in
+  let* inbox, ctxt = Sc_rollup_inbox_storage.get_inbox ctxt rollup in
   let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
   let default_number_of_sections =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt

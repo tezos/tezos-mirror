@@ -2080,7 +2080,7 @@ module Sc_rollup = struct
 
   let register_inbox () =
     Registration.register1 ~chunked:true S.inbox (fun ctxt rollup () () ->
-        Sc_rollup.Inbox.inbox ctxt rollup >>=? fun (inbox, _ctxt) ->
+        Sc_rollup.Inbox.get_inbox ctxt rollup >>=? fun (inbox, _ctxt) ->
         return inbox)
 
   let register_kind () =

@@ -33,7 +33,7 @@ let update_num_and_size_of_messages ~num_messages ~total_messages_size message =
     + String.length
         (message : Sc_rollup_inbox_message_repr.serialized :> string) )
 
-let inbox ctxt rollup =
+let get_inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
   let* ctxt, res = Store.Inbox.find ctxt rollup in
   match res with
@@ -62,7 +62,7 @@ let add_messages ctxt rollup messages =
   let commitment_period =
     Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
   in
-  let* inbox, ctxt = inbox ctxt rollup in
+  let* inbox, ctxt = get_inbox ctxt rollup in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
       (fun (num_messages, total_messages_size, ctxt) message ->

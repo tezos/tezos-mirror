@@ -3222,7 +3222,7 @@ module Sc_rollup : sig
       source:public_key_hash ->
       (t * Z.t * context) tzresult Lwt.t
 
-    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
+    val get_inbox : context -> rollup -> (t * context) tzresult Lwt.t
   end
 
   module Outbox : sig
