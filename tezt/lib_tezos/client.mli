@@ -1087,6 +1087,7 @@ val run_script :
   ?source:string ->
   ?payer:string ->
   ?gas:int ->
+  ?trace_stack:bool ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1102,6 +1103,7 @@ val spawn_run_script :
   ?source:string ->
   ?payer:string ->
   ?gas:int ->
+  ?trace_stack:bool ->
   prg:string ->
   storage:string ->
   input:string ->
