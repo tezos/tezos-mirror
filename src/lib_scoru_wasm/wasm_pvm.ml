@@ -455,24 +455,15 @@ struct
 
     let get_info tree =
       let open Lwt_syntax in
-      let* ({current_tick; last_input_info; tick_state; _} as pvm) =
+      let+ ({current_tick; last_input_info; _} as pvm) =
         Tree_encoding_runner.decode pvm_state_encoding tree
       in
-      let input_request = input_request pvm in
-      let+ input_request =
-        match tick_state with
-        | Eval config ->
-            let maybe_reveal =
-              Tezos_webassembly_interpreter.Eval.is_reveal_tick config
-            in
-            Lwt.return
-              (match maybe_reveal with
-              | Some reveal -> Wasm_pvm_sig.Reveal_required reveal
-              | None -> input_request)
-        | _ -> Lwt.return input_request
-      in
       Wasm_pvm_sig.
-        {current_tick; last_input_read = last_input_info; input_request}
+        {
+          current_tick;
+          last_input_read = last_input_info;
+          input_request = input_request pvm;
+        }
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
