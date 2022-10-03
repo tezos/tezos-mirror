@@ -378,7 +378,7 @@ let manager_state_encoding =
 let empty_manager_state = {managers_seen = Signature.Public_key_hash.Map.empty}
 
 (** Mode-dependent information needed in final checks. *)
-type application_info = {
+type block_finalization_info = {
   fitness : Fitness.t;
   block_producer : Consensus_key.pk;
   payload_producer : Consensus_key.pk;
@@ -405,8 +405,8 @@ type application_info = {
     If you add a new mode, please make sure that it has a way to bound
    the size of the map {!recfield:managers_seen}. *)
 type mode =
-  | Application of application_info
-  | Partial_validation of application_info
+  | Application of block_finalization_info
+  | Partial_validation of block_finalization_info
   | Construction of {
       predecessor_round : Round.t;
       predecessor_hash : Block_hash.t;
@@ -2644,7 +2644,7 @@ let begin_any_application ctxt chain_id ~predecessor_level
   in
   let payload_hash = block_header.protocol_data.contents.payload_hash in
   let predecessor_hash = block_header.shell.predecessor in
-  let application_info =
+  let block_finalization_info =
     {
       fitness;
       block_producer;
@@ -2654,8 +2654,8 @@ let begin_any_application ctxt chain_id ~predecessor_level
     }
   in
   let mode =
-    if is_partial then Partial_validation application_info
-    else Application application_info
+    if is_partial then Partial_validation block_finalization_info
+    else Application block_finalization_info
   in
   let all_expected_consensus_features =
     Consensus.expected_features_for_application
@@ -3050,14 +3050,12 @@ let validate_operation ?(check_signature = true)
   let {shell; protocol_data = Operation_data protocol_data} =
     packed_operation
   in
-  let validation_pass_opt =
-    Alpha_context.Operation.acceptable_pass packed_operation
-  in
+  let validation_pass_opt = Operation.acceptable_pass packed_operation in
   let* block_state =
     check_validation_pass_consistency info block_state validation_pass_opt
   in
   let block_state = record_operation block_state oph validation_pass_opt in
-  let operation : _ Alpha_context.operation = {shell; protocol_data} in
+  let operation : _ operation = {shell; protocol_data} in
   match (info.mode, validation_pass_opt) with
   | Partial_validation _, Some n
     when Compare.Int.(n <> Operation_repr.consensus_pass) ->
@@ -3230,8 +3228,7 @@ let check_endorsement_power vi bs =
     (Validate_errors.Block.Not_enough_endorsements {required; provided})
 
 let finalize_validate_block_header vi vs checkable_payload_hash
-    (block_header_contents : Alpha_context.Block_header.contents) round fitness
-    =
+    (block_header_contents : Block_header.contents) round fitness =
   let locked_round_evidence =
     Option.map
       (fun (preendorsement_round, preendorsement_count) ->

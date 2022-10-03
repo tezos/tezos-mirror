@@ -2245,7 +2245,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
                {balance_updates; allocated_destination_contract}) )
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
-         rejected by {!Validate_operation.validate_operation}. *)
+         rejected by {!Validate.validate_operation}. *)
       fail Validate_errors.Failing_noop_error
   | Single (Manager_operation _) ->
       apply_manager_operations
@@ -2623,7 +2623,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~liquidity_baking_toggle_ema ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let level = Level.current ctxt in
   let endorsing_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
