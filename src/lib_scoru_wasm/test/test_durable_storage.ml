@@ -509,6 +509,90 @@ let test_store_read () =
   assert (value = expected_read_bytes) ;
   return_ok_unit
 
+let test_store_write () =
+  let open Lwt_syntax in
+  (*
+  Store the following tree:
+    /durable/a/path/_ = "..."
+
+  We expect that writing to "/a/path" should extend the value.
+  We expect that writing to "/a/new/path" should create a new value.
+  *)
+  let existing_key = "/a/path" in
+  let new_key = "/a/new/path" in
+  let contents = "a value of sorts" in
+  let* durable = make_durable [(existing_key, contents)] in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [existing_key; new_key; contents] src
+  in
+  let existing_key_src = src in
+  let new_key_src =
+    Int32.add src @@ Int32.of_int @@ String.length existing_key
+  in
+  let contents_src =
+    Int32.add new_key_src @@ Int32.of_int @@ String.length new_key
+  in
+  let write_offset = 5l in
+  let values =
+    Values.
+      [
+        Num (I32 existing_key_src);
+        Num (I32 (Int32.of_int @@ String.length existing_key));
+        Num (I32 write_offset);
+        Num (I32 contents_src);
+        Num (I32 (Int32.of_int @@ String.length contents));
+      ]
+  in
+  let* durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_write
+      values
+  in
+  assert (result = [Values.Num (I32 0l)]) ;
+  let tree = Durable.of_storage_exn durable in
+  let* value =
+    Durable.find_value_exn tree @@ Durable.key_of_string_exn existing_key
+  in
+  let* result = Chunked_byte_vector.to_string value in
+  (* We started writing at an offset into the value. *)
+  let expected_write_bytes =
+    (String.sub contents 0 @@ Int32.to_int write_offset) ^ contents
+  in
+  assert (expected_write_bytes = result) ;
+
+  let values =
+    Values.
+      [
+        Num (I32 new_key_src);
+        Num (I32 (Int32.of_int @@ String.length new_key));
+        Num (I32 0l);
+        Num (I32 contents_src);
+        Num (I32 (Int32.of_int @@ String.length contents));
+      ]
+  in
+  let* durable, result =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_write
+      values
+  in
+  assert (result = [Values.Num (I32 0l)]) ;
+  let tree = Durable.of_storage_exn durable in
+  let* value =
+    Durable.find_value_exn tree @@ Durable.key_of_string_exn new_key
+  in
+  let* result = Chunked_byte_vector.to_string value in
+  assert (contents = result) ;
+  return_ok_unit
+
 (* Test invalid key encodings are rejected. *)
 let test_durable_invalid_keys () =
   let open Lwt.Syntax in
@@ -544,6 +628,7 @@ let tests =
     tztest "store_copy" `Quick test_store_copy;
     tztest "store_move" `Quick test_store_move;
     tztest "store_read" `Quick test_store_read;
+    tztest "store_write" `Quick test_store_write;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;

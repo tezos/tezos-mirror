@@ -94,6 +94,15 @@ val delete : t -> key -> t Lwt.t
 *)
 val hash_exn : t -> key -> Context_hash.t Lwt.t
 
+(** [write_value durable key offset bytes] writes [bytes] to [key],
+    starting at the given [offset].
+
+    If no value at [key] exists, it is created.
+
+    @raise Out_of_bounds
+*)
+val write_value_exn : t -> key -> int64 -> string -> t Lwt.t
+
 (** [read_value durable key offset max_bytes] reads up to [max_bytes]
     bytes from the value at [key], starting at the given [offset].
 

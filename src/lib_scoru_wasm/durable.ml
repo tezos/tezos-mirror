@@ -131,7 +131,28 @@ let hash_exn tree key =
 (* The maximum size of bytes allowed to be read/written at once. *)
 let max_store_io_size = 4096L
 
-exception Out_of_bounds of (int64 * int64)
+let write_value_exn tree key offset bytes =
+  let open Lwt.Syntax in
+  let open Tezos_lazy_containers in
+  let num_bytes = Int64.of_int @@ String.length bytes in
+  assert (num_bytes <= max_store_io_size) ;
+
+  let key = to_value_key key in
+  let* opt = T.find_tree tree key in
+  let encoding = E.scope key E.chunked_byte_vector in
+  let* value =
+    match opt with
+    | None -> Lwt.return @@ Chunked_byte_vector.allocate num_bytes
+    | Some _subtree -> Runner.decode encoding tree
+  in
+  let vec_len = Chunked_byte_vector.length value in
+  if offset > vec_len then raise (Out_of_bounds (offset, vec_len)) ;
+  let grow_by = Int64.(num_bytes |> add offset |> Fun.flip sub vec_len) in
+  if Int64.compare grow_by 0L > 0 then Chunked_byte_vector.grow value grow_by ;
+  let* () =
+    Chunked_byte_vector.store_bytes value offset @@ Bytes.of_string bytes
+  in
+  Runner.encode encoding value tree
 
 let read_value_exn tree key offset num_bytes =
   let open Lwt.Syntax in
