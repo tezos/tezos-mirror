@@ -38,9 +38,13 @@ let test_execution_correspondance skip count () =
     (fun kernel ->
       let open Lwt_result_syntax in
       let*! tree = initial_tree ~from_binary:true ~max_tick:40_000L kernel in
+      let*! tree_snapshotted = eval_until_input_requested tree in
+      let*! tree_with_dummy_input =
+        set_input_step "dummy_input" 0 tree_snapshotted
+      in
       let*! tree =
-        if skip = 0L then Lwt.return tree
-        else Wasm.compute_step_many ~max_steps:skip tree
+        if skip = 0L then Lwt.return tree_with_dummy_input
+        else Wasm.compute_step_many ~max_steps:skip tree_with_dummy_input
       in
       let rec explore tree' n =
         let*! tree_ref = Wasm.compute_step_many ~max_steps:n tree in

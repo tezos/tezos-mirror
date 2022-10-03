@@ -193,15 +193,15 @@ let test_gather_floppies_until_first_PVM_input kernel =
 
 let test_gather_floppies_and_compute ~max_steps kernel =
   let open Lwt_result_syntax in
-  let open Test_wasm_pvm in
   let* tree = init_tree_with_floppies ~max_steps kernel in
   (* Make the first ticks of the WASM PVM (parsing of origination
-     message, parsing and init of the kernel), to switch it to
+     message, snapshot,n parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
-  let*! tree = eval_until_input_requested tree in
+  let*! tree_snapshotted = eval_until_input_requested tree in
   (* Feeding it with one input *)
-  let*! tree = set_input_step "test" 0 tree in
-  (* running until waiting for input *)
+  let*! tree_with_input = set_input_step "test" 0 tree_snapshotted in
+  (* running until waiting for next input *)
+  let*! tree = eval_until_input_requested tree_with_input in
   let*! state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in

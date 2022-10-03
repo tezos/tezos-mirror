@@ -90,10 +90,7 @@ struct
     let tick_state_encoding =
       let open Tezos_tree_encoding in
       tagged_union
-        ~default:(fun () ->
-          Decode
-            (Tezos_webassembly_interpreter.Decode.initial_decode_kont
-               ~name:wasm_main_module_name))
+        ~default:(fun () -> Snapshot)
         (value [] Data_encoding.string)
         [
           case

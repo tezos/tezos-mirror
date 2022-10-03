@@ -61,13 +61,19 @@ let origination_tick = Z.one
 
 let snapshot_tick = Z.one
 
+let input_tick = Z.one
+
 let test_looping_kernel () =
   let open Lwt_result_syntax in
   let max_nb_ticks = 5000L in
 
   (* This module loops indefinitely. *)
   let*! loop_module_tree = initial_tree ~max_tick:max_nb_ticks loop_module in
-  let* stuck, _ = eval_until_stuck loop_module_tree in
+  let*! tree_snapshotted = eval_until_input_requested loop_module_tree in
+  let*! tree_with_dummy_input =
+    set_input_step "dummy_input" 0 tree_snapshotted
+  in
+  let* stuck, _ = eval_until_stuck tree_with_dummy_input in
   match stuck with
   | Too_many_ticks -> return_unit
   | _ -> failwith "second: Unexpected stuck state!"
@@ -78,7 +84,15 @@ let test_noop_kernel () =
 
   (* This module does a noop. *)
   let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
-  let*! tree = eval_until_input_requested noop_module_tree in
+  (* Eval until snapshot, which shouldn't take any tick since the default state
+     is Snapshot. *)
+  let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
+  (* Adds one input tick, part of the maximum number of ticks per toplevel
+     call. *)
+  let*! tree_with_dummy_input =
+    set_input_step "dummy_input" 0 tree_snapshotted
+  in
+  let*! tree = eval_until_input_requested tree_with_dummy_input in
   let*! info = Wasm.get_info tree in
   (* off-by-one introduced by Gather_floppies*)
   return
@@ -86,11 +100,23 @@ let test_noop_kernel () =
 
 let test_stuck_in_decode_kernel () =
   let open Lwt_result_syntax in
-  let max_nb_ticks = 1L in
+  (* For now the PVM will always do at least 2 ticks per toplevel calls: one for
+     the input tick, and another for the tick leading to the `Too_many_ticks`
+     state. *)
+  let max_nb_ticks = 2L in
 
   (* This module does a noop. *)
   let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
-  let* stuck, tree = eval_until_stuck noop_module_tree in
+  (* Eval until snapshot, which shouldn't take any tick since the default state
+     is Snapshot. *)
+  let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
+  (* Adds one input tick, part of the maximum number of ticks per toplevel
+     call. *)
+  let*! tree_with_dummy_input =
+    set_input_step "dummy_input" 0 tree_snapshotted
+  in
+  (* Eval one tick *)
+  let* stuck, tree = eval_until_stuck tree_with_dummy_input in
   assert (stuck = Too_many_ticks) ;
   let*! info = Wasm.get_info tree in
   (* off-by-one introduced by Gather_floppies*)
@@ -103,8 +129,16 @@ let test_stuck_in_init_kernel () =
 
   (* This module does a noop. *)
   let*! noop_module_tree = initial_tree ~max_tick:max_nb_ticks noop_module in
+  (* Eval until snapshot, which shouldn't take any tick since the default state
+     is Snapshot. *)
+  let*! tree_snapshotted = eval_until_input_requested noop_module_tree in
+  (* Adds one input tick, part of the maximum number of ticks per toplevel
+     call. *)
+  let*! tree_with_dummy_input =
+    set_input_step "dummy_input" 0 tree_snapshotted
+  in
   (* go to first Init step *)
-  let*! tree = eval_until_init noop_module_tree in
+  let*! tree = eval_until_init tree_with_dummy_input in
   let*! stuck = Wasm.Internal_for_tests.is_stuck tree in
   assert (stuck = None) ;
 

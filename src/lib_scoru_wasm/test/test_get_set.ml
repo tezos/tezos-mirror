@@ -153,7 +153,16 @@ let test_get_info () =
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
-    {current_tick = Z.one; last_input_read; input_request = No_input_required}
+    {
+      current_tick = Z.one;
+      last_input_read;
+      input_request =
+        Input_required
+        (* While it shouldn't be Input_required after an input, `add_input_info`
+           doesn't use the PVM interface but encodes it directly into the tree.
+           The tree is in `Input_required` state since it is in snapshot state,
+           waiting for the next_input. *);
+    }
   in
   let* actual_info = Wasm.get_info tree in
   assert (actual_info.last_input_read = None) ;
