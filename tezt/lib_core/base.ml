@@ -94,6 +94,13 @@ let rec drop n l =
   else if n = 0 then l
   else match l with [] -> [] | _ :: rest -> drop (n - 1) rest
 
+let span pred =
+  let rec aux acc = function
+    | x :: xs when pred x -> aux (x :: acc) xs
+    | l -> (List.rev acc, l)
+  in
+  aux []
+
 let rex ?opts r = (r, Re.compile (Re.Perl.re ?opts r))
 
 let show_rex = fst
