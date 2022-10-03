@@ -1397,12 +1397,21 @@ let run_script ?hooks ?no_base_dir_warnings ?balance ?self_address ?source
       client
     |> Process.check_and_read_stdout
   in
-  match client_output =~* rex "storage\n(.*)" with
-  | None ->
+  (* Extract the final storage, which is between the 'storage' and
+     'emitted operations' line in [client_output] *)
+  let client_output_lines = String.split_on_char '\n' client_output in
+  let _header, tail =
+    span (fun line -> not (String.equal "storage" line)) client_output_lines
+  in
+  let storage, _tail =
+    span (fun line -> not (String.equal "emitted operations" line)) tail
+  in
+  match storage with
+  | "storage" :: storage -> return @@ String.trim (String.concat "\n" storage)
+  | _ ->
       Test.fail
         "Cannot extract new storage from client_output: %s"
         client_output
-  | Some storage -> return @@ String.trim storage
 
 let spawn_register_global_constant ?(wait = "none") ?burn_cap ~value ~src client
     =
