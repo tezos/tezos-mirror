@@ -27,12 +27,12 @@
    -------
    Component:    Michelson
    Invocation:   dune exec tezt/tests/main.exe -- --file ticket_receipt_and_rpc.ml
-   Subject:      Regression tests for ticket receipt and ticket RPC
+   Subject:      Regression tests for ticket receipt/RPC/CLI
 *)
 
 let hooks = Tezos_regression.hooks
 
-let check_ticket_balance client ~contract ~ticketer ~content_type ~content
+let rpc_check_ticket_balance client ~contract ~ticketer ~content_type ~content
     ~expected =
   let post_body =
     Ezjsonm.value_from_string
@@ -53,6 +53,24 @@ let check_ticket_balance client ~contract ~ticketer ~content_type ~content
   @@ Check.(
        (actual = expected)
          int
+         ~__LOC__
+         ~error_msg:"expected ticket amount %R, got %L")
+
+let cli_check_ticket_balance client ~hooks ~contract ~ticketer ~content_type
+    ~content ~expected =
+  let* actual =
+    Client.ticket_balance
+      client
+      ~hooks
+      ~contract
+      ~ticketer
+      ~content_type
+      ~content:(sf {|"%s"|} content)
+  in
+  return
+  @@ Check.(
+       (String.trim actual = string_of_int expected)
+         string
          ~__LOC__
          ~error_msg:"expected ticket amount %R, got %L")
 
@@ -124,52 +142,35 @@ let test_ticket_receipt_and_rpc =
       ~hooks
       client
   in
-  (* Check that the ticket balance are expected via [ticket_balance] RPC. *)
-  let* () =
-    check_ticket_balance
-      client
-      ~contract:kt_a
-      ~ticketer:kt_a
-      ~content_type:"string"
-      ~content:"red"
-      ~expected:1
-  in
-  let* () =
-    check_ticket_balance
-      client
-      ~contract:kt_a
-      ~ticketer:kt_a
-      ~content_type:"string"
-      ~content:"green"
-      ~expected:2
-  in
-  let* () =
-    check_ticket_balance
-      client
-      ~contract:kt_a
-      ~ticketer:kt_a
-      ~content_type:"string"
-      ~content:"blue"
-      ~expected:0
-  in
-  let* () =
-    check_ticket_balance
-      client
-      ~contract:kt_b
-      ~ticketer:kt_a
-      ~content_type:"string"
-      ~content:"blue"
-      ~expected:1
-  in
-  let* () =
-    check_ticket_balance
-      client
-      ~contract:kt_c
-      ~ticketer:kt_a
-      ~content_type:"string"
-      ~content:"blue"
-      ~expected:1
-  in
-  unit
+  (* Check that the ticket balance are expected via both RPC and CLI. *)
+  [
+    (kt_a, kt_a, "string", "red", 1);
+    (kt_a, kt_a, "string", "green", 2);
+    (kt_a, kt_a, "string", "blue", 0);
+    (kt_b, kt_a, "string", "blue", 1);
+    (kt_c, kt_a, "string", "blue", 1);
+  ]
+  |> Lwt_list.iter_s
+     @@ fun (contract, ticketer, content_type, content, expected) ->
+     let* () =
+       rpc_check_ticket_balance
+         client
+         ~contract
+         ~ticketer
+         ~content_type
+         ~content
+         ~expected
+     in
+     let* () =
+       cli_check_ticket_balance
+         client
+         ~hooks
+         ~contract
+         ~ticketer
+         ~content_type
+         ~content
+         ~expected
+     in
+     unit
 
 let register ~protocols = test_ticket_receipt_and_rpc protocols

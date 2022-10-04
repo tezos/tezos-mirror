@@ -90,3 +90,18 @@ This sequence of operations was run:
             Account updates:
               [CONTRACT_HASH] ... +1
 
+
+./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"red"'
+1
+
+./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"green"'
+2
+
+./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"blue"'
+0
+
+./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"blue"'
+1
+
+./octez-client --mode mockup get ticket balance for '[CONTRACT_HASH]' with ticketer '[CONTRACT_HASH]' and type string and content '"blue"'
+1
