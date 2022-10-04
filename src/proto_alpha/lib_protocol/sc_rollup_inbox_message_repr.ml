@@ -142,3 +142,34 @@ let deserialize s =
 let unsafe_of_string s = s
 
 let unsafe_to_string s = s
+
+(* 32 *)
+let hash_prefix = "\003\250\174\239\012" (* scib3(55) *)
+
+module Hash = struct
+  let prefix = "scib3"
+
+  let encoded_size = 55
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "serialized_message_hash"
+
+        let title =
+          "The hash of a serialized message of the smart contract rollup inbox."
+
+        let b58check_prefix = hash_prefix
+
+        (* defaults to 32 *)
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
+end
+
+let hash_serialized_message (payload : serialized) =
+  Hash.hash_string [(payload :> string)]
