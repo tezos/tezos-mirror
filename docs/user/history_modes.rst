@@ -7,7 +7,7 @@ history can be deleted as they are not required anymore.
 
 Three history modes are provided:
 
-- **Full** (default mode with 5 additional cycles)
+- **Full** (default mode with 1 additional cycle)
 
   The node stores the minimal data since the genesis required to reconstruct
   (or 'replay') the complete chain's ledger state.
@@ -196,15 +196,13 @@ on mainnet is currently set to 5 cycles). However, the
 node is able to keep an additional number of cycles that is
 configurable.
 
-By default, the number of additional cycles kept, for both ``full``
-and ``rolling`` nodes, is *5 cycles*. On mainnet, this would total *10
-cycles* of complete history (approximately four weeks), as we keep 5
-cycles beyond the minimal number of cycles, that is *5 + 5 = 10*. It is
-possible to increase this parameter to keep more history or, on the
-contrary, decrease it to reduce the storage size. For example, it is
-possible to run a baker and a delegation service on rolling mode as
-long as we keep 7 cycles (to allow for reward dispatching), meaning
-that at least 2 additional cycles must be kept.
+By default, 1 additional cycle is kept for both ``full`` and
+``rolling`` nodes. It is possible to increase this parameter to keep
+more history or, on the contrary, decrease it to reduce the storage
+size. For example, it is possible to run a node with *5* additional
+cycles. On mainnet, this would total *10 cycles* of complete history
+(approximately four weeks), as we keep 5 cycles beyond the minimal
+number of cycles, that is *5 + 5 = 10*.
 
 
 When initializing your node on an empty storage, you may specify the

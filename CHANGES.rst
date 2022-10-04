@@ -82,6 +82,11 @@ Node
   table during a branch switch containing a user activated protocol
   upgrade.
 
+- Decreased, from 5 to 1, the default number of additional cycles to
+  keep in both ``Full`` and ``Rolling`` history modes. As a
+  consequence, the storage footprint will be lowered and only the last
+  6 cycles will be available (10 previously).
+
 Client
 ------
 
