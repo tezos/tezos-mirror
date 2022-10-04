@@ -510,7 +510,7 @@ The results of the test suite on terminated pipelines is presented on
 the details of the merge request page corresponding to the
 pipeline's branch (if any). For more information, see the `GitLab
 documentation on Unit test reports
-<https://docs.gitlab.com/ee/ci/unit_test_reports.html>`__.
+<https://docs.gitlab.com/ee/ci/testing/unit_test_reports.html>`__.
 
 By default, the ``test`` of the CI runs the tests as a set of independent jobs
 that cluster the tests with a varying grain. This strikes a balance between exploiting GitLab
@@ -589,7 +589,7 @@ The summary report gives the merge request an overall test coverage percentage
 Additionally, using ``bisect-ppx-report cobertura``, we produce and
 upload a Cobertura artifact activating the `test coverage
 visualization
-<https://docs.gitlab.com/ee/user/project/merge_requests/test_coverage_visualization.html>`_
+<https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html>`_
 in GitLab:
 
 .. image:: images/testing-coverage-markers.png
