@@ -842,7 +842,6 @@ val sc_rollup_add_messages :
   ?storage_limit:counter ->
   ?counter:counter ->
   source:public_key_hash ->
-  rollup:Alpha_context.Sc_rollup.t ->
   messages:string list ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->

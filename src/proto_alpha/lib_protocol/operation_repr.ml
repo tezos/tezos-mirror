@@ -437,7 +437,6 @@ and _ manager_operation =
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup_repr.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
@@ -1160,19 +1159,12 @@ module Encoding = struct
         {
           tag = sc_rollup_operation_add_message_tag;
           name = "sc_rollup_add_messages";
-          encoding =
-            obj2
-              (req "rollup" Sc_rollup_repr.encoding)
-              (req "message" (list string));
+          encoding = obj1 (req "message" (list string));
           select =
             (function
             | Manager (Sc_rollup_add_messages _ as op) -> Some op | _ -> None);
-          proj =
-            (function
-            | Sc_rollup_add_messages {rollup; messages} -> (rollup, messages));
-          inj =
-            (fun (rollup, messages) ->
-              Sc_rollup_add_messages {rollup; messages});
+          proj = (function Sc_rollup_add_messages {messages} -> messages);
+          inj = (fun messages -> Sc_rollup_add_messages {messages});
         }
 
     let sc_rollup_cement_case =

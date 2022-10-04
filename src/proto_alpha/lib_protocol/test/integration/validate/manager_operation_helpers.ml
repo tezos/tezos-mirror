@@ -1063,8 +1063,6 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
     (Some refutation)
 
 let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
-  let open Lwt_result_syntax in
-  let* sc_rollup = sc_rollup_of infos.ctxt.sc_rollup in
   Op.sc_rollup_add_messages
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit
@@ -1073,7 +1071,6 @@ let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
     (contract_of (get_source infos))
-    sc_rollup
     [""]
 
 let mk_sc_rollup_timeout (oinfos : operation_req) (infos : infos) =

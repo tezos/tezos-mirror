@@ -691,7 +691,6 @@ val sc_rollup_add_messages :
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
-  Sc_rollup.t ->
   string list ->
   Operation.packed tzresult Lwt.t
 

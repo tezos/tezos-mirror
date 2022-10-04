@@ -1516,7 +1516,7 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
       ~sc_rollup_max_number_of_messages_per_commitment_period
       Context.T2
   in
-  let* block, rollup = sc_originate block account1 "unit" in
+  let* block, _rollup = sc_originate block account1 "unit" in
   let* constants = Context.get_constants (B block) in
   let Constants.Parametric.{max_number_of_messages_per_commitment_period; _} =
     constants.parametric.sc_rollup
@@ -1526,10 +1526,10 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
   let messages =
     List.repeat max_number_of_messages_per_commitment_period "foo"
   in
-  let* op = Op.sc_rollup_add_messages (I incr) account1 rollup messages in
+  let* op = Op.sc_rollup_add_messages (I incr) account1 messages in
   let* incr = Incremental.add_operation ~check_size:false incr op in
   (* This break the limit *)
-  let* op = Op.sc_rollup_add_messages (I incr) account2 rollup ["foo"] in
+  let* op = Op.sc_rollup_add_messages (I incr) account2 ["foo"] in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
         (Sc_rollup_errors

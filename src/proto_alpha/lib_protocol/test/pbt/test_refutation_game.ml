@@ -219,7 +219,7 @@ let originate_rollup originator messager ~first_inputs block =
       ~parameters_ty:(Script.lazy_expr @@ Expr.from_string "unit")
   in
   let* add_message_operation =
-    Op.sc_rollup_add_messages (B block) messager sc_rollup first_inputs
+    Op.sc_rollup_add_messages (B block) messager first_inputs
   in
   let* block =
     Block.bake ~operations:[origination_operation; add_message_operation] block
@@ -1006,7 +1006,7 @@ module Arith_test_pvm = struct
 end
 
 (** Construct the inbox for the protocol side. *)
-let construct_inbox_proto block rollup levels_and_inputs contract =
+let construct_inbox_proto block levels_and_inputs contract =
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun block (level, payloads) ->
@@ -1017,7 +1017,7 @@ let construct_inbox_proto block rollup levels_and_inputs contract =
       in
       let* block = Block.bake_n (diff_with_level - 1) block in
       let* operation_add_message =
-        Op.sc_rollup_add_messages (B block) contract rollup payloads
+        Op.sc_rollup_add_messages (B block) contract payloads
       in
       Block.bake ~operation:operation_add_message block)
     block
@@ -1529,7 +1529,7 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
 let prepare_game block rollup lcc commitment_level p1_client p2_client contract
     levels_and_inputs =
   let open Lwt_result_syntax in
-  let* block = construct_inbox_proto block rollup levels_and_inputs contract in
+  let* block = construct_inbox_proto block levels_and_inputs contract in
   let* operation_publish_commitment_p1 =
     operation_publish_commitment (B block) rollup lcc commitment_level p1_client
   in
@@ -1651,13 +1651,12 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
               Op.sc_rollup_add_messages
                 (B block)
                 defender.player.contract
-                rollup
                 payloads
             in
             (* Start the game in between adding messages so the latest protocol
                inbox is no longer equal to the player's view on inbox. *)
             let* operation_add_messages2 =
-              Op.sc_rollup_add_messages (B block) contract3 rollup payloads
+              Op.sc_rollup_add_messages (B block) contract3 payloads
             in
             Block.bake
               ~operations:

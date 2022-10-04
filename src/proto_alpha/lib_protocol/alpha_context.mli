@@ -4396,7 +4396,6 @@ and _ manager_operation =
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation

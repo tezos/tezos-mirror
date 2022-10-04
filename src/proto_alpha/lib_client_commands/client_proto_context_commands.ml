@@ -3000,11 +3000,6 @@ let commands_rw () =
       @@ Client_keys.Public_key_hash.source_param
            ~name:"src"
            ~desc:"Name of the source contract."
-      @@ prefixes ["to"]
-      @@ param
-           ~name:"dst"
-           ~desc:"Address of the destination smart-contract rollup."
-           Sc_rollup_params.sc_rollup_address_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -3015,7 +3010,6 @@ let commands_rw () =
              counter )
            messages
            source
-           rollup
            cctxt ->
         let open Lwt_result_syntax in
         let* messages =
@@ -3042,7 +3036,6 @@ let commands_rw () =
             ?confirmations:cctxt#confirmations
             ~simulation
             ~source
-            ~rollup
             ~messages
             ~src_pk
             ~src_sk

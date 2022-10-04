@@ -100,7 +100,7 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
     let open Result_syntax in
     let+ accu = accu in
     match operation with
-    | Sc_rollup_add_messages {rollup = _; messages} ->
+    | Sc_rollup_add_messages {messages} ->
         let messages =
           List.map
             (fun message -> Sc_rollup.Inbox_message.External message)
