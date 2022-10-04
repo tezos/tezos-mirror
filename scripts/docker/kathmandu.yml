@@ -11,7 +11,7 @@ services:
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
@@ -25,7 +25,7 @@ services:
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
@@ -40,7 +40,7 @@ services:
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
