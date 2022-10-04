@@ -146,15 +146,15 @@ end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
 
-let hash_skip_list_cell cell =
-  let current_level_hash = Skip_list.content cell in
-  let back_pointers_hashes = Skip_list.back_pointers cell in
-  Hash.to_bytes current_level_hash
-  :: List.map Hash.to_bytes back_pointers_hashes
-  |> Hash.hash_bytes
-
 module V1 = struct
   type history_proof = (Hash.t, Hash.t) Skip_list.cell
+
+  let hash_history_proof cell =
+    let current_level_hash = Skip_list.content cell in
+    let back_pointers_hashes = Skip_list.back_pointers cell in
+    Hash.to_bytes current_level_hash
+    :: List.map Hash.to_bytes back_pointers_hashes
+    |> Hash.hash_bytes
 
   let equal_history_proof = Skip_list.equal Hash.equal Hash.equal
 
@@ -162,7 +162,7 @@ module V1 = struct
     Skip_list.encoding Hash.encoding Hash.encoding
 
   let pp_history_proof fmt history =
-    let history_hash = hash_skip_list_cell history in
+    let history_hash = hash_history_proof history in
     Format.fprintf
       fmt
       "@[hash : %a@;%a@]"
@@ -570,7 +570,7 @@ struct
       commit_tree ctxt tree inbox.level
     in
     let prev_cell = inbox.old_levels_messages in
-    let prev_cell_ptr = hash_skip_list_cell prev_cell in
+    let prev_cell_ptr = hash_history_proof prev_cell in
     let*? history = History.remember prev_cell_ptr prev_cell history in
     let cell =
       Skip_list.next ~prev_cell ~prev_cell_ptr (current_level_hash inbox)
@@ -673,15 +673,15 @@ struct
     aux [] ptr_path
 
   let verify_inclusion_proof proof a b =
-    let assoc = List.map (fun c -> (hash_skip_list_cell c, c)) proof in
+    let assoc = List.map (fun c -> (hash_history_proof c, c)) proof in
     let path = List.split assoc |> fst in
     let deref =
       let open Hash.Map in
       let map = of_seq (List.to_seq assoc) in
       fun ptr -> find_opt ptr map
     in
-    let cell_ptr = hash_skip_list_cell b in
-    let target_ptr = hash_skip_list_cell a in
+    let cell_ptr = hash_history_proof b in
+    let target_ptr = hash_history_proof a in
     Skip_list.valid_back_path
       ~equal_ptr:Hash.equal
       ~deref
@@ -985,7 +985,7 @@ struct
 
     let produce_inclusion_proof history a b =
       let open Tzresult_syntax in
-      let cell_ptr = hash_skip_list_cell b in
+      let cell_ptr = hash_history_proof b in
       let target_index = Skip_list.index a in
       let* history = History.remember cell_ptr b history in
       let deref ptr = History.find ptr history in
