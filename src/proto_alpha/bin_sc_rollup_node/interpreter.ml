@@ -35,24 +35,15 @@ module type S = sig
   module Free_pvm :
     Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
 
-  (** [process_head node_ctxt head] interprets the messages associated
-      with a [head] from a chain [event]. This requires the inbox to be updated
-      beforehand. *)
   val process_head :
     Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
-      for a given [tick] if this [tick] happened before
-      [level]. Otherwise, returns [None].*)
   val state_of_tick :
     _ Node_context.t ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
 
-  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
-      block [head], or the state at rollup genesis if the block is before the
-      rollup origination. *)
   val state_of_head :
     'a Node_context.t ->
     'a Context.t ->
