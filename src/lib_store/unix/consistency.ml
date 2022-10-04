@@ -551,7 +551,7 @@ let infer_savepoint_and_caboose chain_dir block_store =
   let cemented_caboose_candidate = lowest_cemented_block cemented_block_files in
   let floating_stores = Block_store.floating_block_stores block_store in
   match (cemented_savepoint_candidate, cemented_caboose_candidate) with
-  | Some cemented_savepoint, Some caboose ->
+  | Some cemented_savepoint, Some cemented_caboose ->
       (* Cemented candidates are available. However, we must check
          that the lowest block with metadata from the floating store
          is not lower than the cemented candidate and thus, a better
@@ -569,8 +569,11 @@ let infer_savepoint_and_caboose chain_dir block_store =
             else cemented_savepoint
         | None -> cemented_savepoint
       in
-      return (sp, caboose)
-  | None, Some caboose_level ->
+      let cb =
+        if Compare.Int32.(cemented_caboose > sp) then sp else cemented_caboose
+      in
+      return (sp, cb)
+  | None, Some cemented_caboose ->
       (* No cemented cycle with metadata but some cycles. Search for
          the savepoint in the floating blocks. *)
       let* _, lowest_floating_with_metadata =
@@ -580,6 +583,11 @@ let infer_savepoint_and_caboose chain_dir block_store =
         match lowest_floating_with_metadata with
         | Some lvl -> return lvl
         | None -> tzfail (Corrupted_store Cannot_find_floating_savepoint)
+      in
+      let caboose_level =
+        if Compare.Int32.(cemented_caboose > savepoint_level) then
+          savepoint_level
+        else cemented_caboose
       in
       return (savepoint_level, caboose_level)
   | None, None ->
