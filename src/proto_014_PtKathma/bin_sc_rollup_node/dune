@@ -3,8 +3,8 @@
 
 (executable
  (name main_sc_rollup_node_014_PtKathma)
- (public_name octez-sc-rollup-node-014-PtKathma)
- (package octez-sc-rollup-node-014-PtKathma)
+ (public_name octez-sc-rollup-node-PtKathma)
+ (package octez-sc-rollup-node-PtKathma)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

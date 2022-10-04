@@ -40,15 +40,12 @@ full: odoc
 	# Same ordering constraint: html *after* odoc (see target "all")
 	${MAKE} html
 
-main:
-	${MAKE} -C .. all
-
 # Build the manuals for a given protocol
-%/tezos-client.html: main
+%/tezos-client.html:
 	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-baker.html: main
+%/tezos-baker.html:
 	@../tezos-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-accuser.html: main
+%/tezos-accuser.html:
 	@../tezos-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
@@ -63,13 +60,13 @@ manuals: \
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
-odoc: main docexes
+odoc: docexes
 	cd $$(pwd)/.. ; dune build @doc
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
 
-odoc-lite: main docexes
+odoc-lite: docexes
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
 	rsync --recursive --links --perms --exclude="src/proto_0*" \
@@ -115,10 +112,10 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh compile-master-sources-buster
 
 # build dune targets together to avoid concurrent dunes
-docexes: main
+docexes:
 	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
-developer/metrics.csv: main
+developer/metrics.csv:
 	../tezos-node dump-metrics > developer/metrics.csv
 
 $(ERRDOCEXE): docexes

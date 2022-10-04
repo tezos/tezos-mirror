@@ -14,12 +14,20 @@ and "current protocol" refers to its successor, N+1. For instance, if
 The various pieces of code to be removed are within directory
 ``src/proto_<N>_<Hash>/``, unless indicated otherwise.
 
+Update Manifest
+---------------
+
+In :src:`manifest/main.ml`, look for ``let alpha = active Name.alpha``.
+In one of the lines above it is the declaration of the protocol you are freezing.
+Replace ``active`` by ``frozen`` for this protocol.
+Run the manifest with ``make -C manifest``.
+
 Remove Accuser, Baker
 ---------------------
 
 These daemons are no longer needed. Thus, the code in
-``bin_{accuser,baker}/`` can be safely removed and the files
-``script-inputs/active_protocol_versions`` and ``script-inputs/active_testing_protocol_versions`` should be
+``bin_{accuser,baker}/`` can be safely removed and
+``script-inputs/active_testing_protocol_versions`` should be
 modified accordingly.
 
 Remove Protocol Tests

@@ -3184,6 +3184,8 @@ module Protocol : sig
 
   val number : t -> number
 
+  val short_hash : t -> string
+
   val status : t -> status
 
   val name_dash : t -> string
@@ -3265,8 +3267,15 @@ end = struct
     val name_dash : t -> string
 
     val base_path : t -> string
+
+    val short_hash : t -> string
   end = struct
-    type t = {name_underscore : string; name_dash : string; number : number}
+    type t = {
+      short_hash : string;
+      name_underscore : string;
+      name_dash : string;
+      number : number;
+    }
 
     let make name number =
       if
@@ -3290,13 +3299,15 @@ end = struct
       let name_underscore =
         make_full_name '_' (String.map (function '-' -> '_' | c -> c) name)
       in
-      {number; name_dash; name_underscore}
+      {short_hash = name; number; name_dash; name_underscore}
 
     let v name number = make name (V number)
 
     let alpha = make "alpha" Alpha
 
     let other name = make name Other
+
+    let short_hash t = t.short_hash
 
     let number t = t.number
 
@@ -3364,6 +3375,8 @@ end = struct
     | Some x -> x
 
   let number p = Name.number p.name
+
+  let short_hash p = Name.short_hash p.name
 
   let status p = p.status
 
@@ -4019,6 +4032,7 @@ module Protocol = Protocol
     register @@ make ~name ~status:Not_mainnet ~main ~embedded ~client ()
 
   let register_alpha_family status name =
+    let short_hash = Name.short_hash name in
     let name_dash = Name.name_dash name in
     let name_underscore = Name.name_underscore name in
     let number = Name.number name in
@@ -4502,7 +4516,7 @@ module Protocol = Protocol
     let daemon daemon =
       only_if active @@ fun () ->
       public_exe
-        (sf "octez-%s-%s" daemon name_dash)
+        (sf "octez-%s-%s" daemon short_hash)
         ~internal_name:(sf "main_%s_%s" daemon name_underscore)
         ~path:(path // sf "bin_%s" daemon)
         ~synopsis:(sf "Tezos/Protocol: %s binary" daemon)
@@ -4584,7 +4598,7 @@ module Protocol = Protocol
     let _sc_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "octez-sc-rollup-client-%s" name_dash)
+        (sf "octez-sc-rollup-client-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-sc-rollup-client-alpha` client binary"
@@ -4609,7 +4623,7 @@ module Protocol = Protocol
     let _sc_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "octez-sc-rollup-node-%s" name_dash)
+        (sf "octez-sc-rollup-node-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
         ~path:(path // "bin_sc_rollup_node")
         ~synopsis:"Tezos/Protocol: Smart Contract Rollup node binary"
@@ -4686,7 +4700,7 @@ module Protocol = Protocol
     let _tx_rollup_client =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "octez-tx-rollup-client-%s" name_dash)
+        (sf "octez-tx-rollup-client-%s" short_hash)
         ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_client")
         ~synopsis:"Tezos/Protocol: `octez-tx-rollup-client-alpha` client binary"
@@ -4708,7 +4722,7 @@ module Protocol = Protocol
     let _tx_rollup_node =
       only_if (active && N.(number >= 013)) @@ fun () ->
       public_exe
-        (sf "octez-tx-rollup-node-%s" name_dash)
+        (sf "octez-tx-rollup-node-%s" short_hash)
         ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
         ~path:(path // "bin_tx_rollup_node")
         ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
@@ -5787,6 +5801,16 @@ let () =
     | Other -> ()
   in
   write "script-inputs/active_protocol_versions" @@ fun fmt ->
+  List.iter (write_protocol fmt) Protocol.active
+
+(* Generate active_protocol_versions_without_number. *)
+let () =
+  let write_protocol fmt protocol =
+    match Protocol.number protocol with
+    | Alpha | V _ -> Format.fprintf fmt "%s\n" (Protocol.short_hash protocol)
+    | Other -> ()
+  in
+  write "script-inputs/active_protocol_versions_without_number" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
 let () = check ~exclude ()

@@ -258,19 +258,19 @@
       start_in: 7 minutes
     - when: never # default
 
-opam:octez-accuser-014-PtKathma:
+opam:octez-accuser-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-accuser-014-PtKathma
+    package: octez-accuser-PtKathma
 
-opam:octez-accuser-015-PtLimaPt:
+opam:octez-accuser-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-accuser-015-PtLimaPt
+    package: octez-accuser-PtLimaPt
 
 opam:octez-accuser-alpha:
   extends:
@@ -279,19 +279,19 @@ opam:octez-accuser-alpha:
   variables:
     package: octez-accuser-alpha
 
-opam:octez-baker-014-PtKathma:
+opam:octez-baker-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-baker-014-PtKathma
+    package: octez-baker-PtKathma
 
-opam:octez-baker-015-PtLimaPt:
+opam:octez-baker-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-baker-015-PtLimaPt
+    package: octez-baker-PtLimaPt
 
 opam:octez-baker-alpha:
   extends:
@@ -328,19 +328,19 @@ opam:octez-protocol-compiler:
   variables:
     package: octez-protocol-compiler
 
-opam:octez-sc-rollup-client-014-PtKathma:
+opam:octez-sc-rollup-client-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_2
   variables:
-    package: octez-sc-rollup-client-014-PtKathma
+    package: octez-sc-rollup-client-PtKathma
 
-opam:octez-sc-rollup-client-015-PtLimaPt:
+opam:octez-sc-rollup-client-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_2
   variables:
-    package: octez-sc-rollup-client-015-PtLimaPt
+    package: octez-sc-rollup-client-PtLimaPt
 
 opam:octez-sc-rollup-client-alpha:
   extends:
@@ -349,19 +349,19 @@ opam:octez-sc-rollup-client-alpha:
   variables:
     package: octez-sc-rollup-client-alpha
 
-opam:octez-sc-rollup-node-014-PtKathma:
+opam:octez-sc-rollup-node-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-sc-rollup-node-014-PtKathma
+    package: octez-sc-rollup-node-PtKathma
 
-opam:octez-sc-rollup-node-015-PtLimaPt:
+opam:octez-sc-rollup-node-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-sc-rollup-node-015-PtLimaPt
+    package: octez-sc-rollup-node-PtLimaPt
 
 opam:octez-sc-rollup-node-alpha:
   extends:
@@ -377,19 +377,19 @@ opam:octez-signer:
   variables:
     package: octez-signer
 
-opam:octez-tx-rollup-client-014-PtKathma:
+opam:octez-tx-rollup-client-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-tx-rollup-client-014-PtKathma
+    package: octez-tx-rollup-client-PtKathma
 
-opam:octez-tx-rollup-client-015-PtLimaPt:
+opam:octez-tx-rollup-client-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-tx-rollup-client-015-PtLimaPt
+    package: octez-tx-rollup-client-PtLimaPt
 
 opam:octez-tx-rollup-client-alpha:
   extends:
@@ -398,19 +398,19 @@ opam:octez-tx-rollup-client-alpha:
   variables:
     package: octez-tx-rollup-client-alpha
 
-opam:octez-tx-rollup-node-014-PtKathma:
+opam:octez-tx-rollup-node-PtKathma:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-tx-rollup-node-014-PtKathma
+    package: octez-tx-rollup-node-PtKathma
 
-opam:octez-tx-rollup-node-015-PtLimaPt:
+opam:octez-tx-rollup-node-PtLimaPt:
   extends:
     - .opam_template
     - .rules_template__trigger_opam_batch_1
   variables:
-    package: octez-tx-rollup-node-015-PtLimaPt
+    package: octez-tx-rollup-node-PtLimaPt
 
 opam:octez-tx-rollup-node-alpha:
   extends:

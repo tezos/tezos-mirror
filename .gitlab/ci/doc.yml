@@ -14,7 +14,7 @@ documentation:build_all:
   before_script:
     - . $HOME/.venv/bin/activate
   script:
-    - make -C docs -j all
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-build-all
   artifacts:
     expose_as: 'Documentation - excluding old protocols'
     paths:
@@ -33,8 +33,7 @@ documentation:linkcheck:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
-    - make -C docs redirectcheck
-    - make -C docs linkcheck
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-linkcheck
   allow_failure: true
 
 # here we use this hack to publish the tezos documentation on

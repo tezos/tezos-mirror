@@ -39,12 +39,12 @@ let init_client proto =
 
 let encode protocol what json =
   Codec.encode
-    ~name:(String.concat "." [Protocol.daemon_name protocol; what])
+    ~name:(String.concat "." [Protocol.encoding_prefix protocol; what])
     json
 
 let decode protocol what hex =
   Codec.decode
-    ~name:(String.concat "." [Protocol.daemon_name protocol; what])
+    ~name:(String.concat "." [Protocol.encoding_prefix protocol; what])
     hex
 
 let encode_and_sign_operation protocol client op =

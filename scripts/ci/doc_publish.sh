@@ -3,6 +3,7 @@
 cd "${CI_PROJECT_DIR}" || exit 1
 
 if [ "${CI_COMMIT_REF_NAME}" == "master" ] ; then
+  make all ;
   make -C docs -j full ;
   git clone --depth 5 git@gitlab.com:"${CI_PROJECT_NAMESPACE}"/"${CI_PROJECT_NAMESPACE}".gitlab.io gitlab.io ;
   rsync --recursive --links --perms --delete --exclude=.doctrees --exclude={{main,alpha,zero}net,master}/index.html docs/_build/ gitlab.io/public/ ;

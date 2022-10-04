@@ -145,10 +145,23 @@ opam-configure:
 		opam reinstall --yes --with-test ${package}.dev
 endif
 
+.PHONY: doc-build-all
+doc-build-all:
+	cd ${CI_PROJECT_DIR} && \
+		make all && \
+		make -C docs -j all
+
 .PHONY: doc-publish
 doc-publish:
 	cd ${CI_PROJECT_DIR} && \
 		./scripts/ci/doc_publish.sh
+
+.PHONY: doc-linkcheck
+doc-linkcheck:
+	cd ${CI_PROJECT_DIR} && \
+		make all && \
+		make -C docs redirectcheck && \
+		make -C docs linkcheck
 
 .PHONY: opam-release
 opam-release:
