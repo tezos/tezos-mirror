@@ -110,11 +110,7 @@ let copy_tree_exn tree from_key to_key =
   let* move_tree = find_tree_exn tree from_key in
   T.add_tree tree to_key move_tree
 
-let count_subtrees tree key =
-  let open Lwt.Syntax in
-  let* opt = T.find_tree tree @@ to_value_key key in
-  let+ len = T.length tree key in
-  if Option.is_none opt then len else len - 1
+let count_subtrees tree key = T.length tree key
 
 let delete tree key = T.remove tree key
 

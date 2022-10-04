@@ -138,20 +138,21 @@ let should_run_store_has_kernel kernel =
   assert (is_stuck state_after_first_message) ;
   return_ok_unit
 
+(* The `should_run_store_list_size_kernel` asserts
+   whether the tree has three subtrees. Note that the `_` subtree is included
+   and so, after adding the `four` subtree the state will become stuck.*)
 let should_run_store_list_size_kernel kernel =
   let open Lwt_syntax in
   let* tree = initial_tree ~from_binary:true kernel in
+  let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["one"; "three"] in
-  let* tree = add_value tree ["one"; "four"] in
   (* Make the first ticks of the WASM PVM (parsing of origination
      message, parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
   let* tree = eval_until_input_requested tree in
   (* Feeding it with one input *)
   let* tree = set_input_step "test" 0 tree in
-  (* Adding a value at ["one"] should not affect the count. *)
-  let* tree = add_value tree ["one"] in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
@@ -162,7 +163,7 @@ let should_run_store_list_size_kernel kernel =
   (* We now add another value - this will cause the kernel
      assertion on this path to fail, as there are now four subtrees. *)
   let* tree = set_input_step "test" 1 tree in
-  let* tree = add_value tree ["one"; "five"] in
+  let* tree = add_value tree ["one"; "four"] in
   let* tree = eval_until_input_requested tree in
   let* state_after_second_message =
     Wasm.Internal_for_tests.get_tick_state tree

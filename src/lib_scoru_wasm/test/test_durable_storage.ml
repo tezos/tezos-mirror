@@ -135,7 +135,7 @@ let test_store_list_size () =
 
   We expect that the list size of "/a/short/path" is 2.
 
-  Note that the value of "/durable/a/short/path/_" is not included in the listing.
+  Note that the value of "/durable/a/short/path/_" is included in the listing.
   *)
   let* durable =
     make_durable
@@ -162,7 +162,7 @@ let test_store_list_size () =
       Host_funcs.Internal_for_tests.store_list_size
       values
   in
-  assert (result = Values.[Num (I64 (I64.of_int_s 2))]) ;
+  assert (result = Values.[Num (I64 (I64.of_int_s 3))]) ;
   Lwt.return_ok ()
 
 (* Test checking that [store_delete key] deletes the subtree at [key] from the
@@ -306,10 +306,9 @@ let test_durable_count_subtrees () =
     let+ n = Durable.count_subtrees dbl @@ Durable.key_of_string_exn under in
     assert (n = count)
   in
-  let* () = assert_subtree_count tree 2 "/hello" in
-  let* () = assert_subtree_count tree 2 "/hello" in
-  let* () = assert_subtree_count tree 1 "/hello/you" in
-  let* () = assert_subtree_count tree 0 "/hello/you/too" in
+  let* () = assert_subtree_count tree 3 "/hello" in
+  let* () = assert_subtree_count tree 2 "/hello/you" in
+  let* () = assert_subtree_count tree 1 "/hello/you/too" in
   let* () = assert_subtree_count tree 0 "/bye" in
   Lwt.return_ok ()
 

@@ -242,7 +242,7 @@ let store_has =
           let r =
             match (value_opt, num_subtrees) with
             | None, 0 -> store_has_unknown_key
-            | Some _, 0 -> store_has_value_only
+            | Some _, 1 -> store_has_value_only
             | None, _ -> store_has_subtrees_only
             | _ -> store_has_value_and_subtrees
           in

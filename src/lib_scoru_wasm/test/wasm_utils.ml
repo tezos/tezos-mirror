@@ -224,10 +224,12 @@ module Kernels = struct
   (* Kernel checking the return value of store_list_size host func.
 
      This kernel expects a collection of values to exist:
+     - `/durable/one/_`
      - `/durable/one/two`
      - `/durable/one/three`
-     - `/durable/one/four`
-     and asserts that `store_list_size(/one) = 3`.
+
+     and asserts that `store_list_size(/one) = 3`. Note that the root subtree
+     `/durable/one/_` is counted among the three
   *)
   let test_store_list_size_kernel = "test-store-list-size"
 
