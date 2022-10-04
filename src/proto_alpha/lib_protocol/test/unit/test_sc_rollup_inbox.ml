@@ -31,5 +31,176 @@
     Subject:    These unit tests check the off-line inbox implementation for
                 smart contract rollups
 *)
+open Protocol
 
-let tests = Test_sc_rollup_inbox_legacy.tests
+let lift k = Environment.wrap_tzresult k
+
+module Merkelized_payload_hashes =
+  Alpha_context.Sc_rollup.Inbox_merkelized_payload_hashes
+
+module Message = Alpha_context.Sc_rollup.Inbox_message
+
+let assert_equal_payload ~__LOC__ found (expected : Message.serialized) =
+  Assert.equal_string
+    ~loc:__LOC__
+    (Message.unsafe_to_string expected)
+    (Message.unsafe_to_string found)
+
+let assert_equal_payload_hash ~__LOC__ found expected =
+  Assert.equal
+    ~loc:__LOC__
+    Message.Hash.equal
+    "Protocol hashes aren't equal"
+    Message.Hash.pp
+    expected
+    found
+
+let assert_merkelized_payload ~__LOC__ ~payload_hash ~index found =
+  let open Lwt_result_syntax in
+  let found_payload_hash = Merkelized_payload_hashes.get_payload_hash found in
+  let found_index = Merkelized_payload_hashes.get_index found in
+  let* () =
+    assert_equal_payload_hash ~__LOC__ found_payload_hash payload_hash
+  in
+  Assert.equal_int ~loc:__LOC__ found_index index
+
+let assert_equal_merkelized_payload ~__LOC__ ~found ~expected =
+  let payload_hash = Merkelized_payload_hashes.get_payload_hash expected in
+  let index = Merkelized_payload_hashes.get_index expected in
+  assert_merkelized_payload ~__LOC__ ~payload_hash ~index found
+
+let gen_payload_size = QCheck2.Gen.(1 -- 10)
+
+let gen_payload =
+  let open QCheck2.Gen in
+  let+ payload = string_size gen_payload_size in
+  Message.unsafe_of_string payload
+
+let gen_payloads =
+  let open QCheck2.Gen in
+  list_size (2 -- 50) gen_payload
+
+let gen_index payloads =
+  let open QCheck2.Gen in
+  let max_index = List.length payloads - 1 in
+  let* index = 0 -- max_index in
+  return index
+
+let gen_payloads_and_index =
+  let open QCheck2.Gen in
+  let* payloads = gen_payloads in
+  let* index = gen_index payloads in
+  return (payloads, index)
+
+let gen_payloads_and_two_index =
+  let open QCheck2.Gen in
+  let* payloads = gen_payloads in
+  let* index = gen_index payloads in
+  let* index' = gen_index payloads in
+  return (payloads, index, index')
+
+let fill_merkelized_payload history payloads =
+  let open Lwt_result_syntax in
+  let* first, payloads =
+    match payloads with
+    | x :: xs -> return (x, xs)
+    | [] -> failwith "empty payloads"
+  in
+  let*? history, merkelized_payload =
+    lift @@ Merkelized_payload_hashes.genesis history first
+  in
+  Lwt.return @@ lift
+  @@ List.fold_left_e
+       (fun (history, payloads) payload ->
+         Merkelized_payload_hashes.add_payload history payloads payload)
+       (history, merkelized_payload)
+       payloads
+
+let construct_merkelized_payload payloads =
+  let history = Merkelized_payload_hashes.History.empty ~capacity:1000L in
+  fill_merkelized_payload history payloads
+
+let test_merkelized_payload_history payloads =
+  let open Lwt_result_syntax in
+  let nb_payloads = List.length payloads in
+  let* history, merkelized_payloads = construct_merkelized_payload payloads in
+  let* () =
+    Assert.equal_int
+      ~loc:__LOC__
+      nb_payloads
+      (Merkelized_payload_hashes.get_index merkelized_payloads + 1)
+  in
+  List.iteri_es
+    (fun index (expected_payload : Message.serialized) ->
+      let expected_payload_hash =
+        Message.hash_serialized_message expected_payload
+      in
+      let found_merkelized_payload =
+        WithExceptions.Option.get ~loc:__LOC__
+        @@ Merkelized_payload_hashes.Internal_for_tests.find_predecessor_payload
+             history
+             ~index
+             merkelized_payloads
+      in
+      let found_payload_hash =
+        Merkelized_payload_hashes.get_payload_hash found_merkelized_payload
+      in
+      assert_equal_payload_hash
+        ~__LOC__
+        found_payload_hash
+        expected_payload_hash)
+    payloads
+
+let test_merkelized_payload_proof (payloads, index) =
+  let open Lwt_result_syntax in
+  let* history, merkelized_payload = construct_merkelized_payload payloads in
+  let ( Merkelized_payload_hashes.
+          {merkelized = target_merkelized_payload; payload = proof_payload},
+        proof ) =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ Merkelized_payload_hashes.produce_proof history ~index merkelized_payload
+  in
+  let payload : Message.serialized =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth payloads index
+  in
+  let payload_hash = Message.hash_serialized_message payload in
+  let* () = assert_equal_payload ~__LOC__ proof_payload payload in
+  let* () =
+    assert_merkelized_payload
+      ~__LOC__
+      ~index
+      ~payload_hash
+      target_merkelized_payload
+  in
+  let*? proof_ancestor_merkelized, proof_current_merkelized =
+    lift @@ Merkelized_payload_hashes.verify_proof proof
+  in
+  let* () =
+    assert_equal_merkelized_payload
+      ~__LOC__
+      ~found:proof_ancestor_merkelized
+      ~expected:target_merkelized_payload
+  in
+  let* () =
+    assert_equal_merkelized_payload
+      ~__LOC__
+      ~found:proof_current_merkelized
+      ~expected:merkelized_payload
+  in
+  return_unit
+
+let merkelized_payload_tests =
+  [
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"Merkelized messages: Add messages then retrieve them from history."
+      gen_payloads
+      test_merkelized_payload_history;
+    Tztest.tztest_qcheck2
+      ~count:1000
+      ~name:"Merkelized messages: Produce proof and verify its validity."
+      gen_payloads_and_index
+      test_merkelized_payload_proof;
+  ]
+
+let tests = merkelized_payload_tests @ Test_sc_rollup_inbox_legacy.tests
