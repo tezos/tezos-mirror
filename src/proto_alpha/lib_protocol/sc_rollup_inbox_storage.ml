@@ -88,24 +88,20 @@ let add_messages ctxt rollup messages =
   let* () =
     assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages
   in
-  let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
-  let* ctxt, genesis_info = Storage.Sc_rollup.Genesis_info.get ctxt rollup in
-  let origination_level = genesis_info.level in
-  let levels =
-    Int32.sub
-      (Raw_level_repr.to_int32 inbox_level)
-      (Raw_level_repr.to_int32 origination_level)
-  in
-  let*? current_messages, ctxt =
-    Sc_rollup_in_memory_inbox.current_messages ctxt rollup
-  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3292
+
+     The carbonation needs to be activated again with the new internal inbox's
+     design, i.e. the skip list. *)
   let cost_add_serialized_messages =
     Sc_rollup_costs.cost_add_serialized_messages
       ~num_messages
       ~total_messages_size
-      levels
+      0l
   in
   let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
+  let*? current_messages, ctxt =
+    Sc_rollup_in_memory_inbox.current_messages ctxt rollup
+  in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
