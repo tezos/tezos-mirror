@@ -45,9 +45,9 @@ end
 let () = Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz4" 36
 
 module Public_key = struct
-  open Bls12_381.Signature.MinPk
+  open Bls12_381_signature.MinPk
 
-  type t = Bls12_381.Signature.MinPk.pk
+  type t = Bls12_381_signature.MinPk.pk
 
   let name = "Bls12_381.Public_key"
 
@@ -63,7 +63,7 @@ module Public_key = struct
 
   let of_bytes_without_validation = of_bytes_opt
 
-  let size _pk = Bls12_381.Signature.MinPk.pk_size_in_bytes
+  let size _pk = Bls12_381_signature.MinPk.pk_size_in_bytes
 
   type Base58.data += Data of t
 
@@ -84,8 +84,8 @@ module Public_key = struct
 
     let compare a b =
       Bytes.compare
-        (Bls12_381.Signature.MinPk.pk_to_bytes a)
-        (Bls12_381.Signature.MinPk.pk_to_bytes b)
+        (Bls12_381_signature.MinPk.pk_to_bytes a)
+        (Bls12_381_signature.MinPk.pk_to_bytes b)
   end)
 
   include Helpers.MakeRaw (struct
@@ -134,7 +134,7 @@ module Public_key = struct
 end
 
 module Secret_key = struct
-  type t = Bls12_381.Signature.sk
+  type t = Bls12_381_signature.sk
 
   let name = "Bls12_381.Secret_key"
 
@@ -144,22 +144,22 @@ module Secret_key = struct
     type nonrec t = t
 
     let compare a b =
-      let a = Bls12_381.Signature.sk_to_bytes a
-      and b = Bls12_381.Signature.sk_to_bytes b in
+      let a = Bls12_381_signature.sk_to_bytes a
+      and b = Bls12_381_signature.sk_to_bytes b in
       Bytes.compare a b
   end)
 
-  let size = Bls12_381.Signature.sk_size_in_bytes
+  let size = Bls12_381_signature.sk_size_in_bytes
 
-  let to_bytes = Bls12_381.Signature.sk_to_bytes
+  let to_bytes = Bls12_381_signature.sk_to_bytes
 
   let to_string s = Bytes.to_string (to_bytes s)
 
-  let of_bytes_opt = Bls12_381.Signature.sk_of_bytes_opt
+  let of_bytes_opt = Bls12_381_signature.sk_of_bytes_opt
 
   let of_string_opt s = of_bytes_opt (Bytes.of_string s)
 
-  let to_public_key = Bls12_381.Signature.MinPk.derive_pk
+  let to_public_key = Bls12_381_signature.MinPk.derive_pk
 
   type Base58.data += Data of t
 
@@ -237,21 +237,21 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 end
 
-type t = Bls12_381.Signature.MinPk.signature
+type t = Bls12_381_signature.MinPk.signature
 
 type watermark = Bytes.t
 
-let name = "Bls12_381.Signature"
+let name = "Bls12_381_signature"
 
 let title = "A Bls12_381 signature"
 
-let size = Bls12_381.Signature.MinPk.signature_size_in_bytes
+let size = Bls12_381_signature.MinPk.signature_size_in_bytes
 
-let to_bytes = Bls12_381.Signature.MinPk.signature_to_bytes
+let to_bytes = Bls12_381_signature.MinPk.signature_to_bytes
 
 let of_bytes_opt s =
   if Bytes.length s = size then
-    Bls12_381.Signature.MinPk.signature_of_bytes_opt s
+    Bls12_381_signature.MinPk.signature_of_bytes_opt s
   else None
 
 let to_string s = Bytes.to_string (to_bytes s)
@@ -322,7 +322,7 @@ end)
 let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
 let zero =
-  Bls12_381.Signature.MinPk.signature_of_bytes_exn
+  Bls12_381_signature.MinPk.signature_of_bytes_exn
   @@ Bytes.of_string
        "\192\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
 
@@ -330,15 +330,15 @@ let sign ?watermark sk msg =
   let msg =
     match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
   in
-  Bls12_381.Signature.MinPk.Aug.sign sk msg
+  Bls12_381_signature.MinPk.Aug.sign sk msg
 
 let check ?watermark pk signature msg =
   let msg =
     match watermark with None -> msg | Some prefix -> Bytes.cat prefix msg
   in
-  Bls12_381.Signature.MinPk.Aug.verify pk msg signature
+  Bls12_381_signature.MinPk.Aug.verify pk msg signature
 
-(* [seed] must be at least of 32 bytes or [Bls12_381.Signature.generate_sk] will
+(* [seed] must be at least of 32 bytes or [Bls12_381_signature.generate_sk] will
    throw an error. *)
 let generate_key ?seed () =
   let seed =
@@ -349,8 +349,8 @@ let generate_key ?seed () =
            bytes of 32 *)
         Hacl.Rand.gen 32
   in
-  let sk = Bls12_381.Signature.generate_sk seed in
-  let pk = Bls12_381.Signature.MinPk.derive_pk sk in
+  let sk = Bls12_381_signature.generate_sk seed in
+  let pk = Bls12_381_signature.MinPk.derive_pk sk in
   let pkh = Public_key.hash pk in
   (pkh, pk, sk)
 
@@ -373,9 +373,9 @@ let aggregate_check pk_msg_list signature =
         (pk, msg))
       pk_msg_list
   in
-  Bls12_381.Signature.MinPk.Aug.aggregate_verify pk_msg_list signature
+  Bls12_381_signature.MinPk.Aug.aggregate_verify pk_msg_list signature
 
-let aggregate_signature_opt = Bls12_381.Signature.MinPk.aggregate_signature_opt
+let aggregate_signature_opt = Bls12_381_signature.MinPk.aggregate_signature_opt
 
 module Primitive = struct
   include Bls12_381

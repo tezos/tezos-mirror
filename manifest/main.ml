@@ -82,12 +82,16 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  let version = V.(at_least "4.0.0" && less_than "4.1.0") in
+  let version = V.(at_least "5.0.0" && less_than "5.1.0") in
   external_lib
     ~js_compatible:true
     ~npm_deps:[Npm.make "@dannywillems/ocaml-bls12-381" version]
     "bls12-381"
     version
+
+let bls12_381_signature =
+  let version = V.exactly "1.0.0" in
+  external_lib ~js_compatible:true "bls12-381-signature" version
 
 let bls12_381_polynomial =
   let version = V.at_least "0.1.0" in
@@ -784,6 +788,7 @@ let octez_crypto =
         zarith;
         zarith_stubs_js;
         bls12_381;
+        bls12_381_signature;
       ]
     ~js_compatible:true
 

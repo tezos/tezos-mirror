@@ -27,9 +27,9 @@
 
 include
   S.AGGREGATE_SIGNATURE
-    with type Public_key.t = Bls12_381.Signature.MinPk.pk
-     and type Secret_key.t = Bls12_381.Signature.sk
-     and type t = Bls12_381.Signature.MinPk.signature
+    with type Public_key.t = Bls12_381_signature.MinPk.pk
+     and type Secret_key.t = Bls12_381_signature.sk
+     and type t = Bls12_381_signature.MinPk.signature
      and type watermark = Bytes.t
 
 include S.RAW_DATA with type t := t
