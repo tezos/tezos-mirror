@@ -387,10 +387,9 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup_in_memory_inbox : sig
-  val current_messages :
-    t -> Sc_rollup_repr.t -> (Context.tree option * t) tzresult
+  val current_messages : t -> Context.tree option
 
-  val set_current_messages : t -> Sc_rollup_repr.t -> Context.tree -> t tzresult
+  val set_current_messages : t -> Context.tree -> t
 end
 
 module Dal : sig

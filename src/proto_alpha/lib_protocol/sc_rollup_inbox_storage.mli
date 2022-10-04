@@ -42,14 +42,13 @@ val get_inbox :
 *)
 val add_external_messages :
   Raw_context.t ->
-  Sc_rollup_repr.t ->
   string list ->
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [add_internal_message context rollup ~payload ~sender ~source] adds the
-  internal message of [payload], [sender], and [source] to [rollup]'s inbox.
+    internal message of [payload], [sender], and [source] to [rollup]'s inbox.
 
-  See [add_external_messages] for returned values and failures.
+    See [add_external_messages] for returned values and failures.
 *)
 val add_internal_message :
   Raw_context.t ->

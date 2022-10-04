@@ -3212,7 +3212,7 @@ module Sc_rollup : sig
       Merkelized_operations with type tree = P.tree and type inbox_context = P.t
 
     val add_external_messages :
-      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+      context -> string list -> (t * Z.t * context) tzresult Lwt.t
 
     val add_internal_message :
       context ->

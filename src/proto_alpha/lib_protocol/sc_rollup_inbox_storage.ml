@@ -53,7 +53,7 @@ let assert_inbox_nb_messages_in_commitment_period ctxt inbox extra_messages =
     Compare.Int64.(nb_messages_in_commitment_period > limit)
     Sc_rollup_max_number_of_messages_reached_for_commitment_period
 
-let add_messages ctxt rollup messages =
+let add_messages ctxt messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
@@ -99,9 +99,7 @@ let add_messages ctxt rollup messages =
       0l
   in
   let*? ctxt = Raw_context.consume_gas ctxt cost_add_serialized_messages in
-  let*? current_messages, ctxt =
-    Sc_rollup_in_memory_inbox.current_messages ctxt rollup
-  in
+  let current_messages = Sc_rollup_in_memory_inbox.current_messages ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
@@ -115,8 +113,8 @@ let add_messages ctxt rollup messages =
       messages
       current_messages
   in
-  let*? ctxt =
-    Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
+  let ctxt =
+    Sc_rollup_in_memory_inbox.set_current_messages ctxt current_messages
   in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3920
      Account the size's difference with the carbonated storage. *)
@@ -156,17 +154,17 @@ let serialize_internal_message ctxt ~payload ~sender ~source =
   in
   return (message, ctxt)
 
-let add_external_messages ctxt rollup external_messages =
+let add_external_messages ctxt external_messages =
   let open Lwt_result_syntax in
   let*? ctxt, messages = serialize_external_messages ctxt external_messages in
-  add_messages ctxt rollup messages
+  add_messages ctxt messages
 
-let add_internal_message ctxt rollup ~payload ~sender ~source =
+let add_internal_message ctxt _rollup ~payload ~sender ~source =
   let open Lwt_result_syntax in
   let*? message, ctxt =
     serialize_internal_message ctxt ~payload ~sender ~source
   in
-  add_messages ctxt rollup [message]
+  add_messages ctxt [message]
 
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages
