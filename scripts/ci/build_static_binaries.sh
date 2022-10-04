@@ -10,3 +10,9 @@ echo "Build and install static binaries"
 echo "Strip debug symbols and compress binaries (parallelized)"
 # shellcheck disable=SC2046,SC2038
 find "octez-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" | xargs -n1 -P$(nproc) -i sh -c 'strip --strip-debug {}; upx -6q {};'
+
+# Show the effect of previous actions
+find "octez-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" |
+while read -r b; do
+    file "$(realpath "$b")";
+done
