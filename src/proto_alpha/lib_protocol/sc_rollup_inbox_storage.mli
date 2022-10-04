@@ -59,6 +59,9 @@ val add_internal_message :
   source:Signature.public_key_hash ->
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
+(** Initialize the inbox in the storage at protocol initialization. *)
+val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig

@@ -153,6 +153,10 @@
         "Liquidity_baking_lqt",
         "Liquidity_baking_migration",
 
+        "Sc_rollup_costs",
+        "Sc_rollup_errors",
+        "Sc_rollup_inbox_storage",
+
         "Legacy_script_patches",
         "Init_storage",
         "Sapling_validator",
@@ -164,10 +168,7 @@
         "Tx_rollup_inbox_storage",
         "Tx_rollup_commitment_storage",
         "Tx_rollup_storage",
-        "Sc_rollup_costs",
-        "Sc_rollup_errors",
         "Sc_rollup_commitment_storage",
-        "Sc_rollup_inbox_storage",
         "Sc_rollup_outbox_storage",
         "Sc_rollup_stake_storage",
         "Sc_rollup_storage",

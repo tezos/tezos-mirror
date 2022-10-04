@@ -175,3 +175,9 @@ let add_internal_message ctxt rollup ~payload ~sender ~source =
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages
 end
+
+let init ctxt =
+  let open Lwt_result_syntax in
+  let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
+  let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
+  Store.Inbox.init ctxt inbox
