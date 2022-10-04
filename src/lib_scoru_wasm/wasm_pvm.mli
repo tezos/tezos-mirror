@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,42 +27,5 @@
 (** Maximum number of reboots per inputs. *)
 val maximum_reboots_per_input : Z.t
 
-type tick_state =
-  | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
-  | Link of {
-      ast_module : Tezos_webassembly_interpreter.Ast.module_;
-      externs :
-        Tezos_webassembly_interpreter.Instance.extern
-        Tezos_webassembly_interpreter.Instance.Vector.t;
-      imports_offset : int32;
-    }
-  | Init of {
-      self : Tezos_webassembly_interpreter.Instance.module_key;
-      ast_module : Tezos_webassembly_interpreter.Ast.module_;
-      init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
-      module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
-    }
-  | Eval of Tezos_webassembly_interpreter.Eval.config
-  | Stuck of Wasm_pvm_errors.t
-  | Snapshot
-
-type pvm_state = {
-  last_input_info : Wasm_pvm_sig.input_info option;
-      (** Info about last read input. *)
-  current_tick : Z.t;  (** Current tick of the PVM. *)
-  reboot_counter : Z.t;  (** Number of reboots for the current input. *)
-  durable : Durable.t;  (** The durable storage of the PVM. *)
-  buffers : Tezos_webassembly_interpreter.Eval.buffers;
-      (** Input and outut buffers used by the PVM host functions. *)
-  tick_state : tick_state;  (** The current tick state. *)
-  last_top_level_call : Z.t;
-      (** Last tick corresponding to a top-level call. *)
-  max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
-  maximum_reboots_per_input : Z.t;  (** Number of reboots between two inputs. *)
-}
-
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S
-    with type tree = T.tree
-     and type tick_state = tick_state
-     and type pvm_state = pvm_state
+  Gather_floppies.S with type tree = T.tree

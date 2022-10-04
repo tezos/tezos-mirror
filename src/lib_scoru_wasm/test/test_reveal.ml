@@ -68,8 +68,9 @@ let test_reveal_preimage_gen preimage max_bytes =
   let*! state = eval_until_input_requested state_with_dummy_input in
   let*! info = Wasm.get_info state in
   let* () =
-    match info.Wasm_pvm_sig.input_request with
-    | Wasm_pvm_sig.No_input_required | Input_required -> assert false
+    let open Wasm_pvm_state in
+    match info.input_request with
+    | No_input_required | Input_required -> assert false
     | Reveal_required (Reveal_raw_data hash) ->
         (* The PVM has reached a point where it’s asking for some
            preimage. Since the memory is left blank, we are looking
@@ -83,8 +84,9 @@ let test_reveal_preimage_gen preimage max_bytes =
   let*! state = Wasm.reveal_step (Bytes.of_string preimage) state in
   let*! info = Wasm.get_info state in
   let* () =
-    match info.Wasm_pvm_sig.input_request with
-    | Wasm_pvm_sig.No_input_required -> return_unit
+    let open Wasm_pvm_state in
+    match info.input_request with
+    | No_input_required -> return_unit
     | Input_required ->
         failwith "should be running, but expect input from the L1"
     | Reveal_required _ -> failwith "should be running, but expect reveal tick"

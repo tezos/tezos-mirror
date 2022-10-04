@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Wasm_pvm_sig
+open Wasm_pvm_state
 open Tezos_lazy_containers
 
 (** FIXME: https://gitlab.com/tezos/tezos/-/issues/3361
@@ -106,11 +107,7 @@ module type S = sig
   include Wasm_pvm_sig.S
 
   module Internal_for_tests : sig
-    include
-      Wasm_pvm_sig.Internal_for_tests
-        with type tree := tree
-         and type tick_state := tick_state
-         and type pvm_state := pvm_state
+    include Wasm_pvm_sig.Internal_for_tests with type tree := tree
 
     val get_internal_status : tree -> internal_status option Lwt.t
 
@@ -121,15 +118,8 @@ end
 module Make
     (T : Tezos_tree_encoding.TREE)
     (Wasm : Wasm_pvm_sig.S with type tree = T.tree) :
-  S
-    with type tree = T.tree
-     and type tick_state = Wasm.tick_state
-     and type pvm_state = Wasm.pvm_state = struct
+  S with type tree = T.tree = struct
   type tree = Wasm.tree
-
-  type tick_state = Wasm.tick_state
-
-  type pvm_state = Wasm.pvm_state
 
   module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
 
@@ -435,6 +425,8 @@ module Make
 
   let compute_step_many ~max_steps =
     compute_step_gen (Wasm.compute_step_many ~max_steps)
+
+  module Internal_for_benchmark = Wasm.Internal_for_benchmark
 
   module Internal_for_tests = struct
     include Wasm.Internal_for_tests

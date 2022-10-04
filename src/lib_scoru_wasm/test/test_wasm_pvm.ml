@@ -212,6 +212,7 @@ let should_run_store_delete_kernel kernel =
 let build_snapshot_wasm_state_from_set_input
     ?(max_tick = Z.of_int64 default_max_tick) tree =
   let open Lwt_syntax in
+  let open Wasm_pvm_state.Internal_state in
   (* Only serves to encode the `Snapshot` state. *)
   let state_encoding =
     Tezos_tree_encoding.(
@@ -221,7 +222,7 @@ let build_snapshot_wasm_state_from_set_input
           case
             "snapshot"
             (value [] Data_encoding.unit)
-            (function Wasm_pvm.Snapshot -> Some () | _ -> None)
+            (function Snapshot -> Some () | _ -> None)
             (fun () -> Snapshot);
         ])
   in
@@ -229,7 +230,7 @@ let build_snapshot_wasm_state_from_set_input
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.scope ["wasm"] state_encoding)
-      Wasm_pvm.Snapshot
+      Snapshot
       tree
   in
   (* Since we start directly after at an input_step, we need to offset the tick

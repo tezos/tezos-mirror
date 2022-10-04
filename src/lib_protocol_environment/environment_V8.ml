@@ -105,13 +105,14 @@ module type T = sig
        and type Dal.page_proof = Tezos_crypto_dal.Cryptobox.Verifier.page_proof
        and type Bounded.Non_negative_int32.t =
         Tezos_base.Bounded.Non_negative_int32.t
-       and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info
-       and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_sig.output_info
-       and type Wasm_2_0_0.input_hash = Tezos_scoru_wasm.Wasm_pvm_sig.input_hash
-       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_sig.reveal
+       and type Wasm_2_0_0.input = Tezos_scoru_wasm.Wasm_pvm_state.input_info
+       and type Wasm_2_0_0.output = Tezos_scoru_wasm.Wasm_pvm_state.output_info
+       and type Wasm_2_0_0.input_hash =
+        Tezos_scoru_wasm.Wasm_pvm_state.input_hash
+       and type Wasm_2_0_0.reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal
        and type Wasm_2_0_0.input_request =
-        Tezos_scoru_wasm.Wasm_pvm_sig.input_request
-       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_sig.info
+        Tezos_scoru_wasm.Wasm_pvm_state.input_request
+       and type Wasm_2_0_0.info = Tezos_scoru_wasm.Wasm_pvm_state.info
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -1044,30 +1045,30 @@ struct
   end
 
   module Wasm_2_0_0 = struct
-    type input = Tezos_scoru_wasm.Wasm_pvm_sig.input_info = {
+    type input = Tezos_scoru_wasm.Wasm_pvm_state.input_info = {
       inbox_level : Bounded.Non_negative_int32.t;
       message_counter : Z.t;
     }
 
-    type output = Tezos_scoru_wasm.Wasm_pvm_sig.output_info = {
+    type output = Tezos_scoru_wasm.Wasm_pvm_state.output_info = {
       outbox_level : Bounded.Non_negative_int32.t;
       message_index : Z.t;
     }
 
-    type input_hash = Tezos_scoru_wasm.Wasm_pvm_sig.input_hash
+    type input_hash = Tezos_scoru_wasm.Wasm_pvm_state.input_hash
 
     let input_hash_to_string =
-      Tezos_scoru_wasm.Wasm_pvm_sig.input_hash_to_string
+      Tezos_scoru_wasm.Wasm_pvm_state.input_hash_to_string
 
-    type reveal = Tezos_scoru_wasm.Wasm_pvm_sig.reveal =
+    type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
       | Reveal_raw_data of input_hash
 
-    type input_request = Tezos_scoru_wasm.Wasm_pvm_sig.input_request =
+    type input_request = Tezos_scoru_wasm.Wasm_pvm_state.input_request =
       | No_input_required
       | Input_required
       | Reveal_required of reveal
 
-    type info = Tezos_scoru_wasm.Wasm_pvm_sig.info = {
+    type info = Tezos_scoru_wasm.Wasm_pvm_state.info = {
       current_tick : Z.t;
       last_input_read : input option;
       input_request : input_request;

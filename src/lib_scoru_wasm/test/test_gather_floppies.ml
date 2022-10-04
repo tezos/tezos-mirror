@@ -76,7 +76,7 @@ let set_floppy_input_step chunk sk counter tree =
     @@ `External input
   in
   let input_info =
-    Wasm_pvm_sig.
+    Wasm_pvm_state.
       {
         inbox_level =
           Option.value_f ~default:(fun () -> assert false)
@@ -176,7 +176,7 @@ let init_tree_with_floppies ?(max_steps = Wasm_utils.default_max_tick) kernel =
   let*! tree = eval_until_input_requested ~max_steps tree in
   let set_input (tree, counter) chunk =
     let*! info = Wasm.get_info tree in
-    if info.input_request = Wasm_pvm_sig.Input_required then
+    if info.input_request = Wasm_pvm_state.Input_required then
       let*! tree = set_floppy_input_step chunk sk counter tree in
       let+ () = check_gathering_status (Gathering_floppies pk) tree in
       (tree, succ counter)
