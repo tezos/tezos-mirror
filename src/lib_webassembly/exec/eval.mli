@@ -31,6 +31,9 @@ type init_state =
   | Map_concat_step
   | Join_step
   | Section_step
+  | Eval_const
+  | Create_global_step
+  | Run_data_step
 
 (** Exception raised on irreducible states of the small step
     initialization. *)
@@ -38,7 +41,7 @@ exception Init_step_error of init_state
 
 (** Possible erroneous states of the small-step evaluation, used for error
     reporting. *)
-type eval_state = Invoke_step of string
+type eval_state = Invoke_step of string | Label_step | Frame_step | Eval_step
 
 (** Exception raised on irreducible states of the small step
     evaluation. *)

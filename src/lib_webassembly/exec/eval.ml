@@ -101,10 +101,13 @@ type init_state =
   | Map_concat_step
   | Join_step
   | Section_step
+  | Eval_const
+  | Create_global_step
+  | Run_data_step
 
 exception Init_step_error of init_state
 
-type eval_state = Invoke_step of string
+type eval_state = Invoke_step of string | Label_step | Frame_step | Eval_step
 
 exception Evaluation_step_error of eval_state
 
@@ -1316,7 +1319,8 @@ let label_step :
     (Durable_storage.t * label_step_kont) Lwt.t =
  fun ~init durable c buffers frame label_kont ->
   match label_kont with
-  | LS_Push_frame _ | LS_Modify_top _ -> assert false
+  | LS_Push_frame _ | LS_Modify_top _ ->
+      raise (Evaluation_step_error Label_step)
   | LS_Start (Label_stack (label, stack)) ->
       let vs, es = label.label_code in
       if 0l < Vector.num_elements es then
@@ -1452,7 +1456,7 @@ let dup_frame {frame_arity; frame_specs = {inst; locals}; frame_label_kont} =
   {frame_arity; frame_specs = {inst; locals}; frame_label_kont}
 
 let frame_step ~init durable c buffers = function
-  | SK_Result _ | SK_Trapped _ -> assert false
+  | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Frame_step)
   | SK_Start (frame, stack) ->
       let+ kont =
         match frame.frame_label_kont with
@@ -1518,7 +1522,7 @@ let frame_step ~init durable c buffers = function
 
 let step ?(init = false) ?(durable = Durable_storage.empty) c buffers =
   match c.step_kont with
-  | SK_Result _ | SK_Trapped _ -> assert false
+  | SK_Result _ | SK_Trapped _ -> raise (Evaluation_step_error Eval_step)
   | kont ->
       let+ durable, step_kont = frame_step ~init durable c buffers kont in
       (durable, {c with step_kont})
@@ -1663,7 +1667,7 @@ let eval_const_step buffers = function
   | EC_Next c ->
       let+ _, c = step ~init:true c buffers in
       EC_Next c
-  | EC_Stop _ -> assert false
+  | EC_Stop _ -> raise (Init_step_error Eval_const)
 
 (* Modules *)
 
@@ -1694,7 +1698,7 @@ let create_global_completed (gtype, kont) =
 
 let create_global_step buffers ((gtype, ekont) as kont) =
   match create_global_completed kont with
-  | Some _ -> assert false
+  | Some _ -> raise (Init_step_error Create_global_step)
   | None ->
       let+ ekont = eval_const_step buffers ekont in
       (gtype, ekont)
@@ -1784,7 +1788,7 @@ let run_data (inst : module_inst) i data =
              MemoryInit x @@ at;
              DataDrop x @@ at;
            ]
-  | Declarative -> assert false
+  | Declarative -> raise (Init_step_error Run_data_step)
 
 let run_start start = [plain (Call start.it.sfunc @@ start.at)]
 

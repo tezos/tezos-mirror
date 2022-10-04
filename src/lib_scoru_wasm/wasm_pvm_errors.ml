@@ -71,6 +71,9 @@ let init_state_to_string_raw = function
   | Map_concat_step -> "Map_concat_step"
   | Join_step -> "Join_step"
   | Section_step -> "Section_step"
+  | Eval_const -> "Eval_const"
+  | Create_global_step -> "Create_global_step"
+  | Run_data_step -> "Run_data_step"
 
 let init_state_to_string exn = init_state_to_string_raw exn |> truncate_message
 
@@ -86,6 +89,9 @@ let durable_exn_explanation exn =
 
 let eval_state_to_string_raw = function
   | Eval.Invoke_step msg -> "Invoke_step: " ^ msg
+  | Label_step -> "Label_step"
+  | Frame_step -> "Frame_step"
+  | Eval_step -> "Eval_step"
 
 let eval_state_to_string exn = eval_state_to_string_raw exn |> truncate_message
 

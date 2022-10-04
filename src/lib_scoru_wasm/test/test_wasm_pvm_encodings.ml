@@ -56,12 +56,31 @@ let decode_state_gen =
 
 let init_state_gen =
   let open QCheck2.Gen in
-  oneofl [Eval.Init_step; Map_step; Map_concat_step; Join_step; Section_step]
+  oneofl
+    [
+      Eval.Init_step;
+      Map_step;
+      Map_concat_step;
+      Join_step;
+      Section_step;
+      Eval_const;
+      Create_global_step;
+      Run_data_step;
+    ]
 
 let eval_state_gen =
   let open QCheck2.Gen in
-  let+ msg = string in
-  Eval.Invoke_step msg
+  let invoke_step =
+    let+ msg = string in
+    Eval.Invoke_step msg
+  in
+  oneof
+    [
+      invoke_step;
+      return Eval.Label_step;
+      return Eval.Frame_step;
+      return Eval.Eval_step;
+    ]
 
 let reveal_error_gen =
   let open QCheck2.Gen in
