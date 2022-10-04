@@ -96,6 +96,9 @@ struct
   let back_path list start stop =
     back_path ~deref:(deref list) ~cell_ptr:start ~target_index:stop
 
+  let find list start stop =
+    find ~deref:(deref list) ~cell_ptr:start ~target_index:stop
+
   let search list start target_content =
     search
       ~deref:(deref list)
@@ -111,6 +114,70 @@ struct
       path
 
   let rec nlist basis n = if n = 0 then zero else succ (nlist basis (n - 1))
+
+  let check_find i j =
+    let open Lwt_result_syntax in
+    let l = nlist basis i in
+    let*? () =
+      match find l i j with
+      | None -> error (err (Printf.sprintf "There must be a cell (%d)" i))
+      | Some cell ->
+          error_unless
+            (index cell = j)
+            (err
+               (Printf.sprintf
+                  "Found cell is not the correct one (found %d, expected %d)"
+                  (index cell)
+                  j))
+    in
+    let*? path =
+      match back_path l i j with
+      | None ->
+          error (err (Printf.sprintf "There must be path from %d to %d" i j))
+      | Some path -> ok path
+    in
+    let*? () =
+      match List.(hd (rev path)) with
+      | None ->
+          error
+            (err
+               (Printf.sprintf
+                  " There can't be an empty path from %d to %d"
+                  i
+                  j))
+      | Some stop_cell ->
+          error_unless
+            (j = stop_cell)
+            (err
+               (Printf.sprintf
+                  "Found cell is not equal to stop cell of back path (%d to %d)"
+                  i
+                  j))
+    in
+    return_unit
+
+  let check_invalid_find i =
+    let open Lwt_result_syntax in
+    let l = nlist basis i in
+    let check_nothing_found i j =
+      match find l i j with
+      | None -> ok ()
+      | Some _v ->
+          error
+            (err
+               (Printf.sprintf
+                  "There should be no value found at %d from %d"
+                  i
+                  j))
+    in
+    let*? () = check_nothing_found i (-1) in
+    let rec aux j =
+      if i <= j then return_unit
+      else
+        let*? () = check_nothing_found j i in
+        aux (j + 1)
+    in
+    aux 0
 
   let check_path i j back_path_fn =
     let l = nlist basis i in
@@ -264,6 +331,18 @@ let test_skip_list_nat_check_path (basis, i, j) =
   end) in
   M.check_path i j M.back_path
 
+let test_skip_list_nat_check_find (basis, i, j) =
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  M.check_find i j
+
+let test_skip_list_nat_check_invalid_find (basis, i) =
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  M.check_invalid_find i
+
 let test_skip_list_nat_check_invalid_path (basis, i) =
   let module M = TestNat (struct
     let basis = basis
@@ -395,6 +474,23 @@ let tests =
         return (basis, i, j))
       test_skip_list_nat_check_path;
     Tztest.tztest_qcheck2
+      ~name:"Skip list: find cell with `find` and `check`"
+      ~count:10
+      QCheck2.Gen.(
+        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* i = 0 -- 100 in
+        let* j = 0 -- i in
+        return (basis, i, j))
+      test_skip_list_nat_check_find;
+    Tztest.tztest_qcheck2
+      ~name:"Skip list: `find` won't produce invalid value"
+      ~count:10
+      QCheck2.Gen.(
+        let* basis = frequency [(5, pure 2); (1, 2 -- 73)] in
+        let* i = 0 -- 100 in
+        return (basis, i))
+      test_skip_list_nat_check_invalid_find;
+    Tztest.tztest_qcheck2
       ~name:"Skip list: `back_path` won't produce invalid paths"
       ~count:10
       QCheck2.Gen.(
@@ -425,7 +521,7 @@ let tests =
       test_skip_list_nat_check_invalid_path_with_search;
     (* We cheat here to avoid mixing non-pbt tests with pbt tests. *)
     Tztest.tztest_qcheck2
-      ~name:"Skip list: `seearch` may not produce minimal path"
+      ~name:"Skip list: `search` may not produce minimal path"
       ~count:10
       QCheck2.Gen.unit
       test_search_non_minimal_back_path;
