@@ -19,28 +19,28 @@ trace
     [ (Pair 1 "hello" 0) ]
   - location: 13 (remaining gas: 1039989.613 units remaining)
     [ 1 ]
-  - location: 11 (remaining gas: 1039989.593 units remaining)
+  - location: 11 (remaining gas: 1039989.588 units remaining)
     [ (Pair "hello" 0)
       1 ]
-  - location: 15 (remaining gas: 1039989.583 units remaining)
+  - location: 15 (remaining gas: 1039989.578 units remaining)
     [ (Pair "hello" 0)
       (Pair "hello" 0)
       1 ]
-  - location: 16 (remaining gas: 1039989.573 units remaining)
+  - location: 16 (remaining gas: 1039989.568 units remaining)
     [ 0
       (Pair "hello" 0)
       1 ]
-  - location: 17 (remaining gas: 1039989.563 units remaining)
+  - location: 17 (remaining gas: 1039989.558 units remaining)
     [ (Pair "hello" 0)
       1 ]
-  - location: 18 (remaining gas: 1039989.553 units remaining)
+  - location: 18 (remaining gas: 1039989.548 units remaining)
     [ "hello"
       1 ]
-  - location: 19 (remaining gas: 1039989.543 units remaining)
+  - location: 19 (remaining gas: 1039989.538 units remaining)
     [ (Pair "hello" 1) ]
-  - location: 20 (remaining gas: 1039989.533 units remaining)
+  - location: 20 (remaining gas: 1039989.528 units remaining)
     [ {}
       (Pair "hello" 1) ]
-  - location: 22 (remaining gas: 1039989.523 units remaining)
+  - location: 22 (remaining gas: 1039989.518 units remaining)
     [ (Pair {} "hello" 1) ]
 

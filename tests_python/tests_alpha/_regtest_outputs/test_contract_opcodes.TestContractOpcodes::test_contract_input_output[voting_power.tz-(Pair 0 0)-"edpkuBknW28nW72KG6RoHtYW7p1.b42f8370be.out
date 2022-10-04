@@ -13,20 +13,20 @@ trace
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ]
   - location: 10 (remaining gas: 1039667.038 units remaining)
     [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ]
-  - location: 11 (remaining gas: 1039446.492 units remaining)
+  - location: 11 (remaining gas: 1039446.382 units remaining)
     [ 4000000000000 ]
-  - location: 12 (remaining gas: 1039446.492 units remaining)
+  - location: 12 (remaining gas: 1039446.382 units remaining)
     [  ]
-  - location: 14 (remaining gas: 1039236.106 units remaining)
+  - location: 14 (remaining gas: 1039235.916 units remaining)
     [ 20000000000000 ]
-  - location: 12 (remaining gas: 1039236.086 units remaining)
+  - location: 12 (remaining gas: 1039235.891 units remaining)
     [ 4000000000000
       20000000000000 ]
-  - location: 15 (remaining gas: 1039236.076 units remaining)
+  - location: 15 (remaining gas: 1039235.881 units remaining)
     [ (Pair 4000000000000 20000000000000) ]
-  - location: 16 (remaining gas: 1039236.066 units remaining)
+  - location: 16 (remaining gas: 1039235.871 units remaining)
     [ {}
       (Pair 4000000000000 20000000000000) ]
-  - location: 18 (remaining gas: 1039236.056 units remaining)
+  - location: 18 (remaining gas: 1039235.861 units remaining)
     [ (Pair {} 4000000000000 20000000000000) ]
 

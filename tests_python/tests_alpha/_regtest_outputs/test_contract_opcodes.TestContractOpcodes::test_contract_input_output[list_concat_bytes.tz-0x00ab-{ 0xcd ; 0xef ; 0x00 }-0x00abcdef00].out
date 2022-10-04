@@ -17,11 +17,11 @@ trace
       { 0xcd ; 0xef ; 0x00 } ]
   - location: 10 (remaining gas: 1039994.109 units remaining)
     [ { 0x00ab ; 0xcd ; 0xef ; 0x00 } ]
-  - location: 11 (remaining gas: 1039993.969 units remaining)
+  - location: 11 (remaining gas: 1039993.967 units remaining)
     [ 0x00abcdef00 ]
-  - location: 12 (remaining gas: 1039993.959 units remaining)
+  - location: 12 (remaining gas: 1039993.957 units remaining)
     [ {}
       0x00abcdef00 ]
-  - location: 14 (remaining gas: 1039993.949 units remaining)
+  - location: 14 (remaining gas: 1039993.947 units remaining)
     [ (Pair {} 0x00abcdef00) ]
 

@@ -13,11 +13,11 @@ trace
     [ (Some "hello") ]
   - location: 10 (remaining gas: 1039993.571 units remaining)
     [ "hello" ]
-  - location: 10 (remaining gas: 1039993.561 units remaining)
+  - location: 10 (remaining gas: 1039993.556 units remaining)
     [ "hello" ]
-  - location: 16 (remaining gas: 1039993.551 units remaining)
+  - location: 16 (remaining gas: 1039993.546 units remaining)
     [ {}
       "hello" ]
-  - location: 18 (remaining gas: 1039993.541 units remaining)
+  - location: 18 (remaining gas: 1039993.536 units remaining)
     [ (Pair {} "hello") ]
 
