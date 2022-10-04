@@ -9,6 +9,7 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 
 : "${NODE_HOST:="node"}"
 : "${NODE_RPC_PORT:="8732"}"
+: "${NODE_RPC_ADDR:="localhost"}"
 
 : "${PROTOCOL:="unspecified-PROTOCOL-variable"}"
 

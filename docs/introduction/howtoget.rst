@@ -141,22 +141,94 @@ listed by ``dnf repoinfo``.
 
 .. _using_docker_images:
 
-Using Docker images
--------------------
+Using Docker Images And Docker-Compose
+--------------------------------------
 
 For every change committed in the GitLab repository, Docker images are
 automatically generated and published on `DockerHub
 <https://hub.docker.com/r/tezos/tezos/>`_. This provides a convenient
 way to run an always up-to-date ``tezos-node``.
 
-One way to run those Docker images is with Docker Compose.
-An example Docker Compose script is provided in
-:src:`scripts/docker/docker-compose-generic.yml`.
-It launches a node, a baker, and an accuser for protocol Alpha.
-You can adapt it to run the baker and accuser for other protocols
-by replacing all instances of ``alpha`` to e.g. ``014-PtKathma`` for Kathmandu.
-Replacing the value of the ``PROTOCOL`` environment variable is enough
-but you may want to update the ``hostname`` and the container name too.
+One way to run those Docker images is with `docker-compose <https://docs.docker.com/compose>`_.
+We provide ``docker-compose`` files for all active
+protocols. You can pick one and start with the following command (we'll assume alpha on this guide):
+
+::
+
+    cd scripts/docker
+    export LIQUIDITY_BAKING_VOTE=pass # You can choose between 'on', 'pass' or 'off'.
+    docker-compose -f alpha.yml up
+
+The above command will launch a node, a client, a baker, and an accuser for
+the Alpha protocol.
+
+You can open a new shell session and run ``docker ps`` in it, to display all the available containers, e.g.::
+
+    8f3638fae48c  docker.io/tezos/tezos:latest  tezos-node            3 minutes ago  Up 3 minutes ago   0.0.0.0:8732->8732/tcp, 0.0.0.0:9732->9732/tcp  node-alpha
+    8ba4d6077e2d  docker.io/tezos/tezos:latest  tezos-baker --liq...  3 minutes ago  Up 31 seconds ago                                                  baker-alpha
+    3ee7fcbc2158  docker.io/tezos/tezos:latest  tezos-accuser         3 minutes ago  Up 35 seconds ago                                                  accuser-alpha
+
+
+The node's RPC interface will be available on localhost and can be queried with ``tezos-client``.
+
+::
+
+    docker exec node-alpha tezos-client rpc list
+
+Building Docker Images Locally
+------------------------------
+
+The docker image used throughout the docker-compose files is fetched from upstream, but you can also
+build one locally and reference it. Run the following commands to build the image:
+
+::
+
+    ./scripts/ci/create_docker_image.build.sh
+    ./scripts/ci/create_docker_image.minimal.sh
+
+
+And then update the docker-compose file (e.g., ``alpha.yml``) with the docker tag::
+
+    node:
+      image: tezos:latest
+      ...
+
+Docker Image Configuration
+--------------------------
+
+Lastly, the entrypoint script (:src:`scripts/docker/entrypoint.sh`) provides the following configurable
+environment variables:
+
+- ``DATA_DIR``: The directory to store the node's data (defaults to ``/var/run/tezos``).
+- ``NODE_HOST``: The name of the node container (defaults to ``node``).
+- ``NODE_RPC_PORT``: The RPC port to listen to (defaults to ``8732``).
+- ``NODE_RPC_ADDR``: The RPC address that the node will listen to (defaults to ``localhost``).
+- ``PROTOCOL``: The protocol that will be used.
+
+These variables can be set in the docker-compose file, as demonstrated in ``alpha.yml``::
+
+    node:
+      ...
+      environment:
+        PROTOCOL: alpha
+      ...
+
+If the above options are not enough, you can always replace the default ``entrypoint`` and ``command`` fields.
+
+::
+
+    version: "3"
+    services:
+      node:
+        container_name: node-alpha
+        entrypoint: /bin/sh
+        command: /etc/my-init-script.sh
+        volumes:
+          - ./my-init-script.sh:/etc/my-init-script.sh
+          - ...
+        environment:
+          PROTOCOL: alpha
+     ...
 
 .. _building_with_opam:
 
