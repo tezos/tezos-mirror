@@ -85,6 +85,10 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
          ok hash)
        script_opt
 
+let get_contract_ticket_balance (rpc : #rpc_context) ~chain ~block contract key
+    =
+  Plugin.RPC.Contract.ticket_balance rpc (chain, block) contract key
+
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
