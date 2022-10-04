@@ -534,10 +534,10 @@ let send_text_messages ?src client msgs =
 
 let parse_inbox json =
   let go () =
-    let inbox = JSON.as_object json in
     return
-      ( List.assoc "current_level_hash" inbox |> JSON.as_string,
-        List.assoc "nb_messages_in_commitment_period" inbox |> JSON.as_int )
+      JSON.
+        ( json |-> "current_level_proof" |-> "hash" |> as_string,
+          json |-> "nb_messages_in_commitment_period" |> JSON.as_int )
   in
   Lwt.catch go @@ fun exn ->
   failwith
