@@ -92,6 +92,12 @@ the plugin in the file ``proto_XXX/lib_plugin/plugin_registration.ml``.
 Other plugins should be evaluated case-by-case. At the moment of writing, the
 ``Mempool`` plugin is the only one that can be safely removed.
 
+Remove Old Docker-Compose Files
+-------------------------------
+
+The docker-compose file with the corresponding protocol name can be removed from the
+``scripts/docker`` directory.
+
 Add an Entry in ``CHANGES.rst``
 -------------------------------
 

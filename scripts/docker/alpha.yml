@@ -1,0 +1,51 @@
+version: "3"
+services:
+  octez-node:
+    container_name: octez-node-alpha
+    image: tezos/tezos:latest
+    hostname: octez-node
+    command: tezos-node
+    ports:
+      - 9732:9732
+      - 8732:8732
+    environment:
+      NODE_RPC_ADDR: "0.0.0.0"
+      NODE_HOST: octez-node
+      PROTOCOL: alpha
+    volumes:
+      - node_data:/var/run/tezos/node
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  octez-baker:
+    container_name: octez-baker-alpha
+    image: tezos/tezos:latest
+    hostname: octez-baker
+    command: tezos-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
+    environment:
+      NODE_RPC_ADDR: "0.0.0.0"
+      NODE_HOST: octez-node
+      PROTOCOL: alpha
+    volumes:
+      - client_data:/var/run/tezos/client
+      - node_data:/var/run/tezos/node
+    restart: on-failure
+
+
+  octez-accuser:
+    container_name: octez-accuser-alpha
+    image: tezos/tezos:latest
+    hostname: octez-accuser
+    command: tezos-accuser
+    environment:
+      NODE_RPC_ADDR: "0.0.0.0"
+      NODE_HOST: octez-node
+      PROTOCOL: alpha
+    volumes:
+      - client_data:/var/run/tezos/client
+      - node_data:/var/run/tezos/node
+    restart: on-failure
+
+volumes:
+  node_data: {}
+  client_data: {}
