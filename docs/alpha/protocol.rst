@@ -79,9 +79,14 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   smart_rollups
+
+.. toctree::
+   :maxdepth: 2
+
    plugins
 
 .. toctree::
    :maxdepth: 2
-   
+
    event

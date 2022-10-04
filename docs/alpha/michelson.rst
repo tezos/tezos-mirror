@@ -53,6 +53,8 @@ always succeed to receive tokens, and does nothing else.
 Another kind of addresses, prefixed by ``txr1`` and ``tz4``, are
 related to :doc:`transaction rollups <./transaction_rollups>`.
 
+Finally, addresses prefixed with ``scr1`` identify smart rollups.
+
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
