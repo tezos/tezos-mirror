@@ -122,6 +122,13 @@ let conf_rust = opam_only "conf-rust" V.True
 
 let ctypes = external_lib ~js_compatible:true "ctypes" V.(at_least "0.18.0")
 
+let ctypes_foreign =
+  external_lib
+    ~js_compatible:true
+    ~opam:"ctypes-foreign"
+    "ctypes.foreign"
+    V.(at_least "0.18.0")
+
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
 let ctypes_stubs_js = external_lib ~js_compatible:true "ctypes_stubs_js" V.True
@@ -1569,6 +1576,27 @@ let _octez_p2p_tests =
                 "runtest_p2p_maintenance";
               ];
         ])
+
+let _octez_wasmer =
+  public_lib
+    "tezos-wasmer"
+    ~path:"src/lib_wasmer"
+    ~synopsis:"Wasmer bindings for SCORU WASM"
+    ~deps:[ctypes; ctypes_foreign; lwt; lwt_unix; tezos_rust_lib]
+    ~preprocess:[pps ppx_deriving_show]
+    ~flags:(Flags.standard ~disable_warnings:[9; 27] ())
+    ~ctypes:
+      Ctypes.
+        {
+          external_library_name = "wasmer";
+          include_header = "wasmer.h";
+          extra_search_dir = "%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs";
+          type_description = {instance = "Types"; functor_ = "Api_types_desc"};
+          function_description =
+            {instance = "Functions"; functor_ = "Api_funcs_desc"};
+          generated_types = "Api_types";
+          generated_entry_point = "Api";
+        }
 
 let octez_scoru_wasm =
   public_lib
