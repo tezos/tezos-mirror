@@ -283,9 +283,6 @@ module V1 = struct
 
   let current_level_hash inbox = inbox.current_level_hash ()
 
-  let old_levels_messages_encoding =
-    Skip_list.encoding Hash.encoding Hash.encoding
-
   let encoding =
     Data_encoding.(
       conv
@@ -318,7 +315,7 @@ module V1 = struct
            (req "nb_messages_in_commitment_period" int64)
            (req "level" Raw_level_repr.encoding)
            (req "current_level_hash" Hash.encoding)
-           (req "old_levels_messages" old_levels_messages_encoding)))
+           (req "old_levels_messages" history_proof_encoding)))
 
   let number_of_messages_during_commitment_period inbox =
     inbox.nb_messages_in_commitment_period
