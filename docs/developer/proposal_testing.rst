@@ -177,21 +177,20 @@ mistake `snapshot a protocol`, like in step 1 above, with `snapshot a node`,
 which results in a snapshot file like in here) that contains the real status of
 a Mainnet's node at a particular moment in time. Such a snapshot file can be
 downloaded from several sites on the internet (see :doc:`../user/snapshots`).
-For instance, the site `Giganode <https://snapshots-tezos.giganode.io/>`_ stores
+Such websites store
 daily snapshot files from both Mainnet and Testnet, in both ``full`` and
 ``rolling`` mode (see :doc:`../user/history_modes`). For the purposes of testing
 the migration, a snapshot file in ``rolling`` mode is enough. It is important to
 use a snapshot file that is recent enough as to contain the predecessor of the
 Alpha protocol. It is also important to note down the level at which the
 snapshot file was taken, which determines at which level we want to trigger the
-migration. The `Giganode snapshots page <https://snapshots-tezos.giganode.io/>`_
-conveniently indicates the date and the level (the `block`) at which each
+migration. The snapshots websites
+conveniently indicate the date and the level (the `block`) at which each
 snapshot file was taken.
 
 In our example we will use a snapshot file
 ``~/snapshot-mainnet.rolling``
-that was downloaded from `Giganode <https://snapshots-tezos.giganode.io/>`_
-and which was taken at level ``1617344``.
+which was taken at level ``1617344``.
 
 The next subsections explain each of the individual steps 1--7.
 
@@ -357,8 +356,7 @@ If we wish to test the migration in a realistic scenario, we need to import a
 context from a Mainnet's snapshot file. As explained in the beginning of Section
 `Prepare the migration`_, in our example we will use a snapshot file
 ``~/snapshot-mainnet.rolling``
-that was downloaded from `Giganode <https://snapshots-tezos.giganode.io/>`_
-and which was taken at level ``1617344``.
+which was taken at level ``1617344``.
 
 We also need to generate a node identity, which we will keep in the folder that
 contains the history of the node. Since importing a node from a snapshot file is
@@ -378,8 +376,7 @@ The ``./tezos-node snapshot import`` command accepts an option
 ``--block <block_hash>`` that instructs the command to check that the hash of
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
-the current main chain of the Tezos network. The
-`Giganode <https://snapshots-tezos.giganode.io/>`_ provides
+the current main chain of the Tezos network. The snapshots websites normally provide
 the hash of the last block in a given snapshot file. Although we will not be
 using the ``--block`` option in this tutorial, the developer is encouraged to
 check that this prefix corresponds to the hash of a real block in Mainnet.
