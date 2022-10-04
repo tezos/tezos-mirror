@@ -397,6 +397,58 @@ let store_move =
             to_key_length
       | _ -> raise Bad_input)
 
+let store_read_name = "tezos_store_read"
+
+let store_read_type =
+  let input_types =
+    Types.
+      [
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Vector.of_list Types.[NumType I32Type] in
+  Types.FuncType (input_types, output_types)
+
+let store_read_aux durable memories key_offset key_length value_offset dest
+    max_bytes =
+  let open Lwt_syntax in
+  let key_length = Int32.to_int key_length in
+  if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
+  let* memory = retrieve_memory memories in
+  let* key = Memory.load_bytes memory key_offset key_length in
+  let tree = Durable.of_storage_exn durable in
+  let key = Durable.key_of_string_exn key in
+  let+ value = Durable.read_value_exn tree key value_offset max_bytes in
+  let _ = Memory.store_bytes memory dest value in
+  ( Durable.to_storage tree,
+    [Values.(Num (I32 (Int32.of_int @@ String.length value)))] )
+
+let store_read =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      match inputs with
+      | [
+       Values.(Num (I32 key_offset));
+       Values.(Num (I32 key_length));
+       Values.(Num (I32 value_offset));
+       Values.(Num (I32 dest));
+       Values.(Num (I32 max_bytes));
+      ] ->
+          store_read_aux
+            durable
+            memories
+            key_offset
+            key_length
+            (Int64.of_int32 value_offset)
+            dest
+            (Int64.of_int32 max_bytes)
+      | _ -> raise Bad_input)
+
 (** [reveal_args args] compute the list of arguments type of a host
     functions resulting in a reveal tick. [args] is the list of types
     specific to a given host functions, and [reveal_args] appends two
@@ -423,6 +475,60 @@ let reveal_preimage_parse_args memories args =
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
 
+let store_write_name = "tezos_write_read"
+
+let store_write_type =
+  let input_types =
+    Types.
+      [
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Vector.of_list Types.[NumType I32Type] in
+  Types.FuncType (input_types, output_types)
+
+let store_write_aux durable memories key_offset key_length value_offset src
+    num_bytes =
+  let open Lwt_syntax in
+  if num_bytes > 4096l then Lwt.return (durable, [Values.Num (I32 1l)])
+  else
+    let num_bytes = Int32.to_int num_bytes in
+    let key_length = Int32.to_int key_length in
+    if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
+    let* memory = retrieve_memory memories in
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let* payload = Memory.load_bytes memory src num_bytes in
+    let tree = Durable.of_storage_exn durable in
+    let key = Durable.key_of_string_exn key in
+    let+ tree = Durable.write_value_exn tree key value_offset payload in
+    (Durable.to_storage tree, [Values.(Num (I32 0l))])
+
+let store_write =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      match inputs with
+      | [
+       Values.(Num (I32 key_offset));
+       Values.(Num (I32 key_length));
+       Values.(Num (I32 value_offset));
+       Values.(Num (I32 src));
+       Values.(Num (I32 num_bytes));
+      ] ->
+          store_write_aux
+            durable
+            memories
+            key_offset
+            key_length
+            (Int64.of_int32 value_offset)
+            src
+            num_bytes
+      | _ -> raise Bad_input)
+
 let lookup_opt name =
   match name with
   | "read_input" ->
@@ -442,6 +548,10 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_move_type, store_move_name)))
   | "reveal_preimage" ->
       Some (ExternFunc (HostFunc (reveal_preimage_type, reveal_preimage_name)))
+  | "store_read" ->
+      Some (ExternFunc (HostFunc (store_read_type, store_read_name)))
+  | "store_write" ->
+      Some (ExternFunc (HostFunc (store_write_type, store_write_name)))
   | _ -> None
 
 let lookup name =
@@ -462,6 +572,8 @@ let register_host_funcs registry =
       (store_copy_name, store_copy);
       (store_move_name, store_move);
       (reveal_preimage_name, reveal_preimage);
+      (store_read_name, store_read);
+      (store_write_name, store_write);
     ]
 
 module Internal_for_tests = struct
@@ -480,6 +592,10 @@ module Internal_for_tests = struct
   let store_copy = Func.HostFunc (store_copy_type, store_copy_name)
 
   let store_move = Func.HostFunc (store_move_type, store_move_name)
+
+  let store_read = Func.HostFunc (store_read_type, store_read_name)
+
+  let store_write = Func.HostFunc (store_write_type, store_write_name)
 
   let store_list_size =
     Func.HostFunc (store_list_size_type, store_list_size_name)

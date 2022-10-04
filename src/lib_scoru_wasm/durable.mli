@@ -33,6 +33,10 @@ exception Invalid_key of string
 (** A value was not found in the durable store. *)
 exception Not_found
 
+(** Attempted to write/read to/from a value at [offset],
+    beyond the [limit]. *)
+exception Out_of_bounds of (int64 * int64)
+
 (** [Durable_storage.t] was empty. *)
 exception Durable_empty
 
@@ -89,3 +93,20 @@ val delete : t -> key -> t Lwt.t
     @raise Not_found when [key] is not found
 *)
 val hash_exn : t -> key -> Context_hash.t Lwt.t
+
+(** [write_value durable key offset bytes] writes [bytes] to [key],
+    starting at the given [offset].
+
+    If no value at [key] exists, it is created.
+
+    @raise Out_of_bounds
+*)
+val write_value_exn : t -> key -> int64 -> string -> t Lwt.t
+
+(** [read_value durable key offset max_bytes] reads up to [max_bytes]
+    bytes from the value at [key], starting at the given [offset].
+
+    @raise Not_found when [key] is not found.
+    @raise Out_of_bounds when [offset] is larger than the value.
+*)
+val read_value_exn : t -> key -> int64 -> int64 -> string Lwt.t

@@ -111,5 +111,9 @@ module Internal_for_tests : sig
 
   val store_move : Tezos_webassembly_interpreter.Instance.func_inst
 
+  val store_read : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_write : Tezos_webassembly_interpreter.Instance.func_inst
+
   val store_list_size : Tezos_webassembly_interpreter.Instance.func_inst
 end

@@ -99,10 +99,10 @@ let should_run_debug_kernel kernel =
   assert (not @@ is_stuck state_after_first_message) ;
   return_ok_unit
 
-let add_value tree key_steps =
+let add_value ?(content = "a very long value") tree key_steps =
   let open Tezos_lazy_containers in
   let open Test_encodings_util in
-  let value = Chunked_byte_vector.of_string "a very long value" in
+  let value = Chunked_byte_vector.of_string content in
   Tree_encoding_runner.encode
     Tezos_tree_encoding.(
       scope ("durable" :: List.append key_steps ["_"]) chunked_byte_vector)
@@ -456,6 +456,93 @@ let test_bulk_noops () =
 
   Lwt_result_syntax.return_unit
 
+let test_durable_store_io () =
+  let open Lwt_result_syntax in
+  let from_path = "/from/value" in
+  let from_path_location = 100 in
+  let to_path = "/to/value" in
+  let to_path_location = from_path_location + String.length from_path in
+  let read_offset = 2 in
+  let write_offset = 0 in
+  let buffer_location = 15 in
+  let buffer_length = 1 in
+  let modul =
+    Format.sprintf
+      {|
+        (module
+          (type (;0;) (func (param i32 i32 i32 i32 i32) (result i32)))
+          (import "rollup_safe_core" "store_read"
+            (func $store_read (type 0)))
+          (import "rollup_safe_core" "store_write"
+            (func $store_write (type 0)))
+          (func (export "kernel_next")
+            (local i32)
+            (call $store_read (i32.const %d)
+                              (i32.const %d)
+                              (i32.const %d)
+                              (i32.const %d)
+                              (i32.const %d))
+            drop
+            (call $store_write (i32.const %d)
+                               (i32.const %d)
+                               (i32.const %d)
+                               (i32.const %d)
+                               (i32.const %d))
+            drop)
+          (memory (;0;) 17)
+          (export "memory" (memory 0))
+          (data (;0;) (i32.const %d) "%s%s"))
+    |}
+      (* store_read args *)
+      from_path_location
+      (String.length from_path)
+      read_offset
+      buffer_location
+      buffer_length
+      (* store_write args *)
+      to_path_location
+      (String.length to_path)
+      write_offset
+      buffer_location
+      buffer_length
+      (* data block *)
+      from_path_location
+      from_path
+      to_path
+  in
+  (* Let's first init the tree to compute. *)
+  let*! tree = initial_tree ~from_binary:false modul in
+  let*! tree = eval_until_input_requested tree in
+
+  (* Add content to '/from/value' key in durable *)
+  let content = "abcde" in
+  let*! tree = add_value tree ["from"; "value"] ~content in
+
+  (* We should not have a byte written to '/to/value' *)
+  let*! durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let*! value =
+    Durable.find_value durable (Durable.key_of_string_exn "/to/value")
+  in
+  assert (Option.is_none value) ;
+
+  (* Set input and eval again. *)
+  let*! tree = set_input_step "dummy_input" 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state) ;
+
+  (* We should now have a byte written to '/to/value' *)
+  let*! durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let*! value =
+    Durable.find_value_exn durable (Durable.key_of_string_exn "/to/value")
+  in
+  let*! value = Tezos_lazy_containers.Chunked_byte_vector.to_string value in
+  let expected = String.sub content read_offset 1 in
+  assert (expected = value) ;
+  return_unit
+
 let tests =
   [
     tztest
@@ -508,4 +595,5 @@ let tests =
       `Quick
       test_invalid_key_truncated;
     tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
+    tztest "Test durable store io" `Quick test_durable_store_io;
   ]

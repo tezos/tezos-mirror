@@ -168,26 +168,21 @@ let make_durable list_key_vals =
   let* tree = empty_tree () in
   let* tree =
     Tree_encoding_runner.encode
-      (Tezos_tree_encoding.value ["durable"; "_keep_me"] Data_encoding.bool)
+      (Tezos_tree_encoding.value ["durable"; "_"; "keep_me"] Data_encoding.bool)
       true
       tree
   in
-  let* tree =
+  let* durable = wrap_as_durable_storage tree in
+  let+ tree =
     List.fold_left
       (fun acc (key, value) ->
         let* tree = acc in
-        let key_steps = String.split_on_char '/' ("durable/" ^ key ^ "/_") in
-        let* tree =
-          Tree_encoding_runner.encode
-            Tezos_tree_encoding.(scope key_steps chunked_byte_vector)
-            (Chunked_byte_vector.of_string value)
-            tree
-        in
-        Lwt.return tree)
-      (Lwt.return tree)
+        let key = Durable.key_of_string_exn key in
+        Durable.write_value_exn tree key 0L value)
+      (Lwt.return @@ Durable.of_storage_exn durable)
       list_key_vals
   in
-  wrap_as_durable_storage tree
+  Durable.to_storage tree
 
 let make_module_inst list_key_vals src =
   let module_inst = Tezos_webassembly_interpreter.Instance.empty_module_inst in
@@ -260,3 +255,13 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
         test kernel)
   in
   return_unit
+
+let retrieve_memory module_reg =
+  let open Lwt_syntax in
+  let* (module_inst : Instance.module_inst) =
+    Instance.ModuleMap.get "test" module_reg
+  in
+  let memories = module_inst.memories in
+  if Lazy_vector.Int32Vector.num_elements memories = 1l then
+    Lazy_vector.Int32Vector.get 0l memories
+  else assert false
