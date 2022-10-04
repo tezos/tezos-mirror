@@ -409,6 +409,53 @@ let test_invalid_key_truncated () =
   assert (is_stuck ~step:`Eval ~reason state) ;
   return_unit
 
+let test_bulk_noops () =
+  let open Lwt.Syntax in
+  let module_ =
+    {|
+      (module
+        (memory 0)
+        (export "mem" (memory 0))
+        (func (export "kernel_next")
+          (nop)
+        )
+      )
+    |}
+  in
+  let* base_tree = initial_tree ~max_tick:500L module_ in
+  let* base_tree = set_input_step "dummy_input" 0 base_tree in
+
+  let rec goto_snapshot ticks tree_slow =
+    let* tree_fast = Wasm.compute_step_many ~max_steps:ticks base_tree in
+    let* tree_slow = Wasm.compute_step tree_slow in
+
+    assert (
+      Context_hash.(Test_encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
+
+    let* stuck = Wasm_utils.Wasm.Internal_for_tests.is_stuck tree_fast in
+    assert (Option.is_none stuck) ;
+
+    let* state = Wasm.Internal_for_tests.get_tick_state tree_slow in
+    if state = Snapshot then Lwt.return (ticks, tree_slow)
+    else goto_snapshot (Int64.succ ticks) tree_slow
+  in
+
+  let* ticks, snapshot = goto_snapshot 1L base_tree in
+  let* snapshot_info = Wasm_utils.Wasm.get_info snapshot in
+  assert (snapshot_info.input_request = Input_required) ;
+
+  (* Try to advance past the snapshot point. *)
+  let* tree_fast =
+    Wasm.compute_step_many ~max_steps:(Int64.mul ticks 2L) base_tree
+  in
+
+  (* Because the Snapshot state is an input state, the [compute_step_many]
+     invocation must not be able to zoom past it! *)
+  assert (
+    Context_hash.(Test_encodings_util.Tree.(hash tree_fast = hash snapshot))) ;
+
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     tztest
@@ -460,4 +507,5 @@ let tests =
       "Test Stuck state is truncated on long messages"
       `Quick
       test_invalid_key_truncated;
+    tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
   ]
