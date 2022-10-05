@@ -36,8 +36,14 @@ module Proto = struct
     type t = Raw_context.t
 
     let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
-      Lwt.map wrap_tzresult
-      @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+      let open Lwt_result_syntax in
+      let+ ctxt =
+        Lwt.map wrap_tzresult
+        @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+      in
+      Raw_context.set_gas_limit
+        ctxt
+        (Gas_limit_repr.fp_of_milligas_int (max_int - 1))
   end
 
   type context = Context.t
