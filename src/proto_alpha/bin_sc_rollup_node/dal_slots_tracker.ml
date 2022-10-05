@@ -261,13 +261,13 @@ let download_and_save_slots
            if not slot_header_is_stored then
              failwith "Slot header was not found in store"
            else
-             let*! {header; _} =
+             let*! {commitment; _} =
                Store.Dal_slots_headers.get
                  store
                  ~primary_key:published_block_hash
                  ~secondary_key:s_slot
              in
-             let* pages = Dal_node_client.get_slot_pages dal_cctxt header in
+             let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
              let*! () =
                save_confirmed_slot store current_block_hash s_slot pages
              in

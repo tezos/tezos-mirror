@@ -46,11 +46,14 @@
    The slot header can also be used to prove that a blob of data is a
    portion of the initial slot. *)
 
-module Header : sig
+module Commitment : sig
+  (** A slot commitment is provided via the environment. *)
   type t = Dal.commitment
 
   val encoding : t Data_encoding.t
 
+  (** A dummy value for a commitment. This commitment does not
+     correspond to any valid pre-image. *)
   val zero : t
 end
 
@@ -91,7 +94,7 @@ end
     (KATE commitment hash). *)
 type id = {published_level : Raw_level_repr.t; index : Index.t}
 
-type t = {id : id; header : Header.t}
+type t = {id : id; commitment : Commitment.t}
 
 type slot = t
 

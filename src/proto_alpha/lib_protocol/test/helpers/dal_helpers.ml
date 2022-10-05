@@ -92,11 +92,11 @@ let mk_slot ?(level = level_one) ?(index = S.Index.zero)
   let params = Cryptobox.Internal_for_tests.parameters dal in
   let slot_data = Bytes.init params.slot_size fill_function in
   let* polynomial = dal_mk_polynomial_from_slot dal slot_data in
-  let kate_commit = Cryptobox.commit dal polynomial in
+  let commitment = Cryptobox.commit dal polynomial in
   return
     ( slot_data,
       polynomial,
-      S.{id = S.{published_level = level; index}; header = kate_commit} )
+      S.{id = S.{published_level = level; index}; commitment} )
 
 let mk_page_id published_level slot_index page_index =
   P.{slot_id = {published_level; index = slot_index}; page_index}

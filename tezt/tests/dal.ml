@@ -220,7 +220,7 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
   in
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make parameters in
-  let header =
+  let commitment =
     Rollup.Dal.Commitment.dummy_commitment parameters cryptobox "coucou"
   in
   Check.(
@@ -239,7 +239,7 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Operation.Manager.(
       inject
         ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header]
+        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment]
         client)
   in
   let* (`OpHash oph3) =
@@ -260,28 +260,31 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let publish_slot ~source ?fee ~index ~header node client =
+let publish_slot ~source ?fee ~index ~commitment node client =
   let level = Node.get_level node in
   Operation.Manager.(
     inject
-      [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~header]
+      [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
       client)
 
 let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
-  let header =
+  let commitment =
     Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
   in
-  publish_slot ~source ?fee ~index ~header
+  publish_slot ~source ?fee ~index ~commitment
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~header node client =
   let level = Node.get_level node in
   let header = Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt header in
   match header with
   | None -> assert false
-  | Some header ->
+  | Some commitment ->
       Operation.Manager.(
         inject
-          [make ~source ~fee @@ dal_publish_slot_header ~index ~level ~header]
+          [
+            make ~source ~fee
+            @@ dal_publish_slot_header ~index ~level ~commitment;
+          ]
           client)
 
 let slot_availability ~signer availability client =

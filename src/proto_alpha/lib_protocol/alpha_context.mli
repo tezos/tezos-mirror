@@ -2832,7 +2832,7 @@ module Dal : sig
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
     (** This module re-exports definitions from {!Dal_slot_repr.Header}. *)
-    module Header : sig
+    module Commitment : sig
       type t = Dal.commitment
 
       val encoding : t Data_encoding.t
@@ -2842,7 +2842,7 @@ module Dal : sig
 
     type id = {published_level : Raw_level.t; index : Slot_index.t}
 
-    type t = {id : id; header : Header.t}
+    type t = {id : id; commitment : Commitment.t}
 
     val encoding : t Data_encoding.t
 

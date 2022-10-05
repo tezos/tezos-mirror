@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Header = struct
+module Commitment = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
      It is not clear whether the size of the slot associated to the
@@ -65,7 +65,7 @@ end
 
 type id = {published_level : Raw_level_repr.t; index : Index.t}
 
-type t = {id : id; header : Header.t}
+type t = {id : id; commitment : Commitment.t}
 
 type slot = t
 
@@ -75,8 +75,8 @@ let slot_id_equal ({published_level; index} : id) s2 =
   Raw_level_repr.equal published_level s2.published_level
   && Index.equal index s2.index
 
-let slot_equal ({id; header} : t) s2 =
-  slot_id_equal id s2.id && Header.equal header s2.header
+let slot_equal ({id; commitment} : t) s2 =
+  slot_id_equal id s2.id && Commitment.equal commitment s2.commitment
 
 let compare_slot_id ({published_level; index} : id) s2 =
   let c = Raw_level_repr.compare published_level s2.published_level in
@@ -90,7 +90,7 @@ let zero_id =
     index = Index.zero;
   }
 
-let zero = {id = zero_id; header = Header.zero}
+let zero = {id = zero_id; commitment = Commitment.zero}
 
 module Slot_index = Index
 
@@ -154,25 +154,25 @@ end
 let slot_encoding =
   let open Data_encoding in
   conv
-    (fun {id = {published_level; index}; header} ->
-      (published_level, index, header))
-    (fun (published_level, index, header) ->
-      {id = {published_level; index}; header})
+    (fun {id = {published_level; index}; commitment} ->
+      (published_level, index, commitment))
+    (fun (published_level, index, commitment) ->
+      {id = {published_level; index}; commitment})
     (obj3
        (req "level" Raw_level_repr.encoding)
        (req "index" Data_encoding.uint8)
-       (req "header" Header.encoding))
+       (req "commitment" Commitment.encoding))
 
-let pp_slot fmt {id = {published_level; index}; header} =
+let pp_slot fmt {id = {published_level; index}; commitment} =
   Format.fprintf
     fmt
-    "slot:(published_level: %a, index: %a, header: %a)"
+    "slot:(published_level: %a, index: %a, commitment: %a)"
     Raw_level_repr.pp
     published_level
     Format.pp_print_int
     index
-    Header.pp
-    header
+    Commitment.pp
+    commitment
 
 module Slot_market = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3108
@@ -314,7 +314,7 @@ module Slots_history = struct
   end
 
   module V1 = struct
-    (* The content of a cell is the hash of all the slot headers
+    (* The content of a cell is the hash of all the slot commitments
        represented as a merkle list. *)
     (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3765
        Decide how to store attested slots in the skip list's content. *)
@@ -603,7 +603,7 @@ module Slots_history = struct
 
     let proof_error reason = fail @@ dal_proof_error reason
 
-    let check_page_proof dal_params proof data pid slot_header =
+    let check_page_proof dal_params proof data pid commitment =
       let open Lwt_tzresult_syntax in
       let* dal =
         match Dal.make dal_params with
@@ -619,10 +619,10 @@ module Slots_history = struct
           (Bytes.to_string data)
           Page.pp
           pid
-          Header.pp
-          slot_header
+          Commitment.pp
+          commitment
       in
-      match Dal.verify_page dal slot_header page proof with
+      match Dal.verify_page dal commitment page proof with
       | Ok true -> return ()
       | Ok false ->
           fail_with_error_msg
@@ -652,7 +652,7 @@ module Slots_history = struct
              initialized with a min elt (slot zero)."
       | Some (page_data, page_proof), Found target_cell ->
           (* The slot to which the page is supposed to belong is found. *)
-          let {id; header} = Skip_list.content target_cell in
+          let {id; commitment} = Skip_list.content target_cell in
           (* We check that the slot is not the dummy slot. *)
           let* () =
             fail_when
@@ -662,7 +662,7 @@ module Slots_history = struct
                   proof should be constructed with the slot zero.")
           in
           let* () =
-            check_page_proof dal_params page_proof page_data page_id header
+            check_page_proof dal_params page_proof page_data page_id commitment
           in
           let inc_proof = List.rev search_result.Skip_list.rev_path in
           let* () =
@@ -739,7 +739,7 @@ module Slots_history = struct
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
           (* If the page is supposed to be confirmed, the last cell in
              [inc_proof] should store the slot of the page. *)
-          let {id; header} = Skip_list.content target_cell in
+          let {id; commitment} = Skip_list.content target_cell in
           let* () =
             fail_when
               Compare.Int.(compare_slot_id id zero.id = 0)
@@ -753,7 +753,7 @@ module Slots_history = struct
           (* We check that the page indeed belongs to the target slot at the
              given page index. *)
           let* () =
-            check_page_proof dal_params page_proof page_data page_id header
+            check_page_proof dal_params page_proof page_data page_id commitment
           in
           (* If all checks succeed, we return the data/content of the page. *)
           return_some page_data

@@ -51,7 +51,8 @@ module Plugin = struct
       process_manager_operations [] block.operations {apply; apply_internal})
     |> List.map_es (fun slot ->
            return
-             (Dal.Slot_index.to_int slot.Dal.Slot.id.index, slot.Dal.Slot.header))
+             ( Dal.Slot_index.to_int slot.Dal.Slot.id.index,
+               slot.Dal.Slot.commitment ))
 end
 
 let () = Dal_plugin.register (module Plugin)
