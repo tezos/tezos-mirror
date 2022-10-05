@@ -138,6 +138,23 @@ module Proto = struct
       assert (consumed > 0) ;
       (data, consumed)
 
+    let unparse_data_cost (raw_ctxt : Raw_context.t) ty data =
+      let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ _expr, updated_ctxt =
+        Lwt.map wrap_tzresult
+        @@ Script_ir_translator.unparse_data
+             ctxt
+             Script_ir_translator.Optimized
+             ty
+             data
+      in
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      consumed
+
     let unparse_ty (raw_ctxt : Raw_context.t) (Ex_ty ty) =
       let open Result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in

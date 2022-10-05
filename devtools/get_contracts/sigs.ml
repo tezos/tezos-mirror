@@ -128,6 +128,8 @@ module type PROTOCOL = sig
       ('a, 'b) ty ->
       Script.node ->
       ('a * int) tzresult Lwt.t
+
+    val unparse_data_cost : context -> ('a, 'b) ty -> 'a -> int tzresult Lwt.t
   end
 
   module Storage : sig
