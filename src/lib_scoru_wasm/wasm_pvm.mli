@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Maximum number of reboots per inputs. *)
+val maximum_reboots_per_input : Z.t
+
 type tick_state =
   | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
   | Link of {

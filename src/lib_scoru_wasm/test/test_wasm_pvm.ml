@@ -246,6 +246,7 @@ let build_snapshot_wasm_state_from_set_input
       snapshot_tick
       tree
   in
+  let* tree = Wasm.Internal_for_tests.reset_reboot_counter tree in
   Test_encodings_util.Tree_encoding_runner.encode
     (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
     snapshot_tick
