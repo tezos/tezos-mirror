@@ -514,6 +514,8 @@ module Entrypoint : module type of Entrypoint_repr
 (** This module re-exports definitions from {!Script_repr} and
     {!Michelson_v1_primitives}. *)
 module Script : sig
+  type error += Lazy_script_decode
+
   type prim = Michelson_v1_primitives.prim =
     | K_parameter
     | K_storage

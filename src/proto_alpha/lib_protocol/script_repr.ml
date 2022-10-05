@@ -52,6 +52,11 @@ let () =
     ~title:"Invalid binary format"
     ~description:
       "Could not deserialize some piece of data from its binary representation"
+    ~pp:(fun fmt () ->
+      Format.fprintf
+        fmt
+        "Could not deserialize some piece of data from its binary \
+         representation")
     Data_encoding.empty
     (function Lazy_script_decode -> Some () | _ -> None)
     (fun () -> Lazy_script_decode)
