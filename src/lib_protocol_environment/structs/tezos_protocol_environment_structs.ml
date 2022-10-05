@@ -91,12 +91,14 @@ module V4 = struct
 end
 
 module V5 = struct
+  module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Bounded = V5_bounded
   module RPC_directory = V0_RPC_directory
 end
 
 module V6 = struct
+  module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Plonk = V6_plonk
   module Bounded = V5_bounded
@@ -104,6 +106,7 @@ module V6 = struct
 end
 
 module V7 = struct
+  module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Array = V7_array
   module Plonk = V7_plonk
