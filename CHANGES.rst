@@ -87,6 +87,14 @@ Node
   consequence, the storage footprint will be lowered and only the last
   6 cycles will be available (10 previously).
 
+- Removed Giganode from the list of bootstrap peers for Mainnet.
+
+- Removed the ``--network hangzhounet`` and ``--network jakartanet``
+  built-in network aliases.
+
+- Add third user-activated upgrade to the ``--network ghostnet`` built-in
+  network alias (at level 1191936 for Kathmandu).
+
 Client
 ------
 
