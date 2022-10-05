@@ -28,7 +28,7 @@ It requires protocol environment V7, compared to V6 for Kathmandu.
   protocol (MR :gl:`!6042`)
 
 - Introduce a module Q, making a subset of Zarith.Q available to the
-  protocol (MR :gl:`!6042`)
+  protocol (MR :gl:`!6092`)
 
 - Generalise the Bounded module to support more datatypes. (MR :gl:`!6076`)
 
