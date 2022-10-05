@@ -872,7 +872,7 @@ let tests =
     Tztest.tztest_qcheck2
       ~name:"An empty inbox is still able to produce proofs that return None"
       QCheck2.Gen.(
-        let* n = 0 -- 2000 in
+        let* n = 1 -- 2000 in
         let* m = 0 -- 1000 in
         return (level_of_int n, Z.of_int m))
       test_empty_inbox_proof;
