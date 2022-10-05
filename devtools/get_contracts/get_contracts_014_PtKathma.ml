@@ -103,7 +103,7 @@ module Proto = struct
         ~allow_contract ~allow_ticket script =
       let open Result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
-      let+ Script_ir_translator.Ex_ty ty, _ =
+      let+ Script_ir_translator.Ex_ty ty, updated_ctxt =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
              ctxt
@@ -114,12 +114,16 @@ module Proto = struct
              ~allow_ticket
              script
       in
-      Ex_ty ty
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (Ex_ty ty, consumed)
 
     let parse_data (raw_ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
-      let+ data, _ =
+      let+ data, updated_ctxt =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
              ctxt
@@ -128,7 +132,11 @@ module Proto = struct
              ty
              expr
       in
-      data
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (data, consumed)
 
     let unparse_ty (raw_ctxt : Raw_context.t) (Ex_ty ty) =
       let open Result_syntax in
@@ -141,11 +149,15 @@ module Proto = struct
     let parse_toplevel (raw_ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
-      let+ toplevel, _ =
+      let+ toplevel, updated_ctxt =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_toplevel ctxt ~legacy:true expr
       in
-      toplevel
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (toplevel, consumed)
 
     let parse_code (raw_ctxt : Raw_context.t) code =
       let open Lwt_result_syntax in
@@ -246,7 +258,7 @@ module Proto = struct
       in
       match parse_result with
       | Error _ -> acc
-      | Ok data -> (
+      | Ok (data, _cost) -> (
           match Script_ir_translator.unparse_ty ~loc:0 (Obj.magic ctxt) ty with
           | Error _ -> assert false
           | Ok (ty_expr, _) ->

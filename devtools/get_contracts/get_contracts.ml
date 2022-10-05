@@ -157,14 +157,14 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
           ~allow_ticket:true
           (Micheline.root type_expr)
       with
-      | Ok ex_ty -> (hashed_ty, ex_ty)
+      | Ok (ex_ty, _parse_ty_cost) -> (hashed_ty, ex_ty)
       | Error _ -> assert false
 
     let get_script_storage_type ctxt script_expr =
       let open Lwt_syntax in
       let+ result = P.Translator.parse_toplevel ctxt script_expr in
       match result with
-      | Ok code ->
+      | Ok (code, _parsing_toplevel_cost) ->
           let storage_type_expr =
             Micheline.strip_locations @@ P.code_storage_type code
           in

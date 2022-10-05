@@ -113,11 +113,12 @@ module type PROTOCOL = sig
       allow_contract:bool ->
       allow_ticket:bool ->
       Script.node ->
-      ex_ty tzresult
+      (ex_ty * int) tzresult
 
     val unparse_ty : context -> ex_ty -> Script.node tzresult
 
-    val parse_toplevel : context -> Script.expr -> toplevel tzresult Lwt.t
+    val parse_toplevel :
+      context -> Script.expr -> (toplevel * int) tzresult Lwt.t
 
     val parse_code : context -> Script.lazy_expr -> ex_code tzresult Lwt.t
 
@@ -126,7 +127,7 @@ module type PROTOCOL = sig
       allow_forged:bool ->
       ('a, 'b) ty ->
       Script.node ->
-      'a tzresult Lwt.t
+      ('a * int) tzresult Lwt.t
   end
 
   module Storage : sig
