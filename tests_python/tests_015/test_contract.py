@@ -2226,32 +2226,6 @@ code {{
 @pytest.mark.incremental
 @pytest.mark.contract
 @pytest.mark.regression
-class TestOriginateContractFromContract:
-    def test_originate_contract_from_contract_origination(
-        self, client_regtest_scrubbed, session
-    ):
-        client = client_regtest_scrubbed
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'originate_contract.tz'
-        )
-        originate(client, session, path, 'Unit', 200)
-
-    def test_originate_contract_from_contract_transfer(
-        self, client_regtest_scrubbed
-    ):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'originate_contract',
-            ['--arg', 'Unit', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
-
-
-@pytest.mark.incremental
-@pytest.mark.contract
-@pytest.mark.regression
 class TestCreateRemoveTickets:
     def test_add_clear_tickets_origination(
         self, client_regtest_scrubbed, session
