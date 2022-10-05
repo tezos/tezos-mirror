@@ -204,6 +204,16 @@ let make_module_inst list_key_vals src =
   Instance.update_module_ref module_reg module_key module_inst ;
   (module_reg, module_key, host_funcs_registry)
 
+let retrieve_memory module_reg =
+  let open Lwt_syntax in
+  let* (module_inst : Instance.module_inst) =
+    Instance.ModuleMap.get "test" module_reg
+  in
+  let memories = module_inst.memories in
+  if Lazy_vector.Int32Vector.num_elements memories = 1l then
+    Lazy_vector.Int32Vector.get 0l memories
+  else assert false
+
 module Kernels = struct
   (* Kernel failing at `kernel_next` invocation. *)
   let unreachable_kernel = "unreachable"
@@ -257,13 +267,3 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
         test kernel)
   in
   return_unit
-
-let retrieve_memory module_reg =
-  let open Lwt_syntax in
-  let* (module_inst : Instance.module_inst) =
-    Instance.ModuleMap.get "test" module_reg
-  in
-  let memories = module_inst.memories in
-  if Lazy_vector.Int32Vector.num_elements memories = 1l then
-    Lazy_vector.Int32Vector.get 0l memories
-  else assert false

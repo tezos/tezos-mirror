@@ -50,6 +50,9 @@ module type S = sig
   val hash : tree -> Context_hash.t
 
   val length : tree -> key -> int Lwt.t
+
+  val list :
+    tree -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
 end
 
 type 'tree backend = (module S with type tree = 'tree)
@@ -83,6 +86,16 @@ let hash : type tree. tree backend -> tree -> Context_hash.t =
 let length : type tree. tree backend -> tree -> key -> int Lwt.t =
  fun (module T) tree key -> T.length tree key
 
+let list :
+    type tree.
+    tree backend ->
+    tree ->
+    ?offset:int ->
+    ?length:int ->
+    key ->
+    (string * tree) list Lwt.t =
+ fun (module T) tree ?offset ?length key -> T.list tree ?offset ?length key
+
 type wrapped_tree = Wrapped_tree : 'tree * 'tree backend -> wrapped_tree
 
 type Tezos_lazy_containers.Lazy_map.tree += Wrapped of wrapped_tree
@@ -112,6 +125,11 @@ module Wrapped : S with type tree = wrapped_tree = struct
     match t' with Some t' -> Some (Wrapped_tree (t', b)) | None -> None
 
   let length (Wrapped_tree (t, b)) key = length b t key
+
+  let list (Wrapped_tree (t, b)) ?offset ?length key =
+    let open Lwt.Syntax in
+    let+ list = list b t ?offset ?length key in
+    List.map (fun (step, tree) -> (step, Wrapped_tree (tree, b))) list
 
   let find (Wrapped_tree (t, b)) key = find b t key
 

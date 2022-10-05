@@ -84,6 +84,10 @@ val move_tree_exn : t -> key -> key -> t Lwt.t
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
 
+(** [subtree_name_at durable key n] returns the name of the n_th subtree 
+    under [key]. *)
+val subtree_name_at : t -> key -> int -> string Lwt.t
+
 (** [delete durable key] deletes the value at and/or subtrees of [key]. *)
 val delete : t -> key -> t Lwt.t
 

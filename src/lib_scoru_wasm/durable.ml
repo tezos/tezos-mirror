@@ -32,6 +32,8 @@ type t = T.tree
 
 exception Invalid_key of string
 
+exception Index_too_large of int
+
 exception Not_found
 
 exception Durable_empty = Storage.Durable_empty
@@ -113,6 +115,16 @@ let copy_tree_exn tree from_key to_key =
 let count_subtrees tree key = T.length tree key
 
 let delete tree key = T.remove tree key
+
+let subtree_name_at tree key index =
+  let open Lwt.Syntax in
+  let* subtree = find_tree_exn tree key in
+  let* list = T.list ~offset:index ~length:1 subtree [] in
+  let nth = List.nth list 0 in
+  match nth with
+  | Some ("_", _) -> Lwt.return ""
+  | Some (step, _) -> Lwt.return step
+  | None -> raise (Index_too_large index)
 
 let move_tree_exn tree from_key to_key =
   let open Lwt.Syntax in

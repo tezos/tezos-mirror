@@ -303,6 +303,72 @@ let store_list_size =
           (durable, [Values.(Num (I64 (I64.of_int_s num_subtrees)))])
       | _ -> raise Bad_input)
 
+let store_get_nth_key_name = "tezos_store_get_nth_key_list"
+
+let store_get_nth_key_type =
+  let input_types =
+    Types.
+      [
+        NumType I32Type;
+        NumType I32Type;
+        NumType I64Type;
+        NumType I32Type;
+        NumType I32Type;
+      ]
+    |> Vector.of_list
+  in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+let store_get_nth_key_aux durable memories key_offset key_length index dst
+    max_size =
+  let open Lwt.Syntax in
+  let index = Int64.to_int index in
+  let key_length = Int32.to_int key_length in
+  if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
+  let* memory = retrieve_memory memories in
+  let* key = Memory.load_bytes memory key_offset key_length in
+  let tree = Durable.of_storage_exn durable in
+  let key = Durable.key_of_string_exn key in
+  let* result = Durable.subtree_name_at tree key index in
+
+  let result_size = String.length result in
+  let max_size = Int32.to_int max_size in
+  let result =
+    if max_size < result_size then String.sub result 0 max_size else result
+  in
+  let* _ =
+    if result <> "" then Memory.store_bytes memory dst result
+    else Lwt.return_unit
+  in
+  Lwt.return (Int32.of_int @@ String.length result)
+
+let store_get_nth_key =
+  Host_funcs.Host_func
+    (fun _input_buffer _output_buffer durable memories inputs ->
+      let open Lwt.Syntax in
+      match inputs with
+      | Values.
+          [
+            Num (I32 key_offset);
+            Num (I32 key_length);
+            Num (I64 index);
+            Num (I32 dst);
+            Num (I32 max_size);
+          ] ->
+          let+ result =
+            store_get_nth_key_aux
+              durable
+              memories
+              key_offset
+              key_length
+              index
+              dst
+              max_size
+          in
+          (durable, [Values.(Num (I32 result))])
+      | _ -> raise Bad_input)
+
 let store_copy_name = "tezos_store_copy"
 
 let store_copy_type =
@@ -540,6 +606,9 @@ let lookup_opt name =
   | "store_has" -> Some (ExternFunc (HostFunc (store_has_type, store_has_name)))
   | "store_list_size" ->
       Some (ExternFunc (HostFunc (store_list_size_type, store_list_size_name)))
+  | "store_get_nth_key" ->
+      Some
+        (ExternFunc (HostFunc (store_get_nth_key_type, store_get_nth_key_name)))
   | "store_delete" ->
       Some (ExternFunc (HostFunc (store_delete_type, store_delete_name)))
   | "store_copy" ->
@@ -568,6 +637,7 @@ let register_host_funcs registry =
       (write_debug_name, write_debug);
       (store_has_name, store_has);
       (store_list_size_name, store_list_size);
+      (store_get_nth_key_name, store_get_nth_key);
       (store_delete_name, store_delete);
       (store_copy_name, store_copy);
       (store_move_name, store_move);
@@ -599,4 +669,7 @@ module Internal_for_tests = struct
 
   let store_list_size =
     Func.HostFunc (store_list_size_type, store_list_size_name)
+
+  let store_get_nth_key =
+    Func.HostFunc (store_get_nth_key_type, store_get_nth_key_name)
 end
