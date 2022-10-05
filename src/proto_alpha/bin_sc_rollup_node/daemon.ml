@@ -270,6 +270,8 @@ module Make (PVM : Pvm.S) = struct
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = notify_injector node_ctxt head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
+    let* () = Components.Batcher.batch () in
+    let* () = Components.Batcher.new_head head in
     let*! () = Injector.inject () in
     return_unit
 
@@ -327,6 +329,10 @@ module Make (PVM : Pvm.S) = struct
     let* () = Layer1.shutdown l1_ctxt in
     let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
+    let* () = message "Shutting down Injector@." in
+    let* () = Injector.shutdown () in
+    let* () = message "Shutting down Batcher@." in
+    let* () = Components.Batcher.shutdown () in
     let* () = message "Closing store@." in
     let* () = Store.close store in
     let* () = Event.shutdown_node exit_status in
@@ -391,6 +397,15 @@ module Make (PVM : Pvm.S) = struct
           (Node_context.readonly node_ctxt)
           ~data_dir:configuration.data_dir
           ~signers
+      in
+      let* () =
+        match
+          Configuration.Operator_purpose_map.find
+            Add_messages
+            node_ctxt.operators
+        with
+        | None -> return_unit
+        | Some signer -> Components.Batcher.init ~signer node_ctxt
       in
       let*! () =
         Event.node_is_ready
