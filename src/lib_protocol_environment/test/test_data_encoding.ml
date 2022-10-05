@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,18 +23,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Invocation:
-     dune exec src/lib_protocol_environment/test/test.exe
-   or for a superset of these tests:
-     dune build @src/lib_protocol_environment/runtest
+(** Testing
+    -------
+    Component:    Environment structs
+    Invocation:   dune exec src/lib_protocol_environment/test/test.exe -- test "^data_encoding$"
+    Subject:      Environment structs modifications to Data_encoding
+                  e.g. in src/lib_protocol_environment/structs/v5_data_encoding.ml
 *)
 
-let () =
-  Alcotest_lwt.run
-    "tezos-shell-context"
-    [
-      ("mem_context", Test_mem_context.tests);
-      ("cache", Test_cache.tests);
-      ("data_encoding", Test_data_encoding.tests);
-    ]
-  |> Lwt_main.run
+open Tezos_protocol_environment_structs.V8
+
+type t = {x : int; y : string Data_encoding.lazy_t}
+
+let test_unparsable_lazyexpr () =
+  let parsed_encoding = Data_encoding.(lazy_encoding (Fixed.string 3)) in
+  let enc =
+    let open Data_encoding in
+    conv
+      (fun {x; y} -> (x, y))
+      (fun (x, y) -> {x; y})
+      (obj2 (req "x" int8) (req "y" parsed_encoding))
+  in
+  let bytes_v = Hex.(to_bytes_exn (`Hex "030000000401020304")) in
+  let v = Data_encoding.Binary.of_bytes_exn enc bytes_v in
+  let json =
+    try Data_encoding.Json.construct enc v
+    with exn ->
+      Alcotest.failf
+        "Unexpected exception in %s:@\n%s"
+        __LOC__
+        (Printexc.to_string exn)
+  in
+  let expected_json =
+    `O
+      [
+        ("x", `Float 3.000000);
+        ("y", `O [("unparsed-binary", `String "01020304")]);
+      ]
+  in
+  Lib_test.Assert.equal
+    ~pp:Data_encoding.Json.pp
+    ~msg:"Constructed json is incorrect"
+    ~loc:__LOC__
+    expected_json
+    json ;
+  Lwt.return_unit
+
+let tests =
+  [
+    Alcotest_lwt.test_case "unparsable_lazyexpr" `Quick (fun _ ->
+        test_unparsable_lazyexpr);
+  ]
