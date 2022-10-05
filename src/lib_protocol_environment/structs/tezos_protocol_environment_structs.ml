@@ -86,10 +86,12 @@ module V4 = struct
 end
 
 module V5 = struct
+  module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
 end
 
 module V6 = struct
+  module Data_encoding = V5_data_encoding
   module Error_monad_infix_globals = V0_error_monad_infix_globals
   module Plonk = V6_plonk
 end
