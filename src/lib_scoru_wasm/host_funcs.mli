@@ -59,21 +59,18 @@ exception Bad_input
 (** A durable key was given by the kernel with a longer-than-allowed length. *)
 exception Key_too_large of int
 
-module Internal_for_tests : sig
+module Aux : sig
   (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
        ~num_bytes] reads num_bytes from the memory of module_inst starting at
        src and writes this to the output_buffer. It also checks that
        the input payload is no larger than `max_output`. It returns 0 for Ok and
       1 for `output too large`.*)
-  val aux_write_output :
-    input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
+  val write_output :
     output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
     memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
     src:int32 ->
     num_bytes:int32 ->
     int32 Lwt.t
-
-  val write_output : Tezos_webassembly_interpreter.Instance.func_inst
 
   (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
        ~level_offset ~id_offset ~dst ~max_bytes] reads `input_buffer`
@@ -83,7 +80,7 @@ module Internal_for_tests : sig
        with `input too large` otherwise. It returns the size of the
        payload. Note also that, if the level increases this function also
       updates the level of the output buffer and resets its id to zero.*)
-  val aux_write_input_in_memory :
+  val read_input :
     input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
     output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
     memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
@@ -93,6 +90,79 @@ module Internal_for_tests : sig
     dst:int32 ->
     max_bytes:int32 ->
     int Lwt.t
+
+  val store_has :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    int32 Lwt.t
+
+  val store_delete :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    Durable.t Lwt.t
+
+  val store_copy :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    from_key_offset:int32 ->
+    from_key_length:int32 ->
+    to_key_offset:int32 ->
+    to_key_length:int32 ->
+    Durable.t Lwt.t
+
+  val store_move :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    from_key_offset:int32 ->
+    from_key_length:int32 ->
+    to_key_offset:int32 ->
+    to_key_length:int32 ->
+    Durable.t Lwt.t
+
+  val store_read :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    value_offset:int32 ->
+    dest:int32 ->
+    max_bytes:int32 ->
+    int32 Lwt.t
+
+  val store_write :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    value_offset:int32 ->
+    src:int32 ->
+    num_bytes:int32 ->
+    (Durable.t * int32) Lwt.t
+
+  val store_list_size :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    (Durable.t * int64) Lwt.t
+
+  val store_get_nth_key :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    index:int64 ->
+    dst:int32 ->
+    max_size:int32 ->
+    int32 Lwt.t
+end
+
+module Internal_for_tests : sig
+  val write_output : Tezos_webassembly_interpreter.Instance.func_inst
 
   val read_input : Tezos_webassembly_interpreter.Instance.func_inst
 

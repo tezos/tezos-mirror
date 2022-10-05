@@ -54,7 +54,7 @@ let test_aux_write_output () =
   in
   assert (Input_buffer.num_elements input_buffer = Z.one) ;
   let* _ =
-    Host_funcs.Internal_for_tests.aux_write_input_in_memory
+    Host_funcs.Aux.read_input
       ~input_buffer
       ~output_buffer
       ~memory
@@ -67,12 +67,7 @@ let test_aux_write_output () =
   let output_level = Output_buffer.get_level output_buffer in
   assert (output_level = 2l) ;
   let* result =
-    Host_funcs.Internal_for_tests.aux_write_output
-      ~input_buffer
-      ~output_buffer
-      ~memory
-      ~src:50l
-      ~num_bytes:5l
+    Host_funcs.Aux.write_output ~output_buffer ~memory ~src:50l ~num_bytes:5l
   in
   let* z = Output_buffer.get output_buffer 2l Z.zero in
   assert (result = 0l) ;

@@ -41,46 +41,167 @@ let retrieve_memory memories =
   | Host_funcs.Available_memories _ ->
       crash_with "caller module must have exactly 1 memory instance"
 
-let aux_write_input_in_memory ~input_buffer ~output_buffer ~memory ~rtype_offset
-    ~level_offset ~id_offset ~dst ~max_bytes =
-  let open Lwt.Syntax in
-  Lwt.catch
-    (fun () ->
-      let* {rtype; raw_level; message_counter; payload} =
-        Input_buffer.dequeue input_buffer
-      in
-      Output_buffer.set_level output_buffer raw_level ;
-      let input_size = Bytes.length payload in
-      if Int64.of_int input_size > 4096L then
-        raise (Eval.Crash (Source.no_region, "input too large"))
-      else
-        let payload =
-          Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
-        in
-        let _ = Memory.store_bytes memory dst (Bytes.to_string payload) in
-        let _ = Memory.store_num memory rtype_offset 0l (I32 rtype) in
-        let _ = Memory.store_num memory level_offset 0l (I32 raw_level) in
-        let _ =
-          Memory.store_num
-            memory
-            id_offset
-            0l
-            (I64 (Z.to_int64 message_counter))
-        in
-        Lwt.return input_size)
-    (fun exn ->
-      match exn with
-      | Input_buffer.Dequeue_from_empty_queue -> Lwt.return 0
-      | _ -> raise exn)
+let check_key_length key_length =
+  if key_length > Durable.max_key_length then raise (Key_too_large key_length)
 
-let aux_write_output ~input_buffer:_ ~output_buffer ~memory ~src ~num_bytes =
-  let open Lwt.Syntax in
-  if num_bytes > 4096l then Lwt.return 1l
-  else
-    let num_bytes = Int32.to_int num_bytes in
-    let* payload = Memory.load_bytes memory src num_bytes in
-    let* () = Output_buffer.set_value output_buffer (Bytes.of_string payload) in
-    Lwt.return 0l
+module Aux = struct
+  let read_input ~input_buffer ~output_buffer ~memory ~rtype_offset
+      ~level_offset ~id_offset ~dst ~max_bytes =
+    let open Lwt.Syntax in
+    Lwt.catch
+      (fun () ->
+        let* {rtype; raw_level; message_counter; payload} =
+          Input_buffer.dequeue input_buffer
+        in
+        let input_size = Bytes.length payload in
+        if Int64.of_int input_size > 4096L then
+          raise (Eval.Crash (Source.no_region, "input too large"))
+        else
+          let payload =
+            Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
+          in
+          let* () = Memory.store_bytes memory dst (Bytes.to_string payload) in
+          let* () = Memory.store_num memory rtype_offset 0l (I32 rtype) in
+          let* () = Memory.store_num memory level_offset 0l (I32 raw_level) in
+          let* () =
+            Memory.store_num
+              memory
+              id_offset
+              0l
+              (I64 (Z.to_int64 message_counter))
+          in
+          Output_buffer.set_level output_buffer raw_level ;
+          Lwt.return input_size)
+      (fun exn ->
+        match exn with
+        | Input_buffer.Dequeue_from_empty_queue -> Lwt.return 0
+        | _ -> raise exn)
+
+  let write_output ~output_buffer ~memory ~src ~num_bytes =
+    let open Lwt.Syntax in
+    if num_bytes > 4096l then Lwt.return 1l
+    else
+      let num_bytes = Int32.to_int num_bytes in
+      let* payload = Memory.load_bytes memory src num_bytes in
+      let* () =
+        Output_buffer.set_value output_buffer (Bytes.of_string payload)
+      in
+      Lwt.return 0l
+
+  let store_has_unknown_key = 0l
+
+  let store_has_value_only = 1l
+
+  let store_has_subtrees_only = 2l
+
+  let store_has_value_and_subtrees = 3l
+
+  let store_has ~durable ~memory ~key_offset ~key_length =
+    let open Lwt.Syntax in
+    let key_length = Int32.to_int key_length in
+    check_key_length key_length ;
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let key = Durable.key_of_string_exn key in
+    let* value_opt = Durable.find_value durable key in
+    let+ num_subtrees = Durable.count_subtrees durable key in
+    match (value_opt, num_subtrees) with
+    | None, 0 -> store_has_unknown_key
+    | Some _, 1 -> store_has_value_only
+    | None, _ -> store_has_subtrees_only
+    | _ -> store_has_value_and_subtrees
+
+  let store_delete ~durable ~memory ~key_offset ~key_length =
+    let open Lwt.Syntax in
+    let key_length = Int32.to_int key_length in
+    check_key_length key_length ;
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let key = Durable.key_of_string_exn key in
+    Durable.delete durable key
+
+  let store_list_size ~durable ~memory ~key_offset ~key_length =
+    let open Lwt.Syntax in
+    let key_length = Int32.to_int key_length in
+    check_key_length key_length ;
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let key = Durable.key_of_string_exn key in
+    let+ num_subtrees = Durable.count_subtrees durable key in
+    (durable, I64.of_int_s num_subtrees)
+
+  let store_copy ~durable ~memory ~from_key_offset ~from_key_length
+      ~to_key_offset ~to_key_length =
+    let open Lwt_syntax in
+    let from_key_length = Int32.to_int from_key_length in
+    let to_key_length = Int32.to_int to_key_length in
+    check_key_length from_key_length ;
+    check_key_length to_key_length ;
+    let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
+    let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
+    let from_key = Durable.key_of_string_exn from_key in
+    let to_key = Durable.key_of_string_exn to_key in
+    Durable.copy_tree_exn durable from_key to_key
+
+  let store_move ~durable ~memory ~from_key_offset ~from_key_length
+      ~to_key_offset ~to_key_length =
+    let open Lwt.Syntax in
+    let from_key_length = Int32.to_int from_key_length in
+    let to_key_length = Int32.to_int to_key_length in
+    check_key_length from_key_length ;
+    check_key_length to_key_length ;
+    let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
+    let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
+    let from_key = Durable.key_of_string_exn from_key in
+    let to_key = Durable.key_of_string_exn to_key in
+    Durable.move_tree_exn durable from_key to_key
+
+  let store_read ~durable ~memory ~key_offset ~key_length ~value_offset ~dest
+      ~max_bytes =
+    let open Lwt_syntax in
+    let value_offset = Int64.of_int32 value_offset in
+    let max_bytes = Int64.of_int32 max_bytes in
+    let key_length = Int32.to_int key_length in
+    check_key_length key_length ;
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let key = Durable.key_of_string_exn key in
+    let* value = Durable.read_value_exn durable key value_offset max_bytes in
+    let+ () = Memory.store_bytes memory dest value in
+    Int32.of_int (String.length value)
+
+  let store_write ~durable ~memory ~key_offset ~key_length ~value_offset ~src
+      ~num_bytes =
+    let open Lwt_syntax in
+    if num_bytes > 4096l then Lwt.return (durable, 1l)
+    else
+      let value_offset = Int64.of_int32 value_offset in
+      let num_bytes = Int32.to_int num_bytes in
+      let key_length = Int32.to_int key_length in
+      check_key_length key_length ;
+      let* key = Memory.load_bytes memory key_offset key_length in
+      let* payload = Memory.load_bytes memory src num_bytes in
+      let key = Durable.key_of_string_exn key in
+      let+ durable = Durable.write_value_exn durable key value_offset payload in
+      (durable, 0l)
+
+  let store_get_nth_key ~durable ~memory ~key_offset ~key_length ~index ~dst
+      ~max_size =
+    let open Lwt.Syntax in
+    let index = Int64.to_int index in
+    let key_length = Int32.to_int key_length in
+    check_key_length key_length ;
+    let* key = Memory.load_bytes memory key_offset key_length in
+    let key = Durable.key_of_string_exn key in
+    let* result = Durable.subtree_name_at durable key index in
+
+    let result_size = String.length result in
+    let max_size = Int32.to_int max_size in
+    let result =
+      if max_size < result_size then String.sub result 0 max_size else result
+    in
+    let* _ =
+      if result <> "" then Memory.store_bytes memory dst result
+      else Lwt.return_unit
+    in
+    Lwt.return (Int32.of_int @@ String.length result)
+end
 
 let read_input_type =
   let input_types =
@@ -113,7 +234,7 @@ let read_input =
       ] ->
           let* memory = retrieve_memory memories in
           let* x =
-            aux_write_input_in_memory
+            Aux.read_input
               ~input_buffer
               ~output_buffer
               ~memory
@@ -137,19 +258,12 @@ let write_output_type =
 
 let write_output =
   Host_funcs.Host_func
-    (fun input_buffer output_buffer durable memories inputs ->
+    (fun _input_buffer output_buffer durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let* memory = retrieve_memory memories in
-          let* x =
-            aux_write_output
-              ~input_buffer
-              ~output_buffer
-              ~memory
-              ~src
-              ~num_bytes
-          in
+          let* x = Aux.write_output ~output_buffer ~memory ~src ~num_bytes in
           Lwt.return (durable, [Values.(Num (I32 x))])
       | _ -> raise Bad_input)
 
@@ -216,37 +330,21 @@ let store_has_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let store_has_unknown_key = 0
-
-let store_has_value_only = 1
-
-let store_has_subtrees_only = 2
-
-let store_has_value_and_subtrees = 3
-
 let store_has =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
-          let key_length = Int32.to_int key_length in
-          if key_length > Durable.max_key_length then
-            raise (Key_too_large key_length) ;
           let* memory = retrieve_memory memories in
-          let* key = Memory.load_bytes memory key_offset key_length in
-          let tree = Durable.of_storage_exn durable in
-          let key = Durable.key_of_string_exn key in
-          let* value_opt = Durable.find_value tree key in
-          let+ num_subtrees = Durable.count_subtrees tree key in
-          let r =
-            match (value_opt, num_subtrees) with
-            | None, 0 -> store_has_unknown_key
-            | Some _, 1 -> store_has_value_only
-            | None, _ -> store_has_subtrees_only
-            | _ -> store_has_value_and_subtrees
+          let+ r =
+            Aux.store_has
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
           in
-          (durable, [Values.(Num (I32 (I32.of_int_s r)))])
+          (durable, [Values.(Num (I32 r))])
       | _ -> raise Bad_input)
 
 let store_delete_name = "tezos_store_delete"
@@ -258,23 +356,21 @@ let store_delete_type =
   let output_types = Vector.of_list [] in
   Types.FuncType (input_types, output_types)
 
-let store_delete_aux durable memories key_offset key_length =
-  let open Lwt.Syntax in
-  let key_length = Int32.to_int key_length in
-  if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
-  let* memory = retrieve_memory memories in
-  let* key = Memory.load_bytes memory key_offset key_length in
-  let tree = Durable.of_storage_exn durable in
-  let key = Durable.key_of_string_exn key in
-  let+ tree = Durable.delete tree key in
-  (Durable.to_storage tree, [])
-
 let store_delete =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
       match inputs with
       | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
-          store_delete_aux durable memories key_offset key_length
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let+ durable =
+            Aux.store_delete
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+          in
+          (Durable.to_storage durable, [])
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
@@ -292,15 +388,15 @@ let store_list_size =
       let open Lwt.Syntax in
       match inputs with
       | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
-          let key_length = Int32.to_int key_length in
-          if key_length > Durable.max_key_length then
-            raise (Key_too_large key_length) ;
           let* memory = retrieve_memory memories in
-          let* key = Memory.load_bytes memory key_offset key_length in
-          let tree = Durable.of_storage_exn durable in
-          let key = Durable.key_of_string_exn key in
-          let+ num_subtrees = Durable.count_subtrees tree key in
-          (durable, [Values.(Num (I64 (I64.of_int_s num_subtrees)))])
+          let+ durable, result =
+            Aux.store_list_size
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+          in
+          (Durable.to_storage durable, [Values.(Num (I64 result))])
       | _ -> raise Bad_input)
 
 let store_get_nth_key_name = "tezos_store_get_nth_key_list"
@@ -320,29 +416,6 @@ let store_get_nth_key_type =
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
-let store_get_nth_key_aux durable memories key_offset key_length index dst
-    max_size =
-  let open Lwt.Syntax in
-  let index = Int64.to_int index in
-  let key_length = Int32.to_int key_length in
-  if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
-  let* memory = retrieve_memory memories in
-  let* key = Memory.load_bytes memory key_offset key_length in
-  let tree = Durable.of_storage_exn durable in
-  let key = Durable.key_of_string_exn key in
-  let* result = Durable.subtree_name_at tree key index in
-
-  let result_size = String.length result in
-  let max_size = Int32.to_int max_size in
-  let result =
-    if max_size < result_size then String.sub result 0 max_size else result
-  in
-  let* _ =
-    if result <> "" then Memory.store_bytes memory dst result
-    else Lwt.return_unit
-  in
-  Lwt.return (Int32.of_int @@ String.length result)
-
 let store_get_nth_key =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -356,15 +429,16 @@ let store_get_nth_key =
             Num (I32 dst);
             Num (I32 max_size);
           ] ->
+          let* memory = retrieve_memory memories in
           let+ result =
-            store_get_nth_key_aux
-              durable
-              memories
-              key_offset
-              key_length
-              index
-              dst
-              max_size
+            Aux.store_get_nth_key
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+              ~index
+              ~dst
+              ~max_size
           in
           (durable, [Values.(Num (I32 result))])
       | _ -> raise Bad_input)
@@ -379,24 +453,6 @@ let store_copy_type =
   let output_types = Vector.of_list [] in
   Types.FuncType (input_types, output_types)
 
-let store_copy_aux durable memories from_key_offset from_key_length
-    to_key_offset to_key_length =
-  let open Lwt_syntax in
-  let from_key_length = Int32.to_int from_key_length in
-  let to_key_length = Int32.to_int to_key_length in
-  if from_key_length > Durable.max_key_length then
-    raise (Key_too_large from_key_length) ;
-  if to_key_length > Durable.max_key_length then
-    raise (Key_too_large to_key_length) ;
-  let* memory = retrieve_memory memories in
-  let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
-  let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
-  let tree = Durable.of_storage_exn durable in
-  let from_key = Durable.key_of_string_exn from_key in
-  let to_key = Durable.key_of_string_exn to_key in
-  let+ tree = Durable.copy_tree_exn tree from_key to_key in
-  (Durable.to_storage tree, [])
-
 let store_copy =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -407,13 +463,19 @@ let store_copy =
        Values.(Num (I32 to_key_offset));
        Values.(Num (I32 to_key_length));
       ] ->
-          store_copy_aux
-            durable
-            memories
-            from_key_offset
-            from_key_length
-            to_key_offset
-            to_key_length
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let durable = Durable.of_storage_exn durable in
+          let+ durable =
+            Aux.store_copy
+              ~durable
+              ~memory
+              ~from_key_offset
+              ~from_key_length
+              ~to_key_offset
+              ~to_key_length
+          in
+          (Durable.to_storage durable, [])
       | _ -> raise Bad_input)
 
 let store_move_name = "tezos_store_move"
@@ -426,24 +488,6 @@ let store_move_type =
   let output_types = Vector.of_list [] in
   Types.FuncType (input_types, output_types)
 
-let store_move_aux durable memories from_key_offset from_key_length
-    to_key_offset to_key_length =
-  let open Lwt.Syntax in
-  let from_key_length = Int32.to_int from_key_length in
-  let to_key_length = Int32.to_int to_key_length in
-  if from_key_length > Durable.max_key_length then
-    raise (Key_too_large from_key_length) ;
-  if to_key_length > Durable.max_key_length then
-    raise (Key_too_large to_key_length) ;
-  let* memory = retrieve_memory memories in
-  let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
-  let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
-  let tree = Durable.of_storage_exn durable in
-  let from_key = Durable.key_of_string_exn from_key in
-  let to_key = Durable.key_of_string_exn to_key in
-  let+ tree = Durable.move_tree_exn tree from_key to_key in
-  (Durable.to_storage tree, [])
-
 let store_move =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -454,13 +498,19 @@ let store_move =
        Values.(Num (I32 to_key_offset));
        Values.(Num (I32 to_key_length));
       ] ->
-          store_move_aux
-            durable
-            memories
-            from_key_offset
-            from_key_length
-            to_key_offset
-            to_key_length
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let durable = Durable.of_storage_exn durable in
+          let+ durable =
+            Aux.store_move
+              ~durable
+              ~memory
+              ~from_key_offset
+              ~from_key_length
+              ~to_key_offset
+              ~to_key_length
+          in
+          (Durable.to_storage durable, [])
       | _ -> raise Bad_input)
 
 let store_read_name = "tezos_store_read"
@@ -480,20 +530,6 @@ let store_read_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_read_aux durable memories key_offset key_length value_offset dest
-    max_bytes =
-  let open Lwt_syntax in
-  let key_length = Int32.to_int key_length in
-  if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
-  let* memory = retrieve_memory memories in
-  let* key = Memory.load_bytes memory key_offset key_length in
-  let tree = Durable.of_storage_exn durable in
-  let key = Durable.key_of_string_exn key in
-  let+ value = Durable.read_value_exn tree key value_offset max_bytes in
-  let _ = Memory.store_bytes memory dest value in
-  ( Durable.to_storage tree,
-    [Values.(Num (I32 (Int32.of_int @@ String.length value)))] )
-
 let store_read =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -505,14 +541,19 @@ let store_read =
        Values.(Num (I32 dest));
        Values.(Num (I32 max_bytes));
       ] ->
-          store_read_aux
-            durable
-            memories
-            key_offset
-            key_length
-            (Int64.of_int32 value_offset)
-            dest
-            (Int64.of_int32 max_bytes)
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let+ len =
+            Aux.store_read
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+              ~value_offset
+              ~dest
+              ~max_bytes
+          in
+          (durable, [Values.(Num (I32 len))])
       | _ -> raise Bad_input)
 
 (** [reveal_args args] compute the list of arguments type of a host
@@ -558,22 +599,6 @@ let store_write_type =
   let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
-let store_write_aux durable memories key_offset key_length value_offset src
-    num_bytes =
-  let open Lwt_syntax in
-  if num_bytes > 4096l then Lwt.return (durable, [Values.Num (I32 1l)])
-  else
-    let num_bytes = Int32.to_int num_bytes in
-    let key_length = Int32.to_int key_length in
-    if key_length > Durable.max_key_length then raise (Key_too_large key_length) ;
-    let* memory = retrieve_memory memories in
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let* payload = Memory.load_bytes memory src num_bytes in
-    let tree = Durable.of_storage_exn durable in
-    let key = Durable.key_of_string_exn key in
-    let+ tree = Durable.write_value_exn tree key value_offset payload in
-    (Durable.to_storage tree, [Values.(Num (I32 0l))])
-
 let store_write =
   Host_funcs.Host_func
     (fun _input_buffer _output_buffer durable memories inputs ->
@@ -585,14 +610,20 @@ let store_write =
        Values.(Num (I32 src));
        Values.(Num (I32 num_bytes));
       ] ->
-          store_write_aux
-            durable
-            memories
-            key_offset
-            key_length
-            (Int64.of_int32 value_offset)
-            src
-            num_bytes
+          let open Lwt.Syntax in
+          let* memory = retrieve_memory memories in
+          let durable = Durable.of_storage_exn durable in
+          let+ durable, ret =
+            Aux.store_write
+              ~durable
+              ~memory
+              ~key_offset
+              ~key_length
+              ~value_offset
+              ~src
+              ~num_bytes
+          in
+          (Durable.to_storage durable, [Values.(Num (I32 ret))])
       | _ -> raise Bad_input)
 
 let lookup_opt name =
@@ -647,11 +678,7 @@ let register_host_funcs registry =
     ]
 
 module Internal_for_tests = struct
-  let aux_write_output = aux_write_output
-
   let write_output = Func.HostFunc (write_output_type, write_output_name)
-
-  let aux_write_input_in_memory = aux_write_input_in_memory
 
   let read_input = Func.HostFunc (read_input_type, read_input_name)
 
