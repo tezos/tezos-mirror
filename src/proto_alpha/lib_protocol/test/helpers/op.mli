@@ -721,7 +721,7 @@ val dal_publish_slot_header :
   ?storage_limit:counter ->
   Context.t ->
   Contract.t ->
-  Dal.Slot.t ->
+  Dal.Slot.Header.t ->
   (packed_operation, tztrace) result Lwt.t
 
 (** [zk_rollup_origination ctxt source ~public_parameters ~circuits_info

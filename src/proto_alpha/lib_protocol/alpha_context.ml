@@ -116,7 +116,7 @@ module Dal = struct
     include Raw_context.Dal
   end
 
-  module Slots_history = Dal_slot_repr.Slots_history
+  module Slots_history = Dal_slot_repr.History
   module Slots_storage = Dal_slot_storage
 end
 

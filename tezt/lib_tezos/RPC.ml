@@ -1031,7 +1031,7 @@ let get_chain_block_context_delegate_voting_power ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_dal_confirmed_slots_history ?(chain = "main")
+let get_chain_block_context_dal_confirmed_slot_headers_history ?(chain = "main")
     ?(block = "head") () =
   make
     GET
@@ -1042,7 +1042,7 @@ let get_chain_block_context_dal_confirmed_slots_history ?(chain = "main")
       block;
       "context";
       "dal";
-      "confirmed_slots_history";
+      "confirmed_slot_headers_history";
     ]
     Fun.id
 

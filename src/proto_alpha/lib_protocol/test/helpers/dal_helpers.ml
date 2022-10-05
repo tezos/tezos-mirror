@@ -26,7 +26,7 @@
 open Protocol
 module S = Dal_slot_repr
 module P = S.Page
-module Hist = S.Slots_history
+module Hist = S.History
 module Ihist = Hist.Internal_for_tests
 
 (* Some global constants. *)
@@ -96,7 +96,7 @@ let mk_slot ?(level = level_one) ?(index = S.Index.zero)
   return
     ( slot_data,
       polynomial,
-      S.{id = S.{published_level = level; index}; commitment} )
+      S.Header.{id = {published_level = level; index}; commitment} )
 
 let mk_page_id published_level slot_index page_index =
   P.{slot_id = {published_level; index = slot_index}; page_index}
@@ -104,7 +104,7 @@ let mk_page_id published_level slot_index page_index =
 let no_data = Some (fun ~default_char:_ _ -> None)
 
 let mk_page_info ?(default_char = 'x') ?level ?(page_index = P.Index.zero)
-    ?(custom_data = None) dal (slot : S.t) polynomial =
+    ?(custom_data = None) dal (slot : S.Header.t) polynomial =
   let open Result_syntax in
   let level =
     match level with None -> slot.id.published_level | Some level -> level

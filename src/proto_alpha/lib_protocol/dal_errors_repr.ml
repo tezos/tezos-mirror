@@ -39,8 +39,8 @@ type error +=
       proposed_fees : Tez_repr.t;
     }
   | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
-  | Dal_publish_slot_header_duplicate of {slot : Dal_slot_repr.t}
-  | Dal_rollup_already_registered_to_slot of
+  | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
+  | Dal_rollup_already_registered_to_slot_index of
       (Sc_rollup_repr.t * Dal_slot_repr.Index.t)
   | Dal_requested_subscriptions_at_future_level of
       (Raw_level_repr.t * Raw_level_repr.t)
@@ -51,7 +51,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"dal_subscribe_rollup_invalid_slot_index"
-    ~title:"DAL slot invalid index for subscribing sc rollup"
+    ~title:"DAL invalid slot index for subscribing sc rollup"
     ~description
     ~pp:(fun ppf (given, maximum) ->
       Format.fprintf
@@ -190,10 +190,11 @@ let () =
     ~title:"DAL publish slot header duplicate"
     ~description
     ~pp:(fun ppf _proposed -> Format.fprintf ppf "%s" description)
-    (obj1 (req "proposed" Dal_slot_repr.encoding))
+    (obj1 (req "proposed" Dal_slot_repr.Header.encoding))
     (function
-      | Dal_publish_slot_header_duplicate {slot} -> Some slot | _ -> None)
-    (fun slot -> Dal_publish_slot_header_duplicate {slot}) ;
+      | Dal_publish_slot_header_duplicate {slot_header} -> Some slot_header
+      | _ -> None)
+    (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
   register_error_kind
     `Permanent
     ~id:"Dal_rollup_already_subscribed_to_slot"
@@ -202,7 +203,7 @@ let () =
     ~pp:(fun ppf (rollup, slot_index) ->
       Format.fprintf
         ppf
-        "Rollup %a is already subscribed to data availability slot %a"
+        "Rollup %a is already subscribed to data availability slot index %a"
         Sc_rollup_repr.pp
         rollup
         Dal_slot_repr.Index.pp
@@ -212,11 +213,11 @@ let () =
         (req "rollup" Sc_rollup_repr.encoding)
         (req "slot_index" Dal_slot_repr.Index.encoding))
     (function
-      | Dal_rollup_already_registered_to_slot (rollup, slot_index) ->
+      | Dal_rollup_already_registered_to_slot_index (rollup, slot_index) ->
           Some (rollup, slot_index)
       | _ -> None)
     (fun (rollup, slot_index) ->
-      Dal_rollup_already_registered_to_slot (rollup, slot_index)) ;
+      Dal_rollup_already_registered_to_slot_index (rollup, slot_index)) ;
   let description =
     "Requested List of subscribed rollups to slot at a future level"
   in

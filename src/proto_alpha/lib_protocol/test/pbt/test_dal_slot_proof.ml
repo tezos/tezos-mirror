@@ -63,7 +63,7 @@ let populate_slots_history dal (levels_data : levels) =
     let* cell, cache =
       if skip_slot then return (cell, cache)
       else
-        Dal_slot_repr.Slots_history.add_confirmed_slots cell cache [slot]
+        Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
         |> Environment.wrap_tzresult
     in
     return (cell, cache, (poly, slot, skip_slot) :: slots_info)
@@ -104,8 +104,9 @@ let request_unconfirmed_page dal (poly, slot, skip_slot) =
      slot at the next level is unconfirmed (since we insert levels without
      any confirmed slot). *)
   let level =
-    if skip_slot then Dal_slot_repr.(slot.id.published_level)
-    else Raw_level_repr.succ Dal_slot_repr.(slot.id.published_level)
+    let open Dal_slot_repr.Header in
+    if skip_slot then slot.id.published_level
+    else Raw_level_repr.succ slot.id.published_level
   in
   let* _page_info, page_id = mk_page_info ~level dal slot poly in
   (* We should not provide the page's info if we want to build an
@@ -167,7 +168,7 @@ let tests =
   Result.value_f
     (dal_mk_env
        {
-         Dal_slot_repr.Slots_history.redundancy_factor = 16;
+         Dal_slot_repr.History.redundancy_factor = 16;
          page_size = 4096 / 64;
          slot_size = 1048576 / 64;
          number_of_shards = 2048 / 64;

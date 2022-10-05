@@ -401,23 +401,23 @@ module Dal : sig
      no-op. *)
   val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
 
-  (** [register_slot ctxt slot] returns a new context where the new
-     candidate [slot] have been taken into account. Returns [Some
-     (ctxt,updated)] where [updated=true] if the candidate is
-     registered. [Some (ctxt,false)] if another candidate was already
-     registered previously. Returns an error if the slot is
-     invalid. *)
-  val register_slot : t -> Dal_slot_repr.t -> (t * bool) tzresult
+  (** [register_slot_header ctxt slot_header] returns a new context
+     where the new candidate [slot] have been taken into
+     account. Returns [Some (ctxt,updated)] where [updated=true] if
+     the candidate is registered. [Some (ctxt,false)] if another
+     candidate was already registered previously. Returns an error if
+     the slot is invalid. *)
+  val register_slot_header : t -> Dal_slot_repr.Header.t -> (t * bool) tzresult
 
   (** [candidates ctxt] returns the current list of slot for which
      there is at least one candidate. *)
-  val candidates : t -> Dal_slot_repr.t list
+  val candidates : t -> Dal_slot_repr.Header.t list
 
-  (** [is_slot_available ctxt slot_index] returns [true] if the
+  (** [is_slot_index_available ctxt slot_index] returns [true] if the
      [slot_index] is declared available by the protocol. [false]
      otherwise. If the [index] is out of the interval
      [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_available : t -> Dal_slot_repr.Index.t -> bool
+  val is_slot_index_available : t -> Dal_slot_repr.Index.t -> bool
 
   (** [shards ctxt ~endorser] returns the shard assignment for the
      [endorser] for the current level. *)

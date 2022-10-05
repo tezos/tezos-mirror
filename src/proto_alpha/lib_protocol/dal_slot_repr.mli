@@ -84,20 +84,21 @@ module Index : sig
   val equal : t -> t -> bool
 end
 
-(** For Layer-1, a slot is described by the level at which it is published,
+module Header : sig
+  (** For Layer-1, a slot is described by the level at which it is published,
     the slot's index (in the list of slots), and the slot's header
     (KATE commitment hash). *)
-type id = {published_level : Raw_level_repr.t; index : Index.t}
+  type id = {published_level : Raw_level_repr.t; index : Index.t}
 
-type t = {id : id; commitment : Commitment.t}
+  type t = {id : id; commitment : Commitment.t}
 
-type slot = t
+  (** The encoding ensures the slot is always a non-negative number. *)
+  val encoding : t Data_encoding.t
 
-val equal : t -> t -> bool
+  val pp : Format.formatter -> t -> unit
 
-val pp_slot : Format.formatter -> t -> unit
-
-type slot_index = Index.t
+  val equal : t -> t -> bool
+end
 
 (** A DAL slot is decomposed to a successive list of pages with fixed content
    size. The size is chosen so that it's possible to inject a page in a Tezos
@@ -105,6 +106,8 @@ type slot_index = Index.t
 *)
 module Page : sig
   type content = Bytes.t
+
+  type slot_index = Index.t
 
   module Index : sig
     type t = int
@@ -125,7 +128,7 @@ module Page : sig
 
   (** A page is identified by its slot id and by its own index in the list
      of pages of the slot. *)
-  type t = {slot_id : id; page_index : Index.t}
+  type t = {slot_id : Header.id; page_index : Index.t}
 
   type proof = Dal.page_proof
 
@@ -137,11 +140,6 @@ module Page : sig
 
   val pp : Format.formatter -> t -> unit
 end
-
-(** The encoding ensures the slot is always a non-negative number. *)
-val encoding : t Data_encoding.t
-
-val pp : Format.formatter -> t -> unit
 
 (** Only one slot header is accepted per slot index. If two slots
    headers are included into a block, the second one will fail.
@@ -167,10 +165,10 @@ module Slot_market : sig
      registered. Returns [Some (_, false)] otherwise. Returns [None]
      if the [index] is not in the interval [0;length] where [length]
      is the value provided to the [init] function. *)
-  val register : t -> slot -> (t * bool) option
+  val register : t -> Header.t -> (t * bool) option
 
-  (** [candidates t] returns a list of slot candidates. *)
-  val candidates : t -> slot list
+  (** [candidates t] returns a list of slot header candidates. *)
+  val candidates : t -> Header.t list
 end
 
 (** This module provides an abstract data structure (type {!t}) that represents a
@@ -184,7 +182,7 @@ end
     maintained and used by the rollup node to produce refutation proofs
     involving DAL slot inputs.
 *)
-module Slots_history : sig
+module History : sig
   (** Abstract representation of a skip list specialized for
        confirmed slot headers. *)
   type t
@@ -204,15 +202,15 @@ module Slots_history : sig
       the cache are needed to produce proofs involving slots' pages. *)
   module History_cache : Bounded_history_repr.S
 
-  (** [add_confirmed_slots hist cache slots] updates the given structure
-      [hist] with the list of [slots]. The given [cache] is also updated to
+  (** [add_confirmed_slots hist cache slot_headers] updates the given structure
+      [hist] with the list of [slot_headers]. The given [cache] is also updated to
       add successive values of [cell] to it. *)
-  val add_confirmed_slots :
-    t -> History_cache.t -> slot list -> (t * History_cache.t) tzresult
+  val add_confirmed_slot_headers :
+    t -> History_cache.t -> Header.t list -> (t * History_cache.t) tzresult
 
-  (** [add_confirmed_slots_no_cache cell slots] same as {!add_confirmed_slots},
-      but no cache is updated. *)
-  val add_confirmed_slots_no_cache : t -> slot list -> t tzresult
+  (** [add_confirmed_slot_headers_no_cache cell slot_headers] same as
+     {!add_confirmed_slot_headers}, but no cache is updated. *)
+  val add_confirmed_slot_headers_no_cache : t -> Header.t list -> t tzresult
 
   (** [equal a b] returns true iff a is equal to b. *)
   val equal : t -> t -> bool
@@ -300,7 +298,7 @@ module Slots_history : sig
   type error += Dal_proof_error of string
 
   module Internal_for_tests : sig
-    val content : t -> slot
+    val content : t -> Header.t
 
     val proof_statement_is : proof -> [`Confirmed | `Unconfirmed] -> bool
   end

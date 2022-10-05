@@ -1053,7 +1053,7 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
   let index = Alpha_context.Dal.Slot_index.zero in
   let commitment = Alpha_context.Dal.Slot.Commitment.zero in
   let slot =
-    Alpha_context.Dal.Slot.{id = {published_level; index}; commitment}
+    Alpha_context.Dal.Slot.Header.{id = {published_level; index}; commitment}
   in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee

@@ -45,14 +45,16 @@ module Plugin = struct
     in
     let apply_internal acc ~source:_ _op _res = acc in
     let apply (type kind) acc ~source:_ (op : kind manager_operation) _res =
-      match op with Dal_publish_slot_header {slot} -> slot :: acc | _ -> acc
+      match op with
+      | Dal_publish_slot_header {slot_header} -> slot_header :: acc
+      | _ -> acc
     in
     Layer1_services.(
       process_manager_operations [] block.operations {apply; apply_internal})
     |> List.map_es (fun slot ->
            return
-             ( Dal.Slot_index.to_int slot.Dal.Slot.id.index,
-               slot.Dal.Slot.commitment ))
+             ( Dal.Slot_index.to_int slot.Dal.Slot.Header.id.index,
+               slot.Dal.Slot.Header.commitment ))
 end
 
 let () = Dal_plugin.register (module Plugin)

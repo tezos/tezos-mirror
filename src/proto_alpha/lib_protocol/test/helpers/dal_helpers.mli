@@ -27,9 +27,9 @@ open Protocol
 
 (** Some global constants. *)
 
-val genesis_history : Dal_slot_repr.Slots_history.t
+val genesis_history : Dal_slot_repr.History.t
 
-val genesis_history_cache : Dal_slot_repr.Slots_history.History_cache.t
+val genesis_history_cache : Dal_slot_repr.History.History_cache.t
 
 val level_one : Raw_level_repr.t
 
@@ -58,14 +58,14 @@ val dal_mk_prove_page :
    commitment). *)
 val mk_slot :
   ?level:Raw_level_repr.t ->
-  ?index:Dal_slot_repr.slot_index ->
+  ?index:Dal_slot_repr.Index.t ->
   ?fill_function:(int -> char) ->
   Cryptobox.t ->
-  (bytes * Cryptobox.polynomial * Dal_slot_repr.t, error trace) result
+  (bytes * Cryptobox.polynomial * Dal_slot_repr.Header.t, error trace) result
 
 (** Constructs a record value of type Page.id. *)
 val mk_page_id :
-  Raw_level_repr.t -> Dal_slot_repr.slot_index -> int -> Dal_slot_repr.Page.t
+  Raw_level_repr.t -> Dal_slot_repr.Index.t -> int -> Dal_slot_repr.Page.t
 
 val no_data : (default_char:char -> int -> bytes option) option
 
@@ -81,7 +81,7 @@ val mk_page_info :
   ?page_index:int ->
   ?custom_data:(default_char:char -> int -> bytes option) option ->
   Cryptobox.t ->
-  Dal_slot_repr.t ->
+  Dal_slot_repr.Header.t ->
   Cryptobox.polynomial ->
   ( (bytes * Cryptobox.page_proof) option * Dal_slot_repr.Page.t,
     error trace )
@@ -92,7 +92,7 @@ val mk_page_info :
 val next_char : char -> char
 
 (** Increment the given slot index. Returns zero in case of overflow. *)
-val succ_slot_index : Dal_slot_repr.slot_index -> Dal_slot_repr.slot_index
+val succ_slot_index : Dal_slot_repr.Index.t -> Dal_slot_repr.Index.t
 
 (** Auxiliary test function used by both unit and PBT tests: This function
    produces a proof from the given information and verifies the produced result,
@@ -100,7 +100,7 @@ val succ_slot_index : Dal_slot_repr.slot_index -> Dal_slot_repr.slot_index
     [check_verify_result], respectively. *)
 val produce_and_verify_proof :
   check_produce:
-    ((Dal_slot_repr.Slots_history.proof * bytes option) tzresult ->
+    ((Dal_slot_repr.History.proof * bytes option) tzresult ->
     (bytes * Cryptobox.page_proof) option ->
     (unit, tztrace) result Lwt.t) ->
   ?check_verify:
@@ -108,8 +108,8 @@ val produce_and_verify_proof :
     (bytes * Cryptobox.page_proof) option ->
     (unit, tztrace) result Lwt.t) ->
   Cryptobox.t ->
-  Dal_slot_repr.Slots_history.t ->
-  Dal_slot_repr.Slots_history.History_cache.t ->
+  Dal_slot_repr.History.t ->
+  Dal_slot_repr.History.History_cache.t ->
   page_info:(bytes * Cryptobox.page_proof) option ->
   page_id:Dal_slot_repr.Page.t ->
   (unit, tztrace) result Lwt.t
@@ -121,7 +121,7 @@ val eq_page_proof : Cryptobox.page_proof -> Cryptobox.page_proof -> bool
 val successful_check_produce_result :
   __LOC__:string ->
   [`Confirmed | `Unconfirmed] ->
-  (Dal_slot_repr.Slots_history.proof * bytes option, tztrace) result ->
+  (Dal_slot_repr.History.proof * bytes option, tztrace) result ->
   (bytes * 'a) option ->
   (unit, tztrace) result Lwt.t
 

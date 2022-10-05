@@ -402,7 +402,7 @@ module Manager = struct
         ]
         @ parameters
     | Dal_publish_slot_header {level; index; commitment} ->
-        let slot =
+        let slot_header =
           `O
             [
               ("index", json_of_int index);
@@ -410,7 +410,10 @@ module Manager = struct
               ("commitment", json_of_commitment commitment);
             ]
         in
-        [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
+        [
+          ("kind", `String "dal_publish_slot_header");
+          ("slot_header", slot_header);
+        ]
     | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
         [
           ("kind", `String "sc_rollup_dal_slot_subscribe");

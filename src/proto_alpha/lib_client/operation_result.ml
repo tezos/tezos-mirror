@@ -412,12 +412,12 @@ let pp_manager_operation_content (type kind) source ppf
         slot_index
         Sc_rollup.Address.pp
         rollup
-  | Dal_publish_slot_header {slot} ->
+  | Dal_publish_slot_header {slot_header} ->
       Format.fprintf
         ppf
         "Data availability slot header publishing:@,Slot: %a"
-        Dal.Slot.pp
-        slot
+        Dal.Slot.Header.pp
+        slot_header
   | Zk_rollup_origination _ ->
       Format.fprintf ppf "Zk rollup origination:@,From: %a" Contract.pp source
   | Zk_rollup_publish _ ->

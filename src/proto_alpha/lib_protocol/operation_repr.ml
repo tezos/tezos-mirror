@@ -426,7 +426,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header : {
-      slot : Dal_slot_repr.t;
+      slot_header : Dal_slot_repr.Header.t;
     }
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {
@@ -1146,12 +1146,13 @@ module Encoding = struct
         {
           tag = dal_publish_slot_header_tag;
           name = "dal_publish_slot_header";
-          encoding = obj1 (req "slot" Dal_slot_repr.encoding);
+          encoding = obj1 (req "slot_header" Dal_slot_repr.Header.encoding);
           select =
             (function
             | Manager (Dal_publish_slot_header _ as op) -> Some op | _ -> None);
-          proj = (function Dal_publish_slot_header {slot} -> slot);
-          inj = (fun slot -> Dal_publish_slot_header {slot});
+          proj =
+            (function Dal_publish_slot_header {slot_header} -> slot_header);
+          inj = (fun slot_header -> Dal_publish_slot_header {slot_header});
         }
 
     let sc_rollup_add_messages_case =

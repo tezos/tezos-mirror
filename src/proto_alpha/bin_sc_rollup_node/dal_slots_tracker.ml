@@ -395,7 +395,7 @@ module Confirmed_slots_history = struct
     let slots_to_save =
       let open Dal in
       List.fast_sort
-        (fun Slot.{id = {index = a; _}; _} {id = {index = b; _}; _} ->
+        (fun Slot.Header.{id = {index = a; _}; _} {id = {index = b; _}; _} ->
           Slot_index.compare a b)
         slots_to_save
     in
@@ -403,7 +403,7 @@ module Confirmed_slots_history = struct
     let* slots_history = slots_history_of_hash node_ctxt pred in
     let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
     let*? slots_history, slots_cache =
-      Dal.Slots_history.add_confirmed_slots
+      Dal.Slots_history.add_confirmed_slot_headers
         slots_history
         slots_cache
         slots_to_save

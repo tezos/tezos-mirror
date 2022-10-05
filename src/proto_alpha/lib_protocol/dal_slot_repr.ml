@@ -63,39 +63,62 @@ module Index = struct
   let equal = Compare.Int.equal
 end
 
-type id = {published_level : Raw_level_repr.t; index : Index.t}
+module Header = struct
+  type id = {published_level : Raw_level_repr.t; index : Index.t}
 
-type t = {id : id; commitment : Commitment.t}
+  type t = {id : id; commitment : Commitment.t}
 
-type slot = t
+  let slot_id_equal ({published_level; index} : id) s2 =
+    Raw_level_repr.equal published_level s2.published_level
+    && Index.equal index s2.index
 
-type slot_index = Index.t
+  let equal {id; commitment} s2 =
+    slot_id_equal id s2.id && Commitment.equal commitment s2.commitment
 
-let slot_id_equal ({published_level; index} : id) s2 =
-  Raw_level_repr.equal published_level s2.published_level
-  && Index.equal index s2.index
+  let compare_slot_id {published_level; index} s2 =
+    let c = Raw_level_repr.compare published_level s2.published_level in
+    if Compare.Int.(c <> 0) then c else Index.compare index s2.index
 
-let slot_equal ({id; commitment} : t) s2 =
-  slot_id_equal id s2.id && Commitment.equal commitment s2.commitment
+  let zero_id =
+    {
+      (* We don't expect to have any published slot at level
+         Raw_level_repr.root. *)
+      published_level = Raw_level_repr.root;
+      index = Index.zero;
+    }
 
-let compare_slot_id ({published_level; index} : id) s2 =
-  let c = Raw_level_repr.compare published_level s2.published_level in
-  if Compare.Int.(c <> 0) then c else Index.compare index s2.index
+  let zero = {id = zero_id; commitment = Commitment.zero}
 
-let zero_id =
-  {
-    (* We don't expect to have any published slot at level
-       Raw_level_repr.root. *)
-    published_level = Raw_level_repr.root;
-    index = Index.zero;
-  }
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {id = {published_level; index}; commitment} ->
+        (published_level, index, commitment))
+      (fun (published_level, index, commitment) ->
+        {id = {published_level; index}; commitment})
+      (obj3
+         (req "level" Raw_level_repr.encoding)
+         (req "index" Data_encoding.uint8)
+         (req "commitment" Commitment.encoding))
 
-let zero = {id = zero_id; commitment = Commitment.zero}
+  let pp fmt {id = {published_level; index}; commitment} =
+    Format.fprintf
+      fmt
+      "published_level: %a index: %a commitment: %a"
+      Raw_level_repr.pp
+      published_level
+      Format.pp_print_int
+      index
+      Commitment.pp
+      commitment
+end
 
 module Slot_index = Index
 
 module Page = struct
   type content = Bytes.t
+
+  type slot_index = Index.t
 
   module Index = struct
     type t = int
@@ -111,7 +134,7 @@ module Page = struct
     let equal = Compare.Int.equal
   end
 
-  type t = {slot_id : id; page_index : Index.t}
+  type t = {slot_id : Header.id; page_index : Index.t}
 
   type proof = Dal.page_proof
 
@@ -128,7 +151,8 @@ module Page = struct
          (req "page_index" Index.encoding))
 
   let equal {slot_id; page_index} p =
-    slot_id_equal slot_id p.slot_id && Index.equal page_index p.page_index
+    Header.slot_id_equal slot_id p.slot_id
+    && Index.equal page_index p.page_index
 
   let proof_encoding = Dal.page_proof_encoding
 
@@ -151,29 +175,6 @@ module Page = struct
       (Data_encoding.Json.construct proof_encoding proof)
 end
 
-let slot_encoding =
-  let open Data_encoding in
-  conv
-    (fun {id = {published_level; index}; commitment} ->
-      (published_level, index, commitment))
-    (fun (published_level, index, commitment) ->
-      {id = {published_level; index}; commitment})
-    (obj3
-       (req "level" Raw_level_repr.encoding)
-       (req "index" Data_encoding.uint8)
-       (req "commitment" Commitment.encoding))
-
-let pp_slot fmt {id = {published_level; index}; commitment} =
-  Format.fprintf
-    fmt
-    "slot:(published_level: %a, index: %a, commitment: %a)"
-    Raw_level_repr.pp
-    published_level
-    Format.pp_print_int
-    index
-    Commitment.pp
-    commitment
-
 module Slot_market = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3108
 
@@ -182,44 +183,50 @@ module Slot_market = struct
 
   module Slot_index_map = Map.Make (Index)
 
-  type t = {length : int; slots : slot Slot_index_map.t}
+  type t = {length : int; slot_headers : Header.t Slot_index_map.t}
 
   let init ~length =
     if Compare.Int.(length < 0) then
       invalid_arg "Dal_slot_repr.Slot_market.init: length cannot be negative" ;
-    let slots = Slot_index_map.empty in
-    {length; slots}
+    let slot_headers = Slot_index_map.empty in
+    {length; slot_headers}
 
   let length {length; _} = length
 
-  let register t new_slot =
-    if not Compare.Int.(0 <= new_slot.id.index && new_slot.id.index < t.length)
+  let register t new_slot_header =
+    let open Header in
+    if
+      not
+        Compare.Int.(
+          0 <= new_slot_header.id.index && new_slot_header.id.index < t.length)
     then None
     else
       let has_changed = ref false in
       let update = function
         | None ->
             has_changed := true ;
-            Some new_slot
+            Some new_slot_header
         | Some x -> Some x
       in
-      let slots = Slot_index_map.update new_slot.id.index update t.slots in
-      let t = {t with slots} in
+      let slot_headers =
+        Slot_index_map.update new_slot_header.id.index update t.slot_headers
+      in
+      let t = {t with slot_headers} in
       Some (t, !has_changed)
 
   let candidates t =
-    t.slots |> Slot_index_map.to_seq |> Seq.map snd |> List.of_seq
+    t.slot_headers |> Slot_index_map.to_seq |> Seq.map snd |> List.of_seq
 end
 
-module Slots_history = struct
+module History = struct
   (* History is represented via a skip list. The content of the cell
      is the hash of a merkle proof. *)
 
   (* A leaf of the merkle tree is a slot. *)
   module Leaf = struct
-    type t = slot
+    type t = Header.t
 
-    let to_bytes = Data_encoding.Binary.to_bytes_exn slot_encoding
+    let to_bytes = Data_encoding.Binary.to_bytes_exn Header.encoding
   end
 
   module Content_prefix = struct
@@ -296,7 +303,7 @@ module Slots_history = struct
         guarantee that it can only be called with the adequate compare function.
     *)
 
-    let compare = compare_slot_id
+    let compare = Header.compare_slot_id
 
     let compare_lwt a b = Lwt.return @@ compare a b
 
@@ -304,13 +311,16 @@ module Slots_history = struct
       let open Tzresult_syntax in
       let* () =
         error_when
-          (Compare.Int.( <= ) (compare elt.id (content prev_cell).id) 0)
+          (Compare.Int.( <= )
+             (compare elt.Header.id (content prev_cell).Header.id)
+             0)
           Add_element_in_slots_skip_list_violates_ordering
       in
       return @@ next ~prev_cell ~prev_cell_ptr elt
 
     let search ~deref ~cell ~target_id =
-      search ~deref ~cell ~compare:(fun slot -> compare_lwt slot.id target_id)
+      search ~deref ~cell ~compare:(fun slot ->
+          compare_lwt slot.Header.id target_id)
   end
 
   module V1 = struct
@@ -318,7 +328,7 @@ module Slots_history = struct
        represented as a merkle list. *)
     (* TODO/DAL: https://gitlab.com/tezos/tezos/-/issues/3765
        Decide how to store attested slots in the skip list's content. *)
-    type content = slot
+    type content = Header.t
 
     (* A pointer to a cell is the hash of its content and all the back
        pointers. *)
@@ -329,21 +339,21 @@ module Slots_history = struct
     type t = history
 
     let history_encoding =
-      Skip_list.encoding Pointer_hash.encoding slot_encoding
+      Skip_list.encoding Pointer_hash.encoding Header.encoding
 
     let equal_history : history -> history -> bool =
-      Skip_list.equal Pointer_hash.equal slot_equal
+      Skip_list.equal Pointer_hash.equal Header.equal
 
     let encoding = history_encoding
 
     let equal : t -> t -> bool = equal_history
 
-    let genesis : t = Skip_list.genesis (zero : slot)
+    let genesis : t = Skip_list.genesis Header.zero
 
     let hash_skip_list_cell cell =
       let current_slot = Skip_list.content cell in
       let back_pointers_hashes = Skip_list.back_pointers cell in
-      Data_encoding.Binary.to_bytes_exn slot_encoding current_slot
+      Data_encoding.Binary.to_bytes_exn Header.encoding current_slot
       :: List.map Pointer_hash.to_bytes back_pointers_hashes
       |> Pointer_hash.hash_bytes
 
@@ -354,7 +364,7 @@ module Slots_history = struct
         "@[hash : %a@;%a@]"
         Pointer_hash.pp
         history_hash
-        (Skip_list.pp ~pp_content:pp_slot ~pp_ptr:Pointer_hash.pp)
+        (Skip_list.pp ~pp_content:Header.pp ~pp_ptr:Pointer_hash.pp)
         history
 
     module History_cache =
@@ -373,20 +383,20 @@ module Slots_history = struct
           let equal = equal_history
         end)
 
-    let add_confirmed_slot (t, cache) slot =
+    let add_confirmed_slot_header (t, cache) slot_header =
       let open Tzresult_syntax in
       let prev_cell_ptr = hash_skip_list_cell t in
       let* cache = History_cache.remember prev_cell_ptr t cache in
-      let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot in
+      let* new_cell = Skip_list.next ~prev_cell:t ~prev_cell_ptr slot_header in
       return (new_cell, cache)
 
-    let add_confirmed_slots (t : t) cache slots =
-      List.fold_left_e add_confirmed_slot (t, cache) slots
+    let add_confirmed_slot_headers (t : t) cache slot_headers =
+      List.fold_left_e add_confirmed_slot_header (t, cache) slot_headers
 
-    let add_confirmed_slots_no_cache =
+    let add_confirmed_slot_headers_no_cache =
       let no_cache = History_cache.empty ~capacity:0L in
       fun t slots ->
-        List.fold_left_e add_confirmed_slot (t, no_cache) slots >|? fst
+        List.fold_left_e add_confirmed_slot_header (t, no_cache) slots >|? fst
 
     (* Dal proofs section *)
 
@@ -652,11 +662,11 @@ module Slots_history = struct
              initialized with a min elt (slot zero)."
       | Some (page_data, page_proof), Found target_cell ->
           (* The slot to which the page is supposed to belong is found. *)
-          let {id; commitment} = Skip_list.content target_cell in
+          let Header.{id; commitment} = Skip_list.content target_cell in
           (* We check that the slot is not the dummy slot. *)
           let* () =
             fail_when
-              Compare.Int.(compare_slot_id id zero.id = 0)
+              Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
                  "Skip_list.search returned 'Found <zero_slot>': No existence \
                   proof should be constructed with the slot zero.")
@@ -739,10 +749,10 @@ module Slots_history = struct
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
           (* If the page is supposed to be confirmed, the last cell in
              [inc_proof] should store the slot of the page. *)
-          let {id; commitment} = Skip_list.content target_cell in
+          let Header.{id; commitment} = Skip_list.content target_cell in
           let* () =
             fail_when
-              Compare.Int.(compare_slot_id id zero.id = 0)
+              Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
                  "verify_proof: cannot construct a confirmation page proof \
                   with 'zero' as target slot.")
@@ -759,7 +769,7 @@ module Slots_history = struct
           return_some page_data
       | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
           (* The page's slot is supposed to be unconfirmed. *)
-          let ( < ) a b = Compare.Int.(compare_slot_id a b < 0) in
+          let ( < ) a b = Compare.Int.(Header.compare_slot_id a b < 0) in
           (* We retrieve the last cell of the inclusion proof to be able to
              call {!verify_inclusion_proof}. We also do some well-formedness on
              the shape of the inclusion proof (see the case [Page_unconfirmed]
@@ -833,9 +843,3 @@ module Slots_history = struct
 
   include V1
 end
-
-let encoding = slot_encoding
-
-let pp = pp_slot
-
-let equal = slot_equal

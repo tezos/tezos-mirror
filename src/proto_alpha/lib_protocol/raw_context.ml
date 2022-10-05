@@ -1555,7 +1555,10 @@ end
 
 module Dal = struct
   type error +=
-    | Dal_register_invalid_slot of {length : int; slot : Dal_slot_repr.t}
+    | Dal_register_invalid_slot_header of {
+        length : int;
+        slot_header : Dal_slot_repr.Header.t;
+      }
 
   let () =
     register_error_kind
@@ -1572,13 +1575,17 @@ module Dal = struct
            %d. Found: %a."
           length
           Dal_slot_repr.Index.pp
-          slot.Dal_slot_repr.id.index)
+          slot.Dal_slot_repr.Header.id.index)
       Data_encoding.(
-        obj2 (req "length" int31) (req "slot" Dal_slot_repr.encoding))
+        obj2
+          (req "length" int31)
+          (req "slot_header" Dal_slot_repr.Header.encoding))
       (function
-        | Dal_register_invalid_slot {length; slot} -> Some (length, slot)
+        | Dal_register_invalid_slot_header {length; slot_header} ->
+            Some (length, slot_header)
         | _ -> None)
-      (fun (length, slot) -> Dal_register_invalid_slot {length; slot})
+      (fun (length, slot_header) ->
+        Dal_register_invalid_slot_header {length; slot_header})
 
   let record_available_shards ctxt slots shards =
     let dal_endorsement_slot_accountability =
@@ -1589,22 +1596,24 @@ module Dal = struct
     in
     {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
 
-  let register_slot ctxt slot =
+  let register_slot_header ctxt slot_header =
     match
-      Dal_slot_repr.Slot_market.register ctxt.back.dal_slot_fee_market slot
+      Dal_slot_repr.Slot_market.register
+        ctxt.back.dal_slot_fee_market
+        slot_header
     with
     | None ->
         let length =
           Dal_slot_repr.Slot_market.length ctxt.back.dal_slot_fee_market
         in
-        error (Dal_register_invalid_slot {length; slot})
+        error (Dal_register_invalid_slot_header {length; slot_header})
     | Some (dal_slot_fee_market, updated) ->
         ok ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
 
   let candidates ctxt =
     Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
 
-  let is_slot_available ctxt =
+  let is_slot_index_available ctxt =
     let threshold =
       ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
     in
