@@ -87,7 +87,9 @@ module Proto = struct
   module Translator = struct
     type toplevel = Script_ir_translator.toplevel
 
-    type ex_ty = Script_typed_ir.ex_ty
+    type ('a, 'b) ty = ('a, 'b) Script_typed_ir.ty
+
+    type ex_ty = Ex_ty : ('a, 'b) ty -> ex_ty
 
     type ex_code = Script_ir_translator.ex_code
 
@@ -102,7 +104,7 @@ module Proto = struct
         ~allow_contract ~allow_ticket script =
       let open Result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
-      let+ ty, _ =
+      let+ Script_typed_ir.Ex_ty ty, _ =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
              ctxt
@@ -113,7 +115,7 @@ module Proto = struct
              ~allow_ticket
              script
       in
-      ty
+      Ex_ty ty
 
     let parse_data (raw_ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
@@ -129,7 +131,7 @@ module Proto = struct
       in
       data
 
-    let unparse_ty (raw_ctxt : Raw_context.t) (Script_typed_ir.Ex_ty ty) =
+    let unparse_ty (raw_ctxt : Raw_context.t) (Ex_ty ty) =
       let open Result_syntax in
       let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ expr, _ =
@@ -241,7 +243,7 @@ module Proto = struct
           Box.OPS.fold (fun _k v acc -> g v @ acc) Box.boxed [])
       @@ find_lambda_tys tv
 
-    let collect_lambda_tys (Script_typed_ir.Ex_ty ty) =
+    let collect_lambda_tys (Translator.Ex_ty ty) =
       match find_lambda_tys ty with
       | [] -> None
       | lams -> Some (Ex_ty_lambdas (ty, lams))

@@ -96,7 +96,9 @@ module type PROTOCOL = sig
   module Translator : sig
     type toplevel
 
-    type ex_ty
+    type ('a, 'b) ty
+
+    type ex_ty = Ex_ty : ('a, 'b) ty -> ex_ty
 
     type ex_code
 
