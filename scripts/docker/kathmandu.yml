@@ -4,14 +4,14 @@ services:
     container_name: octez-node-kathmandu
     image: tezos/tezos:latest
     hostname: octez-node
-    command: tezos-node
+    command: octez-node
     ports:
       - 9732:9732
       - 8732:8732
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
@@ -21,11 +21,11 @@ services:
     container_name: octez-baker-kathmandu
     image: tezos/tezos:latest
     hostname: octez-baker
-    command: tezos-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
+    command: octez-baker --liquidity-baking-toggle-vote $LIQUIDITY_BAKING_VOTE
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
@@ -36,11 +36,11 @@ services:
     container_name: octez-accuser-kathmandu
     image: tezos/tezos:latest
     hostname: octez-accuser
-    command: tezos-accuser
+    command: octez-accuser
     environment:
       NODE_RPC_ADDR: "0.0.0.0"
       NODE_HOST: octez-node
-      PROTOCOL: 014-PtKathma
+      PROTOCOL: PtKathma
     volumes:
       - client_data:/var/run/tezos/client
       - node_data:/var/run/tezos/node
