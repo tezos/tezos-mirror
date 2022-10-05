@@ -23,8 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Invocation:
+     dune exec src/lib_protocol_environment/test/test.exe
+   or for a superset of these tests:
+     dune build @src/lib_protocol_environment/runtest
+*)
+
 let () =
   Alcotest_lwt.run
     "tezos-shell-context"
-    [("mem_context", Test_mem_context.tests); ("cache", Test_cache.tests)]
+    [
+      ("mem_context", Test_mem_context.tests);
+      ("cache", Test_cache.tests);
+      ("data_encoding", Test_data_encoding.tests);
+    ]
   |> Lwt_main.run

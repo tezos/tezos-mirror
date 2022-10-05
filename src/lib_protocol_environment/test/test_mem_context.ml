@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Environment
-    Invocation:   dune build @src/lib_protocol_environment/runtest
+    Invocation:   dune exec src/lib_protocol_environment/test/test.exe -- test "^mem_context$"
     Dependencies: src/lib_protocol_environment/test/assert.ml
     Subject:      Low-level operations on memory contexts.
 *)

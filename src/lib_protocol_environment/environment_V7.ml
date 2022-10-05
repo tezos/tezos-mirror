@@ -256,7 +256,7 @@ struct
   module Lwt = Lwt
 
   module Data_encoding = struct
-    include Data_encoding
+    include Tezos_protocol_environment_structs.V7.Data_encoding
 
     type tag_size = [`Uint8 | `Uint16]
 

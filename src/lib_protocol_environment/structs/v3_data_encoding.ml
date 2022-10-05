@@ -25,6 +25,72 @@
 
 include Data_encoding
 
+module Encoding = struct
+  include Encoding
+
+  let lazy_encoding encoding =
+    let binary = lazy_encoding encoding in
+    let json =
+      let open Json_encoding in
+      let write (type value)
+          (module Repr : Json_repr.Repr with type value = value) le =
+        match force_decode le with
+        | Some r ->
+            Json_repr.convert
+              (module Json_repr.Ezjsonm)
+              (module Repr)
+              (Json.construct encoding r)
+        | None ->
+            apply_lazy
+              ~fun_value:(fun _ -> assert false)
+              ~fun_bytes:(fun b ->
+                let (`Hex h) = Hex.of_bytes b in
+                Repr.repr (`O [("unparsed-binary", Repr.repr (`String h))]))
+              ~fun_combine:(fun _ _ -> assert false)
+              le
+      in
+      let read (type value)
+          (module Repr : Json_repr.Repr with type value = value) j =
+        let j = Json_repr.convert (module Repr) (module Json_repr.Ezjsonm) j in
+        make_lazy encoding (Json.destruct encoding j)
+      in
+      repr_agnostic_custom {write; read} ~schema:Json_schema.any
+    in
+    Data_encoding__Encoding.raw_splitted ~json ~binary
+end
+
+(* We have to define this twice bc in data-encoding<0.7 the type equality for
+   [lazy_t] is not propagated. *)
+let lazy_encoding encoding =
+  let binary = lazy_encoding encoding in
+  let json =
+    let open Json_encoding in
+    let write (type value)
+        (module Repr : Json_repr.Repr with type value = value) le =
+      match force_decode le with
+      | Some r ->
+          Json_repr.convert
+            (module Json_repr.Ezjsonm)
+            (module Repr)
+            (Json.construct encoding r)
+      | None ->
+          apply_lazy
+            ~fun_value:(fun _ -> assert false)
+            ~fun_bytes:(fun b ->
+              let (`Hex h) = Hex.of_bytes b in
+              Repr.repr (`O [("unparsed-binary", Repr.repr (`String h))]))
+            ~fun_combine:(fun _ _ -> assert false)
+            le
+    in
+    let read (type value) (module Repr : Json_repr.Repr with type value = value)
+        j =
+      let j = Json_repr.convert (module Repr) (module Json_repr.Ezjsonm) j in
+      make_lazy encoding (Json.destruct encoding j)
+    in
+    repr_agnostic_custom {write; read} ~schema:Json_schema.any
+  in
+  Data_encoding__Encoding.raw_splitted ~json ~binary
+
 module Json = struct
   include Data_encoding.Json
 
