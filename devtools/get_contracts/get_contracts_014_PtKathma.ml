@@ -97,13 +97,14 @@ module Proto = struct
     let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
       8 * Obj.(reachable_words @@ repr code)
 
-    let parse_ty (ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
+    let parse_ty (raw_ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
         ~allow_contract ~allow_ticket script =
       let open Result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ ty, _ =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
-             (Obj.magic ctxt)
+             ctxt
              ~legacy:true
              ~allow_lazy_storage
              ~allow_operation
@@ -113,12 +114,13 @@ module Proto = struct
       in
       ty
 
-    let parse_data (ctxt : Raw_context.t) ~allow_forged ty expr =
+    let parse_data (raw_ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ data, _ =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
-             (Obj.magic ctxt)
+             ctxt
              ~legacy:true
              ~allow_forged
              ty
@@ -126,30 +128,29 @@ module Proto = struct
       in
       data
 
-    let unparse_ty (ctxt : Raw_context.t) (Script_ir_translator.Ex_ty ty) =
+    let unparse_ty (raw_ctxt : Raw_context.t) (Script_ir_translator.Ex_ty ty) =
       let open Result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ expr, _ =
-        wrap_tzresult
-        @@ Script_ir_translator.unparse_ty ~loc:0 (Obj.magic ctxt) ty
+        wrap_tzresult @@ Script_ir_translator.unparse_ty ~loc:0 ctxt ty
       in
       expr
 
-    let parse_toplevel (ctxt : Raw_context.t) expr =
+    let parse_toplevel (raw_ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ toplevel, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel
-             (Obj.magic ctxt)
-             ~legacy:true
-             expr
+        @@ Script_ir_translator.parse_toplevel ctxt ~legacy:true expr
       in
       toplevel
 
-    let parse_code ctxt code =
+    let parse_code (raw_ctxt : Raw_context.t) code =
       let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ parsed_code, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy:true ~code
+        @@ Script_ir_translator.parse_code ctxt ~legacy:true ~code
       in
       parsed_code
   end
