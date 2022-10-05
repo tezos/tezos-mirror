@@ -304,6 +304,61 @@ let test_minimal_back_path () =
          (M.back_path l start target, expected_path))
        cases)
 
+let test_search_non_minimal_back_path () =
+  let basis = 2 in
+  let module M = TestNat (struct
+    let basis = basis
+  end) in
+  let l = M.nlist basis 100 in
+  let index_of_content candidate =
+    match List.find (fun (_, cell) -> cell = candidate) l.cells with
+    | None -> assert false
+    | Some (x, _) -> x
+  in
+  let deref x = match M.deref l x with None -> assert false | Some x -> x in
+  (* This target is chosen to demonstrate that the path is not always
+     minimal, but this happens only on the very last node. [target]
+     must be odd to ensure the content is not in the list. *)
+  let target = 17 in
+  let start_index = 100 in
+  let start = deref start_index in
+  (* Since we are only checking the minimality of the path returned by
+     search, we assume the other part of the [search] specification to
+     be correct below (hence the [assert false]). *)
+  match M.search l start target with
+  | M.{last_cell = Nearest {lower; upper = Some upper}; rev_path} -> (
+      match rev_path with
+      | [] ->
+          (* By specification of the function [search]. *)
+          assert false
+      | _lower :: upper_path as lower_path -> (
+          (* We check the upper path is minimal. *)
+          let upper_index = index_of_content upper in
+          match M.back_path l start_index upper_index with
+          | None ->
+              (* By specification of the function [search]. *)
+              assert false
+          | Some upper_expected_path ->
+              if List.rev upper_path = List.map deref upper_expected_path then
+                (* We check the lower path is not minimal. *)
+                let lower_index = index_of_content lower in
+                match M.back_path l start_index lower_index with
+                | None ->
+                    (* By specification of the function [search]. *)
+                    assert false
+                | Some lower_expected_path ->
+                    if List.rev lower_path = List.map deref lower_expected_path
+                    then
+                      failwith
+                        "The path returned is minimal while it should not be \
+                         the case."
+                    else return ()
+              else (* By specification of the function [search]. *)
+                assert false))
+  | _ ->
+      (* The cell does not exist in the list. *)
+      assert false
+
 let test_skip_list_nat_check_path_with_search (basis, i, j) =
   let module M = TestNat (struct
     let basis = basis
@@ -369,4 +424,10 @@ let tests =
         let* i = 0 -- 10 in
         return (basis, i))
       test_skip_list_nat_check_invalid_path_with_search;
+    (* We cheat here to avoid mixing non-pbt tests with pbt tests. *)
+    Tztest.tztest_qcheck2
+      ~name:"Skip list: `seearch` may not produce minimal path"
+      ~count:10
+      QCheck2.Gen.unit
+      test_search_non_minimal_back_path;
   ]
