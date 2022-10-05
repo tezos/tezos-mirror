@@ -3,15 +3,17 @@
 usage () {
     cat >&2 <<!EOF
 usage:
-  $0 [<branch>]
+  $0 [<repo> <branch>]
 !EOF
 }
 
-if [ $# -eq 1 ];
+if [ $# -eq 2 ];
 then
-  BRANCH=$1
+  REPO=$1
+  BRANCH=$2
 elif [ $# -eq 0 ]
 then
+  REPO="tezos/tezos"
   BRANCH="latest-release"
 else
   usage
@@ -102,7 +104,7 @@ poetry --version # should output 1.1.13
 ##
 ## Test installing Octez python development dependencies
 ##
-git clone "$CI_REPOSITORY_URL" --depth 1 --branch "$BRANCH"
+git clone --depth 1 --branch "$BRANCH" https://gitlab.com/"$REPO".git tezos
 
 # [install octez python dev-dependencies]
 cd tezos
