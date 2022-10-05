@@ -135,17 +135,23 @@ let stop proof =
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   P.proof_stop_state P.proof
 
-(* This takes an [input] and checks if it is at or above the given level.
+(* This takes an [input] and checks if it is at or above the given level,
+   and if it is at or below the origination level for this rollup.
    It returns [None] if this is the case.
 
    We use this to check that the PVM proof is obeying [commit_level]
    correctly---if the message obtained from the inbox proof is at or
    above [commit_level] the [input_given] in the PVM proof should be
    [None]. *)
-let cut_at_level level (input : Sc_rollup_PVM_sig.input) =
+let cut_at_level ~origination_level ~commit_level
+    (input : Sc_rollup_PVM_sig.input) =
   match input with
   | Inbox_message {inbox_level = input_level; _} ->
-      if Raw_level_repr.(level <= input_level) then None else Some input
+      if
+        Raw_level_repr.(
+          input_level <= origination_level || commit_level <= input_level)
+      then None
+      else Some input
   | Reveal _data -> Some input
 
 let proof_error reason =
@@ -179,7 +185,11 @@ let valid ~metadata snapshot commit_level ~pvm_name proof =
     | Some (Reveal_proof Metadata_proof) ->
         return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
   in
-  let input = Option.bind input (cut_at_level commit_level) in
+  let input =
+    Option.bind
+      input
+      (cut_at_level ~origination_level:metadata.origination_level ~commit_level)
+  in
   let* input_requested = P.verify_proof input P.proof in
   let* () =
     match (proof.input_proof, input_requested) with
@@ -286,7 +296,11 @@ let produce ~metadata pvm_and_state commit_level =
           ( Some (Reveal_proof Metadata_proof),
             Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
   in
-  let input_given = Option.bind input_given (cut_at_level commit_level) in
+  let input_given =
+    Option.bind
+      input_given
+      (cut_at_level ~origination_level:metadata.origination_level ~commit_level)
+  in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in
   let module P_with_proof = struct
     include P
