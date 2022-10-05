@@ -113,12 +113,11 @@ module Proto = struct
       in
       ty
 
-    let parse_data ?type_logger (ctxt : Raw_context.t) ~allow_forged ty expr =
+    let parse_data (ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
       let+ data, _ =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
-             ?type_logger
              (Obj.magic ctxt)
              ~legacy:true
              ~allow_forged
