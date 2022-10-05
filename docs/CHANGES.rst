@@ -3,6 +3,16 @@
 Changelog
 '''''''''
 
+Version 14.1
+============
+
+- Fixed a number of issues with JSON encodings.
+
+- Removed Giganode from the list of bootstrap peers for Mainnet.
+
+- Add third user-activated upgrade to the ``--network ghostnet`` built-in
+  network alias (at level 1191936 for Kathmandu).
+
 Version 14.0
 ============
 

@@ -1,7 +1,7 @@
-Version 14.0
+Version 14.1
 ============
 
-Version 14.0 contains a new version (V6) of the protocol environment,
+Version 14.1 contains a new version (V6) of the protocol environment,
 which is the set of functions that a protocol can call. This new
 version is used by protocol Kathmandu, which is a proposal for the
 successor of Jakarta. This release also contains Kathmandu itself as
@@ -16,6 +16,9 @@ the storage format. Run ``tezos-node upgrade storage`` to update your
 storage. This upgrade is instantaneous but the data-directory can no
 longer be used with version 13.0 once upgraded.
 
+Version 14.1 fixes a number of issues with JSON encodings
+and updates built-in network aliases.
+
 Update Instructions
 -------------------
 
@@ -24,7 +27,7 @@ To update from sources::
   # Removes tezos folder from PATH if added with Octez <= v13 instructions
   PATH=${PATH##"$HOME"/tezos/:}
   git fetch
-  git checkout v14.0
+  git checkout v14.1
   opam switch remove .
   rm -rf _opam _build
   make build-deps
@@ -34,8 +37,9 @@ To update from sources::
 .. note::
 
    Note that ``opam switch remove .`` is only needed if you are
-   updating an already compiled repository, not if you are compiling
-   from a freshly cloned repository. This command is needed because
+   updating an already compiled repository of Octez v13.0 or older,
+   not if you are compiling from a freshly cloned repository or if you are
+   upgrading from Octez v14.0. This command is needed because
    Octez now requires OCaml 4.14.0.
 
 .. warning::
@@ -55,10 +59,11 @@ To update from sources::
      make: opam: Permission denied
      Makefile:53: *** Unexpected opam version (found: , expected: 2.*).  Stop.
 
-If you are using Docker instead, use the ``v14.0`` Docker images of Tezos.
+If you are using Docker instead, use the ``v14.1`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 14.1 <../CHANGES.html#version-14-1>`_
 - `Version 14.0 <../CHANGES.html#version-14-0>`_
 - `Version 14.0~rc1 <../CHANGES.html#version-14-0-rc1>`_
