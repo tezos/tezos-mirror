@@ -4,6 +4,10 @@ Installation troubleshooting
 This page groups information about known problems when installing Tezos (more precisely, the "Octez" implementation of Tezos software).
 The different issues and their solutions are grouped per installation method, except for generic issues concerning all installation scenarios.
 
+This page lists only the most frequent problems.
+If you don't find your problem in this page, chances are that the problem is too specific.
+Consult the :doc:`./support` sources (e.g. the Tezos Stack Exchange), to see if others have encountered a similar problem, and whether a solution is known.
+
 Generic issues
 --------------
 
