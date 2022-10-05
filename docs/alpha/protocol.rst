@@ -90,3 +90,13 @@ Sapling, etc), and some details about its implementation.
    :maxdepth: 2
 
    event
+
+.. toctree::
+   :maxdepth: 2
+
+   blocks_ops
+
+.. toctree::
+   :maxdepth: 2
+
+   validation

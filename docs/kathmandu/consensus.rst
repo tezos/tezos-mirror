@@ -448,6 +448,11 @@ Consensus related protocol parameters
 Shell-protocol interaction revisited
 ------------------------------------
 
+.. FIXME tezos/tezos#3914:
+
+   Integrate protocol-specific block parts in the blocks and ops
+   entry.
+
 :ref:`Recall<shell_proto_interact_kathmandu>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
 Namely, these two notions are the protocol-specific header and the fitness.
 As in Emmy*, the protocol-specific header contains the fields:
