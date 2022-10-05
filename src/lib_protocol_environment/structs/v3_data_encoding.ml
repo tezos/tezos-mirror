@@ -41,12 +41,13 @@ module Encoding = struct
               (module Repr)
               (Json.construct encoding r)
         | None ->
-            Repr.repr
-              (`O
-                [
-                  ( "unparsed-binary",
-                    Repr.repr `Null );
-                ])
+            apply_lazy
+              ~fun_value:(fun _ -> assert false)
+              ~fun_bytes:(fun b ->
+                let (`Hex h) = Hex.of_bytes b in
+                Repr.repr (`O [("unparsed-binary", Repr.repr (`String h))]))
+              ~fun_combine:(fun _ _ -> assert false)
+              le
       in
       let read (type value)
           (module Repr : Json_repr.Repr with type value = value) j =
@@ -73,12 +74,13 @@ let lazy_encoding encoding =
             (module Repr)
             (Json.construct encoding r)
       | None ->
-          Repr.repr
-            (`O
-              [
-                ( "unparsed-binary",
-                  Repr.repr `Null );
-              ])
+          apply_lazy
+            ~fun_value:(fun _ -> assert false)
+            ~fun_bytes:(fun b ->
+              let (`Hex h) = Hex.of_bytes b in
+              Repr.repr (`O [("unparsed-binary", Repr.repr (`String h))]))
+            ~fun_combine:(fun _ _ -> assert false)
+            le
     in
     let read (type value) (module Repr : Json_repr.Repr with type value = value)
         j =
