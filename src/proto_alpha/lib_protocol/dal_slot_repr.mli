@@ -74,12 +74,7 @@ module Index : sig
 
   val max_value : t
 
-  (** [of_int n] constructs a`Slot_index.t`
-      May fail with:
-     {ul
-       {li [Dal_invalid_slot_header n] if [n] is either negative or greater than [max_slot_value].}
-     }
-    *)
+  (** [of_int n] constructs a`Slot_index.t` *)
   val of_int : int -> t option
 
   val to_int : t -> int
