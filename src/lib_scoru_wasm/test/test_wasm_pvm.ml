@@ -545,6 +545,192 @@ let test_durable_store_io () =
   assert (expected = value) ;
   return_unit
 
+let test_kernel_reboot_gen max_reboot expected_reboots =
+  let open Lwt_result_syntax in
+  (* Extracted from the kernel, these are the constant values used to build the
+     initial memory and the addresses where values are stored. *)
+  let data_offset_start = 100 in
+
+  (* Durable storage: reboot key *)
+  let reboot_key = "/kernel/env/reboot" in
+  let reboot_key_length = String.length reboot_key in
+  let reboot_key_offset = data_offset_start in
+
+  (* Durable storage: reboot counter *)
+  let reboot_counter_key = "/reboot/counter" in
+  let reboot_counter_key_length = String.length reboot_counter_key in
+  let reboot_counter_key_offset = reboot_key_offset + reboot_key_length in
+
+  (* Memory only: reboot flag and reboot counter *)
+  let reboot_flag_in_memory_offset =
+    reboot_counter_key_offset + reboot_counter_key_offset
+  in
+  let reboot_counter_in_memory_offset =
+    reboot_flag_in_memory_offset
+    + Tezos_webassembly_interpreter.Types.(num_size I32Type)
+    (* Number of bytes taken by the flag in memory *)
+  in
+
+  let reboot_module =
+    Format.sprintf
+      {|
+(module
+ (import "rollup_safe_core" "store_write"
+         (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
+ (import "rollup_safe_core" "store_read"
+         (func $store_read (param i32 i32 i32 i32 i32) (result i32)))
+ (import "rollup_safe_core" "store_has"
+         (func $store_has (param i32 i32) (result i32)))
+ ;; Durable keys
+ (data (i32.const %d) "%s")
+ (data (i32.const %d) "%s")
+
+ (memory 1)
+ (export "mem" (memory 0))
+
+ ;; Finds the reboot counter in the durable storage and increase it, initializes
+ ;; it otherwise.
+ (func $incr_reboot_counter
+       (param) (result i32)
+
+       (local $reboot_counter_key i32)
+       (local $reboot_counter_key_length i32)
+       (local $reboot_counter_offset i32)
+       (local $reboot_counter_value i32)
+
+       (local.set $reboot_counter_key (i32.const %d))
+       (local.set $reboot_counter_key_length (i32.const %d))
+       (local.set $reboot_counter_offset (i32.const %d))
+       (local.set $reboot_counter_value (i32.const 0)) ;; initial value of the counter
+
+       ;; First check the counter exists in the durable storage
+       (call $store_has
+             (local.get $reboot_counter_key)
+             (local.get $reboot_counter_key_length))
+       ;; if store_has returns `1`, the key exists with a value without
+       ;; subtrees, that's exactly what we expect.
+       (i32.const 1)
+       (i32.eq)
+
+       (if
+        ;; if it exists, load it and increment it into $reboot_counter_value
+        (then
+         (call $store_read
+               (local.get $reboot_counter_key)
+               (local.get $reboot_counter_key_length)
+               (i32.const 0) ;; value at offset 0 in the durable storage
+               (local.get $reboot_counter_offset)
+               (i32.const 4)) ;; we expect at most 4 bytes, since the counter is
+                              ;; an i32 in V128 encoding)
+         (drop) ;; we drop the number of bytes read
+         (local.set $reboot_counter_value
+                    (i32.add (i32.load (local.get $reboot_counter_offset))
+                             (i32.const 1)))
+         )
+        )
+       (i32.store (local.get $reboot_counter_offset)
+                  (local.get $reboot_counter_value))
+       (call $store_write
+             (local.get $reboot_counter_key)
+             (local.get $reboot_counter_key_length)
+             (i32.const 0) ;; value at offset 0 in the durable storage
+             (local.get $reboot_counter_offset)
+             (i32.const 4)) ;; we expect at most 4 bytes, since the counter is
+                            ;; an i32 in V128 encoding
+       (drop)
+       (local.get $reboot_counter_value)
+       )
+
+ (func (export "kernel_next")
+       (local $reboot_flag_key i32)
+       (local $reboot_flag_length i32)
+       (local $reboot_flag_value_offset i32)
+       (local $reboot_flag_value i32)
+       (local $reboot_max i32)
+
+       (local.set $reboot_flag_key (i32.const %d))
+       (local.set $reboot_flag_length (i32.const %d))
+       (local.set $reboot_flag_value_offset (i32.const %d))
+       (local.set $reboot_max (i32.const %ld))
+
+       ;; first increase the reboot counter; and put the counter on the stack
+       (call $incr_reboot_counter)
+       ;; determine the reboot flag: if it is lesser than the maximum then
+       ;; reboot, otherwise don't reboot
+       (local.get $reboot_max)
+       (i32.lt_s)
+       ;; set the reboot flag
+       (if
+        (then
+         (call $store_write
+               (local.get $reboot_flag_key)
+               (local.get $reboot_flag_length)
+               (i32.const 0)
+               (local.get $reboot_flag_value)
+               (i32.const 4));; we expect at most 4 bytes, since the counter is
+                             ;; an i32 in V128 encoding
+         (drop))
+       )
+
+       ;; explicitely do nothing
+       (nop)
+       )
+ )
+|}
+      (* Data section *)
+      reboot_key_offset
+      reboot_key
+      reboot_counter_key_offset
+      reboot_counter_key
+      (* `incr_counter` function *)
+      reboot_counter_key_offset
+      reboot_counter_key_length
+      reboot_counter_in_memory_offset
+      (* `kernel_next` function *)
+      data_offset_start (* == reboot_key's offset *)
+      reboot_key_length
+      reboot_flag_in_memory_offset
+      max_reboot
+  in
+  (* Let's first init the tree to compute. *)
+  let*! tree = initial_tree ~from_binary:false reboot_module in
+  let*! tree = eval_until_input_requested tree in
+  let*! tree = set_input_step "dummy_input" 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
+
+  (* If the expected number of reboots from the PVM is lower than the maximum
+     asked by the kernel itself, this should lead to a stuck state with
+     `Too_many_reboots`. *)
+  if max_reboot <= expected_reboots then assert (not @@ is_stuck state)
+  else assert (is_stuck ~step:`Too_many_reboots state) ;
+
+  let*! durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let*! value =
+    Durable.find_value durable (Durable.key_of_string_exn "/reboot/counter")
+  in
+  match value with
+  | None ->
+      failwith
+        "Evaluation error: couldn't find the reboot counter in the durable \
+         storage"
+  | Some value ->
+      let*! value = Tezos_lazy_containers.Chunked_byte_vector.to_bytes value in
+      (* WASM Values in memories are encoded in little-endian order. *)
+      let value = Bytes.get_int32_le value 0 in
+      assert (value = expected_reboots) ;
+      return_unit
+
+let test_kernel_reboot () =
+  (* The kernel doesn't accept more than 10 reboots between two inputs, this test will succeed. *)
+  test_kernel_reboot_gen 5l 5l
+
+let test_kernel_reboot_failing () =
+  (* The kernel doesn't accept more than 10 reboots between two inputs, it will
+     then fail after 10. *)
+  test_kernel_reboot_gen 15l 10l
+
 let tests =
   [
     tztest
@@ -598,4 +784,9 @@ let tests =
       test_invalid_key_truncated;
     tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
     tztest "Test durable store io" `Quick test_durable_store_io;
+    tztest "Test reboot" `Quick test_kernel_reboot;
+    tztest
+      "Test reboot takes too many reboots"
+      `Quick
+      test_kernel_reboot_failing;
   ]
