@@ -120,6 +120,13 @@ module type PROTOCOL = sig
     val parse_toplevel : context -> Script.expr -> toplevel tzresult Lwt.t
 
     val parse_code : context -> Script.lazy_expr -> ex_code tzresult Lwt.t
+
+    val parse_data :
+      context ->
+      allow_forged:bool ->
+      ('a, 'b) ty ->
+      Script.node ->
+      'a tzresult Lwt.t
   end
 
   module Storage : sig
