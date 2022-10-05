@@ -229,11 +229,11 @@ module Common = struct
     state.num_ticks
 end
 
-module Make (Interpreter : Interpreter.S) = struct
-  module PVM = Interpreter.PVM
+module Make (Simulation : Simulation.S) = struct
+  module PVM = Simulation.PVM
+  module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
   module Free_pvm = Interpreter.Free_pvm
-  module Simulation = Simulation.Make (Interpreter)
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in

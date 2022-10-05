@@ -25,8 +25,8 @@
 
 open Tezos_rpc_http_server
 
-(** Functor to construct an RPC server for a given PVM with interpreter. *)
-module Make (Interpreter : Interpreter.S) : sig
+(** Functor to construct an RPC server for a given PVM with simulation. *)
+module Make (Simulation : Simulation.S) : sig
   (** [start node_ctxt config] starts an RPC server listening for requests on
       the port [config.rpc_port] and address [config.rpc_addr]. *)
   val start :
