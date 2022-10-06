@@ -210,6 +210,11 @@ let is_error ~loc ~pp = function
   | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc
   | Error _ -> return_unit
 
+let get_ok ~__LOC__ = function
+  | Ok r -> return r
+  | Error err ->
+      failwith "@[Unexpected error (%s): %a@]" __LOC__ pp_print_trace err
+
 open Context
 
 (* Some asserts for account operations *)

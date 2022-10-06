@@ -2818,9 +2818,11 @@ module Dal : sig
       val equal : int -> int -> bool
     end
 
-    type t = {slot_index : Slot_index.t; page_index : Index.t}
+    type t
 
     val content_encoding : content Data_encoding.t
+
+    type proof = Dal.page_proof
 
     val encoding : t Data_encoding.t
 

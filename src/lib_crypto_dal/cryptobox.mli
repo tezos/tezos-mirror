@@ -61,14 +61,20 @@ type t
 
 type commitment
 
+type page_proof
+
 module Verifier :
-  VERIFIER with type parameters = parameters and type commitment = commitment
+  VERIFIER
+    with type parameters = parameters
+     and type commitment = commitment
+     and type page_proof = page_proof
 
 include
   VERIFIER
     with type t := t
      and type parameters := parameters
      and type commitment := commitment
+     and type page_proof := page_proof
 
 (** The primitives exposed in this modules require some
    preprocessing. This preprocessing generates data from an unknown
@@ -212,4 +218,7 @@ module Internal_for_tests : sig
      from test frameworks where tests with various parameters could be
      run using the same binary. *)
   val load_parameters : initialisation_parameters -> unit
+
+  (** [parameters t] returns the parameters with which [t] was initialized. *)
+  val parameters : t -> parameters
 end
