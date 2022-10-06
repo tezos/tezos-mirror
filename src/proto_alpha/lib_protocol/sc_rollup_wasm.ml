@@ -305,6 +305,14 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step (Bytes.of_string data) s) in
           set s
+      | PS.Reveal (PS.Metadata _) ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3890
+
+               The WASM PVM does not produce [Needs_metadata] input
+               requests.  Thus, no [set_input_state] should transmit a
+               [Metadata].
+          *)
+          assert false
 
     let set_input input = state_of @@ set_input_state input
 

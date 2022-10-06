@@ -270,9 +270,9 @@ let test_invalid_serialized_inbox_proof () =
   let open Lwt_result_syntax in
   let open Alpha_context in
   let* ctxt = Test_sc_rollup_inbox.create_context () in
-  let*! inbox =
-    Sc_rollup.Inbox.empty ctxt Sc_rollup.Address.zero Raw_level.(succ root)
-  in
+  let rollup = Sc_rollup.Address.zero in
+  let level = Raw_level.(succ root) in
+  let*! inbox = Sc_rollup.Inbox.empty ctxt rollup level in
   let snapshot =
     Sc_rollup.Inbox.take_snapshot
       ~current_level:(Raw_level.of_int32_exn 42l)
@@ -308,9 +308,17 @@ let test_invalid_serialized_inbox_proof () =
     Sc_rollup.Proof.{pvm_step = wrapped_proof; input_proof = Some inbox_proof}
   in
 
+  let metadata =
+    Sc_rollup.Metadata.{address = rollup; origination_level = level}
+  in
   let*! res =
     T.lift
-    @@ Sc_rollup.Proof.valid snapshot Raw_level.root ~pvm_name:"arith" proof
+    @@ Sc_rollup.Proof.valid
+         ~metadata
+         snapshot
+         Raw_level.root
+         ~pvm_name:"arith"
+         proof
   in
   Assert.proto_error
     ~loc:__LOC__

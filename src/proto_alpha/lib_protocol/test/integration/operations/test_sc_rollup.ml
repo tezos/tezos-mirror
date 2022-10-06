@@ -1862,6 +1862,150 @@ let test_dissection_during_final_move () =
   let* _incr = Incremental.add_operation ~expect_apply_failure incr p2_op in
   return_unit
 
+let init_arith_state ~boot_sector =
+  let open Lwt_syntax in
+  let context = Tezos_context_memory.make_empty_context () in
+  let* state = Arith_pvm.initial_state context in
+  let* state = Arith_pvm.install_boot_sector state boot_sector in
+  return (context, state)
+
+let make_arith_state ?(boot_sector = "") metadata =
+  let open Lwt_syntax in
+  let* _context, state = init_arith_state ~boot_sector in
+  let* state_hash1 = Arith_pvm.state_hash state in
+
+  (* 1. We evaluate the boot sector. *)
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.No_input_required) ;
+  let* state = Arith_pvm.eval state in
+  let* state_hash2 = Arith_pvm.state_hash state in
+  (* 2. The state now needs the metadata. *)
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.Needs_reveal Reveal_metadata) ;
+  (* 3. We feed the state with the metadata. *)
+  let input = Sc_rollup.(Reveal (Metadata metadata)) in
+  let* state = Arith_pvm.set_input input state in
+  let* state_hash3 = Arith_pvm.state_hash state in
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.Initial) ;
+
+  return (state_hash1, state_hash2, state_hash3)
+
+let make_refutation_metadata ?(boot_sector = "") metadata =
+  let open Lwt_syntax in
+  let* context, state = init_arith_state ~boot_sector in
+  (* We will prove the tick after the evaluation of the boot sector. *)
+  let* state = Arith_pvm.eval state in
+  let input = Sc_rollup.(Reveal (Metadata metadata)) in
+  let* proof = Arith_pvm.produce_proof context (Some input) state in
+  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+  let wrapped_proof =
+    Sc_rollup.Arith_pvm_with_proof
+      (module struct
+        include Arith_pvm
+
+        let proof = proof
+      end)
+  in
+  let choice = Sc_rollup.Tick.(next initial) in
+  let step : Sc_rollup.Game.step =
+    let pvm_step = wrapped_proof in
+    let input_proof = Some Sc_rollup.Proof.(Reveal_proof Metadata_proof) in
+    Proof {pvm_step; input_proof}
+  in
+  return Sc_rollup.Game.{choice; step}
+
+(** Test that during a refutation game when one malicious player lied on the
+    metadata, he can not win the game. *)
+let test_refute_invalid_metadata () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let predecessor = genesis_info.commitment_hash in
+
+  let post_commitment_from_metadata block account metadata =
+    let*! state1, state2, state3 = make_arith_state metadata in
+    let commitment : Sc_rollup.Commitment.t =
+      {
+        predecessor;
+        inbox_level = Raw_level.of_int32_exn 31l;
+        number_of_ticks = number_of_ticks_exn 2L;
+        compressed_state = state3;
+      }
+    in
+    let* block = add_publish ~rollup block account commitment in
+    return (block, state1, state2, state3)
+  in
+
+  (* [account1] will play a valid commitment with the correct evaluation of
+     the [metadata]. *)
+  let valid_metadata =
+    Sc_rollup.Metadata.
+      {address = rollup; origination_level = Raw_level.(succ root)}
+  in
+  let* block, state1, state2, state3 =
+    post_commitment_from_metadata block account1 valid_metadata
+  in
+
+  (* [account2] will play an invalid commitment with an invalid metadata. *)
+  let invalid_metadata =
+    {valid_metadata with origination_level = Raw_level.of_int32_exn 42l}
+  in
+  let* block, _, _, _ =
+    post_commitment_from_metadata block account2 invalid_metadata
+  in
+
+  (* [account1] starts a refutation game. It will provide a dissection
+     that will directly allow a final move. It's a bit hack-ish, but we
+     know which tick we want to refute.
+  *)
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  let dissection : Sc_rollup.Game.refutation =
+    let choice = Sc_rollup.Tick.initial in
+    let step : Sc_rollup.Game.step =
+      let zero = Sc_rollup.Tick.initial in
+      let one = Sc_rollup.Tick.next zero in
+      let two = Sc_rollup.Tick.next one in
+      Dissection
+        [
+          {tick = zero; state_hash = Some state1};
+          {tick = one; state_hash = Some state2};
+          {tick = two; state_hash = Some state3};
+        ]
+    in
+    {choice; step}
+  in
+  let* dissection_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some dissection)
+  in
+  let* block = add_op block dissection_op in
+
+  (* [account2] will play an invalid proof about the invalid metadata. *)
+  let*! proof = make_refutation_metadata invalid_metadata in
+  let* proof1_op =
+    Op.sc_rollup_refute (B block) account2 rollup pkh1 (Some proof)
+  in
+  let* block = add_op block proof1_op in
+
+  (* We can implicitely check that [proof1_op] was invalid if
+     [account1] wins the game. *)
+  let*! proof = make_refutation_metadata valid_metadata in
+  let* incr = Incremental.begin_construction block in
+  let* proof2_op =
+    Op.sc_rollup_refute (I incr) account1 rollup pkh2 (Some proof)
+  in
+  let* incr = Incremental.add_operation incr proof2_op in
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended (Loser {reason = Conflict_resolved; loser = pkh2})
+  in
+  assert_refute_result ~game_status:expected_game_status incr
+
 let tests =
   [
     Tztest.tztest
@@ -1963,4 +2107,8 @@ let tests =
       "Cannot play a dissection when the final move has started"
       `Quick
       test_dissection_during_final_move;
+    Tztest.tztest
+      "Invalid metadata initialization can be refuted"
+      `Quick
+      test_refute_invalid_metadata;
   ]

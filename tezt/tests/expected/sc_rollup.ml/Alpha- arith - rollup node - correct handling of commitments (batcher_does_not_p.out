@@ -2622,7 +2622,7 @@ This sequence of operations was run:
         "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": "5116" },
+      "number_of_ticks": "5117" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }
 

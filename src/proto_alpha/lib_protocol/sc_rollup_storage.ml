@@ -53,16 +53,16 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
     Sc_rollup_commitment_storage.hash ctxt genesis_commitment
   in
   let*? ctxt, nonce = Raw_context.increment_origination_nonce ctxt in
-  let level = Raw_context.current_level ctxt in
   let*? ctxt, address = address_from_nonce ctxt nonce in
   let* ctxt, pvm_kind_size, _kind_existed =
     Store.PVM_kind.add ctxt address kind
   in
+  let origination_level = (Raw_context.current_level ctxt).level in
   let* ctxt, genesis_info_size, _info_existed =
     Store.Genesis_info.add
       ctxt
       address
-      {commitment_hash = genesis_commitment_hash; level = level.level}
+      {commitment_hash = genesis_commitment_hash; level = origination_level}
   in
   let* ctxt, boot_sector_size, _sector_existed =
     Store.Boot_sector.add ctxt address boot_sector
@@ -71,7 +71,10 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
     Store.Parameters_type.add ctxt address parameters_ty
   in
   let*! inbox =
-    Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) address level.level
+    Sc_rollup_inbox_repr.empty
+      (Raw_context.recover ctxt)
+      address
+      origination_level
   in
   let* ctxt, inbox_size_diff = Store.Inbox.init ctxt address inbox in
   let* ctxt, lcc_size_diff =
@@ -91,7 +94,7 @@ let originate ctxt ~kind ~boot_sector ~parameters_ty ~genesis_commitment =
     Store.Commitment_added.add
       (ctxt, address)
       genesis_commitment_hash
-      level.level
+      origination_level
   in
   (* This store [Store.Commitment_added] is going to be used to look this
      bootstrap commitment. This commitment is added here so the
@@ -137,6 +140,14 @@ let genesis_info ctxt rollup =
   match genesis_info with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some genesis_info -> return (ctxt, genesis_info)
+
+let get_metadata ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, genesis_info = genesis_info ctxt rollup in
+  let metadata : Sc_rollup_metadata_repr.t =
+    {address = rollup; origination_level = genesis_info.level}
+  in
+  return (ctxt, metadata)
 
 let get_boot_sector ctxt rollup =
   let open Lwt_tzresult_syntax in

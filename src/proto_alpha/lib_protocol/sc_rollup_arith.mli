@@ -84,6 +84,7 @@ module type S = sig
     | Halted
     | Waiting_for_input_message
     | Waiting_for_reveal
+    | Waiting_for_metadata
     | Parsing
     | Evaluating
 

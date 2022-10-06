@@ -46,6 +46,7 @@
         "Entrypoint_repr",
         "Bounded_history_repr",
         "Sc_rollup_repr",
+        "Sc_rollup_metadata_repr",
         "Sc_rollup_tick_repr",
         "Sc_rollup_inbox_message_repr",
         "Sc_rollup_outbox_message_repr",
@@ -170,8 +171,8 @@
         "Sc_rollup_inbox_storage",
         "Sc_rollup_outbox_storage",
         "Sc_rollup_stake_storage",
-        "Sc_rollup_refutation_storage",
         "Sc_rollup_storage",
+        "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
         "Dal_slot_storage",

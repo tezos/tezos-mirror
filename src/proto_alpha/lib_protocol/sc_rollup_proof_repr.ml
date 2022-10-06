@@ -49,7 +49,7 @@ let () =
     (function Sc_rollup_invalid_serialized_inbox_proof -> Some () | _ -> None)
     (fun () -> Sc_rollup_invalid_serialized_inbox_proof)
 
-type reveal_proof = Raw_data_proof of string
+type reveal_proof = Raw_data_proof of string | Metadata_proof
 
 let reveal_proof_encoding =
   let open Data_encoding in
@@ -62,10 +62,17 @@ let reveal_proof_encoding =
          (req
             "raw_data"
             (check_size Constants_repr.sc_rollup_message_size_limit bytes)))
-      (function Raw_data_proof s -> Some ((), Bytes.of_string s))
+      (function Raw_data_proof s -> Some ((), Bytes.of_string s) | _ -> None)
       (fun ((), s) -> Raw_data_proof (Bytes.to_string s))
+  and case_metadata_proof =
+    case
+      ~title:"metadata proof"
+      (Tag 1)
+      (obj1 (req "reveal_proof_kind" (constant "metadata_proof")))
+      (function Metadata_proof -> Some () | _ -> None)
+      (fun () -> Metadata_proof)
   in
-  union [case_raw_data]
+  union [case_raw_data; case_metadata_proof]
 
 type input_proof =
   | Inbox_proof of {
@@ -77,12 +84,13 @@ type input_proof =
 
 let input_proof_encoding =
   let open Data_encoding in
+  let proof_kind kind = req "input_proof_kind" (constant kind) in
   let case_inbox_proof =
     case
       ~title:"inbox proof"
       (Tag 0)
       (obj4
-         (req "input_proof_kind" (constant "inbox_proof"))
+         (proof_kind "inbox_proof")
          (req "level" Raw_level_repr.encoding)
          (req "message_counter" Data_encoding.n)
          (req "serialized_proof" Sc_rollup_inbox_repr.serialized_proof_encoding))
@@ -98,11 +106,12 @@ let input_proof_encoding =
       ~title:"reveal proof"
       (Tag 1)
       (obj2
-         (req "input_proof_kind" (constant "reveal_proof"))
+         (proof_kind "reveal_proof")
          (req "reveal_proof" reveal_proof_encoding))
       (function Reveal_proof s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_proof s)
   in
+
   union [case_inbox_proof; case_reveal_proof]
 
 type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
@@ -153,7 +162,7 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
-let valid snapshot commit_level ~pvm_name proof =
+let valid ~metadata snapshot commit_level ~pvm_name proof =
   let open Lwt_tzresult_syntax in
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
@@ -167,6 +176,8 @@ let valid snapshot commit_level ~pvm_name proof =
         Option.map (fun i -> Sc_rollup_PVM_sig.Inbox_message i) inbox_message
     | Some (Reveal_proof (Raw_data_proof data)) ->
         return_some (Sc_rollup_PVM_sig.Reveal (Raw_data data))
+    | Some (Reveal_proof Metadata_proof) ->
+        return_some (Sc_rollup_PVM_sig.Reveal (Metadata metadata))
   in
   let input = Option.bind input (cut_at_level commit_level) in
   let* input_requested = P.verify_proof input P.proof in
@@ -189,11 +200,9 @@ let valid snapshot commit_level ~pvm_name proof =
         check
           (Sc_rollup_PVM_sig.Input_hash.equal data_hash expected_hash)
           "Invalid reveal"
-    | None, (Initial | First_after _ | Needs_reveal _)
-    | Some _, No_input_required
-    | Some (Inbox_proof _), Needs_reveal _
-    | Some (Reveal_proof _), (Initial | First_after _) ->
-        proof_error "Inbox proof and input request are dissociated."
+    | Some (Reveal_proof Metadata_proof), Needs_reveal Reveal_metadata ->
+        return_unit
+    | _ -> proof_error "Inbox proof and input request are dissociated."
   in
   return (input, input_requested)
 
@@ -219,7 +228,7 @@ module type PVM_with_context_and_state = sig
   end
 end
 
-let produce pvm_and_state commit_level =
+let produce ~metadata pvm_and_state commit_level =
   let open Lwt_tzresult_syntax in
   let (module P : PVM_with_context_and_state) = pvm_and_state in
   let open P in
@@ -272,6 +281,10 @@ let produce pvm_and_state commit_level =
             return
               ( Some (Reveal_proof (Raw_data_proof data)),
                 Some (Sc_rollup_PVM_sig.Reveal (Raw_data data)) ))
+    | Needs_reveal Reveal_metadata ->
+        return
+          ( Some (Reveal_proof Metadata_proof),
+            Some Sc_rollup_PVM_sig.(Reveal (Metadata metadata)) )
   in
   let input_given = Option.bind input_given (cut_at_level commit_level) in
   let* pvm_step_proof = P.produce_proof P.context input_given P.state in

@@ -2959,6 +2959,17 @@ module Sc_rollup : sig
     val hash_string : unreachable -> t
   end
 
+  (** See {!Sc_rollup_metadata_repr}. *)
+  module Metadata : sig
+    type t = {address : rollup; origination_level : Raw_level.t}
+
+    val pp : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+
+    val encoding : t Data_encoding.t
+  end
+
   (** See {!Sc_rollup_inbox_message_repr}. *)
   module Inbox_message : sig
     type internal_inbox_message = {
@@ -2988,7 +2999,7 @@ module Sc_rollup : sig
     payload : Inbox_message.serialized;
   }
 
-  type reveal_data = Raw_data of string
+  type reveal_data = Raw_data of string | Metadata of Metadata.t
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -2998,7 +3009,7 @@ module Sc_rollup : sig
 
   module Input_hash : S.HASH
 
-  type reveal = Reveal_raw_data of Input_hash.t
+  type reveal = Reveal_raw_data of Input_hash.t | Reveal_metadata
 
   type input_request =
     | No_input_required
@@ -3009,6 +3020,8 @@ module Sc_rollup : sig
   val input_request_encoding : input_request Data_encoding.t
 
   val input_request_equal : input_request -> input_request -> bool
+
+  val pp_input_request : Format.formatter -> input_request -> unit
 
   module Inbox : sig
     type t
@@ -3344,6 +3357,7 @@ module Sc_rollup : sig
         | Halted
         | Waiting_for_input_message
         | Waiting_for_reveal
+        | Waiting_for_metadata
         | Parsing
         | Evaluating
 
@@ -3494,7 +3508,7 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type reveal_proof = Raw_data_proof of string
+    type reveal_proof = Raw_data_proof of string | Metadata_proof
 
     type input_proof =
       | Inbox_proof of {
@@ -3529,6 +3543,7 @@ module Sc_rollup : sig
     type error += Sc_rollup_proof_check of string
 
     val valid :
+      metadata:Metadata.t ->
       Inbox.history_proof ->
       Raw_level.t ->
       pvm_name:string ->
@@ -3536,7 +3551,10 @@ module Sc_rollup : sig
       (input option * input_request) tzresult Lwt.t
 
     val produce :
-      (module PVM_with_context_and_state) -> Raw_level.t -> t tzresult Lwt.t
+      metadata:Metadata.t ->
+      (module PVM_with_context_and_state) ->
+      Raw_level.t ->
+      t tzresult Lwt.t
   end
 
   module Game : sig
@@ -3632,6 +3650,7 @@ module Sc_rollup : sig
 
     val play :
       stakers:Index.t ->
+      Metadata.t ->
       t ->
       refutation ->
       (game_result, t) Either.t tzresult Lwt.t

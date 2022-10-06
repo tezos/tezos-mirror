@@ -53,6 +53,7 @@ module Impl : Pvm.S = struct
     | Halted -> "Halted"
     | Waiting_for_input_message -> "Waiting for input message"
     | Waiting_for_reveal -> "Waiting for reveal"
+    | Waiting_for_metadata -> "Waiting for metadata"
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
 end

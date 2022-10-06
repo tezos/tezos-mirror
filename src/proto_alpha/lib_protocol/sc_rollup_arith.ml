@@ -130,6 +130,7 @@ module type S = sig
     | Halted
     | Waiting_for_input_message
     | Waiting_for_reveal
+    | Waiting_for_metadata
     | Parsing
     | Evaluating
 
@@ -190,6 +191,7 @@ module Make (Context : P) :
     | Halted
     | Waiting_for_input_message
     | Waiting_for_reveal
+    | Waiting_for_metadata
     | Parsing
     | Evaluating
 
@@ -581,6 +583,7 @@ module Make (Context : P) :
             ("Halted", Halted);
             ("Waiting_for_input_message", Waiting_for_input_message);
             ("Waiting_for_reveal", Waiting_for_reveal);
+            ("Waiting_for_metadata", Waiting_for_metadata);
             ("Parsing", Parsing);
             ("Evaluating", Evaluating);
           ]
@@ -591,6 +594,7 @@ module Make (Context : P) :
         | Halted -> "Halted"
         | Waiting_for_input_message -> "Waiting for input message"
         | Waiting_for_reveal -> "Waiting for reveal"
+        | Waiting_for_metadata -> "Waiting for metadata"
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
@@ -610,6 +614,21 @@ module Make (Context : P) :
         match v with
         | None -> Format.fprintf fmt "<none>"
         | Some h -> PS.Input_hash.pp fmt h
+    end)
+
+    module Metadata = Make_var (struct
+      type t = Sc_rollup_metadata_repr.t option
+
+      let initial = None
+
+      let encoding = Data_encoding.option Sc_rollup_metadata_repr.encoding
+
+      let name = "metadata"
+
+      let pp fmt v =
+        match v with
+        | None -> Format.fprintf fmt "<none>"
+        | Some v -> Sc_rollup_metadata_repr.pp fmt v
     end)
 
     module Current_level = Make_var (struct
@@ -838,7 +857,7 @@ module Make (Context : P) :
     let open Monad.Syntax in
     let* () = Status.create in
     let* () = Next_message.create in
-    let* () = Status.set Waiting_for_input_message in
+    let* () = Status.set Waiting_for_metadata in
     return ()
 
   let result_of ~default m state =
@@ -868,7 +887,8 @@ module Make (Context : P) :
         match h with
         | None -> internal_error "Internal error: Reveal invariant broken"
         | Some h -> return (PS.Needs_reveal (Reveal_raw_data h)))
-    | _ -> return PS.No_input_required
+    | Waiting_for_metadata -> return PS.(Needs_reveal Reveal_metadata)
+    | Halted | Parsing | Evaluating -> return PS.No_input_required
 
   let is_input_state =
     result_of ~default:PS.No_input_required @@ is_input_state_monadic
@@ -927,26 +947,31 @@ module Make (Context : P) :
         let* () = Status.set Waiting_for_input_message in
         return ()
 
-  let reveal_monadic (PS.Raw_data data) =
+  let reveal_monadic reveal_data =
     (*
 
        The inbox cursor is unchanged as the message comes from the
        outer world.
 
-       We don't have to check that the data hash is the one we
+       We don't have to check that the data is the one we
        expected as we decided to trust the initial witness.
 
-       It is the responsibility of the rollup node to check it if it
-       does not want to publish a wrong commitment.
-
-       Notice that a multi-page transmission is possible by embedding
-       a continuation encoded as an optional hash in [data].
+       It is the responsibility of the rollup node to check the validity
+       of the [reveal_data] if it does not want to publish a wrong commitment.
 
     *)
     let open Monad.Syntax in
-    let* () = Next_message.set (Some data) in
-    let* () = start_parsing in
-    return ()
+    match reveal_data with
+    | PS.Raw_data data ->
+        (* Notice that a multi-page transmission is possible by embedding
+           a continuation encoded as an optional hash in [data]. *)
+        let* () = Next_message.set (Some data) in
+        let* () = start_parsing in
+        return ()
+    | PS.Metadata metadata ->
+        let* () = Metadata.set (Some metadata) in
+        let* () = Status.set Waiting_for_input_message in
+        return ()
 
   let ticked m =
     let open Monad.Syntax in
@@ -1190,7 +1215,8 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | Waiting_for_input_message | Waiting_for_reveal -> (
+        | Waiting_for_input_message | Waiting_for_reveal | Waiting_for_metadata
+          -> (
             let* msg = Next_message.get in
             match msg with
             | None -> internal_error "An input state was not provided an input."
@@ -1215,14 +1241,25 @@ module Make (Context : P) :
                 (internal_error
                    "Invalid set_input: expecting inbox message, got a reveal.")
                 state)
-      | PS.Needs_reveal _hash -> (
+      | PS.Needs_reveal (Reveal_raw_data _hash) -> (
           match input_given with
-          | Some (PS.Reveal _ as input_given) -> set_input input_given state
-          | None | Some (PS.Inbox_message _) ->
+          | Some (PS.Reveal (Raw_data _) as input_given) ->
+              set_input input_given state
+          | None | Some (PS.Inbox_message _) | Some (PS.Reveal (Metadata _)) ->
               state_of
                 (internal_error
-                   "Invalid set_input: expecting a reveal, got an inbox \
-                    message.")
+                   "Invalid set_input: expecting a raw data reveal, got an \
+                    inbox message or a reveal metadata.")
+                state)
+      | PS.Needs_reveal Reveal_metadata -> (
+          match input_given with
+          | Some (PS.Reveal (Metadata _) as metadata) ->
+              set_input metadata state
+          | None | Some (PS.Reveal (Raw_data _)) | Some (PS.Inbox_message _) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting a metadata reveal, got an \
+                    inbox message or a raw data reveal.")
                 state)
     in
     return (state, request)
