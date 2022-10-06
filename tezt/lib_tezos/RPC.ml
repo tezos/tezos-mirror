@@ -39,6 +39,10 @@ end
 let make ?data ?query_string =
   make ?data ?query_string ~get_host:Node.rpc_host ~get_port:Node.rpc_port
 
+module Decode = struct
+  let mutez json = json |> JSON.as_int |> Tez.of_mutez_int
+end
+
 let get_config = make GET ["config"] Fun.id
 
 let get_network_connections =
@@ -609,7 +613,7 @@ let get_chain_block_context_contract_balance ?(chain = "main") ?(block = "head")
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "contracts"; id; "balance"]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_contract_frozen_bonds ?(chain = "main")
     ?(block = "head") ~id () =
@@ -625,7 +629,7 @@ let get_chain_block_context_contract_frozen_bonds ?(chain = "main")
       id;
       "frozen_bonds";
     ]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_contract_balance_and_frozen_bonds ?(chain = "main")
     ?(block = "head") ~id () =
@@ -641,7 +645,7 @@ let get_chain_block_context_contract_balance_and_frozen_bonds ?(chain = "main")
       id;
       "balance_and_frozen_bonds";
     ]
-    Fun.id
+    Decode.mutez
 
 let post_chain_block_context_contract_big_map_get ?(chain = "main")
     ?(block = "head") ~id ~data () =
@@ -810,7 +814,7 @@ let get_chain_block_context_delegate_current_frozen_deposits ?(chain = "main")
       pkh;
       "current_frozen_deposits";
     ]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_delegate_deactivated ?(chain = "main")
     ?(block = "head") pkh =
@@ -842,7 +846,7 @@ let get_chain_block_context_delegate_delegated_balance ?(chain = "main")
       pkh;
       "delegated_balance";
     ]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_delegate_delegated_contracts ?(chain = "main")
     ?(block = "head") pkh =
@@ -874,7 +878,7 @@ let get_chain_block_context_delegate_frozen_deposits ?(chain = "main")
       pkh;
       "frozen_deposits";
     ]
-    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
+    Decode.mutez
 
 let get_chain_block_context_delegate_frozen_deposits_limit ?(chain = "main")
     ?(block = "head") pkh =
@@ -890,7 +894,7 @@ let get_chain_block_context_delegate_frozen_deposits_limit ?(chain = "main")
       pkh;
       "frozen_deposits_limit";
     ]
-    Fun.id
+    (fun json -> json |> JSON.as_opt |> Option.map Decode.mutez)
 
 let get_chain_block_context_delegate_full_balance ?(chain = "main")
     ?(block = "head") pkh =
@@ -906,7 +910,7 @@ let get_chain_block_context_delegate_full_balance ?(chain = "main")
       pkh;
       "full_balance";
     ]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_delegate_grace_period ?(chain = "main")
     ?(block = "head") pkh =
@@ -954,7 +958,7 @@ let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
       pkh;
       "frozen_balance";
     ]
-    JSON.(fun json -> json |> as_int |> Tez.of_mutez_int)
+    Decode.mutez
 
 let get_chain_block_context_delegate_frozen_balance_by_cycle ?(chain = "main")
     ?(block = "head") pkh =
@@ -986,14 +990,14 @@ let get_chain_block_context_delegate_staking_balance ?(chain = "main")
       pkh;
       "staking_balance";
     ]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_delegate_balance ?(chain = "main") ?(block = "head")
     pkh =
   make
     GET
     ["chains"; chain; "blocks"; block; "context"; "delegates"; pkh; "balance"]
-    Fun.id
+    Decode.mutez
 
 let get_chain_block_context_delegate_voting_info ?(chain = "main")
     ?(block = "head") pkh =

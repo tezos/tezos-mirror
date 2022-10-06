@@ -678,13 +678,13 @@ module Memchecks = struct
     with_checks ~classification:`Absent ~should_propagate:false
 
   let check_balance ~__LOC__ {client; _} key amount =
-    let* json_bal =
+    let* bal =
       RPC.Client.call client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:key.Account.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     if bal <> amount then
       Test.fail
         ~__LOC__
@@ -1213,13 +1213,13 @@ module Simple_transfers = struct
       ~tags:["transaction"; "transfer"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* json_bal =
+    let* bal =
       RPC.Client.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     let* _ =
       Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
       Operation.inject_transfer
@@ -1246,13 +1246,13 @@ module Simple_transfers = struct
       ~tags:["transaction"; "transfer"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* json_bal =
+    let* bal =
       RPC.Client.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     let* _ =
       Memchecks.with_applied_checks
         ~__LOC__
@@ -1287,13 +1287,13 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* json_bal =
+    let* bal =
       RPC.Client.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     let* _ =
       Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.inject_transfer
@@ -1324,13 +1324,13 @@ module Simple_transfers = struct
     let* counter =
       Operation.get_counter nodes.main.client ~source:Constant.bootstrap2
     in
-    let* json_bal =
+    let* bal =
       RPC.Client.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     let* _ =
       Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
       Operation.inject_transfer
@@ -1359,13 +1359,13 @@ module Simple_transfers = struct
       ~tags:["transaction"; "transfer"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* json_bal =
+    let* bal =
       RPC.Client.call nodes.main.client
       @@ RPC.get_chain_block_context_contract_balance
            ~id:Constant.bootstrap2.public_key_hash
            ()
     in
-    let bal = JSON.as_int json_bal in
+    let bal = Tez.to_mutez bal in
     let* _ =
       Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.inject_transfer

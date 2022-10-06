@@ -1784,15 +1784,15 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
 type balances = {liquid : int; frozen : int}
 
 let contract_balances ~pkh client =
-  let* json_liquid =
+  let* liquid =
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_balance ~id:pkh ()
   in
-  let* frozen_json =
+  let* frozen =
     RPC.Client.call client
     @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:pkh ()
   in
-  return {liquid = JSON.as_int json_liquid; frozen = JSON.as_int frozen_json}
+  return {liquid = Tez.to_mutez liquid; frozen = Tez.to_mutez frozen}
 
 (** This helper allow to attempt recovering bond for SCORU rollup operator.
     if [expect_failure] is set to some string then, we expect the command to fail
@@ -2521,12 +2521,12 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
   let* {stake_amount; _} = get_sc_rollup_constants client in
 
   Check.(
-    (JSON.as_int honest_deposit_json = Tez.to_mutez stake_amount)
-      int
+    (honest_deposit_json = stake_amount)
+      Tez.typ
       ~error_msg:"expecting deposit for honest participant = %R, got %L") ;
   Check.(
-    (JSON.as_int loser_deposit_json = 0)
-      int
+    (loser_deposit_json = Tez.zero)
+      Tez.typ
       ~error_msg:"expecting loss for dishonest participant = %R, got %L") ;
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
