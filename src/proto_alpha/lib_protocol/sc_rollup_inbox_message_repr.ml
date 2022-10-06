@@ -61,6 +61,19 @@ type internal_inbox_message = {
   destination : Sc_rollup_repr.Address.t;
 }
 
+let internal_inbox_message_encoding =
+  let open Data_encoding in
+  conv
+    (fun {payload; sender; source; destination} ->
+      (payload, sender, source, destination))
+    (fun (payload, sender, source, destination) ->
+      {payload; sender; source; destination})
+    (obj4
+       (req "payload" Script_repr.expr_encoding)
+       (req "sender" Contract_hash.encoding)
+       (req "source" Signature.Public_key_hash.encoding)
+       (req "destination" Sc_rollup_repr.Address.encoding))
+
 type t = Internal of internal_inbox_message | External of string
 
 let encoding =
@@ -72,17 +85,11 @@ let encoding =
          case
            (Tag 0)
            ~title:"Internal"
-           (obj4
-              (req "payload" Script_repr.expr_encoding)
-              (req "sender" Contract_hash.encoding)
-              (req "source" Signature.Public_key_hash.encoding)
-              (req "destination" Sc_rollup_repr.Address.encoding))
+           internal_inbox_message_encoding
            (function
-             | Internal {payload; sender; source; destination} ->
-                 Some (payload, sender, source, destination)
+             | Internal internal_message -> Some internal_message
              | External _ -> None)
-           (fun (payload, sender, source, destination) ->
-             Internal {payload; sender; source; destination});
+           (fun internal_message -> Internal internal_message);
          case
            (Tag 1)
            ~title:"External"
