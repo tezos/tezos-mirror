@@ -932,7 +932,8 @@ module Make (Context : P) :
           | Transfer {payload; _} -> (
               match Micheline.root payload with
               | String (_, payload) -> Some payload
-              | _ -> None))
+              | _ -> None)
+          | Start_of_level -> None)
     in
     match payload with
     | Some payload ->

@@ -3011,6 +3011,7 @@ module Sc_rollup : sig
           source : public_key_hash;
           destination : t;
         }
+      | Start_of_level
 
     type t = Internal of internal_inbox_message | External of string
 

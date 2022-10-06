@@ -61,6 +61,7 @@ type internal_inbox_message =
       source : Signature.public_key_hash;
       destination : Sc_rollup_repr.Address.t;
     }
+  | Start_of_level
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
@@ -76,9 +77,16 @@ let internal_inbox_message_encoding =
            (req "destination" Sc_rollup_repr.Address.encoding))
         (function
           | Transfer {payload; sender; source; destination} ->
-              Some (payload, sender, source, destination))
+              Some (payload, sender, source, destination)
+          | _ -> None)
         (fun (payload, sender, source, destination) ->
           Transfer {payload; sender; source; destination});
+      case
+        (Tag 1)
+        ~title:"Start_of_level"
+        empty
+        (function Start_of_level -> Some () | _ -> None)
+        (fun () -> Start_of_level);
     ]
 
 type t = Internal of internal_inbox_message | External of string
