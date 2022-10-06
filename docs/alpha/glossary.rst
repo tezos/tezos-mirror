@@ -100,6 +100,14 @@ _`Double signing`
     network: an accuser_ can provide proof of the double signing to be awarded
     part of the double signer's deposit.
 
+_`Failing Noop`
+   The ``Failing_noop`` operation implements a *No-op*, which always
+   fails at :ref:`application time<operation_validity_alpha>`, and
+   should never appear in :ref:`applied
+   blocks<full_application_alpha>`. This operation allows end-users to
+   :ref:`sign arbitrary messages<failing_noop>` which have no
+   computational semantics.
+
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol, there are some
     fees that users pay to bakers for including their operations in blocks.
@@ -188,6 +196,13 @@ _`Smart Optimistic Rollups`
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+_`Validation pass`
+    An index that can be associated with different kinds of
+    operations, in order to group them into classes. Validation passes
+    enable prioritizing the :ref:`validation and
+    application<operation_validity_alpha>` of certain classes of
+    operations.
 
 _`Voting period`
     Any of the ``proposal``, ``exploration``, ``cooldown``,

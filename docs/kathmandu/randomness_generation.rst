@@ -46,6 +46,8 @@ if a malicious participant can make sure she is the last revealer, then she
 can choose whether to reveal its committed value, effectively choosing between
 two different predetermined seeds.
 
+.. _vdf_kathmandu:
+
 Verifiable Delay Function
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -74,6 +76,8 @@ cheaper and based on a weaker security assumption (low order assumption).
 
 Protocol
 --------
+
+.. _randomness_generation_kathmandu:
 
 Randomness generation overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
