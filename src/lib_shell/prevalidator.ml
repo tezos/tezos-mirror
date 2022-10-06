@@ -269,7 +269,9 @@ end
 
 (** Module type used exclusively in production. *)
 module type T = sig
-  include S
+  type types_state
+
+  val get_rpc_directory : types_state -> types_state RPC_directory.t lazy_t
 
   val name : Name.t
 
@@ -837,7 +839,16 @@ module Make_s
                 Block_hash.pp
                 op.Operation.shell.branch
             else
-              let*? validation_state = pv.validation_state in
+              let*? validation_state =
+                Result.bind_error pv.validation_state (fun err ->
+                    error_with
+                      "%s, in function [on_inject], the [validation_state] \
+                       contains the following error:@\n\
+                       %a"
+                      __LOC__
+                      Error_monad.pp_print_top_error_of_trace
+                      err)
+              in
               let notifier = mk_notifier pv.operation_stream in
               let*! filter_state, validation_state, delta_mempool, to_handle =
                 classify_operation
@@ -1074,9 +1085,13 @@ module Make
                           and type protocol_operation = Filter.Proto.operation
                           and type operation_receipt =
                            Filter.Proto.operation_receipt
-                          and type chain_store = Store.chain_store) :
-  T with type prevalidation_t = Prevalidation_t.t = struct
-  include Make_s (Filter) (Prevalidation_t)
+                          and type chain_store = Store.chain_store) : T = struct
+  module S = Make_s (Filter) (Prevalidation_t)
+  open S
+
+  type types_state = S.types_state
+
+  let get_rpc_directory pv = pv.rpc_directory
 
   let name = (Arg.chain_id, Filter.Proto.hash)
 
@@ -1646,6 +1661,22 @@ module Make
       | Lwt.Return (Error _) | Lwt.Fail _ | Lwt.Sleep -> assert false)
 end
 
+let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) : t =
+  let module Prevalidation_t = Prevalidation.Make (Filter.Proto) in
+  let module Prevalidator =
+    Make
+      (Filter)
+      (struct
+        let limits = limits
+
+        let chain_db = chain_db
+
+        let chain_id = chain_id
+      end)
+      (Prevalidation_t)
+  in
+  (module Prevalidator : T)
+
 module ChainProto_registry = Map.Make (struct
   type t = Chain_id.t * Protocol_hash.t
 
@@ -1665,25 +1696,14 @@ let create limits (module Filter : Shell_plugin.FILTER) chain_db =
     ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
-      let module Prevalidation_t = Prevalidation.Make (Filter.Proto) in
-      let module Prevalidator =
-        Make
-          (Filter)
-          (struct
-            let limits = limits
-
-            let chain_db = chain_db
-
-            let chain_id = chain_id
-          end)
-          (Prevalidation_t)
-      in
+      let prevalidator = make limits chain_db chain_id (module Filter) in
+      let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
         ChainProto_registry.add
           Prevalidator.name
-          (module Prevalidator : T)
+          prevalidator
           !chain_proto_registry ;
-      return (module Prevalidator : T)
+      return prevalidator
   | Some p -> return p
 
 let shutdown (t : t) =
@@ -1794,7 +1814,7 @@ let rpc_directory : t option RPC_directory.t =
           let module Prevalidator : T = (val t : T) in
           let w = Lazy.force Prevalidator.worker in
           let pv = Prevalidator.Worker.state w in
-          let pv_rpc_dir = Lazy.force pv.rpc_directory in
+          let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
           Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
 
 module Internal_for_tests = struct
