@@ -11,6 +11,7 @@
             qcheck-core
             tezos-time-measurement
             data-encoding
+            tezos-event-logging
             )
  (flags (:standard
           -open Tezt
@@ -19,4 +20,5 @@
           -open Tezt.Base
           -open Tezt_performance_regression
           -open Tezos_lwt_result_stdlib
+          -open Tezos_event_logging
          )))
