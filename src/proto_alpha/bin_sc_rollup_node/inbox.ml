@@ -126,7 +126,7 @@ let get_messages Node_context.{l1_ctxt; _} head =
           Environment.wrap_tzresult @@ Script_repr.force_decode parameters
         in
         let message =
-          Sc_rollup.Inbox_message.Deposit
+          Sc_rollup.Inbox_message.Transfer
             {destination = rollup; payload; sender; source}
         in
         Sc_rollup.Inbox_message.Internal message :: accu

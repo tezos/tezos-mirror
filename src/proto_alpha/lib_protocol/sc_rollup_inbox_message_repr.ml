@@ -54,25 +54,32 @@ let () =
     (function Error_decode_inbox_message -> Some () | _ -> None)
     (fun () -> Error_decode_inbox_message)
 
-type internal_inbox_message = {
-  payload : Script_repr.expr;
-  sender : Contract_hash.t;
-  source : Signature.public_key_hash;
-  destination : Sc_rollup_repr.Address.t;
-}
+type internal_inbox_message =
+  | Transfer of {
+      payload : Script_repr.expr;
+      sender : Contract_hash.t;
+      source : Signature.public_key_hash;
+      destination : Sc_rollup_repr.Address.t;
+    }
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
-  conv
-    (fun {payload; sender; source; destination} ->
-      (payload, sender, source, destination))
-    (fun (payload, sender, source, destination) ->
-      {payload; sender; source; destination})
-    (obj4
-       (req "payload" Script_repr.expr_encoding)
-       (req "sender" Contract_hash.encoding)
-       (req "source" Signature.Public_key_hash.encoding)
-       (req "destination" Sc_rollup_repr.Address.encoding))
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Transfer"
+        (obj4
+           (req "payload" Script_repr.expr_encoding)
+           (req "sender" Contract_hash.encoding)
+           (req "source" Signature.Public_key_hash.encoding)
+           (req "destination" Sc_rollup_repr.Address.encoding))
+        (function
+          | Transfer {payload; sender; source; destination} ->
+              Some (payload, sender, source, destination))
+        (fun (payload, sender, source, destination) ->
+          Transfer {payload; sender; source; destination});
+    ]
 
 type t = Internal of internal_inbox_message | External of string
 

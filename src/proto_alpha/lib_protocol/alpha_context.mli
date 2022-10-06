@@ -3004,12 +3004,13 @@ module Sc_rollup : sig
 
   (** See {!Sc_rollup_inbox_message_repr}. *)
   module Inbox_message : sig
-    type internal_inbox_message = {
-      payload : Script.expr;
-      sender : Contract_hash.t;
-      source : public_key_hash;
-      destination : t;
-    }
+    type internal_inbox_message =
+      | Transfer of {
+          payload : Script.expr;
+          sender : Contract_hash.t;
+          source : public_key_hash;
+          destination : t;
+        }
 
     type t = Internal of internal_inbox_message | External of string
 
@@ -3215,12 +3216,12 @@ module Sc_rollup : sig
     val add_external_messages :
       context -> string list -> (t * Z.t * context) tzresult Lwt.t
 
-    val add_internal_message :
+    val add_deposit :
       context ->
-      rollup ->
       payload:Script.expr ->
       sender:Contract_hash.t ->
       source:public_key_hash ->
+      destination:rollup ->
       (t * Z.t * context) tzresult Lwt.t
 
     val get_inbox : context -> (t * context) tzresult Lwt.t

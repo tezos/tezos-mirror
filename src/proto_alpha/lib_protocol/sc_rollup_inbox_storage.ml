@@ -138,11 +138,8 @@ let serialize_external_messages ctxt external_messages =
     ctxt
     external_messages
 
-let serialize_internal_message ctxt rollup ~payload ~sender ~source =
+let serialize_internal_message ctxt internal_message =
   let open Result_syntax in
-  let internal_message =
-    {Sc_rollup_inbox_message_repr.payload; sender; source; destination = rollup}
-  in
   (* Pay gas for serializing an internal message. *)
   let* ctxt =
     Raw_context.consume_gas
@@ -159,12 +156,16 @@ let add_external_messages ctxt external_messages =
   let*? ctxt, messages = serialize_external_messages ctxt external_messages in
   add_messages ctxt messages
 
-let add_internal_message ctxt rollup ~payload ~sender ~source =
+let add_internal_message ctxt internal_message =
   let open Lwt_result_syntax in
-  let*? message, ctxt =
-    serialize_internal_message ctxt ~payload ~sender ~source rollup
-  in
+  let*? message, ctxt = serialize_internal_message ctxt internal_message in
   add_messages ctxt [message]
+
+let add_deposit ctxt ~payload ~sender ~source ~destination =
+  let internal_message : Sc_rollup_inbox_message_repr.internal_inbox_message =
+    Transfer {destination; payload; sender; source}
+  in
+  add_internal_message ctxt internal_message
 
 module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages

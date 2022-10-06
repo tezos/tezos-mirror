@@ -642,9 +642,9 @@ let apply_internal_operation_contents :
       (* Adding the message to the inbox. Note that it is safe to ignore the
          size diff since only its hash and meta data are stored in the context.
          See #3232. *)
-      Sc_rollup.Inbox.add_internal_message
+      Sc_rollup.Inbox.add_deposit
         ctxt
-        destination
+        ~destination
         ~payload
         ~sender
         ~source:payer

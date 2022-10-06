@@ -127,7 +127,7 @@ let test_encode_decode_internal_inbox_message () =
   in
   let* deposit, ctxt =
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_inbox_message
+    @@ Sc_rollup_management_protocol.make_internal_deposit
          ctxt
          pair_nat_ticket_string_ty
          ~payload
@@ -142,7 +142,7 @@ let test_encode_decode_internal_inbox_message () =
   let* deposit, _ctxt =
     let open Script_typed_ir in
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_inbox_message
+    @@ Sc_rollup_management_protocol.make_internal_deposit
          ctxt
          String_t
          ~payload

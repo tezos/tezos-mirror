@@ -298,9 +298,9 @@ let test_transfer_works () =
     let ctxt = Incremental.alpha_ctxt inc in
     let payload = Expr.from_string "42" in
     let* expected_inbox_after, _size, _ctxt =
-      Sc_rollup.Inbox.add_internal_message
+      Sc_rollup.Inbox.add_deposit
         ctxt
-        rollup
+        ~destination:rollup
         ~payload
         ~sender:contract
         ~source:(Context.Contract.pkh c)
