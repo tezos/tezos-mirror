@@ -229,10 +229,8 @@ let download_and_save_slots
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.inter subscribed_slots_indexes confirmed_slots_indexes
   in
-  let number_of_pages =
-    protocol_constants.parametric.dal.slot_size
-    / protocol_constants.parametric.dal.page_size
-  in
+  let params = protocol_constants.parametric.dal.cryptobox_parameters in
+  let number_of_pages = params.slot_size / params.page_size in
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
      As part of the clean rollup storage workflow, we should make sure that
      pages for old slots are removed from the storage when not needed anymore.

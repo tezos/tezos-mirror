@@ -30,13 +30,7 @@ module Plugin = struct
     let cpctxt = new Protocol_client_context.wrap_full ctxt in
     let open Lwt_result_syntax in
     let* constants = Protocol.Constants_services.all cpctxt (chain, block) in
-    let Protocol.Alpha_context.Constants.Parametric.
-          {redundancy_factor; page_size; slot_size; number_of_shards; _} =
-      constants.parametric.dal
-    in
-    return
-      Environment.Dal.
-        {redundancy_factor; page_size; slot_size; number_of_shards}
+    return constants.parametric.dal.cryptobox_parameters
 
   let get_published_slot_headers block ctxt =
     let open Lwt_result_syntax in

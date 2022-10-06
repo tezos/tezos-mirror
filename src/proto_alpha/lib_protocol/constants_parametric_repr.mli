@@ -28,12 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  number_of_shards : int;
   endorsement_lag : int;
   availability_threshold : int;
-  slot_size : int;
-  redundancy_factor : int;
-  page_size : int;
+  cryptobox_parameters : Dal.parameters;
 }
 
 val dal_encoding : dal Data_encoding.t

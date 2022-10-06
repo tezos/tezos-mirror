@@ -773,12 +773,9 @@ module Constants : sig
     type dal = {
       feature_enable : bool;
       number_of_slots : int;
-      number_of_shards : int;
       endorsement_lag : int;
       availability_threshold : int;
-      slot_size : int;
-      redundancy_factor : int;
-      page_size : int;
+      cryptobox_parameters : Dal.parameters;
     }
 
     val dal_encoding : dal Data_encoding.t
@@ -2880,6 +2877,15 @@ module Dal : sig
 
     val add_confirmed_slots :
       t -> History_cache.t -> Slot.t list -> (t * History_cache.t) tzresult
+
+    type dal_parameters = Dal.parameters = {
+      redundancy_factor : int;
+      page_size : int;
+      slot_size : int;
+      number_of_shards : int;
+    }
+
+    type proof
   end
 
   module Slots_storage : sig

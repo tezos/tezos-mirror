@@ -256,6 +256,9 @@ module Slots_history : sig
     number_of_shards : int;
   }
 
+  (** An encoding for values of type {!dal_parameters}. *)
+  val dal_parameters_encoding : dal_parameters Data_encoding.t
+
   (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
       produces a proof that either:
       - there exists a confirmed slot in the skip list that contains
