@@ -19,24 +19,24 @@ trace
   - location: 16 (remaining gas: 1039989.789 units remaining)
     [ { Elt "bar" 4 ; Elt "foo" 11 }
       { Elt "bar" 4 ; Elt "foo" 11 } ]
-  - location: 13 (remaining gas: 1039989.769 units remaining)
+  - location: 13 (remaining gas: 1039989.764 units remaining)
     [ "baz"
       { Elt "bar" 4 ; Elt "foo" 11 }
       { Elt "bar" 4 ; Elt "foo" 11 } ]
-  - location: 17 (remaining gas: 1039989.680 units remaining)
+  - location: 17 (remaining gas: 1039989.675 units remaining)
     [ False
       { Elt "bar" 4 ; Elt "foo" 11 } ]
-  - location: 18 (remaining gas: 1039989.670 units remaining)
+  - location: 18 (remaining gas: 1039989.665 units remaining)
     [ (Some False)
       { Elt "bar" 4 ; Elt "foo" 11 } ]
-  - location: 19 (remaining gas: 1039989.660 units remaining)
+  - location: 19 (remaining gas: 1039989.655 units remaining)
     [ { Elt "bar" 4 ; Elt "foo" 11 }
       (Some False) ]
-  - location: 20 (remaining gas: 1039989.650 units remaining)
+  - location: 20 (remaining gas: 1039989.645 units remaining)
     [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
-  - location: 21 (remaining gas: 1039989.640 units remaining)
+  - location: 21 (remaining gas: 1039989.635 units remaining)
     [ {}
       (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
-  - location: 23 (remaining gas: 1039989.630 units remaining)
+  - location: 23 (remaining gas: 1039989.625 units remaining)
     [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
 

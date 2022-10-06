@@ -292,7 +292,8 @@ module Unparsing_data : Benchmark.S = struct
             let closure () =
               match
                 Lwt_main.run
-                  (Script_ir_translator.unparse_data
+                  (Script_ir_translator.Internal_for_benchmarking.unparse_data
+                     ~stack_depth:0
                      ctxt
                      Script_ir_unparser.Optimized
                      ty
@@ -448,7 +449,8 @@ module Unparsing_code : Benchmark.S = struct
         let closure () =
           let result =
             Lwt_main.run
-              (Script_ir_translator.unparse_code
+              (Script_ir_translator.Internal_for_benchmarking.unparse_code
+                 ~stack_depth:0
                  ctxt
                  Optimized
                  (Micheline.root node))

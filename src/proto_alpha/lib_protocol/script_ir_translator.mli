@@ -199,6 +199,26 @@ val unparse_code :
   Script.node ->
   (Script.expr * context) tzresult Lwt.t
 
+(** For benchmarking purpose, we also export versions of the unparsing
+    functions which don't call location stripping. These functions are
+    not carbonated and should not be called directly from the protocol. *)
+module Internal_for_benchmarking : sig
+  val unparse_data :
+    context ->
+    stack_depth:int ->
+    Script_ir_unparser.unparsing_mode ->
+    ('a, 'ac) ty ->
+    'a ->
+    (Script.node * context) tzresult Lwt.t
+
+  val unparse_code :
+    context ->
+    stack_depth:int ->
+    Script_ir_unparser.unparsing_mode ->
+    Script.node ->
+    (Script.node * context) tzresult Lwt.t
+end
+
 val parse_instr :
   elab_conf:Script_ir_translator_config.elab_config ->
   tc_context ->

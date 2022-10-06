@@ -16,20 +16,20 @@ trace
   - location: 12 (remaining gas: 1039993.458 units remaining)
     [ 0xff
       0xab ]
-  - location: 15 (remaining gas: 1039993.413 units remaining)
+  - location: 15 (remaining gas: 1039993.412 units remaining)
     [ 0xffab ]
-  - location: 10 (remaining gas: 1039993.403 units remaining)
+  - location: 10 (remaining gas: 1039993.397 units remaining)
     [ 0xcd ]
-  - location: 12 (remaining gas: 1039993.393 units remaining)
+  - location: 12 (remaining gas: 1039993.387 units remaining)
     [ 0xff
       0xcd ]
-  - location: 15 (remaining gas: 1039993.348 units remaining)
+  - location: 15 (remaining gas: 1039993.341 units remaining)
     [ 0xffcd ]
-  - location: 10 (remaining gas: 1039993.338 units remaining)
+  - location: 10 (remaining gas: 1039993.326 units remaining)
     [ { 0xffab ; 0xffcd } ]
-  - location: 16 (remaining gas: 1039993.328 units remaining)
+  - location: 16 (remaining gas: 1039993.316 units remaining)
     [ {}
       { 0xffab ; 0xffcd } ]
-  - location: 18 (remaining gas: 1039993.318 units remaining)
+  - location: 18 (remaining gas: 1039993.306 units remaining)
     [ (Pair {} { 0xffab ; 0xffcd }) ]
 

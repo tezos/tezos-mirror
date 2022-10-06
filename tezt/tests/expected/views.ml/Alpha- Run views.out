@@ -13,7 +13,7 @@ view "calls_count" unit nat { CDR ; SIZE };
 view "last_caller" unit (option address) { CDR ; IF_CONS { DIP { DROP } ; SOME } { NONE address } };
 ' --init '{}' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1430.716 units (will add 100 for safety)
+Estimated gas: 1430.736 units (will add 100 for safety)
 Estimated storage: 409 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'ooRkfUHnsTEfQ8SKpGCSop6iptg4dosoRybUNnZ2DD1Zw4RSAFJ'
@@ -50,7 +50,7 @@ This sequence of operations was run:
           KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7
         Storage size: 152 bytes
         Paid storage size diff: 152 bytes
-        Consumed gas: 1430.716
+        Consumed gas: 1430.736
         Balance updates:
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.038
           storage fees ........................... +ꜩ0.038
@@ -88,7 +88,7 @@ code {
      }
    ' --init None --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1454.180 units (will add 100 for safety)
+Estimated gas: 1454.220 units (will add 100 for safety)
 Estimated storage: 465 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'oojctTDMYh47PEbLRq7feuBf77DG8PcPD137Uqi6cCo9My6Wgva'
@@ -133,7 +133,7 @@ This sequence of operations was run:
           KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3
         Storage size: 208 bytes
         Paid storage size diff: 208 bytes
-        Consumed gas: 1454.180
+        Consumed gas: 1454.220
         Balance updates:
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.052
           storage fees ........................... +ꜩ0.052
@@ -145,7 +145,7 @@ Contract memorized as check_caller.
 
 ./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
 Node is bootstrapped.
-Estimated gas: 4413.444 units (will add 100 for safety)
+Estimated gas: 4413.514 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is 'opJoacsqxhcszPfYAgwpBGKqMfoyjZmu9CqBmmiiQtLQB5emLRa'
@@ -171,7 +171,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
-      Consumed gas: 4414.089
+      Consumed gas: 4414.159
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
         KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 ... +ꜩ1
@@ -179,7 +179,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7 --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 2117.191 units (will add 100 for safety)
+Estimated gas: 2117.241 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'onmjSitNnrxA6xCd4u2Ti6Kzyx8HJJoeYW6gs7rk5wdCZkgY2jE'
@@ -205,7 +205,7 @@ This sequence of operations was run:
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 2117.879
+      Consumed gas: 2117.929
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
@@ -215,7 +215,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1BEZadf1sAZ3jjoBJzEgBLhNXpv7WZHDc3 --burn-cap 1 --arg '"KT1PgzSR3Q6vij3daRpdNfQyffBmYK4BkwW7"'
 Node is bootstrapped.
-Estimated gas: 4417.021 units (will add 100 for safety)
+Estimated gas: 4417.116 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is 'oof17dNHXXM2Wc6Nv7iM6utwj7NPQPi1oSPdpFWu5PtafGYCAn9'
@@ -242,7 +242,7 @@ This sequence of operations was run:
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
       Paid storage size diff: 27 bytes
-      Consumed gas: 4417.666
+      Consumed gas: 4417.761
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675

@@ -29,33 +29,33 @@ trace
   - location: 18 (remaining gas: 1039985.593 units remaining)
     [ { "Hello" ; "World" }
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 14 (remaining gas: 1039985.573 units remaining)
+  - location: 14 (remaining gas: 1039985.568 units remaining)
     [ ""
       { "Hello" ; "World" }
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 19 (remaining gas: 1039985.458 units remaining)
+  - location: 19 (remaining gas: 1039985.453 units remaining)
     [ False
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 20 (remaining gas: 1039985.448 units remaining)
+  - location: 20 (remaining gas: 1039985.443 units remaining)
     [ (Some False)
       (Pair "" { "Hello" ; "World" } None) ]
-  - location: 21 (remaining gas: 1039985.448 units remaining)
+  - location: 21 (remaining gas: 1039985.443 units remaining)
     [ (Pair "" { "Hello" ; "World" } None) ]
-  - location: 24 (remaining gas: 1039985.438 units remaining)
+  - location: 24 (remaining gas: 1039985.433 units remaining)
     [ (Pair { "Hello" ; "World" } None) ]
-  - location: 25 (remaining gas: 1039985.428 units remaining)
+  - location: 25 (remaining gas: 1039985.423 units remaining)
     [ { "Hello" ; "World" } ]
-  - location: 21 (remaining gas: 1039985.408 units remaining)
+  - location: 21 (remaining gas: 1039985.398 units remaining)
     [ (Some False)
       { "Hello" ; "World" } ]
-  - location: 26 (remaining gas: 1039985.398 units remaining)
+  - location: 26 (remaining gas: 1039985.388 units remaining)
     [ { "Hello" ; "World" }
       (Some False) ]
-  - location: 27 (remaining gas: 1039985.388 units remaining)
+  - location: 27 (remaining gas: 1039985.378 units remaining)
     [ (Pair { "Hello" ; "World" } (Some False)) ]
-  - location: 28 (remaining gas: 1039985.378 units remaining)
+  - location: 28 (remaining gas: 1039985.368 units remaining)
     [ {}
       (Pair { "Hello" ; "World" } (Some False)) ]
-  - location: 30 (remaining gas: 1039985.368 units remaining)
+  - location: 30 (remaining gas: 1039985.358 units remaining)
     [ (Pair {} { "Hello" ; "World" } (Some False)) ]
 
