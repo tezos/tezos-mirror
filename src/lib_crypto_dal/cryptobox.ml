@@ -333,6 +333,19 @@ module Inner = struct
     number_of_shards : int;
   }
 
+  let parameters_encoding =
+    let open Data_encoding in
+    conv
+      (fun {redundancy_factor; page_size; slot_size; number_of_shards} ->
+        (redundancy_factor, page_size, slot_size, number_of_shards))
+      (fun (redundancy_factor, page_size, slot_size, number_of_shards) ->
+        {redundancy_factor; page_size; slot_size; number_of_shards})
+      (obj4
+         (req "redundancy_factor" uint8)
+         (req "page_size" uint16)
+         (req "slot_size" int31)
+         (req "number_of_shards" uint16))
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
   let make {redundancy_factor; slot_size; page_size; number_of_shards} =
