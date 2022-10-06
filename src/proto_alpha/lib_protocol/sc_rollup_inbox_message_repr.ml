@@ -58,6 +58,7 @@ type internal_inbox_message = {
   payload : Script_repr.expr;
   sender : Contract_hash.t;
   source : Signature.public_key_hash;
+  destination : Sc_rollup_repr.Address.t;
 }
 
 type t = Internal of internal_inbox_message | External of string
@@ -71,15 +72,17 @@ let encoding =
          case
            (Tag 0)
            ~title:"Internal"
-           (obj3
+           (obj4
               (req "payload" Script_repr.expr_encoding)
               (req "sender" Contract_hash.encoding)
-              (req "source" Signature.Public_key_hash.encoding))
+              (req "source" Signature.Public_key_hash.encoding)
+              (req "destination" Sc_rollup_repr.Address.encoding))
            (function
-             | Internal {payload; sender; source} ->
-                 Some (payload, sender, source)
+             | Internal {payload; sender; source; destination} ->
+                 Some (payload, sender, source, destination)
              | External _ -> None)
-           (fun (payload, sender, source) -> Internal {payload; sender; source});
+           (fun (payload, sender, source, destination) ->
+             Internal {payload; sender; source; destination});
          case
            (Tag 1)
            ~title:"External"

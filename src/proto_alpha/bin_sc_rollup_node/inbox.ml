@@ -92,7 +92,7 @@ module State = struct
             block_hash
 end
 
-let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
+let get_messages Node_context.{l1_ctxt; _} head =
   let open Lwt_result_syntax in
   let* block = Layer1.fetch_tezos_block l1_ctxt head in
   let apply (type kind) accu ~source:_ (operation : kind manager_operation)
@@ -121,12 +121,14 @@ let get_messages Node_context.{l1_ctxt; rollup_address; _} head =
           source = Originated sender;
           _;
         },
-        ITransaction_result (Transaction_to_sc_rollup_result _) )
-      when Sc_rollup.Address.(rollup = rollup_address) ->
+        ITransaction_result (Transaction_to_sc_rollup_result _) ) ->
         let+ payload =
           Environment.wrap_tzresult @@ Script_repr.force_decode parameters
         in
-        let message = Sc_rollup.Inbox_message.{payload; sender; source} in
+        let message =
+          Sc_rollup.Inbox_message.Deposit
+            {destination = rollup; payload; sender; source}
+        in
         Sc_rollup.Inbox_message.Internal message :: accu
     | _ -> return accu
   in

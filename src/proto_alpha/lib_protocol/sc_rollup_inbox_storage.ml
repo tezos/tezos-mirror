@@ -138,10 +138,10 @@ let serialize_external_messages ctxt external_messages =
     ctxt
     external_messages
 
-let serialize_internal_message ctxt ~payload ~sender ~source =
+let serialize_internal_message ctxt rollup ~payload ~sender ~source =
   let open Result_syntax in
   let internal_message =
-    {Sc_rollup_inbox_message_repr.payload; sender; source}
+    {Sc_rollup_inbox_message_repr.payload; sender; source; destination = rollup}
   in
   (* Pay gas for serializing an internal message. *)
   let* ctxt =
@@ -159,10 +159,10 @@ let add_external_messages ctxt external_messages =
   let*? ctxt, messages = serialize_external_messages ctxt external_messages in
   add_messages ctxt messages
 
-let add_internal_message ctxt _rollup ~payload ~sender ~source =
+let add_internal_message ctxt rollup ~payload ~sender ~source =
   let open Lwt_result_syntax in
   let*? message, ctxt =
-    serialize_internal_message ctxt ~payload ~sender ~source
+    serialize_internal_message ctxt ~payload ~sender ~source rollup
   in
   add_messages ctxt [message]
 

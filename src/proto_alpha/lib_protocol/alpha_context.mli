@@ -3008,6 +3008,7 @@ module Sc_rollup : sig
       payload : Script.expr;
       sender : Contract_hash.t;
       source : public_key_hash;
+      destination : t;
     }
 
     type t = Internal of internal_inbox_message | External of string

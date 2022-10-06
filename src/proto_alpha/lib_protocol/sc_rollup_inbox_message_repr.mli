@@ -54,6 +54,8 @@ type internal_inbox_message = {
           to the rollup. *)
   source : Signature.public_key_hash;
       (** The implicit account that originated the transaction. *)
+  destination : Sc_rollup_repr.Address.t;
+      (** The destination, as a rollup address, for the message. *)
 }
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are

@@ -104,6 +104,7 @@ let test_encode_decode_internal_inbox_message () =
   let open WithExceptions in
   let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
+  let destination = Sc_rollup.Address.zero in
   let sender =
     Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
   in
@@ -132,6 +133,7 @@ let test_encode_decode_internal_inbox_message () =
          ~payload
          ~sender
          ~source
+         ~destination
   in
   let* () = check_encode_decode_inbox_message deposit in
   (* Check that the size of messages that can be encoded is bounded. *)
@@ -146,6 +148,7 @@ let test_encode_decode_internal_inbox_message () =
          ~payload
          ~sender
          ~source
+         ~destination
   in
   let*! res = check_encode_decode_inbox_message deposit in
   assert_encoding_failure ~loc:__LOC__ res
