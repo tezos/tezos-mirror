@@ -274,6 +274,8 @@ let pp_error_state out = function
       Format.fprintf out "@[<hv 2>Unknown_error (%s)@]" err
   | Wasm_pvm_errors.Too_many_ticks ->
       Format.fprintf out "@[<hv 2>Too_many_ticks@]"
+  | Wasm_pvm_errors.Too_many_reboots ->
+      Format.fprintf out "@[<hv 2>Too_many_reboots@]"
 
 let print_error_state = Format.asprintf "%a" pp_error_state
 

@@ -292,12 +292,7 @@ struct
              new input. *)
           let* status = mark_for_reboot pvm_state.reboot_counter durable in
           (* Execution took too many reboot *)
-          if status = Failing then
-            return
-              ~status
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "Kernel attempted too many reboots within the same input"))
+          if status = Failing then return ~status (Stuck Too_many_reboots)
           else return ~status Snapshot
       | _ when is_time_for_snapshot pvm_state ->
           (* Execution took too many ticks *)

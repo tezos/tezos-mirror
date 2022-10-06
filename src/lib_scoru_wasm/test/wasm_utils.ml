@@ -143,6 +143,7 @@ let check_error ?expected_kind ?expected_reason error =
      not safe to rely on its string representation. *)
   | Some `Unknown, Unknown_error _ -> true
   | Some `Too_many_ticks, Too_many_ticks -> true
+  | Some `Too_many_reboots, Too_many_reboots -> true
   (* The expected step doesn't corresponds to the actual stuck step. *)
   | Some _, _ -> false
   (* No check to do, we simply assume the PVM is in a stuck state. *)

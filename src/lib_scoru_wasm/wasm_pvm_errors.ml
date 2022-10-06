@@ -47,6 +47,7 @@ type t =
   | Invalid_state of truncated_string
   | Unknown_error of truncated_string
   | Too_many_ticks
+  | Too_many_reboots
 
 let decode_state_to_string_raw = function
   | Decode.Byte_vector_step -> "Byte_vector_step"
@@ -212,6 +213,12 @@ let encoding =
         (constant "too_many_ticks")
         (function Too_many_ticks -> Some () | _ -> None)
         (fun () -> Too_many_ticks);
+      case
+        (Tag 7)
+        ~title:"Too_many_reboots"
+        (constant "too_many_reboots")
+        (function Too_many_reboots -> Some () | _ -> None)
+        (fun () -> Too_many_reboots);
     ]
 
 let link_error kind ~module_name ~item_name =
