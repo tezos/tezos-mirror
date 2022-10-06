@@ -3120,7 +3120,7 @@ module Sc_rollup : sig
 
       val hash_level_tree : tree -> Hash.t
 
-      val new_level_tree : inbox_context -> Raw_level.t -> tree Lwt.t
+      val new_level_tree : inbox_context -> tree Lwt.t
 
       val add_messages :
         inbox_context ->

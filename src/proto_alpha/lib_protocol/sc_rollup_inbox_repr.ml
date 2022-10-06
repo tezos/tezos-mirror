@@ -362,8 +362,6 @@ let to_versioned inbox = V1 inbox [@@inline]
 let key_of_message ix =
   ["message"; Data_encoding.Binary.to_string_exn Data_encoding.n ix]
 
-let level_key = ["level"]
-
 let number_of_messages_key = ["number_of_messages"]
 
 type serialized_proof = bytes
@@ -377,7 +375,7 @@ module type Merkelized_operations = sig
 
   val hash_level_tree : tree -> Hash.t
 
-  val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
+  val new_level_tree : inbox_context -> tree Lwt.t
 
   val add_messages :
     inbox_context ->
@@ -492,33 +490,16 @@ struct
 
   let hash_level_tree level_tree = Hash.of_context_hash (Tree.hash level_tree)
 
-  let set_level tree level =
-    let level_bytes =
-      Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
-    in
-    Tree.add tree level_key level_bytes
-
-  let find_level tree =
-    let open Lwt_syntax in
-    let+ level_bytes = Tree.(find tree level_key) in
-    Option.bind
-      level_bytes
-      (Data_encoding.Binary.of_bytes_opt Raw_level_repr.encoding)
-
   let set_number_of_messages tree number_of_messages =
     let number_of_messages_bytes =
       Data_encoding.Binary.to_bytes_exn Data_encoding.n number_of_messages
     in
     Tree.add tree number_of_messages_key number_of_messages_bytes
 
-  (** Initialise the merkle tree for a new level in the inbox. We have
-      to include the [level] in this structure so that it cannot be
-      forged by a malicious rollup node. *)
-  let new_level_tree ctxt level =
-    let open Lwt_syntax in
+  (** Initialise the merkle tree for a new level in the inbox. *)
+  let new_level_tree ctxt =
     let tree = Tree.empty ctxt in
-    let* tree = set_number_of_messages tree Z.zero in
-    set_level tree level
+    set_number_of_messages tree Z.zero
 
   let add_message inbox payload level_tree =
     let open Lwt_tzresult_syntax in
@@ -580,7 +561,7 @@ struct
       let*! tree =
         match level_tree with
         | Some tree -> Lwt.return tree
-        | None -> new_level_tree ctxt inbox.level
+        | None -> new_level_tree ctxt
       in
       commit_tree ctxt tree inbox.level
     in
@@ -599,7 +580,7 @@ struct
       adding messages, and archive the earlier levels depending on the
       [history] parameter's [capacity]. If [level_tree] is [None] (this
       happens when the inbox is first created) we similarly create a new
-      empty level tree with the right [level] key.
+      empty level tree.
 
       This function and {!form_history_proof} are the only places we
       begin new level trees. *)
@@ -609,13 +590,13 @@ struct
       match level_tree with
       | Some tree -> return (history, inbox, tree)
       | None ->
-          let*! tree = new_level_tree ctxt new_level in
+          let*! tree = new_level_tree ctxt in
           return (history, inbox, tree)
     else
       let* history, old_levels_messages =
         form_history_proof ctxt history inbox level_tree
       in
-      let*! tree = new_level_tree ctxt new_level in
+      let*! tree = new_level_tree ctxt in
       let inbox =
         {
           current_level_proof = inbox.current_level_proof;
@@ -719,7 +700,7 @@ struct
 
          [exists level_tree .
               (hash_level_tree level_tree = level.content)
-          AND (payload_and_level n level_tree = (_, (message, l)))]
+          AND (get_messages_payload n level_tree = (_, message))]
 
        Note: in the case that [message] is [None] this shows that
        there's no value at the index [n]; in this case we also must
@@ -836,51 +817,35 @@ struct
 
       [tree -> (tree, result) Lwt.t]
 
-      where [result] is some data extracted from the tree that we care
-      about proving. [payload_and_level n] is such a function, used for
-      checking both the inbox level specified inside the tree and the
-      message at a particular index, [n].
+      where [result] is some data extracted from the tree that we care about
+      proving. [payload_and_message_tree n] is such a function, used for checking
+      the message at a particular index, [n].
 
       For this function, the [result] is
 
-      [(payload, level) : string option * Raw_level_repr.t option]
+      [payload : Sc_rollup_inbox_message_repr.serialized option]
 
-      where [payload] is [None] if there was no message at the index.
-      The [level] part of the result will only be [None] if the [tree]
-      is not in the correct format for an inbox level. This should not
-      happen if the [tree] was correctly initialised with
-      [new_level_tree]. *)
-  let payload_and_level n tree =
+      where [payload] is [None] if there was no message at the index. *)
+  let payload_and_message_tree n tree =
     let open Lwt_syntax in
     let* payload = get_message_payload tree n in
-    let* level = find_level tree in
-    return (tree, (payload, level))
+    return (tree, payload)
 
   (** Utility function that handles all the verification needed for a
       particular message proof at a particular level. It calls
       [P.verify_proof], but also checks the proof has the correct
-      [P.proof_before] hash and the [level] stored inside the tree is
-      the expected one. *)
-  let check_message_proof message_proof level_hash (l, n) label =
+      [P.proof_before] hash. *)
+  let check_message_proof message_proof level_hash n label =
     let open Lwt_tzresult_syntax in
     let* () =
       check
         (Hash.equal level_hash (P.proof_before message_proof))
         (Format.sprintf "message_proof (%s) does not match history" label)
     in
-    let*! result = P.verify_proof message_proof (payload_and_level n) in
+    let*! result = P.verify_proof message_proof (payload_and_message_tree n) in
     match result with
     | None -> proof_error (Format.sprintf "message_proof is invalid (%s)" label)
-    | Some (_, (_, None)) ->
-        proof_error
-          (Format.sprintf "badly encoded level in message_proof (%s)" label)
-    | Some (_, (payload_opt, Some proof_level)) ->
-        let* () =
-          check
-            (Raw_level_repr.equal proof_level l)
-            (Format.sprintf "incorrect level in message_proof (%s)" label)
-        in
-        return payload_opt
+    | Some (_, payload_opt) -> return payload_opt
 
   let verify_proof (l, n) snapshot proof =
     assert (Z.(geq n zero)) ;
@@ -890,11 +855,7 @@ struct
     | Single_level {level; inc = _; message_proof} -> (
         let level_proof = Skip_list.content level in
         let* payload_opt =
-          check_message_proof
-            message_proof
-            level_proof.hash
-            (l, n)
-            "single level"
+          check_message_proof message_proof level_proof.hash n "single level"
         in
         match payload_opt with
         | None ->
@@ -912,7 +873,7 @@ struct
           check_message_proof
             lower_message_proof
             lower_level_proof.hash
-            (l, n)
+            n
             "lower"
         in
         match should_be_none with
@@ -961,10 +922,10 @@ struct
         "could not find level_tree in the inbox_context"
         (P.lookup_tree ctxt (Skip_list.content level).hash)
     in
-    let* message_proof, (payload_opt, _) =
+    let* message_proof, payload_opt =
       option_to_result
         "failed to produce message proof for level_tree"
-        (P.produce_proof ctxt level_tree (payload_and_level n))
+        (P.produce_proof ctxt level_tree (payload_and_message_tree n))
     in
     match payload_opt with
     | Some payload ->
@@ -993,7 +954,7 @@ struct
   let empty context level =
     let open Lwt_syntax in
     let pre_genesis_level = Raw_level_repr.root in
-    let* initial_level = new_level_tree context pre_genesis_level in
+    let* initial_level = new_level_tree context in
     let* () = commit_tree context initial_level pre_genesis_level in
     let initial_level_proof =
       let hash = hash_level_tree initial_level in
