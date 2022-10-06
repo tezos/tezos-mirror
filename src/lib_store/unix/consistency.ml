@@ -482,6 +482,12 @@ let read_block_at_level ~read_metadata block_store ~head:(head_hash, head_level)
     block_store
     (Block_store.Block (head_hash, Int32.(to_int (sub head_level level))))
 
+let read_block_metadata_at_level block_store ~head:(head_hash, head_level) level
+    =
+  Block_store.read_block_metadata
+    block_store
+    (Block_store.Block (head_hash, Int32.(to_int (sub head_level level))))
+
 (* Reads and returns the inferred savepoint. *)
 let load_inferred_savepoint chain_dir block_store head savepoint_level =
   let open Lwt_result_syntax in
@@ -656,65 +662,47 @@ let fix_savepoint_and_caboose ?history_mode chain_dir block_store head genesis =
       in
       return (savepoint, caboose)
 
-(* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
-   by setting it to the lowest block with metadata which is higher
-   that the last allowed fork level of the current head (and <=
-   head_level).
+(* [fix_checkpoint chain_dir block_store ~head ~savepoint] fixes the checkpoint by
+   setting it to the last allowed fork level of the current head. If
+   the metadata of this block is not available, the savepoint is used.
    Assumptions:
    - head is valid,
    - savepoint is valid,
    - block store is valid and available. *)
-let fix_checkpoint chain_dir block_store head =
+let fix_checkpoint chain_dir block_store ~head ~savepoint =
   let open Lwt_result_syntax in
-  let set_checkpoint head =
-    let* head_lafl =
-      match Block_repr.metadata head with
-      | Some m -> return m.last_allowed_fork_level
-      | None ->
-          (*Assumption: head must have metadata *)
-          tzfail
-            (Corrupted_store
-               (Inferred_head (Block_repr.hash head, Block_repr.level head)))
+  let head_hash, head_level = Block_repr.descriptor head in
+  let* inferred_checkpoint =
+    let* head_metadata =
+      read_block_metadata_at_level
+        block_store
+        ~head:(head_hash, head_level)
+        head_level
     in
-    (* Returns the lowest block with metadata *)
-    let rec find_lbwm block_level =
-      let* o =
-        read_block_at_level
-          ~read_metadata:false
-          block_store
-          ~head:(Block_repr.descriptor head)
-          block_level
-      in
-      match o with
-      | Some block -> (
-          if
-            (* The lowest block with metadata is never higher than
-               current head. *)
-            Compare.Int32.(Block_repr.level block = Block_repr.level head)
-          then return head
-          else
-            match Block_repr.metadata block with
-            | Some _metadata -> return block
-            | None -> find_lbwm (Int32.succ block_level))
-      | None ->
-          (* If the head was reached and it has no metadata, the store
-             is broken *)
-          if Compare.Int32.(block_level = Block_repr.level head) then
-            tzfail (Corrupted_store Cannot_find_block_with_metadata)
-          else
-            (* Freshly imported rolling nodes may have deleted blocks
-               at a level higher that the lafl of the current
-               head. Continue. *)
-            find_lbwm (Int32.succ block_level)
-    in
-    let* lbwm = find_lbwm head_lafl in
-    let checkpoint = (Block_repr.hash lbwm, Block_repr.level lbwm) in
-    let* () =
-      Stored_data.write_file (Naming.checkpoint_file chain_dir) checkpoint
-    in
-    return checkpoint
+    match head_metadata with
+    | None -> return savepoint
+    | Some head_metadata -> (
+        let lafl = Block_repr.last_allowed_fork_level head_metadata in
+        let* block =
+          read_block_at_level
+            ~read_metadata:false
+            block_store
+            ~head:(Block_repr.descriptor head)
+            lafl
+        in
+        match block with
+        | None -> return savepoint
+        | Some block ->
+            let block_level = Block_repr.level block in
+            let* metadata =
+              read_block_metadata_at_level
+                block_store
+                ~head:(head_hash, head_level)
+                block_level
+            in
+            if Option.is_some metadata then return (Block_repr.descriptor block)
+            else return savepoint)
   in
-  let* inferred_checkpoint = set_checkpoint head in
   (* Try to load the current checkpoint *)
   let*! stored_checkpoint =
     let*! r = Stored_data.load (Naming.checkpoint_file chain_dir) in
@@ -723,6 +711,11 @@ let fix_checkpoint chain_dir block_store head =
         let*! d = Stored_data.get checkpoint_data in
         Lwt.return_some d
     | Error _ -> Lwt.return_none
+  in
+  let* () =
+    Stored_data.write_file
+      (Naming.checkpoint_file chain_dir)
+      inferred_checkpoint
   in
   let*! () =
     Store_events.(emit fix_checkpoint (stored_checkpoint, inferred_checkpoint))
@@ -1244,7 +1237,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   let* savepoint, caboose =
     fix_savepoint_and_caboose chain_dir block_store head genesis
   in
-  let* checkpoint = fix_checkpoint chain_dir block_store head in
+  let* checkpoint = fix_checkpoint chain_dir block_store ~head ~savepoint in
   let* chain_config =
     fix_chain_config
       ?history_mode
