@@ -139,7 +139,8 @@ let get_messages Node_context.{l1_ctxt; _} head =
         block.operations
         {apply; apply_internal})
   in
-  let messages = List.rev rev_messages in
+  let eol = Sc_rollup.Inbox_message.Internal End_of_level in
+  let messages = List.rev (eol :: rev_messages) in
   let sol = Sc_rollup.Inbox_message.Internal Start_of_level in
   return (sol :: messages)
 
