@@ -145,7 +145,7 @@ of the signer.
    home~$ tezos-signer launch socket signer -a home
 
    vps~$ tezos-client import secret key alice tcp://home:7732/tz1abc...
-   vps~$ tezos-client sign bytes 0x00 for alice
+   vps~$ tezos-client sign bytes 0x03 for alice
 
 Every time the client on *vps* needs to sign an operation for
 *alice*, it sends a signature request to the remote signer on
@@ -156,29 +156,29 @@ Consequently, if we ever have to move the signer to another machine or access it
 A more flexible method is to only register a key as being remote, and separately supply the address of the signer uisng the `-R` option::
 
    vps~$ tezos-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
-   vps~$ tezos-client -R 'tcp://home:7732' sign bytes 0x00 for alice
+   vps~$ tezos-client -R 'tcp://home:7732' sign bytes 0x03 for alice
 
 Alternatively, the address of the signer can be recorded in environment variables::
 
    vps~$ export TEZOS_SIGNER_TCP_HOST=home
    vps~$ export TEZOS_SIGNER_TCP_PORT=7732
    vps~$ tezos-client import secret key alice remote:tz1abc...
-   vps~$ tezos-client sign bytes 0x00 for alice
+   vps~$ tezos-client sign bytes 0x03 for alice
 
 All the above methods can be retargeted to the other signing schemes, for instance, ``http``::
 
    home~$ tezos-signer launch http signer -a home
 
    vps~$ tezos-client import secret key alice http://home:7732/tz1abc...
-   vps~$ tezos-client sign bytes 0x00 for alice
+   vps~$ tezos-client sign bytes 0x03 for alice
 
    vps~$ tezos-client -R 'http://home:7732' import secret key alice remote:tz1abc...
-   vps~$ tezos-client -R 'http://home:7732' sign bytes 0x00 for alice
+   vps~$ tezos-client -R 'http://home:7732' sign bytes 0x03 for alice
 
    vps~$ export TEZOS_SIGNER_HTTP_HOST=home
    vps~$ export TEZOS_SIGNER_HTTP_PORT=7732
    vps~$ tezos-client import secret key alice remote:tz1abc...
-   vps~$ tezos-client sign bytes 0x00 for alice
+   vps~$ tezos-client sign bytes 0x03 for alice
 
 The complete list of environment variables for connecting to the remote signer is:
 
