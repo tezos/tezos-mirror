@@ -26,8 +26,8 @@
 (**
 
    A Merkelized inbox represents a list of messages. This list
-   is decomposed into sublists of messages, one for each non-empty Tezos
-   level greater than the level of the Last Cemented Commitment (LCC).
+   is decomposed into sublists of messages, one for each Tezos level greater
+   than the level where SCORU is activated.
 
    This module is designed to:
 
@@ -38,9 +38,8 @@
    2. offer an efficient function to add a new batch of messages in the
    inbox at the current level.
 
-   To solve (1), we use a proof tree H which is implemented by a sparse
-   merkelized skip list allowing for compact inclusion proofs (See
-   {!skip_list_repr.ml}).
+   To solve (1), we use a proof tree H which is implemented by a merkelized skip
+   list allowing for compact inclusion proofs (See {!skip_list_repr.ml}).
 
    To solve (2), we maintain a separate proof tree C witnessing the
    contents of messages of the current level.
@@ -98,10 +97,9 @@ let () =
   register_error_kind
     `Permanent
     ~id:"sc_rollup_inbox.empty_upper_level"
-    ~title:"Internal error: No payload found in a [Level_crossing] proof"
+    ~title:"Internal error: No payload found in a [Next_level] proof"
     ~description:
-      "Failed to find any message in the [upper_level] of a [Level_crossing] \
-       proof"
+      "Failed to find any message in the [upper_level] of a [Next_level] proof"
     (obj1 (req "upper_level" Raw_level_repr.encoding))
     (function Empty_upper_level upper_level -> Some upper_level | _ -> None)
     (fun upper_level -> Empty_upper_level upper_level)
@@ -763,7 +761,7 @@ struct
        Note: in the case that [message] is [None] this shows that
        there's no value at the index [n]; in this case we also must
        check that [level] equals [snapshot] (otherwise, we'd need a
-       [Level_crossing] proof instead. *)
+       [Next_level] proof instead. *)
     | Single_level of {
         level : history_proof;
         inc : inclusion_proof;
@@ -775,39 +773,18 @@ struct
        [starting_point] as [(l, n)] where [l] is a level and [n] is a
        message index.
 
-       In a [Level_crossing] proof, [lower] is the skip list cell for
-       the level [l] and [upper] must be the skip list cell that comes
-       immediately after it in [snapshot]. If the inbox has been
-       constructed correctly using the functions in this module that
-       will be the next non-empty level in the inbox.
+       In a [Next_level] proof, we prove that:
 
-       [inc] is an inclusion proof of [upper] into [snapshot].
-       [upper_level] is the level of [upper].
+       - There is no message at [(l, n)] with [lower_message_proof].
+       - [lower] belongs to the snapshot with [inc]
 
-       The tree proof [lower_message_proof] shows the following:
-
-         [exists level_tree .
-               (hash_level_tree level_tree = lower.content)
-           AND (payload_and_level n level_tree = (_, (None, l)))]
-
-       in other words, there is no message at index [n] in
-       level [l]. This means that level has been fully read.
-
-       The tree proof [upper_message_proof] shows the following:
-
-         [exists level_tree .
-               (hash_level_tree level_tree = upper.content)
-           AND (payload_and_level 0 level_tree = (_, (message, upper_level)))]
-
-       in other words, if we look in the next non-empty level the
-       message at index zero is [message]. *)
-    | Level_crossing of {
-        lower : history_proof;
-        upper : history_proof;
-        inc : inclusion_proof;
+       The first message to read at the next level of [l] is the
+       first input [Start_of_level].
+    *)
+    | Next_level of {
         lower_message_proof : P.proof;
-        upper_message_proof : P.proof;
-        upper_level : Raw_level_repr.t;
+        lower : history_proof;
+        inc : inclusion_proof;
       }
 
   let pp_proof fmt proof =
@@ -815,18 +792,9 @@ struct
     | Single_level {level; _} ->
         let hash = Skip_list.content level in
         Format.fprintf fmt "Single_level inbox proof at %a" Hash.pp hash
-    | Level_crossing {lower; upper; upper_level; _} ->
+    | Next_level {lower; _} ->
         let lower_hash = Skip_list.content lower in
-        let upper_hash = Skip_list.content upper in
-        Format.fprintf
-          fmt
-          "Level_crossing inbox proof between %a and %a (upper_level %a)"
-          Hash.pp
-          lower_hash
-          Hash.pp
-          upper_hash
-          Raw_level_repr.pp
-          upper_level
+        Format.fprintf fmt "Next_level of lower: %a" Hash.pp lower_hash
 
   let proof_encoding =
     let open Data_encoding in
@@ -847,48 +815,18 @@ struct
           (fun (level, inc, message_proof) ->
             Single_level {level; inc; message_proof});
         case
-          ~title:"Level_crossing"
+          ~title:"Next_level"
           (Tag 1)
-          (obj6
-             (req "lower" history_proof_encoding)
-             (req "upper" history_proof_encoding)
-             (req "inclusion_proof" inclusion_proof_encoding)
+          (obj3
              (req "lower_message_proof" P.proof_encoding)
-             (req "upper_message_proof" P.proof_encoding)
-             (req "upper_level" Raw_level_repr.encoding))
+             (req "lower" history_proof_encoding)
+             (req "inclusion_proof" inclusion_proof_encoding))
           (function
-            | Level_crossing
-                {
-                  lower;
-                  upper;
-                  inc;
-                  lower_message_proof;
-                  upper_message_proof;
-                  upper_level;
-                } ->
-                Some
-                  ( lower,
-                    upper,
-                    inc,
-                    lower_message_proof,
-                    upper_message_proof,
-                    upper_level )
+            | Next_level {lower_message_proof; lower; inc} ->
+                Some (lower_message_proof, lower, inc)
             | _ -> None)
-          (fun ( lower,
-                 upper,
-                 inc,
-                 lower_message_proof,
-                 upper_message_proof,
-                 upper_level ) ->
-            Level_crossing
-              {
-                lower;
-                upper;
-                inc;
-                lower_message_proof;
-                upper_message_proof;
-                upper_level;
-              });
+          (fun (lower_message_proof, lower, inc) ->
+            Next_level {lower_message_proof; lower; inc});
       ]
 
   let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
@@ -907,25 +845,16 @@ struct
       In the case of a [Single_level] proof this is just an inclusion
       proof between [level] and the inbox snapshot targeted the proof.
 
-      In the case of a [Level_crossing] proof [inc] must be an inclusion
-      proof between [upper] and the inbox snapshot. In this case we must
-      additionally check that [lower] is the immediate predecessor of
-      [upper] in the inbox skip list. NB: there may be many 'inbox
-      levels' apart, but if the intervening levels are empty they will
-      be immediate neighbours in the skip list because it misses empty
-      levels out. *)
+      In the case of a [Next_level] proof [inc] must be an inclusion
+      proof between [upper] and the inbox snapshot.
+  *)
   let check_inclusions proof snapshot =
     check
       (match proof with
-      | Single_level {inc; level; _} ->
+      | Single_level {inc; level; message_proof = _} ->
           verify_inclusion_proof inc level snapshot
-      | Level_crossing {inc; lower; upper; _} -> (
-          let prev_cell = Skip_list.back_pointer upper 0 in
-          match prev_cell with
-          | None -> false
-          | Some p ->
-              verify_inclusion_proof inc upper snapshot
-              && Hash.equal p (hash_skip_list_cell lower)))
+      | Next_level {inc; lower; lower_message_proof = _} ->
+          verify_inclusion_proof inc lower snapshot)
       "invalid inclusions"
 
   (** To construct or verify a tree proof we need a function of type
@@ -983,67 +912,40 @@ struct
     let open Lwt_tzresult_syntax in
     let* () = check_inclusions proof snapshot in
     match proof with
-    | Single_level p -> (
-        let level_hash = Skip_list.content p.level in
+    | Single_level {level; inc = _; message_proof} -> (
+        let level_hash = Skip_list.content level in
         let* payload_opt =
-          check_message_proof p.message_proof level_hash (l, n) "single level"
+          check_message_proof message_proof level_hash (l, n) "single level"
         in
         match payload_opt with
         | None ->
-            if equal_history_proof snapshot p.level then return None
+            if equal_history_proof snapshot level then return_none
             else proof_error "payload is None but proof.level not top level"
         | Some payload ->
-            return
-            @@ Some
-                 Sc_rollup_PVM_sig.
-                   {inbox_level = l; message_counter = n; payload})
-    | Level_crossing p -> (
-        let lower_level_hash = Skip_list.content p.lower in
+            return_some
+              Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload})
+    | Next_level {lower_message_proof; lower; inc = _} -> (
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
+           We could prove that the last message to read is SOL, and is
+           before [n]. *)
+        let lower_level_hash = Skip_list.content lower in
         let* should_be_none =
           check_message_proof
-            p.lower_message_proof
+            lower_message_proof
             lower_level_hash
             (l, n)
             "lower"
         in
-        let* () =
-          match should_be_none with
-          | None -> return ()
-          | Some _ -> proof_error "more messages to read in lower level"
-        in
-        let upper_level_hash = Skip_list.content p.upper in
-        let* payload_opt =
-          check_message_proof
-            p.upper_message_proof
-            upper_level_hash
-            (p.upper_level, Z.zero)
-            "upper"
-        in
-        match payload_opt with
+        match should_be_none with
         | None ->
-            (* [check_inclusions] checks at least two important properties:
-               1. [p.lower_level] is different from [p.upper_level]
-               2. [p.upper_level] is included in the snapshot
-
-               If [p.upper_level] is included in the snapshot, the level was
-               created by the protocol. If the protocol created a level tree
-               at [p.upper_level] it *must* contain at least one message.
-               So, if [p.upper_level] exists, at the index [Z.zero] (fetched
-               here), a payload *must* exist.
-
-               This code is then dead as long as we store only the nonempty
-               inboxes.
-            *)
-            fail (Empty_upper_level p.upper_level)
-        | Some payload ->
-            return
-            @@ Some
-                 Sc_rollup_PVM_sig.
-                   {
-                     inbox_level = p.upper_level;
-                     message_counter = Z.zero;
-                     payload;
-                   })
+            let*? payload =
+              Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
+            in
+            let inbox_level = Raw_level_repr.succ l in
+            let message_counter = Z.zero in
+            return_some
+              Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
+        | Some _ -> proof_error "more messages to read in current level")
 
   (** Utility function; we convert all our calls to be consistent with
       [Lwt_tzresult_syntax]. *)
@@ -1100,66 +1002,22 @@ struct
             Some
               Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
           )
-    | None -> (
+    | None ->
         if equal_history_proof inbox level then
           return (Single_level {level; inc; message_proof}, None)
         else
-          let target_index = Skip_list.index level + 1 in
-          let cell_ptr = hash_skip_list_cell inbox in
-          let*? history = History.remember cell_ptr inbox history in
-          let deref ptr = History.find ptr history in
-          let* inc =
-            option_to_result
-              "failed to find path to upper level"
-              (Lwt.return
-                 (Skip_list.back_path ~deref ~cell_ptr ~target_index
-                 |> Option.map (lift_ptr_path deref)
-                 |> Option.join))
+          let lower_message_proof = message_proof in
+          let lower = level in
+          let* input_given =
+            let inbox_level = Raw_level_repr.succ l in
+            let message_counter = Z.zero in
+            let*? payload =
+              Sc_rollup_inbox_message_repr.(serialize (Internal Start_of_level))
+            in
+            return_some
+              Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
           in
-          let* upper =
-            option_to_result
-              "back_path returned empty list"
-              (Lwt.return (List.last_opt inc))
-          in
-          let* upper_level_tree =
-            option_to_result
-              "could not find upper_level_tree in the inbox_context"
-              (P.lookup_tree ctxt (Skip_list.content upper))
-          in
-          let* upper_message_proof, (payload_opt, upper_level_opt) =
-            option_to_result
-              "failed to produce message proof for upper_level_tree"
-              (P.produce_proof ctxt upper_level_tree (payload_and_level Z.zero))
-          in
-          let* upper_level =
-            option_to_result
-              "upper_level_tree was misformed---could not find level"
-              (Lwt.return upper_level_opt)
-          in
-          match payload_opt with
-          | None ->
-              proof_error "if upper_level_tree exists, the payload must exist"
-          | Some payload ->
-              let input_given =
-                Some
-                  Sc_rollup_PVM_sig.
-                    {
-                      inbox_level = upper_level;
-                      message_counter = Z.zero;
-                      payload;
-                    }
-              in
-              return
-                ( Level_crossing
-                    {
-                      lower = level;
-                      upper;
-                      inc;
-                      lower_message_proof = message_proof;
-                      upper_message_proof;
-                      upper_level;
-                    },
-                  input_given ))
+          return (Next_level {lower_message_proof; lower; inc}, input_given)
 
   let empty context level =
     let open Lwt_syntax in

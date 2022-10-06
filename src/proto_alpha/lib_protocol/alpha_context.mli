@@ -3559,6 +3559,7 @@ module Sc_rollup : sig
           proof : Inbox.serialized_proof;
         }
       | Reveal_proof of reveal_proof
+      | First_inbox_message
 
     type t = {pvm_step : wrapped_proof; input_proof : input_proof option}
 
