@@ -2515,6 +2515,7 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode =
     Application
       {
@@ -2569,6 +2570,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode =
     Full_construction
       {
@@ -2603,6 +2605,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
     {

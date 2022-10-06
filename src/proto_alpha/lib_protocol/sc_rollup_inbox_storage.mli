@@ -62,6 +62,12 @@ val add_deposit :
 (** Initialize the inbox in the storage at protocol initialization. *)
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** Push a [Start_of_level] internal inbox message in the inbox using
+    {!add_internal_message}.
+*)
+val add_start_of_level :
+  Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+
 (**/**)
 
 module Internal_for_tests : sig

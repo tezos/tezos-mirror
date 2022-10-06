@@ -132,14 +132,16 @@ let get_messages Node_context.{l1_ctxt; _} head =
         Sc_rollup.Inbox_message.Internal message :: accu
     | _ -> return accu
   in
-  let*? messages =
+  let*? rev_messages =
     Layer1_services.(
       process_applied_manager_operations
         (Ok [])
         block.operations
         {apply; apply_internal})
   in
-  return (List.rev messages)
+  let messages = List.rev rev_messages in
+  let sol = Sc_rollup.Inbox_message.Internal Start_of_level in
+  return (sol :: messages)
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in

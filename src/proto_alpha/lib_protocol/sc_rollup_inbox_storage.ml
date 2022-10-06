@@ -176,3 +176,6 @@ let init ctxt =
   let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
   let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
   Store.Inbox.init ctxt inbox
+
+let add_start_of_level ctxt =
+  add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level

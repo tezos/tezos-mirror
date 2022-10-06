@@ -3225,6 +3225,8 @@ module Sc_rollup : sig
       destination:rollup ->
       (t * Z.t * context) tzresult Lwt.t
 
+    val add_start_of_level : context -> (t * Z.t * context) tzresult Lwt.t
+
     val get_inbox : context -> (t * context) tzresult Lwt.t
   end
 
