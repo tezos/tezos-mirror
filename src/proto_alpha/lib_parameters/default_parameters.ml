@@ -58,17 +58,22 @@ let sc_rollup_timeout_period_in_blocks = 20_160
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 
    Think harder about those values. *)
+let default_cryptobox_parameters =
+  {
+    Dal.Slots_history.page_size = 4096;
+    slot_size = 1 lsl 20;
+    redundancy_factor = 16;
+    number_of_shards = 2048;
+  }
+
 let default_dal =
   Constants.Parametric.
     {
       feature_enable = false;
       number_of_slots = 256;
-      number_of_shards = 2048;
       endorsement_lag = 1;
       availability_threshold = 50;
-      slot_size = 1 lsl 20;
-      redundancy_factor = 16;
-      page_size = 4096;
+      cryptobox_parameters = default_cryptobox_parameters;
     }
 
 let constants_mainnet =
@@ -246,17 +251,22 @@ let constants_mainnet =
       };
   }
 
+let default_cryptobox_parameters_sandbox =
+  {
+    Dal.Slots_history.page_size = 4096;
+    number_of_shards = 256;
+    slot_size = 1 lsl 16;
+    redundancy_factor = 4;
+  }
+
 let default_dal_sandbox =
   Constants.Parametric.
     {
       feature_enable = false;
       number_of_slots = 16;
-      number_of_shards = 256;
       endorsement_lag = 1;
       availability_threshold = 50;
-      slot_size = 1 lsl 16;
-      redundancy_factor = 4;
-      page_size = 4096;
+      cryptobox_parameters = default_cryptobox_parameters_sandbox;
     }
 
 let constants_sandbox =

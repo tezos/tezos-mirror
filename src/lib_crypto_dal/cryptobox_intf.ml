@@ -58,6 +58,9 @@ module type VERIFIER = sig
     number_of_shards : int;
   }
 
+  (** An encoding for values of type {!parameters}. *)
+  val parameters_encoding : parameters Data_encoding.t
+
   (** [make] precomputes the set of values needed by the cryptographic
     primitives defined in this module and stores them in a value of type [t] *)
   val make : parameters -> (t, [> `Fail of string]) result

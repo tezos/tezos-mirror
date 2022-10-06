@@ -583,6 +583,8 @@ module Slots_history = struct
       number_of_shards : int;
     }
 
+    let dal_parameters_encoding = Dal.parameters_encoding
+
     type error += Dal_proof_error of string
 
     let () =

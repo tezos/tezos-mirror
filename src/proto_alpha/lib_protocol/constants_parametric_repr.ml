@@ -28,12 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  number_of_shards : int;
   endorsement_lag : int;
   availability_threshold : int;
-  slot_size : int;
-  redundancy_factor : int;
-  page_size : int;
+  cryptobox_parameters : Dal.parameters;
 }
 
 let dal_encoding =
@@ -42,48 +39,34 @@ let dal_encoding =
     (fun {
            feature_enable;
            number_of_slots;
-           number_of_shards;
            endorsement_lag;
            availability_threshold;
-           slot_size;
-           redundancy_factor;
-           page_size;
+           cryptobox_parameters;
          } ->
-      ( feature_enable,
-        number_of_slots,
-        number_of_shards,
-        endorsement_lag,
-        availability_threshold,
-        slot_size,
-        redundancy_factor,
-        page_size ))
-    (fun ( feature_enable,
-           number_of_slots,
-           number_of_shards,
-           endorsement_lag,
-           availability_threshold,
-           slot_size,
-           redundancy_factor,
-           page_size ) ->
+      ( ( feature_enable,
+          number_of_slots,
+          endorsement_lag,
+          availability_threshold ),
+        cryptobox_parameters ))
+    (fun ( ( feature_enable,
+             number_of_slots,
+             endorsement_lag,
+             availability_threshold ),
+           cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
-        number_of_shards;
         endorsement_lag;
         availability_threshold;
-        slot_size;
-        redundancy_factor;
-        page_size;
+        cryptobox_parameters;
       })
-    (obj8
-       (req "feature_enable" Data_encoding.bool)
-       (req "number_of_slots" Data_encoding.int16)
-       (req "number_of_shards" Data_encoding.int16)
-       (req "endorsement_lag" Data_encoding.int16)
-       (req "availability_threshold" Data_encoding.int16)
-       (req "slot_size" Data_encoding.int31)
-       (req "redundancy_factor" Data_encoding.uint8)
-       (req "page_size" Data_encoding.uint16))
+    (merge_objs
+       (obj4
+          (req "feature_enable" bool)
+          (req "number_of_slots" int16)
+          (req "endorsement_lag" int16)
+          (req "availability_threshold" int16))
+       Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from

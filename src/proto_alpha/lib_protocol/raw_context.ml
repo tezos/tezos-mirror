@@ -939,17 +939,22 @@ let prepare_first_block ~level ~timestamp ctxt =
             sunset_level = c.tx_rollup.sunset_level;
           }
       in
+      let cryptobox_parameters =
+        {
+          Dal.page_size = 4096;
+          number_of_shards = 2048;
+          slot_size = 1 lsl 20;
+          redundancy_factor = 16;
+        }
+      in
       let dal =
         Constants_parametric_repr.
           {
             feature_enable = false;
             number_of_slots = 256;
-            number_of_shards = 2048;
             endorsement_lag = 1;
             availability_threshold = 50;
-            slot_size = 1 lsl 20;
-            redundancy_factor = 16;
-            page_size = 4096;
+            cryptobox_parameters;
           }
       in
       (* Inherit values that existed in previous protocol and haven't changed.
@@ -1604,7 +1609,8 @@ module Dal = struct
       ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
     in
     let number_of_shards =
-      ctxt.back.constants.Constants_parametric_repr.dal.number_of_shards
+      ctxt.back.constants.Constants_parametric_repr.dal.cryptobox_parameters
+        .number_of_shards
     in
     Dal_endorsement_repr.Accountability.is_slot_available
       ctxt.back.dal_endorsement_slot_accountability
@@ -1618,7 +1624,9 @@ module Dal = struct
      the end. However, it should be enough for a prototype. This has a
      very bad complexity too. *)
   let rec compute_shards ?(index = 0) ctxt ~endorser =
-    let max_shards = ctxt.back.constants.dal.number_of_shards in
+    let max_shards =
+      ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
+    in
     Slot_repr.Map.fold_e
       (fun _ (consensus_key, power) (index, shards) ->
         let limit = Compare.Int.min (index + power) max_shards in
