@@ -41,20 +41,24 @@ module Make (Parameters : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 end) =
 struct
-  open Dal_helpers.Make (struct
+  module ARG = struct
     include Parameters
 
     let cryptobox =
       WithExceptions.Result.get_ok ~loc:__LOC__
       @@ Dal_helpers.mk_cryptobox Parameters.dal_parameters.cryptobox_parameters
-  end)
+  end
+
+  open Dal_helpers.Make (ARG)
 
   (* Introduce some intermediate types. *)
 
   (** The slot is not confirmed (skipped) iff the boolean is [true]. *)
   type slot_skipped = bool
 
-  type slots = slot_skipped list
+  type level = int
+
+  type slots = level * slot_skipped list
 
   type levels = slots list
 
@@ -69,32 +73,39 @@ struct
   let populate_slots_history (levels_data : levels) =
     let open Result_syntax in
     (* Make and insert a slot. *)
+    let slot_data =
+      Bytes.init
+        Parameters.(dal_parameters.cryptobox_parameters.slot_size)
+        (fun _i -> 'x')
+    in
+    let* polynomial = dal_mk_polynomial_from_slot slot_data in
+    let commitment = Cryptobox.commit ARG.cryptobox polynomial in
     let add_slot level sindex (cell, cache, slots_info) skip_slot =
       let index =
         Option.value_f
           (Dal_slot_index_repr.of_int_opt sindex)
           ~default:(fun () -> assert false)
       in
-      let* _data, poly, slot = mk_slot ~level ~index () in
+      let slot =
+        Dal_slot_repr.Header.{id = {published_level = level; index}; commitment}
+      in
       let* cell, cache =
         if skip_slot then return (cell, cache)
         else
           Dal_slot_repr.History.add_confirmed_slot_headers cell cache [slot]
           |> Environment.wrap_tzresult
       in
-      return (cell, cache, (poly, slot, skip_slot) :: slots_info)
+      return (cell, cache, (polynomial, slot, skip_slot) :: slots_info)
     in
     (* Insert the slots of a level. *)
-    let add_slots level accu slots_data =
+    let add_slots accu (level, slots_data) =
       (* We start at level one, and we skip even levels for test purpose (which
          means that no DAL slot is confirmed for them). *)
-      let curr_level =
-        Int32.of_int (1 + (2 * level)) |> Raw_level_repr.of_int32_exn
-      in
+      let curr_level = Raw_level_repr.of_int32_exn (Int32.of_int level) in
       List.fold_left_i_e (add_slot curr_level) accu slots_data
     in
     (* Insert the slots of all the levels. *)
-    let add_levels = List.fold_left_i_e add_slots in
+    let add_levels = List.fold_left_e add_slots in
     add_levels (genesis_history, genesis_history_cache, []) levels_data
 
   (** This function returns the (correct) information of a page to
@@ -113,7 +124,7 @@ struct
       (but the slot is not confirmed). Otherwise, we increment the publish_level
       field to simulate a non confirmed slot (as for even levels, no slot is
       confirmed. See {!populate_slots_history}). *)
-  let request_unconfirmed_page (poly, slot, skip_slot) =
+  let request_unconfirmed_page unconfirmed_level (poly, slot, skip_slot) =
     let open Result_syntax in
     (* If the slot is unconfirmed, we test that a page belonging to it is not
        confirmed.  If the slot is confirmed, we check that the page of the
@@ -121,8 +132,7 @@ struct
        any confirmed slot). *)
     let level =
       let open Dal_slot_repr.Header in
-      if skip_slot then slot.id.published_level
-      else Raw_level_repr.succ slot.id.published_level
+      if skip_slot then slot.id.published_level else unconfirmed_level
     in
     let* _page_info, page_id = mk_page_info ~level slot poly in
     (* We should not provide the page's info if we want to build an
@@ -170,23 +180,44 @@ struct
     let*? last_cell, last_cache, slots_info =
       populate_slots_history levels_data
     in
+    let unconfirmed_level =
+      let last_level =
+        List.last (0, []) levels_data
+        |> fst |> Int32.of_int |> Raw_level_repr.of_int32_exn
+      in
+      Raw_level_repr.succ last_level
+    in
     helper_check_pbt_pages
       last_cell
       last_cache
       slots_info
-      ~page_to_request:request_unconfirmed_page
+      ~page_to_request:(request_unconfirmed_page unconfirmed_level)
       ~check_produce:(successful_check_produce_result ~__LOC__ `Unconfirmed)
       ~check_verify:(successful_check_verify_result ~__LOC__ `Unconfirmed)
 
   let tests =
     let gen_dal_config : levels QCheck2.Gen.t =
       QCheck2.Gen.(
-        let nb_slots = pure 20 in
-        let nb_levels = pure 5 in
+        let nb_slots = 10 -- 20 in
+        let nb_levels = 4 -- 8 in
+        let gaps_between_levels = 1 -- 20 in
         (* The slot is confirmed iff the boolean is true *)
         let slot = bool in
         let slots = list_size nb_slots slot in
-        list_size nb_levels slots)
+        (* For each level, we generate the gap/delta w.r.t. the previous level,
+           and the slots' flags (confirmed or not). *)
+        let* l = list_size nb_levels (pair gaps_between_levels slots) in
+        (* We compute the list of slots with explicit levels instead levels
+           gaps. *)
+        let rl, _level =
+          List.fold_left
+            (fun (acc, prev_level) (delta_level, slots) ->
+              let level = prev_level + delta_level in
+              ((level, slots) :: acc, level))
+            ([], 0)
+            l
+        in
+        return @@ List.rev rl)
     in
     [
       Tztest.tztest_qcheck2
