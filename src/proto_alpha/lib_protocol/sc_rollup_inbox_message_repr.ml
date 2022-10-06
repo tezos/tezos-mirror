@@ -62,6 +62,7 @@ type internal_inbox_message =
       destination : Sc_rollup_repr.Address.t;
     }
   | Start_of_level
+  | End_of_level
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
@@ -87,6 +88,12 @@ let internal_inbox_message_encoding =
         empty
         (function Start_of_level -> Some () | _ -> None)
         (fun () -> Start_of_level);
+      case
+        (Tag 2)
+        ~title:"End_of_level"
+        empty
+        (function End_of_level -> Some () | _ -> None)
+        (fun () -> End_of_level);
     ]
 
 type t = Internal of internal_inbox_message | External of string

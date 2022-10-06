@@ -933,7 +933,8 @@ module Make (Context : P) :
               match Micheline.root payload with
               | String (_, payload) -> Some payload
               | _ -> None)
-          | Start_of_level -> None)
+          | Start_of_level -> None
+          | End_of_level -> None)
     in
     match payload with
     | Some payload ->

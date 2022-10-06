@@ -60,6 +60,7 @@ type internal_inbox_message =
     }
   | Start_of_level
       (** Internal message put at the beginning of each inbox's level. *)
+  | End_of_level  (** Internal message put at the end of each inbox's level. *)
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

@@ -3012,6 +3012,7 @@ module Sc_rollup : sig
           destination : t;
         }
       | Start_of_level
+      | End_of_level
 
     type t = Internal of internal_inbox_message | External of string
 
