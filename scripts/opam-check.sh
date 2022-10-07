@@ -1,20 +1,17 @@
 #!/bin/sh
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
-
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam \! -name octez\*-deps.opam\* -print)
 
 echo "## Checking installed dependencies..."
 echo
 
-if ! opam install $opams --deps-only --with-test --show-actions | grep "Nothing to do." > /dev/null 2>&1 ; then
+if ! opam install opam/octez-deps.opam --deps-only --with-test --show-actions | grep "Nothing to do." > /dev/null 2>&1 ; then
     echo
     echo 'Failure! Missing actions:'
     echo
-    opam install $opams --deps-only --with-test --show-actions
+    opam install opam/octez-deps.opam --deps-only --with-test --show-actions
     echo
     echo 'Failed! Please read the doc in `./scripts/update_opam_repo.sh` and act accordingly.'
     echo
