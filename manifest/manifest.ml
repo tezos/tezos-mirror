@@ -1828,6 +1828,16 @@ let register_tezt_targets ~make_tezt_exe =
   String_map.iter register_path !tezt_targets_by_path ;
   make_tezt_exe !tezt_test_libs
 
+let profile_deps : Target.t list String_map.t ref = ref String_map.empty
+
+let add_dep_to_profile profile = function
+  | None -> ()
+  | Some dep ->
+     let old =
+       String_map.find_opt profile !profile_deps |> Option.value ~default:[]
+     in
+     profile_deps := String_map.add profile (dep :: old) !profile_deps
+
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
@@ -3073,6 +3083,10 @@ let generate_profiles ~default_profile =
     | Optional target | Select {package = target; _} | Open (target, _) ->
         add_target_to deps profile target
   in
+  String_map.iter
+    (fun profile deps_to_add ->
+      List.iter (add_target_to deps profile) deps_to_add)
+    !profile_deps ;
   ( Target.iter_internal_by_path @@ fun _ internals ->
     list_iter internals @@ fun internal ->
     let profile = internal.profile |> Option.value ~default:default_profile in
