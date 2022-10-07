@@ -37,19 +37,53 @@
 
 open Shell_operation
 
-type error += Endorsement_branch_not_live
+type error +=
+  | Operation_replacement of {
+      old_hash : Tezos_crypto.Operation_hash.t;
+      new_hash : Tezos_crypto.Operation_hash.t;
+    }
+  | Operation_conflict of {new_hash : Tezos_crypto.Operation_hash.t}
 
 let () =
   register_error_kind
-    `Permanent
-    ~id:"prevalidation.endorsement_branch_not_live"
-    ~title:"Endorsement branch not live"
-    ~description:"Endorsement's branch is not in the live blocks"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Endorsement's branch is not in the live blocks")
-    Data_encoding.(empty)
-    (function Endorsement_branch_not_live -> Some () | _ -> None)
-    (fun () -> Endorsement_branch_not_live)
+    `Temporary
+    ~id:"prevalidation.operation_replacement"
+    ~title:"Operation replacement"
+    ~description:"The operation has been replaced."
+    ~pp:(fun ppf (old_hash, new_hash) ->
+      Format.fprintf
+        ppf
+        "The operation %a has been replaced with %a."
+        Tezos_crypto.Operation_hash.pp
+        old_hash
+        Tezos_crypto.Operation_hash.pp
+        new_hash)
+    (Data_encoding.obj2
+       (Data_encoding.req "old_hash" Tezos_crypto.Operation_hash.encoding)
+       (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+    (function
+      | Operation_replacement {old_hash; new_hash} -> Some (old_hash, new_hash)
+      | _ -> None)
+    (fun (old_hash, new_hash) -> Operation_replacement {old_hash; new_hash}) ;
+  register_error_kind
+    `Temporary
+    ~id:"prevalidation.operation_conflict"
+    ~title:"Operation conflict"
+    ~description:
+      "The operation cannot be added because the mempool already contains a \
+       conflicting operation."
+    ~pp:(fun ppf new_hash ->
+      Format.fprintf
+        ppf
+        "The operation %a cannot be added because the mempool already contains \
+         a conflicting operation that should not be replaced (e.g. an \
+         operation from the same manager with better fees)."
+        Tezos_crypto.Operation_hash.pp
+        new_hash)
+    (Data_encoding.obj1
+       (Data_encoding.req "new_hash" Tezos_crypto.Operation_hash.encoding))
+    (function Operation_conflict {new_hash} -> Some new_hash | _ -> None)
+    (fun new_hash -> Operation_conflict {new_hash})
 
 module type CHAIN_STORE = sig
   type chain_store
@@ -65,9 +99,11 @@ end
 module type T = sig
   type protocol_operation
 
-  type operation_receipt
-
   type validation_state
+
+  type filter_state
+
+  type filter_config
 
   type chain_store
 
@@ -75,159 +111,233 @@ module type T = sig
 
   val create :
     chain_store ->
-    predecessor:Store.Block.t ->
-    live_operations:Tezos_crypto.Operation_hash.Set.t ->
+    head:Store.Block.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
 
-  type result =
-    | Applied of t * operation_receipt
-    | Branch_delayed of tztrace
-    | Branch_refused of tztrace
-    | Refused of tztrace
-    | Outdated of tztrace
+  type replacement =
+    (Tezos_crypto.Operation_hash.t
+    * Prevalidator_classification.error_classification)
+    option
 
-  val apply_operation : t -> protocol_operation operation -> result Lwt.t
+  type add_result =
+    t
+    * filter_state
+    * protocol_operation operation
+    * Prevalidator_classification.classification
+    * replacement
+
+  val add_operation :
+    t ->
+    filter_state ->
+    filter_config ->
+    protocol_operation operation ->
+    add_result Lwt.t
 
   val validation_state : t -> validation_state
 
-  val set_validation_state : t -> validation_state -> t
-
-  val pp_result : Format.formatter -> result -> unit
-
   module Internal_for_tests : sig
-    val to_applied :
-      t -> (protocol_operation operation * operation_receipt) list
+    val get_valid_operations :
+      t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
   end
 end
 
 module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
-     and type operation_receipt = Filter.Proto.operation_receipt
      and type validation_state = Filter.Proto.validation_state
+     and type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
      and type chain_store = Chain_store.chain_store = struct
   module Proto = Filter.Proto
 
   type protocol_operation = Proto.operation
 
-  type operation_receipt = Proto.operation_receipt
-
   type validation_state = Proto.validation_state
+
+  type filter_state = Filter.Mempool.state
+
+  type filter_config = Filter.Mempool.config
 
   type chain_store = Chain_store.chain_store
 
+  type operation = protocol_operation Shell_operation.operation
+
   type t = {
-    validation_state : validation_state;
-    application_state : Proto.application_state;
-    applied : (protocol_operation operation * Proto.operation_receipt) list;
-    live_operations : Tezos_crypto.Operation_hash.Set.t;
+    validation_info : Proto.Mempool.validation_info;
+    mempool : Proto.Mempool.t;
+    validation_state : validation_state; (* initial protocol validation_state *)
   }
 
-  type result =
-    | Applied of t * Proto.operation_receipt
-    | Branch_delayed of tztrace
-    | Branch_refused of tztrace
-    | Refused of tztrace
-    | Outdated of tztrace
-
-  let create chain_store ~predecessor ~live_operations ~timestamp () =
+  let create chain_store ~head ~timestamp () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
     let open Lwt_result_syntax in
-    let* predecessor_context = Chain_store.context chain_store predecessor in
-    let predecessor_hash = Store.Block.hash predecessor in
-    let*! predecessor_context =
+    let* head_context = Chain_store.context chain_store head in
+    let head_hash = Store.Block.hash head in
+    let*! head_context =
       Block_validation.update_testchain_status
-        predecessor_context
-        ~predecessor_hash
+        head_context
+        ~predecessor_hash:head_hash
         timestamp
     in
     let chain_id = Chain_store.chain_id chain_store in
-    let mode = Proto.Partial_construction {predecessor_hash; timestamp} in
-    let predecessor = (Store.Block.header predecessor).shell in
+    let head = (Store.Block.header head).shell in
+    let* validation_info, mempool =
+      Proto.Mempool.init head_context chain_id ~head_hash ~head ~cache:`Lazy
+    in
     let* validation_state =
       Proto.begin_validation
-        predecessor_context
+        head_context
         chain_id
-        mode
-        ~predecessor
+        (Partial_construction {predecessor_hash = head_hash; timestamp})
+        ~predecessor:head
         ~cache:`Lazy
     in
-    let* application_state =
-      Proto.begin_application
-        predecessor_context
-        chain_id
-        mode
-        ~predecessor
-        ~cache:`Lazy
-    in
-    return {validation_state; application_state; applied = []; live_operations}
+    return {validation_info; mempool; validation_state}
 
-  let apply_operation pv op =
+  type error_classification = Prevalidator_classification.error_classification
+
+  type classification = Prevalidator_classification.classification
+
+  type replacement =
+    (Tezos_crypto.Operation_hash.t * error_classification) option
+
+  type add_result = t * filter_state * operation * classification * replacement
+
+  let classification_of_trace trace =
+    match classify_trace trace with
+    | Branch -> `Branch_refused trace
+    | Permanent -> `Refused trace
+    | Temporary -> `Branch_delayed trace
+    | Outdated -> `Outdated trace
+
+  let proto_add_operation ~conflict_handler state op :
+      (Proto.Mempool.t * Proto.Mempool.add_result) tzresult Lwt.t =
+    Proto.Mempool.add_operation
+      ~check_signature:Compare.Int.(op.count_successful_prechecks <= 0)
+      ~conflict_handler
+      state.validation_info
+      state.mempool
+      (op.hash, op.protocol)
+    |> Lwt_result.map_error (function
+           | Proto.Mempool.Validation_error trace -> trace
+           | Add_conflict _ ->
+               (* This cannot happen because we provide a [conflict_handler] to
+                  [Proto.Mempool.add_operation]. See documentation in
+                  [lib_protocol_environment/sigs/v<num>/updater.mli]
+                  with [num >= 7]. *)
+               assert false)
+
+  let translate_proto_add_result (proto_add_result : Proto.Mempool.add_result)
+      op : (replacement, error_classification) result =
+    let open Result in
+    match proto_add_result with
+    | Added -> return_none
+    | Replaced {removed} ->
+        let trace =
+          [Operation_replacement {old_hash = removed; new_hash = op.hash}]
+        in
+        return_some (removed, `Outdated trace)
+    | Unchanged ->
+        error
+          (classification_of_trace [Operation_conflict {new_hash = op.hash}])
+
+  (** Call [Filter.Mempool.add_operation_and_enforce_mempool_bound],
+      which ensures that the number of manager operations in the
+      mempool is bounded as specified in [filter_config].
+
+      The [state] argument is the prevalidation state (which has not
+      been modified yet). The [mempool] and [proto_add_result] are the
+      results of the protocol's [add_operation].
+
+      Maintaining this bound may require the removal of an operation
+      when the mempool was already full. In this case, this operation,
+      called [full_mempool_replacement], must also be removed from the
+      protocol's abstract [mempool].
+
+      Return the updated [state] (containing the updated protocol
+      [mempool]) and [filter_state], and the final [replacement], which
+      may have been mandated either by the protocol's [add_operation]
+      or by [Filter.Mempool.add_operation_and_enforce_mempool_bound]
+      (but not both: if the protocol already causes a replacement, then
+      the mempool is no longer full so there cannot be a
+      [full_mempool_replacement]. *)
+  let enforce_mempool_bound_and_update_states state filter_state filter_config
+      (mempool, proto_add_result) op :
+      (t * filter_state * replacement, error_classification) result Lwt.t =
+    let open Lwt_result_syntax in
+    let*? proto_replacement = translate_proto_add_result proto_add_result op in
+    let* filter_state, full_mempool_replacement =
+      Filter.Mempool.add_operation_and_enforce_mempool_bound
+        ?replace:(Option.map fst proto_replacement)
+        state.validation_state
+        filter_config
+        filter_state
+        (op.hash, op.protocol)
+    in
+    let mempool =
+      match full_mempool_replacement with
+      | `No_replace -> mempool
+      | `Replace (replace_oph, _) ->
+          Proto.Mempool.remove_operation mempool replace_oph
+    in
+    let replacement =
+      match (proto_replacement, full_mempool_replacement) with
+      | _, `No_replace -> proto_replacement
+      | None, `Replace repl -> Some repl
+      | Some _, `Replace _ ->
+          (* If there is a [proto_replacement], it gets removed from the
+             mempool before adding [op] so the mempool cannot be full. *)
+          assert false
+    in
+    return ({state with mempool}, filter_state, replacement)
+
+  let add_operation_result state filter_state filter_config op :
+      (t * filter_state * operation * classification * replacement) tzresult
+      Lwt.t =
+    let open Lwt_result_syntax in
+    let conflict_handler = Filter.Mempool.conflict_handler filter_config in
+    let* proto_output = proto_add_operation ~conflict_handler state op in
+    (* The operation might still be rejected because of a conflict
+       with a previously validated operation, or if the mempool is
+       full and the operation does not have enough fees. Nevertheless,
+       the successful call to [Proto.Mempool.add_operation] guarantees
+       that the operation is individually valid, in particular its
+       signature is correct. Therefore we increment its successful
+       precheck counter, so that any future signature check can be
+       skipped. *)
+    let op = increment_successful_precheck op in
+    let*! res =
+      enforce_mempool_bound_and_update_states
+        state
+        filter_state
+        filter_config
+        proto_output
+        op
+    in
+    match res with
+    | Ok (state, filter_state, replacement) ->
+        return (state, filter_state, op, `Prechecked, replacement)
+    | Error err_class ->
+        return (state, filter_state, op, (err_class :> classification), None)
+
+  let add_operation state filter_state filter_config op : add_result Lwt.t =
     let open Lwt_syntax in
-    if Tezos_crypto.Operation_hash.Set.mem op.hash pv.live_operations then
-      (* As of November 2021, it is dubious that this case can happen.
-         If it can, it is more likely to be because of a consensus operation;
-         hence the returned error. *)
-      Lwt.return (Outdated [Endorsement_branch_not_live])
-    else
-      let+ r =
-        protect (fun () ->
-            let open Lwt_result_syntax in
-            let* validation_state =
-              Proto.validate_operation pv.validation_state op.hash op.protocol
-            in
-            let* application_state, receipt =
-              Proto.apply_operation pv.application_state op.hash op.protocol
-            in
-            return (validation_state, application_state, receipt))
-      in
-      match r with
-      | Ok (validation_state, application_state, receipt) -> (
-          let pv =
-            {
-              validation_state;
-              application_state;
-              applied = (op, receipt) :: pv.applied;
-              live_operations =
-                Tezos_crypto.Operation_hash.Set.add op.hash pv.live_operations;
-            }
-          in
-          match
-            Data_encoding.Binary.(
-              of_bytes_exn
-                Proto.operation_receipt_encoding
-                (to_bytes_exn Proto.operation_receipt_encoding receipt))
-          with
-          | receipt -> Applied (pv, receipt)
-          | exception exn ->
-              Refused
-                [Validation_errors.Cannot_serialize_operation_metadata; Exn exn]
-          )
-      | Error trace -> (
-          match classify_trace trace with
-          | Branch -> Branch_refused trace
-          | Permanent -> Refused trace
-          | Temporary -> Branch_delayed trace
-          | Outdated -> Outdated trace)
+    let* res =
+      protect (fun () ->
+          add_operation_result state filter_state filter_config op)
+    in
+    match res with
+    | Ok add_result -> return add_result
+    | Error trace ->
+        return (state, filter_state, op, classification_of_trace trace, None)
 
   let validation_state {validation_state; _} = validation_state
 
-  let set_validation_state t validation_state = {t with validation_state}
-
-  let pp_result ppf =
-    let open Format in
-    function
-    | Applied _ -> pp_print_string ppf "applied"
-    | Branch_delayed err -> fprintf ppf "branch delayed (%a)" pp_print_trace err
-    | Branch_refused err -> fprintf ppf "branch refused (%a)" pp_print_trace err
-    | Refused err -> fprintf ppf "refused (%a)" pp_print_trace err
-    | Outdated err -> fprintf ppf "outdated (%a)" pp_print_trace err
-
   module Internal_for_tests = struct
-    let to_applied {applied; _} = applied
+    let get_valid_operations {mempool; _} = Proto.Mempool.operations mempool
   end
 end
 
@@ -243,8 +353,9 @@ end
 module Make (Filter : Shell_plugin.FILTER) :
   T
     with type protocol_operation = Filter.Proto.operation
-     and type operation_receipt = Filter.Proto.operation_receipt
      and type validation_state = Filter.Proto.validation_state
+     and type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store =
   MakeAbstract (Production_chain_store) (Filter)
 

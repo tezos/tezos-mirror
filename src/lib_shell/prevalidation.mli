@@ -46,11 +46,13 @@ module type T = sig
 
   (** Similar to the same type in the protocol,
       see {!Tezos_protocol_environment.PROTOCOL} *)
-  type operation_receipt
-
-  (** Similar to the same type in the protocol,
-      see {!Tezos_protocol_environment.PROTOCOL} *)
   type validation_state
+
+  (** Type {!Shell_plugin.FILTER.Mempool.state}. *)
+  type filter_state
+
+  (** Type {!Shell_plugin.FILTER.Mempool.config}. *)
+  type filter_config
 
   (** The type implemented by {!Tezos_store.Store.chain_store} in
       production, and mocked in tests *)
@@ -61,46 +63,63 @@ module type T = sig
   type t
 
   (** Creates a new prevalidation context w.r.t. the protocol associated with
-      the predecessor block. *)
+      the head block. *)
   val create :
     chain_store ->
-    predecessor:Store.Block.t ->
-    live_operations:Tezos_crypto.Operation_hash.Set.t ->
+    head:Store.Block.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
 
-  (** Values returned by {!create}. They are obtained from the result
-      of the protocol [apply_operation] function and the classification of
-      errors. *)
-  type result =
-    | Applied of t * operation_receipt
-    | Branch_delayed of tztrace
-    | Branch_refused of tztrace
-    | Refused of tztrace
-    | Outdated of tztrace
+  (** If an old operation has been replaced by a newly added
+      operation, then this type contains its hash and its new
+      classification. If there is no replaced operation, this is [None]. *)
+  type replacement =
+    (Tezos_crypto.Operation_hash.t
+    * Prevalidator_classification.error_classification)
+    option
 
-  (** [apply_operation t op] calls the protocol [apply_operation] function
-      and handles possible errors, hereby yielding a classification *)
-  val apply_operation :
-    t -> protocol_operation Shell_operation.operation -> result Lwt.t
+  (** Result of {!add_operation}.
+
+      Contain the updated (or unchanged) state {!t} and
+      {!filter_state}, the operation (in which
+      [count_successful_prechecks] has been incremented if
+      appropriate), its classification, and the potential
+      {!replacement}.
+
+      Invariant: [replacement] can only be [Some _] when the
+      classification is [`Prechecked]. *)
+  type add_result =
+    t
+    * filter_state
+    * protocol_operation Shell_operation.operation
+    * Prevalidator_classification.classification
+    * replacement
+
+  (** Call the protocol [Mempool.add_operation] function, providing it
+      with the [conflict_handler] from the plugin.
+
+      Then if the protocol accepts the operation, call the plugin
+      [add_operation_and_enforce_mempool_bound], which is responsible
+      for bounding the number of manager operations in the mempool.
+
+      See {!add_result} for a description of the output. *)
+  val add_operation :
+    t ->
+    filter_state ->
+    filter_config ->
+    protocol_operation Shell_operation.operation ->
+    add_result Lwt.t
 
   (** [validation_state t] returns the subset of [t] corresponding
       to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
 
-  (** Updates the subset of [t] corresponding to the type
-      {!validation_state} of the protocol. *)
-  val set_validation_state : t -> validation_state -> t
-
-  val pp_result : Format.formatter -> result -> unit
-
   module Internal_for_tests : sig
-    (** Returns operations for which {!apply_operation} returned [Applied _]
-        so far. *)
-    val to_applied :
-      t ->
-      (protocol_operation Shell_operation.operation * operation_receipt) list
+    (** Return the map of operations currently present in the protocol
+        representation of the mempool. *)
+    val get_valid_operations :
+      t -> protocol_operation Tezos_crypto.Operation_hash.Map.t
   end
 end
 
@@ -108,8 +127,9 @@ end
 module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
     with type protocol_operation = Filter.Proto.operation
-     and type operation_receipt = Filter.Proto.operation_receipt
      and type validation_state = Filter.Proto.validation_state
+     and type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -140,7 +160,8 @@ module Internal_for_tests : sig
     ->
     T
       with type protocol_operation = Filter.Proto.operation
-       and type operation_receipt = Filter.Proto.operation_receipt
        and type validation_state = Filter.Proto.validation_state
+       and type filter_state = Filter.Mempool.state
+       and type filter_config = Filter.Mempool.config
        and type chain_store = Chain_store.chain_store
 end

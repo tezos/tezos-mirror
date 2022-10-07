@@ -115,7 +115,7 @@ module type RPC = sig
 end
 
 module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto = struct
+  FILTER with module Proto = Proto and type Mempool.state = unit = struct
   module Proto = Proto
 
   module Mempool = struct

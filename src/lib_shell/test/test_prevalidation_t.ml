@@ -63,8 +63,9 @@ end
 module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
   Shell_plugin.FILTER
     with type Proto.operation_data = Proto.operation_data
-     and type Proto.operation = Proto.operation = Shell_plugin.No_filter (struct
-  let hash = Protocol_hash.zero
+     and type Proto.operation = Proto.operation
+     and type Mempool.state = unit = Shell_plugin.No_filter (struct
+  let hash = Tezos_crypto.Protocol_hash.zero
 
   include Proto
 
@@ -72,6 +73,10 @@ module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
 end)
 
 module Mock_filter = MakeFilter (Mock_protocol)
+
+let filter_state : Mock_filter.Mempool.state = ()
+
+let filter_config = Mock_filter.Mempool.default_config
 
 module Init = struct
   let genesis_protocol =
@@ -139,6 +144,8 @@ let make_prevalidation_mock_protocol ctxt =
   let module Prevalidation_t = MakePrevalidation (Chain_store) (Mock_filter) in
   (module Prevalidation_t : Prevalidation.T
     with type protocol_operation = Mock_protocol.operation
+     and type filter_state = Mock_filter.Mempool.state
+     and type filter_config = Mock_filter.Mempool.config
      and type chain_store = unit)
 
 let now () = Time.System.to_protocol (Tezos_base.Time.System.now ())
@@ -149,13 +156,10 @@ let chain_store = ()
 (** Test that [create] returns [Ok] in a pristine context. *)
 let test_create ctxt =
   let open Lwt_result_syntax in
-  let live_operations = Tezos_crypto.Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module P) = make_prevalidation_mock_protocol ctxt in
-  let predecessor : Store.Block.t =
-    Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
-  in
-  let* _ = P.create chain_store ~predecessor ~live_operations ~timestamp () in
+  let head = Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt in
+  let* _ = P.create chain_store ~head ~timestamp () in
   return_unit
 
 module Parser = Shell_operation.MakeParser (Mock_protocol)
@@ -193,144 +197,142 @@ let mk_ops () =
     when the protocol's [apply_operation] crashes. *)
 let test_apply_operation_crash ctxt =
   let open Lwt_result_syntax in
-  let live_operations = Tezos_crypto.Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let ops = mk_ops () in
-  let predecessor : Store.Block.t =
-    Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
-  in
+  let head = Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt in
   let (module P) = make_prevalidation_mock_protocol ctxt in
-  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
-  let apply_op pv op =
-    let*! application_result = P.apply_operation pv op in
-    match application_result with
-    | Applied _ | Branch_refused _ | Refused _ | Outdated _ ->
+  let* pv = P.create chain_store ~head ~timestamp () in
+  let add_op pv op =
+    let*! ( pv,
+            (_filter_state : P.filter_state),
+            (_op : Mock_protocol.operation Shell_operation.operation),
+            classification,
+            (_replacement : P.replacement) ) =
+      P.add_operation pv filter_state filter_config op
+    in
+    match classification with
+    | `Applied | `Prechecked | `Branch_refused _ | `Refused _ | `Outdated _ ->
         (* These cases should not happen because
            [Mock_protocol.apply_operation] is [assert false]. *)
         assert false
-    | Branch_delayed _ ->
+    | `Branch_delayed _ ->
         (* This is the only allowed case. *)
         Lwt.return pv
   in
-  let*! _ = List.fold_left_s apply_op pv ops in
+  let*! _ = List.fold_left_s add_op pv ops in
   return_unit
 
-(** Logical implication *)
-let ( ==> ) a b = (not a) || b
-
-(** Returns a random generator initialized with a seed from [QCheck2] *)
-let mk_rand () =
-  (* We use QCheck2 as the source of randomness, as we hope one day
-     this will become a traditional QCheck2 test. *)
-  QCheck2.Gen.generate ~n:8 QCheck2.Gen.int
-  |> Array.of_list |> Random.State.make
-
-(** [mk_live_operations rand ops] returns a subset of [ops], which is
-    appropriate for being passed as the [live_operations] argument
-    of [Prevalidation.create] *)
-let mk_live_operations rand ops =
-  List.fold_left
-    (fun acc op ->
-      if Random.State.bool rand then
-        Tezos_crypto.Operation_hash.Set.add
-          (Shell_operation.Internal_for_tests.to_raw op |> Operation.hash)
-          acc
-      else acc)
-    Tezos_crypto.Operation_hash.Set.empty
-    ops
-
-module Proto_random_apply :
+module Proto_random_add_operation :
   Tezos_protocol_environment.PROTOCOL
     with type operation_data = unit
      and type operation = Mock_protocol.operation = struct
   include Mock_protocol
 
-  let apply_operation _ _ _ =
-    let b = QCheck2.Gen.(generate1 bool) in
-    Lwt.return (if b then Ok ((), ()) else error_with "Operation doesn't apply")
+  (** Toy mempool with a random [add_operation] function.
+
+      Unlike [Mock_protocol.Mempool], this mempool's type [t] is an
+      actual state that keeps track of validated operations and can be
+      retrieved with [operations]. This allows the test below to check
+      that operations were correctly added or removed. *)
+  module Mempool = struct
+    include Mempool
+    open Tezos_crypto
+
+    type t = operation Operation_hash.Map.t
+
+    type validation_info = unit
+
+    let init _ctxt _chain_id ~head_hash:_ ~head:_ ~cache:_ =
+      Lwt_result.return ((), Operation_hash.Map.empty)
+
+    let operation_encoding =
+      Data_encoding.conv
+        (fun {shell; protocol_data = ()} -> shell)
+        (fun shell -> {shell; protocol_data = ()})
+        Operation.shell_header_encoding
+
+    let encoding = Operation_hash.Map.encoding operation_encoding
+
+    let add_operation ?check_signature:_ ?conflict_handler _info state (oph, op)
+        =
+      if Option.is_none conflict_handler then
+        QCheck2.Test.fail_reportf
+          "Prevalidation should always call [Proto.Mempool.add_operation] with \
+           an explicit [conflict_handler]." ;
+      match
+        QCheck2.Gen.(
+          generate1 (oneofl [`Added; `Replaced; `Unchanged; `Error; `Crash]))
+      with
+      | `Added ->
+          let state = Operation_hash.Map.add oph op state in
+          Lwt_result.return (state, Added)
+      | `Replaced ->
+          let removed =
+            match Operation_hash.Map.choose state with
+            | Some (hash, _) -> hash
+            | None -> Tezos_crypto.Operation_hash.zero
+          in
+          let state = Operation_hash.Map.remove removed state in
+          let state = Operation_hash.Map.add oph op state in
+          Lwt_result.return (state, Replaced {removed})
+      | `Unchanged -> Lwt_result.return (state, Unchanged)
+      | `Error ->
+          let err = error_of_fmt "Error during protocol validation." in
+          Lwt_result.fail (Validation_error [err])
+      | `Crash -> assert false
+
+    let remove_operation state oph = Operation_hash.Map.remove oph state
+
+    let merge ?conflict_handler:_ _ _ = assert false
+
+    let operations = Fun.id
+  end
 end
 
-module Filter_random_apply = MakeFilter (Proto_random_apply)
+module Filter_random_add_operation = MakeFilter (Proto_random_add_operation)
 
-(** Test that [Prevalidation.apply_operations] returns [Outdated]
-    for operations in [live_operations] *)
-let test_apply_operation_live_operations ctxt =
-  let open Lwt_result_syntax in
-  let timestamp : Time.Protocol.t = now () in
-  let rand : Random.State.t = mk_rand () in
-  let ops = mk_ops () in
-  let live_operations : Tezos_crypto.Operation_hash.Set.t =
-    mk_live_operations rand ops
-  in
-  let predecessor : Store.Block.t =
-    Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
-  in
-  let (module Chain_store) = make_chain_store ctxt in
-  let module P = MakePrevalidation (Chain_store) (Filter_random_apply) in
-  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
-  let op_in_live_operations op =
-    Tezos_crypto.Operation_hash.Set.mem
-      (Shell_operation.Internal_for_tests.to_raw op |> Operation.hash)
-      live_operations
-  in
-  let apply_op pv op =
-    let*! application_result = P.apply_operation pv op in
-    let next_pv, result_is_outdated =
-      match application_result with
-      | Applied (next_pv, _receipt) -> (next_pv, false)
-      | Outdated _ -> (pv, true)
-      | Branch_delayed _ | Branch_refused _ | Refused _ -> (pv, false)
-    in
-    (* Here is the main check of this test: *)
-    assert (op_in_live_operations op ==> result_is_outdated) ;
-    Lwt.return next_pv
-  in
-  let*! _ = List.fold_left_s apply_op pv ops in
-  return_unit
+let filter_config = Filter_random_add_operation.Mempool.default_config
 
 (** Test that [Prevalidation.apply_operations] makes field [applied]
     grow and that it grows only for operations on which the protocol
     [apply_operation] returns [Ok]. *)
 let test_apply_operation_applied ctxt =
   let open Lwt_result_syntax in
+  let open Tezos_crypto in
   let timestamp : Time.Protocol.t = now () in
-  let rand : Random.State.t = mk_rand () in
   let ops = mk_ops () in
-  let live_operations : Tezos_crypto.Operation_hash.Set.t =
-    mk_live_operations rand ops
-  in
-  let predecessor : Store.Block.t =
-    Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
-  in
+  let head = Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt in
   let (module Chain_store) = make_chain_store ctxt in
-  let module P = MakePrevalidation (Chain_store) (Filter_random_apply) in
-  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
-  let to_applied = P.Internal_for_tests.to_applied in
+  let module P = MakePrevalidation (Chain_store) (Filter_random_add_operation)
+  in
+  let* pv = P.create chain_store ~head ~timestamp () in
   let apply_op pv op =
-    let applied_before = to_applied pv in
-    let*! application_result = P.apply_operation pv op in
-    let next_pv, result_is_applied =
-      match application_result with
-      | Applied (next_pv, _receipt) -> (next_pv, true)
-      | Branch_delayed _ ->
-          (* As in [test_apply_operation_crash] *)
-          (pv, false)
-      | Outdated _ ->
-          (* This case can happen, because we specified a non-empty [live_operations] set *)
-          (pv, false)
-      | Branch_refused _ | Refused _ ->
-          (* As in [test_apply_operation_crash], these cases cannot happen. *)
-          assert false
+    let*! ( pv,
+            (_filter_state : P.filter_state),
+            (_op : Mock_protocol.operation Shell_operation.operation),
+            classification,
+            replacement ) =
+      P.add_operation pv filter_state filter_config op
     in
-    let applied_after = to_applied next_pv in
-    (* Here is the main check of this test: *)
-    if result_is_applied then
-      assert (Stdlib.List.tl applied_after = applied_before)
-    else
-      (* Physical equality: intended, the [applied] field should
-         not be changed in this case. *)
-      assert (applied_after == applied_before) ;
-    Lwt.return next_pv
+    let valid_ops = P.Internal_for_tests.get_valid_operations pv in
+    (match classification with
+    | `Prechecked -> (
+        assert (Operation_hash.Map.mem op.hash valid_ops) ;
+        match replacement with
+        | None -> ()
+        | Some (removed, _) ->
+            assert (not (Operation_hash.Map.mem removed valid_ops)))
+    | `Branch_delayed _ ->
+        assert (not (Operation_hash.Map.mem op.hash valid_ops)) ;
+        assert (Option.is_none replacement)
+    | `Branch_refused _ | `Refused _ | `Outdated _ | `Applied ->
+        (* These cases cannot happen because the only possible error in
+           [Proto_random_add_operation.Mempool.add_operation] has a
+           [Branch_delayed] classification, protocol crashes are wrapped
+           into a [Branch_delayed] error by [protect], and operation
+           conflicts are also [Branch_delayed]. *)
+        QCheck2.Test.fail_reportf "%s:@.Unexpected classification." __LOC__) ;
+    Lwt.return pv
   in
   let*! _ = List.fold_left_s apply_op pv ops in
   return_unit
@@ -357,11 +359,6 @@ let () =
              from the protocol crashes"
             `Quick
             (Init.wrap_tzresult_lwt_disk test_apply_operation_crash);
-          Tztest.tztest
-            "[apply_operation] returns [Outdated] on operations in \
-             [live_operations]"
-            `Quick
-            (Init.wrap_tzresult_lwt_disk test_apply_operation_live_operations);
           Tztest.tztest
             "[apply_operation] makes the [applied] field grow for [Applied] \
              operations (and only for them)"

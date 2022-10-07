@@ -191,7 +191,7 @@ end
 
 (** Dummy filter that does nothing *)
 module No_filter (Proto : Registered_protocol.T) :
-  FILTER with module Proto = Proto
+  FILTER with module Proto = Proto and type Mempool.state = unit
 
 (** This is a protocol specific module that is used to collect all the
    * protocol-specific metrics. This module
