@@ -49,8 +49,6 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam \! -name octez\*-deps.opam\* -print | LC_COLLATE=C sort -u)
-
 ## Shallow clone of opam repository (requires git protocol version 2)
 export GIT_WORK_TREE="$tmp_dir"
 export GIT_DIR="$GIT_WORK_TREE/.git"
@@ -60,30 +58,9 @@ git remote add origin https://github.com/ocaml/opam-repository
 git fetch --depth 1 origin "$full_opam_repository_tag"
 
 ## Adding the various tezos packages
-packages=
-for opam in $opams; do
 
-    file=$(basename $opam)
-    package=${file%.opam}
-    packages=$packages,$package.dev
-    mkdir -p "$tmp_dir"/packages/$package/$package.dev
-
-    ## HACK: For some reason, `opam admin list/filter` do not follow
-    ## `--with-test/doc` for 'toplevel' package, only for their
-    ## 'dependencies.  We want the exact opposite (like for `opam
-    ## install`), so we manually remove the tag in the most
-    ## ugliest-possible way...
-
-    sed -e "s/{ *with-test *}//" \
-        -e "s/with-test \& //" \
-        -e "s/\& with-test//" \
-        -e "s/{ *with-doc *}//" \
-        -e "s/with-doc \& //" \
-        -e "s/\& with-doc//" \
-        $opam > "$tmp_dir"/packages/$package/$package.dev/opam
-
-done
-
+mkdir -p "$tmp_dir"/packages/octez-deps/octez-deps.dev
+cp opam/octez-deps.opam "$tmp_dir"/packages/octez-deps/octez-deps.dev/opam
 
 ## Filtering unrequired packages
 cd $tmp_dir
@@ -123,7 +100,7 @@ case $(opam --version) in
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}ledgerwallet-tezos,caqti-driver-postgresql,js_of_ocaml-lwt,$dummy_pkg
+  octez-deps,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}ledgerwallet-tezos,caqti-driver-postgresql,js_of_ocaml-lwt,$dummy_pkg
 ## - ocaml-base-compiler has to be explicitely listed for the solver
 ##   to not prefer the "variant" `system` of the compiler
 ## - odoc is used by the CI to generate the doc
@@ -139,12 +116,8 @@ for variant in afl flambda fp ; do
     git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
 done
 
-## Removing the various tezos packages
-for opam in $opams; do
-    file=$(basename $opam)
-    package=${file%.opam}
-    rm -r "$tmp_dir"/packages/$package
-done
+## Removing temporary hacks
+rm -r "$tmp_dir"/packages/octez-deps
 rm -r "$tmp_dir"/packages/$dummy_pkg
 
 ## Generating the diff!
