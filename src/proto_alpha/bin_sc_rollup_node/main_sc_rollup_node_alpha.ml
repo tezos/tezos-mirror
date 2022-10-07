@@ -282,6 +282,7 @@ let config_init_command =
           fee_parameters = Operator_purpose_map.empty;
           mode;
           loser_mode;
+          batcher = Configuration.default_batcher;
         }
       in
       let*? config = check_mode config in

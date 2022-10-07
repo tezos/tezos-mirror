@@ -27,16 +27,11 @@ open Protocol
 open Alpha_context
 
 module type S = sig
-  (** [init ?simulate ?min_batch_elements ?min_batch_size ?max_batch_elements
-      ?max_batch_size ~signer node_ctxt] initializes and start the batcher for
-      [signer]. If [simulation] is [true] (the default), messages added to the
-      batcher are simulated in an incremental simulation context. *)
+  (** [init config ~signer node_ctxt] initializes and starts the batcher for
+      [signer]. If [config.simulation] is [true] (the default), messages added
+      to the batcher are simulated in an incremental simulation context. *)
   val init :
-    ?simulate:bool ->
-    ?min_batch_elements:int ->
-    ?min_batch_size:int ->
-    ?max_batch_elements:int ->
-    ?max_batch_size:int ->
+    Configuration.batcher ->
     signer:public_key_hash ->
     _ Node_context.t ->
     unit tzresult Lwt.t

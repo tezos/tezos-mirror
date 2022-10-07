@@ -43,6 +43,27 @@ type operators = Tezos_crypto.Signature.Public_key_hash.t Operator_purpose_map.t
 
 type fee_parameters = Injection.fee_parameter Operator_purpose_map.t
 
+(** Configuration for the batcher.
+
+  Invariants:
+  - 0 < [min_batch_size] <= [max_batch_size] <= [protocol_max_batch_size]
+  - 0 < [min_batch_elements] <= [max_batch_elements]
+*)
+type batcher = {
+  simulate : bool;
+      (** If [true], the batcher will simulate the messages it receives, in an
+      incremental context, before queuing them. *)
+  min_batch_elements : int;
+      (** The minimum number elements in a batch for it to be produced when the
+          batcher receives new messages. *)
+  min_batch_size : int;
+      (** The minimum size in bytes of a batch for it to be produced when the
+          batcher receives new messages. *)
+  max_batch_elements : int;
+      (** The maximum number of elements that we can put in a batch. *)
+  max_batch_size : int;  (** The maximum size in bytes of a batch. *)
+}
+
 type t = {
   data_dir : string;
   sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
@@ -59,6 +80,7 @@ type t = {
   *)
   dal_node_addr : string;
   dal_node_port : int;
+  batcher : batcher;
 }
 
 (** [make_purpose_map ~default purposes] constructs a purpose map from a list of
@@ -109,6 +131,9 @@ val default_dal_node_addr : string
 
 (** [default_dal_node_port] is the default value for [dal_node_port]. *)
 val default_dal_node_port : int
+
+(** [default_batcher] is the default configuration parameters for the batcher. *)
+val default_batcher : batcher
 
 (** This is the list of available modes. *)
 val modes : mode list

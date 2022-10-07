@@ -30,11 +30,7 @@ module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
 module type S = sig
   val init :
-    ?simulate:bool ->
-    ?min_batch_elements:int ->
-    ?min_batch_size:int ->
-    ?max_batch_elements:int ->
-    ?max_batch_size:int ->
+    Configuration.batcher ->
     signer:public_key_hash ->
     _ Node_context.t ->
     unit tzresult Lwt.t
@@ -60,14 +56,14 @@ module Make (Simulation : Simulation.S) : S = struct
   type state = {
     node_ctxt : Node_context.ro;
     signer : Tezos_crypto.Signature.public_key_hash;
-    simulate : bool;
-    min_batch_elements : int;
-    min_batch_size : int;
-    max_batch_elements : int;
-    max_batch_size : int;
+    conf : Configuration.batcher;
     messages : Message_queue.t;
     mutable simulation_ctxt : Simulation.t option;
   }
+
+  let message_size s =
+    (* Encoded as length of s on 4 bytes + s *)
+    4 + String.length s
 
   let inject_batch state (messages : L2_message.t list) =
     let messages = List.map L2_message.content messages in
@@ -88,12 +84,12 @@ module Make (Simulation : Simulation.S) : S = struct
                current_batch_size,
                current_batch_elements,
                full_batches ) ->
-          let size = String.length (L2_message.content message) in
+          let size = message_size (L2_message.content message) in
           let new_batch_size = current_batch_size + size in
           let new_batch_elements = current_batch_elements + 1 in
           if
-            new_batch_size <= state.max_batch_size
-            && new_batch_elements <= state.max_batch_elements
+            new_batch_size <= state.conf.max_batch_size
+            && new_batch_elements <= state.conf.max_batch_elements
           then
             (* We can add the message to the current batch because we are still
                within the bounds. *)
@@ -115,8 +111,8 @@ module Make (Simulation : Simulation.S) : S = struct
     let batches =
       if
         (not only_full)
-        || current_batch_size >= state.min_batch_size
-           && current_batch_elements >= state.min_batch_elements
+        || current_batch_size >= state.conf.min_batch_size
+           && current_batch_elements >= state.conf.min_batch_elements
       then
         (* We have enough to make a batch with the last non-full batch. *)
         List.rev current_rev_batch :: full_batches
@@ -160,19 +156,22 @@ module Make (Simulation : Simulation.S) : S = struct
 
   let on_register state (messages : string list) =
     let open Lwt_result_syntax in
+    let max_size_msg =
+      min
+        (Protocol.Constants_repr.sc_rollup_message_size_limit
+       + 4 (* We add 4 because [message_size] adds 4. *))
+        state.conf.max_batch_size
+    in
     let*? messages =
       List.mapi_e
         (fun i message ->
-          if String.length message > state.max_batch_size then
-            error_with
-              "Message %d is too large (max size is %d)"
-              i
-              state.max_batch_size
+          if message_size message > max_size_msg then
+            error_with "Message %d is too large (max size is %d)" i max_size_msg
           else Ok (L2_message.make message))
         messages
     in
     let* () =
-      if not state.simulate then return_unit
+      if not state.conf.simulate then return_unit
       else
         match state.simulation_ctxt with
         | None -> failwith "Simulation context of batcher not initialized"
@@ -201,7 +200,7 @@ module Make (Simulation : Simulation.S) : S = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/4224
        Replay with simulation may be too expensive *)
     let+ simulation_ctxt, failing =
-      if not state.simulate then return (simulation_ctxt, [])
+      if not state.conf.simulate then return (simulation_ctxt, [])
       else
         (* Re-simulate one by one *)
         Message_queue.fold_es
@@ -217,18 +216,13 @@ module Make (Simulation : Simulation.S) : S = struct
     (* Forget failing messages *)
     List.iter (Message_queue.remove state.messages) failing
 
-  let init_batcher_state node_ctxt ~signer ~simulate ~min_batch_elements
-      ~min_batch_size ~max_batch_elements ~max_batch_size =
+  let init_batcher_state node_ctxt ~signer conf =
     let open Lwt_syntax in
     return
       {
         node_ctxt;
         signer;
-        simulate;
-        min_batch_elements;
-        min_batch_size;
-        max_batch_elements;
-        max_batch_size;
+        conf;
         messages = Message_queue.create 100_000 (* ~ 400MB *);
         simulation_ctxt = None;
       }
@@ -239,11 +233,7 @@ module Make (Simulation : Simulation.S) : S = struct
     type parameters = {
       node_ctxt : Node_context.ro;
       signer : Tezos_crypto.Signature.public_key_hash;
-      simulate : bool;
-      min_batch_elements : int;
-      min_batch_size : int;
-      max_batch_elements : int;
-      max_batch_size : int;
+      conf : Configuration.batcher;
     }
   end
 
@@ -269,28 +259,9 @@ module Make (Simulation : Simulation.S) : S = struct
 
     type launch_error = error trace
 
-    let on_launch _w ()
-        Types.
-          {
-            node_ctxt;
-            signer;
-            simulate;
-            min_batch_elements;
-            min_batch_size;
-            max_batch_elements;
-            max_batch_size;
-          } =
+    let on_launch _w () Types.{node_ctxt; signer; conf} =
       let open Lwt_result_syntax in
-      let*! state =
-        init_batcher_state
-          node_ctxt
-          ~signer
-          ~simulate
-          ~min_batch_elements
-          ~min_batch_size
-          ~max_batch_elements
-          ~max_batch_size
-      in
+      let*! state = init_batcher_state node_ctxt ~signer conf in
       return state
 
     let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
@@ -308,25 +279,11 @@ module Make (Simulation : Simulation.S) : S = struct
 
   let worker_promise, worker_waker = Lwt.task ()
 
-  let init ?(simulate = true) ?(min_batch_elements = 10) ?(min_batch_size = 10)
-      ?(max_batch_elements = max_int) ?(max_batch_size = 4096) ~signer node_ctxt
-      =
+  let init conf ~signer node_ctxt =
     let open Lwt_result_syntax in
     let node_ctxt = Node_context.readonly node_ctxt in
     let+ worker =
-      Worker.launch
-        table
-        ()
-        {
-          node_ctxt;
-          signer;
-          simulate;
-          min_batch_elements;
-          min_batch_size;
-          max_batch_elements;
-          max_batch_size;
-        }
-        (module Handlers)
+      Worker.launch table () {node_ctxt; signer; conf} (module Handlers)
     in
     Lwt.wakeup worker_waker worker
 

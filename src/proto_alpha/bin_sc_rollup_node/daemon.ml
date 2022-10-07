@@ -420,7 +420,8 @@ module Make (PVM : Pvm.S) = struct
             node_ctxt.operators
         with
         | None -> return_unit
-        | Some signer -> Components.Batcher.init ~signer node_ctxt
+        | Some signer ->
+            Components.Batcher.init configuration.batcher ~signer node_ctxt
       in
       let*! () =
         Event.node_is_ready
