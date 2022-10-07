@@ -3,13 +3,9 @@
 set -e
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-src_dir="$(dirname "$script_dir")"
 
 #shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
-
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam \! -name octez\*-deps.opam\* -print)
-
 
 export OPAMYES="${OPAMYES:=true}"
 
@@ -45,7 +41,7 @@ OPAMASSUMEDEPEXTS=true opam install conf-rust
 # will be intepreted as a string and not as a list of strings leading to
 # an error.
 # shellcheck disable=SC2086
-opam install $opams --deps-only --with-test --criteria="-notuptodate,-changed,-removed"
+opam install opam/octez-deps.opam --deps-only --criteria="-notuptodate,-changed,-removed"
 
 if [ "$1" = "--tps" ]; then
     opam install caqti-driver-postgresql
