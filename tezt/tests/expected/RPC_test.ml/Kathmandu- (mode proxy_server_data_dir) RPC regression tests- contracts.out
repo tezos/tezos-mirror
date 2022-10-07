@@ -52,28 +52,36 @@ Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
@@ -96,21 +104,27 @@ Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
@@ -136,14 +150,18 @@ Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key"
+  
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
@@ -347,14 +365,18 @@ Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter"
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
 Error:
   Rpc request failed:
      - meth: GET
      - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: The client does not support following HTTP redirects yet.
+     - error: Unexpected error 301:
+                "tezos-proxy-server: request unsupported for proxy server, redirecting to node endpoint at http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key"
+  
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
