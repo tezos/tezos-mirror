@@ -185,6 +185,21 @@ val simulate :
   string list ->
   simulation_result Runnable.process
 
+(** [inject client messages] injects the [messages] in the queue the rollup
+    node's batcher and returns the list of message hashes injected. *)
+val inject :
+  ?hooks:Process_hooks.t -> t -> string list -> string list Runnable.process
+
+(** [batcher_queue client] returns the queue of messages, as pairs of message
+    hash and binary message, in the batcher. *)
+val batcher_queue :
+  ?hooks:Process_hooks.t -> t -> (string * string) list Runnable.process
+
+(** [get_batcher_msg client hash] fetches the message whose hash is [hash] from
+    the queue. It fails if the message is not present. *)
+val get_batcher_msg :
+  ?hooks:Process_hooks.t -> t -> string -> string Runnable.process
+
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :
   ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
