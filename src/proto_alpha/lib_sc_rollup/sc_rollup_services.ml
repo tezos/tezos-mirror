@@ -172,6 +172,14 @@ module Make_services (P : PREFIX) = struct
     Tezos_rpc.Context.make_call2 (Tezos_rpc.Service.prefix prefix s)
 end
 
+type simulate_query = {fuel : int64 option}
+
+let simulate_query : simulate_query Tezos_rpc.Query.t =
+  let open Tezos_rpc.Query in
+  query (fun fuel -> {fuel})
+  |+ opt_field "fuel" Tezos_rpc.Arg.int64 (fun t -> t.fuel)
+  |> seal
+
 module Global = struct
   open Tezos_rpc.Path
 
@@ -453,4 +461,22 @@ module Local = struct
       ~query:Tezos_rpc.Query.empty
       ~output:(Data_encoding.option Encodings.commitment_with_hash_and_level)
       (path / "last_published_commitment")
+
+  let injection =
+    Tezos_rpc.Service.post_service
+      ~description:"Inject messages in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~input:
+        Data_encoding.(
+          def
+            "messages"
+            ~description:"Messages to inject"
+            (list L2_message.content_encoding))
+      ~output:
+        Data_encoding.(
+          def
+            "message_hashes"
+            ~description:"Hashes of injected L2 messages"
+            (list L2_message.Hash.encoding))
+      (path / "batcher" / "injection")
 end
