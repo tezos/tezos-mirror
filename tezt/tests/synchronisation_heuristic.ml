@@ -207,7 +207,7 @@ let check_sync_state ?__LOC__ ?endpoint client expected_state =
   in
   Check.(sync_state.sync_state = expected_state)
     sync_state_typ
-    ~error_msg:"Expected node to be %L, was %R" ;
+    ~error_msg:"Expected node to be %R, was %L" ;
   unit
 
 (* Threshold 0, peer always bootstrapped. *)
