@@ -3,6 +3,27 @@
 Changelog
 '''''''''
 
+Version 15.0~rc1
+================
+
+General
+-------
+
+- **Breaking change**: all executables have been renamed.
+  The ``tezos-`` prefix has been replaced by ``octez-`` and protocol numbers
+  have been removed. For instance, ``tezos-node`` is now named ``octez-node``
+  and ``tezos-baker-014-PtKathma`` is now named ``octez-baker-PtKathma``.
+  If you compile using ``make``, symbolic links from the old names to the
+  new names are created, so you can still use the old names.
+  But those old names are deprecated and may stop being supported
+  starting from version 16.0.
+
+- **Breaking change**: in the Docker entrypoint, all commands have been renamed.
+  The ``tezos-`` prefix has been replaced by ``octez-``.
+  For instance, ``tezos-node`` is now named ``octez-node`` and ``tezos-baker``
+  is now named ``octez-baker``. The old command names are still available but
+  are deprecated and may stop being supported starting from version 16.0.
+
 Version 14.1
 ============
 
