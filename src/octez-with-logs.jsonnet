@@ -13,7 +13,7 @@ local rpc = import './rpc.jsonnet';
 local workers = import './workers.jsonnet';
 local logs = import './logs.jsonnet';
 
-local boardtitle = 'Tezos with logs dashboard - branch: ' + std.extVar('branch');
+local boardtitle = 'Octez with logs dashboard';
 
 
 //Position variables
