@@ -24,9 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Elements used by {!Prevalidator_internal}, but also expected to
-    remain unchanged in the new mempool implementation. This module is
-    also included in {!Prevalidator}. *)
+(** Common elements used by both {!Prevalidator_internal} and
+    {!Legacy_prevalidator_internal}. This module is also included in
+    {!Prevalidator}. *)
 
 (** Minimal delay between two mempool advertisements *)
 val advertisement_delay : float

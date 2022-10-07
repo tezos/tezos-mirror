@@ -50,7 +50,7 @@ module Mock_protocol :
     Lwt_result_syntax.return_unit
 end
 
-module Internal_for_tests = Tezos_shell.Prevalidation.Internal_for_tests
+module Internal_for_tests = Prevalidation.Internal_for_tests
 
 module Init = struct
   let genesis_protocol =
@@ -110,10 +110,10 @@ let create_prevalidation
 
     let chain_id () = Init.chain_id
   end in
-  let module Prevalidation =
+  let module Prevalidation_t =
     Internal_for_tests.Make (Chain_store) (Mock_protocol)
   in
-  (module Prevalidation : Tezos_shell.Prevalidation.T
+  (module Prevalidation_t : Prevalidation.T
     with type operation_receipt = unit
      and type validation_state = unit
      and type chain_store = Chain_store.chain_store)

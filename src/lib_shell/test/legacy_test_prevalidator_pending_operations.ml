@@ -25,13 +25,15 @@
 
 (** Testing
     -------
-    Component:    Shell (Prevalidator pending operations)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_pending_operations.exe
+    Component:    Shell (Legacy prevalidator pending operations)
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidator_pending_operations.exe
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 
 open Lib_test.Qcheck2_helpers
-module Pending_ops = Prevalidator_pending_operations
+module Prevalidation = Legacy_prevalidation
+module Pending_ops = Legacy_prevalidator_pending_operations
+module Generators = Legacy_generators
 module CompareListQ = Compare.List (Q)
 
 let pending_of_list =

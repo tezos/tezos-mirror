@@ -23,11 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Prevalidator_classification
+module Prevalidation = Legacy_prevalidation
+module Classification = Legacy_prevalidator_classification
+module Pending_operations = Legacy_prevalidator_pending_operations
+open Classification
 
 let add_if_not_present classification op t =
-  Prevalidator_classification.(
-    if is_in_mempool op.Prevalidation.hash t = None then add classification op t)
+  if is_in_mempool op.Prevalidation.hash t = None then add classification op t
 
 (** A generator for the protocol bytes of an operation. *)
 let operation_proto_gen = QCheck2.Gen.small_string ?gen:None
@@ -50,7 +52,8 @@ let block_hash_gen : Block_hash.t QCheck2.Gen.t =
 (** A generator of operations.
     - [proto_gen] is the generator for protocol bytes. By default, it is
       {!proto_gen} above. This default is fine for cases where having
-      valid proto bytes doesn't matter (for example for {!Prevalidator_classification}).
+      valid proto bytes doesn't matter (for example for
+      {!Legacy_prevalidator_classification}).
     - [block_hash_t] is an optional generator for the branch.
       If omitted {!block_hash_gen} is used.
 
@@ -80,7 +83,7 @@ let q_in_0_1 () =
   let+ p = Lib_test.Qcheck2_helpers.int64_range_gen 0L q in
   Q.make (Z.of_int64 p) (Z.of_int64 q)
 
-let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
+let priority_gen () : Pending_operations.priority QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* top_prio_value = oneofl [`High; `Medium; `Low] in
   match top_prio_value with
@@ -115,8 +118,7 @@ let operation_with_hash_gen ?proto_gen ?block_hash_t () :
   Prevalidation.Internal_for_tests.make_operation op oph ()
 
 let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
-    (unit Prevalidation.operation * Prevalidator_pending_operations.priority)
-    QCheck2.Gen.t =
+    (unit Prevalidation.operation * Pending_operations.priority) QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* op = operation_with_hash_gen ?proto_gen ?block_hash_t () in
   let* priority = priority_gen () in
@@ -223,7 +225,7 @@ let t_gen_ ~can_be_full : unit t QCheck2.Gen.t =
   let+ inputs =
     list_repeat size (pair classification_gen (operation_with_hash_gen ()))
   in
-  let t = Prevalidator_classification.create parameters in
+  let t = Classification.create parameters in
   List.iter
     (fun (classification, op) -> add_if_not_present classification op t)
     inputs ;
@@ -236,7 +238,6 @@ let t_gen = t_gen_ ~can_be_full:true
    different classes. *)
 let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
     =
-  let module Classification = Prevalidator_classification in
   let open QCheck2 in
   fun t ->
     let to_ops map =

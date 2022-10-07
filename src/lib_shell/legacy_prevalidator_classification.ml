@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Prevalidation = Legacy_prevalidation
+
 module Event = struct
   let section = ["prevalidator_classification"]
 

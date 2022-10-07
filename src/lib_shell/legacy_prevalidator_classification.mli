@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Prevalidation := Legacy_prevalidation
+
 (** Classifications which correspond to errors *)
 type error_classification =
   [ `Branch_delayed of tztrace

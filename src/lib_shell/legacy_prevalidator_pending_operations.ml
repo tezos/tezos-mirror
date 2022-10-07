@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Prevalidation = Legacy_prevalidation
+
 (* Ordering is important, as it is used below in map keys comparison *)
 type priority = [`High | `Medium | `Low of Q.t list]
 

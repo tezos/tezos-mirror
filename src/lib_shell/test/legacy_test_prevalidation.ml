@@ -25,10 +25,12 @@
 
 (** Testing
     -------
-    Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
-    Subject:      Unit tests for [Prevalidation]
+    Component:    Legacy_prevalidation
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidation.exe
+    Subject:      Unit tests for [Legacy_prevalidation]
 *)
+
+module Prevalidation = Legacy_prevalidation
 
 let test_safe_decode () =
   let exception Custom_exception of string in
@@ -51,7 +53,7 @@ let test_safe_decode () =
       true)
 
 open Tezos_requester
-module Classification = Prevalidator_classification
+module Classification = Legacy_prevalidator_classification
 
 module Parameters :
   Requester_impl.PARAMETERS

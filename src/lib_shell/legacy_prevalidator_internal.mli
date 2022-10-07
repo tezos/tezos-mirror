@@ -41,7 +41,7 @@ module Internal_for_tests : sig
   (** Documented in the ml file, because this is only exported for tests. *)
   type 'prevalidation_t tools = {
     advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
-    chain_tools : Store.Block.t Prevalidator_classification.chain_tools;
+    chain_tools : Store.Block.t Legacy_prevalidator_classification.chain_tools;
     create :
       predecessor:Store.Block.t ->
       live_operations:Operation_hash.Set.t ->
@@ -79,7 +79,7 @@ module Internal_for_tests : sig
 
   module Make
       (Filter : Shell_plugin.FILTER)
-      (Prevalidation_t : Prevalidation.T
+      (Prevalidation_t : Legacy_prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state
                             and type protocol_operation = Filter.Proto.operation

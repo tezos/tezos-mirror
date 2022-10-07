@@ -27,12 +27,13 @@
 open Prevalidator_internal_common
 open Prevalidator_worker_state
 module Events = Prevalidator_events
-module Classification = Prevalidator_classification
+module Classification = Legacy_prevalidator_classification
+module Prevalidation = Legacy_prevalidation
 
 (** This module encapsulates pending operations to maintain them in two
     different data structure and avoid coslty repetitive convertions when
     handling batches in [classify_pending_operations]. *)
-module Pending_ops = Prevalidator_pending_operations
+module Pending_ops = Legacy_prevalidator_pending_operations
 
 (** Module encapsulating some types that are used both in production
     and in tests. Having them in a module makes it possible to
@@ -715,9 +716,7 @@ module Make_s
         match Prevalidation_t.parse oph op with
         | Error _ ->
             let* () = Events.(emit unparsable_operation) oph in
-            Prevalidator_classification.add_unparsable
-              oph
-              pv.shell.classification ;
+            Classification.add_unparsable oph pv.shell.classification ;
             return_ok_unit
         | Ok parsed_op -> (
             let* v =
@@ -1516,25 +1515,20 @@ module Make
       Shell_metrics.Mempool.set_applied_collector (fun () ->
           List.length shell.classification.applied_rev |> float_of_int) ;
       Shell_metrics.Mempool.set_prechecked_collector (fun () ->
-          Prevalidator_classification.Sized_map.cardinal
-            shell.classification.prechecked
+          Classification.Sized_map.cardinal shell.classification.prechecked
           |> float_of_int) ;
       Shell_metrics.Mempool.set_refused_collector (fun () ->
-          Prevalidator_classification.cardinal shell.classification.refused
-          |> float_of_int) ;
+          Classification.cardinal shell.classification.refused |> float_of_int) ;
       Shell_metrics.Mempool.set_branch_refused_collector (fun () ->
-          Prevalidator_classification.cardinal
-            shell.classification.branch_refused
+          Classification.cardinal shell.classification.branch_refused
           |> float_of_int) ;
       Shell_metrics.Mempool.set_branch_delayed_collector (fun () ->
-          Prevalidator_classification.cardinal
-            shell.classification.branch_delayed
+          Classification.cardinal shell.classification.branch_delayed
           |> float_of_int) ;
       Shell_metrics.Mempool.set_outdated_collector (fun () ->
-          Prevalidator_classification.cardinal shell.classification.outdated
-          |> float_of_int) ;
+          Classification.cardinal shell.classification.outdated |> float_of_int) ;
       Shell_metrics.Mempool.set_unprocessed_collector (fun () ->
-          Prevalidator_pending_operations.cardinal shell.pending |> float_of_int) ;
+          Pending_ops.cardinal shell.pending |> float_of_int) ;
 
       let* filter_state =
         Filter.Mempool.init

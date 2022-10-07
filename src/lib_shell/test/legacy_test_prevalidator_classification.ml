@@ -25,13 +25,15 @@
 
 (** Testing
     -------
-    Component:    Shell (Prevalidator classification)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification.exe
+    Component:    Shell (Legacy prevalidator classification)
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidator_classification.exe
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
 open Lib_test.Qcheck2_helpers
-module Classification = Prevalidator_classification
+module Prevalidation = Legacy_prevalidation
+module Classification = Legacy_prevalidator_classification
+module Generators = Legacy_generators
 
 let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
 
@@ -182,12 +184,12 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   +> (Operation_hash.Set.of_list
      @@ List.rev_map (fun op -> op.Prevalidation.hash) t.applied_rev)
 
-(** Checks both invariants of type [Prevalidator_classification.t]:
+(** Checks both invariants of type [Legacy_prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
       in fields: [refused; outdated; branch_refused; branch_delayed; applied].
     - The fields: [refused; outdated; branch_refused; branch_delayed; applied]
       are disjoint.
-    These invariants are enforced by [Prevalidator_classification]
+    These invariants are enforced by [Legacy_prevalidator_classification]
     **as long as the caller does not [add] an operation which is already
     present in [t]**. We use [check_invariants] in tests where we know
     this does not happen.
@@ -431,7 +433,7 @@ module Bounded = struct
       |> Format.pp_print_list Operation_hash.pp ppf
     in
     Format.asprintf
-      "Prevalidator_classification.t:@.%a@.Classification:@.%s@.First \
+      "Legacy_prevalidator_classification.t:@.%a@.Classification:@.%s@.First \
        bindings:@.%a@.Other bindings:@.%a"
       Classification.Internal_for_tests.pp
       t
@@ -551,7 +553,7 @@ module Bounded = struct
     true
 end
 
-(** Tests of [Prevalidator_classification.to_map] *)
+(** Tests of [Legacy_prevalidator_classification.to_map] *)
 module To_map = struct
   let map_pp fmt x =
     let map_to_list m =
@@ -827,7 +829,7 @@ let test_create_add_not_empty =
 let () =
   let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
-    "Prevalidator_classification"
+    "Legacy_prevalidator_classification"
     [
       mk_tests
         "flush"

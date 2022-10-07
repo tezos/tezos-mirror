@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Prevalidation := Legacy_prevalidation
+
 (** The priority of a pending operation.
 
     A priority is attached to each pending operation. *)

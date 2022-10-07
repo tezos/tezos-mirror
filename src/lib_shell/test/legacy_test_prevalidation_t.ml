@@ -25,10 +25,12 @@
 
 (** Testing
     -------
-    Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation_t.exe
-    Subject:      Unit tests for {!Prevalidation.T}
+    Component:    Legacy_prevalidation
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidation_t.exe
+    Subject:      Unit tests for {!Legacy_prevalidation.T}
 *)
+
+module Prevalidation = Legacy_prevalidation
 
 module Mock_protocol :
   Tezos_protocol_environment.PROTOCOL
@@ -40,7 +42,7 @@ module Mock_protocol :
   include Environment_protocol_T_test.Mock_all_unit
 
   (* We need to override these functions so that they're not [assert
-     false], because the tests below use [Prevalidation.create] which
+     false], because the tests below use [Legacy_prevalidation.create] which
      calls them. *)
 
   let begin_validation _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
@@ -50,7 +52,7 @@ module Mock_protocol :
     Lwt_result_syntax.return_unit
 end
 
-module Internal_for_tests = Tezos_shell.Prevalidation.Internal_for_tests
+module Internal_for_tests = Prevalidation.Internal_for_tests
 
 module Init = struct
   let genesis_protocol =
@@ -110,10 +112,10 @@ let create_prevalidation
 
     let chain_id () = Init.chain_id
   end in
-  let module Prevalidation =
+  let module Prevalidation_t =
     Internal_for_tests.Make (Chain_store) (Mock_protocol)
   in
-  (module Prevalidation : Tezos_shell.Prevalidation.T
+  (module Prevalidation_t : Prevalidation.T
     with type operation_receipt = unit
      and type validation_state = unit
      and type chain_store = Chain_store.chain_store)
