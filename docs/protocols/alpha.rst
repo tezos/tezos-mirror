@@ -13,7 +13,18 @@ New Environment Version (V8)
 ----------------------------
 
 This protocol requires a different protocol environment version than Lima.
-It requires protocol environment V8, compared to V7 for Lima.
+It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
+
+Smart Contract Optimistic Rollups (ongoing)
+-------------------------------------------
+
+Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
+:gl:`!6252`, :gl:`!6396`)
+
+Data Availability Layer (ongoing)
+---------------------------------
+
+Distribution of rollup operations data off-chain. (MR :gl:`!6174`)
 
 Breaking Changes
 ----------------
@@ -27,6 +38,8 @@ Operation receipts
 Bug Fixes
 ---------
 
+- Ghostnet-specific fixes. (MR :gl:`!6401`)
+
 Minor Changes
 -------------
 
@@ -36,3 +49,5 @@ Internal
 - Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
 
 - Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
+
+- Improve ex_ticket_size. (MR :gl:`!6209`)
