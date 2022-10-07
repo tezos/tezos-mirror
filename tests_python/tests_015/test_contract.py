@@ -1791,18 +1791,6 @@ class TestComparables:
         )
 
 
-@pytest.mark.contract
-class TestTypecheckingErrors:
-    def test_big_map_arity_error(self, client: Client):
-        error_pattern = (
-            'primitive EMPTY_BIG_MAP expects 2 arguments but is given 1.'
-        )
-        with utils.assert_run_failure(error_pattern):
-            client.typecheck(
-                os.path.join(CONTRACT_PATH, 'ill_typed', 'big_map_arity.tz')
-            )
-
-
 BAD_ANNOT_TEST = '''
 parameter bytes;
 storage (option (lambda unit unit));
