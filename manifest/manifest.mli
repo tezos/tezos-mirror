@@ -1045,6 +1045,16 @@ val open_ : ?m:string -> target -> target
     Example: [tezos_base |> open_if protocol_is_recent_enough] *)
 val open_if : ?m:string -> bool -> target -> target
 
+(** Add a dependency to a profile.
+
+    See the documentation of the [?profile] argument of target makers for
+    more information about profiles.
+
+    Use [add_dep_to_profile profile dep] to add [dep] as a dependency to the
+    [opam/profile.opam] file without having to add it as a dependency of an
+    actual package. *)
+val add_dep_to_profile : string -> target -> unit
+
 (** Get a name for a given target, to display in errors.
 
     If a target has multiple names, one is chosen arbitrarily.
@@ -1062,7 +1072,8 @@ val name_for_errors : target -> string
     [default_profile] is the name of the profile to use for targets that
     were declared without [?profile]. See the documentation of the [?profile]
     argument of type ['a maker]. *)
-val generate : make_tezt_exe:(target list -> target) -> default_profile:string -> unit
+val generate :
+  make_tezt_exe:(target list -> target) -> default_profile:string -> unit
 
 (** Run various checks.
 
