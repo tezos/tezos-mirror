@@ -27,6 +27,10 @@
 (** Create a prevalidator instance for a specific protocol
     ([Filter.Proto] where [module Filter : Shell_plugin.FILTER]).
 
+    The protocol must be Lima (environment V7) or a more recent
+    version. For Kathmandu and older protocols, use
+    {!Legacy_prevalidator_internal.make} instead.
+
     This function is wrapped in {!Prevalidator.create}. *)
 val make :
   Shell_limits.prevalidator_limits ->

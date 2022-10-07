@@ -47,7 +47,14 @@ let create limits (module Filter : Shell_plugin.FILTER) chain_db =
   with
   | None ->
       let prevalidator =
-        Prevalidator_internal.make limits chain_db chain_id (module Filter)
+        if Filter.Proto.(compare environment_version V7 >= 0) then
+          Prevalidator_internal.make limits chain_db chain_id (module Filter)
+        else
+          Legacy_prevalidator_internal.make
+            limits
+            chain_db
+            chain_id
+            (module Filter)
       in
       let (module Prevalidator : T) = prevalidator in
       chain_proto_registry :=
