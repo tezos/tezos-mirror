@@ -89,6 +89,7 @@ let register_protocol_agnostic_tests () =
   Baking.register_operations_pool ~protocols:[Kathmandu; Lima; Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
+  Big_map_arity.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
   Cache_cache.register protocols ;
   Client_config.register ~protocols:[Alpha] ;
