@@ -29,9 +29,9 @@ module Make (PVM : Pvm.S) = struct
   module Interpreter = Interpreter.Make (PVM)
   module Commitment = Commitment.Make (PVM)
   module Simulation = Simulation.Make (Interpreter)
-  module RPC_server = RPC_server.Make (Simulation)
   module Refutation_game = Refutation_game.Make (Interpreter)
   module Batcher = Batcher.Make (Simulation)
+  module RPC_server = RPC_server.Make (Simulation) (Batcher)
 end
 
 let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =

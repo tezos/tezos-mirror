@@ -229,7 +229,7 @@ module Common = struct
     state.num_ticks
 end
 
-module Make (Simulation : Simulation.S) = struct
+module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   module PVM = Simulation.PVM
   module Interpreter = Simulation.Interpreter
   module Outbox = Outbox.Make (PVM)
@@ -396,6 +396,10 @@ module Make (Simulation : Simulation.S) = struct
     Block_directory.register0 Sc_rollup_services.Global.Block.simulate
     @@ fun (node_ctxt, block) () {messages; reveal_pages} ->
     simulate_messages node_ctxt block ~reveal_pages messages
+
+  let () =
+    Local_directory.register0 Sc_rollup_services.Local.injection
+    @@ fun _node_ctxt () messages -> Batcher.register_messages messages
 
   let register node_ctxt =
     List.fold_left

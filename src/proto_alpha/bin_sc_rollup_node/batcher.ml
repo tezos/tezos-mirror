@@ -28,7 +28,33 @@ open Alpha_context
 open Batcher_worker_types
 module Message_queue = Hash_queue.Make (L2_message.Hash) (L2_message)
 
-module Make (Simulation : Simulation.S) = struct
+module type S = sig
+  val init :
+    ?simulate:bool ->
+    ?min_batch_elements:int ->
+    ?min_batch_size:int ->
+    ?max_batch_elements:int ->
+    ?max_batch_size:int ->
+    signer:public_key_hash ->
+    _ Node_context.t ->
+    unit tzresult Lwt.t
+
+  val active : unit -> bool
+
+  val find_message : L2_message.hash -> L2_message.t option tzresult
+
+  val get_queue : unit -> (L2_message.hash * L2_message.t) list tzresult
+
+  val register_messages : string list -> L2_message.hash list tzresult Lwt.t
+
+  val batch : unit -> unit tzresult Lwt.t
+
+  val new_head : Layer1.head -> unit tzresult Lwt.t
+
+  val shutdown : unit -> unit Lwt.t
+end
+
+module Make (Simulation : Simulation.S) : S = struct
   module PVM = Simulation.PVM
 
   type state = {

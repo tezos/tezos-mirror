@@ -26,7 +26,7 @@
 open Protocol
 open Alpha_context
 
-module Make (Simulation : Simulation.S) : sig
+module type S = sig
   (** [init ?simulate ?min_batch_elements ?min_batch_size ?max_batch_elements
       ?max_batch_size ~signer node_ctxt] initializes and start the batcher for
       [signer]. If [simulation] is [true] (the default), messages added to the
@@ -69,3 +69,5 @@ module Make (Simulation : Simulation.S) : sig
   (** Shutdown the batcher, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
 end
+
+module Make (Simulation : Simulation.S) : S
