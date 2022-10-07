@@ -11,7 +11,7 @@ local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 local rpc = import './rpc.jsonnet';
 
-local boardtitle = 'Tezos basic dashboard - branch: ' + std.extVar('branch');
+local boardtitle = 'Octez basic dashboard';
 
 
 //Position variables

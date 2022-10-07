@@ -6,7 +6,7 @@ local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 
-local boardtitle = 'Tezos compact dashboard - branch: ' + std.extVar('branch');
+local boardtitle = 'Octez compact dashboard';
 
 dashboard.new(
   title=boardtitle,
