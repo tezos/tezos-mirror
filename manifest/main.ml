@@ -363,6 +363,20 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 let ledgerwallet_tezos = external_lib "ledgerwallet-tezos" V.(at_least "0.2.1")
 
+(* DEVELOPMENT-ONLY DEPENDENCIES *)
+
+let () =
+  List.iter
+    (add_dep_to_profile "octez-dev-deps")
+    [
+      external_lib "merlin" V.True;
+      external_lib "odoc" V.True;
+      external_lib "ocp-indent" V.True;
+      external_lib "ocaml-lsp-server" V.(at_least "1.6.1");
+      external_lib "js_of_ocaml-compiler" V.True;
+      external_lib "merge-fmt" V.True;
+    ]
+
 (* INTERNAL LIBS *)
 
 let octez_test_helpers =
@@ -5562,6 +5576,7 @@ let _tztop =
     ~modes:[Byte]
     ~bisect_ppx:false
     ~static:false
+    ~profile:"octez-dev-deps"
     ~deps:
       [
         (* The following deps come from the original dune file. *)
@@ -5737,9 +5752,6 @@ let exclude filename =
   | ["opam"; "mandatory-for-make.opam"] -> true
   (* opam-repository is used by scripts/opam-release.sh *)
   | "opam-repository" :: _ -> true
-  (* opam/octez-dev-deps.opam is not released, it's used to make an opam lock file
-     for developement dependencies. There is no use to generate it. *)
-  | [ "opam"; "octez-dev-deps.opam" ] -> true
   (* Tezt is only partially managed by the manifest.
      There is no real good reason for that but only the core Tezt library is released. *)
   | "tezt" :: "long_tests" :: _ -> true

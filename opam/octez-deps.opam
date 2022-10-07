@@ -95,7 +95,6 @@ depends: [
   "tezos-rust-libs" { = "1.1" }
   "tls" { >= "0.10" }
   "uri" { >= "2.2.0" }
-  "utop" { >= "2.8" }
   "uutf"
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
