@@ -783,7 +783,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     in
     {path = root; repo; patch_context; readonly}
 
-  let close index = Store.Repo.close index.repo
+  let close index =
+    let _interrupted_gc = Store.Gc.cancel index.repo in
+    Store.Repo.close index.repo
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
