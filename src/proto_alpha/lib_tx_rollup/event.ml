@@ -215,14 +215,6 @@ let new_tezos_head =
     ~level:Notice
     ("tezos_head", Tezos_crypto.Block_hash.encoding)
 
-let inject_wait =
-  declare_1
-    ~section
-    ~name:"inject_wait"
-    ~msg:"Waiting {delay} seconds to trigger injection"
-    ~level:Notice
-    ("delay", Data_encoding.float)
-
 module Batcher = struct
   let section = section @ ["batcher"]
 

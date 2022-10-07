@@ -238,4 +238,11 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("error", Error_monad.trace_encoding)
       ~pp1:Format.pp_print_string
       ~pp2:Error_monad.pp_print_trace
+
+  let inject_wait =
+    declare_1
+      ~name:"inject_wait"
+      ~msg:"Waiting {delay} seconds to trigger injection"
+      ~level:Notice
+      ("delay", Data_encoding.float)
 end

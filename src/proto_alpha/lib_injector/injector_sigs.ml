@@ -36,10 +36,11 @@ type approximate_fee_bound = {
 
 type injection_strategy =
   [ `Each_block  (** Inject pending operations after each new L1 block *)
-  | `Delay_block
-    (** Wait for some time after the L1 block is produced to inject pending
-        operations. This strategy allows for maximizing the number of the same
-        kind of operations to include in a block. *)
+  | `Delay_block of float
+    (** [`Delay_block f] strategy waits for [f] * the next block time to be
+        elapsed before injecting pending operations. This strategy allows for
+        maximizing the number of the same kind of operations to include in a
+        block. *)
   ]
 
 (** Explanation for unsuccessful operations (that are included in a block). *)
@@ -170,10 +171,10 @@ module type S = sig
 
   (** Trigger an injection of the pending operations for all workers. If [tags]
       is given, only the workers which have a tag in [tags] inject their pending
-      operations. If [strategy] is given, only workers which have this strategy
-      inject their pending operations. *)
+      operations. [header] must be provided for the [`Delay_block] strategy to
+      compute the next block timestamp. *)
   val inject :
-    ?tags:tag list -> ?strategy:injection_strategy -> unit -> unit Lwt.t
+    ?tags:tag list -> ?header:Tezos_base.Block_header.t -> unit -> unit Lwt.t
 
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
