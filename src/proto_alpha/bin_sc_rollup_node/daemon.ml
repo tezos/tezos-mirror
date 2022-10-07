@@ -220,8 +220,7 @@ module Make (PVM : Pvm.S) = struct
       (reorg : Layer1.head Injector_common.reorg) =
     let open Lwt_result_syntax in
     let open Layer1 in
-    let* head = fetch_tezos_block l1_ctxt new_head.hash
-    and* new_chain =
+    let* new_chain =
       List.map_ep
         (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
         reorg.new_chain
@@ -230,7 +229,7 @@ module Make (PVM : Pvm.S) = struct
         (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
         reorg.old_chain
     in
-    let*! () = Injector.new_tezos_head head {new_chain; old_chain} in
+    let*! () = Injector.new_tezos_head new_head {new_chain; old_chain} in
     return_unit
 
   (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
@@ -266,13 +265,24 @@ module Make (PVM : Pvm.S) = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
        Rollback state information on reorganization, i.e. for
        reorg.old_chain. *)
+    let* new_head =
+      Layer1.fetch_tezos_block node_ctxt.l1_ctxt head.Layer1.hash
+    in
+    let header =
+      Block_header.(
+        raw
+          {
+            shell = new_head.header.shell;
+            protocol_data = new_head.header.protocol_data;
+          })
+    in
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
-    let* () = notify_injector node_ctxt head reorg in
+    let* () = notify_injector node_ctxt new_head reorg in
     let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let* () = Components.Batcher.batch () in
     let* () = Components.Batcher.new_head head in
-    let*! () = Injector.inject () in
+    let*! () = Injector.inject ~header () in
     return_unit
 
   let is_connection_error trace =
@@ -389,7 +399,12 @@ module Make (PVM : Pvm.S) = struct
              Tezos_crypto.Signature.Public_key_hash.Map.empty
         |> Tezos_crypto.Signature.Public_key_hash.Map.bindings
         |> List.map (fun (operator, purposes) ->
-               (operator, `Each_block, purposes))
+               let strategy =
+                 match purposes with
+                 | [Configuration.Add_messages] -> `Delay_block 0.5
+                 | _ -> `Each_block
+               in
+               (operator, strategy, purposes))
       in
       let* () =
         Injector.init
