@@ -254,6 +254,8 @@ Operation receipts
 Bug Fixes
 ---------
 
+- Ghostnet-specific fixes. (MR :gl:`!6401`)
+
 Minor Changes
 -------------
 
@@ -313,6 +315,8 @@ Minor Changes
 - The encoding of the proof argument of the transaction rollup’s
   rejection operation is now opaque, to avoid exposing unnecessary
   details about their implementation. (MR :gl:`!6318`)
+
+- Update gas for L. (MR :gl:`!6519`)
 
 Internal
 --------
@@ -387,3 +391,9 @@ Internal
 
 - Make Micheline serialization gas accounting consistent by construction.
   (MR :gl:`!6403`)
+
+Invoices
+--------
+
+@g.b.fefe rewarded 15000 ꜩ and @Ochem rewarded 10000 ꜩ for code contributions
+(Consensus Key feature) included in this protocol. (MR :gl:`!6350`)

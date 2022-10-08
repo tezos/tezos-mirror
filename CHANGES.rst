@@ -25,6 +25,9 @@ be documented here either.
 Node
 ----
 
+- Added Lima, a protocol proposal for Mainnet featuring, among others,
+  Pipelining, Consensus Key, improvements to Tickets, and Ghostnet fixes.
+
 - Add a `/chains/<chain>/blocks/<block>/merkle_tree_v2` RPC. This is an
   evolution of the `../merkle_tree` RPC, using a simpler implementation of the
   Merkle tree/proof features that works with Irmin trees and proofs underneath
