@@ -19,24 +19,24 @@ trace
   - location: 16 (remaining gas: 1039990.254 units remaining)
     [ { Elt 0 1 }
       { Elt 0 1 } ]
-  - location: 13 (remaining gas: 1039990.234 units remaining)
+  - location: 13 (remaining gas: 1039990.229 units remaining)
     [ 1
       { Elt 0 1 }
       { Elt 0 1 } ]
-  - location: 17 (remaining gas: 1039990.154 units remaining)
+  - location: 17 (remaining gas: 1039990.149 units remaining)
     [ False
       { Elt 0 1 } ]
-  - location: 18 (remaining gas: 1039990.144 units remaining)
+  - location: 18 (remaining gas: 1039990.139 units remaining)
     [ (Some False)
       { Elt 0 1 } ]
-  - location: 19 (remaining gas: 1039990.134 units remaining)
+  - location: 19 (remaining gas: 1039990.129 units remaining)
     [ { Elt 0 1 }
       (Some False) ]
-  - location: 20 (remaining gas: 1039990.124 units remaining)
+  - location: 20 (remaining gas: 1039990.119 units remaining)
     [ (Pair { Elt 0 1 } (Some False)) ]
-  - location: 21 (remaining gas: 1039990.114 units remaining)
+  - location: 21 (remaining gas: 1039990.109 units remaining)
     [ {}
       (Pair { Elt 0 1 } (Some False)) ]
-  - location: 23 (remaining gas: 1039990.104 units remaining)
+  - location: 23 (remaining gas: 1039990.099 units remaining)
     [ (Pair {} { Elt 0 1 } (Some False)) ]
 
