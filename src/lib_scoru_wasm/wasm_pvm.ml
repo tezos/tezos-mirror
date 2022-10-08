@@ -544,11 +544,18 @@ struct
       let open Wasm_pvm_sig in
       let {outbox_level; message_index} = output_info in
       let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
-      let* {output; _} =
-        Tree_encoding_runner.decode durable_buffers_encoding tree
+      let* candidate =
+        Tree_encoding_runner.decode
+          (Tezos_tree_encoding.option durable_buffers_encoding)
+          tree
       in
-      let+ payload = Wasm.Output_buffer.get output outbox_level message_index in
-      Bytes.to_string payload
+      match candidate with
+      | Some {output; _} ->
+          let+ payload =
+            Wasm.Output_buffer.get output outbox_level message_index
+          in
+          Bytes.to_string payload
+      | None -> raise (Invalid_argument "get_output: missing output buffer")
 
     let get_info tree =
       let open Lwt_syntax in
