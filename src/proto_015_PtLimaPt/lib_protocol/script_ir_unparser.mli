@@ -205,4 +205,24 @@ module Data_unparser : functor (P : MICHELSON_PARSER) -> sig
     unparsing_mode ->
     Script.node ->
     (Script.expr * context, error trace) result Lwt.t
+
+  (** For benchmarking purpose, we also export versions of the unparsing
+      functions which don't call location stripping. These functions are
+      not carbonated and should not be called directly from the protocol. *)
+  module Internal_for_benchmarking : sig
+    val unparse_data :
+      context ->
+      stack_depth:int ->
+      unparsing_mode ->
+      ('a, 'ac) ty ->
+      'a ->
+      (Script.node * context) tzresult Lwt.t
+
+    val unparse_code :
+      context ->
+      stack_depth:int ->
+      unparsing_mode ->
+      Script.node ->
+      (Script.node * context) tzresult Lwt.t
+  end
 end

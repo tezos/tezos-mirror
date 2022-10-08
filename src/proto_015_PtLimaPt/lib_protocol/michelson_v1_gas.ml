@@ -56,8 +56,8 @@ module Cost_of = struct
     (* Automatically generated costs functions. *)
 
     (* model N_IAbs_int *)
-    (* Approximating 0.065045 x term *)
-    let cost_N_IAbs_int size = S.safe_int (20 + (size lsr 4))
+    (* Allocates [size] bytes. *)
+    let cost_N_IAbs_int size = S.safe_int (20 + (size lsr 1))
 
     (* model N_IAdd_bls12_381_fr *)
     (* when benchmarking, compile bls12-381 without ADX *)
@@ -71,10 +71,11 @@ module Cost_of = struct
     (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IAdd_bls12_381_g2 = S.safe_int 2_470
 
+    (* Allocates [max size1 size2] *)
     let cost_linear_op_int size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.max size1 size2) in
-      S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 35 + (v0 lsr 1)
 
     (* model N_IAdd_int *)
     (* Approximating 0.078154 x term *)
@@ -105,20 +106,18 @@ module Cost_of = struct
     let cost_N_IAnd = S.safe_int 10
 
     (* model N_IAnd_int_nat *)
-    (* Approximating 0.076804 x 2 x term *)
+    (* Allocates [min size1 size2] *)
     let cost_N_IAnd_int_nat size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.min size1 size2) in
-      S.safe_int 35 + ((v0 lsr 3) + (v0 lsr 6))
+      S.safe_int 35 + (v0 lsr 1)
 
     (* model N_IAnd_nat *)
-    (* Approximating 0.076804 x term *)
-    (* The difference with `cost_N_IAnd_int_nat` comes from Zarith, where the
-       complexity of `Z.logand` depends on the sign of the argument. *)
+    (* Allocates [min size1 size2] *)
     let cost_N_IAnd_nat size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int (Compare.Int.min size1 size2) in
-      S.safe_int 35 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 35 + (v0 lsr 1)
 
     (* model N_IApply *)
     let cost_N_IApply rec_flag =
@@ -194,18 +193,18 @@ module Cost_of = struct
       S.safe_int 35 + ((v0 lsr 6) + (v0 lsr 7))
 
     (* model N_IConcat_bytes_pair *)
-    (* Approximating 0.065017 x term *)
+    (* Allocates [size1 + size2] *)
     let cost_N_IConcat_bytes_pair size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int size1 + S.safe_int size2 in
-      S.safe_int 45 + (v0 lsr 4)
+      S.safe_int 45 + (v0 lsr 1)
 
     (* model N_IConcat_string_pair *)
-    (* Approximating 0.061402 x term *)
+    (* Allocates [size1 + size2] *)
     let cost_N_IConcat_string_pair size1 size2 =
       let open S_syntax in
       let v0 = S.safe_int size1 + S.safe_int size2 in
-      S.safe_int 45 + (v0 lsr 4)
+      S.safe_int 45 + (v0 lsr 1)
 
     (* model N_ICons_list *)
     let cost_N_ICons_list = S.safe_int 10
@@ -226,7 +225,7 @@ module Cost_of = struct
     let cost_N_IContract = S.safe_int 30
 
     (* model N_ICreate_contract *)
-    let cost_N_ICreate_contract = S.safe_int 30
+    let cost_N_ICreate_contract = S.safe_int 60
 
     (* model N_IDiff_timestamps *)
     (* Approximating 0.077922 x term *)
@@ -243,11 +242,11 @@ module Cost_of = struct
     let cost_N_IDip = S.safe_int 10
 
     (* model N_IDipN *)
-    (* Approximating 2.740571 x term *)
+    (* Approximating 4.05787663635 x term *)
     let cost_N_IDipN size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 30 + ((S.safe_int 2 * v0) + (v0 lsr 1) + (v0 lsr 3))
+      S.safe_int 15 + (S.safe_int 4 * v0)
 
     (* model N_IView *)
     let cost_N_IView = S.safe_int 1460
@@ -280,12 +279,14 @@ module Cost_of = struct
       S.safe_int 20 + v0 + (v0 lsr 2)
 
     let cost_div_int size1 size2 =
+      (* Allocates at most [size1] bytes *)
+      let open S_syntax in
+      let v1 = S.safe_int size1 in
       let q = size1 - size2 in
-      if Compare.Int.(q < 0) then S.safe_int 105
+      if Compare.Int.(q < 0) then S.safe_int 105 + (v1 lsr 1)
       else
-        let open S_syntax in
         let v0 = S.safe_int q * S.safe_int size2 in
-        S.safe_int 105 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13)
+        S.safe_int 105 + (v0 lsr 10) + (v0 lsr 11) + (v0 lsr 13) + (v1 lsr 1)
 
     (* model N_IEdiv_int *)
     (* Approximating 0.001591 x term *)
@@ -302,13 +303,13 @@ module Cost_of = struct
     let cost_N_IEdiv_teznat = S.safe_int 70
 
     (* model N_IEmpty_big_map *)
-    let cost_N_IEmpty_big_map = S.safe_int 10
+    let cost_N_IEmpty_big_map = S.safe_int 300
 
     (* model N_IEmpty_map *)
-    let cost_N_IEmpty_map = S.safe_int 220
+    let cost_N_IEmpty_map = S.safe_int 300
 
     (* model N_IEmpty_set *)
-    let cost_N_IEmpty_set = S.safe_int 220
+    let cost_N_IEmpty_set = S.safe_int 300
 
     (* model N_IEq *)
     let cost_N_IEq = S.safe_int 10
@@ -326,7 +327,7 @@ module Cost_of = struct
     let cost_N_IGt = S.safe_int 10
 
     (* model N_IHalt *)
-    let cost_N_IHalt = S.safe_int 10
+    let cost_N_IHalt = S.safe_int 15
 
     (* model N_IHash_key *)
     let cost_N_IHash_key = S.safe_int 605
@@ -394,18 +395,18 @@ module Cost_of = struct
     let cost_N_ILoop_left = S.safe_int 10
 
     (* model N_ILsl_nat *)
-    (* Approximating 0.115642 x term *)
+    (* Allocates at most [size + 256] bytes *)
     let cost_N_ILsl_nat size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 40 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
+      S.safe_int 128 + (v0 lsr 1)
 
     (* model N_ILsr_nat *)
-    (* Approximating 0.115565 x term *)
+    (* Allocates at most [size] bytes*)
     let cost_N_ILsr_nat size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 45 + ((v0 lsr 4) + (v0 lsr 5) + (v0 lsr 6))
+      S.safe_int 45 + (v0 lsr 1)
 
     (* model N_ILt *)
     let cost_N_ILt = S.safe_int 10
@@ -432,11 +433,11 @@ module Cost_of = struct
       S.safe_int 50 + (S.safe_int 7 * v0) + (v0 lsr 1) + (v0 lsr 3)
 
     (* model N_IMap_map *)
-    (* Approximating 7.46280485884 x term *)
+    (* Approximating 8.38965386732 x term *)
     let cost_N_IMap_map size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 50 + ((S.safe_int 7 * v0) + (v0 lsr 1))
+      S.safe_int 40 + ((S.safe_int 8 * v0) + (v0 lsr 1))
 
     (* model N_IMap_mem *)
     (* Approximating 0.048446 x term *)
@@ -516,10 +517,10 @@ module Cost_of = struct
     let cost_N_INeg_bls12_381_g2 = S.safe_int 70
 
     (* model N_INeg *)
-    (* Approximating 0.066076 x term *)
+    (* Allocates [size] bytes *)
     let cost_N_INeg size =
       let open S_syntax in
-      S.safe_int 25 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 1)
 
     (* model N_INeq *)
     let cost_N_INeq = S.safe_int 10
@@ -531,11 +532,11 @@ module Cost_of = struct
     let cost_N_INot = S.safe_int 10
 
     (* model N_INot_int *)
-    (* Approximating 0.075541 x term *)
+    (* Allocates [size] bytes *)
     let cost_N_INot_int size =
       let open S_syntax in
       let v0 = S.safe_int size in
-      S.safe_int 25 + ((v0 lsr 4) + (v0 lsr 7))
+      S.safe_int 25 + (v0 lsr 1)
 
     (* model N_INow *)
     let cost_N_INow = S.safe_int 10
@@ -570,7 +571,7 @@ module Cost_of = struct
     let cost_N_IRight = S.safe_int 10
 
     (* model N_ISapling_empty_state *)
-    let cost_N_ISapling_empty_state = S.safe_int 10
+    let cost_N_ISapling_empty_state = S.safe_int 300
 
     (* model N_ISapling_verify_update *)
     let cost_N_ISapling_verify_update size1 size2 bound_data =
@@ -591,7 +592,7 @@ module Cost_of = struct
     let cost_N_ISender = S.safe_int 10
 
     (* model N_ISet_delegate *)
-    let cost_N_ISet_delegate = S.safe_int 30
+    let cost_N_ISet_delegate = S.safe_int 60
 
     (* model N_ISet_iter *)
     (* Approximating 7.633555 x term *)
@@ -622,26 +623,26 @@ module Cost_of = struct
       S.safe_int 680 + (S.safe_int 3 * v0)
 
     (* model N_ISlice_bytes *)
-    (* Approximating 0.065752 x term *)
+    (* Allocates [size] bytes *)
     let cost_N_ISlice_bytes size =
       let open S_syntax in
-      S.safe_int 25 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 1)
 
     (* model N_ISlice_string *)
-    (* Approximating 0.065688 x term *)
+    (* Allocates [size] bytes *)
     let cost_N_ISlice_string size =
       let open S_syntax in
-      S.safe_int 25 + (S.safe_int size lsr 4)
+      S.safe_int 25 + (S.safe_int size lsr 1)
 
     (* model N_ISource *)
     let cost_N_ISource = S.safe_int 10
 
     (* model N_ISplit_ticket *)
-    (* Approximating 0.132362 x term *)
+    (* Allocates [max size1 size2] *)
     let cost_N_ISplit_ticket size1 size2 =
       let open S_syntax in
       let v1 = S.safe_int (Compare.Int.max size1 size2) in
-      S.safe_int 40 + (v1 lsr 3)
+      S.safe_int 40 + (v1 lsr 1)
 
     (* model N_IString_size *)
     let cost_N_IString_size = S.safe_int 15
@@ -667,10 +668,10 @@ module Cost_of = struct
     let cost_N_ITicket = S.safe_int 10
 
     (* model N_ITotal_voting_power *)
-    let cost_N_ITotal_voting_power = S.safe_int 370
+    let cost_N_ITotal_voting_power = S.safe_int 450
 
     (* model N_ITransfer_tokens *)
-    let cost_N_ITransfer_tokens = S.safe_int 30
+    let cost_N_ITransfer_tokens = S.safe_int 60
 
     (* model N_IUncomb *)
     (* Approximating 3.944710 x term *)
@@ -683,7 +684,7 @@ module Cost_of = struct
     let cost_N_IUnpair = S.safe_int 10
 
     (* model N_IVoting_power *)
-    let cost_N_IVoting_power = S.safe_int 530
+    let cost_N_IVoting_power = S.safe_int 640
 
     (* model N_IXor *)
     let cost_N_IXor = S.safe_int 15
@@ -721,7 +722,7 @@ module Cost_of = struct
     let cost_N_KMap_enter_body = S.safe_int 80
 
     (* model N_KNil *)
-    let cost_N_KNil = S.safe_int 10
+    let cost_N_KNil = S.safe_int 15
 
     (* model N_KReturn *)
     let cost_N_KReturn = S.safe_int 10
@@ -939,7 +940,7 @@ module Cost_of = struct
     (* model UNPARSING_DATA
        This is the cost of one iteration of unparse_data, extracted by hand from the
        parameter fit for the UNPARSING_DATA benchmark. *)
-    let cost_UNPARSING_DATA = S.safe_int 45
+    let cost_UNPARSING_DATA = S.safe_int 65
 
     (* model PARSE_TYPE
        This is the cost of one iteration of parse_ty, extracted by hand from the
@@ -1565,13 +1566,11 @@ module Cost_of = struct
 
     (* This is the cost of allocating a string and blitting existing ones into it. *)
     let concat_string total_bytes =
-      atomic_step_cost
-        S.(add (S.safe_int 100) (S.ediv total_bytes (S.safe_int 10)))
+      atomic_step_cost S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
 
     (* Same story as Concat_string. *)
     let concat_bytes total_bytes =
-      atomic_step_cost
-        S.(add (S.safe_int 100) (S.ediv total_bytes (S.safe_int 10)))
+      atomic_step_cost S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
 
     (* Cost of access taken care of in Contract_storage.get_balance_carbonated *)
     let balance = Gas.free
@@ -1580,7 +1579,7 @@ module Cost_of = struct
     let unpack bytes =
       let blen = Bytes.length bytes in
       let open S_syntax in
-      atomic_step_cost (S.safe_int 260 + (S.safe_int blen lsr 3))
+      atomic_step_cost (S.safe_int 260 + (S.safe_int blen lsr 1))
 
     (* TODO benchmark *)
     (* FIXME: imported from 006, needs proper benchmarks *)
