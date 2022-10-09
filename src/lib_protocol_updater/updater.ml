@@ -56,48 +56,52 @@ let do_compile hash p =
     // Tezos_crypto.Protocol_hash.to_short_b58check hash
     // Format.asprintf "protocol_%a" Tezos_crypto.Protocol_hash.pp hash
   in
-  let* r = Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p in
-  match r with
-  | Error err ->
-      let* () = Events.(emit compiler_exit_error) err in
-      Lwt.return_false
-  | Ok () -> (
-      let compiler_command =
-        ( Sys.executable_name,
-          [|compiler_name; "-register"; "-o"; plugin_file; source_dir|] )
-      in
-      let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
-      let* s =
-        Lwt_process.exec
-          ~stdin:`Close
-          ~stdout:(`FD_copy fd)
-          ~stderr:(`FD_move fd)
-          compiler_command
-      in
-      match s with
-      | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
-          let* () = Events.(emit compilation_interrupted) log_file in
-          Lwt.return_false
-      | Unix.WEXITED x when x <> 0 ->
-          let* () = Events.(emit compilation_error) log_file in
-          Lwt.return_false
-      | Unix.WEXITED _ -> (
-          try
-            Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
-            Lwt.return_true
-          with
-          | Dynlink.(Error (Cannot_open_dynamic_library exn)) ->
-              let* () =
-                Events.(emit dynlink_error_static)
-                  (plugin_file, Printexc.to_string exn)
-              in
-              Lwt.return_false
-          | Dynlink.(Error err) ->
-              let* () =
-                Events.(emit dynlink_error)
-                  (plugin_file, Dynlink.error_message err)
-              in
-              Lwt.return_false))
+  try
+    Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
+    Lwt.return_true
+  with Dynlink.Error _ -> (
+    let* r = Tezos_base_unix.Protocol_files.write_dir source_dir ~hash p in
+    match r with
+    | Error err ->
+        let* () = Events.(emit compiler_exit_error) err in
+        Lwt.return_false
+    | Ok () -> (
+        let compiler_command =
+          ( Sys.executable_name,
+            [|compiler_name; "-register"; "-o"; plugin_file; source_dir|] )
+        in
+        let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
+        let* s =
+          Lwt_process.exec
+            ~stdin:`Close
+            ~stdout:(`FD_copy fd)
+            ~stderr:(`FD_move fd)
+            compiler_command
+        in
+        match s with
+        | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
+            let* () = Events.(emit compilation_interrupted) log_file in
+            Lwt.return_false
+        | Unix.WEXITED x when x <> 0 ->
+            let* () = Events.(emit compilation_error) log_file in
+            Lwt.return_false
+        | Unix.WEXITED _ -> (
+            try
+              Dynlink.loadfile_private (plugin_file ^ ".cmxs") ;
+              Lwt.return_true
+            with
+            | Dynlink.(Error (Cannot_open_dynamic_library exn)) ->
+                let* () =
+                  Events.(emit dynlink_error_static)
+                    (plugin_file, Printexc.to_string exn)
+                in
+                Lwt.return_false
+            | Dynlink.(Error err) ->
+                let* () =
+                  Events.(emit dynlink_error)
+                    (plugin_file, Dynlink.error_message err)
+                in
+                Lwt.return_false)))
 
 let compile hash p =
   let open Lwt_syntax in
