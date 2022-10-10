@@ -289,10 +289,8 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
           ]
           client)
 
-let slot_availability ~signer availability client =
-  (* FIXME/DAL: fetch the constant from protocol parameters. *)
-  let default_size = 256 in
-  let endorsement = Array.make default_size false in
+let slot_availability ~signer ~nb_slots availability client =
+  let endorsement = Array.make nb_slots false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
   Operation.Consensus.(inject ~signer (slot_availability ~endorsement) client)
 
@@ -443,11 +441,16 @@ let test_slot_management_logic =
   check_manager_operation_status operations_result fees_error oph4 ;
   check_manager_operation_status operations_result Applied oph3 ;
   check_manager_operation_status operations_result Applied oph2 ;
-  let* _ = slot_availability ~signer:Constant.bootstrap1 [1; 0] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap2 [1; 0] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap3 [1] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap4 [1] client in
-  let* _ = slot_availability ~signer:Constant.bootstrap5 [1] client in
+  let nb_slots = parameters.number_of_slots in
+  let* _ =
+    slot_availability ~nb_slots ~signer:Constant.bootstrap1 [1; 0] client
+  in
+  let* _ =
+    slot_availability ~nb_slots ~signer:Constant.bootstrap2 [1; 0] client
+  in
+  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap3 [1] client in
+  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap4 [1] client in
+  let* _ = slot_availability ~nb_slots ~signer:Constant.bootstrap5 [1] client in
   let* () = Client.bake_for_and_wait client in
   let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
   let dal_slot_availability =
@@ -792,15 +795,23 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
   (* 6. endorse only slots 1 and 2. *)
+  let* parameters = Rollup.Dal.Parameters.from_client client in
+  let nb_slots = parameters.number_of_slots in
   let* _op_hash =
-    slot_availability ~signer:Constant.bootstrap1 [2; 1; 0] client
+    slot_availability ~nb_slots ~signer:Constant.bootstrap1 [2; 1] client
   in
   let* _op_hash =
-    slot_availability ~signer:Constant.bootstrap2 [2; 1; 0] client
+    slot_availability ~nb_slots ~signer:Constant.bootstrap2 [2; 1] client
   in
-  let* _op_hash = slot_availability ~signer:Constant.bootstrap3 [2; 1] client in
-  let* _op_hash = slot_availability ~signer:Constant.bootstrap4 [2; 1] client in
-  let* _op_hash = slot_availability ~signer:Constant.bootstrap5 [2; 1] client in
+  let* _op_hash =
+    slot_availability ~nb_slots ~signer:Constant.bootstrap3 [2; 1] client
+  in
+  let* _op_hash =
+    slot_availability ~nb_slots ~signer:Constant.bootstrap4 [2; 1] client
+  in
+  let* _op_hash =
+    slot_availability ~nb_slots ~signer:Constant.bootstrap5 [2; 1] client
+  in
   let* () = Client.bake_for_and_wait client in
   let* level =
     Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)

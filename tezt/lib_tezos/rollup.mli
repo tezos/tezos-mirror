@@ -221,6 +221,7 @@ module Dal : sig
       redundancy_factor : int;
       slot_size : int;
       page_size : int;
+      number_of_slots : int;
     }
 
     val parameter_file : Protocol.t -> string Lwt.t

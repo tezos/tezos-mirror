@@ -269,23 +269,18 @@ let constants_mainnet =
       };
   }
 
-let default_cryptobox_parameters_sandbox =
+(* Sandbox and test networks's Dal cryptobox are computed by this function:
+   - Redundancy_factor is provided as a parameter;
+   - The other fields are derived from mainnet's values, as divisions by the
+     provided factor. *)
+let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
+  let m = default_cryptobox_parameters in
   {
-    Dal.Slots_history.page_size = 4096;
-    number_of_shards = 256;
-    slot_size = 1 lsl 16;
-    redundancy_factor = 4;
+    Dal.Slots_history.redundancy_factor;
+    page_size = m.page_size / mainnet_constants_divider;
+    slot_size = m.slot_size / mainnet_constants_divider;
+    number_of_shards = m.number_of_shards / mainnet_constants_divider;
   }
-
-let default_dal_sandbox =
-  Constants.Parametric.
-    {
-      feature_enable = false;
-      number_of_slots = 16;
-      endorsement_lag = 1;
-      availability_threshold = 50;
-      cryptobox_parameters = default_cryptobox_parameters_sandbox;
-    }
 
 let constants_sandbox =
   let consensus_committee_size = 256 in
@@ -304,7 +299,16 @@ let constants_sandbox =
   in
   {
     constants_mainnet with
-    dal = default_dal_sandbox;
+    dal =
+      Constants.Parametric.
+        {
+          constants_mainnet.dal with
+          number_of_slots = 16;
+          cryptobox_parameters =
+            derive_cryptobox_parameters
+              ~redundancy_factor:8
+              ~mainnet_constants_divider:32;
+        };
     Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
@@ -341,6 +345,16 @@ let constants_test =
   in
   {
     constants_mainnet with
+    dal =
+      Constants.Parametric.
+        {
+          constants_mainnet.dal with
+          number_of_slots = 8;
+          cryptobox_parameters =
+            derive_cryptobox_parameters
+              ~redundancy_factor:4
+              ~mainnet_constants_divider:64;
+        };
     Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;

@@ -505,6 +505,7 @@ module Dal = struct
       redundancy_factor : int;
       slot_size : int;
       page_size : int;
+      number_of_slots : int;
     }
 
     let parameter_file protocol =
@@ -520,7 +521,15 @@ module Dal = struct
       let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
       let slot_size = JSON.(json |-> "slot_size" |> as_int) in
       let page_size = JSON.(json |-> "page_size" |> as_int) in
-      return {number_of_shards; redundancy_factor; slot_size; page_size}
+      let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
+      return
+        {
+          number_of_shards;
+          redundancy_factor;
+          slot_size;
+          page_size;
+          number_of_slots;
+        }
   end
 
   module RPC = struct
@@ -575,7 +584,14 @@ module Dal = struct
   let make
       ?(on_error =
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
-      Parameters.{redundancy_factor; number_of_shards; slot_size; page_size} =
+      Parameters.
+        {
+          redundancy_factor;
+          number_of_shards;
+          slot_size;
+          page_size;
+          number_of_slots = _;
+        } =
     let initialisation_parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
         ~slot_size
