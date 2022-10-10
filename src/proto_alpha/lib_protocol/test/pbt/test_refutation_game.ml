@@ -1500,6 +1500,13 @@ let gen_game ~p1_strategy ~p2_strategy =
       p1_start,
       levels_and_messages )
 
+(** Shrinker is really slow. Deactivating it. *)
+let gen_game ~p1_strategy ~p2_strategy =
+  let open QCheck2.Gen in
+  make_primitive
+    ~gen:(fun rand -> generate1 ~rand (gen_game ~p1_strategy ~p2_strategy))
+    ~shrink:(fun _ -> Seq.empty)
+
 (** [prepare_game block rollup lcc commitment_level p1_client p2_client contract
     levels_and_messages] prepares a context where [p1_client] and [p2_client]
     are in conflict for one commitment.
@@ -1601,7 +1608,7 @@ let test_game ~p1_strategy ~p2_strategy () =
         (if p1_start then "p1" else "p2")
         pp_levels_and_messages
         levels_and_messages)
-    ~count:200
+    ~count:100
     ~name
     ~gen:(gen_game ~p1_strategy ~p2_strategy)
     (fun ( block,
