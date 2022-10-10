@@ -185,8 +185,8 @@ module Dune = struct
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(virtual_modules = Stdlib.List.[]) ?default_implementation ?implements
       ?modules ?modules_without_implementation ?modes ?foreign_stubs
-      ?c_library_flags ?(private_modules = Stdlib.List.[]) ?js_of_ocaml
-      (names : string list) =
+      ?c_library_flags ?(ctypes = E) ?(private_modules = Stdlib.List.[])
+      ?js_of_ocaml (names : string list) =
     [
       V
         [
@@ -271,6 +271,7 @@ module Dune = struct
               S "names" :: of_atom_list x.names;
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
+          ctypes;
         ];
     ]
 
@@ -769,6 +770,59 @@ module Flags = struct
   let include_ f = {standard = false; rest = Dune.[S ":include"; S f]}
 end
 
+module Ctypes = struct
+  type description = {instance : string; functor_ : string}
+
+  type t = {
+    external_library_name : string;
+    include_header : string;
+    extra_search_dir : string;
+    type_description : description;
+    function_description : description;
+    generated_types : string;
+    generated_entry_point : string;
+  }
+
+  let to_dune desc =
+    Dune.
+      [
+        S "ctypes";
+        [S "external_library_name"; S desc.external_library_name];
+        [
+          S "build_flags_resolver";
+          [
+            S "vendored";
+            [
+              S "c_flags";
+              S ":standard";
+              S "-Wno-discarded-qualifiers";
+              S ("-I" ^ desc.extra_search_dir);
+            ];
+            [
+              S "c_library_flags";
+              S ":standard";
+              S ("-l" ^ desc.external_library_name);
+              S ("-L" ^ desc.extra_search_dir);
+            ];
+          ];
+        ];
+        [S "headers"; [S "include"; S desc.include_header]];
+        [
+          S "type_description";
+          [S "instance"; S desc.type_description.instance];
+          [S "functor"; S desc.type_description.functor_];
+        ];
+        [
+          S "function_description";
+          [S "concurrency"; S "unlocked"];
+          [S "instance"; S desc.function_description.instance];
+          [S "functor"; S desc.function_description.functor_];
+        ];
+        [S "generated_types"; S desc.generated_types];
+        [S "generated_entry_point"; S desc.generated_entry_point];
+      ]
+end
+
 module Env : sig
   (* See manifest.mli for documentation *)
 
@@ -945,6 +999,7 @@ module Target = struct
     cram : bool;
     license : string option;
     extra_authors : string list;
+    ctypes : Ctypes.t option;
   }
 
   and preprocessor = PPS of t * string list | Staged_PPS of t list
@@ -1071,6 +1126,7 @@ module Target = struct
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_stubs:Dune.foreign_stubs ->
+    ?ctypes:Ctypes.t ->
     ?implements:t option ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
@@ -1157,7 +1213,7 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
-      ?(dune = Dune.[]) ?flags ?foreign_stubs ?implements ?inline_tests
+      ?(dune = Dune.[]) ?flags ?foreign_stubs ?ctypes ?implements ?inline_tests
       ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
       ?opam ?opam_bug_reports ?opam_doc ?opam_homepage
@@ -1474,6 +1530,7 @@ module Target = struct
         cram;
         license;
         extra_authors;
+        ctypes;
       }
 
   let public_lib ?internal_name =
@@ -2007,6 +2064,7 @@ let generate_dune (internal : Target.internal) =
     | None -> Dune.E
     | Some docs -> Dune.(S "documentation" :: docs)
   in
+  let ctypes = Option.map Ctypes.to_dune internal.ctypes in
   Dune.(
     executable_or_library
       kind
@@ -2030,6 +2088,7 @@ let generate_dune (internal : Target.internal) =
       ?modes:internal.modes
       ?foreign_stubs:internal.foreign_stubs
       ?c_library_flags:internal.c_library_flags
+      ?ctypes
       ~private_modules:internal.private_modules
       ?js_of_ocaml:internal.js_of_ocaml
     :: documentation :: create_empty_files :: internal.dune)
@@ -2401,6 +2460,7 @@ let generate_dune_project_files () =
   Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
   Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
   Format.fprintf fmt "(cram enable)@." ;
+  Format.fprintf fmt "(using ctypes 0.1)@." ;
   ( Target.iter_internal_by_opam @@ fun package internals ->
     let has_public_target =
       List.exists
