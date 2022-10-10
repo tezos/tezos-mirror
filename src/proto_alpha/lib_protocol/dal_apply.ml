@@ -62,7 +62,7 @@ let apply_data_availability ctxt data_availability ~endorser =
   Dal.Endorsement.record_available_shards ctxt data_availability shards
   |> return
 
-let validate_publish_slot_header ctxt Dal.Slot.{id = {index; _}; _} =
+let validate_publish_slot_header ctxt Dal.Slot.Header.{id = {index; _}; _} =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Tzresult_syntax in
   let open Constants in
@@ -75,16 +75,17 @@ let validate_publish_slot_header ctxt Dal.Slot.{id = {index; _}; _} =
     (Dal_publish_slot_header_invalid_index
        {given = index; maximum = number_of_slots})
 
-let apply_publish_slot_header ctxt slot =
+let apply_publish_slot_header ctxt slot_header =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  Dal.Slot.register_slot ctxt slot >>? fun (ctxt, updated) ->
-  if updated then ok ctxt else error (Dal_publish_slot_header_duplicate {slot})
+  Dal.Slot.register_slot_header ctxt slot_header >>? fun (ctxt, updated) ->
+  if updated then ok ctxt
+  else error (Dal_publish_slot_header_duplicate {slot_header})
 
 let dal_finalisation ctxt =
   only_if_dal_feature_enabled
     ctxt
     ~default:(fun ctxt -> return (ctxt, None))
     (fun ctxt ->
-      Dal.Slot.finalize_current_slots ctxt >>= fun ctxt ->
-      Dal.Slot.finalize_pending_slots ctxt >|=? fun (ctxt, slot_availability) ->
-      (ctxt, Some slot_availability))
+      Dal.Slot.finalize_current_slot_headers ctxt >>= fun ctxt ->
+      Dal.Slot.finalize_pending_slot_headers ctxt
+      >|=? fun (ctxt, slot_availability) -> (ctxt, Some slot_availability))

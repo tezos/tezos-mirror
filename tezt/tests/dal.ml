@@ -220,7 +220,7 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
   in
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let cryptobox = Rollup.Dal.make parameters in
-  let header =
+  let commitment =
     Rollup.Dal.Commitment.dummy_commitment parameters cryptobox "coucou"
   in
   Check.(
@@ -239,7 +239,7 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Operation.Manager.(
       inject
         ~force:true
-        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~header]
+        [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment]
         client)
   in
   let* (`OpHash oph3) =
@@ -260,28 +260,33 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let publish_slot ~source ?fee ~index ~header node client =
+let publish_slot ~source ?fee ~index ~commitment node client =
   let level = Node.get_level node in
   Operation.Manager.(
     inject
-      [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~header]
+      [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
       client)
 
 let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
-  let header =
+  let commitment =
     Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
   in
-  publish_slot ~source ?fee ~index ~header
+  publish_slot ~source ?fee ~index ~commitment
 
-let publish_slot_header ~source ?(fee = 1200) ~index ~header node client =
+let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
   let level = Node.get_level node in
-  let header = Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt header in
-  match header with
+  let commitment =
+    Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt commitment
+  in
+  match commitment with
   | None -> assert false
-  | Some header ->
+  | Some commitment ->
       Operation.Manager.(
         inject
-          [make ~source ~fee @@ dal_publish_slot_header ~index ~level ~header]
+          [
+            make ~source ~fee
+            @@ dal_publish_slot_header ~index ~level ~commitment;
+          ]
           client)
 
 let slot_availability ~signer availability client =
@@ -290,8 +295,6 @@ let slot_availability ~signer availability client =
   let endorsement = Array.make default_size false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
   Operation.Consensus.(inject ~signer (slot_availability ~endorsement) client)
-
-let header_of_slot_metadata {Sc_rollup_client.header; _} = header
 
 type status = Applied | Failed of {error_id : string}
 
@@ -343,7 +346,9 @@ let check_dal_raw_context node =
       JSON.unannotate j |> Ezjsonm.wrap |> Ezjsonm.to_string
     in
     let* confirmed_slots_opt =
-      RPC.call node (RPC.get_chain_block_context_dal_confirmed_slots_history ())
+      RPC.call
+        node
+        (RPC.get_chain_block_context_dal_confirmed_slot_headers_history ())
     in
     if JSON.is_null confirmed_slots_opt then
       Test.fail
@@ -351,7 +356,7 @@ let check_dal_raw_context node =
          enabled" ;
     let confirmed_slots = json_to_string confirmed_slots_opt in
     let confirmed_slots_from_ctxt =
-      json_to_string @@ JSON.(dal_raw_json |-> "slots_history")
+      json_to_string @@ JSON.(dal_raw_json |-> "slot_headers_history")
     in
     if not (String.equal confirmed_slots confirmed_slots_from_ctxt) then
       Test.fail "Confirmed slots history mismatch." ;
@@ -553,11 +558,11 @@ let test_dal_node_slot_management =
 
 let publish_and_store_slot node client dal_node source index content =
   let* slot_header = RPC.call dal_node (Rollup.Dal.RPC.split_slot content) in
-  let header =
+  let commitment =
     Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
     |> mandatory "The b58check-encoded slot header is not valid"
   in
-  let* _ = publish_slot ~source ~fee:1_200 ~index ~header node client in
+  let* _ = publish_slot ~source ~fee:1_200 ~index ~commitment node client in
   return (index, slot_header)
 
 let test_dal_node_slots_headers_tracking =
@@ -709,15 +714,15 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
 
   (* 1. Send three slots to dal node and obtain corresponding headers. *)
   let slot_contents_0 = "DEADC0DE" in
-  let* slot_header_0 =
+  let* commitment_0 =
     RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_0)
   in
   let slot_contents_1 = "CAFEDEAD" in
-  let* slot_header_1 =
+  let* commitment_1 =
     RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_1)
   in
   let slot_contents_2 = "C0FFEE" in
-  let* slot_header_2 =
+  let* commitment_2 =
     RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_2)
   in
   (* 2. Run rollup node for an originated rollup. *)
@@ -750,7 +755,7 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
     publish_slot_header
       ~source:Constant.bootstrap1
       ~index:0
-      ~header:slot_header_0
+      ~commitment:commitment_0
       node
       client
   in
@@ -758,7 +763,7 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
     publish_slot_header
       ~source:Constant.bootstrap2
       ~index:1
-      ~header:slot_header_1
+      ~commitment:commitment_1
       node
       client
   in
@@ -766,7 +771,7 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
     publish_slot_header
       ~source:Constant.bootstrap3
       ~index:2
-      ~header:slot_header_2
+      ~commitment:commitment_2
       node
       client
   in
@@ -775,12 +780,15 @@ let rollup_node_stores_dal_slots _protocol dal_node sc_rollup_node
   let* slots_published_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (second_subscription_level + 1)
   in
-  let* slots_metadata =
-    Sc_rollup_client.dal_slots_metadata ~hooks sc_rollup_client
+  let* slots_headers =
+    Sc_rollup_client.dal_slot_headers ~hooks sc_rollup_client
   in
-  let slot_headers = slots_metadata |> List.map header_of_slot_metadata in
-  let expected_slot_headers = [slot_header_0; slot_header_1; slot_header_2] in
-  Check.(slot_headers = expected_slot_headers)
+  let commitments =
+    slots_headers
+    |> List.map (fun Sc_rollup_client.{commitment; _} -> commitment)
+  in
+  let expected_commitments = [commitment_0; commitment_1; commitment_2] in
+  Check.(commitments = expected_commitments)
     (Check.list Check.string)
     ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
   (* 6. endorse only slots 1 and 2. *)

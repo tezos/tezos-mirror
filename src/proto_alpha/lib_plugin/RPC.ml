@@ -2288,7 +2288,7 @@ end
 
 module Dal = struct
   module S = struct
-    let dal_confirmed_slots_history =
+    let dal_confirmed_slot_headers_history =
       let output = Data_encoding.option Dal.Slots_history.encoding in
       let query = RPC_query.(seal @@ query ()) in
       RPC_service.get_service
@@ -2297,22 +2297,23 @@ module Dal = struct
            DAL is enabled, or [None] otherwise."
         ~output
         ~query
-        RPC_path.(open_root / "context" / "dal" / "confirmed_slots_history")
+        RPC_path.(
+          open_root / "context" / "dal" / "confirmed_slot_headers_history")
   end
 
-  let register_dal_confirmed_slots_history () =
+  let register_dal_confirmed_slot_headers_history () =
     Registration.register0
       ~chunked:false
-      S.dal_confirmed_slots_history
+      S.dal_confirmed_slot_headers_history
       (fun ctxt () () ->
         if (Constants.parametric ctxt).dal.feature_enable then
-          Dal.Slots_storage.get_slots_history ctxt >|=? Option.some
+          Dal.Slots_storage.get_slot_headers_history ctxt >|=? Option.some
         else return None)
 
-  let register () = register_dal_confirmed_slots_history ()
+  let register () = register_dal_confirmed_slot_headers_history ()
 
   let dal_confirmed_slots_history ctxt block =
-    RPC_context.make_call0 S.dal_confirmed_slots_history ctxt block () ()
+    RPC_context.make_call0 S.dal_confirmed_slot_headers_history ctxt block () ()
 end
 
 module Tx_rollup = struct

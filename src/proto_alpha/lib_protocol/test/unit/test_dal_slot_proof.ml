@@ -34,7 +34,7 @@
 open Protocol
 module S = Dal_slot_repr
 module P = S.Page
-module Hist = S.Slots_history
+module Hist = S.History
 open Dal_helpers
 
 (* Tests to check insertion of slots in a dal skip list. *)
@@ -42,11 +42,11 @@ open Dal_helpers
 (** Check insertion of a new slot in the given skip list. *)
 let skip_list_ordering dal skip_list ~mk_level ~mk_slot_index ~check_result =
   let open Lwt_result_syntax in
-  let {S.id; _} = Hist.Internal_for_tests.content skip_list in
+  let {S.Header.id; _} = Hist.Internal_for_tests.content skip_list in
   let*? _data, _poly, slot =
     mk_slot ~level:(mk_level id) ~index:(mk_slot_index id) dal
   in
-  Hist.add_confirmed_slots_no_cache skip_list [slot]
+  Hist.add_confirmed_slot_headers_no_cache skip_list [slot]
   |> Environment.wrap_tzresult |> check_result
 
 (** This test attempts to add a slot on top of genesis cell zero which would
@@ -59,8 +59,8 @@ let insertion_breaks_skip_list_ordering dal () =
   skip_list_ordering
     dal
     genesis_history
-    ~mk_level:(fun id -> id.S.published_level)
-    ~mk_slot_index:(fun id -> id.S.index)
+    ~mk_level:(fun id -> id.S.Header.published_level)
+    ~mk_slot_index:(fun id -> id.S.Header.index)
     ~check_result:(fun res ->
       Assert.proto_error ~loc:__LOC__ res (function
           | Hist.Add_element_in_slots_skip_list_violates_ordering -> true
@@ -73,8 +73,8 @@ let correct_insertion_in_skip_list_ordering_1 dal () =
   skip_list_ordering
     dal
     genesis_history
-    ~mk_level:(fun id -> Raw_level_repr.succ id.S.published_level)
-    ~mk_slot_index:(fun id -> id.S.index)
+    ~mk_level:(fun id -> Raw_level_repr.succ id.S.Header.published_level)
+    ~mk_slot_index:(fun id -> id.S.Header.index)
     ~check_result:(fun res ->
       let* _skip_list = Assert.get_ok ~__LOC__ res in
       return_unit)
@@ -86,8 +86,8 @@ let correct_insertion_in_skip_list_ordering_2 dal () =
   skip_list_ordering
     dal
     genesis_history
-    ~mk_level:(fun id -> id.S.published_level)
-    ~mk_slot_index:(fun id -> succ_slot_index id.S.index)
+    ~mk_level:(fun id -> id.S.Header.published_level)
+    ~mk_slot_index:(fun id -> succ_slot_index id.S.Header.index)
     ~check_result:(fun res ->
       let* _skip_list = Assert.get_ok ~__LOC__ res in
       return_unit)
@@ -99,15 +99,16 @@ let correct_insertion_in_skip_list_ordering_3 dal () =
   skip_list_ordering
     dal
     genesis_history
-    ~mk_level:(fun id -> id.S.published_level)
-    ~mk_slot_index:(fun id -> succ_slot_index id.S.index)
+    ~mk_level:(fun id -> id.S.Header.published_level)
+    ~mk_slot_index:(fun id -> succ_slot_index id.S.Header.index)
     ~check_result:(fun res ->
       let* skip_list = Assert.get_ok ~__LOC__ res in
       skip_list_ordering
         dal
         skip_list
-        ~mk_level:(fun id -> Raw_level_repr.(succ (succ id.S.published_level)))
-        ~mk_slot_index:(fun id -> id.S.index)
+        ~mk_level:(fun id ->
+          Raw_level_repr.(succ (succ id.S.Header.published_level)))
+        ~mk_slot_index:(fun id -> id.S.Header.index)
         ~check_result:(fun res ->
           let* _skip_list = Assert.get_ok ~__LOC__ res in
           return_unit))
@@ -118,7 +119,7 @@ let correct_insertion_in_skip_list_ordering_3 dal () =
 (** This test attempts to construct a proof to confirm a slot page from the
     genesis skip list. Proof production is expected to fail. *)
 let confirmed_page_on_genesis dal () =
-  let {S.id = {published_level; index}; _} =
+  let {S.Header.id = {published_level; index}; _} =
     Hist.Internal_for_tests.content genesis_history
   in
   let page_id = mk_page_id published_level index P.Index.zero in
@@ -136,7 +137,7 @@ let confirmed_page_on_genesis dal () =
 (** This test attempts to construct a proof to unconfirm a slot page from the
     genesis skip list. Proof production is expected to succeed. *)
 let unconfirmed_page_on_genesis dal incr_level =
-  let {S.id = {published_level; index}; _} =
+  let {S.Header.id = {published_level; index}; _} =
     Hist.Internal_for_tests.content genesis_history
   in
   let level, sindex =
@@ -162,7 +163,7 @@ let helper_confirmed_slot_on_genesis ~level ~mk_page_info ~check_produce
   let open Lwt_result_syntax in
   let*? _slot_data, polynomial, slot = mk_slot ~level dal in
   let*? skip_list, cache =
-    Hist.add_confirmed_slots genesis_history genesis_history_cache [slot]
+    Hist.add_confirmed_slot_headers genesis_history genesis_history_cache [slot]
     |> Environment.wrap_tzresult
   in
   let*? page_info, page_id = mk_page_info dal slot polynomial in

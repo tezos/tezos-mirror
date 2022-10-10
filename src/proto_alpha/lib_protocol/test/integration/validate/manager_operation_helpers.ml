@@ -1051,8 +1051,10 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
 let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
   let published_level = Alpha_context.Raw_level.of_int32_exn Int32.zero in
   let index = Alpha_context.Dal.Slot_index.zero in
-  let header = Alpha_context.Dal.Slot.Header.zero in
-  let slot = Alpha_context.Dal.Slot.{id = {published_level; index}; header} in
+  let commitment = Alpha_context.Dal.Slot.Commitment.zero in
+  let slot =
+    Alpha_context.Dal.Slot.Header.{id = {published_level; index}; commitment}
+  in
   Op.dal_publish_slot_header
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit

@@ -234,7 +234,7 @@ module Dal_slot = struct
       Bitset.mem subscribed_slots (Dal_slot_repr.Index.to_int slot_index)
     in
     if slot_already_subscribed then
-      fail (Dal_rollup_already_registered_to_slot (rollup, slot_index))
+      fail (Dal_rollup_already_registered_to_slot_index (rollup, slot_index))
     else
       let*? subscribed_slots =
         Bitset.add subscribed_slots (Dal_slot_repr.Index.to_int slot_index)

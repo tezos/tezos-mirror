@@ -2832,7 +2832,7 @@ module Dal : sig
       {!Dal_slot_storage} and {!Raw_context.Dal}. *)
   module Slot : sig
     (** This module re-exports definitions from {!Dal_slot_repr.Header}. *)
-    module Header : sig
+    module Commitment : sig
       type t = Dal.commitment
 
       val encoding : t Data_encoding.t
@@ -2840,23 +2840,26 @@ module Dal : sig
       val zero : t
     end
 
-    type id = {published_level : Raw_level.t; index : Slot_index.t}
+    module Header : sig
+      type id = {published_level : Raw_level.t; index : Slot_index.t}
 
-    type t = {id : id; header : Header.t}
+      type t = {id : id; commitment : Commitment.t}
 
-    val encoding : t Data_encoding.t
+      val encoding : t Data_encoding.t
 
-    val pp : Format.formatter -> t -> unit
+      val pp : Format.formatter -> t -> unit
 
-    val equal : t -> t -> bool
+      val equal : t -> t -> bool
+    end
 
-    val register_slot : context -> t -> (context * bool) tzresult
+    val register_slot_header : context -> Header.t -> (context * bool) tzresult
 
-    val find : context -> Raw_level.t -> t list option tzresult Lwt.t
+    val find_slot_headers :
+      context -> Raw_level.t -> Header.t list option tzresult Lwt.t
 
-    val finalize_current_slots : context -> context Lwt.t
+    val finalize_current_slot_headers : context -> context Lwt.t
 
-    val finalize_pending_slots :
+    val finalize_pending_slot_headers :
       context -> (context * Endorsement.t) tzresult Lwt.t
   end
 
@@ -2873,10 +2876,14 @@ module Dal : sig
 
     module History_cache : Bounded_history_repr.S
 
-    val add_confirmed_slots_no_cache : t -> Slot.t list -> t tzresult
+    val add_confirmed_slot_headers_no_cache :
+      t -> Slot.Header.t list -> t tzresult
 
-    val add_confirmed_slots :
-      t -> History_cache.t -> Slot.t list -> (t * History_cache.t) tzresult
+    val add_confirmed_slot_headers :
+      t ->
+      History_cache.t ->
+      Slot.Header.t list ->
+      (t * History_cache.t) tzresult
 
     type dal_parameters = Dal.parameters = {
       redundancy_factor : int;
@@ -2889,7 +2896,7 @@ module Dal : sig
   end
 
   module Slots_storage : sig
-    val get_slots_history : t -> Slots_history.t tzresult Lwt.t
+    val get_slot_headers_history : t -> Slots_history.t tzresult Lwt.t
   end
 end
 
@@ -2912,7 +2919,7 @@ module Dal_errors : sig
       }
     | Dal_publish_slot_header_candidate_with_low_fees of {proposed_fees : Tez.t}
     | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
-    | Dal_publish_slot_header_duplicate of {slot : Dal.Slot.t}
+    | Dal_publish_slot_header_duplicate of {slot_header : Dal.Slot.Header.t}
 end
 
 (** This module re-exports definitions from {!Sc_rollup_storage} and
@@ -4357,7 +4364,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header : {
-      slot : Dal.Slot.t;
+      slot_header : Dal.Slot.Header.t;
     }
       -> Kind.dal_publish_slot_header manager_operation
   | Sc_rollup_originate : {

@@ -281,7 +281,7 @@ module Manager : sig
   val dal_publish_slot_header :
     level:int ->
     index:int ->
-    header:Tezos_crypto_dal.Cryptobox.commitment ->
+    commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     payload
 
   (** [sc_rollup_dal_slot_subscribe ~rollup ~slot_index] builds an

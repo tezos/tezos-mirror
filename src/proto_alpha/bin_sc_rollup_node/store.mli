@@ -148,7 +148,7 @@ module Dal_slots_headers :
   Store_utils.Nested_map
     with type primary_key = Block_hash.t
      and type secondary_key = Dal.Slot_index.t
-     and type value = Dal.Slot.t
+     and type value = Dal.Slot.Header.t
 
 (** Confirmed DAL slots history. See documentation of
     {Dal_slot_repr.Slots_history} for more details. *)

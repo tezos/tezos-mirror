@@ -318,15 +318,15 @@ module Dal_slots_headers = Make_nested_map (struct
 
   let compare_secondary_keys = Dal.Slot_index.compare
 
-  type value = Dal.Slot.t
+  type value = Dal.Slot.Header.t
 
   let secondary_key_encoding = Dal.Slot_index.encoding
 
   let secondary_key_name = "slot_index"
 
-  let value_encoding = Dal.Slot.encoding
+  let value_encoding = Dal.Slot.Header.encoding
 
-  let value_name = "slot_metadata"
+  let value_name = "slot_header"
 end)
 
 (** Confirmed DAL slots history. See documentation of

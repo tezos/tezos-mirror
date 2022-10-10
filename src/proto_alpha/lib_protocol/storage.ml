@@ -1950,14 +1950,6 @@ module Dal = struct
         let name = ["dal"]
       end)
 
-  module Level_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["level"]
-         end))
-         (Make_index (Raw_level_repr.Index))
-
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3113
 
      This is only for prototyping. Probably something smarter would be
@@ -1965,28 +1957,44 @@ module Dal = struct
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3684
 
      This storage should be carbonated. *)
-  module Slot_headers =
-    Level_context.Make_map
-      (Registered)
-      (struct
-        let name = ["slots"]
-      end)
-      (struct
-        type t = Dal_slot_repr.t list
+  module Slot = struct
+    module Slot_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["slot"]
+        end)
 
-        let encoding = Data_encoding.(list Dal_slot_repr.encoding)
-      end)
+    module Level_context =
+      Make_indexed_subcontext
+        (Make_subcontext (Registered) (Raw_context)
+           (struct
+             let name = ["level"]
+           end))
+           (Make_index (Raw_level_repr.Index))
 
-  module Slots_history =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["slots_history"]
-      end)
-      (struct
-        type t = Dal_slot_repr.Slots_history.t
+    module Headers =
+      Level_context.Make_map
+        (Registered)
+        (struct
+          let name = ["slot_headers"]
+        end)
+        (struct
+          type t = Dal_slot_repr.Header.t list
 
-        let encoding = Dal_slot_repr.Slots_history.encoding
-      end)
+          let encoding = Data_encoding.(list Dal_slot_repr.Header.encoding)
+        end)
+
+    module History =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["slot_headers_history"]
+        end)
+        (struct
+          type t = Dal_slot_repr.History.t
+
+          let encoding = Dal_slot_repr.History.encoding
+        end)
+  end
 end
 
 module Zk_rollup = struct

@@ -44,12 +44,12 @@ class unix_cctxt :
 val make_unix_cctxt : Configuration.t -> cctxt
 
 val get_slot :
-  #cctxt -> ?trim_slot:bool -> Dal.Slot.Header.t -> string tzresult Lwt.t
+  #cctxt -> ?trim_slot:bool -> Dal.Slot.Commitment.t -> string tzresult Lwt.t
 
 val get_shard :
-  #cctxt -> Dal.Slot.Header.t -> int -> Cryptobox.shard tzresult Lwt.t
+  #cctxt -> Dal.Slot.Commitment.t -> int -> Cryptobox.shard tzresult Lwt.t
 
 (** [get_slot_pages cctxt header ] fetches from the dal node the pages
     of the slot with header [header]. *)
 val get_slot_pages :
-  #cctxt -> Dal.Slot.Header.t -> Dal.Page.content list tzresult Lwt.t
+  #cctxt -> Dal.Slot.Commitment.t -> Dal.Page.content list tzresult Lwt.t

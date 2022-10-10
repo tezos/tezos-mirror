@@ -261,13 +261,13 @@ let download_and_save_slots
            if not slot_header_is_stored then
              failwith "Slot header was not found in store"
            else
-             let*! {header; _} =
+             let*! {commitment; _} =
                Store.Dal_slots_headers.get
                  store
                  ~primary_key:published_block_hash
                  ~secondary_key:s_slot
              in
-             let* pages = Dal_node_client.get_slot_pages dal_cctxt header in
+             let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
              let*! () =
                save_confirmed_slot store current_block_hash s_slot pages
              in
@@ -395,7 +395,7 @@ module Confirmed_slots_history = struct
     let slots_to_save =
       let open Dal in
       List.fast_sort
-        (fun Slot.{id = {index = a; _}; _} {id = {index = b; _}; _} ->
+        (fun Slot.Header.{id = {index = a; _}; _} {id = {index = b; _}; _} ->
           Slot_index.compare a b)
         slots_to_save
     in
@@ -403,7 +403,7 @@ module Confirmed_slots_history = struct
     let* slots_history = slots_history_of_hash node_ctxt pred in
     let* slots_cache = slots_history_cache_of_hash node_ctxt pred in
     let*? slots_history, slots_cache =
-      Dal.Slots_history.add_confirmed_slots
+      Dal.Slots_history.add_confirmed_slot_headers
         slots_history
         slots_cache
         slots_to_save

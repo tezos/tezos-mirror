@@ -342,7 +342,7 @@ module Manager = struct
     | Dal_publish_slot_header of {
         level : int;
         index : int;
-        header : Tezos_crypto_dal.Cryptobox.commitment;
+        commitment : Tezos_crypto_dal.Cryptobox.commitment;
       }
     | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
@@ -362,8 +362,8 @@ module Manager = struct
       ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
     Transfer {amount; dest; parameters = Some {entrypoint; arg}}
 
-  let dal_publish_slot_header ~level ~index ~header =
-    Dal_publish_slot_header {level; index; header}
+  let dal_publish_slot_header ~level ~index ~commitment =
+    Dal_publish_slot_header {level; index; commitment}
 
   let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
     Sc_rollup_dal_slot_subscribe {rollup; slot_index}
@@ -401,16 +401,19 @@ module Manager = struct
           ("destination", `String dest);
         ]
         @ parameters
-    | Dal_publish_slot_header {level; index; header} ->
-        let slot =
+    | Dal_publish_slot_header {level; index; commitment} ->
+        let slot_header =
           `O
             [
               ("index", json_of_int index);
               ("level", json_of_int level);
-              ("header", json_of_commitment header);
+              ("commitment", json_of_commitment commitment);
             ]
         in
-        [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
+        [
+          ("kind", `String "dal_publish_slot_header");
+          ("slot_header", slot_header);
+        ]
     | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
         [
           ("kind", `String "sc_rollup_dal_slot_subscribe");

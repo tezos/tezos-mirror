@@ -37,15 +37,15 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/dal/slots
+./octez-sc-rollup-client-alpha rpc get /global/dal/slot_headers
 [ { "level": 4, "index": 0,
-    "header":
+    "commitment":
       "sh23JCJDe5NojHgzFFhFmRZayf5QGo7C3rVv9eyPA7bqR592hQo4fB7Zg67dY8iAW4tmSrff6v" },
   { "level": 4, "index": 1,
-    "header":
+    "commitment":
       "[DAL_SLOT_HEADER]" },
   { "level": 4, "index": 2,
-    "header":
+    "commitment":
       "sh26FkLr6i1hb3CDtx7kWEYbS28byamyW7brBjCwdciGCFKNmkyyWt6wX1wvL7A7n25YyHFmEB" } ]
 
 ./octez-sc-rollup-client-alpha rpc get /global/dal/slot_pages

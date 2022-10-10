@@ -44,27 +44,29 @@
     - For every level below [current_level - lag], there should not be
    any slot in the storage.  *)
 
-(** [find ctxt level] returns [Some slots] where [slots] are pending
-   slots at level [level].  [None] is returned if no [slot] was
-   registered at this level. The function fails if the reading into
-   the context fails. *)
-val find :
+(** [find_slot_headers ctxt level] returns [Some slot_headers] where [slot_headers]
+   are pending slots at level [level].  [None] is returned if no
+   [slot_header] was registered at this level. The function fails if
+   the reading into the context fails. *)
+val find_slot_headers :
   Raw_context.t ->
   Raw_level_repr.t ->
-  Dal_slot_repr.t list option tzresult Lwt.t
+  Dal_slot_repr.Header.t list option tzresult Lwt.t
 
-(** [finalize_current_slots ctxt] finalizes the current slots posted
-   on this block and marks them as pending into the context.  *)
-val finalize_current_slots : Raw_context.t -> Raw_context.t Lwt.t
+(** [finalize_current_slot_headers ctxt] finalizes the current slot
+   headers posted on this block and marks them as pending into the
+   context.  *)
+val finalize_current_slot_headers : Raw_context.t -> Raw_context.t Lwt.t
 
-(** [finalize_pending_slots ctxt] finalizes pending slots which are
-   old enough (i.e. registered at level [current_level - lag]). All
-   slots marked as available are returned. All the pending slots at
-   [current_level - lag] level are removed from the context. *)
-val finalize_pending_slots :
+(** [finalize_pending_slot_headers ctxt] finalizes pending slot
+   headers which are old enough (i.e. registered at level
+   [current_level - lag]). All slots marked as available are
+   returned. All the pending slots at [current_level - lag] level are
+   removed from the context. *)
+val finalize_pending_slot_headers :
   Raw_context.t -> (Raw_context.t * Dal_endorsement_repr.t) tzresult Lwt.t
 
-(** [get_slots_history ctxt] returns the current value of slots_history stored
+(** [get_slot_headers_history ctxt] returns the current value of slots_history stored
    in [ctxt], or Slots_history.genesis if no value is stored yet. *)
-val get_slots_history :
-  Raw_context.t -> Dal_slot_repr.Slots_history.t tzresult Lwt.t
+val get_slot_headers_history :
+  Raw_context.t -> Dal_slot_repr.History.t tzresult Lwt.t

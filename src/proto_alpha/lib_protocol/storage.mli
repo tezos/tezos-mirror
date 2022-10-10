@@ -902,18 +902,20 @@ module Sc_rollup : sig
 end
 
 module Dal : sig
-  (** This is a temporary storage for slot header proposed onto the L1. *)
-  module Slot_headers :
-    Non_iterable_indexed_data_storage
-      with type t = Raw_context.t
-       and type key = Raw_level_repr.t
-       and type value = Dal_slot_repr.slot list
+  module Slot : sig
+    (** This is a temporary storage for slot headers proposed onto the L1. *)
+    module Headers :
+      Non_iterable_indexed_data_storage
+        with type t = Raw_context.t
+         and type key = Raw_level_repr.t
+         and type value = Dal_slot_repr.Header.t list
 
-  (** This is a permanent storage for slot header confirmed by the L1. *)
-  module Slots_history :
-    Single_data_storage
-      with type t := Raw_context.t
-       and type value = Dal_slot_repr.Slots_history.t
+    (** This is a permanent storage for slot headers confirmed by the L1. *)
+    module History :
+      Single_data_storage
+        with type t := Raw_context.t
+         and type value = Dal_slot_repr.History.t
+  end
 end
 
 module Zk_rollup : sig
