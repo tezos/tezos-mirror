@@ -38,6 +38,10 @@ struct
 
   let elements q = Ring.fold (fun _ x acc -> x :: acc) q []
 
+  let keys q = Ring.fold (fun k _ acc -> k :: acc) q []
+
+  let bindings q = Ring.fold (fun k x acc -> (k, x) :: acc) q []
+
   (** [oldest_elements q n f] returns the (at most) [n] oldest elements of the
       queue and calls [f] on the bindings for these elements. The elements are
       returned from oldest to newest. *)
