@@ -202,8 +202,6 @@ module V1 = struct
      the number of messages that have not been consumed by a commitment cementing ;
    - [nb_messages_in_commitment_period] :
      the number of messages during the commitment period ;
-   - [starting_level_of_current_commitment_period] :
-     the level marking the beginning of the current commitment period ;
    - [current_level_hash] : the root hash of [current_level] ;
    - [old_levels_messages] : a witness of the inbox history.
 
@@ -220,19 +218,22 @@ module V1 = struct
   type t = {
     level : Raw_level_repr.t;
     nb_messages_in_commitment_period : int64;
-    starting_level_of_current_commitment_period : Raw_level_repr.t;
     message_counter : Z.t;
     (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
     current_level_hash : unit -> Hash.t;
     old_levels_messages : history_proof;
   }
 
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+
+     The number of messages during commitment period is broken with the
+     unique inbox. *)
+
   let equal inbox1 inbox2 =
     (* To be robust to addition of fields in [t]. *)
     let {
       level;
       nb_messages_in_commitment_period;
-      starting_level_of_current_commitment_period;
       message_counter;
       current_level_hash;
       old_levels_messages;
@@ -244,10 +245,6 @@ module V1 = struct
          equal
            nb_messages_in_commitment_period
            inbox2.nb_messages_in_commitment_period)
-    && Raw_level_repr.(
-         equal
-           starting_level_of_current_commitment_period
-           inbox2.starting_level_of_current_commitment_period)
     && Z.equal message_counter inbox2.message_counter
     && Hash.equal (current_level_hash ()) (inbox2.current_level_hash ())
     && equal_history_proof old_levels_messages inbox2.old_levels_messages
@@ -256,7 +253,6 @@ module V1 = struct
       {
         level;
         nb_messages_in_commitment_period;
-        starting_level_of_current_commitment_period;
         message_counter;
         current_level_hash;
         old_levels_messages;
@@ -266,7 +262,6 @@ module V1 = struct
       "@[<hov 2>{ level = %a@;\
        current messages hash  = %a@;\
        nb_messages_in_commitment_period = %s@;\
-       starting_level_of_current_commitment_period = %a@;\
        message_counter = %a@;\
        old_levels_messages = %a@;\
        }@]"
@@ -275,8 +270,6 @@ module V1 = struct
       Hash.pp
       (current_level_hash ())
       (Int64.to_string nb_messages_in_commitment_period)
-      Raw_level_repr.pp
-      starting_level_of_current_commitment_period
       Z.pp_print
       message_counter
       pp_history_proof
@@ -297,70 +290,36 @@ module V1 = struct
         (fun {
                message_counter;
                nb_messages_in_commitment_period;
-               starting_level_of_current_commitment_period;
                level;
                current_level_hash;
                old_levels_messages;
              } ->
           ( message_counter,
             nb_messages_in_commitment_period,
-            starting_level_of_current_commitment_period,
             level,
             current_level_hash (),
             old_levels_messages ))
         (fun ( message_counter,
                nb_messages_in_commitment_period,
-               starting_level_of_current_commitment_period,
                level,
                current_level_hash,
                old_levels_messages ) ->
           {
             message_counter;
             nb_messages_in_commitment_period;
-            starting_level_of_current_commitment_period;
             level;
             current_level_hash = (fun () -> current_level_hash);
             old_levels_messages;
           })
-        (obj6
+        (obj5
            (req "message_counter" n)
            (req "nb_messages_in_commitment_period" int64)
-           (req
-              "starting_level_of_current_commitment_period"
-              Raw_level_repr.encoding)
            (req "level" Raw_level_repr.encoding)
            (req "current_level_hash" Hash.encoding)
            (req "old_levels_messages" old_levels_messages_encoding)))
 
   let number_of_messages_during_commitment_period inbox =
     inbox.nb_messages_in_commitment_period
-
-  let start_new_commitment_period inbox level =
-    {
-      inbox with
-      starting_level_of_current_commitment_period = level;
-      nb_messages_in_commitment_period = 0L;
-    }
-
-  let starting_level_of_current_commitment_period inbox =
-    inbox.starting_level_of_current_commitment_period
-
-  let refresh_commitment_period ~commitment_period ~level inbox =
-    let start = starting_level_of_current_commitment_period inbox in
-    let freshness = Raw_level_repr.diff level start in
-    let open Int32 in
-    let open Compare.Int32 in
-    if freshness >= commitment_period then (
-      let nb_periods =
-        to_int ((mul (div freshness commitment_period)) commitment_period)
-      in
-      let new_starting_level = Raw_level_repr.(add start nb_periods) in
-      assert (Raw_level_repr.(new_starting_level <= level)) ;
-      assert (
-        rem (Raw_level_repr.diff new_starting_level start) commitment_period
-        = 0l) ;
-      start_new_commitment_period inbox new_starting_level)
-    else inbox
 end
 
 type versioned = V1 of V1.t
@@ -559,8 +518,6 @@ struct
     in
     let inbox =
       {
-        starting_level_of_current_commitment_period =
-          inbox.starting_level_of_current_commitment_period;
         current_level_hash = inbox.current_level_hash;
         level = inbox.level;
         old_levels_messages = inbox.old_levels_messages;
@@ -656,8 +613,6 @@ struct
       let*! tree = new_level_tree ctxt new_level in
       let inbox =
         {
-          starting_level_of_current_commitment_period =
-            inbox.starting_level_of_current_commitment_period;
           current_level_hash = inbox.current_level_hash;
           nb_messages_in_commitment_period =
             inbox.nb_messages_in_commitment_period;
@@ -1030,7 +985,6 @@ struct
         level;
         message_counter = Z.zero;
         nb_messages_in_commitment_period = 0L;
-        starting_level_of_current_commitment_period = level;
         current_level_hash = (fun () -> initial_hash);
         old_levels_messages = Skip_list.genesis initial_hash;
       }

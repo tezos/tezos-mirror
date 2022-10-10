@@ -185,16 +185,20 @@ let process_head node_ctxt Layer1.({level; hash = head_hash} as head) =
        let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
        if messages = [] then return (history, inbox, ctxt)
        else
-         let commitment_period =
-           node_ctxt.protocol_constants.parametric.sc_rollup
-             .commitment_period_in_blocks |> Int32.of_int
-         in
-         let inbox =
-           Sc_rollup.Inbox.refresh_commitment_period
-             ~commitment_period
-             ~level
-             inbox
-         in
+         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
+
+               The number of messages during commitment period is broken with the
+               unique inbox. *)
+         (* let commitment_period =
+          *   node_ctxt.protocol_constants.parametric.sc_rollup
+          *     .commitment_period_in_blocks |> Int32.of_int
+          * in
+          * let inbox =
+          *   Sc_rollup.Inbox.refresh_commitment_period
+          *     ~commitment_period
+          *     ~level
+          *     inbox
+          * in *)
          let* messages_tree, history, inbox =
            Context.Inbox.add_messages
              node_ctxt.context

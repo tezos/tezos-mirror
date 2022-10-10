@@ -57,9 +57,6 @@ let add_messages ctxt messages =
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   let open Lwt_tzresult_syntax in
   let open Raw_context in
-  let commitment_period =
-    Constants_storage.sc_rollup_commitment_period_in_blocks ctxt |> Int32.of_int
-  in
   let* inbox, ctxt = get_inbox ctxt in
   let* num_messages, total_messages_size, ctxt =
     List.fold_left_es
@@ -78,12 +75,6 @@ let add_messages ctxt messages =
         return (num_messages, total_messages_size, ctxt))
       (0, 0, ctxt)
       messages
-  in
-  let inbox =
-    Sc_rollup_inbox_repr.refresh_commitment_period
-      ~commitment_period
-      ~level
-      inbox
   in
   let* () =
     assert_inbox_nb_messages_in_commitment_period ctxt inbox num_messages

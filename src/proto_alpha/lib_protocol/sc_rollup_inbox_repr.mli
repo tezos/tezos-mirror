@@ -204,13 +204,6 @@ module V1 : sig
     number of messages added in the inbox since the beginning of
     the current commitment period. *)
   val number_of_messages_during_commitment_period : t -> int64
-
-  (** [refresh_commitment_period ~commitment_period ~level inbox] updates
-      [inbox] to take into account the commitment_period: this resets a
-      counter for the number of messages in a given commitment period
-      (which is limited). *)
-  val refresh_commitment_period :
-    commitment_period:int32 -> level:Raw_level_repr.t -> t -> t
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
