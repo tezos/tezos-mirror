@@ -117,7 +117,7 @@ module type S = sig
       output. The result is meant to be deserialized using
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
-  val get_output : output_info -> tree -> string Lwt.t
+  val get_output : output_info -> tree -> string option Lwt.t
 
   (** [get_info] provides a typed view of the current machine state. Should not
       raise. *)

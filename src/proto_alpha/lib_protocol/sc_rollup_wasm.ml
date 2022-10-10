@@ -405,7 +405,7 @@ module V2_0_0 = struct
     let state_of_output_proof s = s.output_proof_state
 
     let has_output : PS.output -> bool Monad.t = function
-      | {outbox_level; message_index; message} ->
+      | {outbox_level; message_index; message} -> (
           let open Monad.Syntax in
           let* s = get in
           let* result =
@@ -423,7 +423,11 @@ module V2_0_0 = struct
               Sc_rollup_outbox_message_repr.encoding
               message
           in
-          return @@ Compare.String.(result = message_encoded)
+          return
+          @@
+          match result with
+          | Some result -> Compare.String.(result = message_encoded)
+          | None -> false)
 
     let verify_output_proof p =
       let open Lwt_syntax in

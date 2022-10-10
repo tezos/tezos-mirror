@@ -1083,12 +1083,14 @@ struct
         Wasm.set_input_step {inbox_level; message_counter} payload tree
 
       let get_output {outbox_level; message_index} (tree : Tree.tree) =
+        let open Lwt_syntax in
         let outbox_level =
           Tezos_protocol_environment_structs.V6.Bounded.Int32
           .non_negative_of_legacy_non_negative
             outbox_level
         in
-        Wasm.get_output {outbox_level; message_index} tree
+        let+ payload = Wasm.get_output {outbox_level; message_index} tree in
+        match payload with Some payload -> payload | None -> ""
 
       let convert_input : Tezos_scoru_wasm.Wasm_pvm_sig.input_info -> input =
         function

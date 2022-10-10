@@ -549,13 +549,15 @@ struct
           (Tezos_tree_encoding.option durable_buffers_encoding)
           tree
       in
-      match candidate with
-      | Some {output; _} ->
-          let+ payload =
-            Wasm.Output_buffer.get output outbox_level message_index
-          in
-          Bytes.to_string payload
-      | None -> raise (Invalid_argument "get_output: missing output buffer")
+      try
+        match candidate with
+        | Some {output; _} ->
+            let+ payload =
+              Wasm.Output_buffer.get output outbox_level message_index
+            in
+            Some (Bytes.to_string payload)
+        | None -> Lwt.return None
+      with _ -> Lwt.return None
 
     let get_info tree =
       let open Lwt_syntax in
