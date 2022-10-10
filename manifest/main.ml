@@ -3591,7 +3591,7 @@ end = struct
             (2, "test_sc_rollup_tick_repr", N.(number >= 013));
             (2, "test_sc_rollup_encoding", N.(number >= 015));
             (3, "refutation_game_pbt", N.(number == 013));
-            (3, "test_refutation_game", N.(number >= 014));
+            (3, "test_refutation_game", N.(number >= 016));
             (3, "test_carbonated_map", N.(number >= 013));
             (3, "test_zk_rollup_encoding", N.(number >= 015));
             (3, "test_dal_slot_proof", N.(number >= 016));
@@ -3634,7 +3634,7 @@ end = struct
               octez_benchmark;
               benchmark |> if_some |> open_;
               benchmark_type_inference |> if_some |> open_;
-              sc_rollup |> if_some |> if_ N.(number >= 015) |> open_;
+              sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
             ]
@@ -4567,7 +4567,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let layer2_utils =
-      only_if N.(number >= 015) @@ fun () ->
+      only_if N.(number >= 016) @@ fun () ->
       public_lib
         (sf "tezos-layer2-utils-%s" name_dash)
         ~path:(path // "lib_layer2_utils")
@@ -4583,7 +4583,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let sc_rollup =
-      only_if N.(number >= 013) @@ fun () ->
+      only_if N.(number >= 016) @@ fun () ->
       public_lib
         (sf "tezos-sc-rollup-%s" name_dash)
         ~path:(path // "lib_sc_rollup")
@@ -4601,7 +4601,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let _sc_rollup_client =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 016)) @@ fun () ->
       public_exe
         (sf "octez-sc-rollup-client-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_client_%s" name_underscore)
@@ -4626,7 +4626,7 @@ module Protocol = Protocol
           ]
     in
     let _sc_rollup_node =
-      only_if (active && N.(number >= 013)) @@ fun () ->
+      only_if (active && N.(number >= 016)) @@ fun () ->
       public_exe
         (sf "octez-sc-rollup-node-%s" short_hash)
         ~internal_name:(sf "main_sc_rollup_node_%s" name_underscore)
@@ -4746,7 +4746,7 @@ module Protocol = Protocol
           ]
     in
     let dal =
-      only_if (active && N.(number >= 015)) @@ fun () ->
+      only_if (active && N.(number >= 016)) @@ fun () ->
       public_lib
         (sf "tezos-dal-%s" name_dash)
         ~path:(path // "lib_dal")
@@ -4768,7 +4768,7 @@ module Protocol = Protocol
         ~linkall:true
     in
     let _dal_tests =
-      only_if (active && N.(number >= 015)) @@ fun () ->
+      only_if (active && N.(number >= 016)) @@ fun () ->
       test
         "main"
         ~path:(path // "lib_dal/test")
