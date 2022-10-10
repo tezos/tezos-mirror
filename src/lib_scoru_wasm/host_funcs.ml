@@ -44,6 +44,24 @@ let retrieve_memory memories =
 let check_key_length key_length =
   if key_length > Durable.max_key_length then raise (Key_too_large key_length)
 
+module Error = struct
+  let store_key_too_large = -1l
+
+  let store_invalid_key = -2l
+
+  let store_not_a_value = -3l
+
+  let memory_invalid_access = -4l
+end
+
+let safe_load_byte memory ofs len =
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () ->
+      let+ bytes = Memory.load_bytes memory ofs len in
+      Some bytes)
+    (fun _ -> return None)
+
 module Aux = struct
   let read_input ~input_buffer ~output_buffer ~memory ~rtype_offset
       ~level_offset ~id_offset ~dst ~max_bytes =
@@ -152,6 +170,27 @@ module Aux = struct
     let from_key = Durable.key_of_string_exn from_key in
     let to_key = Durable.key_of_string_exn to_key in
     Durable.move_tree_exn durable from_key to_key
+
+  let store_value_size ~durable ~memory ~key_offset ~key_length =
+    let open Lwt_syntax in
+    let key_len = Int32.to_int key_length in
+    if key_len > Durable.max_key_length then return Error.store_key_too_large
+    else
+      let* key = safe_load_byte memory key_offset key_len in
+      match key with
+      | Some key -> (
+          match Durable.key_of_string_opt key with
+          | Some key -> (
+              let* bytes = Durable.find_value durable key in
+              match bytes with
+              | Some bytes ->
+                  let size =
+                    Tezos_lazy_containers.Chunked_byte_vector.length bytes
+                  in
+                  return (Int64.to_int32 size)
+              | None -> return Error.store_not_a_value)
+          | None -> return Error.store_invalid_key)
+      | None -> return Error.memory_invalid_access
 
   let store_read ~durable ~memory ~key_offset ~key_length ~value_offset ~dest
       ~max_bytes =
@@ -371,6 +410,33 @@ let store_delete =
               ~key_length
           in
           (Durable.to_storage durable, [])
+      | _ -> raise Bad_input)
+
+let store_value_size_name = "tezos_store_value_size"
+
+let store_value_size_type =
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
+  let output_types = Vector.of_list Types.[NumType I32Type] in
+  Types.FuncType (input_types, output_types)
+
+let store_value_size =
+  let open Lwt_syntax in
+  let open Values in
+  Host_funcs.Host_func
+    (fun _input _output durable memories inputs ->
+      match inputs with
+      | [Num (I32 key_offset); Num (I32 key_length)] ->
+          let* memory = retrieve_memory memories in
+          let+ res =
+            Aux.store_value_size
+              ~durable:(Durable.of_storage_exn durable)
+              ~memory
+              ~key_offset
+              ~key_length
+          in
+          (durable, Values.[Num (I32 res)])
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
@@ -646,6 +712,9 @@ let lookup_opt name =
       Some (ExternFunc (HostFunc (store_copy_type, store_copy_name)))
   | "store_move" ->
       Some (ExternFunc (HostFunc (store_move_type, store_move_name)))
+  | "store_value_size" ->
+      Some
+        (ExternFunc (HostFunc (store_value_size_type, store_value_size_name)))
   | "reveal_preimage" ->
       Some (ExternFunc (HostFunc (reveal_preimage_type, reveal_preimage_name)))
   | "store_read" ->
@@ -672,6 +741,7 @@ let register_host_funcs registry =
       (store_delete_name, store_delete);
       (store_copy_name, store_copy);
       (store_move_name, store_move);
+      (store_value_size_name, store_value_size);
       (reveal_preimage_name, reveal_preimage);
       (store_read_name, store_read);
       (store_write_name, store_write);
@@ -693,6 +763,9 @@ module Internal_for_tests = struct
   let store_read = Func.HostFunc (store_read_type, store_read_name)
 
   let store_write = Func.HostFunc (store_write_type, store_write_name)
+
+  let store_value_size =
+    Func.HostFunc (store_value_size_type, store_value_size_name)
 
   let store_list_size =
     Func.HostFunc (store_list_size_type, store_list_size_name)

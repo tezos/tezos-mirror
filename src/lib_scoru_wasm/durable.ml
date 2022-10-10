@@ -75,6 +75,9 @@ let key_of_string_exn s =
   in
   if all_steps_valid key then key else raise (Invalid_key s)
 
+let key_of_string_opt s =
+  try Some (key_of_string_exn s) with Invalid_key _ -> None
+
 (** We append all values with '_', which is an invalid key-character w.r.t.
     external use.
 

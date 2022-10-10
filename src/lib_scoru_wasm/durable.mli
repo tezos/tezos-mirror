@@ -64,6 +64,8 @@ val max_key_length : int
 (** raise @Invalid_key *)
 val key_of_string_exn : string -> key
 
+val key_of_string_opt : string -> key option
+
 (** [find_value durable key] optionally looks for the value encoded at [key]
     in [durable]. *)
 val find_value :

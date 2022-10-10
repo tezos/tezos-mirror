@@ -660,6 +660,70 @@ let test_store_read () =
   assert (value = expected_read_bytes) ;
   return_ok_unit
 
+let test_store_value_size () =
+  let open Lwt_syntax in
+  let to_res x = [Values.(Num (I32 x))] in
+  let invoke_store_value_size ~module_reg ~caller ~durable host_funcs_reg values
+      =
+    let+ _durable, result =
+      Eval.invoke
+        ~module_reg
+        ~caller
+        ~durable
+        host_funcs_reg
+        Host_funcs.Internal_for_tests.store_value_size
+        values
+    in
+    result
+  in
+
+  let key = "/a/b/c" in
+  let invalid_key = "a/b" in
+  let missing_key = "/a/b/d" in
+  let contents = "foobar" in
+  let contents_len = Int32.of_int (String.length contents) in
+  let* durable = make_durable [(key, contents)] in
+  let src = 20l in
+  let module_reg, module_key, host_funcs_registry =
+    make_module_inst [key; invalid_key; missing_key; contents] src
+  in
+  let key_src, key_len = (src, Int32.of_int (String.length key)) in
+  let invalid_key_src, invalid_key_len =
+    (Int32.add key_src key_len, Int32.of_int (String.length invalid_key))
+  in
+  let missing_key_src, missing_key_len =
+    ( Int32.add invalid_key_src invalid_key_len,
+      Int32.of_int (String.length missing_key) )
+  in
+  let* result =
+    invoke_store_value_size
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Values.[Num (I32 key_src); Num (I32 key_len)]
+  in
+  assert (result = [Values.Num (I32 contents_len)]) ;
+  let* result =
+    invoke_store_value_size
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Values.[Num (I32 invalid_key_src); Num (I32 invalid_key_len)]
+  in
+  assert (result = to_res Host_funcs.Error.store_invalid_key) ;
+  let* result =
+    invoke_store_value_size
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Values.[Num (I32 missing_key_src); Num (I32 missing_key_len)]
+  in
+  assert (result = to_res Host_funcs.Error.store_not_a_value) ;
+  Lwt_result_syntax.return_unit
+
 let test_store_write () =
   let open Lwt_syntax in
   (*
@@ -781,6 +845,7 @@ let tests =
     tztest "store_move" `Quick test_store_move;
     tztest "store_read" `Quick test_store_read;
     tztest "store_write" `Quick test_store_write;
+    tztest "store_value_size" `Quick test_store_value_size;
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;

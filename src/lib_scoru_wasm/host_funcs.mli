@@ -59,6 +59,20 @@ exception Bad_input
 (** A durable key was given by the kernel with a longer-than-allowed length. *)
 exception Key_too_large of int
 
+module Error : sig
+  (** The store key submitted as an argument of a host function
+      exceeds the authorized limit. *)
+  val store_key_too_large : int32
+
+  (** The store key submitted as an argument of a host function
+      cannot be parsed. *)
+  val store_invalid_key : int32
+
+  (** The contents (if any) of the store under the key submitted as an
+      argument of a host function is not a value. *)
+  val store_not_a_value : int32
+end
+
 module Aux : sig
   (** [aux_write_output ~input_buffer ~output_buffer ~module_inst ~src
        ~num_bytes] reads num_bytes from the memory of module_inst starting at
@@ -123,6 +137,13 @@ module Aux : sig
     to_key_length:int32 ->
     Durable.t Lwt.t
 
+  val store_value_size :
+    durable:Durable.t ->
+    memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
+    key_offset:int32 ->
+    key_length:int32 ->
+    int32 Lwt.t
+
   val store_read :
     durable:Durable.t ->
     memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
@@ -180,6 +201,8 @@ module Internal_for_tests : sig
   val store_copy : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_move : Tezos_webassembly_interpreter.Instance.func_inst
+
+  val store_value_size : Tezos_webassembly_interpreter.Instance.func_inst
 
   val store_read : Tezos_webassembly_interpreter.Instance.func_inst
 
