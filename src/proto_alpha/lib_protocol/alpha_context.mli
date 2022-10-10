@@ -3703,7 +3703,7 @@ module Sc_rollup : sig
       refutation ->
       (game_result, t) Either.t tzresult Lwt.t
 
-    type timeout = {alice : int; bob : int; last_turn_level : Raw_level_repr.t}
+    type timeout = {alice : int; bob : int; last_turn_level : Raw_level.t}
 
     val timeout_encoding : timeout Data_encoding.t
 
