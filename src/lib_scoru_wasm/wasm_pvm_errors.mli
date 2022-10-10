@@ -67,6 +67,8 @@ type t =
       (** Wraps unexpected exceptions raised by the interpreter. *)
   | Too_many_ticks
       (** The maximum number of ticks was reached before the end of current top level call *)
+  | Too_many_reboots
+      (** The maximum number of reboots was reached before the next inputs *)
 
 (* [invalid_state msg] builds an `Invalid_state` error out of a message. *)
 val invalid_state : string -> t

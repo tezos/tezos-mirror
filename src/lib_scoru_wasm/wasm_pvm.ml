@@ -31,11 +31,20 @@ let wasm_main_module_name = "main"
    kernel to expose a function named [kernel_next]. *)
 let wasm_entrypoint = "kernel_next"
 
-(* TODO: #3590
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3590
    An appropriate number should be used,
    currently 100 times the nb of ticks it takes tx_kernel to init, deposit, then withdraw
    (so 100x 2 billion ticks) *)
 let wasm_max_tick = Z.of_int 200_000_000_000
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
+   Find an appropriate number of reboots per inputs.
+*)
+let maximum_reboots_per_input = Z.of_int 10
+
+(* Flag used in the durable storage by the kernel to ask a reboot from the PVM
+   without consuming an input. *)
+let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot"
 
 module Wasm = Tezos_webassembly_interpreter
 
@@ -56,12 +65,13 @@ type tick_state =
   | Stuck of Wasm_pvm_errors.t
   | Snapshot
 
-type computation_status = Starting | Restarting | Running | Failing
+type computation_status = Starting | Restarting | Running | Failing | Reboot
 
 type pvm_state = {
   last_input_info : Wasm_pvm_sig.input_info option;
       (** Info about last read input. *)
   current_tick : Z.t;  (** Current tick of the PVM. *)
+  reboot_counter : Z.t;  (** Number of reboots for the current input. *)
   durable : Durable.t;  (** The durable storage of the PVM. *)
   buffers : Wasm.Eval.buffers;
       (** Input and outut buffers used by the PVM host functions. *)
@@ -69,6 +79,7 @@ type pvm_state = {
   last_top_level_call : Z.t;
       (** Last tick corresponding to a top-level call. *)
   max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
+  maximum_reboots_per_input : Z.t;  (** Number of reboots between two inputs. *)
 }
 
 module Make (T : Tezos_tree_encoding.TREE) :
@@ -159,14 +170,18 @@ struct
       conv
         (fun ( last_input_info,
                current_tick,
+               reboot_counter,
                durable,
                buffers,
                tick_state,
                last_top_level_call,
-               max_nb_ticks ) ->
+               max_nb_ticks,
+               maximum_reboots_per_input ) ->
           {
             last_input_info;
             current_tick;
+            reboot_counter =
+              Option.value ~default:maximum_reboots_per_input reboot_counter;
             durable;
             buffers =
               (*`Gather_floppies` uses `get_info`, that decodes the state of the
@@ -177,27 +192,33 @@ struct
             tick_state;
             last_top_level_call;
             max_nb_ticks;
+            maximum_reboots_per_input;
           })
         (fun {
                last_input_info;
                current_tick;
+               reboot_counter;
                durable;
                buffers;
                tick_state;
                last_top_level_call;
                max_nb_ticks;
+               maximum_reboots_per_input;
              } ->
           ( last_input_info,
             current_tick,
+            Some reboot_counter,
             durable,
             Some buffers,
             tick_state,
             last_top_level_call,
-            max_nb_ticks ))
-        (tup7
+            max_nb_ticks,
+            maximum_reboots_per_input ))
+        (tup9
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
+           (value_option ["wasm"; "reboot_counter"] Data_encoding.n)
            (scope ["durable"] Durable.encoding)
            (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
@@ -208,6 +229,10 @@ struct
            (value
               ~default:wasm_max_tick
               ["pvm"; "max_nb_ticks"]
+              Data_encoding.n)
+           (value
+              ~default:maximum_reboots_per_input
+              ["pvm"; "maximum_reboots_per_input"]
               Data_encoding.n))
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
@@ -228,6 +253,27 @@ struct
     let is_time_for_snapshot pvm_state =
       Z.Compare.(ticks_to_snapshot pvm_state <= Z.zero)
 
+    let has_reboot_flag durable =
+      let open Lwt_syntax in
+      let+ allows_reboot =
+        Lwt.catch
+          (fun () -> Durable.(find_value durable reboot_flag_key))
+          (function exn -> raise exn)
+      in
+      allows_reboot <> None
+
+    let mark_for_reboot reboot_counter durable =
+      let open Lwt_syntax in
+      if Z.Compare.(reboot_counter <= Z.zero) then return Failing
+      else
+        let+ has_reboot_flag = has_reboot_flag durable in
+        if has_reboot_flag then Reboot else Restarting
+
+    let initial_boot_state () =
+      Decode
+        (Tezos_webassembly_interpreter.Decode.initial_decode_kont
+           ~name:wasm_main_module_name)
+
     let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state)
         =
       let open Lwt_syntax in
@@ -237,12 +283,24 @@ struct
       match tick_state with
       | Stuck e -> return ~status:Failing (Stuck e)
       | Snapshot ->
-          return
-            ~status:Failing
-            (Stuck (Wasm_pvm_errors.invalid_state "snapshot is a tick state"))
+          let* has_reboot_flag = has_reboot_flag durable in
+          if has_reboot_flag then
+            let* durable = Durable.(delete durable reboot_flag_key) in
+            return ~durable (initial_boot_state ())
+          else
+            return
+              ~status:Failing
+              (Stuck
+                 (Wasm_pvm_errors.invalid_state
+                    "snapshot is an input tick state"))
       | _ when eval_has_finished tick_state && is_time_for_snapshot pvm_state ->
-          (* We have an empty set of admin instructions *)
-          return ~status:Restarting Snapshot
+          (* We have an empty set of admin instructions, we can either reboot
+             without consuming another input if the flag has been set or read a
+             new input. *)
+          let* status = mark_for_reboot pvm_state.reboot_counter durable in
+          (* Execution took too many reboot *)
+          if status = Failing then return ~status (Stuck Too_many_reboots)
+          else return ~status Snapshot
       | _ when is_time_for_snapshot pvm_state ->
           (* Execution took too many ticks *)
           return ~status:Failing (Stuck Too_many_ticks)
@@ -380,8 +438,15 @@ struct
 
     let next_last_top_level_call {current_tick; last_top_level_call; _} =
       function
-      | Restarting -> Z.succ current_tick
+      | Restarting | Reboot -> Z.succ current_tick
       | Starting | Failing | Running -> last_top_level_call
+
+    let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _}
+        status =
+      match status with
+      | Reboot -> Z.pred reboot_counter
+      | Restarting | Failing -> maximum_reboots_per_input
+      | Starting | Running -> reboot_counter
 
     let compute_step_inner pvm_state =
       let open Lwt_syntax in
@@ -389,19 +454,32 @@ struct
       let* durable, tick_state, status = next_tick_state pvm_state in
       let current_tick = Z.succ pvm_state.current_tick in
       let last_top_level_call = next_last_top_level_call pvm_state status in
+      let reboot_counter = next_reboot_counter pvm_state status in
       let pvm_state =
-        {pvm_state with tick_state; durable; current_tick; last_top_level_call}
+        {
+          pvm_state with
+          tick_state;
+          durable;
+          current_tick;
+          last_top_level_call;
+          reboot_counter;
+        }
       in
       return pvm_state
 
     let input_request pvm_state =
+      let open Lwt_syntax in
       match pvm_state.tick_state with
-      | Stuck _ | Snapshot -> Wasm_pvm_sig.Input_required
+      | Stuck _ -> return Wasm_pvm_sig.Input_required
+      | Snapshot ->
+          let+ has_reboot_flag = has_reboot_flag pvm_state.durable in
+          if has_reboot_flag then Wasm_pvm_sig.No_input_required
+          else Wasm_pvm_sig.Input_required
       | Eval config -> (
           match Tezos_webassembly_interpreter.Eval.is_reveal_tick config with
-          | Some reveal -> Reveal_required reveal
-          | None -> No_input_required)
-      | _ -> No_input_required
+          | Some reveal -> return (Wasm_pvm_sig.Reveal_required reveal)
+          | None -> return Wasm_pvm_sig.No_input_required)
+      | _ -> return Wasm_pvm_sig.No_input_required
 
     let is_top_level_padding pvm_state =
       eval_has_finished pvm_state.tick_state
@@ -412,7 +490,8 @@ struct
       assert (max_steps > 0L) ;
 
       let rec go steps_left pvm_state =
-        if steps_left > 0L && input_request pvm_state = No_input_required then
+        let* input_request = input_request pvm_state in
+        if steps_left > 0L && input_request = No_input_required then
           if is_top_level_padding pvm_state then
             (* We're in the top-level padding after the evaluation has
                finished. That means we can skip up to the tick before the
@@ -473,15 +552,12 @@ struct
 
     let get_info tree =
       let open Lwt_syntax in
-      let+ ({current_tick; last_input_info; _} as pvm) =
+      let* ({current_tick; last_input_info; _} as pvm) =
         Tree_encoding_runner.decode pvm_state_encoding tree
       in
+      let+ input_request = input_request pvm in
       Wasm_pvm_sig.
-        {
-          current_tick;
-          last_input_read = last_input_info;
-          input_request = input_request pvm;
-        }
+        {current_tick; last_input_read = last_input_info; input_request}
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
@@ -510,9 +586,7 @@ struct
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
                The goal is to read a complete inbox. *)
             (* Go back to decoding *)
-            Decode
-              (Tezos_webassembly_interpreter.Decode.initial_decode_kont
-                 ~name:wasm_main_module_name)
+            initial_boot_state ()
         | Decode _ ->
             Lwt.return
               (Stuck
@@ -620,6 +694,20 @@ struct
         let open Lwt_syntax in
         let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         let pvm_state = {pvm_state with max_nb_ticks = n} in
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+      let set_maximum_reboots_per_input n tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        let pvm_state = {pvm_state with maximum_reboots_per_input = n} in
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+      let reset_reboot_counter tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        let pvm_state =
+          {pvm_state with reboot_counter = pvm_state.maximum_reboots_per_input}
+        in
         Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
     end
   end

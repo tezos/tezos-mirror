@@ -41,7 +41,9 @@ let wat2wasm code =
 
 let default_max_tick = 100000L
 
-let initial_tree ?(max_tick = default_max_tick) ?(from_binary = false) code =
+let initial_tree ?(max_tick = default_max_tick)
+    ?(max_reboots = Wasm_pvm.maximum_reboots_per_input) ?(from_binary = false)
+    code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
   let* empty_tree = empty_tree () in
@@ -56,7 +58,8 @@ let initial_tree ?(max_tick = default_max_tick) ?(from_binary = false) code =
       ~empty_tree
       boot_sector
   in
-  Wasm.Internal_for_tests.set_max_nb_ticks max_tick_Z tree
+  let* tree = Wasm.Internal_for_tests.set_max_nb_ticks max_tick_Z tree in
+  Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 
 let eval_until_stuck ?(max_steps = 20000L) tree =
   let open Lwt.Syntax in
@@ -143,6 +146,7 @@ let check_error ?expected_kind ?expected_reason error =
      not safe to rely on its string representation. *)
   | Some `Unknown, Unknown_error _ -> true
   | Some `Too_many_ticks, Too_many_ticks -> true
+  | Some `Too_many_reboots, Too_many_reboots -> true
   (* The expected step doesn't corresponds to the actual stuck step. *)
   | Some _, _ -> false
   (* No check to do, we simply assume the PVM is in a stuck state. *)
