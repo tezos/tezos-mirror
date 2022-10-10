@@ -75,6 +75,8 @@ module type Internal_for_tests = sig
 
   val set_max_nb_ticks : Z.t -> tree -> tree Lwt.t
 
+  val set_maximum_reboots_per_input : Z.t -> tree -> tree Lwt.t
+
   val reset_reboot_counter : tree -> tree Lwt.t
 end
 

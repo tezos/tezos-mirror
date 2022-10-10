@@ -79,6 +79,7 @@ type pvm_state = {
   last_top_level_call : Z.t;
       (** Last tick corresponding to a top-level call. *)
   max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
+  maximum_reboots_per_input : Z.t;  (** Number of reboots between two inputs. *)
 }
 
 module Make (T : Tezos_tree_encoding.TREE) :
@@ -174,11 +175,13 @@ struct
                buffers,
                tick_state,
                last_top_level_call,
-               max_nb_ticks ) ->
+               max_nb_ticks,
+               maximum_reboots_per_input ) ->
           {
             last_input_info;
             current_tick;
-            reboot_counter;
+            reboot_counter =
+              Option.value ~default:maximum_reboots_per_input reboot_counter;
             durable;
             buffers =
               (*`Gather_floppies` uses `get_info`, that decodes the state of the
@@ -189,6 +192,7 @@ struct
             tick_state;
             last_top_level_call;
             max_nb_ticks;
+            maximum_reboots_per_input;
           })
         (fun {
                last_input_info;
@@ -199,23 +203,22 @@ struct
                tick_state;
                last_top_level_call;
                max_nb_ticks;
+               maximum_reboots_per_input;
              } ->
           ( last_input_info,
             current_tick,
-            reboot_counter,
+            Some reboot_counter,
             durable,
             Some buffers,
             tick_state,
             last_top_level_call,
-            max_nb_ticks ))
-        (tup8
+            max_nb_ticks,
+            maximum_reboots_per_input ))
+        (tup9
            ~flatten:true
            (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
            (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
-           (value
-              ~default:kernel_next_maximum_reboot
-              ["wasm"; "reboot_counter"]
-              Data_encoding.n)
+           (value_option ["wasm"; "reboot_counter"] Data_encoding.n)
            (scope ["durable"] Durable.encoding)
            (option durable_buffers_encoding)
            (scope ["wasm"] tick_state_encoding)
@@ -226,6 +229,10 @@ struct
            (value
               ~default:wasm_max_tick
               ["pvm"; "max_nb_ticks"]
+              Data_encoding.n)
+           (value
+              ~default:maximum_reboots_per_input
+              ["pvm"; "maximum_reboots_per_input"]
               Data_encoding.n))
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
@@ -434,7 +441,8 @@ struct
       | Restarting | Reboot -> Z.succ current_tick
       | Starting | Failing | Running -> last_top_level_call
 
-    let next_reboot_counter {reboot_counter; _} status =
+    let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _}
+        status =
       match status with
       | Reboot -> Z.pred reboot_counter
       | Restarting | Failing -> maximum_reboots_per_input
@@ -686,6 +694,12 @@ struct
         let open Lwt_syntax in
         let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         let pvm_state = {pvm_state with max_nb_ticks = n} in
+        Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+      let set_maximum_reboots_per_input n tree =
+        let open Lwt_syntax in
+        let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
+        let pvm_state = {pvm_state with maximum_reboots_per_input = n} in
         Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
       let reset_reboot_counter tree =

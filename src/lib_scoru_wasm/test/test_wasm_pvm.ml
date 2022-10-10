@@ -545,7 +545,7 @@ let test_durable_store_io () =
   assert (expected = value) ;
   return_unit
 
-let test_kernel_reboot_gen max_reboot expected_reboots =
+let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
   let open Lwt_result_syntax in
   (* Extracted from the kernel, these are the constant values used to build the
      initial memory and the addresses where values are stored. *)
@@ -690,10 +690,15 @@ let test_kernel_reboot_gen max_reboot expected_reboots =
       data_offset_start (* == reboot_key's offset *)
       reboot_key_length
       reboot_flag_in_memory_offset
-      max_reboot
+      reboots
   in
   (* Let's first init the tree to compute. *)
-  let*! tree = initial_tree ~from_binary:false reboot_module in
+  let*! tree =
+    initial_tree
+      ~max_reboots:(Z.of_int32 pvm_max_reboots)
+      ~from_binary:false
+      reboot_module
+  in
   let*! tree = eval_until_input_requested tree in
   let*! tree = set_input_step "dummy_input" 0 tree in
   let*! tree = eval_until_input_requested tree in
@@ -702,7 +707,7 @@ let test_kernel_reboot_gen max_reboot expected_reboots =
   (* If the expected number of reboots from the PVM is lower than the maximum
      asked by the kernel itself, this should lead to a stuck state with
      `Too_many_reboots`. *)
-  if max_reboot <= expected_reboots then assert (not @@ is_stuck state)
+  if reboots <= pvm_max_reboots then assert (not @@ is_stuck state)
   else assert (is_stuck ~step:`Too_many_reboots state) ;
 
   let*! durable = wrap_as_durable_storage tree in
@@ -724,12 +729,12 @@ let test_kernel_reboot_gen max_reboot expected_reboots =
 
 let test_kernel_reboot () =
   (* The kernel doesn't accept more than 10 reboots between two inputs, this test will succeed. *)
-  test_kernel_reboot_gen 5l 5l
+  test_kernel_reboot_gen ~reboots:5l ~expected_reboots:5l ~pvm_max_reboots:10l
 
 let test_kernel_reboot_failing () =
   (* The kernel doesn't accept more than 10 reboots between two inputs, it will
      then fail after 10. *)
-  test_kernel_reboot_gen 15l 10l
+  test_kernel_reboot_gen ~reboots:15l ~expected_reboots:10l ~pvm_max_reboots:10l
 
 let tests =
   [
