@@ -38,8 +38,6 @@ Operation receipts
 Bug Fixes
 ---------
 
-- Ghostnet-specific fixes. (MR :gl:`!6401`)
-
 Minor Changes
 -------------
 

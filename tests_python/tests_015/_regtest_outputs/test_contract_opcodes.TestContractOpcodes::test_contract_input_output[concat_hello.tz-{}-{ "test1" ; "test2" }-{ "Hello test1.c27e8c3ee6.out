@@ -16,20 +16,20 @@ trace
   - location: 12 (remaining gas: 1039993.211 units remaining)
     [ "Hello "
       "test1" ]
-  - location: 15 (remaining gas: 1039993.166 units remaining)
+  - location: 15 (remaining gas: 1039993.161 units remaining)
     [ "Hello test1" ]
-  - location: 10 (remaining gas: 1039993.156 units remaining)
+  - location: 10 (remaining gas: 1039993.146 units remaining)
     [ "test2" ]
-  - location: 12 (remaining gas: 1039993.146 units remaining)
+  - location: 12 (remaining gas: 1039993.136 units remaining)
     [ "Hello "
       "test2" ]
-  - location: 15 (remaining gas: 1039993.101 units remaining)
+  - location: 15 (remaining gas: 1039993.086 units remaining)
     [ "Hello test2" ]
-  - location: 10 (remaining gas: 1039993.091 units remaining)
+  - location: 10 (remaining gas: 1039993.071 units remaining)
     [ { "Hello test1" ; "Hello test2" } ]
-  - location: 16 (remaining gas: 1039993.081 units remaining)
+  - location: 16 (remaining gas: 1039993.061 units remaining)
     [ {}
       { "Hello test1" ; "Hello test2" } ]
-  - location: 18 (remaining gas: 1039993.071 units remaining)
+  - location: 18 (remaining gas: 1039993.051 units remaining)
     [ (Pair {} { "Hello test1" ; "Hello test2" }) ]
 

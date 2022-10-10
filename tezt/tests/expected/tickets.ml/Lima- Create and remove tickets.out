@@ -1,7 +1,7 @@
 
 ./octez-client --mode mockup --wait none originate contract add_clear_tickets.tz transferring 200 from bootstrap1 running file:./tezt/tests/contracts/proto_alpha/add_clear_tickets.tz --init '{}' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1437.760 units (will add 100 for safety)
+Estimated gas: 1437.780 units (will add 100 for safety)
 Estimated storage: 398 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -44,7 +44,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 141 bytes
         Paid storage size diff: 141 bytes
-        Consumed gas: 1437.760
+        Consumed gas: 1437.780
         Balance updates:
           [PUBLIC_KEY_HASH] ... -ꜩ0.03525
           storage fees ........................... +ꜩ0.03525
@@ -58,7 +58,7 @@ Contract memorized as add_clear_tickets.tz.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "A"'
 Node is bootstrapped.
-Estimated gas: 2582.458 units (will add 100 for safety)
+Estimated gas: 2582.758 units (will add 100 for safety)
 Estimated storage: 105 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -87,7 +87,7 @@ This sequence of operations was run:
         { Pair 0x0135c48b18c573e6d98d89ef9192f152c92c3ef39a00 (Pair "A" 1) }
       Storage size: 180 bytes
       Paid storage size diff: 105 bytes
-      Consumed gas: 2583.103
+      Consumed gas: 2583.403
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.02625
         storage fees ........................... +ꜩ0.02625
@@ -101,7 +101,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint clear --arg Unit
 Node is bootstrapped.
-Estimated gas: 2772.454 units (will add 100 for safety)
+Estimated gas: 2772.629 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -127,7 +127,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: {}
       Storage size: 141 bytes
-      Consumed gas: 2773.099
+      Consumed gas: 2773.274
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -138,7 +138,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "B"'
 Node is bootstrapped.
-Estimated gas: 2582.458 units (will add 100 for safety)
+Estimated gas: 2582.758 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -166,7 +166,7 @@ This sequence of operations was run:
       Updated storage:
         { Pair 0x0135c48b18c573e6d98d89ef9192f152c92c3ef39a00 (Pair "B" 1) }
       Storage size: 180 bytes
-      Consumed gas: 2583.103
+      Consumed gas: 2583.403
       Ticket updates:
         Ticketer: [CONTRACT_HASH]
         Content type: string
@@ -177,7 +177,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap2 to '[CONTRACT_HASH]' --burn-cap 2 --entrypoint add --arg 'Pair 1 "C"'
 Node is bootstrapped.
-Estimated gas: 3264.087 units (will add 100 for safety)
+Estimated gas: 3264.687 units (will add 100 for safety)
 Estimated storage: 105 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -207,7 +207,7 @@ This sequence of operations was run:
           Pair 0x0135c48b18c573e6d98d89ef9192f152c92c3ef39a00 (Pair "B" 1) }
       Storage size: 219 bytes
       Paid storage size diff: 105 bytes
-      Consumed gas: 3264.732
+      Consumed gas: 3265.332
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.02625
         storage fees ........................... +ꜩ0.02625

@@ -35,6 +35,9 @@
 
     Do not fail if something goes wrong.
 *)
+
+*)
+
 let invoice_contract ctxt ~address ~amount_mutez =
   match Tez_repr.of_mutez amount_mutez with
   | None -> Lwt.return (ctxt, [])
@@ -49,7 +52,6 @@ let invoice_contract ctxt ~address ~amount_mutez =
       >|= function
       | Ok res -> res
       | Error _ -> (ctxt, []))
-*)
 
 (*
   To patch code of legacy contracts you can add a helper function here and call
@@ -102,7 +104,27 @@ let patch_script (address, hash, patched_code) ctxt =
         address ;
       return ctxt
 
-let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
+module Patch_ghostnet = struct
+  let ghostnet_id =
+    let id = Chain_id.of_b58check_exn "NetXnHfVqm9iesp" in
+    if Chain_id.equal id Constants_repr.mainnet_id then assert false else id
+
+  let patch chain_id ctxt level =
+    if Chain_id.equal chain_id ghostnet_id then
+      Raw_context.patch_constants ctxt (fun c ->
+          {c with vdf_difficulty = Int64.div c.vdf_difficulty 4L})
+      >>= fun ctxt ->
+      Voting_period_storage.get_current ctxt >>=? fun current ->
+      let level = Raw_level_repr.to_int32 level in
+      if Compare.Int32.equal current.start_position level then
+        (* do nothing; the migration happens at the end of a voting
+           period, so the period has already been reset *)
+        return ctxt
+      else Voting_period_storage.reset ctxt
+    else return ctxt
+end
+
+let prepare_first_block chain_id ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
   let parametric = Raw_context.constants ctxt in
@@ -166,7 +188,17 @@ let prepare_first_block _chain_id ctxt ~typecheck ~level ~timestamp =
       Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt ->
       Delegate_cycles.Migration_from_Kathmandu.update ctxt >>=? fun ctxt ->
-      return (ctxt, []))
+      Patch_ghostnet.patch chain_id ctxt level >>=? fun ctxt ->
+      invoice_contract
+        ctxt
+        ~address:"tz1X81bCXPtMiHu1d4UZF4GPhMPkvkp56ssb"
+        ~amount_mutez:15_000_000_000L
+      >>= fun (ctxt, bu1) ->
+      invoice_contract
+        ctxt
+        ~address:"tz1MidLyXXvKWMmbRvKKeusDtP95NDJ5gAUx"
+        ~amount_mutez:10_000_000_000L
+      >>= fun (ctxt, bu2) -> return (ctxt, bu1 @ bu2))
   >>=? fun (ctxt, balance_updates) ->
   List.fold_right_es patch_script Legacy_script_patches.addresses_to_patch ctxt
   >>=? fun ctxt ->

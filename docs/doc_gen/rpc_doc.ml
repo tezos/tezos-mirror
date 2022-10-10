@@ -40,7 +40,7 @@ let protocols =
     ( "lima",
       "Lima",
       Some "/include/rpc_introduction.rst.inc",
-      "PtLimaPt5HZrSMR4TB1qM7Ed8riGUqozU7qcbZNbpZgMPuVUweD" );
+      "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW" );
   ]
 
 let pp_name ppf = function

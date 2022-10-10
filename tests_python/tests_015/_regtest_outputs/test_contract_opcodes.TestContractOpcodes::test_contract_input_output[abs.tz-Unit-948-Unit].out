@@ -14,25 +14,25 @@ trace
   - location: 8 (remaining gas: 1039989.769 units remaining)
     [ 948
       948 ]
-  - location: 9 (remaining gas: 1039989.744 units remaining)
+  - location: 9 (remaining gas: 1039989.743 units remaining)
     [ -948
       948 ]
-  - location: 10 (remaining gas: 1039989.724 units remaining)
+  - location: 10 (remaining gas: 1039989.722 units remaining)
     [ 948
       948 ]
-  - location: 11 (remaining gas: 1039989.689 units remaining)
+  - location: 11 (remaining gas: 1039989.687 units remaining)
     [ 0 ]
-  - location: 13 (remaining gas: 1039989.679 units remaining)
+  - location: 13 (remaining gas: 1039989.677 units remaining)
     [ True ]
-  - location: 14 (remaining gas: 1039989.679 units remaining)
+  - location: 14 (remaining gas: 1039989.677 units remaining)
     [  ]
-  - location: 14 (remaining gas: 1039989.669 units remaining)
+  - location: 14 (remaining gas: 1039989.662 units remaining)
     [  ]
-  - location: 20 (remaining gas: 1039989.659 units remaining)
+  - location: 20 (remaining gas: 1039989.652 units remaining)
     [ Unit ]
-  - location: 21 (remaining gas: 1039989.649 units remaining)
+  - location: 21 (remaining gas: 1039989.642 units remaining)
     [ {}
       Unit ]
-  - location: 23 (remaining gas: 1039989.639 units remaining)
+  - location: 23 (remaining gas: 1039989.632 units remaining)
     [ (Pair {} Unit) ]
 

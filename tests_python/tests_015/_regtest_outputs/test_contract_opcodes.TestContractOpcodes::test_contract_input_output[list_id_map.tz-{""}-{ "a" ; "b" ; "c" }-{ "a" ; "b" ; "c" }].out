@@ -13,15 +13,15 @@ trace
     [ { "a" ; "b" ; "c" } ]
   - location: 10 (remaining gas: 1039994.543 units remaining)
     [ "a" ]
-  - location: 10 (remaining gas: 1039994.533 units remaining)
+  - location: 10 (remaining gas: 1039994.528 units remaining)
     [ "b" ]
-  - location: 10 (remaining gas: 1039994.523 units remaining)
-    [ "c" ]
   - location: 10 (remaining gas: 1039994.513 units remaining)
+    [ "c" ]
+  - location: 10 (remaining gas: 1039994.498 units remaining)
     [ { "a" ; "b" ; "c" } ]
-  - location: 12 (remaining gas: 1039994.503 units remaining)
+  - location: 12 (remaining gas: 1039994.488 units remaining)
     [ {}
       { "a" ; "b" ; "c" } ]
-  - location: 14 (remaining gas: 1039994.493 units remaining)
+  - location: 14 (remaining gas: 1039994.478 units remaining)
     [ (Pair {} { "a" ; "b" ; "c" }) ]
 

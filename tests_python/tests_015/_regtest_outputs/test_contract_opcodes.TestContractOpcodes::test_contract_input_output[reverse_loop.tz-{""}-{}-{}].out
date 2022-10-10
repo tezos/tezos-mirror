@@ -33,18 +33,18 @@ trace
     [ False
       {}
       {} ]
-  - location: 18 (remaining gas: 1039986.144 units remaining)
+  - location: 18 (remaining gas: 1039986.139 units remaining)
     [ False
       {}
       {} ]
-  - location: 33 (remaining gas: 1039986.134 units remaining)
-    [ {}
-      {} ]
   - location: 33 (remaining gas: 1039986.124 units remaining)
-    [ {} ]
-  - location: 34 (remaining gas: 1039986.114 units remaining)
     [ {}
       {} ]
-  - location: 36 (remaining gas: 1039986.104 units remaining)
+  - location: 33 (remaining gas: 1039986.114 units remaining)
+    [ {} ]
+  - location: 34 (remaining gas: 1039986.104 units remaining)
+    [ {}
+      {} ]
+  - location: 36 (remaining gas: 1039986.094 units remaining)
     [ (Pair {} {}) ]
 

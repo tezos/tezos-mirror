@@ -16,13 +16,13 @@ trace
   - location: 12 (remaining gas: 1039993.365 units remaining)
     [ "Hello "
       "World!" ]
-  - location: 15 (remaining gas: 1039993.320 units remaining)
+  - location: 15 (remaining gas: 1039993.314 units remaining)
     [ "Hello World!" ]
-  - location: 10 (remaining gas: 1039993.310 units remaining)
+  - location: 10 (remaining gas: 1039993.299 units remaining)
     [ { "Hello World!" } ]
-  - location: 16 (remaining gas: 1039993.300 units remaining)
+  - location: 16 (remaining gas: 1039993.289 units remaining)
     [ {}
       { "Hello World!" } ]
-  - location: 18 (remaining gas: 1039993.290 units remaining)
+  - location: 18 (remaining gas: 1039993.279 units remaining)
     [ (Pair {} { "Hello World!" }) ]
 
