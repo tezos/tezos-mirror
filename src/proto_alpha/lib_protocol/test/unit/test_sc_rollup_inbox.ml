@@ -377,13 +377,7 @@ let test_inbox_proof_production (list_of_payloads, additional_payloads, l, n) =
       (* If there are [additional_payloads], we will take the snapshot
          of the additional level, which should ignore the additional
          payloads. Otherwise, we take a snapshot of the whole inbox. *)
-      let current_level =
-        let curr = inbox_level inbox in
-        match additional_payloads with
-        | [] -> Raw_level_repr.succ curr
-        | _ -> curr
-      in
-      let snapshot = take_snapshot ~current_level inbox in
+      let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification = verify_proof (l, n) snapshot proof in
       match verification with
@@ -417,13 +411,7 @@ let test_inbox_proof_verification (list_of_payloads, additional_payloads, l, n)
           (* If there are [additional_payloads], we will take the snapshot
              of the additional level, which should ignore the additional
              payloads. Otherwise, we take a snapshot of the whole inbox. *)
-          let current_level =
-            let curr = inbox_level inbox in
-            match additional_payloads with
-            | [] -> Raw_level_repr.succ curr
-            | _ -> curr
-          in
-          let snapshot = take_snapshot ~current_level inbox in
+          let snapshot = take_snapshot inbox in
           let proof = node_proof_to_protocol_proof proof in
           let*! verification = verify_proof (l, n) snapshot proof in
           match verification with
@@ -451,8 +439,7 @@ let test_empty_inbox_proof (level, n) =
       create_context ()
       >>=? fun ctxt ->
       let*! inbox = empty ctxt level in
-      let current_level = Raw_level_repr.succ (inbox_level inbox) in
-      let snapshot = take_snapshot ~current_level inbox in
+      let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification =
         verify_proof (Raw_level_repr.root, n) snapshot proof
@@ -659,30 +646,6 @@ let test_inclusion_proofs_depending_on_history_capacity
     (I.verify_inclusion_proof ip1 hp hp && I.verify_inclusion_proof ip2 hp hp)
     (err "Inclusion proofs are expected to be valid.")
 
-(** In this test, we make sure that the snapshot of an empty inbox is not
-    impacted by the [current_level] parameter. *)
-let test_empty_inbox_snapshot_taking (origination_level, snapshot_level) =
-  let open Lwt_result_syntax in
-  let origination_level =
-    Raw_level_repr.of_int32_exn @@ Int32.of_int origination_level
-  in
-  let snapshot_level =
-    Raw_level_repr.of_int32_exn @@ Int32.of_int snapshot_level
-  in
-  let* ctxt = create_context () in
-  let*! inbox = empty ctxt origination_level in
-  (* We take a snapshot of the whole inbox. *)
-  let current_level = Raw_level_repr.succ origination_level in
-  let expected_snapshot = take_snapshot ~current_level inbox in
-  (* We take a snapshot at a random level. *)
-  let actual_snapshot = take_snapshot ~current_level:snapshot_level inbox in
-  (* They're expected to be the same. *)
-  fail_unless
-    (equal_history_proof expected_snapshot actual_snapshot)
-    (err
-       "Snapshot at origination level of an empty inbox should be equal to \
-        snapshots at any level.")
-
 (** In this test, we make sure that the snapshot of an inbox is taken
     at the beginning of a block level. *)
 let test_inbox_snapshot_taking (list_of_payloads, payloads) =
@@ -690,10 +653,8 @@ let test_inbox_snapshot_taking (list_of_payloads, payloads) =
   setup_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox inboxes ->
   let inbox_level = inbox_level inbox in
-  (* If we take a snapshot of [inbox_level + 1], we take a snapshot of the
-     whole inbox. *)
   let current_level = Raw_level_repr.succ inbox_level in
-  let expected_snapshot = take_snapshot ~current_level inbox in
+  let expected_snapshot = take_snapshot inbox in
   (* Now, if we add messages to the inbox at [current_level], the inbox's
      snapshot for this level should not changed. *)
   let* _level_tree, _history, inbox, _inboxes =
@@ -706,7 +667,7 @@ let test_inbox_snapshot_taking (list_of_payloads, payloads) =
       (Some current_level_tree)
       [payloads]
   in
-  let new_snapshot = take_snapshot ~current_level inbox in
+  let new_snapshot = take_snapshot inbox in
   fail_unless
     (equal_history_proof expected_snapshot new_snapshot)
     (err
@@ -780,9 +741,7 @@ let test_inclusion_proof_of_unarchived_message () =
   let* snapshot =
     setup_inbox_with_messages payloads
     @@ fun _ctxt _level_tree _history inbox _inboxes ->
-    (* We set the inbox level in the future. *)
-    let level = Raw_level_repr.of_int32_exn 42l in
-    return (take_snapshot ~current_level:level inbox)
+    return (take_snapshot inbox)
   in
 
   let proof = node_proof_to_protocol_proof proof in
@@ -898,18 +857,6 @@ let tests =
          capacities"
       gen_history_params
       test_for_successive_add_messages_with_different_histories_capacities;
-    Tztest.tztest_qcheck2
-      ~count:10
-      ~name:
-        "Take snapshot of an empty inbox for any current level gives the same \
-         result"
-      (let open QCheck2.Gen in
-      let* origination_level = small_nat in
-      let origination_level = succ origination_level in
-      let* offset = small_nat in
-      let snapshot_level = origination_level + offset + 1 in
-      return (origination_level, snapshot_level))
-      test_empty_inbox_snapshot_taking;
     Tztest.tztest_qcheck2
       ~count:10
       ~name:
