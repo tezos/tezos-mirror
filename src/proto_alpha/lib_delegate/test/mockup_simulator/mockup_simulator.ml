@@ -828,17 +828,16 @@ let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
   User_hooks.check_chain_on_success ~chain:state.chain
 
 let genesis_protocol_data (baker_sk : Signature.secret_key)
-    (predecessor_block_hash : Block_hash.t)
-    (block_header : Block_header.shell_header) : Bytes.t =
+    (predecessor_hash : Block_hash.t) (block_header : Block_header.shell_header)
+    : Bytes.t =
   let proof_of_work_nonce =
     Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
   in
-  let operation_list_hash = Operation_list_hash.compute [] in
   let payload_hash =
     Protocol.Alpha_context.Block_payload.hash
-      ~predecessor:predecessor_block_hash
-      Alpha_context.Round.zero
-      operation_list_hash
+      ~predecessor_hash
+      ~payload_round:Alpha_context.Round.zero
+      []
   in
   let contents =
     Protocol.Alpha_context.Block_header.

@@ -148,6 +148,8 @@ let may_start_new_voting_period ctxt =
   Voting_period.is_last_block ctxt >>=? fun is_last ->
   if is_last then start_new_voting_period ctxt else return ctxt
 
+(** {2 Application of voting operations} *)
+
 let get_testnet_dictator ctxt chain_id =
   (* This function should always, ALWAYS, return None on mainnet!!!! *)
   match Constants.testnet_dictator ctxt with
@@ -160,48 +162,39 @@ let is_testnet_dictator ctxt chain_id delegate =
   | Some pkh -> Signature.Public_key_hash.equal pkh delegate
   | _ -> false
 
-(** {2 Application of voting operations} *)
-
-(** Helpers to apply [Proposals] operations from a
-    registered dictator of a test chain. These operations let the
-    dictator immediately change the current voting period's kind, and
-    the current proposal if applicable. Of course, there must never be
-    such a dictator on mainnet. *)
-module Testnet_dictator = struct
-  (** Forcibly update the voting period according to a voting
-      dictator's Proposals operation.
-
-      {!check_proposals} should guarantee that this function cannot
-      return an error. *)
-  let record_proposals ctxt chain_id proposals =
-    let open Lwt_tzresult_syntax in
-    let*! ctxt = Vote.clear_ballots ctxt in
-    let*! ctxt = Vote.clear_proposals ctxt in
-    let*! ctxt = Vote.clear_current_proposal ctxt in
-    let ctxt = record_dictator_proposal_seen ctxt in
-    match proposals with
-    | [] ->
-        Voting_period.Testnet_dictator.overwrite_current_kind
-          ctxt
-          chain_id
-          Proposal
-    | [proposal] ->
-        let* ctxt = Vote.init_current_proposal ctxt proposal in
-        Voting_period.Testnet_dictator.overwrite_current_kind
-          ctxt
-          chain_id
-          Adoption
-    | _ :: _ :: _ ->
-        (* This does not fail if validate proposal was previously
-           called. *)
-        fail Validate_errors.Voting.Testnet_dictator_multiple_proposals
-end
+(** Apply a [Proposals] operation from a registered dictator of a test
+    chain. This forcibly updates the voting period, changing the
+    current voting period kind and the current proposal if
+    applicable. Of course, there must never be such a dictator on
+    mainnet: see {!is_testnet_dictator}. *)
+let apply_testnet_dictator_proposals ctxt chain_id proposals =
+  let open Lwt_tzresult_syntax in
+  let*! ctxt = Vote.clear_ballots ctxt in
+  let*! ctxt = Vote.clear_proposals ctxt in
+  let*! ctxt = Vote.clear_current_proposal ctxt in
+  let ctxt = record_dictator_proposal_seen ctxt in
+  match proposals with
+  | [] ->
+      Voting_period.Testnet_dictator.overwrite_current_kind
+        ctxt
+        chain_id
+        Proposal
+  | [proposal] ->
+      let* ctxt = Vote.init_current_proposal ctxt proposal in
+      Voting_period.Testnet_dictator.overwrite_current_kind
+        ctxt
+        chain_id
+        Adoption
+  | _ :: _ :: _ ->
+      (* This case should not be possible if the operation has been
+         previously validated by {!Validate.validate_operation}. *)
+      fail Validate_errors.Voting.Testnet_dictator_multiple_proposals
 
 let apply_proposals ctxt chain_id (Proposals {source; period = _; proposals}) =
   let open Lwt_tzresult_syntax in
   let* ctxt =
     if is_testnet_dictator ctxt chain_id source then
-      Testnet_dictator.record_proposals ctxt chain_id proposals
+      apply_testnet_dictator_proposals ctxt chain_id proposals
     else if dictator_proposal_seen ctxt then
       (* Noop if dictator voted *)
       return ctxt

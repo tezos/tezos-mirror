@@ -165,15 +165,14 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       List.map (fun l -> List.map snd l.Preapply_result.applied) preapply_result
     in
     let payload_hash =
-      let operation_list_hash =
+      let operation_hashes =
         Stdlib.List.tl operations |> List.flatten
         |> List.map Tezos_base.Operation.hash
-        |> Operation_list_hash.compute
       in
       Block_payload.hash
-        ~predecessor:shell_header.predecessor
-        payload_round
-        operation_list_hash
+        ~predecessor_hash:shell_header.predecessor
+        ~payload_round
+        operation_hashes
     in
     return (shell_header, operations, payload_hash)
   in
@@ -239,15 +238,14 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       >>=? fun shell_header ->
       let operations = List.map (List.map convert_operation) operations in
       let payload_hash =
-        let operation_list_hash =
+        let operation_hashes =
           Stdlib.List.tl operations |> List.flatten
           |> List.map Tezos_base.Operation.hash
-          |> Operation_list_hash.compute
         in
         Block_payload.hash
-          ~predecessor:shell_header.predecessor
-          payload_round
-          operation_list_hash
+          ~predecessor_hash:shell_header.predecessor
+          ~payload_round
+          operation_hashes
       in
       return (shell_header, operations, payload_hash)
   in

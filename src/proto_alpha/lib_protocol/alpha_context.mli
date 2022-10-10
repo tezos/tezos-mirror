@@ -3841,11 +3841,13 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+(** See {!Block_payload_repr}. *)
 module Block_payload : sig
+  (** See {!Block_payload_repr.hash}. *)
   val hash :
-    predecessor:Block_hash.t ->
-    Round.t ->
-    Operation_list_hash.t ->
+    predecessor_hash:Block_hash.t ->
+    payload_round:Round.t ->
+    Operation_list_hash.elt list ->
     Block_payload_hash.t
 end
 

@@ -1957,10 +1957,10 @@ type mode =
       predecessor_round : Round.t;
     }
   | Full_construction of {
-      predecessor : Block_hash.t;
+      block_data_contents : Block_header.contents;
+      predecessor_hash : Block_hash.t;
       payload_producer : Consensus_key.t;
       block_producer : Consensus_key.t;
-      block_data_contents : Block_header.contents;
       round : Round.t;
       predecessor_level : Level.t;
       predecessor_round : Round.t;
@@ -2245,7 +2245,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
                {balance_updates; allocated_destination_contract}) )
   | Single (Failing_noop _) ->
       (* This operation always fails. It should already have been
-         rejected by {!Validate_operation.validate_operation}. *)
+         rejected by {!Validate.validate_operation}. *)
       fail Validate_errors.Failing_noop_error
   | Single (Manager_operation _) ->
       apply_manager_operations
@@ -2464,12 +2464,6 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-let compute_payload_hash (ctxt : context) ~(predecessor : Block_hash.t)
-    ~(payload_round : Round.t) : Block_payload_hash.t =
-  let non_consensus_operations = non_consensus_operations ctxt in
-  let operations_hash = Operation_list_hash.compute non_consensus_operations in
-  Block_payload.hash ~predecessor payload_round operations_hash
-
 let are_endorsements_required ctxt ~level =
   First_level_of_protocol.get ctxt >|=? fun first_level ->
   (* NB: the first level is the level of the migration block. There
@@ -2549,7 +2543,7 @@ let begin_application ctxt chain_id ~migration_balance_updates
 
 let begin_full_construction ctxt chain_id ~migration_balance_updates
     ~migration_operation_results ~predecessor_timestamp ~predecessor_level
-    ~predecessor_round ~predecessor ~timestamp
+    ~predecessor_round ~predecessor_hash ~timestamp
     (block_data_contents : Block_header.contents) =
   let open Lwt_tzresult_syntax in
   let round_durations = Constants.round_durations ctxt in
@@ -2579,11 +2573,11 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let mode =
     Full_construction
       {
-        predecessor;
+        block_data_contents;
+        predecessor_hash;
         payload_producer = Consensus_key.pkh payload_producer;
         block_producer = Consensus_key.pkh block_producer;
         round;
-        block_data_contents;
         predecessor_round;
         predecessor_level;
       }
@@ -2625,21 +2619,21 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
         @ liquidity_baking_operations_results;
     }
 
-let finalize_application ctxt block_data_contents ~round ~predecessor
+let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     ~liquidity_baking_toggle_ema ~implicit_operations_results
     ~migration_balance_updates ~(block_producer : Consensus_key.t)
     ~(payload_producer : Consensus_key.t) =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let level = Level.current ctxt in
   let endorsing_power = Consensus.current_endorsement_power ctxt in
   let* required_endorsements =
     are_endorsements_required ctxt ~level:level.level
   in
   let block_payload_hash =
-    compute_payload_hash
-      ctxt
-      ~predecessor
+    Block_payload.hash
+      ~predecessor_hash
       ~payload_round:block_data_contents.Block_header.payload_round
+      (non_consensus_operations ctxt)
   in
   (* from this point nothing should fail *)
   (* We mark the endorsement branch as the grand parent branch when
@@ -2655,7 +2649,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor
   (* We mark the current payload hash as the predecessor one => this
      will only be accessed by the successor block now. *)
   let*! ctxt =
-    Consensus.store_endorsement_branch ctxt (predecessor, block_payload_hash)
+    Consensus.store_endorsement_branch
+      ctxt
+      (predecessor_hash, block_payload_hash)
   in
   let* ctxt = Round.update ctxt round in
   (* end of level  *)
@@ -2776,9 +2772,9 @@ let finalize_block (application_state : application_state) shell_header_opt =
   match application_state.mode with
   | Full_construction
       {
-        predecessor;
-        predecessor_level = _;
         block_data_contents;
+        predecessor_hash;
+        predecessor_level = _;
         predecessor_round;
         block_producer;
         payload_producer;
@@ -2812,7 +2808,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ctxt
           block_data_contents
           ~round
-          ~predecessor
+          ~predecessor_hash
           ~liquidity_baking_toggle_ema
           ~implicit_operations_results
           ~migration_balance_updates
@@ -2860,7 +2856,7 @@ let finalize_block (application_state : application_state) shell_header_opt =
           ctxt
           protocol_data.contents
           ~round
-          ~predecessor:shell.predecessor
+          ~predecessor_hash:shell.predecessor
           ~liquidity_baking_toggle_ema
           ~implicit_operations_results
           ~migration_balance_updates

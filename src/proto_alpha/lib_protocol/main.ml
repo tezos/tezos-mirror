@@ -295,7 +295,7 @@ let begin_application ctxt chain_id mode ~predecessor =
         ~predecessor_timestamp
         ~predecessor_level
         ~predecessor_round
-        ~predecessor:predecessor_hash
+        ~predecessor_hash
         ~timestamp
         block_header_data.contents
   | Partial_construction _ ->

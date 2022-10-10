@@ -253,15 +253,14 @@ module Forge = struct
       List.concat (match List.tl operations with None -> [] | Some l -> l)
     in
     let hashes = List.map Operation.hash_packed non_consensus_operations in
-    let non_consensus_operations_hash = Operation_list_hash.compute hashes in
     let payload_round =
       match payload_round with None -> round | Some r -> r
     in
     let payload_hash =
       Block_payload.hash
-        ~predecessor:shell.predecessor
-        payload_round
-        non_consensus_operations_hash
+        ~predecessor_hash:shell.predecessor
+        ~payload_round
+        hashes
     in
     let contents =
       make_contents

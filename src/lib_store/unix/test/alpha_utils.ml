@@ -588,11 +588,10 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let payload_hash =
     let non_consensus_operations = Stdlib.List.tl operations |> List.concat in
     let hashes = List.map Operation.hash_packed non_consensus_operations in
-    let non_consensus_operations_hash = Operation_list_hash.compute hashes in
     Block_payload.hash
-      ~predecessor:shell.predecessor
-      contents.payload_round
-      non_consensus_operations_hash
+      ~predecessor_hash:shell.predecessor
+      ~payload_round:contents.payload_round
+      hashes
   in
   let contents = {contents with payload_hash} in
   let shell = {shell with context = context_hash} in
