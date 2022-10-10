@@ -13,7 +13,6 @@
   test_tx_rollup_l2_encoding
   test_bitset
   test_sc_rollup_tick_repr
-  test_refutation_game
   test_carbonated_map)
  (libraries
   tezos-base
@@ -92,11 +91,6 @@
 (rule
  (alias runtest)
  (package tezos-protocol-014-PtKathma-tests)
- (action (run %{dep:./test_refutation_game.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-014-PtKathma-tests)
  (action (run %{dep:./test_carbonated_map.exe})))
 
 (rule (alias runtest1) (action (run %{exe:liquidity_baking_pbt.exe})))
@@ -118,7 +112,5 @@
 (rule (alias runtest2) (action (run %{exe:test_bitset.exe})))
 
 (rule (alias runtest2) (action (run %{exe:test_sc_rollup_tick_repr.exe})))
-
-(rule (alias runtest3) (action (run %{exe:test_refutation_game.exe})))
 
 (rule (alias runtest3) (action (run %{exe:test_carbonated_map.exe})))

@@ -26,7 +26,6 @@ depends: [
   "tezos-crypto-dal"
   "irmin-pack" { >= "3.4.0" & < "3.5.0" }
   "irmin" { >= "3.4.0" & < "3.5.0" }
-  "tezos-dal-015-PtLimaPt"
 ]
 depopts: [
   "tezos-dal-alpha"

@@ -10,11 +10,7 @@ octez-dal-node
 octez-node
 octez-protocol-compiler
 octez-proxy-server
-octez-sc-rollup-client-PtKathma
-octez-sc-rollup-client-PtLimaPt
 octez-sc-rollup-client-alpha
-octez-sc-rollup-node-PtKathma
-octez-sc-rollup-node-PtLimaPt
 octez-sc-rollup-node-alpha
 octez-signer
 octez-snoop

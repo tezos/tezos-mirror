@@ -26,7 +26,6 @@
   irmin-pack
   irmin-pack.unix
   irmin
-  tezos-dal-015-PtLimaPt
   (select void_for_linking-tezos-dal-alpha from
    (tezos-dal-alpha -> void_for_linking-tezos-dal-alpha.empty)
    (-> void_for_linking-tezos-dal-alpha.empty)))
