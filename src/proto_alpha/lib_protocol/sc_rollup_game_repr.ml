@@ -678,6 +678,8 @@ let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
   let alice_to_play = Staker.equal alice refuter in
   let open Sc_rollup_tick_repr in
   let tick = of_number_of_ticks child.number_of_ticks in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3974
+     0 tick commitments are impossible with SOL/EOL. *)
   let game_state =
     Dissecting
       {
