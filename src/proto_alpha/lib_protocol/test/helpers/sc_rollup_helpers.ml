@@ -177,30 +177,60 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
   in
   return res
 
-let make_external_inbox_message_repr str =
+(** {2. Inbox message helpers.} *)
+
+(** {1. Above [Alpha_context].} *)
+
+let message_serialize msg =
   WithExceptions.Result.get_ok
     ~loc:__LOC__
-    Sc_rollup_inbox_message_repr.(External str |> serialize)
+    Sc_rollup.Inbox_message.(serialize msg)
 
-let make_input_repr ?(inbox_level = Raw_level_repr.root)
-    ?(message_counter = Z.zero) message =
-  Sc_rollup_PVM_sig.Inbox_message
-    {
-      inbox_level;
-      message_counter;
-      payload = make_external_inbox_message_repr message;
-    }
+let make_external_inbox_message str = message_serialize (External str)
 
-let make_external_inbox_message str =
-  WithExceptions.Result.get_ok
-    ~loc:__LOC__
-    Sc_rollup.Inbox_message.(External str |> serialize)
+let make_internal_inbox_message internal_msg =
+  message_serialize (Internal internal_msg)
 
 let make_input ?(inbox_level = Raw_level.root) ?(message_counter = Z.zero)
-    message =
-  Sc_rollup.Inbox_message
-    {
-      inbox_level;
-      message_counter;
-      payload = make_external_inbox_message message;
-    }
+    payload =
+  Sc_rollup.Inbox_message {inbox_level; message_counter; payload}
+
+let make_external_input ?inbox_level ?message_counter str =
+  let payload = make_external_inbox_message str in
+  make_input ?inbox_level ?message_counter payload
+
+let make_sol ~inbox_level =
+  let payload = make_internal_inbox_message Start_of_level in
+  make_input ~inbox_level ~message_counter:Z.zero payload
+
+let make_eol ~inbox_level ~message_counter =
+  let payload = make_internal_inbox_message End_of_level in
+  make_input ~inbox_level ~message_counter payload
+
+(** {1. Below [Alpha_context].} *)
+
+let message_serialize_repr msg =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Sc_rollup_inbox_message_repr.(serialize msg)
+
+let make_external_inbox_message_repr str = message_serialize_repr (External str)
+
+let make_internal_inbox_message_repr internal_msg =
+  message_serialize_repr (Internal internal_msg)
+
+let make_input_repr ?(inbox_level = Raw_level_repr.root)
+    ?(message_counter = Z.zero) payload =
+  Sc_rollup_PVM_sig.Inbox_message {inbox_level; message_counter; payload}
+
+let make_external_input_repr ?inbox_level ?message_counter str =
+  let payload = make_external_inbox_message_repr str in
+  make_input_repr ?inbox_level ?message_counter payload
+
+let make_sol_repr ~inbox_level =
+  let payload = make_internal_inbox_message_repr Start_of_level in
+  make_input_repr ~inbox_level ~message_counter:Z.zero payload
+
+let make_eol_repr ~inbox_level ~message_counter =
+  let payload = make_internal_inbox_message_repr End_of_level in
+  make_input_repr ~inbox_level ~message_counter payload

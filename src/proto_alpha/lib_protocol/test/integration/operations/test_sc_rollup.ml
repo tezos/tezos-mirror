@@ -1712,7 +1712,7 @@ let dumb_proof ~choice =
   let context_arith_pvm = Tezos_context_memory.make_empty_context () in
   let*! arith_state = Arith_pvm.initial_state context_arith_pvm in
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
-  let input = Sc_rollup_helpers.make_input "c4c4" in
+  let input = Sc_rollup_helpers.make_external_input "c4c4" in
   let* proof =
     Arith_pvm.produce_proof context_arith_pvm (Some input) arith_state
     >|= Environment.wrap_tzresult
