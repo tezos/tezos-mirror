@@ -32,22 +32,22 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lreads_KiB_persec_average{dimension="tezos-accuser"}',
+        'netdata_apps_lreads_KiB_persec_average{dimension="octez-accuser"}',
         legendFormat=reads_accuser,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lwrites_KiB_persec_average{dimension="tezos-accuser"}',
+        'netdata_apps_lwrites_KiB_persec_average{dimension="octez-accuser"}',
         legendFormat=writes_accuser,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lreads_KiB_persec_average{dimension="tezos-baker"}',
+        'netdata_apps_lreads_KiB_persec_average{dimension="octez-baker"}',
         legendFormat=reads_baker,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lweads_KiB_persec_average{dimension="tezos-baker"}',
+        'netdata_apps_lweads_KiB_persec_average{dimension="octez-baker"}',
         legendFormat=writes_baker,
       )
     ),
@@ -66,12 +66,12 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_cpu_percentage_average{dimension="tezos-accuser"}',
+        'netdata_apps_cpu_percentage_average{dimension="octez-accuser"}',
         legendFormat=load_accuser,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_cpu_percentage_average{dimension="tezos-baker"}',
+        'netdata_apps_cpu_percentage_average{dimension="octez-baker"}',
         legendFormat=load_baker,
       )
     ),
@@ -100,22 +100,22 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_mem_MiB_average{dimension="tezos-accuser"}',
+        'netdata_apps_mem_MiB_average{dimension="octez-accuser"}',
         legendFormat=ram_accuser,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_swap_MiB_average{dimension="tezos-accuser"}',
+        'netdata_apps_swap_MiB_average{dimension="octez-accuser"}',
         legendFormat=swap_accuser,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_mem_MiB_average{dimension="tezos-baker"}',
+        'netdata_apps_mem_MiB_average{dimension="octez-baker"}',
         legendFormat=ram_baker,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_swap_MiB_average{dimension="tezos-baker"}',
+        'netdata_apps_swap_MiB_average{dimension="octez-baker"}',
         legendFormat=swap_baker,
       )
     ),
