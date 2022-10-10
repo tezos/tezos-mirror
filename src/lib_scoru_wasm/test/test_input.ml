@@ -96,7 +96,7 @@ let read_input () =
   in
   assert (Input_buffer.num_elements input_buffer = Z.one) ;
   let* result =
-    Host_funcs.Internal_for_tests.aux_write_input_in_memory
+    Host_funcs.Aux.read_input
       ~input_buffer
       ~output_buffer
       ~memory
@@ -129,7 +129,7 @@ let read_input_no_messages () =
   let output_buffer = Output_buffer.alloc () in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
   let* result =
-    Host_funcs.Internal_for_tests.aux_write_input_in_memory
+    Host_funcs.Aux.read_input
       ~input_buffer
       ~output_buffer
       ~memory
