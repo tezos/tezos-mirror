@@ -19,12 +19,13 @@ Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 
 Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
-:gl:`!6252`, :gl:`!6396`)
+:gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Distribution of rollup operations data off-chain. (MR :gl:`!6174`)
+Distribution of rollup operations data off-chain. (MRs :gl:`!6174`, :gl:`!6388`,
+:gl:`!6527`)
 
 Breaking Changes
 ----------------
