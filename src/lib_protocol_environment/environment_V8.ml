@@ -1062,6 +1062,7 @@ struct
 
     type reveal = Tezos_scoru_wasm.Wasm_pvm_state.reveal =
       | Reveal_raw_data of input_hash
+      | Reveal_metadata
 
     type input_request = Tezos_scoru_wasm.Wasm_pvm_state.input_request =
       | No_input_required

@@ -622,17 +622,12 @@ let store_read =
           (durable, [Values.(Num (I32 len))])
       | _ -> raise Bad_input)
 
-(** [reveal_args args] compute the list of arguments type of a host
-    functions resulting in a reveal tick. [args] is the list of types
-    specific to a given host functions, and [reveal_args] appends two
-    int32 which specify the output buffer (base, and length) where the
-    result of the function is to be stored. *)
-let reveal_args args = args @ Types.[NumType I32Type; NumType I32Type]
-
-let reveal_preimage_name = "reveal_preimage"
+let reveal_preimage_name = "tezos_reveal_preimage"
 
 let reveal_preimage_type =
-  let input_types = reveal_args Types.[NumType I32Type] |> Vector.of_list in
+  let input_types =
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type] |> Vector.of_list
+  in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
   Types.FuncType (input_types, output_types)
 
@@ -647,6 +642,26 @@ let reveal_preimage_parse_args memories args =
   | _ -> raise Bad_input
 
 let reveal_preimage = Host_funcs.Reveal_func reveal_preimage_parse_args
+
+let reveal_metadata_name = "tezos_reveal_metadata"
+
+let reveal_metadata_type =
+  let input_types = Types.[NumType I32Type] |> Vector.of_list in
+  let output_types = Types.[NumType I32Type] |> Vector.of_list in
+  Types.FuncType (input_types, output_types)
+
+(* The rollup address is a 20-byte hash. The origination level is
+   a 4-byte (32bit) integer. *)
+let metadata_size = Int32.add 20l 4l
+
+let reveal_metadata_parse_args _memories args =
+  match args with
+  | Values.[Num (I32 base)] ->
+      Lwt.return
+        (Reveal.Reveal_metadata, Host_funcs.{base; max_bytes = metadata_size})
+  | _ -> raise Bad_input
+
+let reveal_metadata = Host_funcs.Reveal_func reveal_metadata_parse_args
 
 let store_write_name = "tezos_write_read"
 
@@ -717,6 +732,8 @@ let lookup_opt name =
         (ExternFunc (HostFunc (store_value_size_type, store_value_size_name)))
   | "reveal_preimage" ->
       Some (ExternFunc (HostFunc (reveal_preimage_type, reveal_preimage_name)))
+  | "reveal_metadata" ->
+      Some (ExternFunc (HostFunc (reveal_metadata_type, reveal_metadata_name)))
   | "store_read" ->
       Some (ExternFunc (HostFunc (store_read_type, store_read_name)))
   | "store_write" ->
@@ -743,11 +760,14 @@ let register_host_funcs registry =
       (store_move_name, store_move);
       (store_value_size_name, store_value_size);
       (reveal_preimage_name, reveal_preimage);
+      (reveal_metadata_name, reveal_metadata);
       (store_read_name, store_read);
       (store_write_name, store_write);
     ]
 
 module Internal_for_tests = struct
+  let metadata_size = Int32.to_int metadata_size
+
   let write_output = Func.HostFunc (write_output_type, write_output_name)
 
   let read_input = Func.HostFunc (read_input_type, read_input_name)

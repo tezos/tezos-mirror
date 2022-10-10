@@ -248,6 +248,8 @@ module V2_0_0 = struct
               (* In case of an invalid hash, the rollup is
                  blocked. Any commitment will be invalid. *)
               Waiting_for_reveal (Reveal_raw_data Input_hash.zero))
+      | Reveal_required Wasm_2_0_0.Reveal_metadata ->
+          Waiting_for_reveal Reveal_metadata
 
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
@@ -283,10 +285,10 @@ module V2_0_0 = struct
       return []
 
     let set_input_state input =
+      let open Monad.Syntax in
       match input with
       | PS.Inbox_message input ->
           let open PS in
-          let open Monad.Syntax in
           let {inbox_level; message_counter; payload} = input in
           let* s = get in
           let* s =
@@ -301,18 +303,18 @@ module V2_0_0 = struct
           in
           set s
       | PS.Reveal (PS.Raw_data data) ->
-          let open Monad.Syntax in
           let* s = get in
           let* s = lift (WASM_machine.reveal_step (Bytes.of_string data) s) in
           set s
-      | PS.Reveal (PS.Metadata _) ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3890
-
-               The WASM PVM does not produce [Needs_metadata] input
-               requests.  Thus, no [set_input_state] should transmit a
-               [Metadata].
-          *)
-          assert false
+      | PS.Reveal (PS.Metadata metadata) ->
+          let metadata_bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Sc_rollup_metadata_repr.encoding
+              metadata
+          in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
+          set s
 
     let set_input input = state_of @@ set_input_state input
 

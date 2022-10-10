@@ -11769,7 +11769,7 @@ type input_hash
 
 val input_hash_to_string : input_hash -> string
 
-type reveal = Reveal_raw_data of input_hash
+type reveal = Reveal_raw_data of input_hash | Reveal_metadata
 
 type input_request =
   | No_input_required

@@ -34,9 +34,9 @@
 *)
 
 open Protocol
-open Alpha_context
 
 let test_initial_state_hash_wasm_pvm () =
+  let open Alpha_context in
   let open Lwt_result_syntax in
   let context = Tezos_context_memory.make_empty_context () in
   let*! state = Sc_rollup_helpers.Wasm_pvm.initial_state context in
@@ -72,6 +72,19 @@ let test_incomplete_kernel_chunk_limit () =
   | None -> return_unit
   | Some _ -> failwith "encoding of a floppy with a chunk too large should fail"
 
+let test_metadata_size () =
+  let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in
+  let metadata =
+    Sc_rollup_metadata_repr.{address; origination_level = Raw_level_repr.root}
+  in
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Sc_rollup_metadata_repr.encoding metadata
+  in
+  assert (
+    Bytes.length bytes
+    = Tezos_scoru_wasm.Host_funcs.Internal_for_tests.metadata_size) ;
+  Lwt_result_syntax.return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -82,4 +95,5 @@ let tests =
       "encoding of a floppy with a chunk too large should fail"
       `Quick
       test_incomplete_kernel_chunk_limit;
+    Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
   ]

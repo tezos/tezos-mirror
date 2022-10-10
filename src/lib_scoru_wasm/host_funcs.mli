@@ -183,6 +183,9 @@ module Aux : sig
 end
 
 module Internal_for_tests : sig
+  (** The number of bytes used to store the metadata of a rollup in memory *)
+  val metadata_size : int
+
   val write_output : Tezos_webassembly_interpreter.Instance.func_inst
 
   val read_input : Tezos_webassembly_interpreter.Instance.func_inst

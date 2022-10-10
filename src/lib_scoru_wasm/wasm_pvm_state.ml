@@ -45,6 +45,7 @@ let input_hash_to_string =
 
 type reveal = Tezos_webassembly_interpreter.Reveal.reveal =
   | Reveal_raw_data of Tezos_webassembly_interpreter.Reveal.input_hash
+  | Reveal_metadata
 
 (** Represents the state of input requests. *)
 type input_request =

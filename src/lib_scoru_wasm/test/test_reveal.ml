@@ -36,7 +36,7 @@ open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
 open Wasm_utils
 
-let module_ hash_addr preimage_addr max_bytes =
+let reveal_preimage_module hash_addr preimage_addr max_bytes =
   Format.sprintf
     {|
       (module
@@ -54,11 +54,44 @@ let module_ hash_addr preimage_addr max_bytes =
     preimage_addr
     max_bytes
 
+let reveal_metadata_module metadata_addr =
+  Format.sprintf
+    {|
+      (module
+        (import "rollup_safe_core" "reveal_metadata"
+          (func $reveal_metadata (param i32) (result i32))
+        )
+        (memory 1)
+        (export "mem" (memory 0))
+        (func (export "kernel_next")
+          (call $reveal_metadata (i32.const %ld))
+        )
+      )
+    |}
+    metadata_addr
+
+let reveal_returned_size tree =
+  let open Lwt_syntax in
+  let* tick_state = Wasm.Internal_for_tests.get_tick_state tree in
+  match tick_state with
+  | Eval
+      Tezos_webassembly_interpreter.Eval.
+        {
+          step_kont =
+            SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
+          _;
+        } -> (
+      let* hd = Tezos_lazy_containers.Lazy_vector.Int32Vector.get 0l vs in
+      match hd with
+      | Num (I32 size) -> return size
+      | _ -> Stdlib.failwith "Incorrect stack")
+  | _ -> Stdlib.failwith "The tick after reveal_step is not consistent"
+
 let test_reveal_preimage_gen preimage max_bytes =
   let open Lwt_result_syntax in
   let hash_addr = 120l in
   let preimage_addr = 200l in
-  let modl = module_ hash_addr preimage_addr max_bytes in
+  let modl = reveal_preimage_module hash_addr preimage_addr max_bytes in
   let*! state = initial_tree modl in
   let*! state_snapshotted = eval_until_input_requested state in
   let*! state_with_dummy_input =
@@ -69,9 +102,8 @@ let test_reveal_preimage_gen preimage max_bytes =
   let*! info = Wasm.get_info state in
   let* () =
     let open Wasm_pvm_state in
-    match info.input_request with
-    | No_input_required | Input_required -> assert false
-    | Reveal_required (Reveal_raw_data hash) ->
+    match info.Wasm_pvm_state.input_request with
+    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
         (* The PVM has reached a point where it’s asking for some
            preimage. Since the memory is left blank, we are looking
            for the zero hash *)
@@ -80,6 +112,7 @@ let test_reveal_preimage_gen preimage max_bytes =
         in
         assert (hash = zero_hash) ;
         return_unit
+    | No_input_required | Input_required | Reveal_required _ -> assert false
   in
   let*! state = Wasm.reveal_step (Bytes.of_string preimage) state in
   let*! info = Wasm.get_info state in
@@ -91,24 +124,9 @@ let test_reveal_preimage_gen preimage max_bytes =
         failwith "should be running, but expect input from the L1"
     | Reveal_required _ -> failwith "should be running, but expect reveal tick"
   in
-  let*! tick_state = Wasm.Internal_for_tests.get_tick_state state in
   (* The revelation step should contain the number of bytes effectively wrote in
      memory for the preimage. *)
-  let* returned_size =
-    match tick_state with
-    | Eval
-        Tezos_webassembly_interpreter.Eval.
-          {
-            step_kont =
-              SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
-            _;
-          } -> (
-        let*! hd = Tezos_lazy_containers.Lazy_vector.Int32Vector.get 0l vs in
-        match hd with
-        | Num (I32 size) -> return size
-        | _ -> failwith "Incorrect stack")
-    | _ -> failwith "The tick after reveal_step is not consistent"
-  in
+  let*! returned_size = reveal_returned_size state in
   (* Let's check the preimage in memory. *)
   let*! module_instance =
     Wasm.Internal_for_tests.get_module_instance_exn state
@@ -143,6 +161,56 @@ let test_reveal_preimage_above_max () =
   let max_bytes = 50l in
   test_reveal_preimage_gen preimage max_bytes
 
+let test_reveal_metadata () =
+  let open Lwt_result_syntax in
+  let metadata_addr = 200l in
+  let modl = reveal_metadata_module metadata_addr in
+  let*! state = initial_tree modl in
+  let*! state_snapshotted = eval_until_input_requested state in
+  let*! state_with_dummy_input =
+    set_input_step "dummy_input" 0 state_snapshotted
+  in
+  (* Let’s go *)
+  let*! state = eval_until_input_requested state_with_dummy_input in
+  let*! info = Wasm.get_info state in
+  let* () =
+    match info.Wasm_pvm_state.input_request with
+    | Wasm_pvm_state.Reveal_required Reveal_metadata -> return_unit
+    | No_input_required | Input_required | Reveal_required _ -> assert false
+  in
+  (* These are dummy metadata since we do not have access to the
+     metadata definition in this compilation unit. *)
+  let metadata =
+    Bytes.init
+      Tezos_scoru_wasm.Host_funcs.Internal_for_tests.metadata_size
+      Char.chr
+  in
+  let*! state = Wasm.reveal_step metadata state in
+  let*! info = Wasm.get_info state in
+  let* () =
+    match info.Wasm_pvm_state.input_request with
+    | Wasm_pvm_state.No_input_required -> return_unit
+    | Input_required ->
+        failwith "should be running, but expect input from the L1"
+    | Reveal_required _ -> failwith "should be running, but expect reveal tick"
+  in
+  (* The revelation step should contain the number of bytes effectively wrote in
+     memory for the preimage. *)
+  let*! returned_size = reveal_returned_size state in
+  (* Let's check the preimage in memory. *)
+  let*! module_instance =
+    Wasm.Internal_for_tests.get_module_instance_exn state
+  in
+  let*! memory = Instance.Vector.get 0l module_instance.memories in
+  assert (
+    Int32.to_int returned_size
+    = Tezos_scoru_wasm.Host_funcs.Internal_for_tests.metadata_size) ;
+  let*! preimage_in_memory =
+    Memory.load_bytes memory metadata_addr (Int32.to_int returned_size)
+  in
+  assert (preimage_in_memory = Bytes.to_string metadata) ;
+  return_unit
+
 let tests =
   [
     tztest
@@ -153,4 +221,5 @@ let tests =
       "Test reveal_preimage with preimage length above max_bytes"
       `Quick
       test_reveal_preimage_above_max;
+    tztest "Test reveal_metadata" `Quick test_reveal_metadata;
   ]
