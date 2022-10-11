@@ -35,14 +35,7 @@
    start with the "legacy" prefix and will be removed when Lima is
    activated on Mainnet. *)
 
-open Validation_errors
-
-type 'protocol_operation operation = {
-  hash : Tezos_crypto.Operation_hash.t;
-  raw : Operation.t;
-  protocol : 'protocol_operation;
-  count_successful_prechecks : int;
-}
+open Shell_operation
 
 type error += Endorsement_branch_not_live
 
@@ -80,14 +73,6 @@ module type T = sig
 
   type t
 
-  val parse :
-    Tezos_crypto.Operation_hash.t ->
-    Operation.t ->
-    protocol_operation operation tzresult
-
-  val increment_successful_precheck :
-    protocol_operation operation -> protocol_operation operation
-
   val create :
     chain_store ->
     predecessor:Store.Block.t ->
@@ -116,14 +101,6 @@ module type T = sig
       t -> (protocol_operation operation * operation_receipt) list
   end
 end
-
-(** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
-let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
-    'a tzresult =
-  let open Result_syntax in
-  match Data_encoding.Binary.of_bytes_opt encoding bytes with
-  | None -> tzfail Parse_error
-  | Some protocol_data -> return protocol_data
 
 module MakeAbstract
     (Chain_store : CHAIN_STORE)
@@ -154,35 +131,6 @@ module MakeAbstract
     | Branch_refused of tztrace
     | Refused of tztrace
     | Outdated of tztrace
-
-  let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
-    safe_binary_of_bytes Proto.operation_data_encoding proto
-
-  let parse hash (raw : Operation.t) =
-    let open Result_syntax in
-    let size = Data_encoding.Binary.length Operation.encoding raw in
-    if size > Proto.max_operation_data_length then
-      tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
-    else
-      let+ protocol_data = parse_unsafe raw.proto in
-      {
-        hash;
-        raw;
-        protocol = {Proto.shell = raw.Operation.shell; protocol_data};
-        (* When an operation is parsed, we assume that it has never been
-           successfully prechecked. *)
-        count_successful_prechecks = 0;
-      }
-
-  let increment_successful_precheck op =
-    (* We avoid {op with ...} to get feedback from the compiler if the record
-       type is extended/modified in the future. *)
-    {
-      hash = op.hash;
-      raw = op.raw;
-      protocol = op.protocol;
-      count_successful_prechecks = op.count_successful_prechecks + 1;
-    }
 
   let create chain_store ~predecessor ~live_operations ~timestamp () =
     (* The prevalidation module receives input from the system byt handles
@@ -301,17 +249,6 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
   MakeAbstract (Production_chain_store) (Proto)
 
 module Internal_for_tests = struct
-  let to_raw {raw; _} = raw
-
-  let hash_of {hash; _} = hash
-
-  let make_operation op oph data =
-    (* When we build an operation, we assume that it has never been
-       successfully prechecked. *)
-    {hash = oph; raw = op; protocol = data; count_successful_prechecks = 0}
-
-  let safe_binary_of_bytes = safe_binary_of_bytes
-
   module type CHAIN_STORE = CHAIN_STORE
 
   module Make = MakeAbstract

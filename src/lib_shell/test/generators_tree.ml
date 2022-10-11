@@ -36,6 +36,7 @@
 (** Generators building on top of {!Generators}, that are capable of
     producing trees of blocks. *)
 
+open Shell_operation
 module Classification = Prevalidator_classification
 
 (** Various functions about {!list} *)
@@ -208,8 +209,8 @@ module Block = struct
   (** The block-like interface that suffices to test
       [Prevalidator.Internal_for_tests.handle_live_operations] *)
   type t = {
-    hash : Tezos_crypto.Block_hash.t;
-    operations : unit Prevalidation.operation list list;
+    bhash : Tezos_crypto.Block_hash.t;
+    operations : unit operation list list;
   }
 
   (* Because we use hashes to implement equality, we must make sure
@@ -217,10 +218,10 @@ module Block = struct
      implies [b1 <> b2] where [<>] is polymorphic inequality. Said
      differently, hashes should not be faked. *)
   let equal : t -> t -> bool =
-   fun t1 t2 -> Tezos_crypto.Block_hash.equal t1.hash t2.hash
+   fun t1 t2 -> Tezos_crypto.Block_hash.equal t1.bhash t2.bhash
 
   let compare (t1 : t) (t2 : t) =
-    Tezos_crypto.Block_hash.compare t1.hash t2.hash
+    Tezos_crypto.Block_hash.compare t1.bhash t2.bhash
 
   (** [hash_of_blocks ops] is used to compute the hash of a block whose
       [operations] field contains [ops].
@@ -233,7 +234,7 @@ module Block = struct
   let hash_of_block ops =
     let hash =
       Tezos_crypto.Operation_list_hash.compute
-        (List.map (fun op -> op.Prevalidation.hash) @@ List.concat ops)
+        (List.map (fun op -> op.hash) @@ List.concat ops)
     in
     (* We forge a fake [block_header] hash by first hashing the operations
        and change the [b58] signature into a signature that looks like
@@ -247,16 +248,16 @@ module Block = struct
     | Ok hash -> hash
 
   (** Returns the [hash] field of a {!t} *)
-  let to_hash (blk : t) = blk.hash
+  let to_hash (blk : t) = blk.bhash
 
   let tools : t Classification.block_tools =
     let operations block =
-      List.map (List.map (fun op -> op.Prevalidation.raw)) block.operations
+      List.map (List.map (fun op -> op.raw)) block.operations
     in
     let all_operation_hashes block =
-      List.map (List.map (fun op -> op.Prevalidation.hash)) block.operations
+      List.map (List.map (fun op -> op.hash)) block.operations
     in
-    {hash = to_hash; operations; all_operation_hashes}
+    {bhash = to_hash; operations; all_operation_hashes}
 
   let to_string t =
     let ops_list_to_string ops =
@@ -264,7 +265,7 @@ module Block = struct
         "|"
         (List.map
            Tezos_crypto.Operation_hash.to_short_b58check
-           (List.map (fun op -> op.Prevalidation.hash) ops))
+           (List.map (fun op -> op.hash) ops))
     in
     let ops_string =
       List.fold_left
@@ -272,7 +273,7 @@ module Block = struct
         ""
         t.operations
     in
-    Format.asprintf "%a:[%s]" Tezos_crypto.Block_hash.pp t.hash ops_string
+    Format.asprintf "%a:[%s]" Tezos_crypto.Block_hash.pp t.bhash ops_string
 
   (* [pp_list] is unused but useful when debugging, renaming it to [_pp_list] to keep it around  *)
 
@@ -308,8 +309,8 @@ let block_gen ?proto_gen () : Block.t QCheck2.Gen.t =
     (* In production these lists are exactly of size 4, being more general *)
     list_size (int_range 0 8) ops_list_gen
   in
-  let hash = Block.hash_of_block ops in
-  return Block.{hash; operations = ops}
+  let bhash = Block.hash_of_block ops in
+  return Block.{bhash; operations = ops}
 
 (* A generator of sets of {!Block.t} where all elements are guaranteed
    to be different. [list_gen] is an optional list generator. If omitted
@@ -400,15 +401,14 @@ let tree_gen ?blocks () =
 (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
 let old_mempool_gen (tree : Block.t Tree.tree) :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t =
   let blocks = Tree.values tree in
   let pairs = List.concat_map Block.tools.operations blocks |> List.concat in
   let elements =
     List.map
       (fun (op : Operation.t) ->
         let hash = Operation.hash op in
-        Prevalidation.Internal_for_tests.make_operation op hash ())
+        Internal_for_tests.make_operation op hash ())
       pairs
   in
   if elements = [] then QCheck2.Gen.return Tezos_crypto.Operation_hash.Map.empty
@@ -417,7 +417,7 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
     QCheck2.Gen.map
       (fun l ->
         List.to_seq l
-        |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+        |> Seq.map (fun op -> (op.hash, op))
         |> Tezos_crypto.Operation_hash.Map.of_seq)
       list_gen
 
@@ -500,7 +500,7 @@ let classification_chain_tools (tree : Block.t Tree.tree) :
 let tree_gen ?blocks () :
     (Block.t Tree.tree
     * (Block.t * Block.t) option
-    * unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t)
+    * unit operation Tezos_crypto.Operation_hash.Map.t)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* tree = tree_gen ?blocks () in

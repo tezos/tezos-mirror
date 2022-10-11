@@ -34,10 +34,10 @@
    activated on Mainnet. *)
 
 open Prevalidator_classification
+open Shell_operation
 
 let add_if_not_present classification op t =
-  Prevalidator_classification.(
-    if is_in_mempool op.Prevalidation.hash t = None then add classification op t)
+  if Option.is_none (is_in_mempool op.hash t) then add classification op t
 
 (** A generator for the protocol bytes of an operation. *)
 let operation_proto_gen = QCheck2.Gen.small_string ?gen:None
@@ -66,7 +66,7 @@ let block_hash_gen : Tezos_crypto.Block_hash.t QCheck2.Gen.t =
 
     This function should be renamed to [raw_operation_gen] at some point,
     because it returns {!Operation.t} (the [op] prefix is for functions
-    returning {!Prevalidation.operation} values). *)
+    returning {!operation} values). *)
 let operation_gen ?(proto_gen = operation_proto_gen) ?block_hash_t () :
     Operation.t QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -101,7 +101,7 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
       `Low weights
 
 (** [operation_with_hash_gen ?proto_gen ?block_hash_t ()] is a generator
-    for parsable operations, i.e. values of type {!Prevalidation.operation}.
+    for parsable operations, i.e. values of type {!operation}.
 
     In production, this type guarantees that the underlying operation
     has been successfully parsed. This is NOT the case with this generator.
@@ -119,14 +119,13 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
     i.e. to have both [operation_data = unit] and strings generated for
     [operation_data] always empty. *)
 let operation_with_hash_gen ?proto_gen ?block_hash_t () :
-    unit Prevalidation.operation QCheck2.Gen.t =
+    unit operation QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ oph, op = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
-  Prevalidation.Internal_for_tests.make_operation op oph ()
+  Internal_for_tests.make_operation op oph ()
 
 let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
-    (unit Prevalidation.operation * Prevalidator_pending_operations.priority)
-    QCheck2.Gen.t =
+    (unit operation * Prevalidator_pending_operations.priority) QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* op = operation_with_hash_gen ?proto_gen ?block_hash_t () in
   let* priority = priority_gen () in
@@ -148,12 +147,11 @@ let raw_op_map_gen ?proto_gen ?block_hash_t () :
     this generator guarantees that all returned operations are distinct
     (because their hashes differ). *)
 let op_map_gen ?proto_gen ?block_hash_t () :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ ops = small_list (operation_with_hash_gen ?proto_gen ?block_hash_t ()) in
   List.to_seq ops
-  |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+  |> Seq.map (fun op -> (op.hash, op))
   |> Tezos_crypto.Operation_hash.Map.of_seq
 
 (** A generator like {!raw_op_map_gen} but which guarantees the size
@@ -186,16 +184,14 @@ let raw_op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
     of fixed lengths) because we *need* to return maps, because we need
     the properties that all operations hashes are different. *)
 let op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
-    unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t
-    =
+    unit operation Tezos_crypto.Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let map_take_n n m =
     Tezos_crypto.Operation_hash.Map.bindings m
     |> List.take_n n |> List.to_seq |> Tezos_crypto.Operation_hash.Map.of_seq
   in
   let merge _oph old _new = Some old in
-  let rec go
-      (ops : unit Prevalidation.operation Tezos_crypto.Operation_hash.Map.t) =
+  let rec go (ops : unit operation Tezos_crypto.Operation_hash.Map.t) =
     if Tezos_crypto.Operation_hash.Map.cardinal ops >= n then
       (* Done *)
       return (map_take_n n ops)
@@ -247,8 +243,7 @@ let t_gen = t_gen_ ~can_be_full:true
 (* With probability 1/2, we take an operation hash already present in the
    classification. This operation is taken uniformly among the
    different classes. *)
-let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
-    =
+let with_t_operation_gen : unit t -> unit operation QCheck2.Gen.t =
   let module Classification = Prevalidator_classification in
   let open QCheck2 in
   fun t ->
@@ -292,8 +287,8 @@ let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
     @ [(freq_fresh t, operation_with_hash_gen ())]
     |> Gen.frequency
 
-let t_with_operation_gen_ ~can_be_full :
-    (unit t * unit Prevalidation.operation) QCheck2.Gen.t =
+let t_with_operation_gen_ ~can_be_full : (unit t * unit operation) QCheck2.Gen.t
+    =
   let open QCheck2.Gen in
   let* t = t_gen_ ~can_be_full in
   pair (return t) (with_t_operation_gen t)

@@ -34,6 +34,8 @@
    start with the "legacy" prefix and will be removed when Lima is
    activated on Mainnet. *)
 
+open Shell_operation
+
 (* Ordering is important, as it is used below in map keys comparison *)
 type priority = [`High | `Medium | `Low of Q.t list]
 
@@ -74,7 +76,7 @@ module Sized_set =
 *)
 type 'a t = {
   (* The main map *)
-  pending : 'a Prevalidation.operation Map.t Priority_map.t;
+  pending : 'a operation Map.t Priority_map.t;
   (* Used for advertising *)
   hashes : Sized_set.t;
   (* We need to remember the priority of each hash, to be used when removing
@@ -107,7 +109,7 @@ let get_priority_map prio pending =
   match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
 
 let add op prio {pending; hashes; priority_of} =
-  let oph = op.Prevalidation.hash in
+  let oph = op.hash in
   let mp = get_priority_map prio pending |> Map.add oph op in
   {
     pending = Priority_map.add prio mp pending;

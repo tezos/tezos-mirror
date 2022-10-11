@@ -5,7 +5,7 @@
  (names
   test_shell
   test_synchronisation_heuristic_fuzzy
-  test_prevalidation
+  test_shell_operation
   test_prevalidation_t
   test_prevalidator_classification
   test_prevalidator_classification_operations
@@ -67,7 +67,7 @@
 (rule
  (alias runtest)
  (package tezos-shell)
- (action (run %{dep:./test_prevalidation.exe})))
+ (action (run %{dep:./test_shell_operation.exe})))
 
 (rule
  (alias runtest)

@@ -60,8 +60,6 @@ module Mock_protocol :
     Lwt_result_syntax.return_unit
 end
 
-module Internal_for_tests = Prevalidation.Internal_for_tests
-
 module Init = struct
   let genesis_protocol =
     Tezos_crypto.Protocol_hash.of_b58check_exn
@@ -108,13 +106,8 @@ module Init = struct
     Store.Unsafe.block_of_repr repr
 end
 
-let create_prevalidation
-    (module Mock_protocol : Tezos_protocol_environment.PROTOCOL
-      with type operation_data = unit
-       and type operation_receipt = unit
-       and type validation_state = unit) ctxt =
-  let module Chain_store :
-    Internal_for_tests.CHAIN_STORE with type chain_store = unit = struct
+let make_chain_store ctxt =
+  let module Chain_store = struct
     type chain_store = unit
 
     let context () _block : Tezos_protocol_environment.Context.t tzresult Lwt.t
@@ -123,13 +116,18 @@ let create_prevalidation
 
     let chain_id () = Init.chain_id
   end in
-  let module Prevalidation_t =
-    Internal_for_tests.Make (Chain_store) (Mock_protocol)
+  (module Chain_store : Prevalidation.Internal_for_tests.CHAIN_STORE
+    with type chain_store = unit)
+
+module MakePrevalidation = Prevalidation.Internal_for_tests.Make
+
+let make_prevalidation_mock_protocol ctxt =
+  let (module Chain_store) = make_chain_store ctxt in
+  let module Prevalidation_t = MakePrevalidation (Chain_store) (Mock_protocol)
   in
   (module Prevalidation_t : Prevalidation.T
-    with type operation_receipt = unit
-     and type validation_state = unit
-     and type chain_store = Chain_store.chain_store)
+    with type protocol_operation = Mock_protocol.operation
+     and type chain_store = unit)
 
 let now () = Time.System.to_protocol (Tezos_base.Time.System.now ())
 
@@ -141,26 +139,21 @@ let test_create ctxt =
   let open Lwt_result_syntax in
   let live_operations = Tezos_crypto.Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
-  let (module Prevalidation) =
-    create_prevalidation (module Mock_protocol) ctxt
-  in
+  let (module P) = make_prevalidation_mock_protocol ctxt in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
-  let* _ =
-    Prevalidation.create chain_store ~predecessor ~live_operations ~timestamp ()
-  in
+  let* _ = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   return_unit
 
-(** A generator of [Prevalidation.operation] values that make sure
+module Parser = Shell_operation.MakeParser (Mock_protocol)
+
+(** A generator of [operation] values that makes sure
     to return distinct operations (hashes are not fake and they are
     all different). Returned maps are exactly of size [n]. *)
-let prevalidation_operations_gen (type a)
-    (module P : Prevalidation.T with type protocol_operation = a) ~(n : int) :
-    a Prevalidation.operation list QCheck2.Gen.t =
-  let mk_operation (hash, (raw : Operation.t)) :
-      P.protocol_operation Prevalidation.operation =
-    match P.parse hash raw with
+let operations_gen ~(n : int) =
+  let mk_operation (hash, (raw : Operation.t)) =
+    match Parser.parse hash raw with
     | Ok x -> x
     | Error err ->
         Format.printf "%a" Error_monad.pp_print_trace err ;
@@ -168,7 +161,7 @@ let prevalidation_operations_gen (type a)
   in
   let open QCheck2.Gen in
   (* We need to specify the protocol bytes generator to always generate the
-     empty string, otherwise the call to [P.parse] will fail with the
+     empty string, otherwise the call to [Parser.parse] will fail with the
      bytes being too long (hereby looking like an attack). *)
   let proto_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
   let+ (ops : Operation.t Tezos_crypto.Operation_hash.Map.t) =
@@ -179,12 +172,8 @@ let prevalidation_operations_gen (type a)
 (** The number of operations used by tests that follow *)
 let nb_ops = 100
 
-let mk_ops (type a)
-    (module P : Prevalidation.T with type protocol_operation = a) :
-    a Prevalidation.operation list =
-  let ops =
-    QCheck2.Gen.generate1 (prevalidation_operations_gen (module P) ~n:nb_ops)
-  in
+let mk_ops () =
+  let ops = QCheck2.Gen.generate1 (operations_gen ~n:nb_ops) in
   assert (Compare.List_length_with.(ops = nb_ops)) ;
   ops
 
@@ -194,13 +183,11 @@ let test_apply_operation_crash ctxt =
   let open Lwt_result_syntax in
   let live_operations = Tezos_crypto.Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
-  let (module P) = create_prevalidation (module Mock_protocol) ctxt in
-  let ops : P.protocol_operation Prevalidation.operation list =
-    mk_ops (module P)
-  in
+  let ops = mk_ops () in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
+  let (module P) = make_prevalidation_mock_protocol ctxt in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let apply_op pv op =
     let*! application_result = P.apply_operation pv op in
@@ -229,16 +216,27 @@ let mk_rand () =
 (** [mk_live_operations rand ops] returns a subset of [ops], which is
     appropriate for being passed as the [live_operations] argument
     of [Prevalidation.create] *)
-let mk_live_operations (type a) rand (ops : a Prevalidation.operation list) =
+let mk_live_operations rand ops =
   List.fold_left
-    (fun acc (op : _ Prevalidation.operation) ->
+    (fun acc op ->
       if Random.State.bool rand then
         Tezos_crypto.Operation_hash.Set.add
-          (Internal_for_tests.to_raw op |> Operation.hash)
+          (Shell_operation.Internal_for_tests.to_raw op |> Operation.hash)
           acc
       else acc)
     Tezos_crypto.Operation_hash.Set.empty
     ops
+
+module Proto_random_apply :
+  Tezos_protocol_environment.PROTOCOL
+    with type operation_data = unit
+     and type operation = Mock_protocol.operation = struct
+  include Mock_protocol
+
+  let apply_operation _ _ _ =
+    let b = QCheck2.Gen.(generate1 bool) in
+    Lwt.return (if b then Ok ((), ()) else error_with "Operation doesn't apply")
+end
 
 (** Test that [Prevalidation.apply_operations] returns [Outdated]
     for operations in [live_operations] *)
@@ -246,37 +244,22 @@ let test_apply_operation_live_operations ctxt =
   let open Lwt_result_syntax in
   let timestamp : Time.Protocol.t = now () in
   let rand : Random.State.t = mk_rand () in
-  let (module Protocol : Tezos_protocol_environment.PROTOCOL
-        with type operation_data = unit
-         and type operation_receipt = unit
-         and type validation_state = unit
-         and type application_state = unit) =
-    (module struct
-      include Mock_protocol
-
-      let apply_operation _ _ _ =
-        Lwt.return
-          (if Random.State.bool rand then Ok ((), ())
-          else error_with "Operation doesn't apply")
-    end)
-  in
-  let (module P) = create_prevalidation (module Protocol) ctxt in
-  let ops : P.protocol_operation Prevalidation.operation list =
-    mk_ops (module P)
-  in
+  let ops = mk_ops () in
   let live_operations : Tezos_crypto.Operation_hash.Set.t =
     mk_live_operations rand ops
   in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
+  let (module Chain_store) = make_chain_store ctxt in
+  let module P = MakePrevalidation (Chain_store) (Proto_random_apply) in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let op_in_live_operations op =
     Tezos_crypto.Operation_hash.Set.mem
-      (Internal_for_tests.to_raw op |> Operation.hash)
+      (Shell_operation.Internal_for_tests.to_raw op |> Operation.hash)
       live_operations
   in
-  let apply_op pv (op : _ Prevalidation.operation) =
+  let apply_op pv op =
     let*! application_result = P.apply_operation pv op in
     let next_pv, result_is_outdated =
       match application_result with
@@ -298,32 +281,18 @@ let test_apply_operation_applied ctxt =
   let open Lwt_result_syntax in
   let timestamp : Time.Protocol.t = now () in
   let rand : Random.State.t = mk_rand () in
-  let (module Protocol : Tezos_protocol_environment.PROTOCOL
-        with type operation_data = unit
-         and type operation_receipt = unit
-         and type validation_state = unit) =
-    (module struct
-      include Mock_protocol
-
-      let apply_operation _ _ _ =
-        Lwt.return
-          (if Random.State.bool rand then Ok ((), ())
-          else error_with "Operation doesn't apply")
-    end)
-  in
-  let (module P) = create_prevalidation (module Protocol) ctxt in
-  let ops : P.protocol_operation Prevalidation.operation list =
-    mk_ops (module P)
-  in
+  let ops = mk_ops () in
   let live_operations : Tezos_crypto.Operation_hash.Set.t =
     mk_live_operations rand ops
   in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
+  let (module Chain_store) = make_chain_store ctxt in
+  let module P = MakePrevalidation (Chain_store) (Proto_random_apply) in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let to_applied = P.Internal_for_tests.to_applied in
-  let apply_op pv (op : _ Prevalidation.operation) =
+  let apply_op pv op =
     let applied_before = to_applied pv in
     let*! application_result = P.apply_operation pv op in
     let next_pv, result_is_applied =

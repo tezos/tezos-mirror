@@ -1,0 +1,104 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** This module provides the operation representation used by the
+    prevalidator and its dependencies. It also contains tools for
+    parsing an operation into this representation, and updating the
+    latter. *)
+
+(** Representation of a parsed operation, used only in the shell. *)
+type 'protocol_operation operation = private {
+  hash : Tezos_crypto.Operation_hash.t;  (** Hash of an operation. *)
+  raw : Operation.t;
+      (** Raw representation of an operation (from the point view of the
+          shell). *)
+  protocol : 'protocol_operation;
+      (** Economic protocol specific data of an operation. It is the
+          unserialized representation of [raw.protocol_data]. For
+          convenience, the type associated to this type may be [unit] if we
+          do not have deserialized the operation yet. *)
+  count_successful_prechecks : int;
+      (** This field provides an under-approximation for the number of times
+          the operation has been successfully prechecked. It is an
+          under-approximation because if the operation is e.g., parsed more than
+          once, or is prechecked in other modes, this flag is not globally
+          updated. *)
+}
+
+(** [increment_successful_precheck op] increments the field
+    [count_successful_prechecks] of the given operation [op]. It is supposed
+    to be called after each successful precheck of a given operation [op],
+    and nowhere else. Overflow is unlikely to occur in practice, as the
+    counter grows very slowly and the number of prechecks is bounded. *)
+val increment_successful_precheck :
+  'protocol_operation operation -> 'protocol_operation operation
+
+(** The purpose of this module type is to provide the [parse]
+    function, whose return type depends on the protocol. *)
+module type PARSER = sig
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL.operation} *)
+  type protocol_operation
+
+  (** [parse hash op] reads a usual {!Operation.t} and lifts it to the
+      type {!protocol_operation} used by this module. This function is in the
+      {!tzresult} monad, because it can return the following errors:
+
+      - {!Validation_errors.Oversized_operation} if the size of the operation
+        data within [op] is too large (to protect against DoS attacks), and
+      - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
+  val parse :
+    Tezos_crypto.Operation_hash.t ->
+    Operation.t ->
+    protocol_operation operation tzresult
+end
+
+(** Create a {!PARSER} tailored to a given protocol. *)
+module MakeParser : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
+  PARSER with type protocol_operation = Proto.operation
+
+(**/**)
+
+module Internal_for_tests : sig
+  (** Returns the {!Operation.t} underlying an {!operation} *)
+  val to_raw : _ operation -> Operation.t
+
+  (** The hash of an {!operation} *)
+  val hash_of : _ operation -> Tezos_crypto.Operation_hash.t
+
+  (** A constructor for the [operation] datatype. It by-passes the
+      checks done by the [parse] function. *)
+  val make_operation :
+    Operation.t -> Tezos_crypto.Operation_hash.t -> 'a -> 'a operation
+
+  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
+      Any error happening during parsing becomes {!Parse_error}.
+
+      If one day the functor's signature is simplified, tests could use
+      [parse_unsafe] directly rather than relying on this function to
+      replace [Proto.operation_data_encoding]. *)
+  val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
+end

@@ -36,6 +36,7 @@
 
 open Prevalidator_internal_common
 open Prevalidator_worker_state
+open Shell_operation
 module Events = Prevalidator_events
 module Classification = Prevalidator_classification
 
@@ -146,7 +147,7 @@ let metrics = Shell_metrics.Mempool.init ["mempool"]
 (** The concrete production instance of {!block_tools} *)
 let block_tools : Store.Block.t Classification.block_tools =
   {
-    hash = Store.Block.hash;
+    bhash = Store.Block.hash;
     operations = Store.Block.operations;
     all_operation_hashes = Store.Block.all_operation_hashes;
   }
@@ -195,8 +196,7 @@ module type S = sig
         (** Internal state of the filter in the plugin *)
     mutable validation_state : prevalidation_t tzresult;
     mutable operation_stream :
-      (Classification.classification
-      * protocol_operation Prevalidation.operation)
+      (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
     mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
     mutable filter_config : filter_config;
@@ -282,15 +282,12 @@ module Make_s
 
   type prevalidation_t = Prevalidation_t.t
 
-  type 'operation_data operation = 'operation_data Prevalidation.operation
-
   type types_state = {
     shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable filter_state : filter_state;
     mutable validation_state : prevalidation_t tzresult;
     mutable operation_stream :
-      (Classification.classification
-      * protocol_operation Prevalidation.operation)
+      (Classification.classification * protocol_operation operation)
       Lwt_watcher.input;
     mutable rpc_directory : types_state Tezos_rpc.Directory.t lazy_t;
     mutable filter_config : filter_config;
@@ -336,9 +333,8 @@ module Make_s
      given stream. Operations which cannot be parsed are not notified. *)
   let handle_classification
       ~(notifier :
-         Classification.classification ->
-         protocol_operation Prevalidation.operation ->
-         unit) shell (op, kind) =
+         Classification.classification -> protocol_operation operation -> unit)
+      shell (op, kind) =
     Classification.add kind op shell.classification ;
     notifier kind op
 
@@ -434,7 +430,7 @@ module Make_s
               prevalidation_t
               validation_state
           in
-          let new_op = Prevalidation_t.increment_successful_precheck op in
+          let new_op = increment_successful_precheck op in
           `Passed_precheck (filter_state, prevalidation_t, new_op, replacement)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
@@ -625,7 +621,7 @@ module Make_s
              This field does not only contain valid operation *)
           Mempool.known_valid =
             List.fold_left
-              (fun acc op -> op.Prevalidation.hash :: acc)
+              (fun acc op -> op.hash :: acc)
               prechecked_hashes
               pv_shell.classification.applied_rev;
           pending = Pending_ops.hashes pv_shell.pending;
@@ -721,6 +717,8 @@ module Make_s
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
   module Requests = struct
+    module Parser = MakeParser (Filter.Proto)
+
     let on_arrived (pv : types_state) oph op : (unit, Empty.t) result Lwt.t =
       let open Lwt_syntax in
       let* already_handled =
@@ -728,7 +726,7 @@ module Make_s
       in
       if already_handled then return_ok_unit
       else
-        match Prevalidation_t.parse oph op with
+        match Parser.parse oph op with
         | Error _ ->
             let* () = Events.(emit unparsable_operation) oph in
             Prevalidator_classification.add_unparsable
@@ -780,7 +778,7 @@ module Make_s
            Is this an error? *)
         return_unit
       else
-        match Prevalidation_t.parse oph op with
+        match Parser.parse oph op with
         | Error err ->
             failwith
               "Invalid operation %a: %a."
@@ -928,7 +926,7 @@ module Make_s
           ~from_branch:old_predecessor
           ~to_branch:new_predecessor
           ~live_blocks:new_live_blocks
-          ~parse:(fun oph op -> Result.to_option (Prevalidation_t.parse oph op))
+          ~parse:(fun oph op -> Result.to_option (Parser.parse oph op))
           ~classes:pv.shell.classification
           ~pending:(Pending_ops.operations pv.shell.pending)
           ~block_store:block_tools
@@ -1199,7 +1197,7 @@ module Make
               if params#applied then
                 let applied_seq =
                   pv.shell.classification.applied_rev |> List.to_seq
-                  |> Seq.map (fun (Prevalidation.{hash; _} as op) -> (hash, op))
+                  |> Seq.map (fun ({hash; _} as op) -> (hash, op))
                 in
                 Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
@@ -1209,7 +1207,7 @@ module Make
                        if
                          filter_validation_passes
                            params#validation_passes
-                           op.Prevalidation.protocol
+                           op.protocol
                        then Some (oph, op.protocol)
                        else None)
                 |> List.of_seq
@@ -1222,7 +1220,7 @@ module Make
                   if
                     filter_validation_passes
                       params#validation_passes
-                      op.Prevalidation.protocol
+                      op.protocol
                   then Some (op.protocol, error)
                   else None)
                 map
@@ -1252,7 +1250,7 @@ module Make
             in
             let unprocessed =
               Tezos_crypto.Operation_hash.Map.filter_map
-                (fun _ Prevalidation.{protocol; _} ->
+                (fun _ {protocol; _} ->
                   if filter_validation_passes params#validation_passes protocol
                   then Some protocol
                   else None)
@@ -1291,8 +1289,7 @@ module Make
             let applied_seq =
               if params#applied then
                 pv.shell.classification.applied_rev |> List.to_seq
-                |> Seq.map (fun Prevalidation.{hash; protocol; _} ->
-                       ((hash, protocol), None))
+                |> Seq.map (fun {hash; protocol; _} -> ((hash, protocol), None))
               else Seq.empty
             in
             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
@@ -1304,7 +1301,7 @@ module Make
                 Classification.Sized_map.to_map
                   pv.shell.classification.prechecked
                 |> Tezos_crypto.Operation_hash.Map.to_seq
-                |> Seq.map (fun (hash, Prevalidation.{protocol; _}) ->
+                |> Seq.map (fun (hash, {protocol; _}) ->
                        ((hash, protocol), None))
               else Seq.empty
             in
@@ -1312,7 +1309,7 @@ module Make
               let open Tezos_crypto.Operation_hash in
               map |> Map.to_seq
               |> Seq.map (fun (hash, (op, error)) ->
-                     ((hash, op.Prevalidation.protocol), Some error))
+                     ((hash, op.protocol), Some error))
             in
             let refused_seq =
               if params#refused then
@@ -1374,8 +1371,7 @@ module Make
                         | `Outdated errors ->
                             Some errors
                       in
-                      Lwt.return_some
-                        [(Prevalidation.(op.hash, op.protocol), errors)]
+                      Lwt.return_some [((op.hash, op.protocol), errors)]
                   | Some _ -> next ()
                   | None -> Lwt.return_none)
             in

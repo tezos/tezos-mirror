@@ -49,7 +49,7 @@ let pending_of_list =
     (fun pendings (op, priority) ->
       if
         Tezos_crypto.Operation_hash.Set.mem
-          (Prevalidation.Internal_for_tests.hash_of op)
+          (Shell_operation.Internal_for_tests.hash_of op)
           (Pending_ops.hashes pendings)
       then (* no duplicate hashes *)
         pendings
