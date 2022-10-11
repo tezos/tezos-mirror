@@ -131,7 +131,7 @@ type ('protocol_data, 'a) types_state_shell = {
   worker : Tools.worker_tools;
 }
 
-let metrics = Shell_metrics.Mempool.init ["mempool"]
+let metrics = Shell_metrics.Mempool.init ["legacy_mempool"]
 
 (** The concrete production instance of {!block_tools} *)
 let block_tools : Store.Block.t Classification.block_tools =
@@ -1016,6 +1016,12 @@ module type ARG = sig
   val chain_db : Distributed_db.chain_db
 
   val chain_id : Chain_id.t
+end
+
+module Name = struct
+  include Name
+
+  let base = ["legacy_prevalidator"]
 end
 
 module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)

@@ -26,7 +26,7 @@
 module Prevalidation = Legacy_prevalidation
 
 module Event = struct
-  let section = ["prevalidator_classification"]
+  let section = ["legacy_prevalidator_classification"]
 
   include Internal_event.Simple
 

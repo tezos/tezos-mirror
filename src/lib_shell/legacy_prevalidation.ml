@@ -39,7 +39,7 @@ type error += Endorsement_branch_not_live
 let () =
   register_error_kind
     `Permanent
-    ~id:"prevalidation.endorsement_branch_not_live"
+    ~id:"legacy_prevalidation.endorsement_branch_not_live"
     ~title:"Endorsement branch not live"
     ~description:"Endorsement's branch is not in the live blocks"
     ~pp:(fun ppf () ->
