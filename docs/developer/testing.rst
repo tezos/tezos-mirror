@@ -112,18 +112,12 @@ Typical use cases:
 Example tests:
  - Unit tests for :src:`src/lib_requester`, in :src:`src/lib_requester/test/test_requester.ml`. To
    execute them locally, run ``dune build @src/lib_requester/runtest`` in
-   the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker unit:requester``.
+   the Tezos root.
  - Integration tests for the P2P layer in the shell.  For instance
    :src:`src/lib_p2p/test/test_p2p_pool.ml`. This test forks a set of
    processes that exercise large parts of the P2P layer.  To execute
    it locally, run ``dune build @runtest_p2p_pool`` in the Tezos
-   root. To execute the P2P tests on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker unit:p2p``. The job-name
-   ``unit:p2p`` is ill-chosen, since the test is in fact an
-   integration test.
+   root.
 
 References:
  - `Alcotest README <https://github.com/mirage/alcotest>`_.
@@ -203,15 +197,11 @@ Example tests:
    interpreter (in
    :src:`tests_python/tests_alpha/test_contract_opcodes.py`).  To execute it
    locally, run ``cd tests_python && poetry run pytest tests/test_contract_opcodes.py``
-   in the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker integration:contract_opcodes``.
+   in the Tezos root.
  - Setting up networks of nodes and ensuring their connection
    (in :src:`tests_python/tests_alpha/test_p2p.py`).
    To execute it locally, run ``cd tests_python && poetry run pytest tests/test_p2p.py`` in
-   the Tezos root. To execute them on :ref:`your own machine
-   <executing_gitlab_ci_locally>` using the GitLab CI system, run
-   ``gitlab-runner exec docker integration:p2p``.
+   the Tezos root.
 
 References:
  - `Pytest Documentation <https://docs.pytest.org/en/stable/contents.html>`_
@@ -571,8 +561,7 @@ Other
   For other types of tests, you need to manually modify the
   :src:`.gitlab-ci.yml`. Please refer to the `GitLab CI Pipeline
   Reference <https://docs.gitlab.com/ee/ci/>`_. A helpful tool for
-  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
-  introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
+  this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_.
 
 Test coverage in merge requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -632,43 +621,6 @@ coverage result from there, and also retrieves the artifacts which
 contains the HTML coverage report.
 GitLab also produces a `graph of the coverage ratio over time
 <https://gitlab.com/tezos/tezos/-/graphs/master/charts>`_.
-
-
-
-
-.. _executing_gitlab_ci_locally:
-
-Executing the GitLab CI locally
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-GitLab offers the ability to run jobs defined in the :src:`.gitlab-ci.yml` file on your own machine.
-This is helpful to debug the CI pipeline.
-For this, you need to setup ``gitlab-runner`` on your machine.
-To avoid using outdated versions of the binary, it is recommended to install a
-`release from the development repository <https://gitlab.com/gitlab-org/gitlab-runner/-/releases>`_.
-
-``gitlab-runner`` works with the concept of `executor`. We recommend to use the
-``docker`` executor to sandbox the environment the job will be executed in. This
-supposes that you have docker installed on your machine.
-
-For example, if you want to run the job ``check_python_linting`` which checks the Python syntax, you can use:
-
-.. code-block:: bash
-
-    gitlab-runner exec docker check_python_linting
-
-Note that the first time you execute a job, it may take a long time because it
-requires downloading the docker image, and ``gitlab-runner`` is not verbose on this
-subject. For instance, if Tezos' opam repository has changed, requiring
-a refresh of the locally cached docker image.
-
-Local changes must be committed (but not necessarily pushed remotely)
-before executing the job locally. Indeed, ``gitlab-runner`` will clone
-the head of the current local branch to execute the job.
-
-Another limitation is that only single jobs can be executed using
-``gitlab-runner``. For instance, there is no direct way of executing all
-jobs in the stage ``test``.
 
 Conventions
 -----------
