@@ -62,7 +62,7 @@ type info = {
   input_request : input_request;  (** The current VM input request. *)
 }
 
-(** This module type defines the state for the PVM. 
+(** This module type defines the state for the PVM.
     For use in lib_scoru_wasm only. *)
 module Internal_state = struct
   type tick_state =
