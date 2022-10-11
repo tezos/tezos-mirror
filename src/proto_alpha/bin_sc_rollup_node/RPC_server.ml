@@ -138,6 +138,13 @@ module Make_directory (S : PARAM) = struct
     let*? ctxt = ctxt in
     f ctxt query input
 
+  let register1 service f =
+    let open Lwt_result_syntax in
+    register (Tezos_rpc.Service.subst1 service)
+    @@ fun (ctxt, arg) query input ->
+    let*? ctxt = ctxt in
+    f ctxt arg query input
+
   let build_directory node_ctxt =
     !directory
     |> Tezos_rpc.Directory.map (fun prefix ->
@@ -400,6 +407,20 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
   let () =
     Local_directory.register0 Sc_rollup_services.Local.injection
     @@ fun _node_ctxt () messages -> Batcher.register_messages messages
+
+  let () =
+    Local_directory.register0 Sc_rollup_services.Local.batcher_queue
+    @@ fun _node_ctxt () () ->
+    let open Lwt_result_syntax in
+    let*? queue = Batcher.get_queue () in
+    return queue
+
+  let () =
+    Local_directory.register1 Sc_rollup_services.Local.batcher_message
+    @@ fun _node_ctxt hash () () ->
+    let open Lwt_result_syntax in
+    let*? msg = Batcher.find_message hash in
+    return msg
 
   let register node_ctxt =
     List.fold_left

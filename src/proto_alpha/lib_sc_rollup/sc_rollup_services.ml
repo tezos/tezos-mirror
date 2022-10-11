@@ -112,6 +112,13 @@ module Encodings = struct
             "reveal_pages"
             (list hex_string)
             ~description:"Pages (at most 4kB) to be used for revelation ticks")
+
+  let queued_message =
+    obj2
+      (req "hash" L2_message.Hash.encoding)
+      (req "message" L2_message.encoding)
+
+  let batcher_queue = list queued_message
 end
 
 module Arg = struct
@@ -148,6 +155,16 @@ module Arg = struct
       ~name:"block_id"
       ~construct:construct_block_id
       ~destruct:destruct_block_id
+      ()
+
+  let l2_message_hash : L2_message.hash Tezos_rpc.Arg.t =
+    Tezos_rpc.Arg.make
+      ~descr:"A L2 message hash."
+      ~name:"l2_message_hash"
+      ~construct:L2_message.Hash.to_b58check
+      ~destruct:(fun s ->
+        L2_message.Hash.of_b58check_opt s
+        |> Option.to_result ~none:"Invalid L2 message hash")
       ()
 end
 
@@ -479,4 +496,18 @@ module Local = struct
             ~description:"Hashes of injected L2 messages"
             (list L2_message.Hash.encoding))
       (path / "batcher" / "injection")
+
+  let batcher_queue =
+    Tezos_rpc.Service.get_service
+      ~description:"List messages present in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.batcher_queue
+      (path / "batcher" / "queue")
+
+  let batcher_message =
+    Tezos_rpc.Service.get_service
+      ~description:"List messages present in the batcher's queue"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.option L2_message.encoding)
+      (path / "batcher" / "queue" /: Arg.l2_message_hash)
 end
