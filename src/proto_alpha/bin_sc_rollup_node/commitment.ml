@@ -241,7 +241,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
       current_level
       (Z.add previous_level_num_ticks num_ticks)
 
-  let process_head (node_ctxt : Node_context.t) Layer1.(Head {level; hash}) =
+  let process_head (node_ctxt : Node_context.t) Layer1.{level; hash} =
     let open Lwt_result_syntax in
     let current_level = Raw_level.of_int32_exn level in
     let*! () = update_ticks node_ctxt current_level hash in
@@ -390,8 +390,7 @@ module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM = struct
         in
         Injector.add_pending_operation ~source cement_operation
 
-  let cement_commitment_if_possible node_ctxt
-      (Layer1.Head {level = head_level; _}) =
+  let cement_commitment_if_possible node_ctxt Layer1.{level = head_level; _} =
     let open Lwt_result_syntax in
     let* next_level_to_cement =
       Lwt.map Environment.wrap_tzresult

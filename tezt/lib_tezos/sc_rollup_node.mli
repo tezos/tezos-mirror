@@ -157,3 +157,12 @@ val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
     Returns the hash of the first of these chunks.
     The implementation is PVM-dependent. *)
 val import : t -> pvm_name:string -> filename:string -> string Lwt.t
+
+(** [wait_for ?where sc_node event_name filter] waits for the SCORU node
+    [sc_node] to emit an event named [name] (usually this is the name the event
+    is declared with, concatenated with [".v0"]). [wait_for] continues to wait
+    until an event which satisfies the [filter] (i.e. for which the function
+    returns [Some _]) is produced, in which case the result of the filter is
+    returned. [where], if present, should describe the constraint that [filter]
+    applies. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t

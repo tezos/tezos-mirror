@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+(** [is_processed store hash] returns [true] if the block with [hash] has
+    already been processed by the daemon. *)
+val is_processed : Store.t -> Block_hash.t -> bool Lwt.t
 
-(** This module defines functions that emit the events used by the smart
-    contract rollup node daemon (see {!Daemon}). *)
+(** [mark_processed_head store head] remembers that the [head] is processed. The
+    system should not have to come back to it. *)
+val mark_processed_head : Store.t -> Layer1.head -> unit Lwt.t
 
-(** [head_processing hash level ~finalized] emits the event that the
-    block of the given [hash] and at the given [level] is being processed, and
-    whether it is [finalized]. *)
-val head_processing : Block_hash.t -> int32 -> finalized:bool -> unit Lwt.t
+(** [last_processed_head_opt store] returns the last processed head if it
+    exists. *)
+val last_processed_head_opt : Store.t -> Layer1.head option Lwt.t
 
-(** [new_head_processed hash level] emits the event that the daemon has finished
-    processing the head of the given [hash] and at the given [level]. *)
-val new_head_processed : Block_hash.t -> int32 -> unit Lwt.t
+(** [mark_finalized_head store head] remembers that the [head] is finalized. By
+    construction, every block whose level is smaller than [head]'s is also
+    finalized. *)
+val mark_finalized_head : Store.t -> Layer1.head -> unit Lwt.t
 
-(** [processing_heads_iteration heads] emits the event that the [heads] are
-    going to be processed. *)
-val processing_heads_iteration : Layer1.head list -> unit Lwt.t
+(** [last_finalized_head_opt store] returns the last finalized head if it exists. *)
+val get_finalized_head_opt : Store.t -> Layer1.head option Lwt.t
 
-(** [new_heads_processed heads] emits the event that the [heads] were
-    processed. *)
-val new_heads_processed : Layer1.head list -> unit Lwt.t
+(** [hash_of_level store level] returns the current block hash for a
+   given [level]. Raise [Invalid_argument] if [hash] does not belong
+   to [store]. *)
+val hash_of_level : Store.t -> int32 -> Block_hash.t Lwt.t
 
-(** [included_operation ~finalized op result] emits an event that an operation
-    for the rollup was included in a block (or finalized). *)
-val included_operation :
-  finalized:bool ->
-  'kind Protocol.Alpha_context.manager_operation ->
-  'kind Protocol.Apply_results.manager_operation_result ->
-  unit Lwt.t
-
-(** [wrong_initial_pvm_state_hash actual_hash expected_hash] emits the event
-    that the initial state hash of the PVM [actual_hash] does not agree with
-    [expected_hash]. *)
-val wrong_initial_pvm_state_hash :
-  Sc_rollup.State_hash.t -> Sc_rollup.State_hash.t -> unit Lwt.t
+(** [level_of_hash store hash] returns the level for Tezos block hash [hash] if
+    it is known by the rollup node. *)
+val level_of_hash : Store.t -> Block_hash.t -> int32 tzresult Lwt.t

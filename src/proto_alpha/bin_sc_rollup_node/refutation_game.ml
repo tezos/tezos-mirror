@@ -49,8 +49,7 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val process :
-    Layer1.head -> Configuration.t -> Node_context.t -> unit tzresult Lwt.t
+  val process : Layer1.head -> Node_context.t -> unit tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :
@@ -84,10 +83,10 @@ module Make (Interpreter : Interpreter.S) :
     in
     Injector.add_pending_operation ~source refute_operation
 
-  let generate_proof configuration node_ctxt game start_state =
+  let generate_proof node_ctxt game start_state =
     let open Lwt_result_syntax in
     let*! snapshot_hash =
-      Layer1.hash_of_level
+      State.hash_of_level
         node_ctxt.Node_context.store
         (Int32.pred Raw_level.(to_int32 game.start_level))
     in
@@ -114,10 +113,7 @@ module Make (Interpreter : Interpreter.S) :
       let state = start_state
 
       let reveal hash =
-        Reveals.get
-          ~data_dir:configuration.Configuration.data_dir
-          ~pvm_name:PVM.name
-          ~hash
+        Reveals.get ~data_dir:node_ctxt.data_dir ~pvm_name:PVM.name ~hash
 
       module Inbox_with_history = struct
         include Context.Inbox
@@ -220,7 +216,7 @@ module Make (Interpreter : Interpreter.S) :
           Sc_rollup_node_errors
           .Unreliable_tezos_node_returning_inconsistent_game
 
-  let next_move configuration node_ctxt game =
+  let next_move node_ctxt game =
     let open Lwt_result_syntax in
     let final_move start_tick =
       let* start_state =
@@ -232,9 +228,7 @@ module Make (Interpreter : Interpreter.S) :
             Sc_rollup_node_errors
             .Unreliable_tezos_node_returning_inconsistent_game
       | Some (start_state, _start_hash) ->
-          let* proof =
-            generate_proof configuration node_ctxt game start_state
-          in
+          let* proof = generate_proof node_ctxt game start_state in
           let choice = start_tick in
           return {choice; step = Proof proof}
     in
@@ -254,9 +248,9 @@ module Make (Interpreter : Interpreter.S) :
         let choice = agreed_start_chunk.tick in
         final_move choice
 
-  let play_next_move configuration node_ctxt game self opponent =
+  let play_next_move node_ctxt game self opponent =
     let open Lwt_result_syntax in
-    let* refutation = next_move configuration node_ctxt game in
+    let* refutation = next_move node_ctxt game in
     inject_next_move node_ctxt self ~refutation:(Some refutation) ~opponent
 
   let play_timeout (node_ctxt : Node_context.t) self stakers =
@@ -287,13 +281,12 @@ module Make (Interpreter : Interpreter.S) :
         return (not is_it_me)
     | _ -> return_false
 
-  let play head_block configuration node_ctxt self game staker1 staker2 =
+  let play head_block node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in
     let players = (staker1, staker2) in
     let index = Sc_rollup.Game.Index.make staker1 staker2 in
     match turn ~self game index with
-    | Our_turn {opponent} ->
-        play_next_move configuration node_ctxt game self opponent
+    | Our_turn {opponent} -> play_next_move node_ctxt game self opponent
     | Their_turn ->
         let* timeout_reached =
           timeout_reached ~self head_block node_ctxt players
@@ -341,7 +334,7 @@ module Make (Interpreter : Interpreter.S) :
         return_unit
     | Error errs -> Lwt.return (Error errs)
 
-  let process (Layer1.Head {hash; _}) configuration node_ctxt =
+  let process Layer1.{hash; _} node_ctxt =
     let head_block = `Hash (hash, 0) in
     let open Lwt_result_syntax in
     let refute_signer = Node_context.get_operator node_ctxt Refute in
@@ -353,6 +346,6 @@ module Make (Interpreter : Interpreter.S) :
         let* res = ongoing_game head_block node_ctxt self in
         match res with
         | Some (game, staker1, staker2) ->
-            play head_block configuration node_ctxt self game staker1 staker2
+            play head_block node_ctxt self game staker1 staker2
         | None -> start_game_if_conflict head_block node_ctxt self)
 end

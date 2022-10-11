@@ -28,10 +28,9 @@
 module type S = sig
   module PVM : Pvm.S
 
-  (** [process head config node_ctxt] reacts to any operations of
-      [head] related to refutation games. *)
-  val process :
-    Layer1.head -> Configuration.t -> Node_context.t -> unit tzresult Lwt.t
+  (** [process head node_ctxt] reacts to any operations of [head] related to
+      refutation games. *)
+  val process : Layer1.head -> Node_context.t -> unit tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM

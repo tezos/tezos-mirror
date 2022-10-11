@@ -44,40 +44,11 @@ module Simple = struct
       ~level:Notice
       ()
 
-  let setting_new_head =
+  let switched_new_head =
     declare_2
       ~section
       ~name:"sc_rollup_node_layer_1_new_head"
-      ~msg:"Setting layer 1 head to {hash} at level {level}"
-      ~level:Notice
-      ("hash", Block_hash.encoding)
-      ("level", Data_encoding.int32)
-
-  let rollback =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_layer_1_rollback"
-      ~msg:"Rolling back layer 1 head to {hash} at level {level}"
-      ~level:Notice
-      ("hash", Block_hash.encoding)
-      ("level", Data_encoding.int32)
-
-  let reacting_to_reorganization =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_layer_1_reorganization"
-      ~msg:
-        "Reacting to layer 1 reorganization: rollback to {rollback_hash}, \
-         process {new_blocks}"
-      ~level:Notice
-      ("rollback_hash", Block_hash.encoding)
-      ("new_blocks", Data_encoding.list Block_hash.encoding)
-
-  let new_head_processed =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_layer_1_new_head_processed"
-      ~msg:"Finished processing layer 1 head {hash} at level {level}"
+      ~msg:"Layer 1 node has switched to head {hash} at level {level}"
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
@@ -87,12 +58,4 @@ let starting = Simple.(emit starting)
 
 let stopping = Simple.(emit stopping)
 
-let setting_new_head hash level = Simple.(emit setting_new_head (hash, level))
-
-let new_head_processed hash level =
-  Simple.(emit new_head_processed (hash, level))
-
-let reacting_to_reorganization h hs =
-  Simple.(emit reacting_to_reorganization (h, hs))
-
-let rollback h hs = Simple.(emit rollback (h, hs))
+let switched_new_head hash level = Simple.(emit switched_new_head (hash, level))

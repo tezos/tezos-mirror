@@ -32,37 +32,46 @@ module Simple = struct
   let section = ["sc_rollup_node"; "daemon"]
 
   let head_processing =
-    declare_4
+    declare_3
       ~section
       ~name:"sc_rollup_daemon_process_head"
-      ~msg:
-        "Processing: head {hash} at level {level}: finalized? {finalized}, \
-         partially processed? {seen_before}"
+      ~msg:"Processing {finalized} head {hash} at level {level}"
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("finalized", Data_encoding.bool)
-      ("seen_before", Data_encoding.bool)
+      ~pp3:(fun fmt finalized ->
+        Format.pp_print_string fmt @@ if finalized then "finalized" else "new")
 
-  let not_finalized_head =
+  let new_head_processed =
     declare_2
       ~section
-      ~name:"sc_rollup_daemon_not_finalized"
-      ~msg:
-        "The following head has only be partially processed - commitments have \
-         not been computed: Head {hash} at level {level}"
+      ~name:"sc_rollup_node_layer_1_new_head_processed"
+      ~msg:"Finished processing layer 1 head {hash} at level {level}"
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
   let processing_heads_iteration =
-    declare_2
+    declare_3
       ~section
       ~name:"sc_rollup_daemon_processing_heads"
       ~msg:
-        "A new iteration of process_heads has been triggered: processing heads \
-         from level {from} to level {to}"
+        "A new iteration of process_heads has been triggered: processing \
+         {number} heads from level {from} to level {to}"
       ~level:Notice
+      ("number", Data_encoding.int31)
+      ("from", Data_encoding.int32)
+      ("to", Data_encoding.int32)
+
+  let new_heads_processed =
+    declare_3
+      ~section
+      ~name:"sc_rollup_node_layer_1_new_heads_processed"
+      ~msg:
+        "Finished processing {number} layer 1 heads for levels {from} to {to}"
+      ~level:Notice
+      ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
 
@@ -118,28 +127,28 @@ module Simple = struct
       ("expected", Sc_rollup.State_hash.encoding)
 end
 
-let head_processing hash level finalized seen_before =
-  Simple.(emit head_processing (hash, level, finalized, seen_before))
+let head_processing hash level ~finalized =
+  Simple.(emit head_processing (hash, level, finalized))
 
-let not_finalized_head hash level =
-  Simple.(emit not_finalized_head (hash, level))
+let new_head_processed hash level =
+  Simple.(emit new_head_processed (hash, level))
 
-let processing_heads_iteration old_heads new_heads =
-  let maybe_level = Option.map (fun (Layer1.Head {level; _}) -> level) in
-  let from_level =
-    match maybe_level @@ List.hd old_heads with
-    | None -> maybe_level @@ List.hd new_heads
-    | Some level -> Some level
-  in
-  let to_level =
-    match maybe_level @@ List.last_opt new_heads with
-    | None -> maybe_level @@ List.hd old_heads
-    | Some level -> Some level
-  in
-  match (from_level, to_level) with
-  | Some from_level, Some to_level ->
-      Simple.(emit processing_heads_iteration (from_level, to_level))
-  | _ -> Lwt.return_unit
+let new_heads_iteration event = function
+  | oldest :: rest ->
+      let newest =
+        match List.rev rest with [] -> oldest | newest :: _ -> newest
+      in
+      let number =
+        Int32.sub newest.Layer1.level oldest.Layer1.level
+        |> Int32.succ |> Int32.to_int
+      in
+      Simple.emit event (number, oldest.level, newest.level)
+  | [] -> Lwt.return_unit
+
+let processing_heads_iteration =
+  new_heads_iteration Simple.processing_heads_iteration
+
+let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
 let included_operation (type kind) ~finalized
     (operation : kind Protocol.Alpha_context.manager_operation)

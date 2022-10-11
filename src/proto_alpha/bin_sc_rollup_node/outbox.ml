@@ -29,24 +29,13 @@ open Node_context
 open Protocol.Alpha_context
 
 module Make (PVM : Pvm.S) = struct
-  let get_head store =
-    let open Lwt_result_syntax in
-    let*! head = Layer1.current_head_hash store in
-    match head with None -> failwith "No head" | Some head -> return head
-
-  let get_context (node_ctxt : Node_context.t) =
-    let open Lwt_result_syntax in
-    let* head = get_head node_ctxt.store in
-    let* ctxt = Node_context.checkout_context node_ctxt head in
-    return ctxt
-
   let get_state_of_lcc node_ctxt =
     let open Lwt_result_syntax in
     let*! lcc_level =
       Store.Last_cemented_commitment_level.get node_ctxt.store
     in
     let*! block_hash =
-      Layer1.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
+      State.hash_of_level node_ctxt.store (Raw_level.to_int32 lcc_level)
     in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in

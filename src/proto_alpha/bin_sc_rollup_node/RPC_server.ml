@@ -30,8 +30,20 @@ open Protocol
 
 let get_head store =
   let open Lwt_result_syntax in
-  let*! head = Layer1.current_head_hash store in
-  match head with None -> failwith "No head" | Some head -> return head
+  let*! head = State.last_processed_head_opt store in
+  match head with None -> failwith "No head" | Some {hash; _} -> return hash
+
+let get_head_opt store = State.last_processed_head_opt store
+
+let get_head_hash_opt store =
+  let open Lwt_option_syntax in
+  let+ {hash; _} = State.last_processed_head_opt store in
+  hash
+
+let get_head_level_opt store =
+  let open Lwt_option_syntax in
+  let+ {level; _} = State.last_processed_head_opt store in
+  level
 
 let get_state_info_exn store =
   let open Lwt_result_syntax in
@@ -126,25 +138,26 @@ module Common = struct
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.current_tezos_head ())
-      (fun () () -> Layer1.current_head_hash store >>= return)
+      (fun () () -> get_head_hash_opt store >>= return)
 
   let register_current_tezos_level store dir =
     RPC_directory.register0
       dir
       (Sc_rollup_services.Global.current_tezos_level ())
-      (fun () () -> Layer1.current_level store >>= return)
+      (fun () () -> get_head_level_opt store >>= return)
 
   let register_current_inbox node_ctxt dir =
-    let open Lwt_result_syntax in
     RPC_directory.opt_register0
       dir
       (Sc_rollup_services.Global.current_inbox ())
       (fun () () ->
-        Layer1.current_head_hash node_ctxt.Node_context.store >>= function
+        let open Lwt_result_syntax in
+        let*! head = get_head_hash_opt node_ctxt.Node_context.store in
+        match head with
         | Some head_hash ->
             let* inbox = Inbox.inbox_of_hash node_ctxt head_hash in
             return_some inbox
-        | None -> return None)
+        | None -> return_none)
 
   let register_current_ticks store dir =
     RPC_directory.register0
@@ -316,9 +329,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         let store = node_ctxt.Node_context.store in
         let*! lcc_level = Store.Last_cemented_commitment_level.get store in
         let*! block_hash =
-          Layer1.hash_of_level
-            store
-            (Alpha_context.Raw_level.to_int32 lcc_level)
+          State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
         in
         let* state = get_state ~block_hash node_ctxt in
         let*! outbox = PVM.get_outbox state in

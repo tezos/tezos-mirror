@@ -24,42 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type head_state = {head : Layer1.head; finalized : bool; seen_before : bool}
-
-let emit_head_processing_event
-    {head = Head {hash; level}; finalized; seen_before} =
-  Daemon_event.head_processing hash level finalized seen_before
-
-let emit_heads_not_processed_event head_states =
-  Lwt_list.iter_s
-    (fun {head = Head {hash; level}; _} ->
-      Daemon_event.not_finalized_head hash level)
-    head_states
-
-let categorise_heads (node_ctxt : Node_context.t) old_heads new_heads =
-  (* For each head, determine if it has already been seen before and if it has
-     been finalized, using the block finality time (for Tenderbake, this
-     is 2).
-  *)
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2868
-     Handle protocols with non-deterministic finality. *)
-  let all_heads = old_heads @ new_heads in
-  let number_of_temporary_heads =
-    min node_ctxt.block_finality_time (List.length all_heads)
-  in
-
-  let number_of_new_heads = List.length new_heads in
-
-  let head_states, _, _ =
-    List.fold_right
-      (fun head (heads, n, m) ->
-        ({head; finalized = n <= 0; seen_before = m <= 0} :: heads, n - 1, m - 1))
-      all_heads
-      ([], number_of_temporary_heads, number_of_new_heads)
-  in
-  head_states
-
 module Make (PVM : Pvm.S) = struct
   module Components = Components.Make (PVM)
   open Protocol
@@ -179,7 +143,7 @@ module Make (PVM : Pvm.S) = struct
           (* No action for non successful operations  *)
           return_unit
 
-  let process_l1_block_operations ~finalized node_ctxt (Layer1.Head {hash; _}) =
+  let process_l1_block_operations ~finalized node_ctxt Layer1.{hash; _} =
     let open Lwt_result_syntax in
     let* block = Layer1.fetch_tezos_block node_ctxt.Node_context.l1_ctxt hash in
     let apply (type kind) accu ~source (operation : kind manager_operation)
@@ -201,78 +165,84 @@ module Make (PVM : Pvm.S) = struct
     in
     return_unit
 
-  let process_head configuration node_ctxt head_state =
+  let before_origination (node_ctxt : Node_context.t) Layer1.{level; _} =
+    let origination_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+    level < origination_level
+
+  let rec processed_finalized_block (node_ctxt : Node_context.t)
+      Layer1.({hash; level} as block) =
     let open Lwt_result_syntax in
-    let {finalized; seen_before; head} = head_state in
-    let* () =
-      let*! () = emit_head_processing_event head_state in
-      (* Avoid processing inbox again if it has been processed before for this head *)
-      if seen_before then
-        if finalized then process_l1_block_operations ~finalized node_ctxt head
-        else return_unit
-      else
-        let* ctxt = Inbox.process_head node_ctxt head in
-        let* () = Dal_slots_tracker.process_head node_ctxt head in
-        let* () = process_l1_block_operations ~finalized node_ctxt head in
-        (* Avoid storing and publishing commitments if the head is not final *)
-        (* Avoid triggering the pvm execution if this has been done before for this head *)
-        Components.Interpreter.process_head node_ctxt ctxt head
+    let*! last_finalized = State.get_finalized_head_opt node_ctxt.store in
+    let already_finalized =
+      match last_finalized with
+      | Some Layer1.{level = finalized_level; _} -> level <= finalized_level
+      | None -> false
     in
+    unless (already_finalized || before_origination node_ctxt block)
+    @@ fun () ->
+    let* predecessor = Layer1.get_predecessor_opt node_ctxt.l1_ctxt block in
     let* () =
-      when_ finalized @@ fun () ->
-      Components.Commitment.process_head node_ctxt head
+      Option.iter_es (processed_finalized_block node_ctxt) predecessor
     in
-    (* Publishing a commitment when one is available does not depend on the state of
-       the current head. *)
+    let*! () = Daemon_event.head_processing hash level ~finalized:true in
+    let* () = process_l1_block_operations ~finalized:true node_ctxt block in
+    let* () = Components.Commitment.process_head node_ctxt block in
+    (* At each block, there may be some refutation related actions to
+       be performed. *)
+    let* () = Components.Refutation_game.process block node_ctxt in
+    let*! () = State.mark_finalized_head node_ctxt.store block in
+    return_unit
+
+  let process_head (node_ctxt : Node_context.t) Layer1.({hash; level} as head) =
+    let open Lwt_result_syntax in
+    let*! () = Daemon_event.head_processing hash level ~finalized:false in
+    let* ctxt = Inbox.process_head node_ctxt head in
+    let* () = Dal_slots_tracker.process_head node_ctxt head in
+    let* () = process_l1_block_operations ~finalized:false node_ctxt head in
+    (* Avoid storing and publishing commitments if the head is not final. *)
+    (* Avoid triggering the pvm execution if this has been done before for
+       this head. *)
+    let* () = Components.Interpreter.process_head node_ctxt ctxt head in
+    let* finalized_block, _ =
+      Layer1.nth_predecessor
+        node_ctxt.l1_ctxt
+        node_ctxt.block_finality_time
+        head
+    in
+    let* () = processed_finalized_block node_ctxt finalized_block in
+    let*! () = State.mark_processed_head node_ctxt.store head in
+    (* Publishing a commitment when one is available does not depend on the
+       state of the current head. *)
     let* () = Components.Commitment.publish_commitment node_ctxt in
     let* () =
       Components.Commitment.cement_commitment_if_possible node_ctxt head
     in
-    let* () =
-      (* At each block, there may be some refutation related actions to
-         be performed. *)
-      when_ finalized @@ fun () ->
-      Components.Refutation_game.process head configuration node_ctxt
-    in
-    when_ finalized (fun () ->
-        let*! () = Layer1.mark_processed_head node_ctxt.store head in
-        return ())
-
-  let notify_injector {Node_context.l1_ctxt; store; _} chain_event =
-    let open Lwt_result_syntax in
-    let open Layer1 in
-    let hash = chain_event_head_hash chain_event in
-    let* head = fetch_tezos_block l1_ctxt hash in
-    let* reorg = get_tezos_reorg_for_new_head l1_ctxt store hash in
-    let*! () = Injector.new_tezos_head head reorg in
+    let*! () = Daemon_event.new_head_processed hash level in
     return_unit
 
-  (* [on_layer_1_chain_event node_ctxt store chain_event] processes a
-     list of heads, coming either from a list of [old_heads] persisted in the
-     store, or from the current [chain_event]. [old_heads] is a list of heads
-     that have not been recognised as finalised by the rollup node. This list
-     has been set by the last iteration of [on_layer_1_chain_event] in
-     the {!daemonize} function, or it is the empty list if the rollup node is
-     executing [on_layer_1_chain_event] for the very first time.
-     These are heads included in
-     the branch currently tracked by the rollup node, and that
-     have only been partially processed, due to the rollup  node not being able
-     to establish their finality. The function persists to disk the list of
-     heads from the current branch tracked by the rollup node,
-     whose finality cannot be established at the time the function is invoked.
-     Those heads will be processed again at the next iteration of
-     [on_layer_1_chain_event] in the [daemonize] function. If [chain_event] is
-     a rollback event, then the list of heads persisted to disk is reset to the
-     empty list, as the rollup node started tracking a new branch.
-     Because heads that still have not been processed as finalized are
-     persisted to disk, this function is robust against interruptions.
-  *)
-  let on_layer_1_chain_event configuration node_ctxt chain_event =
+  let notify_injector {Node_context.l1_ctxt; _} new_head
+      (reorg : Layer1.head Injector_common.reorg) =
     let open Lwt_result_syntax in
-    let*! old_heads =
-      Layer1.get_heads_not_finalized node_ctxt.Node_context.store
-    in
     let open Layer1 in
+    let* head = fetch_tezos_block l1_ctxt new_head.hash
+    and* new_chain =
+      List.map_ep
+        (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
+        reorg.new_chain
+    and* old_chain =
+      List.map_ep
+        (fun {hash; _} -> fetch_tezos_block l1_ctxt hash)
+        reorg.old_chain
+    in
+    let*! () = Injector.new_tezos_head head {new_chain; old_chain} in
+    return_unit
+
+  (* [on_layer_1_head node_ctxt head] processes a new head from the L1. It
+     also processes any missing blocks that were not processed. Every time a
+     head is processed we also process head~2 as finalized (which may recursively
+     imply the processing of head~3, etc). *)
+  let on_layer_1_head node_ctxt head =
+    let open Lwt_result_syntax in
     let* () =
       (* Get information about the last cemented commitment to determine the
          commitment (if any) to publish next. We do this only once per
@@ -280,57 +250,27 @@ module Make (PVM : Pvm.S) = struct
       Components.Commitment.sync_last_cemented_commitment_hash_with_level
         node_ctxt
     in
-    let* () = notify_injector node_ctxt chain_event in
-    let* non_final_heads =
-      match chain_event with
-      | SameBranch {new_head; intermediate_heads} ->
-          let new_heads = intermediate_heads @ [new_head] in
-          let*! () =
-            Daemon_event.processing_heads_iteration old_heads new_heads
-          in
-          let head_states = categorise_heads node_ctxt old_heads new_heads in
-          let* () =
-            List.iter_es (process_head configuration node_ctxt) head_states
-          in
-          (* Return new_head to be processed as finalized head if the
-             next chain event is of type SameBranch.
-          *)
-          let non_final_head_states =
-            List.filter (fun head_state -> not head_state.finalized) head_states
-          in
-          let*! () = emit_heads_not_processed_event non_final_head_states in
-          let non_final_heads =
-            List.map (fun head_state -> head_state.head) non_final_head_states
-          in
-          return non_final_heads
-      | Rollback {new_head = Layer1.Head {level = new_level; _}} ->
-          (* The new_head of the rollback event corresponds to a head that
-             was previously finalized. Heads in `old_heads` that have a level
-             preceding or equal to `new_level` can now be considered final,
-             and will be processed as such. `new_level` can now be considered
-             as such. Heads in `old_heads` whose level is greater than
-             `new_level` can be safely discarded.
-          *)
-          let final_heads, _non_final_heads =
-            List.partition
-              (fun head ->
-                let (Layer1.Head {level; _}) = head in
-                level <= new_level)
-              old_heads
-          in
-          let+ () =
-            List.iter_es
-              (fun head ->
-                process_head
-                  configuration
-                  node_ctxt
-                  {head; finalized = true; seen_before = true})
-              final_heads
-          in
-          []
+    let*! old_head =
+      State.last_processed_head_opt node_ctxt.Node_context.store
     in
-    let*! () = Layer1.set_heads_not_finalized node_ctxt.store non_final_heads in
-    let*! () = Layer1.processed chain_event in
+    let old_head =
+      match old_head with
+      | Some old_head -> `Head old_head
+      | None ->
+          (* if no head has been processed yet, we want to handle all blocks
+             since, and including, the rollup origination. *)
+          let origination_level =
+            Raw_level.to_int32 node_ctxt.genesis_info.level
+          in
+          `Level (Int32.pred origination_level)
+    in
+    let* reorg =
+      Layer1.get_tezos_reorg_for_new_head node_ctxt.l1_ctxt old_head head
+    in
+    let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
+    let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
+    let* () = notify_injector node_ctxt head reorg in
+    let*! () = Daemon_event.new_heads_processed reorg.new_chain in
     let*! () = Injector.inject () in
     return_unit
 
@@ -354,9 +294,9 @@ module Make (PVM : Pvm.S) = struct
     let rec loop (l1_ctxt : Layer1.t) =
       let*! () =
         Lwt_stream.iter_s
-          (fun event ->
+          (fun head ->
             let open Lwt_syntax in
-            let* res = on_layer_1_chain_event configuration node_ctxt event in
+            let* res = on_layer_1_head node_ctxt head in
             match res with
             | Ok () -> return_unit
             | Error trace when is_connection_error trace ->
@@ -370,7 +310,7 @@ module Make (PVM : Pvm.S) = struct
                 Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
                 let* _ = Lwt_exit.exit_and_wait 1 in
                 return_unit)
-          l1_ctxt.events
+          l1_ctxt.heads
       in
       let*! () = Event.connection_lost () in
       let* l1_ctxt =
@@ -384,10 +324,8 @@ module Make (PVM : Pvm.S) = struct
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
     let message = l1_ctxt.cctxt#message in
-    let* () = message "Stopping L1 monitor@." in
-    l1_ctxt.stopper () ;
     let* () = message "Shutting down L1@." in
-    let* () = Layer1.shutdown store in
+    let* () = Layer1.shutdown l1_ctxt in
     let* () = message "Shutting down RPC server@." in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = message "Closing store@." in
