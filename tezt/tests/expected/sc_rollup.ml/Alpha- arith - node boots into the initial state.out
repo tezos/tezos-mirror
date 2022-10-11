@@ -37,8 +37,8 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "0"
 
-./octez-sc-rollup-client-alpha rpc get /global/status
+./octez-sc-rollup-client-alpha rpc get /global/block/head/status
 "Halted"

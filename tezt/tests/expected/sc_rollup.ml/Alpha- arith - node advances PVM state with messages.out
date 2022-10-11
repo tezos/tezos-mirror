@@ -37,10 +37,10 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "0"
 
 ./octez-client --wait none send sc rollup message '["1 6 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -82,19 +82,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\007"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "20"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "20"
 
 ./octez-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -137,19 +137,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\n"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "38"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "38"
 
 ./octez-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -192,19 +192,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\r"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "57"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "57"
 
 ./octez-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -248,19 +248,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\016"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "76"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "76"
 
 ./octez-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -304,19 +304,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\019"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "95"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "95"
 
 ./octez-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -360,19 +360,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\022"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "114"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "114"
 
 ./octez-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -416,19 +416,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\025"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "133"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "133"
 
 ./octez-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -473,19 +473,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\028"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "152"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "152"
 
 ./octez-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -530,19 +530,19 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\031"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "171"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "171"
 
 ./octez-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
@@ -587,11 +587,11 @@ This sequence of operations was run:
                                }
 
 
-./octez-sc-rollup-client-alpha get state value for vars/value
+./octez-sc-rollup-client-alpha get state value for vars/value --block head
 "\000\000\000\""
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "191"
