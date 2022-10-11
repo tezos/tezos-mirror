@@ -68,19 +68,91 @@ let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
   | Ok cryptobox -> return (cryptobox, parameters)
   | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
-let daemonize cctxt handle =
+module Handler = struct
+  (** [make_stream_daemon handler streamed_call] calls [handler] on each newly
+      received value from [streamed_call].
+
+      It returns a couple [(p, stopper)] where [p] is a promise resolving when the
+      stream closes and [stopper] a function closing the stream.
+  *)
+  let make_stream_daemon handle streamed_call =
+    let open Lwt_result_syntax in
+    let* stream, stopper = streamed_call in
+    let rec go () =
+      let*! tok = Lwt_stream.get stream in
+      match tok with
+      | None -> return_unit
+      | Some element ->
+          let* () = handle element in
+          go ()
+    in
+    return (go (), stopper)
+
+  let new_head config ctxt cctxt =
+    let open Lwt_result_syntax in
+    let handler (block_hash, (_block_header : Tezos_base.Block_header.t)) =
+      (* Try to resolve the protocol plugin corresponding to the protocol of the
+         targeted node. *)
+      match Node_context.get_status ctxt with
+      | Starting -> (
+          let* plugin = resolve_plugin cctxt in
+          match plugin with
+          | Some plugin ->
+              let (module Plugin : Dal_plugin.T) = plugin in
+              let*! () =
+                Event.emit_protocol_plugin_resolved Plugin.Proto.hash
+              in
+              let* dal_constants, dal_parameters =
+                init_cryptobox config.Configuration.use_unsafe_srs cctxt plugin
+              in
+              Node_context.set_ready
+                ctxt
+                (module Plugin)
+                dal_constants
+                dal_parameters ;
+              let*! () = Event.(emit node_is_ready ()) in
+              return_unit
+          | None -> return_unit)
+      | Ready {plugin = (module Plugin); _} ->
+          let* slot_headers =
+            Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
+          in
+          let*! () =
+            List.iter_s
+              (fun (slot_index, slot_header) ->
+                Slot_headers_store.add
+                  (Node_context.get_store ctxt).slot_headers_store
+                  ~primary_key:block_hash
+                  ~secondary_key:slot_index
+                  slot_header)
+              slot_headers
+          in
+          return_unit
+    in
+    let*! () = Event.(emit layer1_node_tracking_started ()) in
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
+        If the layer1 node reboots, the rpc stream breaks.*)
+    make_stream_daemon
+      handler
+      (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+end
+
+let daemonize handlers =
   let open Lwt_result_syntax in
-  let* t, stopper = Layer1.on_new_head cctxt handle in
+  let* handlers = List.map_es (fun x -> x) handlers in
   let (_ : Lwt_exit.clean_up_callback_id) =
     (* close the stream when an exit signal is received *)
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
-        stopper () ;
+        List.iter (fun (_, stopper) -> stopper ()) handlers ;
         Lwt.return_unit)
   in
   (* The no_cancel might not be necessary. Lwt_exit cancels the
      main promise upon receiving a signal or other form of interruption. The
      no_cancel renders this cancelation into a no-op.*)
-  Lwt.no_cancel t
+  Lwt.no_cancel
+    (let* _ = all (List.map fst handlers) in
+     return_unit)
+  |> lwt_map_error (List.fold_left (fun acc errs -> errs @ acc) [])
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 
@@ -98,43 +170,4 @@ let run ~data_dir cctxt =
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
   in
-  let*! () = Event.(emit layer1_node_tracking_started ()) in
-  let new_head_handler (block_hash, (_block_header : Tezos_base.Block_header.t))
-      =
-    (* Try to resolve the protocol plugin corresponding to the protocol of the
-       targeted node. *)
-    match Node_context.get_status ctxt with
-    | Starting -> (
-        let* plugin = resolve_plugin cctxt in
-        match plugin with
-        | Some plugin ->
-            let (module Plugin : Dal_plugin.T) = plugin in
-            let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
-            let* dal_constants, dal_parameters =
-              init_cryptobox config.use_unsafe_srs cctxt plugin
-            in
-            Node_context.set_ready
-              ctxt
-              (module Plugin)
-              dal_constants
-              dal_parameters ;
-            let*! () = Event.(emit node_is_ready ()) in
-            return_unit
-        | None -> return_unit)
-    | Ready {plugin = (module Plugin); _} ->
-        let* slot_headers =
-          Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
-        in
-        let*! () =
-          List.iter_s
-            (fun (slot_index, slot_header) ->
-              Slot_headers_store.add
-                (Node_context.get_store ctxt).slot_headers_store
-                ~primary_key:block_hash
-                ~secondary_key:slot_index
-                slot_header)
-            slot_headers
-        in
-        return_unit
-  in
-  daemonize cctxt new_head_handler
+  daemonize [Handler.new_head config ctxt cctxt]
