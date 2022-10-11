@@ -194,10 +194,9 @@ module Scripts = struct
 
     let trace_encoding : Script_typed_ir.execution_trace encoding =
       def "scripted.trace" @@ list
-      @@ obj4
+      @@ obj3
            (req "location" Script.location_encoding)
            (req "gas" Gas.Arith.z_fp_encoding)
-           (req "remaining_gas" Gas.encoding)
            (req "stack" (list Script.expr_encoding))
 
     let trace_code_output_encoding =
@@ -516,8 +515,7 @@ module Scripts = struct
             trace
               Plugin_errors.Cannot_serialize_log
               (unparse_stack ctxt (stack, stack_ty))
-            >>=? fun stack ->
-            return (ctxt, (loc, consumed_gas, Gas.level ctxt, stack) :: l))
+            >>=? fun stack -> return (ctxt, (loc, consumed_gas, stack) :: l))
           (ctxt, [])
           (List.rev !log)
         >>=? fun (_ctxt, res) -> return (Some (List.rev res))
