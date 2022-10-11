@@ -45,7 +45,11 @@ module Arith_proof_format =
     end)
 
 module Impl : Pvm.S = struct
-  include Sc_rollup.ArithPVM.Make (Arith_proof_format)
+  module PVM = Sc_rollup.ArithPVM.Make (Arith_proof_format)
+  include PVM
+
+  let kind = Sc_rollup.Kind.of_pvm (module PVM)
+
   module State = Context.PVMState
 
   let string_of_status status =

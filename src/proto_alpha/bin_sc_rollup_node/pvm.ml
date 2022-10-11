@@ -34,6 +34,9 @@ module type S = sig
       with type context = Context.rw_index
        and type hash = Sc_rollup.State_hash.t
 
+  (** Kind of the PVM (same as {!name}).  *)
+  val kind : Sc_rollup.Kind.t
+
   (** [get_tick state] gets the total tick counter for the given PVM state. *)
   val get_tick : state -> Sc_rollup.Tick.t Lwt.t
 
