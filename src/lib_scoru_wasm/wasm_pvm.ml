@@ -198,15 +198,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
         bs
         tree
 
-    let compute_step_many_until ?(max_steps = 1L) should_continue tree =
-      let open Lwt.Syntax in
-      let* pvm_state = decode tree in
-      let* pvm_state, executed_ticks =
-        Wasm_vm.compute_step_many_until ~max_steps should_continue pvm_state
-      in
-      let* tree = encode pvm_state tree in
-      Lwt.return (tree, executed_ticks)
-
     let compute_step_many ~max_steps tree =
       let open Lwt.Syntax in
       let* pvm_state = decode tree in
@@ -260,9 +251,9 @@ module Make (T : Tezos_tree_encoding.TREE) :
 
       let encode = encode
 
-      let compute_step_many_until = compute_step_many_until
-
       let compute_step_many_until_pvm_state = Wasm_vm.compute_step_many_until
+
+      let compute_step_many_pvm_state = Wasm_vm.compute_step_many
 
       let eval_has_finished = Wasm_vm.eval_has_finished
     end
