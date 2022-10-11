@@ -622,15 +622,7 @@ module History = struct
       in
       let page = {Dal.content = data; index = pid.Page.page_index} in
       let fail_with_error_msg what =
-        Format.kasprintf
-          proof_error
-          "%s (page data=%s, page id=%a, commitment=%a)."
-          what
-          (Bytes.to_string data)
-          Page.pp
-          pid
-          Commitment.pp
-          commitment
+        Format.kasprintf proof_error "%s (page id=%a)." what Page.pp pid
       in
       match Dal.verify_page dal commitment page proof with
       | Ok true -> return ()
