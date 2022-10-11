@@ -3,7 +3,7 @@ local stat = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 
-local filecheck = if std.extVar('storage_mode') == "filecheck" then true else false;
+local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else false;
 
 
 //##
@@ -91,7 +91,7 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
   storage:
     local query = if filecheck then 'netdata_filecheck_dir_size_bytes_average' else 'netdata_disk_space_GiB_average{chart="disk_space._",dimension="used"}';
     graphPanel.new(
-    title='Storage',
+      title='Storage',
       datasource='Prometheus',
       linewidth=1,
       format='bytes',
