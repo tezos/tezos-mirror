@@ -1076,7 +1076,10 @@ struct
       let set_input_step input payload (tree : Tree.tree) =
         Wasm.set_input_step input payload tree
 
-      let get_output output (tree : Tree.tree) = Wasm.get_output output tree
+      let get_output output (tree : Tree.tree) =
+        let open Lwt_syntax in
+        let+ payload = Wasm.get_output output tree in
+        match payload with Some payload -> payload | None -> ""
 
       let get_info (tree : Tree.tree) =
         let open Lwt_syntax in

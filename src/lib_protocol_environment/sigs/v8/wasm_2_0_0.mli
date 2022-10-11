@@ -52,7 +52,7 @@ module Make
 
   val reveal_step : bytes -> Tree.tree -> Tree.tree Lwt.t
 
-  val get_output : output -> Tree.tree -> string Lwt.t
+  val get_output : output -> Tree.tree -> string option Lwt.t
 
   val get_info : Tree.tree -> info Lwt.t
 end
