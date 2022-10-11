@@ -61,6 +61,8 @@ To update from sources::
 
 If you are using Docker instead, use the ``v14.1`` Docker images of Tezos.
 
+If you are using other forms of Octez distributions (e.g. binary packages), check the update instructions at the end of the corresponding section in :doc:`../introduction/howtoget`.
+
 Changelog
 ---------
 

@@ -3014,7 +3014,7 @@ annotations will see only their top-most stack type elements annotated.
 
 ::
 
-   UNPAIR @fist @second
+   UNPAIR @first @second
    :: pair 'a 'b : 'S
       ->  @first 'a : @second 'b : 'S
 

@@ -176,7 +176,7 @@ The node's RPC interface will be available on localhost and can be queried with 
     docker exec node-alpha tezos-client rpc list
 
 Building Docker Images Locally
-------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The docker image used throughout the docker-compose files is fetched from upstream, but you can also
 build one locally and reference it. Run the following commands to build the image:
@@ -194,7 +194,7 @@ And then update the docker-compose file (e.g., ``alpha.yml``) with the docker ta
       ...
 
 Docker Image Configuration
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Lastly, the entrypoint script (:src:`scripts/docker/entrypoint.sh`) provides the following configurable
 environment variables:
