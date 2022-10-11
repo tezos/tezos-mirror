@@ -3,7 +3,7 @@ local stat = grafana.statPanel;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
 
-local filecheck = if std.extVar('storage_mode') == "filecheck" then true else false;
+local filecheck = if std.extVar('storage_mode') == 'filecheck' then true else false;
 
 
 //##
@@ -31,12 +31,12 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lreads_KiB_persec_average{dimension="tezos"}',
+        'netdata_apps_lreads_KiB_persec_average{dimension="octez"}',
         legendFormat=reads,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_lwrites_KiB_persec_average{dimension="tezos"}',
+        'netdata_apps_lwrites_KiB_persec_average{dimension="octez"}',
         legendFormat=writes,
       )
     ),
@@ -53,7 +53,7 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_cpu_percentage_average{dimension="tezos"}',
+        'netdata_apps_cpu_percentage_average{dimension="octez"}',
         legendFormat=load,
       )
     ),
@@ -78,12 +78,12 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'netdata_apps_mem_MiB_average{dimension="tezos"}',
+        'netdata_apps_mem_MiB_average{dimension="octez"}',
         legendFormat=ram,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_swap_MiB_average{dimension="tezos"}',
+        'netdata_apps_swap_MiB_average{dimension="octez"}',
         legendFormat=swap,
       )
     ),
@@ -91,7 +91,7 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
   storage:
     local query = if filecheck then 'netdata_filecheck_dir_size_bytes_average' else 'netdata_disk_space_GiB_average{chart="disk_space._",dimension="used"}';
     graphPanel.new(
-    title='Storage',
+      title='Storage',
       datasource='Prometheus',
       linewidth=1,
       format='bytes',
@@ -142,22 +142,22 @@ local filecheck = if std.extVar('storage_mode') == "filecheck" then true else fa
       },
     ).addTarget(
       prometheus.target(
-        'sum(netdata_apps_pipes_open_pipes_average{dimension="tezos"}) + sum(netdata_apps_files_open_files_average{dimension="tezos"}) + sum(netdata_apps_sockets_open_sockets_average{dimension="tezos"})',
+        'sum(netdata_apps_pipes_open_pipes_average{dimension="octez"}) + sum(netdata_apps_files_open_files_average{dimension="octez"}) + sum(netdata_apps_sockets_open_sockets_average{dimension="octez"})',
         legendFormat=total,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_sockets_open_sockets_average{dimension="tezos"}',
+        'netdata_apps_sockets_open_sockets_average{dimension="octez"}',
         legendFormat=sockets,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_files_open_files_average{dimension="tezos"}',
+        'netdata_apps_files_open_files_average{dimension="octez"}',
         legendFormat=files,
       )
     ).addTarget(
       prometheus.target(
-        'netdata_apps_pipes_open_pipes_average{dimension="tezos"}',
+        'netdata_apps_pipes_open_pipes_average{dimension="octez"}',
         legendFormat=pipes,
       )
     ),
