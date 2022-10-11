@@ -3039,6 +3039,12 @@ module Sc_rollup : sig
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 
+  val pp_inbox_message : Format.formatter -> inbox_message -> unit
+
+  val pp_reveal_data : Format.formatter -> reveal_data -> unit
+
+  val pp_input : Format.formatter -> input -> unit
+
   val input_equal : input -> input -> bool
 
   val input_encoding : input Data_encoding.t

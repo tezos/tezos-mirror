@@ -67,6 +67,25 @@ type reveal_data = Raw_data of string | Metadata of Sc_rollup_metadata_repr.t
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
+let pp_inbox_message fmt {inbox_level; message_counter; _} =
+  Format.fprintf
+    fmt
+    "@[<v 2>level: %a@,message index: %a@]"
+    Raw_level_repr.pp
+    inbox_level
+    Z.pp_print
+    message_counter
+
+let pp_reveal_data fmt = function
+  | Raw_data _ -> Format.pp_print_string fmt "raw data"
+  | Metadata metadata -> Sc_rollup_metadata_repr.pp fmt metadata
+
+let pp_input fmt = function
+  | Inbox_message msg ->
+      Format.fprintf fmt "@[<v 2>inbox message:@,%a@]" pp_inbox_message msg
+  | Reveal reveal ->
+      Format.fprintf fmt "@[<v 2>reveal: %a@]" pp_reveal_data reveal
+
 (** [inbox_message_encoding] encoding value for {!inbox_message}. *)
 let inbox_message_encoding =
   let open Data_encoding in
