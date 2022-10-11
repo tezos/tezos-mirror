@@ -150,10 +150,15 @@ module Arith = struct
             let chunk = make_chunk () in
             Buffer.add_string buf token ;
             (chunk :: chunks, len))
-          else (
-            if Buffer.length buf > 0 then Buffer.add_char buf ' ' ;
+          else
+            let len =
+              if Buffer.length buf > 0 then (
+                Buffer.add_char buf ' ' ;
+                len + 1)
+              else len
+            in
             Buffer.add_string buf token ;
-            (chunks, size + len)))
+            (chunks, size + len))
         ([], 0)
         tokens
     in
