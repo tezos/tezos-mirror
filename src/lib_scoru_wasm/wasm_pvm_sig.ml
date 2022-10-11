@@ -25,13 +25,13 @@
 (*****************************************************************************)
 open Wasm_pvm_state
 
-(** This module type expose internals necessary for benchmarking. 
-    
-    /!\ Not intended for unit tests: the functions could be used to redefine the 
-    main execution loop, at the risk of departing from what is defined in the 
-    PVM definition. [Internal_for_benchmark.compute_step_many_until] can use 
-    custom stopping condition and therefore should not be used in unit test: 
-    the test could hide regression if the condition change in the code, but not 
+(** This module type expose internals necessary for benchmarking.
+
+    /!\ Not intended for unit tests: the functions could be used to redefine the
+    main execution loop, at the risk of departing from what is defined in the
+    PVM definition. [Internal_for_benchmark.compute_step_many_until] can use
+    custom stopping condition and therefore should not be used in unit test:
+    the test could hide regression if the condition change in the code, but not
     in the test. *)
 module type Internal_for_benchmark = sig
   open Internal_state
@@ -42,14 +42,14 @@ module type Internal_for_benchmark = sig
 
   val encode : pvm_state -> tree -> tree Lwt.t
 
-  (** [compute_step_many_until_pvm_state max_step should_continue pvm_state] 
-      advance forwards the VM in the same manners as [compute_step_many] 
-      as long as [should_continue] returns true. 
-      
+  (** [compute_step_many_until_pvm_state max_step should_continue pvm_state]
+      advance forwards the VM in the same manners as [compute_step_many]
+      as long as [should_continue] returns true.
+
       IS applied on [pvm_state] rather than a tree.
-      
-      /!\ as it allows to redefine the stop condition, this function should 
-      not be used in unit test: the test could hide regression if the 
+
+      /!\ as it allows to redefine the stop condition, this function should
+      not be used in unit test: the test could hide regression if the
       condition change in the code, but not in the test.
   *)
   val compute_step_many_until_pvm_state :
@@ -58,12 +58,12 @@ module type Internal_for_benchmark = sig
     pvm_state ->
     pvm_state Lwt.t
 
-  (** [compute_step_many_until max_step should_continue tree] 
-      advance forwards the VM in the same manners as [compute_step_many] 
-      as long as [should_continue] returns true. 
-      
-      /!\ as it allows to redefine the stop condition, this function should 
-      not be used in unit test: the test could hide regression if the 
+  (** [compute_step_many_until max_step should_continue tree]
+      advance forwards the VM in the same manners as [compute_step_many]
+      as long as [should_continue] returns true.
+
+      /!\ as it allows to redefine the stop condition, this function should
+      not be used in unit test: the test could hide regression if the
       condition change in the code, but not in the test.
   *)
   val compute_step_many_until :
