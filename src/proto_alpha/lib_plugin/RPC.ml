@@ -192,11 +192,12 @@ module Scripts = struct
 
     let trace_code_input_encoding = run_code_input_encoding
 
-    let trace_encoding =
+    let trace_encoding : Script_typed_ir.execution_trace encoding =
       def "scripted.trace" @@ list
-      @@ obj3
+      @@ obj4
            (req "location" Script.location_encoding)
-           (req "gas" Gas.encoding)
+           (req "gas" Gas.Arith.z_fp_encoding)
+           (req "remaining_gas" Gas.encoding)
            (req "stack" (list Script.expr_encoding))
 
     let trace_code_output_encoding =
@@ -498,7 +499,7 @@ module Scripts = struct
       in
       unparse_stack (stack_ty, stack)
 
-    let trace_logger () : Script_typed_ir.logger =
+    let trace_logger ctxt : Script_typed_ir.logger =
       let log : log_element list ref = ref [] in
       let log_interp _ ctxt loc sty stack =
         log := Log (ctxt, loc, stack, sty) :: !log
@@ -509,19 +510,22 @@ module Scripts = struct
       in
       let log_control _ = () in
       let get_log () =
-        List.map_es
-          (fun (Log (ctxt, loc, stack, stack_ty)) ->
+        List.fold_left_es
+          (fun (old_ctxt, l) (Log (ctxt, loc, stack, stack_ty)) ->
+            let consumed_gas = Gas.consumed ~since:old_ctxt ~until:ctxt in
             trace
               Plugin_errors.Cannot_serialize_log
               (unparse_stack ctxt (stack, stack_ty))
-            >>=? fun stack -> return (loc, Gas.level ctxt, stack))
-          !log
-        >>=? fun res -> return (Some (List.rev res))
+            >>=? fun stack ->
+            return (ctxt, (loc, consumed_gas, Gas.level ctxt, stack) :: l))
+          (ctxt, [])
+          (List.rev !log)
+        >>=? fun (_ctxt, res) -> return (Some (List.rev res))
       in
       {log_exit; log_entry; log_interp; get_log; log_control}
 
     let execute ctxt step_constants ~script ~entrypoint ~parameter =
-      let logger = trace_logger () in
+      let logger = trace_logger ctxt in
       Script_interpreter.execute
         ~logger
         ~cached_script:None

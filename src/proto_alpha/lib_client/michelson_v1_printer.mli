@@ -32,7 +32,7 @@ val print_expr : Format.formatter -> Script_repr.expr -> unit
 val print_expr_unwrapped : Format.formatter -> Script_repr.expr -> unit
 
 val print_execution_trace :
-  Format.formatter -> (Script.location * Gas.t * Script.expr list) list -> unit
+  Format.formatter -> Script_typed_ir.execution_trace -> unit
 
 val print_big_map_diff : Format.formatter -> Lazy_storage.diffs -> unit
 

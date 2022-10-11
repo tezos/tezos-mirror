@@ -1217,7 +1217,8 @@ and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
   'c * 'u ->
   unit
 
-and execution_trace = (Script.location * Gas.t * Script.expr list) list
+and execution_trace =
+  (Script.location * Gas.Arith.fp * Gas.t * Script.expr list) list
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
