@@ -176,9 +176,11 @@ let rec pow x n =
   else x * pow x (n - 1)
 
 let snap_to_grid ~inverse_scaling ~resolution x =
-  let not_significant = log10 x / inverse_scaling in
-  let grid = resolution * pow 10 not_significant in
-  grid * (1 + (x / grid))
+  if x = 0 then 0
+  else
+    let not_significant = log10 x / inverse_scaling in
+    let grid = resolution * pow 10 not_significant in
+    grid * (1 + (x / grid))
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
