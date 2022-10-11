@@ -559,7 +559,7 @@ let get_inbox_from_tezos_node sc_rollup client =
   parse_inbox inbox
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
-  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/inbox" in
+  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
   match inbox with
   | None -> failwith "Unable to retrieve inbox from sc rollup node"
   | Some inbox -> parse_inbox inbox
