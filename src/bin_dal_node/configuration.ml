@@ -23,11 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type neighbor = {addr : string; port : int}
+
 type t = {
   use_unsafe_srs : bool;
   data_dir : string;
   rpc_addr : string;
   rpc_port : int;
+  neighbors : neighbor list;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -42,16 +45,25 @@ let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 10732
 
+let default_neighbors = []
+
 let default_use_unsafe_srs = false
+
+let neighbor_encoding : neighbor Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {addr; port} -> (addr, port))
+    (fun (addr, port) -> {addr; port})
+    (obj2 (req "rpc-addr" string) (req "rpc-port" int16))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port})
-    (obj4
+    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors} ->
+      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors))
+    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors) ->
+      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors})
+    (obj5
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -63,7 +75,12 @@ let encoding : t Data_encoding.t =
           string
           default_data_dir)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port))
+       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft
+          "neighbors"
+          ~description:"DAL Neighbors"
+          (list neighbor_encoding)
+          default_neighbors))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 
