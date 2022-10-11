@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,26 +27,5 @@
 (** Maximum number of reboots per inputs. *)
 val maximum_reboots_per_input : Z.t
 
-type tick_state =
-  | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
-  | Link of {
-      ast_module : Tezos_webassembly_interpreter.Ast.module_;
-      externs :
-        Tezos_webassembly_interpreter.Instance.extern
-        Tezos_webassembly_interpreter.Instance.Vector.t;
-      imports_offset : int32;
-    }
-  | Init of {
-      self : Tezos_webassembly_interpreter.Instance.module_key;
-      ast_module : Tezos_webassembly_interpreter.Ast.module_;
-      init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
-      module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
-    }
-  | Eval of Tezos_webassembly_interpreter.Eval.config
-  | Stuck of Wasm_pvm_errors.t
-  | Snapshot
-
-(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
-
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree and type tick_state = tick_state
+  Gather_floppies.S with type tree = T.tree

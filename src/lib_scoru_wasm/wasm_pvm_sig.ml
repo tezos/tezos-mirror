@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,49 +23,59 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Wasm_pvm_state
 
-(** Represents the location of an input message. *)
-type input_info = {
-  inbox_level : Tezos_base.Bounded.Non_negative_int32.t;
-      (** The inbox level at which the message exists.*)
-  message_counter : Z.t;  (** The index of the message in the inbox. *)
-}
+(** This module type expose internals necessary for benchmarking. 
+    
+    /!\ Not intended for unit tests: the functions could be used to redefine the 
+    main execution loop, at the risk of departing from what is defined in the 
+    PVM definition. [Internal_for_benchmark.compute_step_many_until] can use 
+    custom stopping condition and therefore should not be used in unit test: 
+    the test could hide regression if the condition change in the code, but not 
+    in the test. *)
+module type Internal_for_benchmark = sig
+  open Internal_state
 
-(** Represents the location of an output message. *)
-type output_info = {
-  outbox_level : Tezos_base.Bounded.Non_negative_int32.t;
-      (** The outbox level at which the message exists.*)
-  message_index : Z.t;  (** The index of the message in the outbox. *)
-}
-
-type input_hash = Tezos_webassembly_interpreter.Reveal.input_hash
-
-let input_hash_to_string =
-  Tezos_webassembly_interpreter.Reveal.input_hash_to_string
-
-type reveal = Tezos_webassembly_interpreter.Reveal.reveal =
-  | Reveal_raw_data of Tezos_webassembly_interpreter.Reveal.input_hash
-
-(** Represents the state of input requests. *)
-type input_request =
-  | No_input_required  (** The VM does not expect any input. *)
-  | Input_required  (** The VM needs input in order to progress. *)
-  | Reveal_required of reveal
-
-(** Represents the state of the VM. *)
-type info = {
-  current_tick : Z.t;
-      (** The number of ticks processed by the VM, zero for the initial state.
-          [current_tick] must be incremented for each call to [step] *)
-  last_input_read : input_info option;
-      (** The last message to be read by the VM, if any. *)
-  input_request : input_request;  (** The current VM input request. *)
-}
-
-module type Internal_for_tests = sig
   type tree
 
-  type tick_state
+  val decode : tree -> pvm_state Lwt.t
+
+  val encode : pvm_state -> tree -> tree Lwt.t
+
+  (** [compute_step_many_until_pvm_state max_step should_continue pvm_state] 
+      advance forwards the VM in the same manners as [compute_step_many] 
+      as long as [should_continue] returns true. 
+      
+      IS applied on [pvm_state] rather than a tree.
+      
+      /!\ as it allows to redefine the stop condition, this function should 
+      not be used in unit test: the test could hide regression if the 
+      condition change in the code, but not in the test.
+  *)
+  val compute_step_many_until_pvm_state :
+    ?max_steps:int64 ->
+    (pvm_state -> bool Lwt.t) ->
+    pvm_state ->
+    pvm_state Lwt.t
+
+  (** [compute_step_many_until max_step should_continue tree] 
+      advance forwards the VM in the same manners as [compute_step_many] 
+      as long as [should_continue] returns true. 
+      
+      /!\ as it allows to redefine the stop condition, this function should 
+      not be used in unit test: the test could hide regression if the 
+      condition change in the code, but not in the test.
+  *)
+  val compute_step_many_until :
+    ?max_steps:int64 -> (pvm_state -> bool Lwt.t) -> tree -> tree Lwt.t
+
+  val eval_has_finished : tick_state -> bool
+end
+
+module type Internal_for_tests = sig
+  open Internal_state
+
+  type tree
 
   val get_tick_state : tree -> tick_state Lwt.t
 
@@ -83,8 +94,6 @@ end
 (** This module type defines a WASM VM API used for smart-contract rollups. *)
 module type S = sig
   type tree
-
-  type tick_state
 
   (** [compute_step_many ~max_steps tree] forwards the VM by at most [max_step]
       compute tick, yielding if it reaches the maximum number of ticks for a
@@ -123,14 +132,16 @@ module type S = sig
       raise. *)
   val get_info : tree -> info Lwt.t
 
-  module Internal_for_tests :
-    Internal_for_tests with type tree := tree and type tick_state := tick_state
+  module Internal_for_benchmark : Internal_for_benchmark with type tree := tree
+
+  module Internal_for_tests : Internal_for_tests with type tree := tree
 end
 
 (* Encodings *)
 
 let input_info_encoding =
   let open Data_encoding in
+  let open Wasm_pvm_state in
   conv
     (fun {inbox_level; message_counter} -> (inbox_level, message_counter))
     (fun (inbox_level, message_counter) -> {inbox_level; message_counter})

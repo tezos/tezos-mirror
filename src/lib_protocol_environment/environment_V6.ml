@@ -1092,7 +1092,7 @@ struct
         let+ payload = Wasm.get_output {outbox_level; message_index} tree in
         match payload with Some payload -> payload | None -> ""
 
-      let convert_input : Tezos_scoru_wasm.Wasm_pvm_sig.input_info -> input =
+      let convert_input : Tezos_scoru_wasm.Wasm_pvm_state.input_info -> input =
         function
         | {inbox_level; message_counter} ->
             let inbox_level =

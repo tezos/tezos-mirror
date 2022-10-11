@@ -108,7 +108,7 @@ let initialise_tree () =
     tree
 
 let make_inbox_info ~inbox_level ~message_counter =
-  Wasm_pvm_sig.
+  Wasm_pvm_state.
     {
       inbox_level =
         WithExceptions.Option.get
@@ -118,7 +118,7 @@ let make_inbox_info ~inbox_level ~message_counter =
     }
 
 let make_output_info ~outbox_level ~message_index =
-  Wasm_pvm_sig.
+  Wasm_pvm_state.
     {
       outbox_level =
         WithExceptions.Option.get
@@ -149,7 +149,7 @@ let test_get_info () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let expected_info ~inbox_level ~message_counter =
-    let open Wasm_pvm_sig in
+    let open Wasm_pvm_state in
     let last_input_read =
       Some (make_inbox_info ~inbox_level ~message_counter)
     in
@@ -207,7 +207,7 @@ let test_set_input () =
   let* result_input = Tree_encoding_runner.decode inp_encoding tree in
   let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
-    let open Wasm_pvm_sig in
+    let open Wasm_pvm_state in
     let last_input_read =
       Some (make_inbox_info ~inbox_level:5 ~message_counter:10)
     in

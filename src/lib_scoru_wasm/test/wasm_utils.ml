@@ -97,7 +97,7 @@ let rec eval_until_init tree =
 
 let set_input_step message message_counter tree =
   let input_info =
-    Wasm_pvm_sig.
+    Wasm_pvm_state.
       {
         inbox_level =
           Option.value_f ~default:(fun () -> assert false)
@@ -110,7 +110,7 @@ let set_input_step message message_counter tree =
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with
-  | Wasm_pvm.Decode _ -> pp_s "Decode"
+  | Wasm_pvm_state.Internal_state.Decode _ -> pp_s "Decode"
   | Eval _ -> pp_s "Eval"
   | Stuck e ->
       Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e
@@ -153,7 +153,7 @@ let check_error ?expected_kind ?expected_reason error =
   | None, _ -> true
 
 let is_stuck ?step ?reason = function
-  | Wasm_pvm.Stuck err ->
+  | Wasm_pvm_state.Internal_state.Stuck err ->
       check_error ?expected_kind:step ?expected_reason:reason err
   | _ -> false
 

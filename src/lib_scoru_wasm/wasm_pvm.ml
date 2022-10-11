@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+open Wasm_pvm_state.Internal_state
 
 (* The name by which the module is registered. This can be anything as long
    as we use the same name to lookup from the registry. *)
@@ -48,47 +51,12 @@ let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot"
 
 module Wasm = Tezos_webassembly_interpreter
 
-type tick_state =
-  | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
-  | Link of {
-      ast_module : Wasm.Ast.module_;
-      externs : Wasm.Instance.extern Wasm.Instance.Vector.t;
-      imports_offset : int32;
-    }
-  | Init of {
-      self : Wasm.Instance.module_key;
-      ast_module : Tezos_webassembly_interpreter.Ast.module_;
-      init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
-      module_reg : Wasm.Instance.module_reg;
-    }
-  | Eval of Wasm.Eval.config
-  | Stuck of Wasm_pvm_errors.t
-  | Snapshot
-
 type computation_status = Starting | Restarting | Running | Failing | Reboot
 
-type pvm_state = {
-  last_input_info : Wasm_pvm_sig.input_info option;
-      (** Info about last read input. *)
-  current_tick : Z.t;  (** Current tick of the PVM. *)
-  reboot_counter : Z.t;  (** Number of reboots for the current input. *)
-  durable : Durable.t;  (** The durable storage of the PVM. *)
-  buffers : Wasm.Eval.buffers;
-      (** Input and outut buffers used by the PVM host functions. *)
-  tick_state : tick_state;  (** The current tick state. *)
-  last_top_level_call : Z.t;
-      (** Last tick corresponding to a top-level call. *)
-  max_nb_ticks : Z.t;  (** Number of ticks between top level call. *)
-  maximum_reboots_per_input : Z.t;  (** Number of reboots between two inputs. *)
-}
-
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree and type tick_state = tick_state =
-struct
+  Gather_floppies.S with type tree = T.tree = struct
   module Raw = struct
     type tree = T.tree
-
-    type nonrec tick_state = tick_state
 
     module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
     module Parsing = Binary_parser_encodings
@@ -470,28 +438,50 @@ struct
     let input_request pvm_state =
       let open Lwt_syntax in
       match pvm_state.tick_state with
-      | Stuck _ -> return Wasm_pvm_sig.Input_required
+      | Stuck _ -> return Wasm_pvm_state.Input_required
       | Snapshot ->
           let+ has_reboot_flag = has_reboot_flag pvm_state.durable in
-          if has_reboot_flag then Wasm_pvm_sig.No_input_required
-          else Wasm_pvm_sig.Input_required
+          if has_reboot_flag then Wasm_pvm_state.No_input_required
+          else Wasm_pvm_state.Input_required
       | Eval config -> (
           match Tezos_webassembly_interpreter.Eval.is_reveal_tick config with
-          | Some reveal -> return (Wasm_pvm_sig.Reveal_required reveal)
-          | None -> return Wasm_pvm_sig.No_input_required)
-      | _ -> return Wasm_pvm_sig.No_input_required
+          | Some reveal -> return (Wasm_pvm_state.Reveal_required reveal)
+          | None -> return Wasm_pvm_state.No_input_required)
+      | _ -> return Wasm_pvm_state.No_input_required
 
     let is_top_level_padding pvm_state =
       eval_has_finished pvm_state.tick_state
       && not (is_time_for_snapshot pvm_state)
 
-    let compute_step_many ~max_steps tree =
+    let decode tree = Tree_encoding_runner.decode pvm_state_encoding tree
+
+    let encode pvm_state tree =
+      let open Lwt.Syntax in
+      (* {{Note tick state clean-up}}
+
+         The "wasm" directory in the Irmin tree of the PVM is used to
+         maintain a lot of information across tick, but as of now, it
+         was never cleaned up. It meant that the tree would become
+         crowded with data that were no longer needed.
+
+         It turns out it is very simple to clean up, thanks to subtree
+         move.  Because we keep in the lazy-containers the original
+         subtree, and we inject it prior to updating read keys, the
+         tree-encoding library does not rely on the input tree at
+         encoding time.
+
+         With this, we gain an additional 5% of proof size in the
+         worst tick of the computation.wasm kernel. *)
+      let* tree = T.remove tree ["wasm"] in
+      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue
+        pvm_state =
       let open Lwt.Syntax in
       assert (max_steps > 0L) ;
-
       let rec go steps_left pvm_state =
-        let* input_request = input_request pvm_state in
-        if steps_left > 0L && input_request = No_input_required then
+        let* continue = should_continue pvm_state in
+        if steps_left > 0L && continue then
           if is_top_level_padding pvm_state then
             (* We're in the top-level padding after the evaluation has
                finished. That means we can skip up to the tick before the
@@ -511,37 +501,40 @@ struct
             go (Int64.pred steps_left) pvm_state
         else Lwt.return pvm_state
       in
-
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       (* Make sure we perform at least 1 step. The assertion above ensures that
          we were asked to perform at least 1. *)
       let* pvm_state = compute_step_inner pvm_state in
-      let* pvm_state = go (Int64.pred max_steps) pvm_state in
+      go (Int64.pred max_steps) pvm_state
 
-      (* {{Note tick state clean-up}}
+    let compute_step_many_until ?(max_steps = 1L) should_continue tree =
+      let open Lwt.Syntax in
+      assert (max_steps > 0L) ;
 
-         The "wasm" directory in the Irmin tree of the PVM is used to
-         maintain a lot of information across tick, but as of now, it
-         was never cleaned up. It meant that the tree would become
-         crowded with data that were no longer needed.
+      let* pvm_state = decode tree in
 
-         It turns out it is very simple to clean up, thanks to subtree
-         move.  Because we keep in the lazy-containers the original
-         subtree, and we inject it prior to updating read keys, the
-         tree-encoding library does not rely on the input tree at
-         encoding time.
+      (* Make sure we perform at least 1 step. The assertion above ensures that
+         we were asked to perform at least 1. *)
+      let* pvm_state =
+        compute_step_many_until_pvm_state ~max_steps should_continue pvm_state
+      in
 
-         With this, we gain an additional 5% of proof size in the
-         worst tick of the computation.wasm kernel. *)
-      let* tree = T.remove tree ["wasm"] in
+      encode pvm_state tree
 
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+    let compute_step_many ~max_steps tree =
+      let open Lwt_syntax in
+      let should_continue pvm_state =
+        let* input_request_val = input_request pvm_state in
+        match input_request_val with
+        | Reveal_required _ | Input_required -> return false
+        | No_input_required -> return true
+      in
+      compute_step_many_until ~max_steps should_continue tree
 
     let compute_step tree = compute_step_many ~max_steps:1L tree
 
     let get_output output_info tree =
       let open Lwt_syntax in
-      let open Wasm_pvm_sig in
+      let open Wasm_pvm_state in
       let {outbox_level; message_index} = output_info in
       let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
       let* candidate =
@@ -565,12 +558,12 @@ struct
         Tree_encoding_runner.decode pvm_state_encoding tree
       in
       let+ input_request = input_request pvm in
-      Wasm_pvm_sig.
+      Wasm_pvm_state.
         {current_tick; last_input_read = last_input_info; input_request}
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
-      let open Wasm_pvm_sig in
+      let open Wasm_pvm_state in
       let {inbox_level; message_counter} = input_info in
       let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
       let level = Int32.to_string raw_level in
@@ -677,6 +670,18 @@ struct
         | Stuck _ -> return pvm_state.tick_state
       in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    module Internal_for_benchmark = struct
+      let decode = decode
+
+      let encode = encode
+
+      let compute_step_many_until = compute_step_many_until
+
+      let compute_step_many_until_pvm_state = compute_step_many_until_pvm_state
+
+      let eval_has_finished = eval_has_finished
+    end
 
     module Internal_for_tests = struct
       let get_tick_state tree =
