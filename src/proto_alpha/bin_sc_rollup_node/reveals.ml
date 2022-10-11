@@ -65,6 +65,8 @@ let () =
       | Could_not_open_preimage_file filename -> Some filename | _ -> None)
     (fun filename -> Could_not_open_preimage_file filename)
 
+type source = String of string | File of string
+
 let file_contents filename =
   let open Lwt_result_syntax in
   Lwt.catch
@@ -105,15 +107,27 @@ module Arith = struct
   let pvm_name =
     Protocol.Alpha_context.Sc_rollup.ArithPVM.Protocol_implementation.name
 
-  let rev_chunks_of_file filename =
+  type input =
+    | String of {s : string; mutable pos : int; len : int}
+    | Input of in_channel
+
+  let rev_chunks_of_input input =
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3853
        Can be made more efficient. *)
-    let get_char cin = try Some (input_char cin) with End_of_file -> None in
+    let get_char () =
+      match input with
+      | Input cin -> ( try Some (input_char cin) with End_of_file -> None)
+      | String ({s; pos; len} as sin) ->
+          if pos >= len then None
+          else (
+            sin.pos <- pos + 1 ;
+            Some s.[pos])
+    in
     let buf = Buffer.create 31 in
     let tokens =
-      let cin = open_in filename in
+      (* let cin = open_in filename in *)
       let rec aux tokens =
-        match get_char cin with
+        match get_char () with
         | None ->
             List.rev
             @@
@@ -130,7 +144,6 @@ module Arith = struct
             aux tokens
       in
       let tokens = aux [] in
-      close_in cin ;
       tokens
     in
     let limit =
@@ -177,24 +190,47 @@ module Arith = struct
             | Some h -> Format.asprintf "%s hash:%a" chunk Reveal_hash.pp h
           in
           let hash = Reveal_hash.hash_string [cell] in
-          aux (Some hash) ((cell, hash) :: linked_chunks) rev_chunks
+          aux (Some hash) ((hash, cell) :: linked_chunks) rev_chunks
     in
     aux None [] rev_chunks
 
-  let import data_dir filename =
-    ensure_dir_exists data_dir pvm_name ;
-    let rev_chunks = rev_chunks_of_file filename in
+  let input_of_source = function
+    | File filename -> Input (open_in filename)
+    | String s -> String {s; pos = 0; len = String.length s}
+
+  let close_input = function String _ -> () | Input cin -> close_in cin
+
+  let chunkify source =
+    let input = input_of_source source in
+    let rev_chunks = rev_chunks_of_input input in
     let linked_hashed_chunks = link_rev_chunks rev_chunks in
+    close_input input ;
+    linked_hashed_chunks
+
+  let import data_dir source =
+    ensure_dir_exists data_dir pvm_name ;
+    let linked_hashed_chunks = chunkify source in
     List.iter
-      (fun (data, hash) -> save_string (path data_dir pvm_name hash) data)
+      (fun (hash, data) -> save_string (path data_dir pvm_name hash) data)
       linked_hashed_chunks ;
-    Stdlib.List.hd linked_hashed_chunks |> snd
+    Stdlib.List.hd linked_hashed_chunks |> fst
+
+  let chunkify source =
+    let linked_hashed_chunks = chunkify source in
+    let chunks_map =
+      linked_hashed_chunks |> List.to_seq
+      |> Protocol.Alpha_context.Sc_rollup.Reveal_hash.Map.of_seq
+    in
+    (chunks_map, Stdlib.List.hd linked_hashed_chunks |> fst)
 end
 
-let import ~data_dir ~pvm_name ~filename =
-  if
-    String.equal
-      pvm_name
-      Protocol.Alpha_context.Sc_rollup.ArithPVM.Protocol_implementation.name
-  then Arith.import data_dir filename
-  else Stdlib.failwith "Not supported yet"
+let import ~data_dir (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
+    ~filename =
+  match pvm_kind with
+  | Example_arith -> Arith.import data_dir (File filename)
+  | Wasm_2_0_0 -> Stdlib.failwith "Not supported yet"
+
+let chunkify (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) source =
+  match pvm_kind with
+  | Example_arith -> Arith.chunkify source
+  | Wasm_2_0_0 -> Stdlib.failwith "Not supported yet"
