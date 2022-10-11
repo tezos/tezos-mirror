@@ -297,7 +297,7 @@ let test_transfer_works () =
     let* inc = Incremental.begin_construction b in
     let ctxt = Incremental.alpha_ctxt inc in
     let payload = Expr.from_string "42" in
-    let* expected_inbox_after, _size, _ctxt =
+    let* _inbox, _size, ctxt =
       Sc_rollup.Inbox.add_deposit
         ctxt
         ~destination:rollup
@@ -305,6 +305,9 @@ let test_transfer_works () =
         ~sender:contract
         ~source:(Context.Contract.pkh c)
       >|= Environment.wrap_tzresult
+    in
+    let* expected_inbox_after, _size, _ctxt =
+      Sc_rollup.Inbox.add_end_of_level ctxt >|= Environment.wrap_tzresult
     in
     return expected_inbox_after
   in

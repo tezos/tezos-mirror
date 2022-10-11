@@ -43,8 +43,23 @@ let rollup = Sc_rollup_repr.Address.hash_string [""]
 
 let first_level = Raw_level_repr.(succ root)
 
+let inbox_message_testable =
+  Alcotest.testable
+    Sc_rollup_PVM_sig.pp_inbox_message
+    Sc_rollup_PVM_sig.inbox_message_equal
+
 let create_context () =
   Context.init1 () >>=? fun (block, _contract) -> return block.context
+
+let make_payload message =
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Sc_rollup_inbox_message_repr.(serialize @@ External message)
+
+let payloads_from_messages =
+  List.map (fun Sc_rollup_helpers.{input_repr = input; _} ->
+      match input with
+      | Inbox_message {payload; _} -> payload
+      | Reveal _ -> assert false)
 
 let populate_inboxes ctxt level history inbox inboxes level_tree
     list_of_payloads =
@@ -55,13 +70,6 @@ let populate_inboxes ctxt level history inbox inboxes level_tree
         let level = Raw_level_repr.succ level in
         aux level history inbox inboxes level_tree ps
     | payloads :: ps ->
-        Lwt.return
-          (List.map_e
-             (fun payload ->
-               Sc_rollup_inbox_message_repr.(serialize @@ External payload))
-             payloads)
-        >|= Environment.wrap_tzresult
-        >>=? fun payloads ->
         add_messages ctxt history inbox level payloads level_tree
         >|= Environment.wrap_tzresult
         >>=? fun (level_tree, history, inbox') ->
@@ -88,7 +96,8 @@ let setup_inbox_with_messages list_of_payloads f =
   | None -> fail (err "setup_inbox_with_messages called with no messages")
   | Some tree -> f ctxt tree history inbox inboxes
 
-let test_add_messages payloads =
+let test_add_messages messages =
+  let payloads = List.map make_payload messages in
   let nb_payloads = List.length payloads in
   setup_inbox_with_messages [payloads]
   @@ fun _ctxt _messages _history inbox _inboxes ->
@@ -118,13 +127,14 @@ let check_payload messages external_message =
               (Bytes.to_string expected_payload)
               (Bytes.to_string payload)))
 
-let test_get_message_payload payloads =
+let test_get_message_payload messages =
+  let payloads = List.map make_payload messages in
   setup_inbox_with_messages [payloads]
-  @@ fun _ctxt messages _history _inbox _inboxes ->
+  @@ fun _ctxt level_tree _history _inbox _inboxes ->
   List.iteri_es
     (fun i message ->
       let expected_payload = encode_external_message message in
-      get_message_payload messages (Z.of_int i) >>= function
+      get_message_payload level_tree (Z.of_int i) >>= function
       | Some payload ->
           let payload = Sc_rollup_inbox_message_repr.unsafe_to_string payload in
           fail_unless
@@ -133,10 +143,11 @@ let test_get_message_payload payloads =
       | None ->
           fail
             (err (Printf.sprintf "No message payload number %d in messages" i)))
-    payloads
+    messages
 
-let test_inclusion_proof_production (list_of_payloads, n) =
+let test_inclusion_proof_production (list_of_messages, n) =
   let open Lwt_result_syntax in
+  let list_of_payloads = List.map (List.map make_payload) list_of_messages in
   setup_inbox_with_messages list_of_payloads
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
@@ -164,8 +175,9 @@ let test_inclusion_proof_production (list_of_payloads, n) =
            (old_levels_messages inbox))
         (err "The produced inclusion proof is invalid.")
 
-let test_inclusion_proof_verification (list_of_payloads, n) =
+let test_inclusion_proof_verification (list_of_messages, n) =
   let open Lwt_result_syntax in
+  let list_of_payloads = List.map (List.map make_payload) list_of_messages in
   setup_inbox_with_messages list_of_payloads
   @@ fun _ctxt _messages history _inbox inboxes ->
   let inbox = Stdlib.List.hd inboxes in
@@ -286,24 +298,12 @@ let setup_node_inbox_with_messages list_of_payloads f =
   let history = History.empty ~capacity:10000L in
   let rec aux level history inbox inboxes level_tree = function
     | [] -> return (ok (level_tree, history, inbox, inboxes))
-    | payloads :: ps -> (
-        Lwt.return
-          (List.map_e
-             (fun payload ->
-               Sc_rollup_inbox_message_repr.(serialize @@ External payload))
-             payloads)
+    | payloads :: ps ->
+        add_messages ctxt history inbox level payloads level_tree
         >|= Environment.wrap_tzresult
-        >>=? fun payloads ->
-        match payloads with
-        | [] ->
-            let level = Raw_level_repr.succ level in
-            aux level history inbox inboxes level_tree ps
-        | _ ->
-            add_messages ctxt history inbox level payloads level_tree
-            >|= Environment.wrap_tzresult
-            >>=? fun (level_tree, history, inbox') ->
-            let level = Raw_level_repr.succ level in
-            aux level history inbox' (inbox :: inboxes) (Some level_tree) ps)
+        >>=? fun (level_tree, history, inbox') ->
+        let level = Raw_level_repr.succ level in
+        aux level history inbox' (inbox :: inboxes) (Some level_tree) ps
   in
   aux first_level history inbox [] None list_of_payloads
   >>=? fun (level_tree, history, inbox, inboxes) ->
@@ -332,34 +332,36 @@ let payload_string msg =
   Sc_rollup_inbox_message_repr.unsafe_of_string
     (Bytes.to_string (encode_external_message msg))
 
-let next_input ps l n =
-  let ( let* ) = Option.bind in
-  let idx = level_to_int l - 1 in
-  let* payloads = List.nth ps idx in
-  match List.nth payloads (Z.to_int n) with
-  | Some msg ->
-      let payload = payload_string msg in
-      Some Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
-  | None ->
-      let rec aux idx =
-        let* payloads = List.nth ps idx in
-        match List.hd payloads with
-        | Some msg ->
-            let payload = payload_string msg in
-            Some
-              Sc_rollup_PVM_sig.
-                {
-                  inbox_level = level_of_int (idx + 1);
-                  message_counter = Z.zero;
-                  payload;
-                }
-        | None -> aux (idx + 1)
-      in
-      aux (idx + 1)
+let inbox_message_of_input input =
+  match input with Sc_rollup_PVM_sig.Inbox_message x -> Some x | _ -> None
 
-let test_inbox_proof_production (list_of_payloads, additional_payloads, l, n) =
+let next_inbox_message levels_and_messages l n =
+  let equal = Raw_level_repr.( = ) in
+  let messages =
+    WithExceptions.Option.get ~loc:__LOC__
+    @@ List.assoc ~equal l levels_and_messages
+  in
+  match List.nth messages (Z.to_int n) with
+  | Some Sc_rollup_helpers.{input_repr = input; _} ->
+      inbox_message_of_input input
+  | None -> (
+      (* If no input at (l, n), the next input is (l+1, 0). *)
+      match List.assoc ~equal (Raw_level_repr.succ l) levels_and_messages with
+      | None -> None
+      | Some messages ->
+          let Sc_rollup_helpers.{input_repr = input; _} =
+            Stdlib.List.hd messages
+          in
+          inbox_message_of_input input)
+
+let test_inbox_proof_production (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
-  let exp_input = next_input list_of_payloads l n in
+  let exp_input = next_inbox_message levels_and_messages l n in
+  let list_of_payloads =
+    List.map
+      (fun (_, messages) -> payloads_from_messages messages)
+      levels_and_messages
+  in
   setup_node_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox _inboxes ->
   let open Lwt_result_syntax in
@@ -372,25 +374,34 @@ let test_inbox_proof_production (list_of_payloads, additional_payloads, l, n) =
   | Ok (proof, input) -> (
       (* We now switch to a protocol inbox built from the same messages
          for verification. *)
-      setup_inbox_with_messages (list_of_payloads @ [additional_payloads])
-      @@ fun _ctxt _current_level_tree _history inbox _inboxes ->
-      (* If there are [additional_payloads], we will take the snapshot
-         of the additional level, which should ignore the additional
-         payloads. Otherwise, we take a snapshot of the whole inbox. *)
+      (* The snapshot takes the snapshot at the end of the last level,
+         we need to set the level ahead to match the inbox. *)
+      setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
+      @@ fun _ctxt _ _history inbox _inboxes ->
       let snapshot = take_snapshot inbox in
       let proof = node_proof_to_protocol_proof proof in
       let*! verification = verify_proof (l, n) snapshot proof in
       match verification with
       | Ok v_input ->
-          fail_unless
-            (v_input = input && v_input = exp_input)
-            (err "Proof verified but did not match")
+          Alcotest.(check (option inbox_message_testable))
+            "input = v_input"
+            input
+            v_input ;
+          Alcotest.(check (option inbox_message_testable))
+            "exp_input = v_input"
+            exp_input
+            v_input ;
+          return_unit
       | Error _ -> fail [err "Proof verification failed"])
   | Error _ -> fail [err "Proof production failed"]
 
-let test_inbox_proof_verification (list_of_payloads, additional_payloads, l, n)
-    =
+let test_inbox_proof_verification (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
+  let list_of_payloads =
+    List.map
+      (fun (_, messages) -> payloads_from_messages messages)
+      levels_and_messages
+  in
   setup_node_inbox_with_messages list_of_payloads
   @@ fun ctxt current_level_tree history inbox _inboxes ->
   let open Lwt_result_syntax in
@@ -403,14 +414,11 @@ let test_inbox_proof_verification (list_of_payloads, additional_payloads, l, n)
   | Ok (proof, _input) -> (
       (* We now switch to a protocol inbox built from the same messages
          for verification. *)
-      setup_inbox_with_messages (list_of_payloads @ [additional_payloads])
-      @@ fun _ctxt _current_level_tree _history _inbox inboxes ->
+      setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
+      @@ fun _ctxt _ _history _inbox inboxes ->
       (* Use the incorrect inbox *)
       match List.hd inboxes with
       | Some inbox -> (
-          (* If there are [additional_payloads], we will take the snapshot
-             of the additional level, which should ignore the additional
-             payloads. Otherwise, we take a snapshot of the whole inbox. *)
           let snapshot = take_snapshot inbox in
           let proof = node_proof_to_protocol_proof proof in
           let*! verification = verify_proof (l, n) snapshot proof in
@@ -418,38 +426,6 @@ let test_inbox_proof_verification (list_of_payloads, additional_payloads, l, n)
           | Ok _ -> fail [err "Proof should not be valid"]
           | Error _ -> return (ok ()))
       | None -> fail [err "inboxes was empty"])
-  | Error _ -> fail [err "Proof production failed"]
-
-let test_empty_inbox_proof (level, n) =
-  let open Lwt_result_syntax in
-  let*! index = Tezos_context_memory.Context.init "foo" in
-  let ctxt = Tezos_context_memory.Context.empty index in
-  let*! inbox = Node.empty ctxt level in
-  let history = History.empty ~capacity:10000L in
-  let* history, history_proof =
-    Node.form_history_proof ctxt history inbox None
-    >|= Environment.wrap_tzresult
-  in
-  let*! result =
-    Node.produce_proof ctxt history history_proof (Raw_level_repr.root, n)
-  in
-  match result with
-  | Ok (proof, input) -> (
-      (* We now switch to a protocol inbox for verification. *)
-      create_context ()
-      >>=? fun ctxt ->
-      let*! inbox = empty ctxt level in
-      let snapshot = take_snapshot inbox in
-      let proof = node_proof_to_protocol_proof proof in
-      let*! verification =
-        verify_proof (Raw_level_repr.root, n) snapshot proof
-      in
-      match verification with
-      | Ok v_input ->
-          fail_unless
-            (v_input = input && v_input = None)
-            (err "Proof verified but did not match")
-      | Error _ -> fail [err "Proof verification failed"])
   | Error _ -> fail [err "Proof production failed"]
 
 (** This helper function initializes inboxes and histories with different
@@ -489,6 +465,7 @@ let init_inboxes_histories_with_different_capacities
         ~capacity
         ~next_index
     in
+    let payloads = List.map (List.map make_payload) payloads in
     populate_inboxes ctxt first_level history inbox [] None payloads
   in
   (* Here, we have `~capacity:0L`. So no history is kept *)
@@ -648,24 +625,18 @@ let test_inclusion_proofs_depending_on_history_capacity
 
 (** In this test, we make sure that the snapshot of an inbox is taken
     at the beginning of a block level. *)
-let test_inbox_snapshot_taking (list_of_payloads, payloads) =
+let test_inbox_snapshot_taking payloads =
   let open Lwt_result_syntax in
-  setup_inbox_with_messages list_of_payloads
-  @@ fun ctxt current_level_tree history inbox inboxes ->
+  let payloads = List.map make_payload payloads in
+  create_context () >>=? fun ctxt ->
+  let*! inbox = empty ctxt first_level in
   let inbox_level = inbox_level inbox in
-  let current_level = Raw_level_repr.succ inbox_level in
   let expected_snapshot = take_snapshot inbox in
   (* Now, if we add messages to the inbox at [current_level], the inbox's
      snapshot for this level should not changed. *)
-  let* _level_tree, _history, inbox, _inboxes =
-    populate_inboxes
-      ctxt
-      current_level
-      history
-      inbox
-      inboxes
-      (Some current_level_tree)
-      [payloads]
+  let* _ =
+    add_messages_no_history ctxt inbox inbox_level payloads None
+    >|= Environment.wrap_tzresult
   in
   let new_snapshot = take_snapshot inbox in
   fail_unless
@@ -701,57 +672,6 @@ let test_for_successive_add_messages_with_different_histories_capacities
     && Option.equal I.Internal_for_tests.eq_tree level_tree1 level_tree2)
     (err "Trees of (supposedly) equal inboxes should be equal.")
 
-let test_inclusion_proof_of_unarchived_message () =
-  let open Lwt_result_syntax in
-  let level_zero = first_level in
-  let message_counter_zero = Z.zero in
-  let message = "c4c4" in
-  let payloads = [[message]] in
-
-  let check_expected_input (input : Sc_rollup_PVM_sig.inbox_message option) =
-    match input with
-    | Some {payload; _} ->
-        let message' =
-          Sc_rollup_inbox_message_repr.deserialize payload
-          |> WithExceptions.Result.get_ok ~loc:__LOC__
-        in
-        assert (message' = External message)
-    | None -> assert false
-  in
-
-  let* proof =
-    setup_node_inbox_with_messages payloads
-    @@ fun ctxt level_tree history inbox _inboxes ->
-    let* history, history_proof =
-      Node.form_history_proof ctxt history inbox (Some level_tree)
-      >|= Environment.wrap_tzresult
-    in
-    let* proof, input =
-      Node.produce_proof
-        ctxt
-        history
-        history_proof
-        (level_zero, message_counter_zero)
-      >|= Environment.wrap_tzresult
-    in
-    let () = check_expected_input input in
-    return proof
-  in
-
-  let* snapshot =
-    setup_inbox_with_messages payloads
-    @@ fun _ctxt _level_tree _history inbox _inboxes ->
-    return (take_snapshot inbox)
-  in
-
-  let proof = node_proof_to_protocol_proof proof in
-  let* input =
-    verify_proof (level_zero, message_counter_zero) snapshot proof
-    >|= Environment.wrap_tzresult
-  in
-  let () = check_expected_input input in
-  return_unit
-
 let tests =
   let msg_size = QCheck2.Gen.(0 -- 100) in
   let bounded_string = QCheck2.Gen.string_size msg_size in
@@ -779,16 +699,18 @@ let tests =
   in
   let gen_proof_inputs =
     QCheck2.Gen.(
-      let small = 0 -- 5 in
-      let* level = 0 -- 8 in
-      let* before = list_size (return level) (list_size small bounded_string) in
-      let* at = list_size (2 -- 6) bounded_string in
-      let* after = list_size small (list_size small bounded_string) in
-      let payloads = List.append before (at :: after) in
-      let* n = 0 -- (List.length at + 3) in
-      let* additional_payloads = small_list bounded_string in
-      return
-        (payloads, additional_payloads, level_of_int (succ level), Z.of_int n))
+      let* levels = 2 -- 15 in
+      let* levels_and_messages =
+        Sc_rollup_helpers.gen_message_reprs_for_levels_repr
+          ~start_level:1
+          ~max_level:levels
+          bounded_string
+      in
+      let* l = 1 -- (levels - 1) in
+      let l = level_of_int l in
+      let messages_at_l = Stdlib.List.assoc l levels_and_messages in
+      let* n = 0 -- List.length messages_at_l in
+      return (levels_and_messages, l, Z.of_int n))
   in
   let gen_history_params =
     QCheck2.Gen.(
@@ -829,13 +751,6 @@ let tests =
       gen_proof_inputs
       test_inbox_proof_verification;
     Tztest.tztest_qcheck2
-      ~name:"An empty inbox is still able to produce proofs that return None"
-      QCheck2.Gen.(
-        let* n = 1 -- 2000 in
-        let* m = 0 -- 1000 in
-        return (level_of_int n, Z.of_int m))
-      test_empty_inbox_proof;
-    Tztest.tztest_qcheck2
       ~count:10
       ~name:"Checking inboxes history length"
       gen_history_params
@@ -863,14 +778,7 @@ let tests =
         "Take snapshot is not impacted by messages added during the current \
          level"
       (let open QCheck2.Gen in
-      let* list_of_payloads =
-        list_size (1 -- 50) (list_size (1 -- 10) bounded_string)
-      in
       let* payloads = list_size (1 -- 10) bounded_string in
-      return (list_of_payloads, payloads))
+      return payloads)
       test_inbox_snapshot_taking;
-    Tztest.tztest
-      "Test that a unarchived message belongs to the snapshot"
-      `Quick
-      test_inclusion_proof_of_unarchived_message;
   ]
