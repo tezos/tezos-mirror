@@ -228,7 +228,10 @@ let import ~data_dir (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
     ~filename =
   match pvm_kind with
   | Example_arith -> Arith.import data_dir (File filename)
-  | Wasm_2_0_0 -> Stdlib.failwith "Not supported yet"
+  | Wasm_2_0_0 ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4067
+         Add support for multiple revelation data serialization schemes *)
+      Stdlib.failwith "Not supported yet"
 
 let chunkify (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) source =
   match pvm_kind with

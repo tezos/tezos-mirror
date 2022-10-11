@@ -27,16 +27,24 @@ open Protocol
 open Alpha_context
 
 module type S = sig
-  module PVM : Pvm.S
+  module Interpreter : Interpreter.S
+
+  module PVM = Interpreter.PVM
+  module Fueled_pvm = Interpreter.Free_pvm
 
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
     nb_messages : int64;
     state : PVM.state;
+    reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
   }
 
-  val start_simulation : Node_context.ro -> Layer1.head -> t tzresult Lwt.t
+  val start_simulation :
+    Node_context.ro ->
+    reveal_map:string Sc_rollup.Reveal_hash.Map.t option ->
+    Layer1.head ->
+    t tzresult Lwt.t
 
   val simulate_messages :
     Node_context.ro ->
@@ -46,7 +54,8 @@ module type S = sig
 end
 
 module Make (Interpreter : Interpreter.S) :
-  S with module PVM = Interpreter.PVM = struct
+  S with module Interpreter = Interpreter = struct
+  module Interpreter = Interpreter
   module PVM = Interpreter.PVM
   module Fueled_pvm = Interpreter.Free_pvm
 
@@ -55,9 +64,10 @@ module Make (Interpreter : Interpreter.S) :
     inbox_level : Raw_level.t;
     nb_messages : int64;
     state : PVM.state;
+    reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
   }
 
-  let start_simulation node_ctxt (Layer1.{hash; level} as head) =
+  let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
     let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
     let* ctxt =
@@ -73,10 +83,10 @@ module Make (Interpreter : Interpreter.S) :
       Sc_rollup.Inbox.number_of_messages_during_commitment_period inbox
     in
     let inbox_level = Raw_level.succ level in
-    {ctxt; nb_messages; state; inbox_level}
+    {ctxt; nb_messages; state; inbox_level; reveal_map}
 
   let simulate_messages (node_ctxt : Node_context.ro)
-      {ctxt; nb_messages; state; inbox_level} messages =
+      {ctxt; nb_messages; state; inbox_level; reveal_map} messages =
     let open Lwt_result_syntax in
     (* Build new inbox *)
     let*? () =
@@ -101,6 +111,7 @@ module Make (Interpreter : Interpreter.S) :
     (* Build new state *)
     let* Fueled_pvm.{state; num_ticks; _} =
       Fueled_pvm.eval_messages
+        ?reveal_map
         ~fuel:(Fuel.Free.of_ticks 0L)
         node_ctxt
         state
@@ -108,5 +119,5 @@ module Make (Interpreter : Interpreter.S) :
         messages
     in
     let*! ctxt = PVM.State.set ctxt state in
-    return ({ctxt; nb_messages; state; inbox_level}, num_ticks)
+    return ({ctxt; nb_messages; state; inbox_level; reveals_map}, num_ticks)
 end

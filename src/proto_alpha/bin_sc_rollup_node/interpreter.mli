@@ -53,10 +53,10 @@ module type S = sig
       block [head], or the state at rollup genesis if the block is before the
       rollup origination. *)
   val state_of_head :
-    _ Node_context.t ->
-    Context.t ->
+    'a Node_context.t ->
+    'a Context.t ->
     Layer1.head ->
-    (Context.t * PVM.state) tzresult Lwt.t
+    ('a Context.t * PVM.state) tzresult Lwt.t
 end
 
 (** Functor to construct an interpreter for a given PVM. *)

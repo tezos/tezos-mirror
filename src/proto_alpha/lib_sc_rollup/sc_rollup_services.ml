@@ -56,6 +56,11 @@ type eval_result = {
   num_ticks : Z.t;
 }
 
+type simulate_input = {
+  messages : string list;
+  reveal_pages : string list option;
+}
+
 module Encodings = struct
   open Data_encoding
 
@@ -93,6 +98,20 @@ module Encodings = struct
             "num_ticks"
             z
             ~description:"Ticks taken by the PVM for evaluating the messages")
+
+  let simulate_input =
+    conv
+      (fun {messages; reveal_pages} -> (messages, reveal_pages))
+      (fun (messages, reveal_pages) -> {messages; reveal_pages})
+    @@ obj2
+         (req
+            "messages"
+            (list hex_string)
+            ~description:"Input messages for simulation")
+         (opt
+            "reveal_pages"
+            (list hex_string)
+            ~description:"Pages (at most 4kB) to be used for revelation ticks")
 end
 
 module Arg = struct
@@ -342,12 +361,7 @@ module Global = struct
       Tezos_rpc.Service.post_service
         ~description:"Simulate messages evaluation by the PVM"
         ~query:Tezos_rpc.Query.empty
-        ~input:
-          Data_encoding.(
-            def
-              "messages"
-              ~description:"Input messages for simulation"
-              (list Encodings.hex_string))
+        ~input:Encodings.simulate_input
         ~output:Encodings.eval_result
         (path / "simulate")
 

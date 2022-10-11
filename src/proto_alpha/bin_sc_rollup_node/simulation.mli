@@ -26,7 +26,10 @@
 open Protocol.Alpha_context
 
 module type S = sig
-  module PVM : Pvm.S
+  module Interpreter : Interpreter.S
+
+  module PVM = Interpreter.PVM
+  module Fueled_pvm = Interpreter.Free_pvm
 
   (** Type of the state for a simulation. *)
   type t = {
@@ -34,11 +37,16 @@ module type S = sig
     inbox_level : Raw_level.t;
     nb_messages : int64;
     state : PVM.state;
+    reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
   }
 
   (** [start_simulation node_ctxt block] starts a new simulation {e on top} of
       [block], i.e. for an hypothetical new inbox (level).  *)
-  val start_simulation : Node_context.ro -> Layer1.head -> t tzresult Lwt.t
+  val start_simulation :
+    Node_context.ro ->
+    reveal_map:string Sc_rollup.Reveal_hash.Map.t option ->
+    Layer1.head ->
+    t tzresult Lwt.t
 
   (**  [simulate_messages node_ctxt ?fuel sim messages] runs a simulation of new
        [messages] in the given simulation (state) [sim] and returns a new
@@ -52,4 +60,5 @@ module type S = sig
 end
 
 (** Functor to construct a simulator for a given PVM with interpreter. *)
-module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM
+module Make (Interpreter : Interpreter.S) :
+  S with module Interpreter = Interpreter

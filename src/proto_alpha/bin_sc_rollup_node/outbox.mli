@@ -31,7 +31,7 @@ module Make (PVM : Pvm.S) : sig
   (** [proof_of_output node_ctxt output] returns the last cemented commitment
       hash and the proof of the output in the LCC. *)
   val proof_of_output :
-    Node_context.t ->
+    Node_context.rw ->
     Sc_rollup.output ->
     (Store.Last_cemented_commitment_hash.value * string) tzresult Lwt.t
 end

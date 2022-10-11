@@ -206,7 +206,7 @@ let pvm_name_arg =
     Client_proto_args.string_parameter
 
 let pvm_kind_arg =
-  Clic.map_arg pvm_name_arg ~f:(fun _ name ->
+  Tezos_clic.map_arg pvm_name_arg ~f:(fun _ name ->
       match Protocol.Alpha_context.Sc_rollup.Kind.of_name name with
       | None -> failwith "Invalid PVM name %s" name
       | Some kind -> return kind)
