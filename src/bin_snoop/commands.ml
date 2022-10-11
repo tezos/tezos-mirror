@@ -570,6 +570,7 @@ module Codegen_cmd = struct
         "%a@."
         Data_encoding.Json.pp
         (Data_encoding.Json.construct
+           ~include_default_fields:`Always
            Fixed_point_transform.options_encoding
            Fixed_point_transform.default_options) ;
       exit 1
@@ -791,12 +792,50 @@ module List_cmd = struct
     ]
 end
 
+module Generate_config_cmd = struct
+  let params = Clic.fixed ["generate"; "default-config"]
+
+  let options =
+    Clic.args1
+      (Clic.arg
+         ~doc:"save default config to file"
+         ~long:"save-to"
+         ~placeholder:"filename"
+         (Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)))
+
+  let show_config_handler filename () =
+    let json =
+      Data_encoding.Json.construct
+        ~include_default_fields:`Always
+        Fixed_point_transform.options_encoding
+        Fixed_point_transform.default_options
+    in
+    (match filename with
+    | Some filename ->
+        Out_channel.with_open_text filename @@ fun oc ->
+        let outfile = Format.formatter_of_out_channel oc in
+        Format.fprintf outfile "%a@." Data_encoding.Json.pp json ;
+        Format.eprintf "Saved default config to %s@." filename
+    | None -> Format.printf "%a@." Data_encoding.Json.pp json) ;
+    Lwt.return_ok ()
+
+  let command =
+    Clic.command
+      ~desc:
+        "Show the default configurations for fixed-point code generation as \
+         json"
+      options
+      params
+      show_config_handler
+end
+
 let all_commands =
   [
     Benchmark_cmd.command;
     Infer_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
+    Generate_config_cmd.command;
   ]
   @ List_cmd.commands
   @ Registration.all_custom_commands ()
