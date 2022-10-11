@@ -1039,25 +1039,36 @@ let select_op (op_req : operation_req) (infos : infos) =
 let create_Tztest ?hd_msg test tests_msg operations =
   let tl_msg k =
     let sk = kind_to_string k in
-    match hd_msg with None -> sk | Some hd -> Format.sprintf "%s, %s" hd sk
+    match hd_msg with
+    | None -> sk
+    | Some hd -> Format.sprintf "@[%s, %s@]" hd sk
   in
-  List.map
-    (fun kind ->
-      Tztest.tztest
-        (Format.sprintf "%s [%s]" tests_msg (tl_msg kind))
-        `Quick
-        (fun () -> test kind ()))
-    operations
+  [
+    Tztest.tztest (Format.sprintf "@[%s@]" tests_msg) `Quick (fun () ->
+        List.iter_es
+          (fun kind ->
+            Format.printf "%s %s@." tests_msg (tl_msg kind) ;
+            test kind ())
+          operations);
+  ]
 
-let rec create_Tztest_batches test tests_msg operations =
-  let hdmsg k = Format.sprintf "%s" (kind_to_string k) in
-  let aux hd_msg test operations =
-    create_Tztest ~hd_msg test tests_msg operations
-  in
-  match operations with
-  | [] -> []
-  | kop :: kops as ops ->
-      aux (hdmsg kop) (test kop) ops @ create_Tztest_batches test tests_msg kops
+let create_Tztest_batches test tests_msg operations =
+  let hdmsg k = Format.sprintf "@[%s@]" (kind_to_string k) in
+  [
+    Tztest.tztest (Format.sprintf "@[%s@]" tests_msg) `Quick (fun () ->
+        List.iter_es
+          (fun kind1 ->
+            List.iter_es
+              (fun kind2 ->
+                Format.printf
+                  "%s [%s / %s] @."
+                  tests_msg
+                  (hdmsg kind1)
+                  (hdmsg kind2) ;
+                test kind1 kind2 ())
+              operations)
+          operations);
+  ]
 
 (** {2 Diagnostic helpers.} *)
 
