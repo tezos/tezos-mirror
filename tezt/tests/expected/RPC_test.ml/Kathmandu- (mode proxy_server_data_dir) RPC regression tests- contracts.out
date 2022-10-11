@@ -48,32 +48,24 @@
 null
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/delegate
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 { "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
@@ -92,25 +84,19 @@ Error:
 "[PUBLIC_KEY_HASH]"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/entrypoints
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/script
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/storage
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]'
 { "balance": "0",
@@ -132,18 +118,14 @@ Error:
 "0"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {
@@ -343,18 +325,14 @@ null
 "0"
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/counter
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key'
-Error:
-  Rpc request failed:
-     - meth: GET
-     - uri: http://localhost:[PORT]/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/manager_key
-     - error: The client does not support following HTTP redirects yet.
+Fatal error:
+  No service found at this URL
+  
 
 ./octez-client rpc post '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/big_map_get' with '{
   "key": {

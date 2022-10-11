@@ -63,19 +63,24 @@ let launch_rpc_server dir {address; port; tls_cert_and_key; forwarding_endpoint}
     | Some (cert, key) ->
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
   in
+  let server =
+    Tezos_rpc_http_server.RPC_server.init_server
+      dir
+      ~media_types:Tezos_rpc_http.Media_type.all_media_types
+  in
   let middleware =
     Tezos_rpc_http_server.RPC_middleware.proxy_server_query_forwarder
       forwarding_endpoint
   in
+  let callback =
+    Tezos_rpc_http_server.RPC_server.resto_callback server |> middleware
+  in
   Lwt.catch
     (fun () ->
-      Lwt_result.ok
-      @@ Tezos_rpc_http_server.RPC_server.launch
-           ~host
-           mode
-           dir
-           ~middleware
-           ~media_types:Tezos_rpc_http.Media_type.all_media_types)
+      let*! () =
+        Tezos_rpc_http_server.RPC_server.launch ~host server ~callback mode
+      in
+      Lwt.return_ok server)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           tzfail (Proxy_server_RPC_Port_already_in_use [(address, port)])

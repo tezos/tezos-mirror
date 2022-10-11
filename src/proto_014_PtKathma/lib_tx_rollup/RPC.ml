@@ -780,19 +780,24 @@ let start_server configuration state =
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] cors_headers
   in
+  let server =
+    RPC_server.init_server
+      dir
+      ~acl
+      ~cors:{allowed_headers = cors_headers; allowed_origins = cors_origins}
+      ~media_types:Media_type.all_media_types
+  in
   Lwt.catch
     (fun () ->
-      let*! rpc_server =
+      let*! () =
         RPC_server.launch
-          ~media_types:Media_type.all_media_types
           ~host
-          ~acl
-          ~cors:{allowed_headers = cors_headers; allowed_origins = cors_origins}
+          server
+          ~callback:(RPC_server.resto_callback server)
           node
-          dir
       in
       let*! () = Event.(emit rpc_server_is_ready) rpc_addr in
-      return rpc_server)
+      return server)
     fail_with_exn
 
 let balance ctxt (block : block_id) ticket tz4 =

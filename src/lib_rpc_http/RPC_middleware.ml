@@ -25,19 +25,17 @@
 
 let make_transform_callback forwarding_endpoint callback conn req body =
   let open Lwt_syntax in
-  let* answer = callback conn req body in
   let open Cohttp in
+  let* answer = callback conn req body in
   let uri = Request.uri req in
   let answer_has_not_found_status = function
     | `Expert (response, _) | `Response (response, _) ->
-        Cohttp.Response.status response = `Not_found
+        Response.status response = `Not_found
   in
   if answer_has_not_found_status answer then
     let overriding = Uri.to_string forwarding_endpoint ^ Uri.path uri in
-    let headers = Cohttp.Header.of_list [("Location", overriding)] in
-    let response =
-      Cohttp.Response.make ~status:`Moved_permanently ~headers ()
-    in
+    let headers = Header.of_list [("Location", overriding)] in
+    let response = Response.make ~status:`Moved_permanently ~headers () in
     Lwt.return
       (`Response
         ( response,
@@ -49,5 +47,4 @@ let make_transform_callback forwarding_endpoint callback conn req body =
   else Lwt.return answer
 
 let proxy_server_query_forwarder forwarding_endpoint =
-  Resto_cohttp_server.Server.
-    {transform_callback = make_transform_callback forwarding_endpoint}
+  make_transform_callback forwarding_endpoint
