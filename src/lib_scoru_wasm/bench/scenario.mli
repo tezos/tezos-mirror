@@ -41,7 +41,11 @@ type scenario
       (1 action) *)
 val make_scenario_step : string -> Wasm.tree action -> scenario_step
 
+(** [make_scenario kernel_filename list_of_actions] *)
 val make_scenario : string -> scenario_step list -> scenario
+
+(** action corresponding to one top level call of PVM *)
+val exec_loop : Wasm.tree action
 
 (** [exec_on_message message] returns the action corresponding to
       adding the message in the inbox  *)

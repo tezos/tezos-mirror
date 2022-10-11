@@ -3181,6 +3181,7 @@ let _octez_scoru_wasm_benchmark =
         octez_scoru_wasm_tests_helpers;
         lwt_unix;
       ]
+    ~preprocess:[pps ppx_deriving_show]
 
 let _octez_scoru_wasm_tests =
   test

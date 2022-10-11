@@ -53,25 +53,22 @@ let make_scenario kernel actions = {kernel; actions}
 let make_scenario_step (label : string) (action : tree action) : scenario_step =
   (label, action)
 
-let run_action name run_state action =
+let run_step name run_state action =
   let open Lwt_syntax in
-  let* before_tick = lift_lookup get_tick_from_tree run_state in
-  let* tick_state =
-    lift_lookup Wasm.Internal_for_tests.get_tick_state run_state
-  in
+  (* Before *)
+  let* info = lift_lookup Wasm.get_info run_state in
   let _ =
     Printf.printf
-      "=========\n%s \nStart at tick %s %s\n%!"
+      "=========\n%s \nStart at tick %s\n-----\n%!"
       name
-      (Z.to_string before_tick)
-      (PP.tick_label tick_state)
+      (Z.to_string info.current_tick)
   in
   let* time, run_state = Measure.time (fun () -> action run_state) in
   let* info = lift_lookup Wasm.get_info run_state in
   let* tick_state =
     lift_lookup Wasm.Internal_for_tests.get_tick_state run_state
   in
-  let _ = Printf.printf "took %f s\n%!" (Measure.to_seconds time) in
+  let _ = Printf.printf "%s took %f s\n%!" name (Measure.to_seconds time) in
   let _ =
     Printf.printf
       "last tick: %s %s\n%!"
@@ -80,6 +77,41 @@ let run_action name run_state action =
   in
   return run_state
 
+let switch_state_type switch _switch_label a_state =
+  let open Lwt_syntax in
+  let* _, b_state = Measure.time (fun () -> (lift_action switch) a_state) in
+  return b_state
+
+let exec_phase state phase =
+  let open Lwt_syntax in
+  let* a =
+    lift_action
+      (fun s ->
+        let* s, _ = Exec.execute_on_state phase s in
+        return s)
+      state
+  in
+  return a
+
+let exec_loop tree_run_state =
+  let open Lwt_syntax in
+  let* pvm_run_state =
+    switch_state_type
+      Wasm.Internal_for_benchmark.decode
+      "Decode tree"
+      tree_run_state
+  in
+  let* pvm_run_state = Exec.run_loop exec_phase pvm_run_state in
+  let* tree_run_state =
+    switch_state_type
+      (fun state ->
+        (* the encode function takes the previous tree encoding as argument *)
+        Wasm.Internal_for_benchmark.encode state tree_run_state.state)
+      "Encode tree"
+      pvm_run_state
+  in
+  return tree_run_state
+
 let exec_on_message message run_state =
   let open Lwt_syntax in
   let* run_state =
@@ -87,7 +119,7 @@ let exec_on_message message run_state =
       (Exec.set_input_step message run_state.message_counter)
       run_state
   in
-  lift_action Exec.eval_until_input_requested run_state
+  exec_loop {run_state with message_counter = run_state.message_counter + 1}
 
 let exec_on_message_from_file message_path run_state =
   let message = Exec.read_message message_path in
@@ -100,7 +132,7 @@ let run_scenario scenario =
     let rec go run_state = function
       | [] -> return run_state
       | (label, action) :: q ->
-          let* tree = run_action label run_state action in
+          let* tree = run_step label run_state action in
           go tree q
     in
     let* tree = Exec.initial_boot_sector_from_kernel kernel in
