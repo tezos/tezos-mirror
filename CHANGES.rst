@@ -25,6 +25,9 @@ be documented here either.
 Node
 ----
 
+- Fixed the restoration of protocols table when restoring from a
+  inconsistent data directory.
+
 Client
 ------
 
