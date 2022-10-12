@@ -27,6 +27,10 @@ open Tezos_clic
 let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
+let assert_ok ~__LOC__ = function
+  | Ok x -> x
+  | Error _ -> Stdlib.failwith ("Assertion failure at " ^ __LOC__)
+
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   type serialization_costs = {decode : int; encode : int}
 
@@ -172,17 +176,17 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
 
     let parse_ty ctxt type_expr =
       let hashed_ty = hash_expr type_expr in
-      match
-        P.Translator.parse_ty
-          ctxt
-          ~allow_lazy_storage:true
-          ~allow_operation:true
-          ~allow_contract:true
-          ~allow_ticket:true
-          (Micheline.root type_expr)
-      with
-      | Ok (ex_ty, parse_ty_cost) -> (hashed_ty, ex_ty, parse_ty_cost)
-      | Error _ -> assert false
+      let ex_ty, parse_ty_cost =
+        assert_ok ~__LOC__
+        @@ P.Translator.parse_ty
+             ctxt
+             ~allow_lazy_storage:true
+             ~allow_operation:true
+             ~allow_contract:true
+             ~allow_ticket:true
+             (Micheline.root type_expr)
+      in
+      (hashed_ty, ex_ty, parse_ty_cost)
 
     type get_script_storage_type_result = {
       storage_type_hash : P.Script.Hash.t;
@@ -405,27 +409,27 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                             storage_type
                             (Micheline.root storage)
                         in
-                        match storage_parsing_result with
-                        | Error _ -> assert false
-                        | Ok (parsed_storage, parsing_storage_cost) -> (
-                            let+ storage_unparsing_result =
-                              P.Translator.unparse_data_cost
-                                ctxt
-                                storage_type
-                                parsed_storage
-                            in
-                            match storage_unparsing_result with
-                            | Error _ -> assert false
-                            | Ok unparsing_storage_cost ->
-                                Some
-                                  {
-                                    code_costs;
-                                    storage_costs;
-                                    parsing_toplevel_cost;
-                                    parsing_storage_type_cost;
-                                    parsing_storage_cost;
-                                    unparsing_storage_cost;
-                                  })
+                        let parsed_storage, parsing_storage_cost =
+                          assert_ok ~__LOC__ storage_parsing_result
+                        in
+                        let+ storage_unparsing_result =
+                          P.Translator.unparse_data_cost
+                            ctxt
+                            storage_type
+                            parsed_storage
+                        in
+                        let unparsing_storage_cost =
+                          assert_ok ~__LOC__ storage_unparsing_result
+                        in
+                        Some
+                          {
+                            code_costs;
+                            storage_costs;
+                            parsing_toplevel_cost;
+                            parsing_storage_type_cost;
+                            parsing_storage_cost;
+                            unparsing_storage_cost;
+                          }
                       else return None
                     in
                     let key = hash_expr storage in
