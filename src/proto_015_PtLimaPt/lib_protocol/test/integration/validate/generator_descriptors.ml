@@ -159,11 +159,14 @@ let activate_descriptor =
         List.map_es gen state.commitments);
   }
 
+(** During the first voting period in the setup of valid operations generations,
+    a proposal must win the proposal period -- hence [ballot_exploration_prelude]
+    takes place during the first cycle. *)
 let ballot_exploration_descriptor =
   {
     parameters = voting_context_params;
     required_cycle =
-      (fun params -> 1 * Int32.to_int params.constants.cycles_per_voting_period);
+      (fun params -> Int32.to_int params.constants.cycles_per_voting_period);
     required_block = (fun _params -> 0);
     prelude = (On 1, ballot_exploration_prelude);
     opt_prelude = None;
@@ -202,6 +205,21 @@ let proposal_descriptor =
         List.map_es gen state.voters);
   }
 
+(** [Promotion] is the 4th voting period, it requires 3 voting period
+    to last and be successful. [voting_context_params] set a
+    voting_period to 1 cycle. To generate a [Ballot] for this
+    promotion period:
+
+    - the first period should conclude in a proposal wining -- 3 cycles
+    before generating the [Ballot], the proposal period must succeed:[
+    ballot_exploration_prelude],
+
+    - the exploration must conclude in a supermajority for this
+    proposal -- 2 cycles before generating the [Ballot], the
+    exploration period must succeed., and
+
+    - the cooldown must last -- 1 cycle before generating the
+    [Ballot]. *)
 let ballot_promotion_descriptor =
   {
     parameters = voting_context_params;
@@ -729,7 +747,7 @@ let manager_prelude (infos : Manager.infos) b =
   return (operations, state)
 
 (** Build a manager operation according to the information in [infos]
-    on [block] for each source in the [manager_state] guaranteering
+    on [block] for each source in the [manager_state] guaranteeing
     that they are not conflicting. *)
 let manager_candidates block infos batch_max_size =
   let open Lwt_result_syntax in

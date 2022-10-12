@@ -44,11 +44,11 @@ val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
     see {! Plugin.RPC.Validator.t}. *)
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
-(** The 2 first elements of the list returns by [get_endorsers]. *)
+(** Return the two first elements of the list returns by [get_endorsers]. *)
 val get_first_different_endorsers :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
-(** The first element of the list returns by [get_endorsers]. *)
+(** Return the first element of the list returns by [get_endorsers]. *)
 val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 (** Given a delegate public key hash [del], and a context [ctxt],
@@ -57,7 +57,7 @@ val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 val get_endorser_slot :
   t -> public_key_hash -> Slot.t list option tzresult Lwt.t
 
-(** The [n]th element of the list returns by [get_endorsers]. *)
+(** Return the [n]th element of the list returns by [get_endorsers]. *)
 val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 val get_endorsing_power_for_delegate :
