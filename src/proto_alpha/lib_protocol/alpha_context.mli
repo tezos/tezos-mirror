@@ -1611,6 +1611,8 @@ module Manager_counter : sig
 
   module Internal_for_tests : sig
     val of_int : int -> t
+
+    val add : t -> int -> t
   end
 end
 

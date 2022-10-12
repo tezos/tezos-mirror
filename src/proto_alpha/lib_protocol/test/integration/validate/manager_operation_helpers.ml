@@ -1322,7 +1322,9 @@ let expected_witness witness probes ~mode ctxt =
   let open Lwt_result_syntax in
   let b_in, c_in, g_in = witness in
   let*? b_expected = b_in -? probes.fee in
-  let c_expected = Z.add c_in (Z.of_int probes.nb_counter) in
+  let c_expected =
+    Manager_counter.Internal_for_tests.add c_in probes.nb_counter
+  in
   let+ g_expected =
     match (g_in, mode) with
     | Some g_in, Construction ->

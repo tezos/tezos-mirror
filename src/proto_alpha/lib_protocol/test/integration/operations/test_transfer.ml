@@ -536,7 +536,7 @@ let invalid_counter_in_the_future () =
   Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
-  let counter = Z.add cpt (Z.of_int 10) in
+  let counter = Manager_counter.Internal_for_tests.add cpt 10 in
   Op.transaction (I b) contract_1 contract_2 Tez.one ~counter >>=? fun op ->
   Incremental.add_operation b op >>= fun b ->
   Assert.proto_error ~loc:__LOC__ b (function
