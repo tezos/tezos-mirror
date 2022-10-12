@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,7 +33,21 @@ let get_head store =
   let*! head = State.last_processed_head_opt store in
   match head with None -> failwith "No head" | Some {hash; _} -> return hash
 
-let get_head_opt store = State.last_processed_head_opt store
+let get_finalized store =
+  let open Lwt_result_syntax in
+  let*! head = State.get_finalized_head_opt store in
+  match head with
+  | None -> failwith "No finalized head"
+  | Some {hash; _} -> return hash
+
+let get_last_cemented store =
+  let open Lwt_result_syntax in
+  protect @@ fun () ->
+  let*! lcc_level = Store.Last_cemented_commitment_level.get store in
+  let*! lcc_hash =
+    State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
+  in
+  return lcc_hash
 
 let get_head_hash_opt store =
   let open Lwt_option_syntax in
@@ -45,27 +59,10 @@ let get_head_level_opt store =
   let+ {level; _} = State.last_processed_head_opt store in
   level
 
-let get_state_info_exn store =
+let get_state_info_exn store block =
   let open Lwt_result_syntax in
-  let* head = get_head store in
-  let*! state = Store.StateInfo.get store head in
+  let*! state = Store.StateInfo.get store block in
   return state
-
-let get_dal_slot_subscriptions_exn store =
-  let open Lwt_result_syntax in
-  let* head = get_head store in
-  let*! slot_subscriptions = Store.Dal_slot_subscriptions.find store head in
-  match slot_subscriptions with
-  | None -> failwith "No slot subscriptions"
-  | Some slot_subscriptions -> return slot_subscriptions
-
-let get_dal_slots store =
-  let open Lwt_result_syntax in
-  let* head = get_head store in
-  let*! slot_headers =
-    Store.Dal_slots_headers.list_values store ~primary_key:head
-  in
-  return slot_headers
 
 module Slot_pages_map = struct
   open Protocol
@@ -73,11 +70,12 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_slot_pages store =
+let get_dal_slot_pages store block =
   let open Lwt_result_syntax in
-  let* head = get_head store in
   let*! slot_pages =
-    Store.Dal_slot_pages.list_secondary_keys_with_values store ~primary_key:head
+    Store.Dal_slot_pages.list_secondary_keys_with_values
+      store
+      ~primary_key:block
   in
   (* Slot pages are sorted in lexicographic order of slot index and page
      number.*)
@@ -96,13 +94,12 @@ let get_dal_slot_pages store =
   in
   return @@ Slot_pages_map.bindings slot_pages_map
 
-let get_dal_slot_page store slot_index slot_page =
+let get_dal_slot_page store block slot_index slot_page =
   let open Lwt_result_syntax in
-  let* head = get_head store in
   let*! contents_opt_opt =
     Store.Dal_slot_pages.find
       store
-      ~primary_key:head
+      ~primary_key:block
       ~secondary_key:(slot_index, slot_page)
   in
   return
@@ -114,265 +111,257 @@ let get_dal_slot_page store slot_index slot_page =
       | None -> ("Slot was not confirmed", None)
       | Some contents -> ("Slot page is available", Some contents))
 
-let commitment_with_hash commitment =
-  ( Protocol.Alpha_context.Sc_rollup.Commitment.hash_uncarbonated commitment,
-    commitment )
+module type PARAM = sig
+  include Sc_rollup_services.PREFIX
+
+  type context
+
+  val context_of_prefix : Node_context.t -> prefix -> context tzresult Lwt.t
+end
+
+module Make_directory (S : PARAM) = struct
+  open S
+
+  let directory : context tzresult RPC_directory.t ref = ref RPC_directory.empty
+
+  let register service f =
+    directory := RPC_directory.register !directory service f
+
+  let register0 service f =
+    let open Lwt_result_syntax in
+    register (RPC_service.subst0 service) @@ fun ctxt query input ->
+    let*? ctxt = ctxt in
+    f ctxt query input
+
+  let build_directory node_ctxt =
+    !directory
+    |> RPC_directory.map (fun prefix -> context_of_prefix node_ctxt prefix)
+    |> RPC_directory.prefix prefix
+end
+
+module Global_directory = Make_directory (struct
+  include Sc_rollup_services.Global
+
+  type context = Node_context.t
+
+  let context_of_prefix node_ctxt () = return node_ctxt
+end)
+
+module Local_directory = Make_directory (struct
+  include Sc_rollup_services.Local
+
+  type context = Node_context.t
+
+  let context_of_prefix node_ctxt () = return node_ctxt
+end)
+
+module Block_directory = Make_directory (struct
+  include Sc_rollup_services.Global.Block
+
+  type context = Node_context.t * Block_hash.t
+
+  let context_of_prefix node_ctxt (((), block) : prefix) =
+    let open Lwt_result_syntax in
+    let+ block =
+      match block with
+      | `Head -> get_head node_ctxt.Node_context.store
+      | `Hash b -> return b
+      | `Level l -> State.hash_of_level node_ctxt.store l >>= return
+      | `Finalized -> get_finalized node_ctxt.Node_context.store
+      | `Cemented -> get_last_cemented node_ctxt.Node_context.store
+    in
+    (node_ctxt, block)
+end)
 
 module Common = struct
-  let register_current_num_messages store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_num_messages ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let* state_info = get_state_info_exn store in
-        return state_info.num_messages)
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.num_messages
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let+ state_info = get_state_info_exn node_ctxt.store block in
+    state_info.num_messages
 
-  let register_sc_rollup_address configuration dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.sc_rollup_address ())
-      (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
+  let () =
+    Global_directory.register0 Sc_rollup_services.Global.sc_rollup_address
+    @@ fun node_ctxt () () -> return @@ node_ctxt.rollup_address
 
-  let register_current_tezos_head store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_tezos_head ())
-      (fun () () -> get_head_hash_opt store >>= return)
+  let () =
+    Global_directory.register0 Sc_rollup_services.Global.current_tezos_head
+    @@ fun node_ctxt () () -> get_head_hash_opt node_ctxt.store >>= return
 
-  let register_current_tezos_level store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_tezos_level ())
-      (fun () () -> get_head_level_opt store >>= return)
+  let () =
+    Global_directory.register0 Sc_rollup_services.Global.current_tezos_level
+    @@ fun node_ctxt () () -> get_head_level_opt node_ctxt.store >>= return
 
-  let register_current_inbox node_ctxt dir =
-    RPC_directory.opt_register0
-      dir
-      (Sc_rollup_services.Global.current_inbox ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let*! head = get_head_hash_opt node_ctxt.Node_context.store in
-        match head with
-        | Some head_hash ->
-            let* inbox = Inbox.inbox_of_hash node_ctxt head_hash in
-            return_some inbox
-        | None -> return_none)
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.hash
+    @@ fun (_node_ctxt, block) () () -> return block
 
-  let register_current_ticks store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_ticks ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let* state = get_state_info_exn store in
-        return state.num_ticks)
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.level
+    @@ fun (node_ctxt, block) () () -> State.level_of_hash node_ctxt.store block
 
-  let start configuration dir =
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.inbox
+    @@ fun (node_ctxt, block) () () -> Inbox.inbox_of_hash node_ctxt block
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.ticks
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let+ state = get_state_info_exn node_ctxt.store block in
+    state.num_ticks
+end
+
+module Make (PVM : Pvm.S) = struct
+  module PVM = PVM
+  module Outbox = Outbox.Make (PVM)
+
+  let get_state (node_ctxt : Node_context.t) block_hash =
+    let open Lwt_result_syntax in
+    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
+    let*! state = PVM.State.find ctxt in
+    match state with None -> failwith "No state" | Some state -> return state
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.total_ticks
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let*! tick = PVM.get_tick state in
+    return tick
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.state_hash
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let*! hash = PVM.state_hash state in
+    return hash
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.state_value
+    @@ fun (node_ctxt, block) {key} () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let path = String.split_on_char '/' key in
+    let*! value = PVM.State.lookup state path in
+    match value with
+    | None -> failwith "No such key in PVM state"
+    | Some value ->
+        Format.eprintf "Encoded %S\n@.%!" (Bytes.to_string value) ;
+        return value
+
+  let () =
+    Global_directory.register0 Sc_rollup_services.Global.last_stored_commitment
+    @@ fun node_ctxt () () ->
+    let open Lwt_result_syntax in
+    let*! commitment_with_hash =
+      Commitment.last_commitment_with_hash
+        (module Store.Last_stored_commitment_level)
+        node_ctxt.store
+    in
+    return
+      (commitment_with_hash
+      |> Option.map (fun (commitment, hash) -> (commitment, hash, None)))
+
+  let () =
+    Local_directory.register0 Sc_rollup_services.Local.last_published_commitment
+    @@ fun node_ctxt () () ->
+    let open Lwt_result_syntax in
+    let*! result =
+      let open Lwt_option_syntax in
+      let* commitment, hash =
+        Commitment.last_commitment_with_hash
+          (module Store.Last_published_commitment_level)
+          node_ctxt.store
+      in
+      (* The corresponding level in Store.Commitments.published_at_level is
+         available only when the commitment has been published and included
+         in a block. *)
+      let*! published_at_level =
+        Store.Commitments_published_at_level.find node_ctxt.store hash
+      in
+      return (commitment, hash, published_at_level)
+    in
+    return result
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.status
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let*! status = PVM.get_status state in
+    return (PVM.string_of_status status)
+
+  let () =
+    Block_directory.register0
+      Sc_rollup_services.Global.Block.dal_slot_subscriptions
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let*! subs = Store.Dal_slot_subscriptions.find node_ctxt.store block in
+    return subs
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let*! slots =
+      Store.Dal_slots_headers.list_values node_ctxt.store ~primary_key:block
+    in
+    return slots
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_pages
+    @@ fun (node_ctxt, block) () () -> get_dal_slot_pages node_ctxt.store block
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page
+    @@ fun (node_ctxt, block) {index; page} () ->
+    get_dal_slot_page node_ctxt.store block index page
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.outbox
+    @@ fun (node_ctxt, block) () () ->
+    let open Lwt_result_syntax in
+    let* state = get_state node_ctxt block in
+    let*! outbox = PVM.get_outbox state in
+    return outbox
+
+  let () =
+    Global_directory.register0 Sc_rollup_services.Global.outbox_proof
+    @@ fun node_ctxt output () -> Outbox.proof_of_output node_ctxt output
+
+  let register node_ctxt =
+    List.fold_left
+      (fun dir f -> RPC_directory.merge dir (f node_ctxt))
+      RPC_directory.empty
+      [
+        Global_directory.build_directory;
+        Local_directory.build_directory;
+        Block_directory.build_directory;
+      ]
+
+  let start node_ctxt configuration =
     let open Lwt_result_syntax in
     let Configuration.{rpc_addr; rpc_port; _} = configuration in
     let rpc_addr = P2p_addr.of_string_exn rpc_addr in
     let host = Ipaddr.V6.to_string rpc_addr in
     let node = `TCP (`Port rpc_port) in
     let acl = RPC_server.Acl.default rpc_addr in
+    let dir = register node_ctxt in
     let server =
       RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
     in
-    Lwt.catch
-      (fun () ->
-        let*! () =
-          RPC_server.launch
-            ~host
-            server
-            ~callback:(RPC_server.resto_callback server)
-            node
-        in
-        return server)
-      fail_with_exn
+    protect @@ fun () ->
+    let*! () =
+      RPC_server.launch
+        ~host
+        server
+        ~callback:(RPC_server.resto_callback server)
+        node
+    in
+    return server
 
   let shutdown = RPC_server.shutdown
-end
-
-module type S = sig
-  module PVM : Pvm.S
-
-  val shutdown : RPC_server.server -> unit Lwt.t
-
-  val register : Node_context.t -> Configuration.t -> unit RPC_directory.t
-
-  val start :
-    Node_context.t -> Configuration.t -> RPC_server.server tzresult Lwt.t
-end
-
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
-  include Common
-  module PVM = PVM
-  module Outbox = Outbox.Make (PVM)
-
-  let get_context ?block_hash (node_ctxt : Node_context.t) =
-    let open Lwt_result_syntax in
-    let* block_hash =
-      match block_hash with
-      | None -> get_head node_ctxt.store
-      | Some block_hash -> return block_hash
-    in
-    let* ctxt = Node_context.checkout_context node_ctxt block_hash in
-    return ctxt
-
-  let get_state ?block_hash (node_ctxt : Node_context.t) =
-    let open Lwt_result_syntax in
-    let* ctxt = get_context ?block_hash node_ctxt in
-    let*! state = PVM.State.find ctxt in
-    match state with None -> failwith "No state" | Some state -> return state
-
-  let register_current_total_ticks node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_total_ticks ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let* state = get_state node_ctxt in
-        let*! tick = PVM.get_tick state in
-        return tick)
-
-  let register_current_state_hash node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_state_hash ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let* state = get_state node_ctxt in
-        let*! hash = PVM.state_hash state in
-        return hash)
-
-  let register_current_state_value node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Local.current_state_value ())
-      (fun {key} () ->
-        let open Lwt_result_syntax in
-        let* state = get_state node_ctxt in
-        let path = String.split_on_char '/' key in
-        let*! value = PVM.State.lookup state path in
-        match value with
-        | None -> failwith "No such key in PVM state"
-        | Some value ->
-            Format.eprintf "Encoded %S\n@.%!" (Bytes.to_string value) ;
-            return value)
-
-  let register_last_stored_commitment store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.last_stored_commitment ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let*! commitment_with_hash =
-          Commitment.last_commitment_with_hash
-            (module Store.Last_stored_commitment_level)
-            store
-        in
-        return
-          (commitment_with_hash
-          |> Option.map (fun (commitment, hash) -> (commitment, hash, None))))
-
-  let register_last_published_commitment store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Local.last_published_commitment ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let*! result =
-          let open Lwt_option_syntax in
-          let* commitment, hash =
-            Commitment.last_commitment_with_hash
-              (module Store.Last_published_commitment_level)
-              store
-          in
-          (* The corresponding level in Store.Commitments.published_at_level is
-             available only when the commitment has been published and included
-             in a block. *)
-          let*! published_at_level =
-            Store.Commitments_published_at_level.find store hash
-          in
-          return (commitment, hash, published_at_level)
-        in
-        return result)
-
-  let register_current_status node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_status ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let* state = get_state node_ctxt in
-        let*! status = PVM.get_status state in
-        return (PVM.string_of_status status))
-
-  let register_dal_slot_subscriptions store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.dal_slot_subscriptions ())
-      (fun () () -> get_dal_slot_subscriptions_exn store)
-
-  let register_dal_slots store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.dal_slots ())
-      (fun () () -> get_dal_slots store)
-
-  let register_current_outbox node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.current_outbox ())
-      (fun () () ->
-        let open Lwt_result_syntax in
-        let store = node_ctxt.Node_context.store in
-        let*! lcc_level = Store.Last_cemented_commitment_level.get store in
-        let*! block_hash =
-          State.hash_of_level store (Alpha_context.Raw_level.to_int32 lcc_level)
-        in
-        let* state = get_state ~block_hash node_ctxt in
-        let*! outbox = PVM.get_outbox state in
-        return outbox)
-
-  let register_outbox_proof node_ctxt dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.outbox_proof ())
-      (fun output () -> Outbox.proof_of_output node_ctxt output)
-
-  let register_dal_slot_pages store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.dal_slot_pages ())
-      (fun () () -> get_dal_slot_pages store)
-
-  let register_dal_slot_page store dir =
-    RPC_directory.register0
-      dir
-      (Sc_rollup_services.Global.dal_slot_page ())
-      (fun {index; page} () -> get_dal_slot_page store index page)
-
-  let register (node_ctxt : Node_context.t) configuration =
-    RPC_directory.empty
-    |> register_sc_rollup_address configuration
-    |> register_current_tezos_head node_ctxt.store
-    |> register_current_inbox node_ctxt
-    |> register_current_ticks node_ctxt.store
-    |> register_current_total_ticks node_ctxt
-    |> register_current_num_messages node_ctxt.store
-    |> register_current_state_hash node_ctxt
-    |> register_current_state_value node_ctxt
-    |> register_current_status node_ctxt
-    |> register_last_stored_commitment node_ctxt.store
-    |> register_last_published_commitment node_ctxt.store
-    |> register_dal_slot_subscriptions node_ctxt.store
-    |> register_dal_slots node_ctxt.store
-    |> register_current_outbox node_ctxt
-    |> register_outbox_proof node_ctxt
-    |> register_dal_slot_pages node_ctxt.store
-    |> register_dal_slot_page node_ctxt.store
-
-  let start node_ctxt configuration =
-    Common.start configuration (register node_ctxt configuration)
 end

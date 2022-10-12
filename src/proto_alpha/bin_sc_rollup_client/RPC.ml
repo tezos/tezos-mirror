@@ -23,15 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Configuration
-
-let call (cctxt : #sc_client_context) = cctxt#call_service
-
 let get_sc_rollup_addresses_command cctxt =
-  call cctxt (Sc_rollup_services.Global.sc_rollup_address ()) () () ()
+  Sc_rollup_services.Global.(make_call sc_rollup_address) cctxt () () ()
 
-let get_state_value_command cctxt key =
-  call cctxt (Sc_rollup_services.Local.current_state_value ()) () {key} ()
+let get_state_value_command cctxt block key =
+  Sc_rollup_services.Global.Block.(make_call1 state_value) cctxt block {key} ()
 
 let get_outbox_proof cctxt serialized_output =
-  call cctxt (Sc_rollup_services.Global.outbox_proof ()) () serialized_output ()
+  Sc_rollup_services.Global.(make_call outbox_proof)
+    cctxt
+    ()
+    serialized_output
+    ()

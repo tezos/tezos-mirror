@@ -54,24 +54,30 @@ val sc_rollup_address : t -> string Lwt.t
 (** [rpc_get client path] issues a GET request for [path]. *)
 val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
 
-(** [total_ticks client] gets the total number of ticks for the PVM. *)
-val total_ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+(** [total_ticks ?block client] gets the total number of ticks for the PVM. *)
+val total_ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Lwt.t
 
-(** [ticks client] gets the number of ticks for the PVM for the current head. *)
-val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+(** [ticks ?block client] gets the number of ticks for the PVM for the [block]
+    (default ["head"]). *)
+val ticks : ?hooks:Process.hooks -> ?block:string -> t -> int Lwt.t
 
-(** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
-val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
+(** [state_hash ?block client] gets the corresponding PVM state hash for the
+    [block] (default ["head"]). *)
+val state_hash : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
 
-(** [state_value client key] gets the corresponding PVM state value
-   mapped to [key] for the current head block. *)
-val state_value : ?hooks:Process.hooks -> t -> key:string -> bytes Lwt.t
+(** [state_value ?block client key] gets the corresponding PVM state value
+    mapped to [key] for the [block] (default ["head"]). *)
+val state_value :
+  ?hooks:Process.hooks -> ?block:string -> t -> key:string -> bytes Lwt.t
 
-(** [status client] gets the corresponding PVM status for the current head block. *)
-val status : ?hooks:Process.hooks -> t -> string Lwt.t
+(** [status ?block client] gets the corresponding PVM status for the [block]
+    (default ["head"]). *)
+val status : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
 
-(** [outbox client] gets the rollup outbox for the current head block. *)
-val outbox : ?hooks:Process.hooks -> t -> string Lwt.t
+(** [outbox ?block client] gets the rollup outbox for the [block] (default
+    ["cemented"] which is the block corresponding to the last cemented
+    level). *)
+val outbox : ?hooks:Process.hooks -> ?block:string -> t -> string Lwt.t
 
 type outbox_proof = {commitment_hash : string; proof : string}
 
@@ -126,17 +132,23 @@ with its hash and level when the commitment was first published. *)
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
 
-(** [dal_slot_subscriptions client] gets the slots to which the rollup node is subscribed to *)
-val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
+(** [dal_slot_subscriptions ?block client] gets the slots to which the rollup
+    node is subscribed to, for the [block] (default ["head"]). *)
+val dal_slot_subscriptions :
+  ?hooks:Process.hooks -> ?block:string -> t -> int list Lwt.t
 
-(** [dal_slot_headers client] returns the dal slot headers of the last
-   tezos head seen by the rollup node. *)
-val dal_slot_headers : ?hooks:Process.hooks -> t -> slot_header list Lwt.t
+(** [dal_slot_headers ?block client] returns the dal slot headers of the
+    [block] (default ["head"]). *)
+val dal_slot_headers :
+  ?hooks:Process.hooks -> ?block:string -> t -> slot_header list Lwt.t
 
-(** [dal_downloaded_slots client] returns the slots downloaded after processing
-    the last tezos head seen by the rollup node. *)
+(** [dal_downloaded_slots ?block client] returns the slots downloaded after processing
+    the [block] (default ["head"]). *)
 val dal_downloaded_slots :
-  ?hooks:Process.hooks -> t -> (int * string option list) list Lwt.t
+  ?hooks:Process.hooks ->
+  ?block:string ->
+  t ->
+  (int * string option list) list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

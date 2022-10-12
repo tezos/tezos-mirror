@@ -37,122 +37,122 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "0"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "2"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "2"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "3"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "3"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "4"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "4"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "5"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "5"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "6"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "6"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "7"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "7"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "8"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "8"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "9"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "9"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "10"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "10"
 
-./octez-sc-rollup-client-alpha rpc get /global/state_hash
+./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
-./octez-sc-rollup-client-alpha rpc get /global/total_ticks
+./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
 "11"

@@ -559,7 +559,7 @@ let get_inbox_from_tezos_node sc_rollup client =
   parse_inbox inbox
 
 let get_inbox_from_sc_rollup_node sc_rollup_node =
-  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/inbox" in
+  let* inbox = sc_rollup_node_rpc sc_rollup_node "global/block/head/inbox" in
   match inbox with
   | None -> failwith "Unable to retrieve inbox from sc rollup node"
   | Some inbox -> parse_inbox inbox
@@ -3217,6 +3217,99 @@ let test_outbox_message ?expected_error ~earliness entrypoint ~kind =
     expected_storage
     kind
 
+let test_rpcs ~kind =
+  test_scenario
+    ~kind
+    {
+      tags = ["rpc"];
+      variant = "api";
+      description = "RPC API should work and be stable";
+    }
+  @@ fun _protocol sc_rollup_node sc_rollup node client ->
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_client = Sc_rollup_client.create sc_rollup_node in
+  let* sc_rollup_address =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "sc_rollup_address"]
+  in
+  let sc_rollup_address = JSON.as_string sc_rollup_address in
+  Check.((sc_rollup_address = sc_rollup) string)
+    ~error_msg:"SC rollup address of node is %L but should be %R" ;
+  let level = Node.get_level node in
+  let n = 15 in
+  let batch_size = 5 in
+  let* () = send_messages ~batch_size n sc_rollup client in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:3.0 sc_rollup_node (level + n)
+  in
+  let* l1_block_hash = RPC.Client.call client @@ RPC.get_chain_block_hash () in
+  let* l2_block_hash =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "hash"]
+  in
+  let l2_block_hash = JSON.as_string l2_block_hash in
+  Check.((l1_block_hash = l2_block_hash) string)
+    ~error_msg:"Head on L1 is %L where as on L2 it is %R" ;
+  let* l1_block_hash =
+    RPC.Client.call client @@ RPC.get_chain_block_hash ~block:"5" ()
+  in
+  let* l2_block_hash =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "block"; "5"; "hash"]
+  in
+  let l2_block_hash = JSON.as_string l2_block_hash in
+  Check.((l1_block_hash = l2_block_hash) string)
+    ~error_msg:"Block 5 on L1 is %L where as on L2 it is %R" ;
+  let* l2_finalied_block_level =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "finalized"; "level"]
+  in
+  let l2_finalied_block_level = JSON.as_int l2_finalied_block_level in
+  Check.((l2_finalied_block_level = level + n - 2) int)
+    ~error_msg:"Finalized block is %L but should be %R" ;
+  let* l2_num_messages =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "num_messages"]
+  in
+  let l2_num_messages = JSON.as_int l2_num_messages in
+  Check.((l2_num_messages = batch_size) int)
+    ~error_msg:"Number of messages of head is %L but should be %R" ;
+  let* _status =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "status"]
+  in
+  let* _ticks =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "ticks"]
+  in
+  let* _state_hash =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "state_hash"]
+  in
+  let* _outbox =
+    Sc_rollup_client.rpc_get
+      ~hooks
+      sc_client
+      ["global"; "block"; "head"; "outbox"]
+  in
+  let* _head =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_head"]
+  in
+  let* _level =
+    Sc_rollup_client.rpc_get ~hooks sc_client ["global"; "tezos_level"]
+  in
+  unit
+
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
@@ -3227,6 +3320,7 @@ let register ~kind ~protocols =
   test_rollup_inbox_size ~kind protocols ;
   test_rollup_inbox_current_messages_hash ~kind protocols ;
   test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
+  test_rpcs ~kind protocols ;
   (* See above at definition of sc_rollup_node_stops_scenario:
 
      test_rollup_inbox_of_rollup_node

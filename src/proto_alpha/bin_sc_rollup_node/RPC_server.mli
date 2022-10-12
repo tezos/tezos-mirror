@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,15 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
-  module Commitment = Commitment.Make (PVM)
-  module RPC_server = RPC_server.Make (PVM)
-  module Refutation_game = Refutation_game.Make (Interpreter)
-end
+open Tezos_rpc_http_server
 
-let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
-  function
-  | Example_arith -> (module Arith_pvm)
-  | Wasm_2_0_0 -> (module Wasm_2_0_0_pvm)
+(** Functor to construct an RPC server for a given PVM, i.e. the PVM for the
+    rollup of the current node. *)
+module Make (PVM : Pvm.S) : sig
+  (** [start node_ctxt config] starts an RPC server listening for requests on
+      the port [config.rpc_port] and address [config.rpc_addr]. *)
+  val start :
+    Node_context.t -> Configuration.t -> RPC_server.server tzresult Lwt.t
+
+  (** Shutdown a running RPC server. When this function is called, the rollup
+      node will stop listening to incoming requests. *)
+  val shutdown : RPC_server.server -> unit Lwt.t
+end

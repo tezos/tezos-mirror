@@ -101,9 +101,12 @@ let sc_rollup_address sc_client =
   in
   return (String.trim out)
 
-let state_value ?hooks sc_client ~key =
+let state_value ?hooks ?(block = "head") sc_client ~key =
   let* out =
-    spawn_command ?hooks sc_client ["get"; "state"; "value"; "for"; key]
+    spawn_command
+      ?hooks
+      sc_client
+      ["get"; "state"; "value"; "for"; key; "--block"; block]
     |> Process.check_and_read_stdout
   in
   return (Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes)
@@ -178,29 +181,33 @@ let rpc_get ?hooks sc_client path =
   let* output = Process.check_and_read_stdout process in
   return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
 
-let ticks ?hooks sc_client =
+let ticks ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "ticks"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "ticks"] in
   JSON.as_int res
 
-let total_ticks ?hooks sc_client =
+let total_ticks ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "total_ticks"] in
+  let+ res =
+    rpc_get ?hooks sc_client ["global"; "block"; block; "total_ticks"]
+  in
   JSON.as_int res
 
-let state_hash ?hooks sc_client =
+let state_hash ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "state_hash"] in
+  let+ res =
+    rpc_get ?hooks sc_client ["global"; "block"; block; "state_hash"]
+  in
   JSON.as_string res
 
-let status ?hooks sc_client =
+let status ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "status"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "status"] in
   JSON.as_string res
 
-let outbox ?hooks sc_client =
+let outbox ?hooks ?(block = "cemented") sc_client =
   let open Lwt.Syntax in
-  let+ res = rpc_get ?hooks sc_client ["global"; "outbox"] in
+  let+ res = rpc_get ?hooks sc_client ["global"; "block"; block; "outbox"] in
   JSON.encode res
 
 let last_stored_commitment ?hooks sc_client =
@@ -213,16 +220,21 @@ let last_published_commitment ?hooks sc_client =
   let+ json = rpc_get ?hooks sc_client ["local"; "last_published_commitment"] in
   commitment_with_hash_and_level_from_json json
 
-let dal_slot_subscriptions ?hooks sc_client =
+let dal_slot_subscriptions ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
   let+ json =
-    rpc_get ?hooks sc_client ["global"; "dal"; "slot_subscriptions"]
+    rpc_get
+      ?hooks
+      sc_client
+      ["global"; "block"; block; "dal"; "slot_subscriptions"]
   in
   JSON.as_list json |> List.map JSON.as_int
 
-let dal_slot_headers ?hooks sc_client =
+let dal_slot_headers ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slot_headers"] in
+  let+ json =
+    rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_headers"]
+  in
   JSON.(
     as_list json
     |> List.map (fun obj ->
@@ -232,9 +244,11 @@ let dal_slot_headers ?hooks sc_client =
              index = obj |> get "index" |> as_int;
            }))
 
-let dal_downloaded_slots ?hooks sc_client =
+let dal_downloaded_slots ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slot_pages"] in
+  let+ json =
+    rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_pages"]
+  in
   JSON.as_list json
   |> List.map (fun obj ->
          let index = obj |> JSON.get "index" |> JSON.as_int in

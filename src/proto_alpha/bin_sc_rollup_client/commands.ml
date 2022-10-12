@@ -26,6 +26,26 @@
 open Clic
 open Protocol.Alpha_context
 
+let possible_block_ids = ["head"; "finalized"; "cemented"; "<hash>"; "<level>"]
+
+let block_arg =
+  Clic.default_arg
+    ~long:"block"
+    ~short:'B'
+    ~placeholder:"block"
+    ~default:"head"
+    ~doc:
+      (Format.sprintf
+         "The block identifier for which the command applies (possible values: \
+          %s)."
+         (String.concat ", " possible_block_ids))
+    (Clic.parameter
+       (fun _ s ->
+         match Sc_rollup_services.Arg.destruct_block_id s with
+         | Ok b -> return b
+         | Error reason -> failwith "Invalid block id: %s" reason)
+       ~autocomplete:(fun _ -> return possible_block_ids))
+
 let get_sc_rollup_addresses_command () =
   command
     ~desc:
@@ -39,12 +59,12 @@ let get_sc_rollup_addresses_command () =
 let get_state_value_command () =
   command
     ~desc:"Observe a key in the PVM state."
-    no_options
+    (args1 block_arg)
     (prefixes ["get"; "state"; "value"; "for"]
     @@ string ~name:"key" ~desc:"The key of the state value"
     @@ stop)
-    (fun () key (cctxt : #Configuration.sc_client_context) ->
-      RPC.get_state_value_command cctxt key >>=? fun bytes ->
+    (fun block key (cctxt : #Configuration.sc_client_context) ->
+      RPC.get_state_value_command cctxt block key >>=? fun bytes ->
       cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
 
 (** [display_answer cctxt answer] prints an RPC answer. *)
