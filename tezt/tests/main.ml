@@ -141,18 +141,12 @@ let register_protocol_agnostic_tests () =
   Tx_rollup_l2_node.register ~protocols ;
   Tzip4_view.register ~protocols ;
   Views.register protocols ;
-  Retro.register ~protocols
-
-let register_K_plus_tests () =
-  (* Relies on a feature only available since K.
-     Move these to [register_protocol_agnostic_tests] once K is the smallest
-     protocol. *)
-  let protocols = Protocol.[Kathmandu; Alpha] in
-  Events.register ~protocols:[Alpha] ;
+  Retro.register ~protocols ;
+  Events.register ~protocols ;
   Ghostnet_dictator_migration.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
   Operation_validation.register ~protocols ;
-  Sc_rollup.register ~protocols:[Alpha] ;
+  Sc_rollup.register ~protocols ;
   Testnet_dictator.register ~protocols ;
   Vdf_test.register ~protocols
 
@@ -167,7 +161,6 @@ let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
   register_protocol_agnostic_tests () ;
-  register_K_plus_tests () ;
   register_L_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
