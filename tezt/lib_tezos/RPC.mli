@@ -774,6 +774,15 @@ val get_chain_block_context_sc_rollup_boot_sector :
 val get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/commitment/<hash>] *)
+val get_chain_block_context_sc_rollup_commitment :
+  ?chain:string ->
+  ?block:string ->
+  sc_rollup:string ->
+  hash:string ->
+  unit ->
+  JSON.t t
+
 (** Call RPC /chains/<chain>/blocks/<block>/context/sc_rollup/<rollup_hash>/staker/<staker>/staked_on_commitment *)
 val get_chain_block_context_sc_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t

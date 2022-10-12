@@ -1860,85 +1860,104 @@ let first_published_level_is_global _protocol sc_rollup_node sc_rollup node
 
    Originate a rollup with a custom boot sector and check if the RPC returns it.
 *)
-let test_rollup_arith_origination_boot_sector =
-  let boot_sector = "10 10 10 + +" in
-
-  let go client sc_rollup =
-    let* client_boot_sector =
-      RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_sc_rollup_boot_sector sc_rollup
-    in
-    let client_boot_sector = JSON.as_string client_boot_sector in
-    Check.(boot_sector = client_boot_sector)
-      Check.string
-      ~error_msg:"expected value %L, got %R" ;
-    Lwt.return_unit
+let test_rollup_origination_boot_sector ~boot_sector ~kind =
+  test_scenario
+    ~boot_sector
+    ~kind
+    {
+      variant = None;
+      tags = ["boot_sector"];
+      description = "boot_sector is correctly set";
+    }
+  @@ fun _protocol rollup_node sc_rollup _tezos_node tezos_client ->
+  let* client_boot_sector =
+    RPC.Client.call ~hooks tezos_client
+    @@ RPC.get_chain_block_context_sc_rollup_boot_sector sc_rollup
   in
+  let client_boot_sector = JSON.as_string client_boot_sector in
+  let* genesis_info =
+    RPC.Client.call ~hooks tezos_client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+  let genesis_commitment_hash =
+    JSON.(genesis_info |-> "commitment_hash" |> as_string)
+  in
+  let* init_commitment =
+    RPC.Client.call ~hooks tezos_client
+    @@ RPC.get_chain_block_context_sc_rollup_commitment
+         ~sc_rollup
+         ~hash:genesis_commitment_hash
+         ()
+  in
+  let init_hash = JSON.(init_commitment |-> "compressed_state" |> as_string) in
+  let* () = Sc_rollup_node.run rollup_node in
+  let rollup_client = Sc_rollup_client.create rollup_node in
+  let* _ = Sc_rollup_node.wait_for_level ~timeout:3. rollup_node init_level in
+  let* node_state_hash = Sc_rollup_client.state_hash ~hooks rollup_client in
+  Check.(
+    (init_hash = node_state_hash)
+      string
+      ~error_msg:"State hashes should be equal! (%L, %R)") ;
+  Check.(boot_sector = client_boot_sector)
+    Check.string
+    ~error_msg:"expected value %L, got %R"
+  |> return
 
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"]
-    ~title:"originate arith with boot sector"
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      with_fresh_rollup
-        ~kind:"arith"
-        ~boot_sector
-        (fun sc_rollup _sc_rollup_node -> go client sc_rollup)
-        node
-        client)
+(** Check that a node makes use of the boot sector.
+    -------------------------------------------------------
 
-(* Check that a node makes use of the boot sector.
-   -------------------------------------------------------
-
-   Originate 2 rollups with different boot sectors to check if the are
-   actually different.
+    Originate 2 rollups with different boot sectors to check if they have
+    different hash.
 *)
-let test_rollup_node_uses_arith_boot_sector =
-  let go_boot client sc_rollup sc_rollup_node =
+let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4161
+
+     The hash is calculated by the client and given as a proof to the L1. This test
+     should be rewritten in a unit test maybe ?
+  *)
+  test_scenario
+    ~boot_sector:boot_sector1
+    ~kind
+    {
+      variant = None;
+      tags = ["rollup_node"; "boot_sector"];
+      description = "boot sector is evaluated";
+    }
+  @@ fun _protocol _rollup_node sc_rollup1 _tezos_node tezos_client ->
+  let* sc_rollup2 =
+    originate_sc_rollup
+      ~kind
+      ~boot_sector:boot_sector2
+      ~src:Constant.bootstrap2.alias
+      tezos_client
+  in
+  let genesis_state_hash ~sc_rollup tezos_client =
     let* genesis_info =
-      RPC.Client.call ~hooks client
+      RPC.Client.call ~hooks tezos_client
       @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
     in
-    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
-    let* () = Sc_rollup_node.run sc_rollup_node in
-
-    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-    let* level =
-      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+    let commitment_hash =
+      JSON.(genesis_info |-> "commitment_hash" |> as_string)
     in
-
-    let* () = send_text_messages client ["10 +"] in
-    let* _ =
-      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node (level + 1)
+    let* commitment =
+      RPC.Client.call ~hooks tezos_client
+      @@ RPC.get_chain_block_context_sc_rollup_commitment
+           ~sc_rollup
+           ~hash:commitment_hash
+           ()
     in
-
-    Sc_rollup_client.state_hash ~hooks sc_rollup_client
+    let state_hash = JSON.(commitment |-> "compressed_state" |> as_string) in
+    return state_hash
   in
 
-  let with_booted ~boot_sector node client =
-    with_fresh_rollup
-      ~kind:"arith"
-      ~boot_sector
-      (fun sc_rollup sc_rollup_node -> go_boot client sc_rollup sc_rollup_node)
-      node
-      client
-  in
-
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; "node"]
-    ~title:"ensure arith boot sector is used"
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      let* state_hash1 = with_booted ~boot_sector:"10 10 10 + +" node client in
-      let* state_hash2 = with_booted ~boot_sector:"31" node client in
-      Check.(state_hash1 <> state_hash2)
-        Check.string
-        ~error_msg:"State hashes should be different! (%L, %R)" ;
-
-      Lwt.return_unit)
+  let* state_hash_1 = genesis_state_hash ~sc_rollup:sc_rollup1 tezos_client in
+  let* state_hash_2 = genesis_state_hash ~sc_rollup:sc_rollup2 tezos_client in
+  Check.(
+    (state_hash_1 <> state_hash_2)
+      string
+      ~error_msg:"State hashes should be different! (%L, %R)") ;
+  unit
 
 let test_rollup_arith_uses_reveals ~kind =
   let nadd = 32 * 1024 in
@@ -3169,8 +3188,15 @@ let register ~protocols =
   test_rollup_client_generate_keys protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
   (* Specific Arith PVM tezts *)
-  test_rollup_arith_origination_boot_sector protocols ;
-  test_rollup_node_uses_arith_boot_sector protocols ;
+  test_rollup_origination_boot_sector
+    ~boot_sector:"10 10 10 + +"
+    ~kind:"arith"
+    protocols ;
+  test_boot_sector_is_evaluated
+    ~boot_sector1:"10 10 10 + +"
+    ~boot_sector2:"31"
+    ~kind:"arith"
+    protocols ;
   (* Specific Wasm PVM tezts *)
   test_rollup_node_run_with_kernel
     protocols
