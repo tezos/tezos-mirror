@@ -2110,45 +2110,41 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
   let* () = Client.bake_for_and_wait client in
   get_staked_on_commitment ~sc_rollup ~staker:src client
 
-let test_consecutive_commitments ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "l1"; "commitment"; kind]
-    ~title:(Format.asprintf "%s - consecutive commitments" kind)
-    (fun protocol ->
-      setup ~protocol @@ fun _node client ->
-      let* inbox_level = Client.level client in
-      let* sc_rollup = originate_sc_rollup ~kind client in
-      let operator = Constant.bootstrap1.public_key_hash in
-      let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
-      (* As we did no publish any commitment yet, this is supposed to fail. *)
-      let*? process =
-        RPC.Client.spawn client
-        @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
-             ~sc_rollup
-             operator
-      in
-      let* () = Process.check_error ~msg:(rex "Unknown staker") process in
-      let* predecessor, _ =
-        last_cemented_commitment_hash_with_level ~sc_rollup client
-      in
-      let* commit_hash =
-        publish_dummy_commitment
-          ~inbox_level:(inbox_level + commitment_period_in_blocks + 1)
-          ~predecessor
-          ~sc_rollup
-          ~src:operator
-          client
-      in
-      let* _commit_hash =
-        publish_dummy_commitment
-          ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks) + 1)
-          ~predecessor:commit_hash
-          ~sc_rollup
-          ~src:operator
-          client
-      in
-      unit)
+let test_consecutive_commitments _rollup_node sc_rollup _tezos_node tezos_client
+    =
+  let* inbox_level = Client.level tezos_client in
+  let operator = Constant.bootstrap1.public_key_hash in
+  let* {commitment_period_in_blocks; _} =
+    get_sc_rollup_constants tezos_client
+  in
+  (* As we did no publish any commitment yet, this is supposed to fail. *)
+  let*? process =
+    RPC.Client.spawn tezos_client
+    @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
+         ~sc_rollup
+         operator
+  in
+  let* () = Process.check_error ~msg:(rex "Unknown staker") process in
+  let* predecessor, _ =
+    last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
+  in
+  let* commit_hash =
+    publish_dummy_commitment
+      ~inbox_level:(inbox_level + commitment_period_in_blocks)
+      ~predecessor
+      ~sc_rollup
+      ~src:operator
+      tezos_client
+  in
+  let* _commit_hash =
+    publish_dummy_commitment
+      ~inbox_level:(inbox_level + (2 * commitment_period_in_blocks))
+      ~predecessor:commit_hash
+      ~sc_rollup
+      ~src:operator
+      tezos_client
+  in
+  unit
 
 (* Refutation game scenarios
    -------------------------
@@ -3128,7 +3124,11 @@ let register ~kind ~protocols =
     first_published_level_is_global
     protocols
     ~kind ;
-  test_consecutive_commitments protocols ~kind ;
+  test_commitment_scenario
+    ~variant:"consecutive commitments"
+    test_consecutive_commitments
+    protocols
+    ~kind ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4020
      When looking at the logs of these tests, it appears that they do
      not come with enough inspection of the state of the rollup to
