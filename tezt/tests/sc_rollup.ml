@@ -360,59 +360,42 @@ let test_rollup_node_configuration ~kind =
    interacting with.
 *)
 let test_rollup_node_running ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; kind]
-    ~title:(Format.asprintf "%s - running a smart contract rollup node" kind)
-    (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun sc_rollup sc_rollup_node ->
-      let* () = Sc_rollup_node.run sc_rollup_node in
-      let* sc_rollup_from_rpc =
-        sc_rollup_node_rpc sc_rollup_node "global/sc_rollup_address"
-      in
-      match sc_rollup_from_rpc with
-      | None ->
-          (* No curl, no check. *)
-          failwith "Please install curl"
-      | Some sc_rollup_from_rpc ->
-          let sc_rollup_from_rpc = JSON.as_string sc_rollup_from_rpc in
-          if sc_rollup_from_rpc <> sc_rollup then
-            failwith
-              (Printf.sprintf
-                 "Expecting %s, got %s when we query the sc rollup node RPC \
-                  address"
-                 sc_rollup
-                 sc_rollup_from_rpc)
-          else return ())
-
-(* Interacting with a rollup node through a rollup client
-   ------------------------------------------------------
-
-   When a rollup node is running, a rollup client can ask this
-   node its rollup address.
-*)
-let test_rollup_client_gets_address ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; "client"]
-    ~title:"getting a smart-contract rollup address through the client"
-    (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun sc_rollup sc_rollup_node ->
-      let* () = Sc_rollup_node.run sc_rollup_node in
-      let sc_client = Sc_rollup_client.create sc_rollup_node in
-      let* sc_rollup_from_client =
-        Sc_rollup_client.sc_rollup_address sc_client
-      in
-      if sc_rollup_from_client <> sc_rollup then
-        failwith
-          (Printf.sprintf
-             "Expecting %s, got %s when the client asks for the sc rollup \
-              address"
-             sc_rollup
-             sc_rollup_from_client) ;
-      return ())
+  test_scenario
+    {
+      variant = None;
+      tags = ["rollup_node"];
+      description = "the smart contract rollup node runs on correct address";
+    }
+    ~kind
+  @@ fun _protocol rollup_node sc_rollup _tezos_node _tezos_client ->
+  let* () = Sc_rollup_node.run rollup_node in
+  let rollup_client = Sc_rollup_client.create rollup_node in
+  let* sc_rollup_from_rpc =
+    sc_rollup_node_rpc rollup_node "global/sc_rollup_address"
+  in
+  let sc_rollup_from_rpc =
+    match sc_rollup_from_rpc with
+    | None ->
+        (* No curl, no check. *)
+        failwith "Please install curl"
+    | Some sc_rollup_from_rpc -> JSON.as_string sc_rollup_from_rpc
+  in
+  let* sc_rollup_from_client =
+    Sc_rollup_client.sc_rollup_address rollup_client
+  in
+  if sc_rollup_from_rpc <> sc_rollup then
+    failwith
+      (Printf.sprintf
+         "Expecting %s, got %s when we query the sc rollup node RPC address"
+         sc_rollup
+         sc_rollup_from_rpc)
+  else if sc_rollup_from_client <> sc_rollup then
+    failwith
+      (Printf.sprintf
+         "Expecting %s, got %s when the client asks for the sc rollup address"
+         sc_rollup
+         sc_rollup_from_client)
+  else unit
 
 (* Fetching the initial level of a sc rollup
     -----------------------------------------
@@ -3280,7 +3263,6 @@ let register ~protocols =
   (* PVM-independent tests. We still need to specify a PVM kind
      because the tezt will need to originate a rollup. However,
      the tezt will not test for PVM kind specific featued. *)
-  test_rollup_client_gets_address protocols ~kind:"wasm_2_0_0" ;
   test_rollup_node_configuration protocols ~kind:"wasm_2_0_0" ;
   test_rollup_list protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
