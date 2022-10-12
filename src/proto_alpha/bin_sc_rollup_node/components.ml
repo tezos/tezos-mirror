@@ -24,19 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type S = sig
-  module PVM : Pvm.S
-
-  module Interpreter : Interpreter.S with module PVM = PVM
-
-  module Commitment : Commitment_sig.S with module PVM = PVM
-
-  module RPC_server : RPC_server.S with module PVM = PVM
-
-  module Refutation_game : Refutation_game.S with module PVM = PVM
-end
-
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+module Make (PVM : Pvm.S) = struct
   module PVM = PVM
   module Interpreter = Interpreter.Make (PVM)
   module Commitment = Commitment.Make (PVM)
