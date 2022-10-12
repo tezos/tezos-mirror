@@ -333,9 +333,7 @@ let test_pack_unpack =
     comparable_data_generator
     (fun (Ex_comparable_data (ty, x)) ->
       let oty =
-        match comparable_option_t (-1) ty with
-        | Ok ty -> ty
-        | Error _ -> assert false
+        match option_t (-1) ty with Ok ty -> ty | Error _ -> assert false
       in
       qcheck_eq
         ~cmp:(Script_comparable.compare_comparable oty)

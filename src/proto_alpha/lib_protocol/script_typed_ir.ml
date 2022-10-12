@@ -1795,9 +1795,6 @@ let option_pair_int_nat_t =
       {size = Type_size.four},
       Yes )
 
-let comparable_option_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size}, Yes)
-
 let list_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
 

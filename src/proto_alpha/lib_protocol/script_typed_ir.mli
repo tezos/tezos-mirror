@@ -1668,9 +1668,6 @@ val lambda_t :
 
 val option_t : Script.location -> ('v, 'c) ty -> ('v option, 'c) ty tzresult
 
-val comparable_option_t :
-  Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
-
 val option_mutez_t : Tez.t option comparable_ty
 
 val option_string_t : Script_string.t option comparable_ty
