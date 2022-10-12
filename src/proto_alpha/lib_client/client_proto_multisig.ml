@@ -46,7 +46,7 @@ type error += Bytes_deserialisation_error of Bytes.t
 
 type error += Bad_deserialized_contract of (Contract_hash.t * Contract_hash.t)
 
-type error += Bad_deserialized_counter of (counter * counter)
+type error += Bad_deserialized_counter of (Z.t * Z.t)
 
 type error += Non_positive_threshold of int
 

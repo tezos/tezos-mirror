@@ -111,7 +111,7 @@ type operation_req = {
   counter : counter option;
   fee : Tez.t option;
   gas_limit : Op.gas_limit option;
-  storage_limit : counter option;
+  storage_limit : Z.t option;
   force_reveal : bool option;
   amount : Tez.t option;
 }

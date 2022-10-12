@@ -143,7 +143,7 @@ val inject_token_transfer_batch :
   ?counter:counter ->
   ?default_fee:Tez.t ->
   ?default_gas_limit:Gas.Arith.integral ->
-  ?default_storage_limit:counter ->
+  ?default_storage_limit:Z.t ->
   unit ->
   unit tzresult Lwt.t
 

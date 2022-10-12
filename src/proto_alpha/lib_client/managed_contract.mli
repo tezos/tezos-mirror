@@ -84,7 +84,7 @@ val build_transaction_operation :
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   unit ->
   Kind.transaction Annotated_manager_operation.t tzresult Lwt.t
 
@@ -113,7 +113,7 @@ val transfer :
   amount:Tez.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
