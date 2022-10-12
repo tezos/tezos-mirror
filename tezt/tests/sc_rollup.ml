@@ -573,9 +573,12 @@ let test_rollup_inbox_size ~kind =
         let* _, inbox_msg_during_commitment_period =
           get_inbox_from_tezos_node client
         in
+        (* Expect [n] messages per level + SOL/EOL for each level including
+           at inbox's creation. *)
         return
         @@ Check.(
-             (inbox_msg_during_commitment_period = n * (n + 1) / 2)
+             (inbox_msg_during_commitment_period
+             = (n * (n + 1) / 2) + (((n + 1) * 2) + 2))
                int
                ~error_msg:"expected value %R, got %L") )
         node
@@ -1399,7 +1402,7 @@ let commitments_messages_reset _protocol sc_rollup_node sc_rollup _node client =
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
-   Check.(stored_number_of_ticks = Some 0)
+   Check.(stored_number_of_ticks = Some (2 * levels_to_commitment))
      (Check.option Check.int)
      ~error_msg:
        "Number of messages processed by commitment is different from the \
@@ -1498,7 +1501,7 @@ let commitment_stored_robust_to_failures _protocol sc_rollup_node sc_rollup node
     (Option.map (fun (_, c, _) -> c) stored_commitment', "stored in second node") ;
   return ()
 
-let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
+let commitments_reorgs ~kind protocol sc_rollup_node sc_rollup node client =
   (* No messages are published after origination, for
      `sc_rollup_commitment_period_in_blocks - 1` levels. Then a divergence
      occurs:  in the first branch one message is published for
@@ -1603,12 +1606,21 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup node client =
     (Check.option Check.int)
     ~error_msg:
       "Commitment has been stored at a level different than expected (%L = %R)" ;
+  let () = Log.info "init_level: %d" init_level in
   (let stored_number_of_ticks = Option.map number_of_ticks stored_commitment in
-   Check.(stored_number_of_ticks = Some 0)
+   let additional_ticks =
+     match kind with
+     | "arith" -> 1 (* boot sector *) + 1 (* metadata *)
+     | "wasm_2_0_0" -> 1 (* boot_sector *)
+     | _ -> assert false
+   in
+   Check.(
+     stored_number_of_ticks
+     = Some ((2 * levels_to_commitment) + additional_ticks))
      (Check.option Check.int)
      ~error_msg:
-       "Number of messages processed by commitment is different from the \
-        number of messages expected (%L = %R)") ;
+       "Number of ticks processed by commitment is different from the number \
+        of ticks expected (%L = %R)") ;
   let* published_commitment =
     Sc_rollup_client.last_published_commitment ~hooks sc_rollup_client
   in
@@ -3109,7 +3121,7 @@ let test_rpcs ~kind =
       ["global"; "block"; "head"; "num_messages"]
   in
   let l2_num_messages = JSON.as_int l2_num_messages in
-  Check.((l2_num_messages = batch_size) int)
+  Check.((l2_num_messages = batch_size + 2) int)
     ~error_msg:"Number of messages of head is %L but should be %R" ;
   let* _status =
     Sc_rollup_client.rpc_get
@@ -3235,7 +3247,7 @@ let register ~kind ~protocols =
     ~kind ;
   test_commitment_scenario
     "handles_chain_reorgs"
-    commitments_reorgs
+    (commitments_reorgs ~kind)
     protocols
     ~kind ;
   test_commitment_scenario
