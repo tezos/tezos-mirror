@@ -581,70 +581,6 @@ let test_rollup_inbox_size ~kind =
         node
         client)
 
-module Sc_rollup_inbox = struct
-  open Tezos_context_encoding.Context
-
-  module Store = struct
-    module Maker = Irmin_pack_mem.Maker (Conf)
-    include Maker.Make (Schema)
-    module Schema = Tezos_context_encoding.Context.Schema
-  end
-
-  include Tezos_context_helpers.Context.Make_tree (Conf) (Store)
-
-  (* An external message is prefixed with a tag whose length is one byte, and
-     whose value is 1. *)
-  let encode_external_message message =
-    let prefix = "\001" in
-    Bytes.of_string (prefix ^ message)
-
-  (*
-      The hash for empty messages is the hash of empty bytes, and not of an empty
-      tree.
-
-      The hash for non-empty messages is the hash of the tree, where each message
-      payload sits at the key [[message_index, "payload"]], where [message_index]
-      is the index of the current message relative to the first message.
-
-      The [message_counter] is reset to zero when the inbox level increments (and
-      therefore [current_messages] are zero-indexed in the tree).
-  *)
-  let rec build_current_messages_tree counter tree messages =
-    match messages with
-    | [] -> return tree
-    | message :: rest ->
-        let key = Data_encoding.Binary.to_string_exn Data_encoding.z counter in
-        let payload = encode_external_message message in
-        let* tree = add tree ["message"; key] payload in
-        build_current_messages_tree (Z.succ counter) tree rest
-
-  module P = Tezos_protocol_alpha.Protocol
-
-  let predict_current_messages_hash level current_messages =
-    let open P.Alpha_context.Sc_rollup in
-    let open Lwt.Syntax in
-    let level_bytes =
-      Data_encoding.Binary.to_bytes_exn
-        P.Raw_level_repr.encoding
-        (P.Raw_level_repr.of_int32_exn level)
-    in
-    let number_of_messages_bytes =
-      Data_encoding.Binary.to_bytes_exn
-        Data_encoding.n
-        (Z.of_int (List.length current_messages))
-    in
-    let* tree = add (empty ()) ["level"] level_bytes in
-    let* tree = add tree ["number_of_messages"] number_of_messages_bytes in
-    let* tree = build_current_messages_tree Z.zero tree current_messages in
-    let context_hash = hash tree in
-    let test =
-      Data_encoding.Binary.to_bytes_exn
-        Tezos_base.TzPervasives.Context_hash.encoding
-        context_hash
-    in
-    return (Inbox.Hash.of_bytes_exn test)
-end
-
 let fetch_messages_from_block client =
   let* ops = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let messages =
@@ -659,95 +595,6 @@ let fetch_messages_from_block client =
     |> List.map (fun message -> JSON.(message |> as_string))
   in
   return messages
-
-let test_rollup_inbox_current_messages_hash ~kind =
-  regression_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "inbox"; kind]
-    (Format.asprintf
-       "%s - pushing messages in the inbox - current messages hash"
-       kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup ~kind @@ fun _sc_rollup _sc_rollup_node _filename ->
-        let gen_message_batch from until =
-          List.map
-            (fun x ->
-              Printf.sprintf "hello, message number %s" (Int.to_string x))
-            (range from until)
-        in
-        let prepare_batch messages =
-          messages
-          |> List.map (Printf.sprintf "\"%s\"")
-          |> String.concat ", " |> Printf.sprintf "text:[%s]"
-        in
-        let open Tezos_protocol_alpha.Protocol.Alpha_context.Sc_rollup in
-        (* no messages have been sent *)
-        let* pristine_hash, nb_available_messages =
-          get_inbox_from_tezos_node client
-        in
-        let () =
-          Check.((nb_available_messages = 0) int)
-            ~error_msg:"0 messages expected in the inbox"
-        in
-        let* expected = Sc_rollup_inbox.predict_current_messages_hash 0l [] in
-        let () =
-          Check.(
-            (Inbox.Hash.to_b58check expected = pristine_hash)
-              string
-              ~error_msg:"FIRST: expected pristine hash %L, got %R")
-        in
-        (*
-           send messages, and assert that
-           - the hash has changed
-           - the hash matches the 'predicted' hash from the messages we sent
-        *)
-        let fst_batch = gen_message_batch 0 4 in
-        let* () = send_message client @@ prepare_batch fst_batch in
-        let* fst_batch_hash, _ = get_inbox_from_tezos_node client in
-        let () =
-          Check.(
-            (pristine_hash <> fst_batch_hash)
-              string
-              ~error_msg:
-                "expected current messages hash to change when messages sent")
-        in
-        let* expected =
-          Sc_rollup_inbox.predict_current_messages_hash 3l fst_batch
-        in
-        let () =
-          Check.(
-            (Inbox.Hash.to_b58check expected = fst_batch_hash)
-              string
-              ~error_msg:"2 expected first batch hash %L, got %R")
-        in
-        (*
-           send more messages, and assert that
-           - the messages can be retrieved from the latest block
-           - the hash matches the 'predicted' hash from the messages we sent
-        *)
-        let snd_batch = gen_message_batch 5 10 in
-        let* () = send_message client @@ prepare_batch snd_batch in
-        let* messages = fetch_messages_from_block client in
-        let () =
-          Check.(
-            (messages = snd_batch)
-              (list string)
-              ~error_msg:"expected messages:\n%R\nretrieved:\n%L")
-        in
-        let* snd_batch_hash, _ = get_inbox_from_tezos_node client in
-        let* expected =
-          Sc_rollup_inbox.predict_current_messages_hash 4l snd_batch
-        in
-        let () =
-          Check.(
-            (Inbox.Hash.to_b58check expected = snd_batch_hash)
-              string
-              ~error_msg:"expected second batch hash %L, got %R")
-        in
-        unit )
-        node
-        client)
 
 (* Synchronizing the inbox in the rollup node
    ------------------------------------------
@@ -3304,7 +3151,6 @@ let register ~kind ~protocols =
     ~kind
     protocols ;
   test_rollup_inbox_size ~kind protocols ;
-  test_rollup_inbox_current_messages_hash ~kind protocols ;
   test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
   test_rpcs ~kind protocols ;
   (* See above at definition of sc_rollup_node_stops_scenario:
