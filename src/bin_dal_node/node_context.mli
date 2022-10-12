@@ -73,3 +73,6 @@ val get_status : t -> status
 
 (** [get_store ctxt] returns the dal node store. *)
 val get_store : t -> Store.node_store
+
+(** [get_neighbors_cctxts ctxt] returns the dal node neighbors client contexts *)
+val get_neighbors_cctxts : t -> Dal_node_client.cctxt list

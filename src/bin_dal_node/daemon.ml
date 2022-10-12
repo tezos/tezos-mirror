@@ -83,7 +83,14 @@ module Handler = struct
       match tok with
       | None -> return_unit
       | Some element ->
-          let* () = handle element in
+          let*! r = handle element in
+          let*! () =
+            match r with
+            | Ok () -> Lwt.return_unit
+            | Error trace ->
+                let*! () = Event.(emit daemon_error) trace in
+                Lwt.return_unit
+          in
           go ()
     in
     return (go (), stopper)
@@ -135,6 +142,43 @@ module Handler = struct
     make_stream_daemon
       handler
       (Tezos_shell_services.Monitor_services.heads cctxt `Main)
+
+  let new_slot_header ctxt =
+    let open Lwt_result_syntax in
+    let handler n_cctxt ready_ctxt slot_header =
+      let params = ready_ctxt.Node_context.dal_parameters in
+      let downloaded_shard_ids =
+        0 -- ((params.number_of_shards / params.redundancy_factor) - 1)
+      in
+      let* shards =
+        List.fold_left_es
+          (fun acc shard_id ->
+            let* shard = RPC_server.shard_rpc n_cctxt slot_header shard_id in
+            return @@ Cryptobox.IntMap.add shard.index shard.share acc)
+          Cryptobox.IntMap.empty
+          downloaded_shard_ids
+      in
+      let* () =
+        Slot_manager.save_shards
+          (Node_context.get_store ctxt).slots_store
+          (Node_context.get_store ctxt).slots_watcher
+          ready_ctxt.dal_constants
+          slot_header
+          shards
+      in
+      return_unit
+    in
+    let handler n_cctxt slot_header =
+      match Node_context.get_status ctxt with
+      | Starting -> return_unit
+      | Ready ready_ctxt -> handler n_cctxt ready_ctxt slot_header
+    in
+    List.map
+      (fun n_cctxt ->
+        make_stream_daemon
+          (handler n_cctxt)
+          (RPC_server.monitor_slot_headers_rpc n_cctxt))
+      (Node_context.get_neighbors_cctxts ctxt)
 end
 
 let daemonize handlers =
@@ -170,4 +214,4 @@ let run ~data_dir cctxt =
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
   in
-  daemonize [Handler.new_head config ctxt cctxt]
+  daemonize (Handler.new_head config ctxt cctxt :: Handler.new_slot_header ctxt)

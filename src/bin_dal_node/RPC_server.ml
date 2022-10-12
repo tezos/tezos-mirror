@@ -106,14 +106,24 @@ let register_show_slot ctxt dir =
 let register_show_slot_pages ctxt dir =
   RPC_directory.register dir (Services.slot_pages ()) (handle_slot_pages ctxt)
 
+let shard_service = Services.shard ()
+
 let register_shard ctxt dir =
-  RPC_directory.register dir (Services.shard ()) (handle_shard ctxt)
+  RPC_directory.register dir shard_service (handle_shard ctxt)
+
+let shard_rpc ctxt commitment shard =
+  RPC_context.make_call shard_service ctxt (((), commitment), shard) () ()
+
+let monitor_slot_headers_service = Services.monitor_slot_headers ()
 
 let register_monitor_slot_headers ctxt dir =
   RPC_directory.gen_register
     dir
-    (Services.monitor_slot_headers ())
+    monitor_slot_headers_service
     (handle_monitor_slot_headers ctxt)
+
+let monitor_slot_headers_rpc ctxt =
+  RPC_context.make_streamed_call monitor_slot_headers_service ctxt () () ()
 
 let register ctxt =
   RPC_directory.empty
