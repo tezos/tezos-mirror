@@ -595,9 +595,9 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
               "injecting reveal+transfer from %a (counters=%a,%a) to %a"
               Signature.Public_key_hash.pp
               transfer.src.pkh
-              Z.pp_print
+              Manager_counter.pp
               reveal_counter
-              Z.pp_print
+              Manager_counter.pp
               transf_counter
               Contract.pp
               (destination_to_contract transfer.dst))
@@ -621,7 +621,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
               "injecting transfer from %a (counter=%a) to %a"
               Signature.Public_key_hash.pp
               transfer.src.pkh
-              Z.pp_print
+              Manager_counter.pp
               transf_counter
               Contract.pp
               (destination_to_contract transfer.dst))

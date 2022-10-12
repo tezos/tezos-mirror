@@ -38,3 +38,6 @@ val init : t
 
 (** Successor of a counter. *)
 val succ : t -> t
+
+(** Pretty-printer for counters. *)
+val pp : Format.formatter -> t -> unit

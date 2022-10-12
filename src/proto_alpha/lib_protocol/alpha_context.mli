@@ -1604,6 +1604,8 @@ module Manager_counter : sig
   include Compare.S with type t := t
 
   val succ : t -> t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 (** This module re-exports definitions from {!Contract_repr} and

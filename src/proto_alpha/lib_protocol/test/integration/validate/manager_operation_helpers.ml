@@ -226,7 +226,7 @@ let pp_operation_req pp
      amount: %a@,\
      @]"
     (kind_to_string kind)
-    (pp_opt Z.pp_print)
+    (pp_opt Manager_counter.pp)
     counter
     (pp_opt Tez.pp)
     fee
@@ -1388,7 +1388,7 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
       Manager_counter.equal
       ~loc:__LOC__
       "Counter incrementation"
-      Z.pp_print
+      Manager_counter.pp
       c_out
       c_expected
   in

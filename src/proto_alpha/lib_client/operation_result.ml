@@ -995,7 +995,7 @@ let pp_manager_operation_result ppf
   Format.fprintf ppf "@[<v 2>Manager signed operations:" ;
   Format.fprintf ppf "@,From: %a" Signature.Public_key_hash.pp source ;
   Format.fprintf ppf "@,Fee to the baker: %s%a" tez_sym Tez.pp fee ;
-  Format.fprintf ppf "@,Expected counter: %a" Z.pp_print counter ;
+  Format.fprintf ppf "@,Expected counter: %a" Manager_counter.pp counter ;
   Format.fprintf ppf "@,Gas limit: %a" Gas.Arith.pp_integral gas_limit ;
   Format.fprintf ppf "@,Storage limit: %a bytes" Z.pp_print storage_limit ;
   pp_balance_updates ppf balance_updates ;
