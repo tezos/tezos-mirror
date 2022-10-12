@@ -2641,129 +2641,128 @@ let test_interrupt_rollup_node =
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
 
-let test_refutation_reward_and_punishment protocols =
-  register_test
-    ~__FILE__
-    ~tags:["l1"; "refutation"; "stake"; "reward"; "punishment"]
-    ~title:"refutation: check the punishment and reward"
-    (fun protocol ->
-      (* Timeout is the easiest way to end a game, we set timeout period
+let test_refutation_reward_and_punishment ~kind =
+  let timeout_period = 3 in
+  let commitment_period = 2 in
+  test_scenario
+    ~kind
+    ~timeout:timeout_period
+    ~commitment_period
+    {
+      tags = ["refutation"; "reward"; "punishment"];
+      variant = None;
+      description = "participant of a refutation game are slashed/rewarded";
+    }
+  @@ fun _rollup_node sc_rollup node client ->
+  (* Timeout is the easiest way to end a game, we set timeout period
          low to produce an outcome quickly. *)
-      let timeout_period = 3 in
-      let commitment_period = 2 in
-      setup ~commitment_period ~timeout:timeout_period ~protocol
-      @@ fun node client ->
-      let* {commitment_period_in_blocks; stake_amount; _} =
-        get_sc_rollup_constants client
-      in
-      let punishment = Tez.to_mutez stake_amount in
-      let reward = punishment / 2 in
-      (* Originate a Sc rollup. *)
-      let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
+  let* {commitment_period_in_blocks; stake_amount; _} =
+    get_sc_rollup_constants client
+  in
+  let punishment = Tez.to_mutez stake_amount in
+  let reward = punishment / 2 in
 
-      (* Pick the two players and their initial balances. *)
-      let operator1 = Constant.bootstrap2 in
-      let operator2 = Constant.bootstrap3 in
+  (* Pick the two players and their initial balances. *)
+  let operator1 = Constant.bootstrap2 in
+  let operator2 = Constant.bootstrap3 in
 
-      let* operator1_balances =
-        contract_balances ~pkh:operator1.public_key_hash client
-      in
-      let* operator2_balances =
-        contract_balances ~pkh:operator2.public_key_hash client
-      in
+  let* operator1_balances =
+    contract_balances ~pkh:operator1.public_key_hash client
+  in
+  let* operator2_balances =
+    contract_balances ~pkh:operator2.public_key_hash client
+  in
 
-      (* Retrieve the origination commitment *)
-      let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
+  (* Retrieve the origination commitment *)
+  let* c0, _ = last_cemented_commitment_hash_with_level ~sc_rollup client in
 
-      (* Compute the inbox level for which we'd like to commit *)
-      let starting_level = Node.get_level node in
-      let inbox_level = starting_level + commitment_period_in_blocks in
-      (* d is the delta between the target inbox level and the current level *)
-      let d = inbox_level - Node.get_level node in
-      (* Bake sufficiently many blocks to be able to commit for the desired inbox
-         level. We may actually bake no blocks if d <= 0 *)
-      let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
+  (* Compute the inbox level for which we'd like to commit *)
+  let starting_level = Node.get_level node in
+  let inbox_level = starting_level + commitment_period_in_blocks in
+  (* d is the delta between the target inbox level and the current level *)
+  let d = inbox_level - Node.get_level node in
+  (* Bake sufficiently many blocks to be able to commit for the desired inbox
+     level. We may actually bake no blocks if d <= 0 *)
+  let* () = repeat d (fun () -> Client.bake_for_and_wait client) in
 
-      (* [operator1] stakes on a commitment. *)
-      let* _ =
-        publish_dummy_commitment
-          ~inbox_level
-          ~predecessor:c0
-          ~sc_rollup
-          ~number_of_ticks:1
-          ~src:operator1.public_key_hash
-          client
-      in
-      let* new_operator1_balances =
-        contract_balances ~pkh:operator1.public_key_hash client
-      in
+  (* [operator1] stakes on a commitment. *)
+  let* _ =
+    publish_dummy_commitment
+      ~inbox_level
+      ~predecessor:c0
+      ~sc_rollup
+      ~number_of_ticks:1
+      ~src:operator1.public_key_hash
+      client
+  in
+  let* new_operator1_balances =
+    contract_balances ~pkh:operator1.public_key_hash client
+  in
 
-      Check.(
-        (new_operator1_balances.frozen
-        = operator1_balances.frozen + Tez.to_mutez stake_amount)
-          int
-          ~error_msg:"expecting frozen balance for operator1: %R, got %L") ;
+  Check.(
+    (new_operator1_balances.frozen
+    = operator1_balances.frozen + Tez.to_mutez stake_amount)
+      int
+      ~error_msg:"expecting frozen balance for operator1: %R, got %L") ;
 
-      (* [operator2] stakes on a commitment. *)
-      let* _ =
-        publish_dummy_commitment
-          ~inbox_level
-          ~predecessor:c0
-          ~sc_rollup
-          ~number_of_ticks:2
-          ~src:operator2.public_key_hash
-          client
-      in
-      let* new_operator2_balances =
-        contract_balances ~pkh:operator2.public_key_hash client
-      in
-      Check.(
-        (new_operator2_balances.frozen
-        = operator2_balances.frozen + Tez.to_mutez stake_amount)
-          int
-          ~error_msg:"expecting frozen balance for operator2: %R, got %L") ;
+  (* [operator2] stakes on a commitment. *)
+  let* _ =
+    publish_dummy_commitment
+      ~inbox_level
+      ~predecessor:c0
+      ~sc_rollup
+      ~number_of_ticks:2
+      ~src:operator2.public_key_hash
+      client
+  in
+  let* new_operator2_balances =
+    contract_balances ~pkh:operator2.public_key_hash client
+  in
+  Check.(
+    (new_operator2_balances.frozen
+    = operator2_balances.frozen + Tez.to_mutez stake_amount)
+      int
+      ~error_msg:"expecting frozen balance for operator2: %R, got %L") ;
 
-      let module M = Operation.Manager in
-      (* [operator1] starts a dispute, but will never play. *)
-      let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source:operator1
-        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator2.public_key_hash ()
-      in
-      (* Get exactly to the block where we are able to timeout. *)
-      let* () =
-        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
-      in
-      let* () = timeout ~sc_rollup ~staker:operator2.public_key_hash client in
+  let module M = Operation.Manager in
+  (* [operator1] starts a dispute, but will never play. *)
+  let* () =
+    bake_operation_via_rpc client
+    @@ M.make ~source:operator1
+    @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator2.public_key_hash ()
+  in
+  (* Get exactly to the block where we are able to timeout. *)
+  let* () =
+    repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = timeout ~sc_rollup ~staker:operator2.public_key_hash client in
 
-      (* The game should have now ended. *)
+  (* The game should have now ended. *)
 
-      (* [operator2] wins half of the opponent's stake. *)
-      let* final_operator2_balances =
-        contract_balances ~pkh:operator2.public_key_hash client
-      in
-      Check.(
-        (final_operator2_balances.frozen = new_operator2_balances.frozen)
-          int
-          ~error_msg:"operator2 should keep its frozen deposit: %R, got %L") ;
-      Check.(
-        (final_operator2_balances.liquid
-        = new_operator2_balances.liquid + reward)
-          int
-          ~error_msg:"operator2 should win a reward: %R, got %L") ;
+  (* [operator2] wins half of the opponent's stake. *)
+  let* final_operator2_balances =
+    contract_balances ~pkh:operator2.public_key_hash client
+  in
+  Check.(
+    (final_operator2_balances.frozen = new_operator2_balances.frozen)
+      int
+      ~error_msg:"operator2 should keep its frozen deposit: %R, got %L") ;
+  Check.(
+    (final_operator2_balances.liquid = new_operator2_balances.liquid + reward)
+      int
+      ~error_msg:"operator2 should win a reward: %R, got %L") ;
 
-      (* [operator1] loses all its stake. *)
-      let* final_operator1_balances =
-        contract_balances ~pkh:operator1.public_key_hash client
-      in
-      Check.(
-        (final_operator1_balances.frozen
-        = new_operator1_balances.frozen - punishment)
-          int
-          ~error_msg:"operator1 should lose its frozen deposit: %R, got %L") ;
+  (* [operator1] loses all its stake. *)
+  let* final_operator1_balances =
+    contract_balances ~pkh:operator1.public_key_hash client
+  in
+  Check.(
+    (final_operator1_balances.frozen
+    = new_operator1_balances.frozen - punishment)
+      int
+      ~error_msg:"operator1 should lose its frozen deposit: %R, got %L") ;
 
-      unit)
-    protocols
+  unit
 
 (* Testing the execution of outbox messages
    ----------------------------------------
@@ -3185,4 +3184,4 @@ let register ~protocols =
     protocols ;
   test_valid_dispute_dissection ~kind:"arith" protocols ;
   test_timeout ~kind:"arith" protocols ;
-  test_refutation_reward_and_punishment protocols
+  test_refutation_reward_and_punishment protocols ~kind:"arith"
