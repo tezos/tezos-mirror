@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_node_config)
+ (public_name octez-node-config)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-shell-services
+  tezos-rpc-http
+  tezos-rpc-http-server
+  tezos-context
+  tezos-validation)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_rpc_http
+  -open Tezos_rpc_http_server
+  -open Tezos_context
+  -open Tezos_validation))

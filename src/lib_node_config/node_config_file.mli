@@ -64,7 +64,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_config.t;
+  internal_events : Tezos_base.Internal_event_config.t;
   shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;

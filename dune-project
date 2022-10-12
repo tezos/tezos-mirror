@@ -13,6 +13,7 @@
 (package (name octez-codec))
 (package (name octez-dal-node))
 (package (name octez-node))
+(package (name octez-node-config))
 (package (name octez-protocol-compiler))
 (package (name octez-proxy-server))
 (package (name octez-sc-rollup-client-alpha))

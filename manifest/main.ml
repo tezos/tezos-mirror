@@ -3190,6 +3190,22 @@ let octez_dal_node_lib =
         octez_client_base_unix |> open_;
       ]
 
+let octez_node_config =
+  public_lib
+    "octez-node-config"
+    ~path:"src/lib_node_config"
+    ~synopsis:"Octez: `octez-node-config` library"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives" |> open_;
+        octez_stdlib_unix |> open_;
+        octez_shell_services |> open_;
+        octez_rpc_http |> open_;
+        octez_rpc_http_server |> open_;
+        octez_context |> open_;
+        octez_validation |> open_;
+      ]
+
 let octez_scoru_wasm_tests_helpers =
   private_lib
     "test_scoru_wasm_test_helpers"
@@ -5474,6 +5490,7 @@ let _octez_node =
          octez_base |> open_ ~m:"TzPervasives" |> open_;
          octez_base_unix;
          octez_version;
+         octez_node_config |> open_;
          octez_stdlib_unix |> open_;
          octez_shell_services |> open_;
          octez_rpc_http |> open_;
