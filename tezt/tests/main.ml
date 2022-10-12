@@ -96,13 +96,11 @@ let register_protocol_agnostic_tests () =
   Client_run_view.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
   Create_contract.register ~protocols ;
-  Dal.register ~protocols ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols ;
   Encoding.register ~protocols ;
   Forge.register ~protocols ;
   Global_constants.register ~protocols ;
-  Hash_data.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
   Liquidity_baking_per_block_votes.register ~protocols ;
@@ -111,7 +109,6 @@ let register_protocol_agnostic_tests () =
   Mockup.register_global_constants ~protocols ;
   Monitor_operations.register ~protocols ;
   Multinode_snapshot.register ~protocols ;
-  Consensus_key.register ~protocols ;
   Node_event_level.register ~protocols ;
   Normalize.register ~protocols ;
   Precheck.register ~protocols ;
@@ -133,27 +130,37 @@ let register_protocol_agnostic_tests () =
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
-  Test_contract_bls12_381.register ~protocols ;
-  Ticket_receipt_and_rpc.register ~protocols ;
   Timelock.register ~protocols ;
   Tickets.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
   Tzip4_view.register ~protocols ;
-  Views.register protocols ;
   Retro.register ~protocols ;
   Events.register ~protocols ;
   Ghostnet_dictator_migration.register ~protocols ;
-  Increase_paid_storage.register ~protocols ;
   Operation_validation.register ~protocols ;
-  Sc_rollup.register ~protocols ;
   Testnet_dictator.register ~protocols ;
   Vdf_test.register ~protocols ;
   Used_paid_storage_spaces.register ~protocols
+
+(* Regression tests are not easy to maintain for multiple protocols because one needs
+   to update and maintain all the expected output files. Some of them, such as
+   those in [create_contract.ml] and [deposits_limit.ml], already support all protocols.
+   Some do not. Those that do not are declared here. *)
+let register_protocol_specific_because_regression_tests () =
+  Consensus_key.register ~protocols:[Alpha] ;
+  Dal.register ~protocols:[Alpha] ;
+  Hash_data.register ~protocols:[Alpha] ;
+  Increase_paid_storage.register ~protocols:[Kathmandu; Alpha] ;
+  Sc_rollup.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
+  Ticket_receipt_and_rpc.register ~protocols:[Alpha] ;
+  Views.register [Alpha]
 
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
   register_protocol_agnostic_tests () ;
+  register_protocol_specific_because_regression_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
