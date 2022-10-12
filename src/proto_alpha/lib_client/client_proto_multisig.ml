@@ -46,7 +46,7 @@ type error += Bytes_deserialisation_error of Bytes.t
 
 type error += Bad_deserialized_contract of (Contract_hash.t * Contract_hash.t)
 
-type error += Bad_deserialized_counter of (Z.t * Z.t)
+type error += Bad_deserialized_counter of {received : Z.t; expected : Z.t}
 
 type error += Non_positive_threshold of int
 
@@ -225,9 +225,12 @@ let () =
         expected)
     Data_encoding.(obj1 (req "received_expected" (tup2 int31 int31)))
     (function
-      | Bad_deserialized_counter (c1, c2) -> Some (Z.to_int c1, Z.to_int c2)
+      | Bad_deserialized_counter {received; expected} ->
+          Some (Z.to_int received, Z.to_int expected)
       | _ -> None)
-    (fun (c1, c2) -> Bad_deserialized_counter (Z.of_int c1, Z.of_int c2)) ;
+    (fun (received, expected) ->
+      Bad_deserialized_counter
+        {received = Z.of_int received; expected = Z.of_int expected}) ;
   register_error_kind
     `Permanent
     ~id:"thresholdTooHigh"
@@ -1141,7 +1144,10 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
                 action_of_expr ~generic:descr.generic e
               else
                 fail (Bad_deserialized_contract (contract, multisig_contract))
-            else fail (Bad_deserialized_counter (counter, stored_counter))
+            else
+              fail
+                (Bad_deserialized_counter
+                   {received = counter; expected = stored_counter})
         | Tezos_micheline.Micheline.Prim
             ( _,
               Script.D_Pair,
@@ -1175,7 +1181,10 @@ let action_of_bytes ~multisig_contract ~stored_counter ~descr ~chain_id bytes =
                 action_of_expr ~generic:descr.generic e
               else
                 fail (Bad_deserialized_contract (contract, multisig_contract))
-            else fail (Bad_deserialized_counter (counter, stored_counter))
+            else
+              fail
+                (Bad_deserialized_counter
+                   {received = counter; expected = stored_counter})
         | _ -> fail (Bytes_deserialisation_error bytes))
   else fail (Bytes_deserialisation_error bytes)
 
