@@ -760,42 +760,40 @@ let with_fresh_rollups ~kind n f node client =
   go n String_set.empty f
 
 let test_rollup_list ~kind =
-  let open Lwt.Syntax in
-  let go node client =
-    let* rollups =
-      RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
-    in
-    let rollups = JSON.as_list rollups in
-    let () =
-      match rollups with
-      | _ :: _ ->
-          failwith "Expected initial list of originated SCORUs to be empty"
-      | [] -> ()
-    in
-    with_fresh_rollups
-      ~kind
-      10
-      (fun scoru_addresses ->
-        let* () = Client.bake_for_and_wait client in
-        let+ rollups =
-          RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
-        in
-        let rollups =
-          JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
-        in
-        Check.(
-          (rollups = scoru_addresses)
-            (comparable_module (module String_set))
-            ~error_msg:"%L %R"))
-      node
-      client
-  in
-
   register_test
     ~__FILE__
     ~tags:["sc_rollup"; "list"]
     ~title:"list originated rollups"
-    (fun protocol -> setup ~protocol go)
+  @@ fun protocol ->
+  setup ~protocol @@ fun node client ->
+  let* rollups =
+    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
+  in
+  let rollups = JSON.as_list rollups in
+  let () =
+    match rollups with
+    | _ :: _ ->
+        failwith "Expected initial list of originated SCORUs to be empty"
+    | [] -> ()
+  in
+  with_fresh_rollups
+    ~kind
+    10
+    (fun scoru_addresses ->
+      let* () = Client.bake_for_and_wait client in
+      let* rollups =
+        RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
+      in
+      let rollups =
+        JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
+      in
+      Check.(
+        (rollups = scoru_addresses)
+          (comparable_module (module String_set))
+          ~error_msg:"%L %R") ;
+      unit)
+    node
+    client
 
 (* Make sure the rollup node boots into the initial state.
    -------------------------------------------------------
@@ -2050,67 +2048,65 @@ let test_rollup_node_uses_arith_boot_sector =
 
       Lwt.return_unit)
 
-let test_rollup_arith_uses_reveals =
+let test_rollup_arith_uses_reveals ~kind =
   let nadd = 32 * 1024 in
-  let go_boot client sc_rollup sc_rollup_node =
-    let filename =
-      let filename, cout = Filename.open_temp_file "sc_rollup" ".in" in
-      output_string cout "0 " ;
-      for _i = 1 to nadd do
-        output_string cout "1 + "
-      done ;
-      output_string cout "value" ;
-      close_out cout ;
-      filename
-    in
-    let* hash =
-      Sc_rollup_node.import sc_rollup_node ~pvm_name:"arith" ~filename
-    in
-    let* genesis_info =
-      RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
-    in
-    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
-    let* () = Sc_rollup_node.run sc_rollup_node in
-
-    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-    let* level =
-      Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
-    in
-
-    let* () = send_text_messages client ["hash:" ^ hash] in
-    let* () = bake_levels 2 client in
-    let* _ =
-      Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
-    in
-
-    let* encoded_value =
-      Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
-    in
-    let value =
-      match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
-      | Error error ->
-          failwith
-            (Format.asprintf
-               "The arithmetic PVM has an unexpected state: %a"
-               Data_encoding.Binary.pp_read_error
-               error)
-      | Ok x -> x
-    in
-    Check.(
-      (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
-    return ()
-  in
   test_scenario
     ~timeout:120
+    ~kind
     {
-      tags = ["reveals"];
+      tags = ["reveals"; "rollup_node"];
       variant = None;
-      description = "rollup node - correct handling of commitments";
+      description = "rollup node correctly handles reveals";
     }
   @@ fun _protocol sc_rollup_node sc_rollup _node client ->
-  go_boot client sc_rollup sc_rollup_node
+  let filename =
+    let filename, cout = Filename.open_temp_file "sc_rollup" ".in" in
+    output_string cout "0 " ;
+    for _i = 1 to nadd do
+      output_string cout "1 + "
+    done ;
+    output_string cout "value" ;
+    close_out cout ;
+    filename
+  in
+  let* hash =
+    Sc_rollup_node.import sc_rollup_node ~pvm_name:"arith" ~filename
+  in
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+  in
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+
+  let* () = Sc_rollup_node.run sc_rollup_node in
+
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node init_level
+  in
+
+  let* () = send_text_messages client ["hash:" ^ hash] in
+  let* () = bake_levels 2 client in
+  let* _ =
+    Sc_rollup_node.wait_for_level ~timeout:120. sc_rollup_node (level + 1)
+  in
+
+  let* encoded_value =
+    Sc_rollup_client.state_value ~hooks sc_rollup_client ~key:"vars/value"
+  in
+  let value =
+    match Data_encoding.(Binary.of_bytes int31) @@ encoded_value with
+    | Error error ->
+        failwith
+          (Format.asprintf
+             "The arithmetic PVM has an unexpected state: %a"
+             Data_encoding.Binary.pp_read_error
+             error)
+    | Ok x -> x
+  in
+  Check.(
+    (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
+  return ()
 
 (* Initializes a client with an existing account being
    [Constants.tz4_account]. *)
