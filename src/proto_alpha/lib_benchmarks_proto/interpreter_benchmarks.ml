@@ -2867,11 +2867,15 @@ module Registration_section = struct
             make_default_samplers config.Default_config.sampler
           in
           fun () ->
-            let half_amount = Samplers.Random_value.value nat rng_state in
-            let half_amount = Script_int.add_n half_amount Script_int.one_n in
-            let amount = Script_int.add_n half_amount half_amount in
+            let x_amount =
+              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+            in
+            let y_amount =
+              Script_int.succ_n @@ Samplers.Random_value.value nat rng_state
+            in
+            let amount = Script_int.add_n x_amount y_amount in
             let amount =
-              (* this is safe because half_amount > 0 *)
+              (* this is safe because x_amount > 0 and y_amount > 0 *)
               WithExceptions.Option.get ~loc:__LOC__
               @@ Ticket_amount.of_n amount
             in
@@ -2879,7 +2883,7 @@ module Registration_section = struct
             let ticket = {ticket with amount} in
             Ex_stack_and_kinstr
               {
-                stack = (ticket, ((half_amount, half_amount), eos));
+                stack = (ticket, ((x_amount, y_amount), eos));
                 stack_type;
                 kinstr = split_ticket_instr;
               })
