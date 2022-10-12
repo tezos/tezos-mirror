@@ -1300,7 +1300,7 @@ let rec contents_infos :
       let*? fee = manop.fee +? probes.fee in
       let gas_limit = Gas.Arith.add probes.gas_limit manop.gas_limit in
       let nb_counter = succ probes.nb_counter in
-      let _ = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
+      let* () = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
       return {fee; source = probes.source; gas_limit; nb_counter}
 
 (** Computes a [probes] from a list of manager contents. *)
@@ -1408,7 +1408,7 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
       Tez.pp
   in
   let* () = b_cmp b_out b_expected in
-  let _ =
+  let* () =
     Assert.equal
       Manager_counter.equal
       ~loc:__LOC__
@@ -1436,10 +1436,8 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
         g_expected
 
 let observe_list ~only_validate ~mode ctxt_pre ctxt_post ops =
-  List.iter
-    (fun op ->
-      let _ = observe ~only_validate ~mode ctxt_pre ctxt_post op in
-      ())
+  List.iter_es
+    (fun op -> observe ~only_validate ~mode ctxt_pre ctxt_post op)
     ops
 
 let validate_operations inc_in ops =
@@ -1498,7 +1496,7 @@ let validate_with_diagnostic ~only_validate ~mode (infos : infos) ops =
   let* ctxt_post, infos =
     post_state_of_mode ~only_validate ~mode ctxt_pre ops infos
   in
-  let _ = observe_list ~only_validate ~mode ctxt_pre ctxt_post ops in
+  let* () = observe_list ~only_validate ~mode ctxt_pre ctxt_post ops in
   return infos
 
 (** If only the operation validation succeeds; e.g. the rest of the
