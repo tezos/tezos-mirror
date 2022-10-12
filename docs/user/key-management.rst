@@ -1,16 +1,43 @@
 Key Management
 ==============
 
+Securely managing keys is of utmost importance in any blockchain, including Tezos, because keys are used to sign sensitive operations such as transfers of valuable assets (tez, FA tokens, tickets, ...) or baking operations.
+
+The Octez tool suite offers several solutions to store your private keys safely and use them securely for signing operations.
+However, these solutions are **not** enabled by default, so you have to turn them on, as explained in this tutorial.
+
+Indeed, by default:
+
+- Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
+- The client uses these keys to sign user operations (e.g. transfers) by itself.
+- The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)endorsements).
+
+The solutions provided to strengthen the security of the default key management and signing are the following:
+
+- A hardware wallet (highly recommended) allows to:
+
+  + store your private keys securely
+  + sign user operations (e.g. transfers) interactively on the wallet
+  + automatically sign baking operations, such as (pre-)endorsements, more securely.
+
+- If you don't have a hardware wallet:
+
+  + The option ``--encrypted`` of the client offers a first protection for storing your keys.
+  + A separate signer daemon allows to decouple the client and baker from the signing process.
+    In particular, this allows executing a remote signer, placed on a different machine than the client and/or the baker, perhaps less exposed to attacks.
+    As the keys only need to be accessible to the signer, they can also benefit from the lesser exposure.
+
+These solutions are detailed in the rest of this page.
 
 .. _ledger:
 
 Ledger support
 --------------
 
-It is possible and advised to use a hardware wallet to manage your
-keys, Tezos' client supports Ledger Nano devices provided that you have
+It is possible and advised to use a hardware wallet to securely store and manage your
+keys. The Octez client supports Ledger Nano devices provided that they have
 a Tezos app installed.
-The apps were developed by Obsidian Systems and they provide a comprehensive
+The apps were developed by `Obsidian Systems <https://obsidian.systems>`_ and they provide a comprehensive
 `tutorial on how to install it.
 <https://github.com/obsidiansystems/ledger-app-tezos>`_
 
@@ -22,27 +49,27 @@ Live
 <https://www.ledger.com/ledger-live/>`_.
 On Linux make sure you correctly set up your `udev` rules as explained
 `here <https://github.com/obsidiansystems/ledger-app-tezos#udev-rules-linux-only>`_.
-Connect your ledger, unlock it and go the dashboard.
-In Ledger Live `install Tezos Wallet` from the applications list and open it on the
+Connect your Ledger, unlock it and go to the dashboard.
+In Ledger Live install ``Tezos Wallet`` from the applications list and open it on the
 device.
 
 
 Tezos Wallet app
 ~~~~~~~~~~~~~~~~
 
-Now on the client we can import the keys (make sure the device is
+Now on the Octez client we can import the keys (make sure the device is
 in the Tezos Wallet app)::
 
    ./octez-client list connected ledgers
 
-You can follow the instructions to import the ledger private key and
+You can follow the instructions to import the Ledger encrypted private key and
 you can choose between the root or a derived address.
 We can confirm the addition by listing known addresses::
 
    ./octez-client import secret key my_ledger ledger://tz1XXXXXXXXXX
    ./octez-client list known addresses
 
-Optional: we can check that our ledger signs correctly using the
+Optional: we can check that our Ledger signs correctly using the
 following command and confirming on the device::
 
    octez-client show ledger path ledger://tz1XXXXXXXXXX
@@ -56,13 +83,11 @@ Tezos Baking app
 ~~~~~~~~~~~~~~~~
 
 In Ledger Live (with Developer Mode enabled), there is also a `Tezos Baking`
-app which allows a delegate to sign non-interactively e.g. there is no need
-to manually sign every block or endorsement.
-The application however is restricted to sign exclusively blocks and
-endorsement operations; it is not possible to sign for example a
-transfer.
-Furthermore the application keeps track of the last level baked and allows
-only to bake for increasing levels.
+app which allows a delegate to sign automatically (i.e., there is no need
+to manually sign every block or (pre-)endorsement).
+Of course, the application is restricted to only sign baking operations; it never signs a transfer, for example.
+Furthermore, the application keeps track of the last level baked and only
+allows baking for subsequent levels.
 This prevents signing blocks at levels below the latest
 block signed.
 
@@ -79,14 +104,19 @@ More details can be found on the `Tezos Ledger app
 Signer
 ------
 
-Another solution to decouple the node from the signing process is to
-use the *remote signer*.
-Among the signing scheme supported by the client, that we can list
-with ``octez-client list signing schemes``, there are ``unix``,
-``tcp``, ``http`` and ``https``.
-These schemes send signing requests over their respective
-communication channel towards the ``octez-signer``, which can run on a
+A solution to decouple the client and the baker from the signing process is to
+use a *remote signer*.
+
+In this configuration, the client sends signing requests over a
+communication channel towards ``octez-signer``, which can run on a
 different machine that stores the secret key.
+
+There are several *signing schemes* supported by the client, corresponding to different communication channels, such as ``unix``,
+``tcp``, ``http`` and ``https``. We can list the available schemes with::
+
+   octez-client list signing schemes
+
+We now explain how this remote signer configuration works based on signing requests, how can it be set up, and how the connection to the signer can be secured (as by default it is not secure).
 
 Signer requests
 ~~~~~~~~~~~~~~~
@@ -124,7 +154,7 @@ Starting with Octez v12 (supporting the Ithaca protocol), consensus operations a
    * - Endorsement
      - 0x13
 
-The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``, as explained in the signer's manual.
+The magic byte values to be used by the signer can be restricted using its option ``--magic-bytes``, as explained in the :ref:`signer's manual <signer_manual>`.
 
 Signer configuration
 ~~~~~~~~~~~~~~~~~~~~
@@ -132,9 +162,10 @@ Signer configuration
 In our home server we can generate a new key pair (or import one from a
 :ref:`Ledger<ledger>`) and launch a signer that signs operations using these
 keys.
-The new keys are store in ``$HOME/.tezos-signer`` in the same format
+To select the ``tcp`` signing scheme, one has to launch ``octez-signer`` with the ``socket`` argument, as shown below.
+The new keys are stored by the signer in ``$HOME/.tezos-signer`` in the same format
 as ``octez-client``.
-On our internet facing vps we can then import a key with the address
+On our internet-facing virtual private server, called "vps" here, we can then import a key with the address
 of the signer.
 
 ::
@@ -153,7 +184,7 @@ Every time the client on *vps* needs to sign an operation for
 
 However, with the above method, the address of the signer is hard-coded into the remote key value.
 Consequently, if we ever have to move the signer to another machine or access it using another protocol, we will have to change all the remote keys.
-A more flexible method is to only register a key as being remote, and separately supply the address of the signer uisng the `-R` option::
+A more flexible method is to only register a key as being remote, and separately supply the address of the signer using the `-R` option::
 
    vps~$ octez-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
    vps~$ octez-client -R 'tcp://home:7732' sign bytes 0x03 for alice
@@ -165,7 +196,7 @@ Alternatively, the address of the signer can be recorded in environment variable
    vps~$ octez-client import secret key alice remote:tz1abc...
    vps~$ octez-client sign bytes 0x03 for alice
 
-All the above methods can be retargeted to the other signing schemes, for instance, ``http``::
+All the above methods can also be used with the other signing schemes, for instance, ``http``::
 
    home~$ octez-signer launch http signer -a home
 
@@ -182,28 +213,29 @@ All the above methods can be retargeted to the other signing schemes, for instan
 
 The complete list of environment variables for connecting to the remote signer is:
 
-+ `TEZOS_SIGNER_TCP_HOST`
-+ `TEZOS_SIGNER_TCP_PORT` (default: 7732)
-+ `TEZOS_SIGNER_HTTP_HOST`
-+ `TEZOS_SIGNER_HTTP_PORT` (default: 6732)
-+ `TEZOS_SIGNER_HTTPS_HOST`
-+ `TEZOS_SIGNER_HTTPS_PORT` (default: 443)
-+ `TEZOS_SIGNER_UNIX_PATH`
-+ `TEZOS_SIGNER_HTTP_HEADERS`
++ ``TEZOS_SIGNER_TCP_HOST``
++ ``TEZOS_SIGNER_TCP_PORT`` (default: 7732)
++ ``TEZOS_SIGNER_HTTP_HOST``
++ ``TEZOS_SIGNER_HTTP_PORT`` (default: 6732)
++ ``TEZOS_SIGNER_HTTPS_HOST``
++ ``TEZOS_SIGNER_HTTPS_PORT`` (default: 443)
++ ``TEZOS_SIGNER_UNIX_PATH``
++ ``TEZOS_SIGNER_HTTP_HEADERS``
 
 Secure the connection
 ~~~~~~~~~~~~~~~~~~~~~
 
-Note that this setup alone is not secure, **the signer accepts
+Note that the above setup alone is not secure, **the signer accepts
 requests from anybody and happily signs any transaction!**
 
 Improving the security of the communication channel can be done at the
-system level, setting up a tunnel with ``ssh`` or ``wireguard``
-between *home* and *vps*, otherwise the signer already provides an
-additional protection.
+system level by setting up a tunnel with ``ssh`` or ``wireguard``
+between *home* and *vps*.
 
+The signer itself can also be configured to provide additional protection.
 With the option ``--require-authentication`` the signer requires the
 client to authenticate before signing any operation.
+
 First we create a new key on the *vps* and then import it as an
 authorized key on *home* where it is stored under
 ``.tezos-signer/authorized_keys`` (similarly to ``ssh``).
@@ -221,28 +253,27 @@ signer and it is not used as a Tezos account.
    home~$ octez-signer add authorized key edpk123456789 --name vps
    home~$ octez-signer --require-authentication launch socket signer -a home-ip
 
-All request are now signed with the *vps* key thus you are
-guaranteed authenticity and integrity.
-This set up **does not guarantee confidentiality**, an eavesdropper can
-see the transactions that you sign but on a public blockchain this is
-less of a concern.
-You can still use the ``https`` scheme or the tunnel to encrypt your
-traffic.
+All request are now signed with the *vps* key, guaranteeing
+their authenticity and integrity.
+However, this setup **does not guarantee confidentiality**: an eavesdropper can
+see the transactions that you sign (on a public blockchain this may be less of a concern).
+In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
 
 .. _activate_fundraiser_account:
 
-Activate fundraiser account - Mainnet
--------------------------------------
+Getting keys for fundraiser accounts
+------------------------------------
 
-If you took part in the fundraiser you can activate your account for
-the Mainnet on https://check.tezos.com/.
+If you took part in the fundraiser but didn't yet activate your account,
+it is still possible to activate your Mainnet account on https://check.tezos.com/.
 This feature is also included in some wallets.
 If you have any questions or issues, refer to that page or to the `Tezos
-foundation <https://tezos.foundation/>`_ for support.
+Foundation <https://tezos.foundation/>`_ for support.
 
-You may also use ``octez-client`` to activate your account, **be
-warned that you should have a very good understanding of key
-management in Tezos and be familiar with the command-line.**
+You may also use ``octez-client`` to activate your account, but **be
+warned that you should have
+a very good understanding of key management in Tezos and be familiar
+with the command-line.**
 The first step is to recover your private key using the following
 command which will ask for:
 
@@ -255,7 +286,7 @@ command which will ask for:
    octez-client import fundraiser key alice
 
 Once you insert all the required information, the client computes
-your secret key and it asks to create a new password to store your
+your secret key and it asks you to create a new password in order to store your
 secret key on disk encrypted.
 
 If you haven't already activated your account on the website, you can
@@ -266,11 +297,11 @@ foundation.
 
    octez-client activate fundraiser account alice with <code>
 
-Like explained above, your keys are stored under ``~/.tezos-client``.
-We strongly advice you to first **make a backup** and then
-transfer your tokens to a new pair of keys imported from a ledger (see
-:ref:`ledger`).
-
 Check the balance with::
 
-    octez-client get balance for alice
+   octez-client get balance for alice
+
+As explained above, your keys are stored under ``~/.tezos-client``.
+We strongly advise you to first **make a backup** and then
+transfer your tokens to a new pair of keys imported from a Ledger (see
+:ref:`ledger`).
