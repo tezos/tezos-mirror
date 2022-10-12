@@ -2020,105 +2020,81 @@ let test_rollup_arith_uses_reveals ~kind =
     (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
   return ()
 
-(* Initializes a client with an existing account being
-   [Constants.tz4_account]. *)
-let client_with_initial_keys ~protocol ~kind =
-  setup ~protocol @@ with_fresh_rollup ~kind
-  @@ fun _sc_rollup sc_rollup_node ->
-  let sc_client = Sc_rollup_client.create sc_rollup_node in
-  let account = Constant.tz4_account in
-  let* () = Sc_rollup_client.import_secret_key account sc_client in
-  return (sc_client, account)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
+
+    remove the need to have a scoru to run wallet command. In tezt the
+    {!Sc_rollup_client.create} takes a node where the command tested here does
+    not need to have a originated scoru nor a rollup node.
+*)
+
+(** Initializes a client with an account.*)
+let test_scenario_client_with_account ~account ~variant ~kind f =
+  test_scenario
+    ~kind
+    {
+      tags = ["rollup_client"; "wallet"];
+      variant = Some variant;
+      description = "rollup client wallet is valid";
+    }
+  @@ fun rollup_node sc_rollup tezos_node tezos_client ->
+  let rollup_client = Sc_rollup_client.create rollup_node in
+  let* () = Sc_rollup_client.import_secret_key account rollup_client in
+  f rollup_node rollup_client sc_rollup tezos_node tezos_client
 
 (* Check that the client can show the address of a registered account.
    -------------------------------------------------------------------
 *)
 let test_rollup_client_show_address ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["run"; "client"]
-    ~title:"Shows the address of a registered account"
-    (fun protocol ->
-      let* sc_client, account = client_with_initial_keys ~protocol ~kind in
-      let* shown_account =
-        Sc_rollup_client.show_address
-          ~alias:account.Account.aggregate_alias
-          sc_client
-      in
-      if
-        account.aggregate_public_key_hash
-        <> shown_account.aggregate_public_key_hash
-      then
-        failwith
-          (Printf.sprintf
-             "Expecting %s, got %s as public key hash from the client."
-             account.aggregate_public_key_hash
-             shown_account.aggregate_public_key_hash)
-      else if account.aggregate_public_key <> shown_account.aggregate_public_key
-      then
-        failwith
-          (Printf.sprintf
-             "Expecting %s, got %s as public key from the client."
-             account.aggregate_public_key
-             shown_account.aggregate_public_key)
-      else if account.aggregate_secret_key <> shown_account.aggregate_secret_key
-      then
-        let (Unencrypted sk) = shown_account.aggregate_secret_key in
-        let (Unencrypted expected_sk) = shown_account.aggregate_secret_key in
-        failwith
-          (Printf.sprintf
-             "Expecting %s, got %s as secret key from the client."
-             expected_sk
-             sk)
-      else return ())
+  let account = Constant.tz4_account in
+  test_scenario_client_with_account ~account ~kind ~variant:"show address"
+  @@ fun _rollup_node rollup_client _scoru _node _client ->
+  let* shown_account =
+    Sc_rollup_client.show_address ~alias:account.aggregate_alias rollup_client
+  in
+  Check.(
+    (account.aggregate_public_key_hash = shown_account.aggregate_public_key_hash)
+      string
+      ~error_msg:"Expecting %L, got %R as public key hash from the client.") ;
+  Check.(
+    (account.aggregate_public_key = shown_account.aggregate_public_key)
+      string
+      ~error_msg:"Expecting %L, got %R as public key from the client.") ;
+  let (Unencrypted sk) = shown_account.aggregate_secret_key in
+  let (Unencrypted expected_sk) = shown_account.aggregate_secret_key in
+  Check.(
+    (expected_sk = sk)
+      string
+      ~error_msg:"Expecting %L, got %R as secret key from the client.") ;
+  unit
 
 (* Check that the client can generate keys.
    ----------------------------------------
 *)
 let test_rollup_client_generate_keys ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["run"; "client"]
-    ~title:"Generates new tz4 keys"
-    (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun _sc_rollup sc_rollup_node ->
-      let sc_client = Sc_rollup_client.create sc_rollup_node in
-      let alias = "test_key" in
-      let* () = Sc_rollup_client.generate_keys ~alias sc_client in
-      let* _account = Sc_rollup_client.show_address ~alias sc_client in
-      return ())
+  let account = Constant.tz4_account in
+  test_scenario_client_with_account ~account ~kind ~variant:"gen address"
+  @@ fun _rollup_node rollup_client _scoru _node _client ->
+  let alias = "test_key" in
+  let* () = Sc_rollup_client.generate_keys ~alias rollup_client in
+  let* _account = Sc_rollup_client.show_address ~alias rollup_client in
+  return ()
 
 (* Check that the client can list keys.
    ------------------------------------
 *)
 let test_rollup_client_list_keys ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["run"; "client"]
-    ~title:"Lists known aliases in the client"
-    (fun protocol ->
-      let* sc_client, account = client_with_initial_keys ~kind ~protocol in
-      let* maybe_keys = Sc_rollup_client.list_keys sc_client in
-      let expected_keys =
-        [(account.aggregate_alias, account.aggregate_public_key_hash)]
-      in
-      if List.equal ( = ) expected_keys maybe_keys then return ()
-      else
-        let pp ppf l =
-          Format.pp_print_list
-            ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
-            (fun ppf (a, k) -> Format.fprintf ppf "%s: %s" a k)
-            ppf
-            l
-        in
-        Test.fail
-          ~__LOC__
-          "Expecting\n@[%a@]\ngot\n@[%a@]\nas keys from the client."
-          pp
-          expected_keys
-          pp
-          maybe_keys)
+  let account = Constant.tz4_account in
+  test_scenario_client_with_account ~account ~kind ~variant:"list alias"
+  @@ fun _rollup_node rollup_client _scoru _node _client ->
+  let* maybe_keys = Sc_rollup_client.list_keys rollup_client in
+  let expected_keys =
+    [(account.aggregate_alias, account.aggregate_public_key_hash)]
+  in
+  Check.(
+    (expected_keys = maybe_keys)
+      (list (tuple2 string string))
+      ~error_msg:"Expecting\n%L\ngot\n%R\nas keys from the client.") ;
+  unit
 
 let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
     ~sc_rollup ~src client =
