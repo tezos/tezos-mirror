@@ -2373,47 +2373,49 @@ let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
                    \---- c32 ---- c321
     Then, it calls the given scenario on it.
 *)
-let test_forking_scenario ~title ~scenario protocols =
-  register_test
-    ~__FILE__
-    ~tags:["l1"; "commitment"; "cement"; "fork"; "dispute"]
-    ~title
-    (fun protocol ->
-      (* Choosing challenge_windows to be quite longer than commitment_period
-         to avoid being in a situation where the first commitment in the result
-         of [mk_forking_commitments] is cementable without further bakes. *)
-      let commitment_period = 3 in
-      let challenge_window = commitment_period * 7 in
-      (* Completely arbitrary as we decide when to trigger timeouts in tests.
-         Making it a lot smaller than the default value to speed up tests. *)
-      let timeout = 10 in
-      setup ~commitment_period ~challenge_window ~timeout ~protocol
-      @@ fun node client ->
-      (* Originate a Sc rollup. *)
-      let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
-      (* Building a forking commitments tree. *)
-      let operator1 = Constant.bootstrap1 in
-      let operator2 = Constant.bootstrap2 in
-      let level0 = Node.get_level node in
-      let* commits =
-        mk_forking_commitments
-          node
-          client
-          ~sc_rollup
-          ~operator1:operator1.public_key_hash
-          ~operator2:operator2.public_key_hash
-      in
-      let level1 = Node.get_level node in
-      scenario
-        client
-        node
-        ~sc_rollup
-        ~operator1
-        ~operator2
-        commits
-        level0
-        level1)
-    protocols
+let test_forking_scenario ~kind ~variant scenario =
+  let commitment_period = 3 in
+  let challenge_window = commitment_period * 7 in
+  let timeout = 10 in
+  test_scenario
+    ~challenge_window
+    ~commitment_period
+    ~timeout
+    ~kind
+    {
+      tags = ["refutation"; "game"; "commitment"];
+      variant = Some variant;
+      description = "rollup with a commitment dispute";
+    }
+  @@ fun _rollup_node sc_rollup tezos_node tezos_client ->
+  (* Choosing challenge_windows to be quite longer than commitment_period
+     to avoid being in a situation where the first commitment in the result
+     of [mk_forking_commitments] is cementable without further bakes. *)
+
+  (* Completely arbitrary as we decide when to trigger timeouts in tests.
+     Making it a lot smaller than the default value to speed up tests. *)
+  (* Building a forking commitments tree. *)
+  let operator1 = Constant.bootstrap1 in
+  let operator2 = Constant.bootstrap2 in
+  let level0 = Node.get_level tezos_node in
+  let* commits =
+    mk_forking_commitments
+      tezos_node
+      tezos_client
+      ~sc_rollup
+      ~operator1:operator1.public_key_hash
+      ~operator2:operator2.public_key_hash
+  in
+  let level1 = Node.get_level tezos_node in
+  scenario
+    tezos_client
+    tezos_node
+    ~sc_rollup
+    ~operator1
+    ~operator2
+    commits
+    level0
+    level1
 
 (* A more convenient wrapper around [cement_commitment]. *)
 let cement_commitments client sc_rollup ?fail =
@@ -2437,127 +2439,163 @@ let timeout ?expect_failure ~sc_rollup ~staker client =
     - resolves the dispute on top of c2, and checks that the defeated branch
       is removed, while the alive one can be cemented.
 *)
-let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols =
-  test_forking_scenario
-    ~title:
-      "commitments: publish, and try to cement not on top of LCC or disputed"
-    ~scenario:
-      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
-      let c1, c2, c31, c32, c311, c321 = commits in
-      let* constants = get_sc_rollup_constants client in
-      let challenge_window = constants.challenge_window_in_blocks in
-
-      let cement = cement_commitments client sc_rollup in
-      let missing_blocks_to_cement = level0 + challenge_window - level1 in
+let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
+  test_forking_scenario ~variant:"publish, and cement on wrong commitment"
+  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+  let c1, c2, c31, c32, c311, c321 = commits in
+  let* constants = get_sc_rollup_constants client in
+  let challenge_window = constants.challenge_window_in_blocks in
+  let cement = cement_commitments client sc_rollup in
+  let missing_blocks_to_cement = level0 + challenge_window - level1 in
+  let* () =
+    if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
+    else
       let* () =
-        if missing_blocks_to_cement <= 0 then unit (* We can already cement *)
-        else
-          let* () =
-            repeat (missing_blocks_to_cement - 1) (fun () ->
-                Client.bake_for_and_wait client)
-          in
-          (* We cannot cement yet! *)
-          let* () = cement [c1] ~fail:commit_too_recent in
-          (* After these blocks, we should be able to cement all commitments
-             (modulo cementation ordering & disputes resolution) *)
-          repeat challenge_window (fun () -> Client.bake_for_and_wait client)
+        repeat (missing_blocks_to_cement - 1) (fun () ->
+            Client.bake_for_and_wait client)
       in
-      (* We cannot cement any of the commitments before cementing c1 *)
-      let* () = cement [c2; c31; c32; c311; c321] ~fail:parent_not_lcc in
-      (* But, we can cement c1 and then c2, in this order *)
-      let* () = cement [c1; c2] in
-      (* We cannot cement c31 or c32 on top of c2 because they are disputed *)
-      let* () = cement [c31; c32] ~fail:disputed_commit in
-      (* Of course, we cannot cement c311 or c321 because their parents are not
-         cemented. *)
-      let* () = cement ~fail:parent_not_lcc [c311; c321] in
+      (* We cannot cement yet! *)
+      let* () = cement [c1] ~fail:commit_too_recent in
+      (* After these blocks, we should be able to cement all commitments
+         (modulo cementation ordering & disputes resolution) *)
+      repeat challenge_window (fun () -> Client.bake_for_and_wait client)
+  in
+  (* We cannot cement any of the commitments before cementing c1 *)
+  let* () = cement [c2; c31; c32; c311; c321] ~fail:parent_not_lcc in
+  (* But, we can cement c1 and then c2, in this order *)
+  let* () = cement [c1; c2] in
+  (* We cannot cement c31 or c32 on top of c2 because they are disputed *)
+  let* () = cement [c31; c32] ~fail:disputed_commit in
+  (* Of course, we cannot cement c311 or c321 because their parents are not
+     cemented. *)
+  let* () = cement ~fail:parent_not_lcc [c311; c321] in
 
-      (* +++ dispute resolution +++
-         Let's resolve the dispute between operator1 and operator2 on the fork
-         c31 vs c32. [operator1] will make a bad initial dissection, so it
-         loses the dispute, and the branch c32 --- c321 dies. *)
+  (* +++ dispute resolution +++
+     Let's resolve the dispute between operator1 and operator2 on the fork
+     c31 vs c32. [operator1] will make a bad initial dissection, so it
+     loses the dispute, and the branch c32 --- c321 dies. *)
 
-      (* [operator1] starts a dispute. *)
-      let module M = Operation.Manager in
-      let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source:operator2
-        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
-      in
-      (* [operator1] will not play and will be timeout-ed. *)
-      let timeout_period = constants.timeout_period_in_blocks in
-      let* () =
-        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
-      in
-      (* He even timeout himself, what a shame. *)
-      let* () = timeout ~sc_rollup ~staker:operator1.public_key_hash client in
-      (* Attempting to cement defeated branch will fail. *)
-      let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
-      (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
-      cement [c31; c311])
-    protocols
+  (* [operator1] starts a dispute. *)
+  let module M = Operation.Manager in
+  let* () =
+    bake_operation_via_rpc client
+    @@ M.make ~source:operator2
+    @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+  in
+  (* [operator1] will not play and will be timeout-ed. *)
+  let timeout_period = constants.timeout_period_in_blocks in
+  let* () =
+    repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
+  in
+  (* He even timeout himself, what a shame. *)
+  let* () = timeout ~sc_rollup ~staker:operator1.public_key_hash client in
+  (* Attempting to cement defeated branch will fail. *)
+  let* () = cement ~fail:commit_doesnt_exit [c32; c321] in
+  (* Now, we can cement c31 on top of c2 and c311 on top of c31. *)
+  cement [c31; c311]
 
 (** Given a commitment tree constructed by {test_forking_scenario}, this test
     starts a dispute and makes a first valid dissection move.
 *)
-let test_valid_dispute_dissection protocols =
-  test_forking_scenario
-    ~title:"valid dispute dissection"
-    ~scenario:
-      (fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1 ->
-      let c1, c2, c31, c32, _c311, _c321 = commits in
-      let cement = cement_commitments client sc_rollup in
-      let* constants = get_sc_rollup_constants client in
-      let challenge_window = constants.challenge_window_in_blocks in
-      let commitment_period = constants.commitment_period_in_blocks in
-      let number_of_sections_in_dissection =
-        constants.number_of_sections_in_dissection
-      in
-      let* () =
-        (* Be able to cement both c1 and c2 *)
-        repeat (challenge_window + commitment_period) (fun () ->
-            Client.bake_for_and_wait client)
-      in
-      let* () = cement [c1; c2] in
-      let module M = Operation.Manager in
-      (* The source initialises a dispute. *)
-      let source = operator2 in
-      let opponent = operator1.public_key_hash in
-      let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source
-        @@ M.sc_rollup_refute ~sc_rollup ~opponent ()
-      in
-      (* Construct a valid dissection with valid initial hash of size
-         [sc_rollup.number_of_sections_in_dissection]. The state hash below is
-         the hash of the state computed after submitting the first commitment c1
-         (which is also equal to states's hashes of subsequent commitments, as we
-         didn't add any message in inboxes). If this hash needs to be recomputed,
-         run this test with --verbose and grep for 'compressed_state' in the
-         produced logs. *)
-      let state_hash =
-        "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf"
-      in
+let test_valid_dispute_dissection =
+  test_forking_scenario ~variant:"valid dispute dissection"
+  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits _level0 _level1
+    ->
+  let c1, c2, c31, c32, _c311, _c321 = commits in
+  let cement = cement_commitments client sc_rollup in
+  let* constants = get_sc_rollup_constants client in
+  let challenge_window = constants.challenge_window_in_blocks in
+  let commitment_period = constants.commitment_period_in_blocks in
+  let number_of_sections_in_dissection =
+    constants.number_of_sections_in_dissection
+  in
+  let* () =
+    (* Be able to cement both c1 and c2 *)
+    repeat (challenge_window + commitment_period) (fun () ->
+        Client.bake_for_and_wait client)
+  in
+  let* () = cement [c1; c2] in
+  let module M = Operation.Manager in
+  (* The source initialises a dispute. *)
+  let source = operator2 in
+  let opponent = operator1.public_key_hash in
+  let* () =
+    bake_operation_via_rpc client
+    @@ M.make ~source
+    @@ M.sc_rollup_refute ~sc_rollup ~opponent ()
+  in
+  (* Construct a valid dissection with valid initial hash of size
+     [sc_rollup.number_of_sections_in_dissection]. The state hash below is
+     the hash of the state computed after submitting the first commitment c1
+     (which is also equal to states's hashes of subsequent commitments, as we
+     didn't add any message in inboxes). If this hash needs to be recomputed,
+     run this test with --verbose and grep for 'compressed_state' in the
+     produced logs. *)
+  let state_hash = "scs11VNjWyZw4Tgbvsom8epQbox86S2CKkE1UAZkXMM7Pj8MQMLzMf" in
 
-      let rec aux i acc =
-        if i = number_of_sections_in_dissection - 1 then
-          List.rev ({M.state_hash = None; tick = i} :: acc)
-        else aux (i + 1) ({M.state_hash = Some state_hash; tick = i} :: acc)
-      in
-      (* Inject a valid dissection move *)
-      let refutation =
-        M.{choice_tick = 0; refutation_step = Dissection (aux 0 [])}
-      in
+  let rec aux i acc =
+    if i = number_of_sections_in_dissection - 1 then
+      List.rev ({M.state_hash = None; tick = i} :: acc)
+    else aux (i + 1) ({M.state_hash = Some state_hash; tick = i} :: acc)
+  in
+  (* Inject a valid dissection move *)
+  let refutation =
+    M.{choice_tick = 0; refutation_step = Dissection (aux 0 [])}
+  in
 
-      let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source
-        @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
-      in
-      (* We cannot cement neither c31, nor c32 because refutation game hasn't
-         ended. *)
-      cement [c31; c32] ~fail:"Attempted to cement a disputed commitment")
-    protocols
+  let* () =
+    bake_operation_via_rpc client
+    @@ M.make ~source
+    @@ M.sc_rollup_refute ~sc_rollup ~opponent ~refutation ()
+  in
+  (* We cannot cement neither c31, nor c32 because refutation game hasn't
+     ended. *)
+  cement [c31; c32] ~fail:"Attempted to cement a disputed commitment"
+
+(* Testing the timeout to record gas consumption in a regression trace and
+   detect when the value changes.
+   For functional tests on timing-out a dispute, see unit tests in
+   [lib_protocol].
+
+   For this test, we rely on [test_forking_scenario] to create a tree structure
+   of commitments and we start a dispute.
+   The first player is not even going to play, we'll simply bake enough blocks
+   to get to the point where we can timeout. *)
+let test_timeout =
+  test_forking_scenario ~variant:"timeout"
+  @@ fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
+  (* These are the commitments on the rollup. See [test_forking_scenario] to
+       visualize the tree structure. *)
+  let c1, c2, _c31, _c32, _c311, _c321 = commits in
+  (* A helper function to cement a sequence of commitments. *)
+  let cement = cement_commitments client sc_rollup in
+  let* constants = get_sc_rollup_constants client in
+  let challenge_window = constants.challenge_window_in_blocks in
+  let timeout_period = constants.timeout_period_in_blocks in
+
+  (* Bake enough blocks to cement the commitments up to the divergence. *)
+  let* () =
+    repeat
+      (* There are [level0 - level1 - 1] blocks between [level1] and
+         [level0], plus the challenge window for [c1] and the one for [c2].
+      *)
+      (level0 - level1 - 1 + (2 * challenge_window))
+      (fun () -> Client.bake_for_and_wait client)
+  in
+  let* () = cement [c1; c2] in
+
+  let module M = Operation.Manager in
+  (* [operator2] starts a dispute, but won't be playing then. *)
+  let* () =
+    bake_operation_via_rpc client
+    @@ M.make ~source:operator2
+    @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
+  in
+  (* Get exactly to the block where we are able to timeout. *)
+  let* () =
+    repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
+  in
+  timeout ~sc_rollup ~staker:operator1.public_key_hash client
 
 (* Testing rollup node catch up mechanism
    --------------------------------------
@@ -2568,8 +2606,8 @@ let test_valid_dispute_dissection protocols =
 let test_late_rollup_node =
   test_scenario
     {
-      tags = ["node"];
-      variant = Some "late";
+      tags = ["rollup_node"];
+      variant = None;
       description = "a late rollup should catch up";
     }
   @@ fun sc_rollup_node _sc_rollup_address _node client ->
@@ -2602,54 +2640,6 @@ let test_interrupt_rollup_node =
   let* () = Sc_rollup_node.run sc_rollup_node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
   unit
-
-(* Testing the timeout to record gas consumption in a regression trace and
-   detect when the value changes.
-   For functional tests on timing-out a dispute, see unit tests in
-   [lib_protocol].
-
-   For this test, we rely on [test_forking_scenario] to create a tree structure
-   of commitments and we start a dispute.
-   The first player is not even going to play, we'll simply bake enough blocks
-   to get to the point where we can timeout. *)
-let test_timeout protocols =
-  test_forking_scenario
-    ~title:"refutation game timeout"
-    ~scenario:
-      (fun client _node ~sc_rollup ~operator1 ~operator2 commits level0 level1 ->
-      (* These are the commitments on the rollup. See [test_forking_scenario] to
-         visualize the tree structure. *)
-      let c1, c2, _c31, _c32, _c311, _c321 = commits in
-      (* A helper function to cement a sequence of commitments. *)
-      let cement = cement_commitments client sc_rollup in
-      let* constants = get_sc_rollup_constants client in
-      let challenge_window = constants.challenge_window_in_blocks in
-      let timeout_period = constants.timeout_period_in_blocks in
-
-      (* Bake enough blocks to cement the commitments up to the divergence. *)
-      let* () =
-        repeat
-          (* There are [level0 - level1 - 1] blocks between [level1] and
-             [level0], plus the challenge window for [c1] and the one for [c2].
-          *)
-          (level0 - level1 - 1 + (2 * challenge_window))
-          (fun () -> Client.bake_for_and_wait client)
-      in
-      let* () = cement [c1; c2] in
-
-      let module M = Operation.Manager in
-      (* [operator2] starts a dispute, but won't be playing then. *)
-      let* () =
-        bake_operation_via_rpc client
-        @@ M.make ~source:operator2
-        @@ M.sc_rollup_refute ~sc_rollup ~opponent:operator1.public_key_hash ()
-      in
-      (* Get exactly to the block where we are able to timeout. *)
-      let* () =
-        repeat (timeout_period + 1) (fun () -> Client.bake_for_and_wait client)
-      in
-      timeout ~sc_rollup ~staker:operator1.public_key_hash client)
-    protocols
 
 let test_refutation_reward_and_punishment protocols =
   register_test
@@ -3190,7 +3180,9 @@ let register ~protocols =
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
   register ~kind:"arith" ~protocols ;
-  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit protocols ;
-  test_valid_dispute_dissection protocols ;
-  test_timeout protocols ;
+  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit
+    ~kind:"arith"
+    protocols ;
+  test_valid_dispute_dissection ~kind:"arith" protocols ;
+  test_timeout ~kind:"arith" protocols ;
   test_refutation_reward_and_punishment protocols
