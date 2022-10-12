@@ -36,7 +36,7 @@ val fee_arg : (Tez.t option, full) Tezos_clic.arg
 
 val default_fee_arg : (Tez.t option, full) Tezos_clic.arg
 
-val counter_arg : (Z.t option, full) Tezos_clic.arg
+val counter_arg : (Manager_counter.t option, full) Tezos_clic.arg
 
 val gas_limit_arg : (Gas.Arith.integral option, full) Tezos_clic.arg
 

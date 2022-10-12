@@ -94,7 +94,7 @@ type transfer = {
   fee : Tez.t;
   gas_limit : Gas.Arith.integral;
   amount : Tez.t;
-  counter : Z.t option;
+  counter : Manager_counter.t option;
   fresh_dst : bool;
 }
 

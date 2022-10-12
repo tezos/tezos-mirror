@@ -161,7 +161,7 @@ module Contract : sig
 
   val balance_and_frozen_bonds : t -> Contract.t -> Tez.t tzresult Lwt.t
 
-  val counter : t -> Contract.t -> Z.t tzresult Lwt.t
+  val counter : t -> Contract.t -> Manager_counter.t tzresult Lwt.t
 
   val manager : t -> Contract.t -> Account.t tzresult Lwt.t
 

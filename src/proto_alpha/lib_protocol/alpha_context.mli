@@ -1669,12 +1669,13 @@ module Contract : sig
     public_key ->
     context tzresult Lwt.t
 
-  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
+  val get_counter :
+    context -> public_key_hash -> Manager_counter.t tzresult Lwt.t
 
   val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment :
-    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
+    context -> public_key_hash -> Manager_counter.t -> unit tzresult Lwt.t
 
   (** See {!Contract_storage.check_allocated_and_get_balance}. *)
   val check_allocated_and_get_balance :

@@ -32,14 +32,14 @@ type error +=
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Branch *)
       Counter_in_the_future of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
@@ -80,7 +80,10 @@ val must_be_allocated : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
 val check_counter_increment :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t -> unit tzresult Lwt.t
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Manager_counter_repr.t ->
+  unit tzresult Lwt.t
 
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
@@ -107,7 +110,9 @@ val check_allocated_and_get_balance :
   Raw_context.t -> Signature.public_key_hash -> Tez_repr.t tzresult Lwt.t
 
 val get_counter :
-  Raw_context.t -> Signature.Public_key_hash.t -> Z.t tzresult Lwt.t
+  Raw_context.t ->
+  Signature.Public_key_hash.t ->
+  Manager_counter_repr.t tzresult Lwt.t
 
 val get_script_code :
   Raw_context.t ->

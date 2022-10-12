@@ -36,7 +36,7 @@ type _ t =
       fee : Tez.t Limit.t;
       gas_limit : Gas.Arith.integral Limit.t;
       storage_limit : Z.t Limit.t;
-      counter : Z.t option;
+      counter : Manager_counter.t option;
       operation : 'kind manager_operation;
     }
       -> 'kind t

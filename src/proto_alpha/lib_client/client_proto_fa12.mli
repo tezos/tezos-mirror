@@ -106,7 +106,7 @@ val call_contract :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)

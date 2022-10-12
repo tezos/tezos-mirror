@@ -29,7 +29,7 @@ open Protocol.Alpha_context
     to compute an upper bound on the size (in bytes) of an operation. *)
 type approximate_fee_bound = {
   fee : Tez.t;
-  counter : Z.t;
+  counter : Manager_counter.t;
   gas_limit : Gas.Arith.integral;
   storage_limit : Z.t;
 }

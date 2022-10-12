@@ -1398,7 +1398,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   in
   let rec build_contents :
       type kind.
-      Z.t ->
+      Manager_counter.t ->
       kind Annotated_manager_operation.annotated_list ->
       kind Annotated_manager_operation.annotated_list tzresult =
    fun counter -> function

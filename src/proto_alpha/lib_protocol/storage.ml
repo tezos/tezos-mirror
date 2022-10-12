@@ -169,7 +169,8 @@ module Contract = struct
         let name = ["contracts"]
       end)
 
-  module Global_counter : Simple_single_data_storage with type value = Z.t =
+  module Global_counter :
+    Simple_single_data_storage with type value = Manager_counter_repr.t =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
         let name = ["global_counter"]

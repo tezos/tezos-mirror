@@ -80,7 +80,7 @@ val register_global_constant :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -336,7 +336,7 @@ val transfer_with_script :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
@@ -370,7 +370,7 @@ val transfer :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   ?replace_by_fees:bool ->
   unit ->
@@ -580,7 +580,7 @@ val originate_tx_rollup :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -604,7 +604,7 @@ val submit_tx_rollup_batch :
   ?burn_limit:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -629,7 +629,7 @@ val submit_tx_rollup_commitment :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -657,7 +657,7 @@ val submit_tx_rollup_finalize_commitment :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -682,7 +682,7 @@ val submit_tx_rollup_remove_commitment :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -706,7 +706,7 @@ val submit_tx_rollup_rejection :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -740,7 +740,7 @@ val submit_tx_rollup_return_bond :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -764,7 +764,7 @@ val tx_rollup_dispatch_tickets :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -793,7 +793,7 @@ val transfer_ticket :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -951,7 +951,7 @@ val sc_rollup_recover_bond :
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   source:Signature.public_key_hash ->
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->

@@ -30,14 +30,14 @@ type error +=
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Branch *)
       Counter_in_the_future of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
