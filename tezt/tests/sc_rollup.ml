@@ -220,10 +220,8 @@ let with_fresh_rollup ?kind ?boot_sector f tezos_node tezos_client operator =
       tezos_client
       ~default_operator:operator
   in
-  let* configuration_filename =
-    Sc_rollup_node.config_init sc_rollup_node sc_rollup
-  in
-  f sc_rollup sc_rollup_node configuration_filename
+  let* _filename = Sc_rollup_node.config_init sc_rollup_node sc_rollup in
+  f sc_rollup sc_rollup_node
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
@@ -238,8 +236,7 @@ let test_scenario ?regression ~kind ?boot_sector ?commitment_period
     (fun protocol ->
       setup ?commitment_period ?challenge_window ~protocol ?timeout
       @@ fun node client ->
-      ( with_fresh_rollup ~kind ?boot_sector
-      @@ fun sc_rollup sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind ?boot_sector @@ fun sc_rollup sc_rollup_node ->
         scenario protocol sc_rollup_node sc_rollup node client )
         node
         client)
@@ -341,26 +338,15 @@ let test_rollup_node_configuration ~kind =
   register_test
     ~__FILE__
     ~tags:["sc_rollup"]
-    ~title:"configuration of a smart contract optimistic rollup node"
+    ~title:
+      "configuration of a smart rollup node specify the data dir and rpc port."
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun _sc_rollup _sc_rollup_node filename ->
-      let read_configuration =
-        let open Ezjsonm in
-        match from_channel (open_in filename) with
-        | `O fields ->
-            (* Remove "data-dir" and "rpc-port" as they are non deterministic. *)
-            `O
-              (List.filter
-                 (fun (s, _) ->
-                   match s with "data-dir" | "rpc-port" -> false | _ -> true)
-                 fields)
-            |> to_string
-        | _ ->
-            failwith "The configuration file does not have the expected format."
-      in
-      Log.info "Read configuration:\n %s" read_configuration ;
-      return ())
+      @@ fun _sc_rollup sc_rollup_node ->
+      let config = Sc_rollup_node.Config_file.read sc_rollup_node in
+      let _data_dir = JSON.(config |-> "data-dir" |> as_string) in
+      let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
+      unit)
 
 (* Launching a rollup node
    -----------------------
@@ -375,7 +361,7 @@ let test_rollup_node_running ~kind =
     ~title:(Format.asprintf "%s - running a smart contract rollup node" kind)
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun sc_rollup sc_rollup_node _filename ->
+      @@ fun sc_rollup sc_rollup_node ->
       let* () = Sc_rollup_node.run sc_rollup_node in
       let* sc_rollup_from_rpc =
         sc_rollup_node_rpc sc_rollup_node "global/sc_rollup_address"
@@ -408,7 +394,7 @@ let test_rollup_client_gets_address ~kind =
     ~title:"getting a smart-contract rollup address through the client"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun sc_rollup sc_rollup_node _filename ->
+      @@ fun sc_rollup sc_rollup_node ->
       let* () = Sc_rollup_node.run sc_rollup_node in
       let sc_client = Sc_rollup_client.create sc_rollup_node in
       let* sc_rollup_from_client =
@@ -437,7 +423,7 @@ let test_rollup_get_genesis_info ~kind =
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       let current_level = Node.get_level node in
-      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
         let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
@@ -476,7 +462,7 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
          kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
-      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
         let origination_level = Node.get_level node in
 
         (* Bake 10 blocks to be sure that the origination_level of rollup is different
@@ -571,7 +557,7 @@ let test_rollup_inbox_size ~kind =
          kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup ~kind @@ fun _sc_rollup _sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun _sc_rollup _sc_rollup_node ->
         let n = 10 in
         let* () = send_messages n client in
         let* _hash, _level, inbox_msg_during_commitment_period =
@@ -627,7 +613,7 @@ let test_rollup_inbox_of_rollup_node variant scenario ~kind =
          variant)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup ~kind @@ fun sc_rollup sc_rollup_node _filename ->
+      ( with_fresh_rollup ~kind @@ fun sc_rollup sc_rollup_node ->
         let* () = scenario protocol sc_rollup_node sc_rollup node client in
         let* inbox_from_sc_rollup_node =
           get_inbox_from_sc_rollup_node sc_rollup_node
@@ -762,7 +748,7 @@ let with_fresh_rollups ~kind n f node client operator =
     else
       with_fresh_rollup
         ~kind
-        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
+        (fun addr _ -> go (n - 1) (String_set.add addr addrs) k)
         node
         client
         operator
@@ -858,8 +844,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
         ~kind
-        (fun sc_rollup sc_rollup_node _filename ->
-          go client sc_rollup sc_rollup_node)
+        (fun sc_rollup sc_rollup_node -> go client sc_rollup sc_rollup_node)
         node
         client)
 
@@ -994,7 +979,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         with_fresh_rollup
           ~kind
           ?boot_sector
-          (fun sc_rollup_address sc_rollup_node _filename ->
+          (fun sc_rollup_address sc_rollup_node ->
             go ~internal:false client sc_rollup_address sc_rollup_node)
           node
           client)
@@ -1009,7 +994,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         with_fresh_rollup
           ~kind
           ?boot_sector
-          (fun sc_rollup_address sc_rollup_node _filename ->
+          (fun sc_rollup_address sc_rollup_node ->
             go ~internal:true client sc_rollup_address sc_rollup_node)
           node
           client)
@@ -2006,7 +1991,7 @@ let test_rollup_arith_origination_boot_sector =
       with_fresh_rollup
         ~kind:"arith"
         ~boot_sector
-        (fun sc_rollup _sc_rollup_node _filename -> go client sc_rollup)
+        (fun sc_rollup _sc_rollup_node -> go client sc_rollup)
         node
         client)
 
@@ -2043,8 +2028,7 @@ let test_rollup_node_uses_arith_boot_sector =
     with_fresh_rollup
       ~kind:"arith"
       ~boot_sector
-      (fun sc_rollup sc_rollup_node _filename ->
-        go_boot client sc_rollup sc_rollup_node)
+      (fun sc_rollup sc_rollup_node -> go_boot client sc_rollup sc_rollup_node)
       node
       client
   in
@@ -2132,7 +2116,7 @@ let test_rollup_arith_uses_reveals =
    [Constants.tz4_account]. *)
 let client_with_initial_keys ~protocol ~kind =
   setup ~protocol @@ with_fresh_rollup ~kind
-  @@ fun _sc_rollup sc_rollup_node _filename ->
+  @@ fun _sc_rollup sc_rollup_node ->
   let sc_client = Sc_rollup_client.create sc_rollup_node in
   let account = Constant.tz4_account in
   let* () = Sc_rollup_client.import_secret_key account sc_client in
@@ -2190,7 +2174,7 @@ let test_rollup_client_generate_keys ~kind =
     ~title:"Generates new tz4 keys"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun _sc_rollup sc_rollup_node _filename ->
+      @@ fun _sc_rollup sc_rollup_node ->
       let sc_client = Sc_rollup_client.create sc_rollup_node in
       let alias = "test_key" in
       let* () = Sc_rollup_client.generate_keys ~alias sc_client in
