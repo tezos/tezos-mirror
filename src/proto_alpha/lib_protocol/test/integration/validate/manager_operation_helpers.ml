@@ -1525,7 +1525,7 @@ let validate_ko_diagnostic ?(mode = Construction) (infos : infos) ops
           infos.ctxt.block
           ~mempool_mode:(mempool_mode_of mode)
       in
-      let* _ = add_operations ~expect_failure i ops in
+      let* (_ : Incremental.t) = add_operations ~expect_failure i ops in
       return_unit
   | Application -> (
       let*! res =

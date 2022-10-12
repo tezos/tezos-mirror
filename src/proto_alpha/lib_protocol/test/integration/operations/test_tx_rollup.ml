@@ -3521,7 +3521,7 @@ module Rejection = struct
         l2_accounts
     in
     let time = time () in
-    let* _ = C.commit ~time store in
+    let* (_ : Context_hash.t) = C.commit ~time store in
     return store
 
   (** Regression test to ensure that we can reject a commitment where the

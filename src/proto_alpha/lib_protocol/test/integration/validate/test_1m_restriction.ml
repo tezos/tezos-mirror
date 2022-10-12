@@ -175,7 +175,7 @@ let batch_is_not_singles_tests =
       let* batch =
         Op.batch_operations ~source (B infos.ctxt.block) [op1; op2]
       in
-      let* _ = only_validate_diagnostic ~mode infos [batch] in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [batch] in
       let* () = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
@@ -213,8 +213,8 @@ let conflict_free_tests =
         }
       in
       let* op2 = select_op operation_req' infos2 in
-      let* _ = only_validate_diagnostic ~mode infos [op1; op2] in
-      let* _ = only_validate_diagnostic ~mode infos [op2; op1] in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [op1; op2] in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [op2; op1] in
       return_true)
 
 open Lib_test.Qcheck2_helpers

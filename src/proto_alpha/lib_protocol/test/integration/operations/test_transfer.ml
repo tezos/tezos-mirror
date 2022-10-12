@@ -827,7 +827,9 @@ let test_storage_fees_and_internal_operation () =
   in
   (* Ensure success when the initial balance of the originated contract is
      sufficient to pay storage fees. *)
-  let+ _ = originate_and_call ~initial_state ~initial_amount:Tez.one_cent in
+  let+ (_ : State.t) =
+    originate_and_call ~initial_state ~initial_amount:Tez.one_cent
+  in
   ()
 
 let tests =

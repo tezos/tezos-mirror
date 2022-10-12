@@ -437,7 +437,7 @@ let test_validate infos kind =
       }
       infos
   in
-  let* _ = validate_diagnostic infos [op] in
+  let* (_ : infos) = validate_diagnostic infos [op] in
   return_unit
 
 (** Fee payment that emptying a self_delegated implicit. *)
@@ -457,7 +457,7 @@ let test_emptying_self_delegate infos kind =
       }
       infos
   in
-  let* _ = only_validate_diagnostic infos [op] in
+  let* (_ : infos) = only_validate_diagnostic infos [op] in
   return_unit
 
 (** Minimum gas cost to pass the validation:
@@ -484,7 +484,7 @@ let test_empty_undelegate infos kind =
       }
       infos
   in
-  let* _ = only_validate_diagnostic infos [op] in
+  let* (_ : infos) = only_validate_diagnostic infos [op] in
   return_unit
 
 (** No gas consumer with the minimal gas limit for manager operations
@@ -561,7 +561,7 @@ let test_feature_flags infos kind =
   if is_disabled flags kind then
     validate_ko_diagnostic infos [op] (flag_expect_failure flags)
   else
-    let* _ = validate_diagnostic infos [op] in
+    let* (_ : infos) = validate_diagnostic infos [op] in
     return_unit
 
 let tests =

@@ -92,7 +92,7 @@ let test_seed_no_commitment () =
       ()
   in
   let* b = check_seed b initial_seed in
-  let* _ = bake_and_check_seed b seeds in
+  let* (_ : Block.t) = bake_and_check_seed b seeds in
   return_unit
 
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]

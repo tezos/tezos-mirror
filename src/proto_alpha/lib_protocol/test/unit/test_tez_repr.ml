@@ -126,7 +126,7 @@ module Test_tez_repr = struct
 
   let test_of_mutez_exn_negative () =
     try
-      let _ = Tez_repr.of_mutez_exn (-1000000L) in
+      let (_ : Tez_repr.t) = Tez_repr.of_mutez_exn (-1000000L) in
       failwith "should have failed to converted -1000000L to tez"
     with
     | Invalid_argument _ -> return_unit
