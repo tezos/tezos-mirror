@@ -85,7 +85,9 @@ module WASM_P :
   let produce_proof context tree step =
     let open Lwt_syntax in
     let* context = Context_binary.add_tree context [] tree in
-    let _hash = Context_binary.commit ~time:Time.Protocol.epoch context in
+    let* (_hash : Context_hash.t) =
+      Context_binary.commit ~time:Time.Protocol.epoch context
+    in
     let index = Context_binary.index context in
     match Context_binary.Tree.kinded_key tree with
     | Some k ->
