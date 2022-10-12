@@ -3560,7 +3560,7 @@ end = struct
       let _integration_validate =
         only_if N.(number >= 014) @@ fun () ->
         tests
-          ["main"; "test_1m_restriction"]
+          ("main" :: (if N.(number <= 015) then ["test_1m_restriction"] else []))
           ~path:(path // "lib_protocol/test/integration/validate")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
@@ -3573,6 +3573,7 @@ end = struct
               client |> if_some |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
+              plugin |> if_some |> open_;
             ]
       in
       let _integration =
