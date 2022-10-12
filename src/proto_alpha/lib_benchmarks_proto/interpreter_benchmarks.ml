@@ -2841,21 +2841,21 @@ module Registration_section = struct
     let stack_type = ticket unit @$ cpair nat nat @$ bot
 
     let () =
-      let zero = Script_int.zero_n in
+      let one = Script_int.one_n in
       let ticket =
         {
           ticketer =
             Alpha_context.Contract.Implicit
               Environment.Signature.Public_key_hash.zero;
           contents = ();
-          amount = Ticket_amount.one;
+          amount = Ticket_amount.(add one one);
         }
       in
       benchmark_with_fixed_stack
         ~intercept:true
         ~name:Interpreter_workload.N_ISplit_ticket
         ~stack_type
-        ~stack:(ticket, ((zero, zero), eos))
+        ~stack:(ticket, ((one, one), eos))
         ~kinstr:split_ticket_instr
         ()
 
