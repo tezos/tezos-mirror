@@ -151,13 +151,10 @@ let make_parameter name = function
   | None -> []
   | Some value -> [([name], `Int value)]
 
-let test ~__FILE__ ?(tags = []) title f =
+let register_test ?(regression = false) ~__FILE__ ~tags ~title f =
   let tags = "sc_rollup" :: tags in
-  Protocol.register_test ~__FILE__ ~title ~tags f
-
-let regression_test ~__FILE__ ?(tags = []) title f =
-  let tags = "sc_rollup" :: tags in
-  Protocol.register_regression_test ~__FILE__ ~title ~tags f
+  if regression then Protocol.register_regression_test ~__FILE__ ~title ~tags f
+  else Protocol.register_test ~__FILE__ ~title ~tags f
 
 let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let parameters =
@@ -230,13 +227,14 @@ let with_fresh_rollup ?kind ?boot_sector f tezos_node tezos_client operator =
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2933
    Many tests can be refactored using test_scenario. *)
-let test_scenario ~kind ?boot_sector ?commitment_period ?challenge_window
-    ?timeout {variant; tags; description} scenario =
+let test_scenario ?regression ~kind ?boot_sector ?commitment_period
+    ?challenge_window ?timeout {variant; tags; description} scenario =
   let tags = tags @ [kind; variant] in
-  regression_test
+  register_test
+    ?regression
     ~__FILE__
     ~tags
-    (Printf.sprintf "%s - %s (%s)" kind description variant)
+    ~title:(Printf.sprintf "%s - %s (%s)" kind description variant)
     (fun protocol ->
       setup ?commitment_period ?challenge_window ~protocol ?timeout
       @@ fun node client ->
@@ -322,10 +320,13 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
 let test_origination ~kind =
-  regression_test
+  register_test
     ~tags:["sc_rollup"; kind]
     ~__FILE__
-    (Format.asprintf "%s - origination of a SCORU executes without error" kind)
+    ~title:
+      (Format.asprintf
+         "%s - origination of a SCORU executes without error"
+         kind)
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
       let* _sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
@@ -337,10 +338,10 @@ let test_origination ~kind =
    Can use CLI to initialize the rollup node config file
 *)
 let test_rollup_node_configuration ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"]
-    "configuration of a smart contract optimistic rollup node"
+    ~title:"configuration of a smart contract optimistic rollup node"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun _sc_rollup _sc_rollup_node filename ->
@@ -368,10 +369,10 @@ let test_rollup_node_configuration ~kind =
    interacting with.
 *)
 let test_rollup_node_running ~kind =
-  test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "run"; kind]
-    (Format.asprintf "%s - running a smart contract rollup node" kind)
+    ~title:(Format.asprintf "%s - running a smart contract rollup node" kind)
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun sc_rollup sc_rollup_node _filename ->
@@ -401,10 +402,10 @@ let test_rollup_node_running ~kind =
    node its rollup address.
 *)
 let test_rollup_client_gets_address ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "run"; "client"]
-    "getting a smart-contract rollup address through the client"
+    ~title:"getting a smart-contract rollup address through the client"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun sc_rollup sc_rollup_node _filename ->
@@ -429,10 +430,10 @@ let test_rollup_client_gets_address ~kind =
    originated from the context.
 *)
 let test_rollup_get_genesis_info ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "genesis_info"; kind]
-    (Format.asprintf "%s - get genesis info of a sc rollup" kind)
+    ~title:(Format.asprintf "%s - get genesis info of a sc rollup" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       let current_level = Node.get_level node in
@@ -466,12 +467,13 @@ let test_rollup_get_genesis_info ~kind =
    Revisit this test once the rollup node can cement commitments. *)
 let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
     ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "lcc_hash_with_level"; kind]
-    (Format.asprintf
-       "%s - get last cemented commitment hash and inbox level of a sc rollup"
-       kind)
+    ~title:
+      (Format.asprintf
+         "%s - get last cemented commitment hash and inbox level of a sc rollup"
+         kind)
     (fun protocol ->
       setup ~protocol @@ fun node client bootstrap ->
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node _filename ->
@@ -560,12 +562,13 @@ let get_inbox_from_sc_rollup_node sc_rollup_node =
   | Some inbox -> parse_inbox inbox
 
 let test_rollup_inbox_size ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "inbox"; kind]
-    (Format.asprintf
-       "%s - pushing messages in the inbox - check inbox size"
-       kind)
+    ~title:
+      (Format.asprintf
+         "%s - pushing messages in the inbox - check inbox size"
+         kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       ( with_fresh_rollup ~kind @@ fun _sc_rollup _sc_rollup_node _filename ->
@@ -614,13 +617,14 @@ let fetch_messages_from_block client =
    protocol in the context.
 *)
 let test_rollup_inbox_of_rollup_node variant scenario ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "inbox"; "node"; variant; kind]
-    (Printf.sprintf
-       "%s - maintenance of inbox in the rollup node (%s)"
-       kind
-       variant)
+    ~title:
+      (Printf.sprintf
+         "%s - maintenance of inbox in the rollup node (%s)"
+         kind
+         variant)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       ( with_fresh_rollup ~kind @@ fun sc_rollup sc_rollup_node _filename ->
@@ -798,11 +802,10 @@ let test_rollup_list ~kind =
       client
       bootstrap1
   in
-
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "list"]
-    "list originated rollups"
+    ~title:"list originated rollups"
     (fun protocol -> setup ~protocol go)
 
 (* Make sure the rollup node boots into the initial state.
@@ -847,11 +850,10 @@ let test_rollup_node_boots_into_initial_state ~kind =
 
     Lwt.return_unit
   in
-
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "run"; "node"; kind]
-    (Format.asprintf "%s - node boots into the initial state" kind)
+    ~title:(Format.asprintf "%s - node boots into the initial state" kind)
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
@@ -983,10 +985,10 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
   in
 
   if not internal then
-    regression_test
+    register_test
       ~__FILE__
       ~tags:["sc_rollup"; "run"; "node"; kind]
-      test_name
+      ~title:test_name
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
@@ -998,10 +1000,10 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
           client)
       protocols
   else
-    regression_test
+    register_test
       ~__FILE__
       ~tags:["sc_rollup"; "run"; "node"; "internal"; kind]
-      test_name
+      ~title:test_name
       (fun protocol ->
         setup ~protocol @@ fun node client ->
         with_fresh_rollup
@@ -1995,10 +1997,10 @@ let test_rollup_arith_origination_boot_sector =
     Lwt.return_unit
   in
 
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "run"]
-    (Format.asprintf "originate arith with boot sector")
+    ~title:"originate arith with boot sector"
     (fun protocol ->
       setup ~protocol @@ fun node client ->
       with_fresh_rollup
@@ -2047,10 +2049,10 @@ let test_rollup_node_uses_arith_boot_sector =
       client
   in
 
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "run"; "node"]
-    (Format.asprintf "ensure arith boot sector is used")
+    ~title:"ensure arith boot sector is used"
     (fun protocol ->
       setup ~protocol @@ fun node client x ->
       let* state_hash1 =
@@ -2140,10 +2142,10 @@ let client_with_initial_keys ~protocol ~kind =
    -------------------------------------------------------------------
 *)
 let test_rollup_client_show_address ~kind =
-  test
+  register_test
     ~__FILE__
     ~tags:["run"; "client"]
-    "Shows the address of a registered account"
+    ~title:"Shows the address of a registered account"
     (fun protocol ->
       let* sc_client, account = client_with_initial_keys ~protocol ~kind in
       let* shown_account =
@@ -2182,10 +2184,10 @@ let test_rollup_client_show_address ~kind =
    ----------------------------------------
 *)
 let test_rollup_client_generate_keys ~kind =
-  test
+  register_test
     ~__FILE__
     ~tags:["run"; "client"]
-    "Generates new tz4 keys"
+    ~title:"Generates new tz4 keys"
     (fun protocol ->
       setup ~protocol @@ with_fresh_rollup ~kind
       @@ fun _sc_rollup sc_rollup_node _filename ->
@@ -2199,10 +2201,10 @@ let test_rollup_client_generate_keys ~kind =
    ------------------------------------
 *)
 let test_rollup_client_list_keys ~kind =
-  test
+  register_test
     ~__FILE__
     ~tags:["run"; "client"]
-    "Lists known aliases in the client"
+    ~title:"Lists known aliases in the client"
     (fun protocol ->
       let* sc_client, account = client_with_initial_keys ~kind ~protocol in
       let* maybe_keys = Sc_rollup_client.list_keys sc_client in
@@ -2241,10 +2243,10 @@ let publish_dummy_commitment ?(number_of_ticks = 1) ~inbox_level ~predecessor
   get_staked_on_commitment ~sc_rollup ~staker:src client
 
 let test_consecutive_commitments ~kind =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["sc_rollup"; "l1"; "commitment"; kind]
-    (Format.asprintf "%s - consecutive commitments" kind)
+    ~title:(Format.asprintf "%s - consecutive commitments" kind)
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
       let* inbox_level = Client.level client in
@@ -2508,10 +2510,10 @@ let mk_forking_commitments node client ~sc_rollup ~operator1 ~operator2 =
     Then, it calls the given scenario on it.
 *)
 let test_forking_scenario ~title ~scenario protocols =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["l1"; "commitment"; "cement"; "fork"; "dispute"]
-    title
+    ~title
     (fun protocol ->
       (* Choosing challenge_windows to be quite longer than commitment_period
          to avoid being in a situation where the first commitment in the result
@@ -2786,10 +2788,10 @@ let test_timeout protocols =
     protocols
 
 let test_refutation_reward_and_punishment protocols =
-  regression_test
+  register_test
     ~__FILE__
     ~tags:["l1"; "refutation"; "stake"; "reward"; "punishment"]
-    "refutation: check the punishment and reward"
+    ~title:"refutation: check the punishment and reward"
     (fun protocol ->
       (* Timeout is the easiest way to end a game, we set timeout period
          low to produce an outcome quickly. *)
@@ -2926,13 +2928,14 @@ let test_refutation_reward_and_punishment protocols =
 
    The input depends on the PVM.
 *)
-let test_outbox_message_generic ?expected_error skip earliness entrypoint
-    input_message expected_storage kind =
+let test_outbox_message_generic ?regression ?expected_error skip earliness
+    entrypoint input_message expected_storage kind =
   let commitment_period = 2 and challenge_window = 5 in
   let variant =
     (if entrypoint = "" then "" else entrypoint) ^ "_" ^ string_of_int earliness
   in
   test_scenario
+    ?regression
     ~kind
     ~commitment_period
     ~challenge_window
@@ -3037,7 +3040,8 @@ let test_outbox_message_generic ?expected_error skip earliness entrypoint
         return ()
     | Some _ -> return ()
 
-let test_outbox_message ?expected_error ~earliness entrypoint ~kind =
+let test_outbox_message ?regression ?expected_error ~earliness entrypoint ~kind
+    =
   let skip, input_message, expected_storage =
     let entrypoint = if entrypoint = "" then entrypoint else "%" ^ entrypoint in
     match kind with
@@ -3055,6 +3059,7 @@ let test_outbox_message ?expected_error ~earliness entrypoint ~kind =
         assert false
   in
   test_outbox_message_generic
+    ?regression
     ?expected_error
     skip
     earliness
