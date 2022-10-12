@@ -1599,9 +1599,7 @@ end
 
 (** This module re-exports definitions from {!Manager_counter_repr}. *)
 module Manager_counter : sig
-  type t = Z.t
-
-  include Compare.S with type t := t
+  include Compare.S
 
   val succ : t -> t
 

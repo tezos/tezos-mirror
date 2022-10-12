@@ -29,9 +29,8 @@
     each manager operation declares a value for the counter. When
     a manager operation is applied, the value of the counter of
     its manager is checked and incremented. *)
-type t = Z.t
 
-include Compare.S with type t := t
+include Compare.S
 
 (** Initial value for a counter (zero). *)
 val init : t
