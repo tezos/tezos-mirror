@@ -98,28 +98,33 @@ module Header = struct
 
   let zero = {id = zero_id; commitment = Commitment.zero}
 
+  let id_encoding =
+    let open Data_encoding in
+    conv
+      (fun {published_level; index} -> (published_level, index))
+      (fun (published_level, index) -> {published_level; index})
+      (obj2
+         (req "level" Raw_level_repr.encoding)
+         (req "index" Data_encoding.uint8))
+
   let encoding =
     let open Data_encoding in
     conv
-      (fun {id = {published_level; index}; commitment} ->
-        (published_level, index, commitment))
-      (fun (published_level, index, commitment) ->
-        {id = {published_level; index}; commitment})
-      (obj3
-         (req "level" Raw_level_repr.encoding)
-         (req "index" Data_encoding.uint8)
-         (req "commitment" Commitment.encoding))
+      (fun {id; commitment} -> (id, commitment))
+      (fun (id, commitment) -> {id; commitment})
+      (merge_objs id_encoding (obj1 (req "commitment" Commitment.encoding)))
 
-  let pp fmt {id = {published_level; index}; commitment} =
+  let pp_id fmt {published_level; index} =
     Format.fprintf
       fmt
-      "published_level: %a index: %a commitment: %a"
+      "published_level: %a, index: %a"
       Raw_level_repr.pp
       published_level
       Format.pp_print_int
       index
-      Commitment.pp
-      commitment
+
+  let pp fmt {id; commitment = c} =
+    Format.fprintf fmt "id:(%a), commitment: %a" pp_id id Commitment.pp c
 end
 
 module Slot_index = Index

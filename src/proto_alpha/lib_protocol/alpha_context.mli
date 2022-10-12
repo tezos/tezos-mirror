@@ -2804,6 +2804,8 @@ module Dal : sig
     val to_int : t -> int
 
     val compare : t -> t -> int
+
+    val equal : t -> t -> bool
   end
 
   (** This module re-exports definitions from {!Dal_endorsement_repr} and
@@ -2826,6 +2828,8 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
+
   module Page : sig
     type content = bytes
 
@@ -2843,7 +2847,7 @@ module Dal : sig
       val equal : int -> int -> bool
     end
 
-    type t
+    type t = {slot_id : slot_id; page_index : Index.t}
 
     val content_encoding : content Data_encoding.t
 
@@ -2869,11 +2873,15 @@ module Dal : sig
     end
 
     module Header : sig
-      type id = {published_level : Raw_level.t; index : Slot_index.t}
+      type id = slot_id = {published_level : Raw_level.t; index : Slot_index.t}
 
       type t = {id : id; commitment : Commitment.t}
 
+      val id_encoding : id Data_encoding.t
+
       val encoding : t Data_encoding.t
+
+      val pp_id : Format.formatter -> id -> unit
 
       val pp : Format.formatter -> t -> unit
 

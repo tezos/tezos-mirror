@@ -108,6 +108,11 @@ module Dal = struct
     include Raw_context.Dal
   end
 
+  type slot_id = Dal_slot_repr.Header.id = {
+    published_level : Raw_level_repr.t;
+    index : Dal_slot_repr.Index.t;
+  }
+
   module Page = struct
     include Dal_slot_repr.Page
   end
