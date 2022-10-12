@@ -324,17 +324,14 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
 let test_origination ~kind =
-  register_test
-    ~tags:["sc_rollup"; kind]
-    ~__FILE__
-    ~title:
-      (Format.asprintf
-         "%s - origination of a SCORU executes without error"
-         kind)
-    (fun protocol ->
-      setup ~protocol @@ fun _rollup_node rollup_client ->
-      let* _sc_rollup = originate_sc_rollup ~kind rollup_client in
-      unit)
+  test_scenario
+    {
+      variant = None;
+      tags = ["origination"];
+      description = "origination of a SCORU executes without error";
+    }
+    ~kind
+    (fun _ _ _ _ _ -> unit)
 
 (* Initialize configuration
    ------------------------
