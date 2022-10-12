@@ -339,18 +339,19 @@ let test_origination ~kind =
    Can use CLI to initialize the rollup node config file
 *)
 let test_rollup_node_configuration ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"]
-    ~title:
-      "configuration of a smart rollup node specify the data dir and rpc port."
-    (fun protocol ->
-      setup ~protocol @@ with_fresh_rollup ~kind
-      @@ fun _sc_rollup sc_rollup_node ->
-      let config = Sc_rollup_node.Config_file.read sc_rollup_node in
-      let _data_dir = JSON.(config |-> "data-dir" |> as_string) in
-      let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
-      unit)
+  test_scenario
+    {
+      variant = None;
+      tags = ["rollup_node"; "configuration"];
+      description =
+        "configuration of a smart rollup node specify the data dir and rpc port";
+    }
+    ~kind
+  @@ fun _protocol rollup_node _sc_rollup _tezos_node _tezos_client ->
+  let config = Sc_rollup_node.Config_file.read rollup_node in
+  let _data_dir = JSON.(config |-> "data-dir" |> as_string) in
+  let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
+  unit
 
 (* Launching a rollup node
    -----------------------
