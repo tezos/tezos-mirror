@@ -2166,7 +2166,7 @@ let test_consecutive_commitments ~kind =
    its deposit while the honest one has not.
 
 *)
-let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
+let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
     (loser_mode, inputs, final_level, empty_levels, stop_loser_at) =
   test_scenario
     ?commitment_period
@@ -2174,8 +2174,8 @@ let test_refutation_scenario ?commitment_period ?challenge_window variant ~kind
     ~timeout:10
     ?challenge_window
     {
-      tags = ["refutation"; "node"];
-      variant;
+      tags = ["refutation"; "rollup_node"];
+      variant = Some variant;
       description = "refutation games winning strategies";
     }
   @@ fun sc_rollup_node sc_rollup_address node client ->
@@ -2282,7 +2282,7 @@ let test_refutation protocols ~kind =
            ~kind
            ~challenge_window
            ~commitment_period
-           (Some variant)
+           ~variant
            inputs
            protocols)
 
