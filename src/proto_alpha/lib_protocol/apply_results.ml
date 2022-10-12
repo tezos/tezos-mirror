@@ -526,20 +526,15 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.update_consensus_key_case
       ~encoding:
         Data_encoding.(
-          obj2
-            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+          obj1 (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Update_consensus_key_result _ as op) ->
             Some op
         | _ -> None)
       ~kind:Kind.Update_consensus_key_manager_kind
       ~proj:(function
-        | Update_consensus_key_result {consumed_gas} ->
-            (Gas.Arith.ceil consumed_gas, consumed_gas))
-      ~inj:(fun (consumed_gas, consumed_milligas) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        Update_consensus_key_result {consumed_gas = consumed_milligas})
+        | Update_consensus_key_result {consumed_gas} -> consumed_gas)
+      ~inj:(fun consumed_gas -> Update_consensus_key_result {consumed_gas})
 
   let set_deposits_limit_case =
     make
