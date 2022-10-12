@@ -72,6 +72,7 @@
   Sampler
   Voting_period_repr
   Ticket_hash_repr
+  Manager_counter_repr
   Contract_repr
   Indexable
   Entrypoint_repr
@@ -339,6 +340,7 @@
   sampler.ml sampler.mli
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
@@ -588,6 +590,7 @@
   sampler.ml sampler.mli
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
@@ -842,6 +845,7 @@
   sampler.ml sampler.mli
   voting_period_repr.ml voting_period_repr.mli
   ticket_hash_repr.ml ticket_hash_repr.mli
+  manager_counter_repr.ml manager_counter_repr.mli
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli

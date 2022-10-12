@@ -489,7 +489,7 @@ and _ manager_operation =
     }
       -> Kind.zk_rollup_publish manager_operation
 
-and counter = Z.t
+and counter = Manager_counter_repr.t
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function

@@ -581,12 +581,7 @@ and _ manager_operation =
     }
       -> Kind.zk_rollup_publish manager_operation
 
-(** Counters are used as anti-replay protection mechanism in
-    manager operations: each manager account stores a counter and
-    each manager operation declares a value for the counter. When
-    a manager operation is applied, the value of the counter of
-    its manager is checked and incremented. *)
-and counter = Z.t
+and counter = Manager_counter_repr.t
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
