@@ -31,6 +31,8 @@
     its manager is checked and incremented. *)
 type t = Z.t
 
+include Compare.S with type t := t
+
 (** Initial value for a counter (zero). *)
 val init : t
 

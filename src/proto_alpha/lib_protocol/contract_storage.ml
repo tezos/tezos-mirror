@@ -505,8 +505,8 @@ let check_counter_increment c manager counter =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   let expected = Manager_counter_repr.succ contract_counter in
-  if Compare.Z.(expected = counter) then return_unit
-  else if Compare.Z.(expected > counter) then
+  if Manager_counter_repr.(expected = counter) then return_unit
+  else if Manager_counter_repr.(expected > counter) then
     fail (Counter_in_the_past {contract; expected; found = counter})
   else fail (Counter_in_the_future {contract; expected; found = counter})
 

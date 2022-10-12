@@ -2129,7 +2129,7 @@ module Manager = struct
           Inconsistent_sources
       in
       error_unless
-        Compare.Z.(Manager_counter.succ previous_counter = counter)
+        Manager_counter.(succ previous_counter = counter)
         Inconsistent_counters
     in
     let rec check_batch_tail_sanity :

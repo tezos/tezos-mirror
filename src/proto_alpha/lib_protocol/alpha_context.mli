@@ -1601,6 +1601,8 @@ end
 module Manager_counter : sig
   type t = Z.t
 
+  include Compare.S with type t := t
+
   val succ : t -> t
 end
 

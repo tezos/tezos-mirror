@@ -1385,7 +1385,7 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
   let* () = b_cmp b_out b_expected in
   let _ =
     Assert.equal
-      Z.equal
+      Manager_counter.equal
       ~loc:__LOC__
       "Counter incrementation"
       Z.pp_print
