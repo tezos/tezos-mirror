@@ -49,8 +49,8 @@ A correct setup should write an entry in the logs similar to:
 
    <date> - node.main: starting metrics server on <addr>:<port>
 
-Octez Metrics
--------------
+Gathering data
+--------------
 
 This section focuses on access to the metrics and their uses.
 More details on the metrics specifications are available :doc:`here <../developer/openmetrics>`
@@ -218,6 +218,44 @@ With a correct install, you should see lines such as::
 
 Note, if you use filecheck for storage monitoring, you need to configure your dashboards accordingly. More details in the :ref:`Grafazos configuration section <grafazos_configuration>`.
 
+.. _monitoring_logs:
+
+Logs
+~~~~
+
+Eventually, you may want to gather the logs from the different Octez executables. To do so, we suggest to use `Loki <https://grafana.com/docs/loki/latest/>`_ and `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_. Promtail is used to gather the logs from each executable of Octez and pushes them to a Loki instance, for indexing metadata about the logs.
+
+You first need to install both tools, following `their installation instructions <https://grafana.com/docs/loki/latest/installation/local/>`_.
+
+A configuration file will be required, which can be downloaded with:
+
+.. code-block:: shell
+
+	wget https://raw.githubusercontent.com/grafana/loki/master/cmd/loki/loki-local-config.yaml
+	wget https://raw.githubusercontent.com/grafana/loki/main/clients/cmd/promtail/promtail-local-config.yaml
+
+The config file for Loki, ``loki-local-config.yml``, can be left untouched.
+However, the Promtail config file, ``promtail-local-config.yml``, requires to be adapted to get the logs needed.
+For each Octez executable you want the logs from, you need to add a new job to the ``scrape_configs`` part of the config file.
+For instance, to gather the logs from the node, you would add::
+
+  - job_name: octez-node
+  static_configs:
+  - targets:
+      - localhost
+    labels:
+      job: octez-node
+      __path__: /path/to/file/node-logs.log
+
+Note that it requires to redirect the logs from your node into a log file, ``/path/to/file/node-logs.log`` in this example. To do so, you can follow the guidelines from :doc:`the logging documentation <./logging>`.
+
+You can now run both tools with their config files:
+
+.. code-block:: shell
+
+   ./loki-linux-amd64 -config.file=loki-local-config.yaml
+   ./promtail-linux-amd64 -config.file=promtail-local-config.yaml
+
 Dashboards
 ----------
 
@@ -232,6 +270,8 @@ Once installed and running, you should be able to reach the interface on port ``
 
 Then you need to add the configured Prometheus server (see :ref:`Prometheus <prometheus_server>`) as a data source in ``Configuration/Data sources``.
 
+If you want to have logs on your dashboards, as described in :ref:`the logs part <monitoring_logs>`, you also need to add Loki as a data source.
+
 
 Grafazos
 ~~~~~~~~
@@ -244,7 +284,7 @@ This tool generates the following dashboards:
 
 - ``octez-compact``: A compact dashboard that gives a brief overview of the various node metrics on a single page.
 - ``octez-basic``: A basic dashboard with all the node metrics.
-- ``octez-with-logs``: Same as basic but also displays the node's logs, with `Promtail <https://grafana.com/docs/loki/latest/clients/promtail/>`_ (for exporting the logs).
+- ``octez-with-logs``: Same as basic but also displays the node's logs. This dashboard requires to follow the instructions of :ref:`the logs part <monitoring_logs>`.
 - ``octez-full``: A full dashboard with the logs and hardware data. This dashboard should be used with `Netdata <https://www.netdata.cloud/>`_ (for supporting hardware data) in addition to Promtail.
 
 You can generate them from the sources, with your own configuration. Or you can use the JSON files, compatible with your node version found `here <https://gitlab.com/nomadic-labs/grafazos/-/packages>`_.
