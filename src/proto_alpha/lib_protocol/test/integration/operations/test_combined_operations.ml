@@ -92,7 +92,7 @@ let test_multiple_origination_and_delegation () =
       Op.contract_origination
         ~gas_limit
         ~delegate:delegate_pkh
-        ~counter:(Z.of_int i)
+        ~counter:(Manager_counter.Internal_for_tests.of_int i)
         ~fee:Tez.zero
         ~script:Op.dummy_script
         ~credit:(Test_tez.of_int 10)
@@ -327,7 +327,14 @@ let test_inconsistent_counters () =
   (* Make legit transfers, performing reveals *)
   Block.bake ~operations:[op1; op2] blk >>=? fun b ->
   (* Now, counter c1 = counter c2 = 1, Op.transaction builds with counter + 1 *)
-  Op.transaction ~gas_limit ~fee:Tez.one (B b) c1 c2 ~counter:Z.one Tez.one
+  Op.transaction
+    ~gas_limit
+    ~fee:Tez.one
+    (B b)
+    c1
+    c2
+    ~counter:(Manager_counter.Internal_for_tests.of_int 1)
+    Tez.one
   >>=? fun op1 ->
   Op.transaction
     ~gas_limit
@@ -335,7 +342,7 @@ let test_inconsistent_counters () =
     (B b)
     c1
     c2
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     Tez.one
   >>=? fun op2 ->
   Op.transaction
@@ -344,7 +351,7 @@ let test_inconsistent_counters () =
     (B b)
     c1
     c2
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     (Tez.of_mutez_exn 5_000L)
   >>=? fun op2' ->
   Op.transaction
@@ -353,7 +360,7 @@ let test_inconsistent_counters () =
     (B b)
     c1
     c2
-    ~counter:(Z.of_int 3)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 3)
     Tez.one
   >>=? fun op3 ->
   Op.transaction
@@ -362,7 +369,7 @@ let test_inconsistent_counters () =
     (B b)
     c1
     c2
-    ~counter:(Z.of_int 4)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 4)
     Tez.one
   >>=? fun op4 ->
   (* Canari: Check counters are ok *)

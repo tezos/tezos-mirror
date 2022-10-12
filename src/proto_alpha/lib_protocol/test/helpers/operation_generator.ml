@@ -327,7 +327,7 @@ let random_contract_hash = QCheck2.Gen.oneofl contract_hashes
 let gen_counters =
   let open QCheck2.Gen in
   let+ i = nat in
-  Z.of_int i
+  Manager_counter.Internal_for_tests.of_int i
 
 let gen_ticket_amounts =
   let open QCheck2.Gen in

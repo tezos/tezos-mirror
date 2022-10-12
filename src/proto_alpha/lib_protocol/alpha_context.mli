@@ -1608,6 +1608,10 @@ module Manager_counter : sig
   val pp : Format.formatter -> t -> unit
 
   val encoding_for_RPCs : t Data_encoding.t
+
+  module Internal_for_tests : sig
+    val of_int : int -> t
+  end
 end
 
 (** This module re-exports definitions from {!Contract_repr} and

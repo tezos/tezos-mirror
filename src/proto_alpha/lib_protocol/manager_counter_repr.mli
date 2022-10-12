@@ -53,3 +53,7 @@ val encoding_for_RPCs : t Data_encoding.t
 
 (** Encoding for a counter to be used in errors. *)
 val encoding_for_errors : t Data_encoding.t
+
+module Internal_for_tests : sig
+  val of_int : int -> t
+end

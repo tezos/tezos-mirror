@@ -39,3 +39,9 @@ let encoding_for_operation = Data_encoding.(check_size 10 n)
 let encoding_for_RPCs = Data_encoding.n
 
 let encoding_for_errors = Data_encoding.z
+
+module Internal_for_tests = struct
+  let of_int i =
+    assert (Compare.Int.(i >= 0)) ;
+    Z.of_int i
+end

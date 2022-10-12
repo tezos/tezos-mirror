@@ -90,7 +90,7 @@ module Parameters :
   let approximate_fee_bound _ _ =
     {
       fee = Tez.of_mutez_exn 3_000_000L;
-      counter = Z.of_int 500_000;
+      counter = Manager_counter.Internal_for_tests.of_int 500_000;
       gas_limit = Gas.Arith.integral_of_int_exn 500_000;
       storage_limit = Z.of_int 500_000;
     }

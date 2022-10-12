@@ -164,7 +164,7 @@ let test_high_counter infos kind =
       {
         (operation_req_default kind) with
         force_reveal = Some true;
-        counter = Some (Z.of_int max_int);
+        counter = Some (Manager_counter.Internal_for_tests.of_int max_int);
       }
       infos
   in

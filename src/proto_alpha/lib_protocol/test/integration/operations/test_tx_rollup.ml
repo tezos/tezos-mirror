@@ -387,7 +387,7 @@ let make_deposit b tx_rollup l1_src addr =
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     l1_src
@@ -1128,7 +1128,7 @@ let test_additional_space_allocation_for_valid_deposit () =
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1271,7 +1271,7 @@ let test_invalid_deposit_too_big_ticket () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1322,7 +1322,7 @@ let test_invalid_deposit_too_big_ticket_type () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1379,7 +1379,7 @@ let test_valid_deposit_big_ticket () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
