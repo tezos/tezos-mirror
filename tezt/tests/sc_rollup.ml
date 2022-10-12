@@ -171,8 +171,7 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let* node, client =
     Client.init_with_protocol ~parameter_file `Client ~protocol ~nodes_args ()
   in
-  let operator = Constant.bootstrap1.alias in
-  f node client operator
+  f node client
 
 let get_sc_rollup_commitment_period_in_blocks client =
   let* constants = get_sc_rollup_constants client in
@@ -195,8 +194,8 @@ type test = {variant : string; tags : string list; description : string}
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = "bootstrap1") ?(kind = "arith") ?(parameters_ty = "string")
-    ?(boot_sector = boot_sector_of kind) client =
+    ?(src = Constant.bootstrap1.alias) ?(kind = "arith")
+    ?(parameters_ty = "string") ?(boot_sector = boot_sector_of kind) client =
   let* sc_rollup =
     Client.Sc_rollup.(
       originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
@@ -209,7 +208,8 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
 
    A rollup node has a configuration file that must be initialized.
 *)
-let with_fresh_rollup ?kind ?boot_sector f tezos_node tezos_client operator =
+let with_fresh_rollup ?kind ?boot_sector ?(operator = Constant.bootstrap1.alias)
+    f tezos_node tezos_client =
   let* sc_rollup =
     originate_sc_rollup ?kind ?boot_sector ~src:operator tezos_client
   in
@@ -325,8 +325,8 @@ let test_origination ~kind =
          "%s - origination of a SCORU executes without error"
          kind)
     (fun protocol ->
-      setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* _sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
+      setup ~protocol @@ fun _rollup_node rollup_client ->
+      let* _sc_rollup = originate_sc_rollup ~kind rollup_client in
       unit)
 
 (* Initialize configuration
@@ -421,7 +421,7 @@ let test_rollup_get_genesis_info ~kind =
     ~tags:["sc_rollup"; "genesis_info"; kind]
     ~title:(Format.asprintf "%s - get genesis info of a sc rollup" kind)
     (fun protocol ->
-      setup ~protocol @@ fun node client bootstrap ->
+      setup ~protocol @@ fun node client ->
       let current_level = Node.get_level node in
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
@@ -439,8 +439,7 @@ let test_rollup_get_genesis_info ~kind =
             ~error_msg:"expected value %L, got %R") ;
         return () )
         node
-        client
-        bootstrap)
+        client)
 
 (* Fetching the last cemented commitment info for a sc rollup
     ----------------------------------------------------------
@@ -461,7 +460,7 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
          "%s - get last cemented commitment hash and inbox level of a sc rollup"
          kind)
     (fun protocol ->
-      setup ~protocol @@ fun node client bootstrap ->
+      setup ~protocol @@ fun node client ->
       ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
         let origination_level = Node.get_level node in
 
@@ -486,8 +485,7 @@ let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_
           (level = origination_level) int ~error_msg:"expected value %L, got %R") ;
         return () )
         node
-        client
-        bootstrap)
+        client)
 
 (* Pushing message in the inbox
    ----------------------------
@@ -696,7 +694,7 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node _sc_rollup node
     client =
   let num_messages = 1 in
 
-  setup ~protocol @@ fun node' client' _ ->
+  setup ~protocol @@ fun node' client' ->
   let* () = Client.Admin.trust_address client ~peer:node'
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
@@ -742,7 +740,7 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node _sc_rollup node
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
-let with_fresh_rollups ~kind n f node client operator =
+let with_fresh_rollups ~kind n f node client =
   let rec go n addrs k =
     if n < 1 then k addrs
     else
@@ -751,13 +749,12 @@ let with_fresh_rollups ~kind n f node client operator =
         (fun addr _ -> go (n - 1) (String_set.add addr addrs) k)
         node
         client
-        operator
   in
   go n String_set.empty f
 
 let test_rollup_list ~kind =
   let open Lwt.Syntax in
-  let go node client bootstrap1 =
+  let go node client =
     let* rollups =
       RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
     in
@@ -768,7 +765,6 @@ let test_rollup_list ~kind =
           failwith "Expected initial list of originated SCORUs to be empty"
       | [] -> ()
     in
-
     with_fresh_rollups
       ~kind
       10
@@ -786,8 +782,8 @@ let test_rollup_list ~kind =
             ~error_msg:"%L %R"))
       node
       client
-      bootstrap1
   in
+
   register_test
     ~__FILE__
     ~tags:["sc_rollup"; "list"]
@@ -1202,7 +1198,7 @@ let commitment_stored _protocol sc_rollup_node sc_rollup _node client =
   check_published_commitment_in_l1 sc_rollup client published_commitment
 
 let mode_publish mode publishes protocol sc_rollup_node sc_rollup node client =
-  setup ~protocol @@ fun other_node other_client _ ->
+  setup ~protocol @@ fun other_node other_client ->
   let* () = Client.Admin.trust_address client ~peer:other_node
   and* () = Client.Admin.trust_address other_client ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:other_node in
@@ -1513,7 +1509,7 @@ let commitments_reorgs ~kind protocol sc_rollup_node sc_rollup node client =
   let num_messages = 1 in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
 
-  setup ~protocol @@ fun node' client' _ ->
+  setup ~protocol @@ fun node' client' ->
   let* () = Client.Admin.trust_address client ~peer:node'
   and* () = Client.Admin.trust_address client' ~peer:node in
   let* () = Client.Admin.connect_address client ~peer:node' in
@@ -2038,11 +2034,9 @@ let test_rollup_node_uses_arith_boot_sector =
     ~tags:["sc_rollup"; "run"; "node"]
     ~title:"ensure arith boot sector is used"
     (fun protocol ->
-      setup ~protocol @@ fun node client x ->
-      let* state_hash1 =
-        with_booted ~boot_sector:"10 10 10 + +" node client x
-      in
-      let* state_hash2 = with_booted ~boot_sector:"31" node client x in
+      setup ~protocol @@ fun node client ->
+      let* state_hash1 = with_booted ~boot_sector:"10 10 10 + +" node client in
+      let* state_hash2 = with_booted ~boot_sector:"31" node client in
       Check.(state_hash1 <> state_hash2)
         Check.string
         ~error_msg:"State hashes should be different! (%L, %R)" ;
@@ -2232,9 +2226,9 @@ let test_consecutive_commitments ~kind =
     ~tags:["sc_rollup"; "l1"; "commitment"; kind]
     ~title:(Format.asprintf "%s - consecutive commitments" kind)
     (fun protocol ->
-      setup ~protocol @@ fun _node client bootstrap1_key ->
+      setup ~protocol @@ fun _node client ->
       let* inbox_level = Client.level client in
-      let* sc_rollup = originate_sc_rollup ~kind ~src:bootstrap1_key client in
+      let* sc_rollup = originate_sc_rollup ~kind client in
       let operator = Constant.bootstrap1.public_key_hash in
       let* {commitment_period_in_blocks; _} = get_sc_rollup_constants client in
       (* As we did no publish any commitment yet, this is supposed to fail. *)
@@ -2508,7 +2502,7 @@ let test_forking_scenario ~title ~scenario protocols =
          Making it a lot smaller than the default value to speed up tests. *)
       let timeout = 10 in
       setup ~commitment_period ~challenge_window ~timeout ~protocol
-      @@ fun node client _bootstrap1_key ->
+      @@ fun node client ->
       (* Originate a Sc rollup. *)
       let* sc_rollup = originate_sc_rollup client ~parameters_ty:"unit" in
       (* Building a forking commitments tree. *)
@@ -2782,7 +2776,7 @@ let test_refutation_reward_and_punishment protocols =
       let timeout_period = 3 in
       let commitment_period = 2 in
       setup ~commitment_period ~timeout:timeout_period ~protocol
-      @@ fun node client _ ->
+      @@ fun node client ->
       let* {commitment_period_in_blocks; stake_amount; _} =
         get_sc_rollup_constants client
       in
