@@ -8,10 +8,13 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos_dal_node_services
   tezos-client-base
-  tezos-protocol-updater)
+  tezos-protocol-updater
+  tezos-client-base-unix)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_client_base
-  -open Tezos_protocol_updater))
+  -open Tezos_protocol_updater
+  -open Tezos_client_base_unix))

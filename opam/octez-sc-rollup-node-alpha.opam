@@ -23,6 +23,7 @@ depends: [
   "tezos-rpc-http"
   "tezos-rpc-http-server"
   "tezos-dal-node-services"
+  "tezos-dal-node-lib"
   "tezos-shell-services"
   "tezos-sc-rollup-alpha"
   "tezos-layer2-utils-alpha"

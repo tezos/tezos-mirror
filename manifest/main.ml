@@ -3178,8 +3178,10 @@ let octez_dal_node_lib =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
+        octez_dal_node_services;
         octez_client_base |> open_;
         octez_protocol_updater |> open_;
+        octez_client_base_unix |> open_;
       ]
 
 let octez_scoru_wasm_tests_helpers =
@@ -4741,6 +4743,7 @@ module Protocol = Protocol
             octez_rpc_http;
             octez_rpc_http_server;
             octez_dal_node_services;
+            octez_dal_node_lib |> open_;
             octez_shell_services |> open_;
             sc_rollup |> if_some |> open_;
             layer2_utils |> if_some |> open_;

@@ -23,6 +23,7 @@
   tezos-rpc-http
   tezos-rpc-http-server
   tezos_dal_node_services
+  tezos_dal_node_lib
   tezos-shell-services
   tezos-sc-rollup-alpha
   tezos-layer2-utils-alpha
@@ -52,6 +53,7 @@
   -open Tezos_protocol_plugin_alpha
   -open Tezos_protocol_alpha_parameters
   -open Tezos_rpc
+  -open Tezos_dal_node_lib
   -open Tezos_shell_services
   -open Tezos_sc_rollup_alpha
   -open Tezos_layer2_utils_alpha
