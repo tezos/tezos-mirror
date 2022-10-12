@@ -397,83 +397,43 @@ let test_rollup_node_running ~kind =
          sc_rollup_from_client)
   else unit
 
-(* Fetching the initial level of a sc rollup
-    -----------------------------------------
+(** Genesis information and last cemented commitment at origination are correct
+----------------------------------------------------------
 
-   We can fetch the level when a smart contract rollup was
-   originated from the context.
+   We can fetch the hash and level of the last cemented commitment and it's
+   initially equal to the origination information.
 *)
 let test_rollup_get_genesis_info ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "genesis_info"; kind]
-    ~title:(Format.asprintf "%s - get genesis info of a sc rollup" kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      let current_level = Node.get_level node in
-      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
-        (* Bake 10 blocks to be sure that the initial level of rollup is different
-           from the current level. *)
-        let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
-        let* genesis_info =
-          RPC.Client.call client
-          @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
-        in
-        (* 1 Block for activating alpha + 1 block for originating the rollup
-           the rollup initial level should be 2 *)
-        Check.(
-          (JSON.(genesis_info |-> "level" |> as_int) = current_level + 1)
-            int
-            ~error_msg:"expected value %L, got %R") ;
-        return () )
-        node
-        client)
-
-(* Fetching the last cemented commitment info for a sc rollup
-    ----------------------------------------------------------
-
-   We can fetch the hash and level of the last cemented commitment. Initially,
-   this corresponds to `(Sc_rollup.Commitment_hash.zero, origination_level)`.
-*)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2944
-   Revisit this test once the rollup node can cement commitments. *)
-let test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
-    ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "lcc_hash_with_level"; kind]
-    ~title:
-      (Format.asprintf
-         "%s - get last cemented commitment hash and inbox level of a sc rollup"
-         kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup ~kind @@ fun sc_rollup _sc_rollup_node ->
-        let origination_level = Node.get_level node in
-
-        (* Bake 10 blocks to be sure that the origination_level of rollup is different
-           from the level of the head node. *)
-        let* () = repeat 10 (fun () -> Client.bake_for_and_wait client) in
-        let* hash, level =
-          last_cemented_commitment_hash_with_level ~sc_rollup client
-        in
-        let* genesis_info =
-          RPC.Client.call client
-          @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
-        in
-        let genesis_hash =
-          JSON.(genesis_info |-> "commitment_hash" |> as_string)
-        in
-        Check.(
-          (hash = genesis_hash) string ~error_msg:"expected value %L, got %R") ;
-        (* The level of the last cemented commitment should correspond to the
-           rollup origination level. *)
-        Check.(
-          (level = origination_level) int ~error_msg:"expected value %L, got %R") ;
-        return () )
-        node
-        client)
+  test_scenario
+    {
+      variant = None;
+      tags = ["genesis_info"; "lcc"];
+      description = "genesis info and last cemented are equal at origination";
+    }
+    ~kind
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  let origination_level = Node.get_level tezos_node in
+  (* Bake 10 blocks to be sure that the origination_level of rollup is different
+     from the level of the head node. *)
+  let* () = repeat 10 (fun () -> Client.bake_for_and_wait tezos_client) in
+  let* hash, level =
+    last_cemented_commitment_hash_with_level ~sc_rollup tezos_client
+  in
+  let* genesis_info =
+    RPC.Client.call tezos_client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+  in
+  let genesis_hash = JSON.(genesis_info |-> "commitment_hash" |> as_string) in
+  let genesis_level = JSON.(genesis_info |-> "level" |> as_int) in
+  Check.((hash = genesis_hash) string ~error_msg:"expected value %L, got %R") ;
+  (* The level of the last cemented commitment should correspond to the
+     rollup origination level. *)
+  Check.((level = origination_level) int ~error_msg:"expected value %L, got %R") ;
+  Check.(
+    (genesis_level = origination_level)
+      int
+      ~error_msg:"expected value %L, got %R") ;
+  unit
 
 (* Pushing message in the inbox
    ----------------------------
@@ -3128,9 +3088,6 @@ let register ~kind ~protocols =
   test_origination ~kind protocols ;
   test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
-  test_rollup_get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
-    ~kind
-    protocols ;
   test_rollup_inbox_size ~kind protocols ;
   test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
   test_rpcs ~kind protocols ;
