@@ -1863,12 +1863,14 @@ class TestContractOpcodes:
             hash_contract,
             '0x00',
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
+            trace_stack=True,
         )
         assert run_script_res.storage == hash_result
         run_script_res = client.run_script(
             hash_contract,
             '0x00',
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
+            trace_stack=True,
         )
         assert run_script_res.storage == hash_result
 
@@ -1895,7 +1897,7 @@ class TestContractOpcodes:
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
 
         with assert_run_failure(r'unexpected arithmetic overflow'):
-            client.run_script(contract, param, storage)
+            client.run_script(contract, param, storage, trace_stack=True)
 
     @pytest.mark.skip(reason="Bug in annotation system")
     def test_fails_annotated_set_car_cdr(
@@ -1909,6 +1911,7 @@ class TestContractOpcodes:
                 path.join(OPCODES_CONTRACT_PATH, 'set_car.tz'),
                 '(Pair %wrong %field "hello" 0)',
                 '""',
+                trace_stack=True,
             )
 
     @pytest.mark.parametrize(
@@ -1940,5 +1943,7 @@ class TestContractOpcodes:
     ):
         client = client_regtest
         contract = path.join(OPCODES_CONTRACT_PATH, contract)
-        run_script_res = client.run_script(contract, storage, param)
+        run_script_res = client.run_script(
+            contract, storage, param, trace_stack=True
+        )
         assert run_script_res.storage == expected
