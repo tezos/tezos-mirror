@@ -545,29 +545,24 @@ let fetch_messages_from_block client =
    protocol in the context.
 *)
 let test_rollup_inbox_of_rollup_node variant scenario ~kind =
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "inbox"; "node"; variant; kind]
-    ~title:
-      (Printf.sprintf
-         "%s - maintenance of inbox in the rollup node (%s)"
-         kind
-         variant)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      ( with_fresh_rollup ~kind @@ fun sc_rollup sc_rollup_node ->
-        let* () = scenario protocol sc_rollup_node sc_rollup node client in
-        let* inbox_from_sc_rollup_node =
-          get_inbox_from_sc_rollup_node sc_rollup_node
-        in
-        let* inbox_from_tezos_node = get_inbox_from_tezos_node client in
-        return
-        @@ Check.(
-             (inbox_from_sc_rollup_node = inbox_from_tezos_node)
-               (tuple3 string int int)
-               ~error_msg:"expected value %R, got %L") )
-        node
-        client)
+  test_scenario
+    {
+      variant = Some variant;
+      tags = ["inbox"];
+      description = "maintenance of inbox in the rollup node";
+    }
+    ~kind
+  @@ fun protocol sc_rollup_node sc_rollup node client ->
+  let* () = scenario protocol sc_rollup_node sc_rollup node client in
+  let* inbox_from_sc_rollup_node =
+    get_inbox_from_sc_rollup_node sc_rollup_node
+  in
+  let* inbox_from_tezos_node = get_inbox_from_tezos_node client in
+  return
+  @@ Check.(
+       (inbox_from_sc_rollup_node = inbox_from_tezos_node)
+         (tuple3 string int int)
+         ~error_msg:"expected value %R, got %L")
 
 let basic_scenario _protocol sc_rollup_node _sc_rollup _node client =
   let num_messages = 2 in
@@ -577,10 +572,7 @@ let basic_scenario _protocol sc_rollup_node _sc_rollup _node client =
     4
   in
   let* () = Sc_rollup_node.run sc_rollup_node in
-  Log.info "before sending messages\n" ;
   let* () = send_messages num_messages client in
-  let* level = Client.level client in
-  Log.info "level: %d\n" level ;
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
