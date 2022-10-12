@@ -108,7 +108,7 @@ type manager_operation_kind =
 (** The requirements for a tested manager operation. *)
 type operation_req = {
   kind : manager_operation_kind;
-  counter : counter option;
+  counter : Manager_counter.t option;
   fee : Tez.t option;
   gas_limit : Op.gas_limit option;
   storage_limit : Z.t option;
@@ -426,7 +426,7 @@ let fund_account_op block bootstrap account fund counter =
 let fund_account block bootstrap account fund =
   let open Lwt_result_syntax in
   let* counter = Context.Contract.counter (B block) bootstrap in
-  let* operation, (_counter : counter) =
+  let* operation, (_counter : Manager_counter.t) =
     fund_account_op block bootstrap account fund counter
   in
   let*! b = Block.bake ~operation block in

@@ -37,7 +37,7 @@ let big_map_root =
 type info = {
   balance : Tez.t;
   delegate : public_key_hash option;
-  counter : counter option;
+  counter : Manager_counter.t option;
   script : Script.t option;
 }
 

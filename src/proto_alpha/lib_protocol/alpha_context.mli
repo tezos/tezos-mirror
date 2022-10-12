@@ -1597,6 +1597,11 @@ module Ticket_hash : sig
   end
 end
 
+(** This module re-exports definitions from {!Manager_counter_repr}. *)
+module Manager_counter : sig
+  type t = Z.t
+end
+
 (** This module re-exports definitions from {!Contract_repr} and
     {!Contract_storage}. *)
 module Contract : sig
@@ -4346,7 +4351,7 @@ and _ contents =
   | Manager_operation : {
       source : public_key_hash;
       fee : Tez.tez;
-      counter : counter;
+      counter : Manager_counter.t;
       operation : 'kind manager_operation;
       gas_limit : Gas.Arith.integral;
       storage_limit : Z.t;
@@ -4502,8 +4507,6 @@ and _ manager_operation =
       ops : (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
-
-and counter = Z.t
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation

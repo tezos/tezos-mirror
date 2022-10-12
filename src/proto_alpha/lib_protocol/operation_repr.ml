@@ -330,7 +330,7 @@ and _ contents =
   | Manager_operation : {
       source : Signature.public_key_hash;
       fee : Tez_repr.tez;
-      counter : counter;
+      counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
@@ -488,8 +488,6 @@ and _ manager_operation =
       ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
-
-and counter = Manager_counter_repr.t
 
 let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   function

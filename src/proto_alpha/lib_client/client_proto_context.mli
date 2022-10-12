@@ -822,7 +822,7 @@ val sc_rollup_originate :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:string ->
@@ -849,7 +849,7 @@ val sc_rollup_add_messages :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   messages:string list ->
   src_pk:public_key ->
@@ -873,7 +873,7 @@ val sc_rollup_cement :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment.Hash.t ->
@@ -898,7 +898,7 @@ val sc_rollup_publish :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   commitment:Alpha_context.Sc_rollup.Commitment.t ->
@@ -923,7 +923,7 @@ val sc_rollup_execute_outbox_message :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Sc_rollup.t ->
   cemented_commitment:Sc_rollup.Commitment.Hash.t ->
@@ -975,7 +975,7 @@ val sc_rollup_refute :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   refutation:Alpha_context.Sc_rollup.Game.refutation option ->
@@ -1001,7 +1001,7 @@ val sc_rollup_timeout :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   alice:Alpha_context.Sc_rollup.Staker.t ->
@@ -1027,7 +1027,7 @@ val sc_rollup_dal_slot_subscribe :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
   slot_index:int ->

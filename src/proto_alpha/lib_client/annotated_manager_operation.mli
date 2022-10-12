@@ -85,7 +85,7 @@ val set_storage_limit : Z.t Limit.t -> 'a t -> 'a t
 
 (** Set the counter of the annotated operation. Fail if the counter
     is already set. *)
-val set_counter : counter -> 'a t -> 'a t tzresult
+val set_counter : Manager_counter.t -> 'a t -> 'a t tzresult
 
 (** Set the source of the operation. Fail if the source is already set. *)
 val set_source : public_key_hash -> 'a t -> 'a t tzresult

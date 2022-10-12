@@ -45,7 +45,7 @@ type prioritized_manager = {
   gas : Fixed_point_repr.integral_tag Gas.Arith.t;
   weight : Q.t;
   source : public_key_hash;
-  counter : counter;
+  counter : Manager_counter.t;
 }
 
 module PrioritizedManagerSet = Set.Make (struct

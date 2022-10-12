@@ -122,7 +122,7 @@ val transaction :
     yet. Disabled (set to [false]) by default.}} *)
 val unsafe_transaction :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -191,7 +191,7 @@ val revelation :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?forge_pkh:public_key_hash option ->
   Context.t ->
   public_key ->
@@ -282,7 +282,7 @@ val activation :
 
 val combine_operations :
   ?public_key:public_key ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?spurious_operation:packed_operation ->
   source:Contract.t ->
   Context.t ->
@@ -486,7 +486,7 @@ val tx_rollup_remove_commitment :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_dispatch_tickets :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -526,7 +526,7 @@ val tx_rollup_dispatch_tickets :
     yet. Disabled (set to [false]) by default.}} *)
 val transfer_ticket :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -605,7 +605,7 @@ val tx_rollup_reject :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -659,7 +659,7 @@ val sc_rollup_cement :
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_execute_outbox_message :
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -721,7 +721,7 @@ val sc_rollup_timeout :
 
 val dal_publish_slot_header :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -750,7 +750,7 @@ val zk_rollup_origination :
 
 val update_consensus_key :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->

@@ -140,7 +140,7 @@ val inject_token_transfer_batch :
   src_sk:Client_keys.sk_uri ->
   token_transfers:token_transfer list ->
   fee_parameter:Injection.fee_parameter ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?default_fee:Tez.t ->
   ?default_gas_limit:Gas.Arith.integral ->
   ?default_storage_limit:Z.t ->
