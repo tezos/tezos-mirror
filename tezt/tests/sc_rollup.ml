@@ -731,52 +731,46 @@ let test_rollup_list ~kind =
    messages it will boot into the initial state.
 *)
 let test_rollup_node_boots_into_initial_state ~kind =
-  let go client sc_rollup sc_rollup_node =
-    let* genesis_info =
-      RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
-    in
-    let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-
-    let* () = Sc_rollup_node.run sc_rollup_node in
-    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-
-    let* level =
-      Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
-    in
-    Check.(level = init_level)
-      Check.int
-      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-
-    let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
-    Check.(ticks = 0)
-      Check.int
-      ~error_msg:"Unexpected initial tick count (%L = %R)" ;
-
-    let* status = Sc_rollup_client.status ~hooks sc_rollup_client in
-    let expected_status =
-      match kind with
-      | "arith" -> "Halted"
-      | "wasm_2_0_0" -> "Waiting for input message"
-      | _ -> raise (Invalid_argument kind)
-    in
-    Check.(status = expected_status)
-      Check.string
-      ~error_msg:"Unexpected PVM status (%L = %R)" ;
-
-    Lwt.return_unit
+  test_scenario
+    {
+      variant = None;
+      tags = ["rollup_node"; "bootstrap"];
+      description = "rollup node boots into the initial state";
+    }
+    ~kind
+  @@ fun _protocol sc_rollup_node sc_rollup _node client ->
+  let* genesis_info =
+    RPC.Client.call ~hooks client
+    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
   in
-  register_test
-    ~__FILE__
-    ~tags:["sc_rollup"; "run"; "node"; kind]
-    ~title:(Format.asprintf "%s - node boots into the initial state" kind)
-    (fun protocol ->
-      setup ~protocol @@ fun node client ->
-      with_fresh_rollup
-        ~kind
-        (fun sc_rollup sc_rollup_node -> go client sc_rollup sc_rollup_node)
-        node
-        client)
+  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+
+  let* () = Sc_rollup_node.run sc_rollup_node in
+  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+
+  let* level =
+    Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node init_level
+  in
+  Check.(level = init_level)
+    Check.int
+    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+
+  let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+  Check.(ticks = 0)
+    Check.int
+    ~error_msg:"Unexpected initial tick count (%L = %R)" ;
+
+  let* status = Sc_rollup_client.status ~hooks sc_rollup_client in
+  let expected_status =
+    match kind with
+    | "arith" -> "Halted"
+    | "wasm_2_0_0" -> "Waiting for input message"
+    | _ -> raise (Invalid_argument kind)
+  in
+  Check.(status = expected_status)
+    Check.string
+    ~error_msg:"Unexpected PVM status (%L = %R)" ;
+  unit
 
 let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
     ~internal ~kind =
