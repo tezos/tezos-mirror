@@ -27,6 +27,10 @@ open Tezos_clic
 let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
+let assert_ok ~__LOC__ = function
+  | Ok x -> x
+  | Error _ -> Stdlib.failwith ("Assertion failure at " ^ __LOC__)
+
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   type serialization_costs = {decode : int; encode : int}
 
@@ -56,22 +60,46 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   type gas = {
     code_costs : serialization_costs;
     storage_costs : serialization_costs;
+    parsing_toplevel_cost : int;
+    parsing_storage_type_cost : int;
+    parsing_storage_cost : int;
+    unparsing_storage_cost : int;
   }
 
   let gas_headers, gas_to_list =
     (* [gas_to_list] returns the field values corresponding to the [gas_headers].
        Hence it should return lists of the same length as [gas_headers]. *)
     let headers =
-      List.flatten
+      (List.flatten
       @@ List.map
            (fun name -> [name ^ "_decode"; name ^ "_encode"])
-           ["code"; "storage"]
+           ["code"; "storage"])
+      @ [
+          "parsing_toplevel";
+          "parsing_storage_type";
+          "parsing_storage";
+          "unparsing_storage";
+        ]
     in
-    let to_list {code_costs; storage_costs} =
-      List.flatten
+    let to_list
+        {
+          code_costs;
+          storage_costs;
+          parsing_toplevel_cost;
+          parsing_storage_type_cost;
+          parsing_storage_cost;
+          unparsing_storage_cost;
+        } =
+      (List.flatten
       @@ List.map
            (fun {decode; encode} -> [decode; encode])
-           [code_costs; storage_costs]
+           [code_costs; storage_costs])
+      @ [
+          parsing_toplevel_cost;
+          parsing_storage_type_cost;
+          parsing_storage_cost;
+          unparsing_storage_cost;
+        ]
     in
     (headers, to_list)
 
@@ -148,27 +176,42 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
 
     let parse_ty ctxt type_expr =
       let hashed_ty = hash_expr type_expr in
-      match
-        P.Translator.parse_ty
-          ctxt
-          ~allow_lazy_storage:true
-          ~allow_operation:true
-          ~allow_contract:true
-          ~allow_ticket:true
-          (Micheline.root type_expr)
-      with
-      | Ok ex_ty -> (hashed_ty, ex_ty)
-      | Error _ -> assert false
+      let ex_ty, parse_ty_cost =
+        assert_ok ~__LOC__
+        @@ P.Translator.parse_ty
+             ctxt
+             ~allow_lazy_storage:true
+             ~allow_operation:true
+             ~allow_contract:true
+             ~allow_ticket:true
+             (Micheline.root type_expr)
+      in
+      (hashed_ty, ex_ty, parse_ty_cost)
+
+    type get_script_storage_type_result = {
+      storage_type_hash : P.Script.Hash.t;
+      storage_type : P.Translator.ex_ty;
+      parsing_toplevel_cost : int;
+      parsing_storage_type_cost : int;
+    }
 
     let get_script_storage_type ctxt script_expr =
       let open Lwt_syntax in
       let+ result = P.Translator.parse_toplevel ctxt script_expr in
       match result with
-      | Ok code ->
+      | Ok (code, parsing_toplevel_cost) ->
           let storage_type_expr =
             Micheline.strip_locations @@ P.code_storage_type code
           in
-          parse_ty ctxt storage_type_expr
+          let storage_type_hash, storage_type, parsing_storage_type_cost =
+            parse_ty ctxt storage_type_expr
+          in
+          {
+            storage_type_hash;
+            storage_type;
+            parsing_storage_type_cost;
+            parsing_toplevel_cost;
+          }
       | Error _ ->
           P.Script.print_expr Format.std_formatter script_expr ;
           assert false
@@ -338,7 +381,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         | Ok (script, code_costs) ->
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage || collect_gas) then
-                let+ storage_opt =
+                let* storage_opt =
                   Storage_helpers.get_lazy_expr
                     ~what:"contract storage"
                     ~getter:P.Contract.get_storage
@@ -347,12 +390,47 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                     contract
                 in
                 match storage_opt with
-                | Error `AlreadyWarned -> fun x -> x
+                | Error `AlreadyWarned -> return @@ fun x -> x
                 | Ok (storage, storage_costs) ->
-                    let gas =
+                    let+ gas =
                       if Config.collect_gas then
-                        Some {code_costs; storage_costs}
-                      else None
+                        let* {
+                               storage_type_hash = _;
+                               storage_type = Ex_ty storage_type;
+                               parsing_storage_type_cost;
+                               parsing_toplevel_cost;
+                             } =
+                          get_script_storage_type ctxt script
+                        in
+                        let* storage_parsing_result =
+                          P.Translator.parse_data
+                            ctxt
+                            ~allow_forged:true
+                            storage_type
+                            (Micheline.root storage)
+                        in
+                        let parsed_storage, parsing_storage_cost =
+                          assert_ok ~__LOC__ storage_parsing_result
+                        in
+                        let+ storage_unparsing_result =
+                          P.Translator.unparse_data_cost
+                            ctxt
+                            storage_type
+                            parsed_storage
+                        in
+                        let unparsing_storage_cost =
+                          assert_ok ~__LOC__ storage_unparsing_result
+                        in
+                        Some
+                          {
+                            code_costs;
+                            storage_costs;
+                            parsing_toplevel_cost;
+                            parsing_storage_type_cost;
+                            parsing_storage_cost;
+                            unparsing_storage_cost;
+                          }
+                      else return None
                     in
                     let key = hash_expr storage in
                     fun storages ->
@@ -511,12 +589,23 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
               let exprs =
                 ExprMap.add hash (script, false, ExprMap.empty) exprs
               in
-              let*! ty_hash, ty =
+              let*! {
+                      storage_type;
+                      storage_type_hash;
+                      parsing_storage_type_cost = _;
+                      parsing_toplevel_cost = _;
+                    } =
                 Michelson_helpers.get_script_storage_type ctxt script
               in
               ExprMap.fold_es
                 (fun storage_hash {contract = _; storage; gas = _} exprs ->
-                  return @@ add_typed_expr storage_hash storage ty_hash ty exprs)
+                  return
+                  @@ add_typed_expr
+                       storage_hash
+                       storage
+                       storage_type_hash
+                       storage_type
+                       exprs)
                 storages
                 exprs)
             contract_map
@@ -542,7 +631,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
               match value_opt with
               | Error `AlreadyWarned -> return (exprs, i)
               | Ok value_type_expr ->
-                  let ty_hash, ty =
+                  let ty_hash, ty, _parsing_cost =
                     Michelson_helpers.parse_ty ctxt value_type_expr
                   in
                   let+ exprs =
@@ -556,7 +645,10 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         let exprs = Michelson_helpers.unpack_transitive_closure exprs in
         print_endline "Collecting unpack types..." ;
         let unpack_types =
-          let parse_ty = Michelson_helpers.parse_ty ctxt in
+          let parse_ty expr =
+            let hash, ty, _cost = Michelson_helpers.parse_ty ctxt expr in
+            (hash, ty)
+          in
           Michelson_helpers.collect_unpack_types ~parse_ty exprs
         in
         print_endline "Collecting all lambdas..." ;

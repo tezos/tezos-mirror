@@ -96,7 +96,9 @@ module type PROTOCOL = sig
   module Translator : sig
     type toplevel
 
-    type ex_ty
+    type ('a, 'b) ty
+
+    type ex_ty = Ex_ty : ('a, 'b) ty -> ex_ty
 
     type ex_code
 
@@ -111,13 +113,23 @@ module type PROTOCOL = sig
       allow_contract:bool ->
       allow_ticket:bool ->
       Script.node ->
-      ex_ty tzresult
+      (ex_ty * int) tzresult
 
     val unparse_ty : context -> ex_ty -> Script.node tzresult
 
-    val parse_toplevel : context -> Script.expr -> toplevel tzresult Lwt.t
+    val parse_toplevel :
+      context -> Script.expr -> (toplevel * int) tzresult Lwt.t
 
     val parse_code : context -> Script.lazy_expr -> ex_code tzresult Lwt.t
+
+    val parse_data :
+      context ->
+      allow_forged:bool ->
+      ('a, 'b) ty ->
+      Script.node ->
+      ('a * int) tzresult Lwt.t
+
+    val unparse_data_cost : context -> ('a, 'b) ty -> 'a -> int tzresult Lwt.t
   end
 
   module Storage : sig

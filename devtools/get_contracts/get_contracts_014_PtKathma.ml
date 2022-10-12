@@ -35,8 +35,14 @@ module Proto = struct
     type t = Raw_context.t
 
     let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
-      Lwt.map wrap_tzresult
-      @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+      let open Lwt_result_syntax in
+      let+ ctxt =
+        Lwt.map wrap_tzresult
+        @@ Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+      in
+      Raw_context.set_gas_limit
+        ctxt
+        (Gas_limit_repr.fp_of_milligas_int (max_int - 1))
   end
 
   type context = Context.t
@@ -80,7 +86,9 @@ module Proto = struct
   module Translator = struct
     type toplevel = Script_ir_translator.toplevel
 
-    type ex_ty = Script_ir_translator.ex_ty
+    type ('a, 'b) ty = ('a, 'b) Script_typed_ir.ty
+
+    type ex_ty = Ex_ty : ('a, 'b) ty -> ex_ty
 
     type ex_code = Script_ir_translator.ex_code
 
@@ -91,13 +99,14 @@ module Proto = struct
     let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
       8 * Obj.(reachable_words @@ repr code)
 
-    let parse_ty (ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
+    let parse_ty (raw_ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
         ~allow_contract ~allow_ticket script =
       let open Result_syntax in
-      let+ ty, _ =
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ Script_ir_translator.Ex_ty ty, updated_ctxt =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
-             (Obj.magic ctxt)
+             ctxt
              ~legacy:true
              ~allow_lazy_storage
              ~allow_operation
@@ -105,46 +114,74 @@ module Proto = struct
              ~allow_ticket
              script
       in
-      ty
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (Ex_ty ty, consumed)
 
-    let parse_data ?type_logger (ctxt : Raw_context.t) ~allow_forged ty expr =
+    let parse_data (raw_ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
-      let+ data, _ =
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ data, updated_ctxt =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
-             ?type_logger
-             (Obj.magic ctxt)
+             ctxt
              ~legacy:true
              ~allow_forged
              ty
              expr
       in
-      data
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (data, consumed)
 
-    let unparse_ty (ctxt : Raw_context.t) (Script_ir_translator.Ex_ty ty) =
+    let unparse_data_cost (raw_ctxt : Raw_context.t) ty data =
+      let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ _expr, updated_ctxt =
+        Lwt.map wrap_tzresult
+        @@ Script_ir_translator.unparse_data
+             ctxt
+             Script_ir_translator.Optimized
+             ty
+             data
+      in
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      consumed
+
+    let unparse_ty (raw_ctxt : Raw_context.t) (Ex_ty ty) =
       let open Result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ expr, _ =
-        wrap_tzresult
-        @@ Script_ir_translator.unparse_ty ~loc:0 (Obj.magic ctxt) ty
+        wrap_tzresult @@ Script_ir_translator.unparse_ty ~loc:0 ctxt ty
       in
       expr
 
-    let parse_toplevel (ctxt : Raw_context.t) expr =
+    let parse_toplevel (raw_ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
-      let+ toplevel, _ =
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
+      let+ toplevel, updated_ctxt =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel
-             (Obj.magic ctxt)
-             ~legacy:true
-             expr
+        @@ Script_ir_translator.parse_toplevel ctxt ~legacy:true expr
       in
-      toplevel
+      let consumed =
+        (Alpha_context.Gas.consumed ~since:ctxt ~until:updated_ctxt :> int)
+      in
+      assert (consumed > 0) ;
+      (toplevel, consumed)
 
-    let parse_code ctxt code =
+    let parse_code (raw_ctxt : Raw_context.t) code =
       let open Lwt_result_syntax in
+      let ctxt : Alpha_context.context = Obj.magic raw_ctxt in
       let+ parsed_code, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy:true ~code
+        @@ Script_ir_translator.parse_code ctxt ~legacy:true ~code
       in
       parsed_code
   end
@@ -224,7 +261,7 @@ module Proto = struct
           Box.OPS.fold (fun _k v acc -> g v @ acc) Box.boxed [])
       @@ find_lambda_tys tv
 
-    let collect_lambda_tys (Script_ir_translator.Ex_ty ty) =
+    let collect_lambda_tys (Translator.Ex_ty ty) =
       match find_lambda_tys ty with
       | [] -> None
       | lams -> Some (Ex_ty_lambdas (ty, lams))
@@ -238,7 +275,7 @@ module Proto = struct
       in
       match parse_result with
       | Error _ -> acc
-      | Ok data -> (
+      | Ok (data, _cost) -> (
           match Script_ir_translator.unparse_ty ~loc:0 (Obj.magic ctxt) ty with
           | Error _ -> assert false
           | Ok (ty_expr, _) ->
