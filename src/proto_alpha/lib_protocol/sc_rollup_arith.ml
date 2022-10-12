@@ -1047,7 +1047,7 @@ module Make (Context : P) :
   let parse : unit t =
     let open Monad.Syntax in
     let produce_add =
-      let* _ = lexeme in
+      let* (_ : string) = lexeme in
       let* () = next_char in
       let* () = Code.inject IAdd in
       return ()
@@ -1111,12 +1111,12 @@ module Make (Context : P) :
         | Some (' ' | '\n') -> next_char
         | Some '+' -> produce_add
         | Some d when is_digit d ->
-            let* _ = lexeme in
+            let* (_ : string) = lexeme in
             let* () = next_char in
             let* () = Parser_state.set ParseInt in
             return ()
         | Some d when is_letter d ->
-            let* _ = lexeme in
+            let* (_ : string) = lexeme in
             let* () = next_char in
             let* () = Parser_state.set ParseVar in
             return ()

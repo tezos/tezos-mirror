@@ -225,7 +225,9 @@ module Dal_slot = struct
 
   let subscribe ctxt rollup ~slot_index =
     let open Lwt_tzresult_syntax in
-    let* _slot_index = fail_if_slot_index_invalid ctxt slot_index in
+    let* (_slot_index : Dal_slot_repr.Index.t) =
+      fail_if_slot_index_invalid ctxt slot_index
+    in
     (* Check if the rollup exists by looking for the initial level *)
     let* ctxt, _initial_level = genesis_info ctxt rollup in
     let {Level_repr.level; _} = Raw_context.current_level ctxt in

@@ -136,7 +136,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let ss = accu in
       Interp_costs.concat_string_precheck ss
   | ISlice_string _ ->
-      let _offset = accu in
+      let (_offset : Script_int.n Script_int.num) = accu in
       let _length, (s, _) = stack in
       Interp_costs.slice_string s
   | IConcat_bytes_pair _ ->
@@ -353,7 +353,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | ITicket _ | ITicket_deprecated _ -> Interp_costs.ticket
   | IRead_ticket _ -> Interp_costs.read_ticket
   | IOpen_chest _ ->
-      let _chest_key = accu and chest, (time, _) = stack in
+      let (_chest_key : Script_timelock.chest_key) = accu
+      and chest, (time, _) = stack in
       Interp_costs.open_chest ~chest ~time:(Script_int.to_zint time)
   | IEmit _ -> Interp_costs.emit
   | ILog _ -> Gas.free
