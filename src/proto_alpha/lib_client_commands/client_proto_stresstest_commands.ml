@@ -570,8 +570,8 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
   in
   let*! r =
     if not already_revealed then
-      let reveal_counter = Z.succ current_counter in
-      let transf_counter = Z.succ reveal_counter in
+      let reveal_counter = Manager_counter.succ current_counter in
+      let transf_counter = Manager_counter.succ reveal_counter in
       let reveal =
         Manager_operation
           {
@@ -608,7 +608,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
          all the operations we injected. *)
       inject_contents cctxt state.target_block transfer.src.sk list
     else
-      let transf_counter = Z.succ current_counter in
+      let transf_counter = Manager_counter.succ current_counter in
       let manager_op =
         manager_op_of_transfer
           parameters
@@ -1274,7 +1274,7 @@ let estimate_transaction_cost ?smart_contracts
   let* current_counter =
     Alpha_services.Contract.counter cctxt (chain, block) src.source.pkh
   in
-  let transf_counter = Z.succ current_counter in
+  let transf_counter = Manager_counter.succ current_counter in
   let transfer =
     {
       src = src.source;

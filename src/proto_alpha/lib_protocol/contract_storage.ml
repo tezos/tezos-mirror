@@ -504,7 +504,7 @@ let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
 let check_counter_increment c manager counter =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  let expected = Z.succ contract_counter in
+  let expected = Manager_counter_repr.succ contract_counter in
   if Compare.Z.(expected = counter) then return_unit
   else if Compare.Z.(expected > counter) then
     fail (Counter_in_the_past {contract; expected; found = counter})
@@ -513,9 +513,15 @@ let check_counter_increment c manager counter =
 let increment_counter c manager =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
-  Storage.Contract.Global_counter.update c (Z.succ global_counter) >>=? fun c ->
+  Storage.Contract.Global_counter.update
+    c
+    (Manager_counter_repr.succ global_counter)
+  >>=? fun c ->
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  Storage.Contract.Counter.update c contract (Z.succ contract_counter)
+  Storage.Contract.Counter.update
+    c
+    contract
+    (Manager_counter_repr.succ contract_counter)
 
 let get_script_code c contract_hash =
   let contract = Contract_repr.Originated contract_hash in

@@ -1375,7 +1375,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
   | None ->
       Alpha_services.Contract.counter cctxt (chain, block) source
       >>=? fun pcounter ->
-      let counter = Z.succ pcounter in
+      let counter = Manager_counter.succ pcounter in
       return counter
   | Some counter -> return counter)
   >>=? fun counter ->
@@ -1407,7 +1407,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
         Annotated_manager_operation.Single_manager op
     | Cons_manager (op, rest) ->
         apply_specified_options counter op >>? fun op ->
-        build_contents (Z.succ counter) rest >|? fun rest ->
+        build_contents (Manager_counter.succ counter) rest >|? fun rest ->
         Annotated_manager_operation.Cons_manager (op, rest)
   in
   match key with
@@ -1425,7 +1425,7 @@ let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
       in
       Annotated_manager_operation.set_source source reveal >>?= fun reveal ->
       Annotated_manager_operation.set_counter counter reveal >>?= fun reveal ->
-      build_contents (Z.succ counter) operations >>?= fun rest ->
+      build_contents (Manager_counter.succ counter) operations >>?= fun rest ->
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
       may_patch_limits
         cctxt

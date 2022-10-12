@@ -27,3 +27,5 @@
 type t = Z.t
 
 let init = Z.zero
+
+let succ = Z.succ

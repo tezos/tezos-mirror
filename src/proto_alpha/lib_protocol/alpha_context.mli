@@ -1600,6 +1600,8 @@ end
 (** This module re-exports definitions from {!Manager_counter_repr}. *)
 module Manager_counter : sig
   type t = Z.t
+
+  val succ : t -> t
 end
 
 (** This module re-exports definitions from {!Contract_repr} and

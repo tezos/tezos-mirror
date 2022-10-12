@@ -421,7 +421,7 @@ let fund_account_op block bootstrap account fund counter =
       (Contract.Implicit account)
       fund
   in
-  (op, Z.succ counter)
+  (op, Manager_counter.succ counter)
 
 let fund_account block bootstrap account fund =
   let open Lwt_result_syntax in

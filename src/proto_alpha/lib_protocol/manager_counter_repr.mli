@@ -33,3 +33,6 @@ type t = Z.t
 
 (** Initial value for a counter (zero). *)
 val init : t
+
+(** Successor of a counter. *)
+val succ : t -> t
