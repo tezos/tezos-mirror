@@ -227,7 +227,7 @@ module Dal_slot = struct
     let open Lwt_tzresult_syntax in
     let* _slot_index = fail_if_slot_index_invalid ctxt slot_index in
     (* Check if the rollup exists by looking for the initial level *)
-    let* _initial_level = genesis_info ctxt rollup in
+    let* ctxt, _initial_level = genesis_info ctxt rollup in
     let {Level_repr.level; _} = Raw_context.current_level ctxt in
     let* subscribed_slots = subscribed_slots_at_level ctxt rollup level in
     let*? slot_already_subscribed =
@@ -264,7 +264,7 @@ module Dal_slot = struct
     in
     let open Lwt_tzresult_syntax in
     (* Check if the rollup exists by looking for the initial level *)
-    let* _initial_level = genesis_info ctxt rollup in
+    let* ctxt, _initial_level = genesis_info ctxt rollup in
     let* subscribed_slots = subscribed_slots_at_level ctxt rollup level in
     let*? result = to_dal_slot_index_list subscribed_slots in
     return result
