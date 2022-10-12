@@ -188,7 +188,7 @@ let sc_rollup_node_rpc sc_node service =
       let* response = curl ~url in
       return (Some response)
 
-type test = {variant : string; tags : string list; description : string}
+type test = {variant : string option; tags : string list; description : string}
 
 (** This helper injects an SC rollup origination via octez-client. Then it
     bakes to include the origination in a block. It returns the address of the
@@ -227,12 +227,19 @@ let with_fresh_rollup ?kind ?boot_sector ?(operator = Constant.bootstrap1.alias)
    Many tests can be refactored using test_scenario. *)
 let test_scenario ?regression ~kind ?boot_sector ?commitment_period
     ?challenge_window ?timeout {variant; tags; description} scenario =
-  let tags = tags @ [kind; variant] in
+  let tags = kind :: tags in
   register_test
     ?regression
     ~__FILE__
     ~tags
-    ~title:(Printf.sprintf "%s - %s (%s)" kind description variant)
+    ~title:
+      (Printf.sprintf
+         "%s - %s%s"
+         kind
+         description
+         (match variant with
+         | Some variant -> " (" ^ variant ^ ")"
+         | None -> ""))
     (fun protocol ->
       setup ?commitment_period ?challenge_window ~protocol ?timeout
       @@ fun node client ->
@@ -1116,13 +1123,13 @@ let check_published_commitment_in_l1 ?(allow_non_published = false)
   Lwt.return_unit
 
 let test_commitment_scenario ?commitment_period ?challenge_window
-    ?(extra_tags = []) variant =
+    ?(extra_tags = []) ~variant =
   test_scenario
     ?commitment_period
     ?challenge_window
     {
       tags = ["commitment"; "node"] @ extra_tags;
-      variant;
+      variant = Some variant;
       description = "rollup node - correct handling of commitments";
     }
 
@@ -2095,12 +2102,11 @@ let test_rollup_arith_uses_reveals =
       (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
     return ()
   in
-
   test_scenario
     ~timeout:120
     {
       tags = ["reveals"];
-      variant = "arith";
+      variant = None;
       description = "rollup node - correct handling of commitments";
     }
   @@ fun _protocol sc_rollup_node sc_rollup _node client ->
@@ -2392,7 +2398,7 @@ let test_refutation protocols ~kind =
            ~kind
            ~challenge_window
            ~commitment_period
-           variant
+           (Some variant)
            inputs
            protocols)
 
@@ -2683,7 +2689,7 @@ let test_late_rollup_node =
   test_scenario
     {
       tags = ["node"];
-      variant = "late";
+      variant = Some "late";
       description = "a late rollup should catch up";
     }
   @@ fun _protocol sc_rollup_node _sc_rollup_address _node client ->
@@ -2699,7 +2705,7 @@ let test_interrupt_rollup_node =
   test_scenario
     {
       tags = ["node"];
-      variant = "interrupt";
+      variant = None;
       description = "a rollup should recover on interruption before first inbox";
     }
   @@ fun _protocol sc_rollup_node _sc_rollup_address _node client ->
@@ -2910,7 +2916,9 @@ let test_outbox_message_generic ?regression ?expected_error skip earliness
     entrypoint input_message expected_storage kind =
   let commitment_period = 2 and challenge_window = 5 in
   let variant =
-    (if entrypoint = "" then "" else entrypoint) ^ "_" ^ string_of_int earliness
+    Option.some
+    @@ (if entrypoint = "" then "" else entrypoint)
+    ^ "_" ^ string_of_int earliness
   in
   test_scenario
     ?regression
@@ -3051,7 +3059,7 @@ let test_rpcs ~kind =
     ~kind
     {
       tags = ["rpc"];
-      variant = "api";
+      variant = None;
       description = "RPC API should work and be stable";
     }
   @@ fun _protocol sc_rollup_node sc_rollup node client ->
@@ -3179,71 +3187,71 @@ let register ~kind ~protocols =
     ~boot_sector:None
     ~internal:true ;
   test_commitment_scenario
-    "commitment_is_stored"
+    ~variant:"commitment_is_stored"
     commitment_stored
     protocols
     ~kind ;
   test_commitment_scenario
-    "robust_to_failures"
+    ~variant:"robust_to_failures"
     commitment_stored_robust_to_failures
     protocols
     ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "observer"]
-    "observer_does_not_publish"
+    ~variant:"observer_does_not_publish"
     (mode_publish Observer false)
     protocols
     ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "maintenance"]
-    "maintenance_publishes"
+    ~variant:"maintenance_publishes"
     (mode_publish Maintenance true)
     protocols
     ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "batcher"]
-    "batcher_does_not_publish"
+    ~variant:"batcher_does_not_publish"
     (mode_publish Batcher false)
     protocols
     ~kind ;
   test_commitment_scenario
     ~extra_tags:["modes"; "operator"]
-    "operator_publishes"
+    ~variant:"operator_publishes"
     (mode_publish Operator true)
     protocols
     ~kind ;
   test_commitment_scenario
     ~commitment_period:15
     ~challenge_window:10080
-    "node_use_proto_param"
+    ~variant:"node_use_proto_param"
     commitment_stored
     protocols
     ~kind ;
   test_commitment_scenario
-    "non_final_level"
+    ~variant:"non_final_level"
     commitment_not_stored_if_non_final
     protocols
     ~kind ;
   test_commitment_scenario
-    "messages_reset"
+    ~variant:"messages_reset"
     commitments_messages_reset
     protocols
     ~kind ;
   test_commitment_scenario
-    "handles_chain_reorgs"
+    ~variant:"handles_chain_reorgs"
     (commitments_reorgs ~kind)
     protocols
     ~kind ;
   test_commitment_scenario
     ~challenge_window:1
-    "no_commitment_publish_before_lcc"
+    ~variant:"no_commitment_publish_before_lcc"
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2976
        change tests so that we do not need to repeat custom parameters. *)
     commitment_before_lcc_not_published
     protocols
     ~kind ;
   test_commitment_scenario
-    "first_published_at_level_global"
+    ~variant:"first_published_at_level_global"
     first_published_level_is_global
     protocols
     ~kind ;
