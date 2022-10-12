@@ -1473,7 +1473,7 @@ let test_conflict_too_many_proposals () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.proposals (B block) proposer [protos.(0)] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1493,7 +1493,7 @@ let test_conflicting_proposal () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.proposals (B block) proposer [proposal] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1501,7 +1501,7 @@ let test_conflicting_proposal () =
   in
   let proposal' = protos.(1) in
   let* op' = Op.proposals (B block) proposer [proposal'] in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_proposals __LOC__)
       current_block_state
@@ -1838,7 +1838,7 @@ let test_conflicting_ballot () =
     Incremental.validate_operation current_block_state op_in_current_block
   in
   let* op = Op.ballot (B block) voter proposal Vote.Nay in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.validate_operation
       ~expect_failure:(conflicting_ballot __LOC__)
       current_block_state

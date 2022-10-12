@@ -108,7 +108,7 @@ let positive_tests =
       let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op = select_op operation_req infos in
-      let* _infos = wrap_mode ~only_validate:true infos [op] mode in
+      let* (_infos : infos) = wrap_mode ~only_validate:true infos [op] mode in
       return_true)
 
 (** Under 1M restriction, neither a block nor a prevalidator's valid

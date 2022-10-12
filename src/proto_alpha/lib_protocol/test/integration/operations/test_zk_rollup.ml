@@ -97,7 +97,7 @@ let test_disable_feature_flag () =
       ~init_state:Operator.init_state
       ~nb_ops:1
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_failure:
         (check_proto_error Validate_errors.Manager.Zk_rollup_feature_disabled)
@@ -183,7 +183,7 @@ let test_origination_negative_nb_ops () =
       ~nb_ops:(-1)
   in
   let* i = Incremental.begin_construction ctxt in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error Zk_rollup_apply.Zk_rollup_negative_nb_ops)
@@ -224,7 +224,7 @@ let test_originate_two_rollups () =
       ~init_state:Operator.init_state
       ~nb_ops:1
   in
-  let* _b = Block.bake ~operation ctxt in
+  let* (_b : Block.t) = Block.bake ~operation ctxt in
   assert (zk_rollup1 <> zk_rollup2) ;
   return_unit
 
@@ -265,7 +265,7 @@ let test_append_out_of_range_op_code () =
       ~zk_rollup
       ~ops:[no_ticket {l2_op with op_code = 1}]
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error (Zk_rollup_storage.Zk_rollup_invalid_op_code 1))
@@ -291,7 +291,7 @@ let test_append_external_deposit () =
       ~ops:
         [no_ticket {l2_op with price = {l2_op.price with amount = Z.of_int 10}}]
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error Zk_rollup.Errors.Deposit_as_external)
@@ -495,7 +495,7 @@ let test_append_errors () =
       ~zk_rollup
       ~ops:[({op with price}, Some ticket)]
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error Zk_rollup.Errors.Invalid_deposit_amount)
@@ -511,7 +511,7 @@ let test_append_errors () =
       ~zk_rollup
       ~ops:[no_ticket {op with price}]
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error Zk_rollup.Errors.Invalid_deposit_amount)
@@ -532,7 +532,7 @@ let test_append_errors () =
       ~zk_rollup
       ~ops:[({op with price}, Some ticket)]
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error Zk_rollup.Errors.Invalid_deposit_ticket)
@@ -725,7 +725,7 @@ let test_invalid_deposit () =
     let* constants = Context.get_constants (I i) in
     constants.parametric.tx_rollup.max_ticket_payload_size |> return
   in
-  let* _i =
+  let* (_i : Incremental.t) =
     let payload_size = Saturation_repr.safe_int (contents_size + 216) in
     Incremental.add_operation
       ~expect_apply_failure:

@@ -402,15 +402,13 @@ module Test_Ticket_ledger = struct
       to an address. *)
   let test_credit_unknown_index () =
     let ctxt = empty_context in
-
-    let* _ctxt =
+    let* (_ctxt : t) =
       credit
         ctxt
         ticket_idx1
         (Indexable.index_exn 0l)
         (Tx_rollup_l2_qty.of_int64_exn 1L)
     in
-
     return_unit
 
   (** Test that spending a ticket from an index to another one behaves correctly *)

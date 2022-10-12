@@ -466,7 +466,7 @@ let batch_reveal_transaction infos =
       (Context.B infos.ctxt.block)
       [reveal; transaction]
   in
-  let* _i = Incremental.begin_construction infos.ctxt.block in
+  let* (_i : Incremental.t) = Incremental.begin_construction infos.ctxt.block in
   let* (_ : infos) = validate_diagnostic infos [batch] in
   return_unit
 

@@ -384,7 +384,7 @@ let delegates_of_block block =
 let sequential_validate ?(mempool_mode = true) block operations =
   let open Lwt_result_syntax in
   let* inc = Incremental.begin_construction ~mempool_mode block in
-  let* _inc =
+  let* (_inc : Incremental.t) =
     List.fold_left_es
       (fun acc op -> Incremental.validate_operation acc op)
       inc

@@ -4034,7 +4034,9 @@ let test_state_message_storage_preallocation () =
   let ctxt = Incremental.alpha_ctxt i in
   let message, _ = Tx_rollup_message.make_batch "bogus" in
   let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
-  let _inbox_hash = Tx_rollup_inbox.Merkle.merklize_list [message_hash] in
+  let (_inbox_hash : Tx_rollup_inbox.Merkle.root) =
+    Tx_rollup_inbox.Merkle.merklize_list [message_hash]
+  in
   let state = Tx_rollup_state.initial_state ~pre_allocated_storage:Z.zero in
   let occupied_storage_before =
     Tx_rollup_state.Internal_for_tests.get_occupied_storage state

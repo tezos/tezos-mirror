@@ -2478,7 +2478,7 @@ let test_limit_on_number_of_messages_during_commitment_period with_gap () =
   in
   if with_gap then
     (* Changing the commitment period is enough to accept that many messages... *)
-    let*? _r = add_too_many_messages in
+    let*? (_r : Raw_context.t) = add_too_many_messages in
     return ()
   else
     (* ... but if we stay in the same commitment period, it fails. *)

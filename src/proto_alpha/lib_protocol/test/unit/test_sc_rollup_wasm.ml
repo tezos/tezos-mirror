@@ -66,7 +66,9 @@ module Wasm_context = struct
   let produce_proof context tree step =
     let open Lwt_syntax in
     let* context = Context.add_tree context [] tree in
-    let* _hash = Context.commit ~time:Time.Protocol.epoch context in
+    let* (_hash : Context_hash.t) =
+      Context.commit ~time:Time.Protocol.epoch context
+    in
     let index = Context.index context in
     match Context.Tree.kinded_key tree with
     | Some k ->
