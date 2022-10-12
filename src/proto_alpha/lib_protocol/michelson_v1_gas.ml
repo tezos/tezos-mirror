@@ -123,6 +123,9 @@ module Cost_of = struct
     let cost_N_IApply rec_flag =
       if rec_flag then S.safe_int 220 else S.safe_int 140
 
+    (* model N_IBalance *)
+    let cost_N_IBalance = S.safe_int 10
+
     (* model N_IBlake2b *)
     (* Approximating 1.120804 x term *)
     let cost_N_IBlake2b size =
@@ -1306,6 +1309,8 @@ module Cost_of = struct
 
     let amount = atomic_step_cost cost_N_IAmount
 
+    let balance = atomic_step_cost cost_N_IBalance
+
     let chain_id = atomic_step_cost cost_N_IChainId
 
     let ticket = atomic_step_cost cost_N_ITicket
@@ -1571,9 +1576,6 @@ module Cost_of = struct
     (* Same story as Concat_string. *)
     let concat_bytes total_bytes =
       atomic_step_cost S.(add (S.safe_int 100) (S.shift_right total_bytes 1))
-
-    (* Cost of access taken care of in Contract_storage.get_balance_carbonated *)
-    let balance = Gas.free
 
     (* Cost of Unpack pays two integer comparisons, and a Bytes slice *)
     let unpack bytes =
