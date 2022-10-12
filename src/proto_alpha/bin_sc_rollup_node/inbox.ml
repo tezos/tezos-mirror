@@ -40,33 +40,37 @@ module State = struct
 
   let level_of_hash = State.level_of_hash
 
-  (** [inbox_of_head node_ctxt store block] returns the latest
-      inbox at the given [block]. This function always returns
-      [Some inbox] for all levels after the rollup genesis even when
-      no messages has been issued at this specific [block]. In
-      this case, the inbox is the same as the one found in the level
-      when the latest message has been inserted. *)
+  (** [inbox_of_head node_ctxt store block] returns the latest inbox at the
+      given [block]. This function always returns [Some inbox] for all levels
+      at and after the rollup genesis. *)
   let inbox_of_head node_ctxt Layer1.{hash = block_hash; level = block_level} =
     let open Lwt_result_syntax in
     let open Node_context in
     let*! possible_inbox = Store.Inboxes.find node_ctxt.store block_hash in
+    (* Pre-condition: forall l. (l > genesis_level) => inbox[l] <> None. *)
     match possible_inbox with
     | None ->
-        (* We won't find inboxes for blocks before the rollup origination level.
-           Fortunately this case will only ever be called once when dealing with
-           the rollup origination block. After that we would always find an
-           inbox. *)
+        (* The inbox exists for each tezos block the rollup should care about.
+           That is, every block after the origination level. We then join
+           the bandwagon and build the inbox on top of the protocol's inbox
+           at the end of the origination level. *)
         let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
-        if block_level <= genesis_level then
-          let*! inbox =
-            Context.Inbox.empty node_ctxt.context node_ctxt.genesis_info.level
-          in
-          return inbox
-        else
+        if block_level = genesis_level then
+          let Node_context.{cctxt; _} = node_ctxt in
+          Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, `Level genesis_level)
+        else if block_level > genesis_level then
+          (* Invariant broken, the inbox for this level should exist. *)
           failwith
             "The inbox for block hash %a (level = %ld) is missing."
             Block_hash.pp
             block_hash
+            block_level
+        else
+          (* The rollup node should not care about levels before the genesis
+             level. *)
+          failwith
+            "Asking for the inbox before the genesis level (i.e. %ld), out of \
+             the scope of the rollup's node"
             block_level
     | Some inbox -> return inbox
 
@@ -155,67 +159,77 @@ let same_inbox_as_layer_1 node_ctxt head_hash inbox =
     (Sc_rollup.Inbox.equal layer1_inbox inbox)
     (Sc_rollup_node_errors.Inconsistent_inbox {layer1_inbox; inbox})
 
-let process_head node_ctxt Layer1.({level; hash = head_hash} as head) =
+let process_head (node_ctxt : Node_context.t)
+    Layer1.({level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
-  let* messages = get_messages node_ctxt head_hash in
-  let*! () = Inbox_event.get_messages head_hash level (List.length messages) in
-  let*! () = State.add_messages node_ctxt.store head_hash messages in
-  (*
+  let first_inbox_level =
+    Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
+  in
+  if level >= first_inbox_level then
+    let* messages = get_messages node_ctxt head_hash in
+    let*! () =
+      Inbox_event.get_messages head_hash level (List.length messages)
+    in
+    let*! () = State.add_messages node_ctxt.store head_hash messages in
+    (*
 
           We compute the inbox of this block using the inbox of its
           predecessor. That way, the computation of inboxes is robust
           to chain reorganization.
 
-      *)
-  let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
-  let* inbox = State.inbox_of_head node_ctxt predecessor in
-  let* history = State.history_of_head node_ctxt predecessor in
-  let* ctxt =
-    if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
-    then
-      (* This is before we have interpreted the boot sector, so we start
-         with an empty context in genesis *)
-      return (Context.empty node_ctxt.context)
-    else Node_context.checkout_context node_ctxt predecessor.hash
-  in
-  let*! messages_tree = Context.MessageTrees.find ctxt in
-  let* history, inbox, ctxt =
-    lift
-    @@ let*? level = Raw_level.of_int32 level in
-       let*? messages = List.map_e Sc_rollup.Inbox_message.serialize messages in
-       if messages = [] then return (history, inbox, ctxt)
-       else
-         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
-
-               The number of messages during commitment period is broken with the
-               unique inbox. *)
-         (* let commitment_period =
-          *   node_ctxt.protocol_constants.parametric.sc_rollup
-          *     .commitment_period_in_blocks |> Int32.of_int
-          * in
-          * let inbox =
-          *   Sc_rollup.Inbox.refresh_commitment_period
-          *     ~commitment_period
-          *     ~level
-          *     inbox
-          * in *)
-         let* messages_tree, history, inbox =
-           Context.Inbox.add_messages
-             node_ctxt.context
-             history
-             inbox
-             level
-             messages
-             messages_tree
+    *)
+    let* predecessor = Layer1.get_predecessor node_ctxt.l1_ctxt head in
+    let* inbox = State.inbox_of_head node_ctxt predecessor in
+    let* history = State.history_of_head node_ctxt predecessor in
+    let* ctxt =
+      if level <= Raw_level.to_int32 node_ctxt.Node_context.genesis_info.level
+      then
+        (* This is before we have interpreted the boot sector, so we start
+           with an empty context in genesis *)
+        return (Context.empty node_ctxt.context)
+      else Node_context.checkout_context node_ctxt predecessor.hash
+    in
+    let*! messages_tree = Context.MessageTrees.find ctxt in
+    let* history, inbox, ctxt =
+      lift
+      @@ let*? level = Raw_level.of_int32 level in
+         let*? messages =
+           List.map_e Sc_rollup.Inbox_message.serialize messages
          in
+         if messages = [] then return (history, inbox, ctxt)
+         else
+           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3978
 
-         let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
-         return (history, inbox, ctxt)
-  in
-  let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
-  let*! () = State.add_inbox node_ctxt.store head_hash inbox in
-  let*! () = State.add_history node_ctxt.store head_hash history in
-  return ctxt
+                 The number of messages during commitment period is broken with the
+                 unique inbox. *)
+           (* let commitment_period =
+            *   node_ctxt.protocol_constants.parametric.sc_rollup
+            *     .commitment_period_in_blocks |> Int32.of_int
+            * in
+            * let inbox =
+            *   Sc_rollup.Inbox.refresh_commitment_period
+            *     ~commitment_period
+            *     ~level
+            *     inbox
+            * in *)
+           let* messages_tree, history, inbox =
+             Context.Inbox.add_messages
+               node_ctxt.context
+               history
+               inbox
+               level
+               messages
+               messages_tree
+           in
+
+           let*! ctxt = Context.MessageTrees.set ctxt messages_tree in
+           return (history, inbox, ctxt)
+    in
+    let* () = same_inbox_as_layer_1 node_ctxt head_hash inbox in
+    let*! () = State.add_inbox node_ctxt.store head_hash inbox in
+    let*! () = State.add_history node_ctxt.store head_hash history in
+    return ctxt
+  else return (Context.empty node_ctxt.context)
 
 let inbox_of_hash node_ctxt hash =
   let open Lwt_result_syntax in

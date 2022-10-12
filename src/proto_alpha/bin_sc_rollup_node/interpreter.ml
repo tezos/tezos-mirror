@@ -285,15 +285,10 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   (** [transition_pvm node_ctxt predecessor head] runs a PVM at the
       previous state from block [predecessor] by consuming as many messages
       as possible from block [head]. *)
-  let transition_pvm node_ctxt ctxt predecessor Layer1.{hash; level} =
+  let transition_pvm node_ctxt ctxt predecessor Layer1.{hash; _} =
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
-    let pred_level = Int32.pred level |> Raw_level.of_int32_exn in
-    let* ctxt, predecessor_state =
-      if Raw_level.(pred_level <= node_ctxt.Node_context.genesis_info.level)
-      then genesis_state hash node_ctxt ctxt
-      else state_of_head node_ctxt ctxt predecessor
-    in
+    let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
     let metadata = metadata node_ctxt in
     let* state, num_messages, inbox_level, _fuel =
       eval_block_inbox ~metadata node_ctxt hash predecessor_state
@@ -342,12 +337,36 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return_unit
 
   (** [process_head node_ctxt head] runs the PVM for the given head. *)
-  let process_head node_ctxt ctxt head =
+  let process_head (node_ctxt : Node_context.t) ctxt head =
     let open Lwt_result_syntax in
-    let* predecessor =
-      Layer1.get_predecessor node_ctxt.Node_context.l1_ctxt head
+    let first_inbox_level =
+      Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ
     in
-    transition_pvm node_ctxt ctxt predecessor head
+    if head.Layer1.level >= first_inbox_level then
+      let* predecessor =
+        Layer1.get_predecessor node_ctxt.Node_context.l1_ctxt head
+      in
+      transition_pvm node_ctxt ctxt predecessor head
+    else if head.Layer1.level = Raw_level.to_int32 node_ctxt.genesis_info.level
+    then
+      let* ctxt, state = genesis_state head.hash node_ctxt ctxt in
+      (* Write final state to store. *)
+      let*! ctxt = PVM.State.set ctxt state in
+      let*! context_hash = Context.commit ctxt in
+      let*! () = Store.Contexts.add node_ctxt.store head.hash context_hash in
+
+      let*! () =
+        Store.StateInfo.add
+          node_ctxt.store
+          head.hash
+          {
+            num_messages = Z.zero;
+            num_ticks = Z.zero;
+            initial_tick = Sc_rollup.Tick.initial;
+          }
+      in
+      return_unit
+    else return_unit
 
   (** [run_for_ticks node_ctxt predecessor_hash hash tick_distance] starts the
       evaluation of the inbox at block [hash] for at most [tick_distance]. *)
