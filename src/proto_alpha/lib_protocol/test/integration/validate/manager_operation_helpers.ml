@@ -327,7 +327,7 @@ let self_delegate block pkh =
   let* block = Block.bake block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) contract in
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
-  let+ _ = Assert.equal_pkh ~loc:__LOC__ del pkh in
+  let+ () = Assert.equal_pkh ~loc:__LOC__ del pkh in
   block
 
 let delegation block source delegate =
@@ -344,7 +344,7 @@ let delegation block source delegate =
   let* block = Block.bake block ~operation in
   let* del_opt_new = Context.Contract.delegate_opt (B block) contract_source in
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
-  let+ _ = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
+  let+ () = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
   block
 
 let originate_tx_rollup block rollup_account =
@@ -1385,7 +1385,7 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
       (if only_validate then "Balance update (=)" else "Balance update (<=)")
       Tez.pp
   in
-  let* _ = b_cmp b_out b_expected in
+  let* () = b_cmp b_out b_expected in
   let _ =
     Assert.equal
       Z.equal

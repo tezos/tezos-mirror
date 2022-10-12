@@ -558,14 +558,11 @@ let test_feature_flags infos kind =
       infos
   in
   let flags = infos.flags in
-  let* () =
-    if is_disabled flags kind then
-      validate_ko_diagnostic infos [op] (flag_expect_failure flags)
-    else
-      let* _ = validate_diagnostic infos [op] in
-      return_unit
-  in
-  return_unit
+  if is_disabled flags kind then
+    validate_ko_diagnostic infos [op] (flag_expect_failure flags)
+  else
+    let* _ = validate_diagnostic infos [op] in
+    return_unit
 
 let tests =
   let mk_default () = default_init_ctxt () in

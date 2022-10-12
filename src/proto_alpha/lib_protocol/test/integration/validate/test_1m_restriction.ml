@@ -146,7 +146,7 @@ let two_op_from_same_manager_tests =
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op operation_req infos in
       let* op2 = select_op operation_req2 infos in
-      let* _ = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
+      let* () = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
 (** Under 1M restriction, a batch of two operations cannot be replaced
@@ -176,7 +176,7 @@ let batch_is_not_singles_tests =
         Op.batch_operations ~source (B infos.ctxt.block) [op1; op2]
       in
       let* _ = only_validate_diagnostic ~mode infos [batch] in
-      let* _ = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
+      let* () = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
 (** The applications of two covalid operations in a certain context

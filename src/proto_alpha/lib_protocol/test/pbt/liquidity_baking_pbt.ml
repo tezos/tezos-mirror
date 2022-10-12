@@ -310,7 +310,7 @@ let economic_tests =
         true);
   ]
 
-let _ =
+let () =
   let open Lib_test.Qcheck2_helpers in
   Alcotest.run
     "protocol > pbt > liquidity baking"
