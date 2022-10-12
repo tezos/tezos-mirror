@@ -151,8 +151,8 @@ module type S = sig
 
      - For all the cases below, if there is a path from cell [A] to
      cell [B], [rev_path] contains the list of cells to go from [B] to
-     [A]. Consequently, the first element of [rev_path] is [B] and the
-     path is minimal.
+     [A]. Consequently, the first element of [rev_path] is [B].
+     Except for [Nearest_lower], this path is a minimal path.
 
      - [last_pointer = Deref_returned_none] if [deref] fails to
      associate a cell to a pointer during the search. In that case,
@@ -176,8 +176,12 @@ module type S = sig
      [compare (content candidate) < 0] then there is a path from
      [lower] to [candidate]. [upper], if it exists is the successor
      cell to [lower], i.e. [deref ((back_pointer upper) 0) = Some
-     lower].  In that case, [rev_path] is the minimal path from [cell]
-     to [lower]. *)
+     lower].  In that case, [rev_path] is a path from [cell] to
+     [lower]. This path is *NOT* minimal but almost. The path is
+     minimal from [cell] to [upper=Some up]. By minimality, the path
+     is logarithmic. Consequently, since there is a direct pointer
+     from [up] to [lower], the passe to [lower] is also
+     logarithmic. *)
   val search :
     deref:('ptr -> ('content, 'ptr) cell option) ->
     compare:('content -> int Lwt.t) ->
