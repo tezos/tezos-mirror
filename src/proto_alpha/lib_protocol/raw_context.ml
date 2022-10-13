@@ -557,7 +557,7 @@ let consume_gas ctxt cost =
       else error Operation_quota_exceeded
 
 let check_enough_gas ctxt cost =
-  consume_gas ctxt cost >>? fun _ -> Result.return_unit
+  consume_gas ctxt cost >>? fun (_ : t) -> Result.return_unit
 
 let gas_consumed ~since ~until =
   match (gas_level since, gas_level until) with
