@@ -1331,10 +1331,10 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     client
   |> Process.check
 
-let spawn_run_script ?hooks ?(no_base_dir_warnings = false) ?balance
-    ?self_address ?source ?payer ?gas ?(trace_stack = false) ~prg ~storage
-    ~input client =
-  spawn_command ?hooks client
+let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
+    ?balance ?self_address ?source ?payer ?gas ?(trace_stack = false) ~prg
+    ~storage ~input client =
+  spawn_command ?hooks ?protocol_hash client
   @@ optional_switch "no-base-dir-warnings" no_base_dir_warnings
   @ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
   @ optional_arg "payer" Fun.id payer
@@ -1379,11 +1379,12 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
         initial_amount)
   |> Process.check
 
-let run_script ?hooks ?no_base_dir_warnings ?balance ?self_address ?source
-    ?payer ?gas ?trace_stack ~prg ~storage ~input client =
+let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
+    ?self_address ?source ?payer ?gas ?trace_stack ~prg ~storage ~input client =
   let* client_output =
     spawn_run_script
       ?hooks
+      ?protocol_hash
       ?no_base_dir_warnings
       ?balance
       ?source

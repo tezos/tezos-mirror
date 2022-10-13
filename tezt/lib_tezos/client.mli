@@ -1081,6 +1081,7 @@ val stresstest_fund_accounts_from_source :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?no_base_dir_warnings:bool ->
   ?balance:Tez.t ->
   ?self_address:string ->
@@ -1097,6 +1098,7 @@ val run_script :
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
   ?hooks:Process.hooks ->
+  ?protocol_hash:string ->
   ?no_base_dir_warnings:bool ->
   ?balance:Tez.t ->
   ?self_address:string ->
