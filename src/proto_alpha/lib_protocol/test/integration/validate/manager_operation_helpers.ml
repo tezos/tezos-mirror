@@ -1262,7 +1262,7 @@ type probes = {
   source : Signature.Public_key_hash.t;
   fee : Tez.tez;
   gas_limit : Gas.Arith.integral;
-  nb_counter : Z.t;
+  nb_counter : int;
 }
 
 let rec contents_infos :
@@ -1271,12 +1271,12 @@ let rec contents_infos :
   let open Lwt_result_syntax in
   match op with
   | Single (Manager_operation {source; fee; gas_limit; _}) ->
-      return {source; fee; gas_limit; nb_counter = Z.one}
+      return {source; fee; gas_limit; nb_counter = 1}
   | Cons (Manager_operation manop, manops) ->
       let* probes = contents_infos manops in
       let*? fee = manop.fee +? probes.fee in
       let gas_limit = Gas.Arith.add probes.gas_limit manop.gas_limit in
-      let nb_counter = Z.succ probes.nb_counter in
+      let nb_counter = succ probes.nb_counter in
       let _ = Assert.equal_pkh ~loc:__LOC__ manop.source probes.source in
       return {fee; source = probes.source; gas_limit; nb_counter}
 
@@ -1322,7 +1322,7 @@ let expected_witness witness probes ~mode ctxt =
   let open Lwt_result_syntax in
   let b_in, c_in, g_in = witness in
   let*? b_expected = b_in -? probes.fee in
-  let c_expected = Z.add c_in probes.nb_counter in
+  let c_expected = Z.add c_in (Z.of_int probes.nb_counter) in
   let+ g_expected =
     match (g_in, mode) with
     | Some g_in, Construction ->
