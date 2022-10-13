@@ -28,9 +28,17 @@ type error +=
   | (* `Temporary *)
       Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_past of {
+      contract : Contract_repr.t;
+      expected : Z.t;
+      found : Z.t;
+    }
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_future of {
+      contract : Contract_repr.t;
+      expected : Z.t;
+      found : Z.t;
+    }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
   | (* `Branch *)
@@ -91,8 +99,12 @@ let () =
         (req "contract" Contract_repr.encoding)
         (req "expected" z)
         (req "found" z))
-    (function Counter_in_the_future (c, x, y) -> Some (c, x, y) | _ -> None)
-    (fun (c, x, y) -> Counter_in_the_future (c, x, y)) ;
+    (function
+      | Counter_in_the_future {contract; expected; found} ->
+          Some (contract, expected, found)
+      | _ -> None)
+    (fun (contract, expected, found) ->
+      Counter_in_the_future {contract; expected; found}) ;
   register_error_kind
     `Branch
     ~id:"contract.counter_in_the_past"
@@ -113,8 +125,12 @@ let () =
         (req "contract" Contract_repr.encoding)
         (req "expected" z)
         (req "found" z))
-    (function Counter_in_the_past (c, x, y) -> Some (c, x, y) | _ -> None)
-    (fun (c, x, y) -> Counter_in_the_past (c, x, y)) ;
+    (function
+      | Counter_in_the_past {contract; expected; found} ->
+          Some (contract, expected, found)
+      | _ -> None)
+    (fun (contract, expected, found) ->
+      Counter_in_the_past {contract; expected; found}) ;
   register_error_kind
     `Temporary
     ~id:"contract.non_existing_contract"
@@ -491,8 +507,8 @@ let check_counter_increment c manager counter =
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter) then return_unit
   else if Compare.Z.(expected > counter) then
-    fail (Counter_in_the_past (contract, expected, counter))
-  else fail (Counter_in_the_future (contract, expected, counter))
+    fail (Counter_in_the_past {contract; expected; found = counter})
+  else fail (Counter_in_the_future {contract; expected; found = counter})
 
 let increment_counter c manager =
   let contract = Contract_repr.Implicit manager in
