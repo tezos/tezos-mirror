@@ -69,15 +69,6 @@ module Make (Rollup : PARAMETERS) = struct
       (L1_operation.Hash)
       (L1_operation)
 
-  (** Information stored about an L1 operation that was injected on a Tezos
-      node. *)
-  type injected_info = {
-    op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Tezos_crypto.Operation_hash.t;
-        (** The hash of the operation which contains [op] (this can be an L1 batch of
-          several manager operations). *)
-  }
-
   module Injected_operations = Disk_persistence.Make_table (struct
     include L1_operation.Hash.Table
 
@@ -89,12 +80,7 @@ module Make (Rollup : PARAMETERS) = struct
 
     let key_of_string = L1_operation.Hash.of_b58check_opt
 
-    let value_encoding =
-      let open Data_encoding in
-      conv (fun {op; oph} -> (oph, op)) (fun (oph, op) -> {op; oph})
-      @@ merge_objs
-           (obj1 (req "oph" Tezos_crypto.Operation_hash.encoding))
-           L1_operation.encoding
+    let value_encoding = injected_info_encoding
   end)
 
   module Injected_ophs = Disk_persistence.Make_table (struct
@@ -122,18 +108,6 @@ module Make (Rollup : PARAMETERS) = struct
           operation). *)
   }
 
-  (** Information stored about an L1 operation that was included in a Tezos
-    block. *)
-  type included_info = {
-    op : L1_operation.t;  (** The L1 manager operation. *)
-    oph : Tezos_crypto.Operation_hash.t;
-        (** The hash of the operation which contains [op] (this can be an L1 batch of
-          several manager operations). *)
-    l1_block : Tezos_crypto.Block_hash.t;
-        (** The hash of the L1 block in which the operation was included. *)
-    l1_level : int32;  (** The level of [l1_block]. *)
-  }
-
   module Included_operations = Disk_persistence.Make_table (struct
     include L1_operation.Hash.Table
 
@@ -145,17 +119,7 @@ module Make (Rollup : PARAMETERS) = struct
 
     let key_of_string = L1_operation.Hash.of_b58check_opt
 
-    let value_encoding =
-      let open Data_encoding in
-      conv
-        (fun {op; oph; l1_block; l1_level} -> (op, (oph, l1_block, l1_level)))
-        (fun (op, (oph, l1_block, l1_level)) -> {op; oph; l1_block; l1_level})
-      @@ merge_objs
-           L1_operation.encoding
-           (obj3
-              (req "oph" Tezos_crypto.Operation_hash.encoding)
-              (req "l1_block" Tezos_crypto.Block_hash.encoding)
-              (req "l1_level" int32))
+    let value_encoding = included_info_encoding
   end)
 
   module Included_in_blocks = Disk_persistence.Make_table (struct
@@ -1213,4 +1177,27 @@ module Make (Rollup : PARAMETERS) = struct
   let shutdown () =
     let workers = Worker.list table in
     List.iter_p (fun (_signer, w) -> Worker.shutdown w) workers
+
+  let op_status_in_worker state l1_hash =
+    match Op_queue.find_opt state.queue l1_hash with
+    | Some op -> Some (Pending op)
+    | None -> (
+        match
+          Injected_operations.find state.injected.injected_operations l1_hash
+        with
+        | Some info -> Some (Injected info)
+        | None -> (
+            match
+              Included_operations.find
+                state.included.included_operations
+                l1_hash
+            with
+            | Some info -> Some (Included info)
+            | None -> None))
+
+  let operation_status l1_hash =
+    let workers = Worker.list table in
+    List.find_map
+      (fun (_signer, w) -> op_status_in_worker (Worker.state w) l1_hash)
+      workers
 end

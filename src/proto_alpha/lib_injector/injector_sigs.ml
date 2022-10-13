@@ -64,6 +64,62 @@ type retry_action =
       (** The error for the failing operation should be propagated at a higher
           level. *)
 
+(** Information stored about an L1 operation that was injected on a Tezos
+    node. *)
+type injected_info = {
+  op : L1_operation.t;  (** The L1 manager operation. *)
+  oph : Tezos_crypto.Operation_hash.t;
+      (** The hash of the operation which contains [op] (this can be an L1 batch
+          of several manager operations). *)
+}
+
+(** Information stored about an L1 operation that was included in a Tezos
+    block. *)
+type included_info = {
+  op : L1_operation.t;  (** The L1 manager operation. *)
+  oph : Tezos_crypto.Operation_hash.t;
+      (** The hash of the operation which contains [op] (this can be an L1 batch
+          of several manager operations). *)
+  l1_block : Tezos_crypto.Block_hash.t;
+      (** The hash of the L1 block in which the operation was included. *)
+  l1_level : int32;  (** The level of [l1_block]. *)
+}
+
+(** Status of an operation in the injector. *)
+type status =
+  | Pending of L1_operation.t  (** The operation is pending injection. *)
+  | Injected of injected_info
+      (** The operation has been injected successfully in the. node *)
+  | Included of included_info
+      (** The operation has been included in a L1 block. *)
+
+let injected_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({op; oph} : injected_info) -> (op, oph))
+    (fun (op, oph) -> {op; oph})
+  @@ merge_objs
+       L1_operation.encoding
+       (obj1
+          (req
+             "layer1"
+             (obj1 (req "operation_hash" Tezos_crypto.Operation_hash.encoding))))
+
+let included_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {op; oph; l1_block; l1_level} -> (op, (oph, l1_block, l1_level)))
+    (fun (op, (oph, l1_block, l1_level)) -> {op; oph; l1_block; l1_level})
+  @@ merge_objs
+       L1_operation.encoding
+       (obj1
+          (req
+             "layer1"
+             (obj3
+                (req "operation_hash" Tezos_crypto.Operation_hash.encoding)
+                (req "block_hash" Tezos_crypto.Block_hash.encoding)
+                (req "level" int32))))
+
 (** Signature for tags used in injector  *)
 module type TAG = sig
   include Stdlib.Set.OrderedType
@@ -181,4 +237,7 @@ module type S = sig
 
   (** Shutdown the injectors, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
+
+  (** The status of an operation in the injector.  *)
+  val operation_status : L1_operation.hash -> status option
 end
