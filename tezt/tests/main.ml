@@ -78,9 +78,15 @@ let register_protocol_migration_tests () =
     ~loser_protocols:[migrate_from] ;
   Iticket_migration.register ~migrate_from ~migrate_to
 
-(* Tests that are relatively protocol-agnostic.
-   We can run them on all protocols, or only one if the CI would be too slow. *)
-let register_protocol_agnostic_tests () =
+(* Register tests that use [Protocol.register_test] and for which we rely on
+   [?supports] to decide which protocols the tests should run on.
+   As a consequence, all those tests should be registered with [Protocol.all]
+   as the list of protocols.
+
+   In the future, we could remove the [Protocol.t list] arguments from
+   [Protocol.register_test]. It would use [Protocol.all] directly instead.
+   Then we could remove the [~protocols] argument from all register functions. *)
+let register_protocol_tests_that_use_supports_correctly () =
   let protocols = Protocol.all in
   Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols ;
@@ -160,7 +166,7 @@ let register_protocol_specific_because_regression_tests () =
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
-  register_protocol_agnostic_tests () ;
+  register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()
