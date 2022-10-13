@@ -31,3 +31,5 @@ let init = Z.zero
 let succ = Z.succ
 
 let pp = Z.pp_print
+
+let encoding_for_storage = Data_encoding.z

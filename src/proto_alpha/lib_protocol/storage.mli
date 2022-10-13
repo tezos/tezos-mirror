@@ -57,7 +57,8 @@ module Contract : sig
   (** Storage from this submodule must only be accessed through the
       module `Contract`. *)
 
-  module Global_counter : Simple_single_data_storage with type value = Z.t
+  module Global_counter :
+    Simple_single_data_storage with type value = Manager_counter_repr.t
 
   (** The domain of alive contracts *)
   val fold :
@@ -176,7 +177,7 @@ module Contract : sig
   module Counter :
     Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
-       and type value = Z.t
+       and type value = Manager_counter_repr.t
        and type t := Raw_context.t
        and type local_context := local_context
 

@@ -51,6 +51,12 @@ module Encoding = struct
 
     let encoding = Data_encoding.z
   end
+
+  module Manager_counter : VALUE with type t = Manager_counter_repr.t = struct
+    type t = Manager_counter_repr.t
+
+    let encoding = Manager_counter_repr.encoding_for_storage
+  end
 end
 
 module Int31_index : INDEX with type t = int = struct
@@ -175,7 +181,7 @@ module Contract = struct
       (struct
         let name = ["global_counter"]
       end)
-      (Encoding.Z)
+      (Encoding.Manager_counter)
 
   module Indexed_context =
     Make_indexed_subcontext
@@ -272,7 +278,7 @@ module Contract = struct
       (struct
         let name = ["counter"]
       end)
-      (Encoding.Z)
+      (Encoding.Manager_counter)
 
   (* Consume gas for serialization and deserialization of expr in this
      module *)

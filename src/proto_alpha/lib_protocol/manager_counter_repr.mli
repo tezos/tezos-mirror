@@ -41,3 +41,6 @@ val succ : t -> t
 
 (** Pretty-printer for counters. *)
 val pp : Format.formatter -> t -> unit
+
+(** Encoding for a counter to be used in {!Storage}. *)
+val encoding_for_storage : t Data_encoding.t
