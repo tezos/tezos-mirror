@@ -1,0 +1,36 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_014/opcodes/dip.tz on storage '(Pair 0 0)' and input '(Pair 1 1)' --level 1 --trace-stack
+storage
+  (Pair 1 2)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039992.043 units remaining)
+    [ (Pair (Pair 1 1) 0 0) ]
+  - location: 11 (remaining gas: 1039992.033 units remaining)
+    [ (Pair 1 1) ]
+  - location: 12 (remaining gas: 1039992.023 units remaining)
+    [ 1
+      1 ]
+  - location: 13 (remaining gas: 1039992.013 units remaining)
+    [ 1
+      1
+      1 ]
+  - location: 14 (remaining gas: 1039992.013 units remaining)
+    [ 1
+      1 ]
+  - location: 16 (remaining gas: 1039991.978 units remaining)
+    [ 2 ]
+  - location: 14 (remaining gas: 1039991.958 units remaining)
+    [ 1
+      2 ]
+  - location: 17 (remaining gas: 1039991.948 units remaining)
+    [ (Pair 1 2) ]
+  - location: 18 (remaining gas: 1039991.938 units remaining)
+    [ {}
+      (Pair 1 2) ]
+  - location: 20 (remaining gas: 1039991.928 units remaining)
+    [ (Pair {} 1 2) ]
+

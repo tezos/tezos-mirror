@@ -1,0 +1,34 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_014/opcodes/get_and_update_map.tz on storage '(Pair (Some 4) {})' and input '"hello"' --level 1 --trace-stack
+storage
+  (Pair None { Elt "hello" 4 })
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (remaining gas: 1039991.876 units remaining)
+    [ (Pair "hello" (Some 4) {}) ]
+  - location: 13 (remaining gas: 1039991.866 units remaining)
+    [ "hello"
+      (Pair (Some 4) {}) ]
+  - location: 14 (remaining gas: 1039991.866 units remaining)
+    [ (Pair (Some 4) {}) ]
+  - location: 16 (remaining gas: 1039991.856 units remaining)
+    [ (Some 4)
+      {} ]
+  - location: 14 (remaining gas: 1039991.836 units remaining)
+    [ "hello"
+      (Some 4)
+      {} ]
+  - location: 17 (remaining gas: 1039991.741 units remaining)
+    [ None
+      { Elt "hello" 4 } ]
+  - location: 18 (remaining gas: 1039991.731 units remaining)
+    [ (Pair None { Elt "hello" 4 }) ]
+  - location: 19 (remaining gas: 1039991.721 units remaining)
+    [ {}
+      (Pair None { Elt "hello" 4 }) ]
+  - location: 21 (remaining gas: 1039991.711 units remaining)
+    [ (Pair {} None { Elt "hello" 4 }) ]
+

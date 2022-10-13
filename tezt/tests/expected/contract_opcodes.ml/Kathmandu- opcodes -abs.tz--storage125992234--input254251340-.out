@@ -1,0 +1,38 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_014/opcodes/abs.tz on storage Unit and input 948 --level 1 --trace-stack
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039989.789 units remaining)
+    [ (Pair 948 Unit) ]
+  - location: 7 (remaining gas: 1039989.779 units remaining)
+    [ 948 ]
+  - location: 8 (remaining gas: 1039989.769 units remaining)
+    [ 948
+      948 ]
+  - location: 9 (remaining gas: 1039989.744 units remaining)
+    [ -948
+      948 ]
+  - location: 10 (remaining gas: 1039989.724 units remaining)
+    [ 948
+      948 ]
+  - location: 11 (remaining gas: 1039989.689 units remaining)
+    [ 0 ]
+  - location: 13 (remaining gas: 1039989.679 units remaining)
+    [ True ]
+  - location: 14 (remaining gas: 1039989.679 units remaining)
+    [  ]
+  - location: 14 (remaining gas: 1039989.669 units remaining)
+    [  ]
+  - location: 20 (remaining gas: 1039989.659 units remaining)
+    [ Unit ]
+  - location: 21 (remaining gas: 1039989.649 units remaining)
+    [ {}
+      Unit ]
+  - location: 23 (remaining gas: 1039989.639 units remaining)
+    [ (Pair {} Unit) ]
+
