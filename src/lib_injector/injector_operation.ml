@@ -51,13 +51,26 @@ module Make (O : PARAM_OPERATION) :
 
   type t = {hash : hash; operation : O.t; mutable errors : errors}
 
-  let hash_inner_operation op =
-    Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn O.encoding op]
+  let hash_inner_operation nonce op =
+    Hash.hash_string
+      [
+        Option.fold ~none:"" ~some:Z.to_bits nonce;
+        Data_encoding.Binary.to_string_exn O.encoding op;
+      ]
+
+  let counter = ref Z.zero
 
   let no_errors = {count = 0; last_error = None}
 
   let make operation =
-    let hash = hash_inner_operation operation in
+    let nonce =
+      if O.unique operation then (
+        let c = !counter in
+        counter := Z.succ !counter ;
+        Some c)
+      else None
+    in
+    let hash = hash_inner_operation nonce operation in
     {hash; operation; errors = no_errors}
 
   let errors_encoding =

@@ -97,6 +97,11 @@ module type PARAM_OPERATION = sig
 
   (** Pretty-printing injector's operations *)
   val pp : Format.formatter -> t -> unit
+
+  (** If [unique op = true], then the injector's queue will only contain at most
+      one operation [op]. Otherwise, it will allow duplicate such operations to
+      appear in the queue. *)
+  val unique : t -> bool
 end
 
 (** Internal representation of injector operations. *)
