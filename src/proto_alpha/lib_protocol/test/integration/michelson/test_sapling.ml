@@ -344,7 +344,7 @@ module Raw_context_tests = struct
         (i + 1, ctx))
       (0, ctx)
       roots_same_level
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
 
   let test_get_memo_size () =
     Context.init1 () >>=? fun (b, _contract) ->
@@ -386,7 +386,7 @@ module Alpha_context_tests = struct
         ~bound_data:""
         ps
     in
-    verify_update ctx vt ~memo_size:0 |> assert_some >>=? fun _ ->
+    verify_update ctx vt ~memo_size:0 |> assert_some >>=? fun (_, _) ->
     verify_update ctx vt ~memo_size:1 |> assert_none
 
   (* Bench the proving and validation time of shielding and transferring several
@@ -780,7 +780,7 @@ module Interpreter_tests = struct
       src
       block
       baker
-    >>=? fun _ ->
+    >>=? fun (_, _, _) ->
     (* Originating the next contract should fail *)
     originate_contract_hash
       "contracts/sapling_push_sapling_state.tz"

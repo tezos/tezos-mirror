@@ -54,7 +54,7 @@ let inject_the_first_endorsement () =
 
 (** Apply a single endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
-  inject_the_first_endorsement () >>=? fun _ -> return_unit
+  inject_the_first_endorsement () >>=? fun (_, _) -> return_unit
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)

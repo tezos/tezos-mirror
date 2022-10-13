@@ -417,7 +417,7 @@ let test_consume_exactly_all_block_gas () =
         [(src, dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
       src_list
   in
-  bake_operations_with_gas block lld >>=? fun _ -> return ()
+  bake_operations_with_gas block lld >>=? fun (_, _, _) -> return_unit
 
 (** Tests the consumption of more than the block gas level with many single
     operations, should fail *)

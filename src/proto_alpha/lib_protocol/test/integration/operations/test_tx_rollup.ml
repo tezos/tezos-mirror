@@ -5372,7 +5372,7 @@ module Withdraw = struct
       (tx_level 2l)
       [(0, [withdraw])]
       ~previous_message_result
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
 
   (** [test_deposit_multiple_destinations_at_limit] checks that we can
       deposit the maximum number of tickets to multiple destinations ]

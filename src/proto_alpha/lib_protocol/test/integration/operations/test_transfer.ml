@@ -173,7 +173,7 @@ let test_transfers_to_self () =
     ~fee
     contract
     ten_tez
-  >>=? fun _ -> return_unit
+  >>=? fun (_, _) -> return_unit
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
@@ -589,12 +589,12 @@ let test_random_transfer () =
       b
       source
       amount
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
   else
     Incremental.begin_construction ~policy:(Block.Excluding [source_pkh]) b
     >>=? fun i ->
-    transfer_and_check_balances ~loc:__LOC__ i source dest amount >>=? fun _ ->
-    return_unit
+    transfer_and_check_balances ~loc:__LOC__ i source dest amount
+    >>=? fun (_, _) -> return_unit
 
 (** Transfer random transactions. *)
 let test_random_multi_transactions () =
