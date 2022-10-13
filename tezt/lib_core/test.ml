@@ -119,17 +119,21 @@ end = struct
   let count {count; _} = count
 
   let encode {total_time; count} =
-    `O
-      [
-        ("total_time", `String (Int64.to_string total_time));
-        ("count", `String (string_of_int count));
-      ]
+    if total_time = 0L && count = 0 then `Null
+    else
+      `O
+        [
+          ("total_time", `String (Int64.to_string total_time));
+          ("count", `String (string_of_int count));
+        ]
 
   let decode (json : JSON.t) =
-    {
-      total_time = JSON.(json |-> "total_time" |> as_int64);
-      count = JSON.(json |-> "count" |> as_int);
-    }
+    if JSON.is_null json then zero
+    else
+      {
+        total_time = JSON.(json |-> "total_time" |> as_int64);
+        count = JSON.(json |-> "count" |> as_int);
+      }
 end
 
 (* Field [id] is used to be able to iterate on tests in order of registration.
@@ -508,8 +512,11 @@ module Record = struct
     failed_runs : Summed_durations.t;
   }
 
+  let encode_obj fields =
+    `O (List.filter (function _, `Null -> false | _ -> true) fields)
+
   let encode_test {file; title; tags; successful_runs; failed_runs} : JSON.u =
-    `O
+    encode_obj
       [
         ("file", `String file);
         ("title", `String title);
