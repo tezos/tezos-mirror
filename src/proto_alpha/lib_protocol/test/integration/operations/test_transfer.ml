@@ -487,9 +487,7 @@ let test_balance_too_low_two_transfers fee () =
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
-    | t ->
-        failwith "Unexpected error: %a" Error_monad.pp_print_trace t
-        >>=? fun _ -> return_unit
+    | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
   Incremental.begin_construction b >>=? fun i ->
   Incremental.add_operation ~expect_apply_failure i operation >>=? fun i ->
