@@ -37,10 +37,10 @@
 /src/lib_version             @romain.nl
 /src/proto_*/lib_benchmark   @lrand
 /src/proto_*/lib_benchmarks_proto @lrand
-/src/proto_*/lib_protocol/sc_rollup_proof*         @vch9
-/src/proto_*/lib_protocol/sc_rollup_game*          @vch9
-/src/proto_*/lib_protocol/sc_rollup_inbox*         @vch9
-/src/proto_*/lib_protocol/sc_rollup_refutation*    @vch9
+/src/proto_*/lib_protocol/sc_rollup_proof*         @vch9 @sribaroud
+/src/proto_*/lib_protocol/sc_rollup_game*          @vch9 @sribaroud
+/src/proto_*/lib_protocol/sc_rollup_inbox*         @vch9 @sribaroud
+/src/proto_*/lib_protocol/sc_rollup_refutation*    @vch9 @sribaroud
 
 /scripts                     @romain.nl
 
