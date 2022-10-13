@@ -1,7 +1,7 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_nat.tz-(Pair { Elt 1 4 ; Elt 2 11 } None)-1-(Pair 4 (Some True))1]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_nat.tz-(Pair { Elt 1 4 ; Elt 2 11 } None)-3-(Pair 4 (Some False))]
 
 storage
-  (Pair 4 (Some True))
+  (Pair 4 (Some False))
 emitted operations
   
 big_map diff
@@ -10,9 +10,9 @@ big_map diff
   Set map(4)[2] to 11
 trace
   - location: 12 (just consumed gas: 11.838)
-    [ (Pair 1 { Elt 1 4 ; Elt 2 11 } None) ]
+    [ (Pair 3 { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 12 (just consumed gas: 0.010)
-    [ 1
+    [ 3
       (Pair { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 13 (just consumed gas: 0)
     [ (Pair { Elt 1 4 ; Elt 2 11 } None) ]
@@ -22,23 +22,23 @@ trace
     [ { Elt 1 4 ; Elt 2 11 }
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 13 (just consumed gas: 0.025)
-    [ 1
+    [ 3
       { Elt 1 4 ; Elt 2 11 }
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 17 (just consumed gas: 0.723)
-    [ True
+    [ False
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 18 (just consumed gas: 0.010)
-    [ (Some True)
+    [ (Some False)
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 19 (just consumed gas: 0.010)
     [ { Elt 1 4 ; Elt 2 11 }
-      (Some True) ]
+      (Some False) ]
   - location: 20 (just consumed gas: 0.010)
-    [ (Pair { Elt 1 4 ; Elt 2 11 } (Some True)) ]
+    [ (Pair { Elt 1 4 ; Elt 2 11 } (Some False)) ]
   - location: 21 (just consumed gas: 0.010)
     [ {}
-      (Pair { Elt 1 4 ; Elt 2 11 } (Some True)) ]
+      (Pair { Elt 1 4 ; Elt 2 11 } (Some False)) ]
   - location: 23 (just consumed gas: 0.010)
-    [ (Pair {} { Elt 1 4 ; Elt 2 11 } (Some True)) ]
+    [ (Pair {} { Elt 1 4 ; Elt 2 11 } (Some False)) ]
 

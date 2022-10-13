@@ -394,43 +394,6 @@ class TestContractOpcodes:
                 '"baz"',
                 '(Pair 4 (Some False))',
             ),
-            # Memberships in big maps
-            (
-                'big_map_mem_nat.tz',
-                '(Pair { Elt 0 1 } None)',
-                '1',
-                '(Pair 4 (Some False))',
-            ),
-            (
-                'big_map_mem_nat.tz',
-                '(Pair {} None)',
-                '1',
-                '(Pair 4 (Some False))',
-            ),
-            (
-                'big_map_mem_nat.tz',
-                '(Pair { Elt 1 0 } None)',
-                '1',
-                '(Pair 4 (Some True))',
-            ),
-            (
-                'big_map_mem_nat.tz',
-                '(Pair { Elt 1 4 ; Elt 2 11 } None)',
-                '1',
-                '(Pair 4 (Some True))',
-            ),
-            (
-                'big_map_mem_nat.tz',
-                '(Pair { Elt 1 4 ; Elt 2 11 } None)',
-                '2',
-                '(Pair 4 (Some True))',
-            ),
-            (
-                'big_map_mem_nat.tz',
-                '(Pair { Elt 1 4 ; Elt 2 11 } None)',
-                '3',
-                '(Pair 4 (Some False))',
-            ),
             # Identity on sets
             ('set_id.tz', '{}', '{ "a" ; "b" ; "c" }', '{ "a" ; "b" ; "c" }'),
             ('set_id.tz', '{}', '{}', '{}'),

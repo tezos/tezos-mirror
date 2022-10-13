@@ -1,4 +1,4 @@
-tests_015/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_nat.tz-(Pair { Elt 1 4 ; Elt 2 11 } None)-2-(Pair 4 (Some True))0]
+tests_015/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[big_map_mem_nat.tz-(Pair { Elt 1 4 ; Elt 2 11 } None)-1-(Pair 4 (Some True))]
 
 storage
   (Pair 4 (Some True))
@@ -10,9 +10,9 @@ big_map diff
   Set map(4)[2] to 11
 trace
   - location: 12 (remaining gas: 1039988.162 units remaining)
-    [ (Pair 2 { Elt 1 4 ; Elt 2 11 } None) ]
+    [ (Pair 1 { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 12 (remaining gas: 1039988.152 units remaining)
-    [ 2
+    [ 1
       (Pair { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 13 (remaining gas: 1039988.152 units remaining)
     [ (Pair { Elt 1 4 ; Elt 2 11 } None) ]
@@ -22,7 +22,7 @@ trace
     [ { Elt 1 4 ; Elt 2 11 }
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 13 (remaining gas: 1039988.107 units remaining)
-    [ 2
+    [ 1
       { Elt 1 4 ; Elt 2 11 }
       { Elt 1 4 ; Elt 2 11 } ]
   - location: 17 (remaining gas: 1039987.384 units remaining)
