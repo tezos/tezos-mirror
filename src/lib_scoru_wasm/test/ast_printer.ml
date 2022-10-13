@@ -430,6 +430,7 @@ let pp_reveal out = function
         out
         "Reveal_raw_data (%s)"
         (Reveal.input_hash_to_string hash)
+  | Reveal_metadata -> Format.fprintf out "Reveal_metadata"
 
 let pp_invoke_step_kont out = function
   | Eval.Inv_start {func; code = vs, es} ->

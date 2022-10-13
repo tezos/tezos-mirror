@@ -15,7 +15,8 @@
   tezos-protocol-015-PtLimaPt
   tezos-015-PtLimaPt-test-helpers
   alcotest-lwt
-  tezos-stdlib)
+  tezos-stdlib
+  tezos-scoru-wasm)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

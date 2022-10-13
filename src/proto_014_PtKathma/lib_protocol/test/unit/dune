@@ -15,7 +15,8 @@
   tezos-protocol-014-PtKathma
   tezos-014-PtKathma-test-helpers
   alcotest-lwt
-  tezos-stdlib)
+  tezos-stdlib
+  tezos-scoru-wasm)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

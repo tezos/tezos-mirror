@@ -3662,6 +3662,7 @@ end = struct
               alcotest_lwt;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
+              octez_scoru_wasm;
             ]
           ~dune:
             Dune.

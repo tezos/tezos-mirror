@@ -1000,8 +1000,13 @@ let reveal_encoding =
       case
         "Reveal_raw_data"
         input_hash_encoding
-        (function Reveal.Reveal_raw_data hash -> Some hash)
+        (function Reveal.Reveal_raw_data hash -> Some hash | _ -> None)
         (fun hash -> Reveal_raw_data hash);
+      case
+        "Reveal_metadata"
+        (value [] Data_encoding.unit)
+        (function Reveal.Reveal_metadata -> Some () | _ -> None)
+        (fun () -> Reveal_metadata);
     ]
 
 let invoke_step_kont_encoding =
