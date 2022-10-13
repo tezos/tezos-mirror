@@ -374,6 +374,8 @@ let rpc_metrics =
     ~subsystem:"rpc"
     "calls"
 
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
+
 let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
     node (addr, port) =
   let open Lwt_result_syntax in
@@ -418,12 +420,18 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
+  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
+    let path = Cohttp_lwt.Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let*! response = Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
+  in
   let update_metrics uri meth =
     Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
   in
   let callback =
-    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir
-    @@ RPC_server.resto_callback server
+    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
   in
   Lwt.catch
     (fun () ->
@@ -454,8 +462,6 @@ let init_rpc (config : Node_config_file.t) node =
               launch_rpc_server ~acl_policy ~media_types config node addr)
             addrs)
     config.rpc.listen_addrs
-
-module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
