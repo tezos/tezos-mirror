@@ -34,7 +34,7 @@ type t = {
   filter :
     [ `Level_at_least of Internal_event.Level.t
     | `Per_section_prefix of
-      (Internal_event.Section.t * Internal_event.Level.t) list ];
+      (Internal_event.Section.t * Internal_event.Level.t option) list ];
 }
 
 let hostname =
@@ -104,17 +104,20 @@ end) : Internal_event.SINK with type t = t = struct
                 | [one] ->
                     ( Internal_event.Section.make_sanitized
                         (String.split_on_char '.' one),
-                      Internal_event.Level.default )
+                      Some Internal_event.Level.default )
                 | [one; two] ->
                     let lvl =
-                      match Internal_event.Level.of_string two with
-                      | Some s -> s
-                      | None ->
-                          Format.kasprintf
-                            Stdlib.failwith
-                            "Wrong level name: %S in argument %S"
-                            two
-                            s
+                      match String.lowercase_ascii two with
+                      | "none" -> None
+                      | s -> (
+                          match Internal_event.Level.of_string s with
+                          | Some s -> Some s
+                          | None ->
+                              Format.kasprintf
+                                Stdlib.failwith
+                                "Wrong level name: %S in argument %S"
+                                two
+                                s)
                     in
                     let section =
                       match one with
@@ -135,7 +138,9 @@ end) : Internal_event.SINK with type t = t = struct
               | None -> pairs
               | Some lvl -> (
                   match Internal_event.Level.of_string lvl with
-                  | Some l -> (Internal_event.Section.empty, l) :: pairs
+                  | Some l ->
+                      (* establish default for all sections *)
+                      (Internal_event.Section.empty, Some l) :: pairs
                   | None ->
                       Format.kasprintf
                         Stdlib.failwith
@@ -213,13 +218,19 @@ end) : Internal_event.SINK with type t = t = struct
     match filter with
     | `Level_at_least level_at_least ->
         Internal_event.Level.compare M.level level_at_least >= 0
-    | `Per_section_prefix kvl ->
-        List.exists
-          (fun (prefix, lvl) ->
-            Internal_event.(
-              Section.is_prefix ~prefix section
-              && Level.compare M.level lvl >= 0))
-          kvl
+    | `Per_section_prefix kvl -> (
+        match
+          List.find
+            (fun (prefix, _) ->
+              Internal_event.Section.is_prefix ~prefix section)
+            kvl
+        with
+        | None ->
+            (* default *)
+            Internal_event.Level.compare M.level Internal_event.Level.default
+            >= 0
+        | Some (_, None) -> (* exclude list *) false
+        | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
   let handle (type a) {output; lwt_bad_citizen_hack; format; _} m
       ?(section = Internal_event.Section.empty) (event : a) =

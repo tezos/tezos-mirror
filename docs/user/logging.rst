@@ -82,7 +82,9 @@ Common options:
    pairs ``<section-prefix>:<level-threshold>`` which can be used to
    setup more precise filters. ``level-at-least=info`` can be understood
    as ``section-prefix=:info``, the empty section prefix matches all
-   sections.
+   sections. To exclude a specific section use the ``none`` filter, for
+   example ``section-prefix=p2p:none``. To define a filter only for
+   one specific section ``section-prefix=p2p:debug&section-prefix=:none``
 -  ``format=<value>`` the output format used; acceptable values are:
 
    -  ``one-per-line`` (the default): output JSON objects, one per line,
@@ -117,6 +119,9 @@ Examples:
    Executables will write to the file-descriptor ``4`` likely opened by
    a parent monitoring process. The reader will only receive the logs
    from the section ``rpc`` (but all of them including ``Debug``).
+-  ``file-descriptor-path:///the/path/to/write.log?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none"``
+   → Write only sections validator and rpc at debug level but exclude all
+   other sections from the stream.
 
 The format of the events is (usually minified):
 

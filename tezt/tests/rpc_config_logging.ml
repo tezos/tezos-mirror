@@ -111,7 +111,7 @@ let change_logging_configuration =
     call_config_activate
       [
         sf
-          "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&fresh=true"
+          "file-descriptor-path://%s?section-prefix=rpc:debug&section-prefix=validator:debug&section-prefix=:none&fresh=true"
           tmp1;
       ]
   in
