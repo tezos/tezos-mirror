@@ -712,7 +712,7 @@ let test_store_value_size () =
       host_funcs_registry
       Values.[Num (I32 invalid_key_src); Num (I32 invalid_key_len)]
   in
-  assert (result = to_res Host_funcs.Error.store_invalid_key) ;
+  assert (result = to_res Host_funcs.Error.(code Store_invalid_key)) ;
   let* result =
     invoke_store_value_size
       ~module_reg
@@ -721,7 +721,7 @@ let test_store_value_size () =
       host_funcs_registry
       Values.[Num (I32 missing_key_src); Num (I32 missing_key_len)]
   in
-  assert (result = to_res Host_funcs.Error.store_not_a_value) ;
+  assert (result = to_res Host_funcs.Error.(code Store_not_a_value)) ;
   Lwt_result_syntax.return_unit
 
 let test_store_write () =

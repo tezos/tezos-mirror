@@ -60,17 +60,29 @@ exception Bad_input
 exception Key_too_large of int
 
 module Error : sig
-  (** The store key submitted as an argument of a host function
-      exceeds the authorized limit. *)
-  val store_key_too_large : int32
+  type t =
+    | Store_key_too_large
+        (** The store key submitted as an argument of a host function exceeds
+            the authorized limit. Has code `-1`. *)
+    | Store_invalid_key
+        (** The store key submitted as an argument of a host function cannot be
+            parsed. Has code `-2`. *)
+    | Store_not_a_value
+        (** The contents (if any) of the store under the key submitted as an
+            argument of a host function is not a value. Has code `-3`. *)
+    | Store_invalid_access
+        (** An access in a value of the durable storage has failed, supposedly
+            out of bounds of a value. Has code `-4`. *)
+    | Memory_invalid_access
+        (** An address is out of bound of the memory. Has code `-5`. *)
+    | Input_output_too_large
+        (** The input or output submitted as an argument of a host function
+            exceeds the authorized limit. Has code `-6`. *)
+    | Generic_invalid_access
+        (** Generic error code for unexpected errors. Has code `-7`. *)
 
-  (** The store key submitted as an argument of a host function
-      cannot be parsed. *)
-  val store_invalid_key : int32
-
-  (** The contents (if any) of the store under the key submitted as an
-      argument of a host function is not a value. *)
-  val store_not_a_value : int32
+  (** [code error] returns the error code associated to the error. *)
+  val code : t -> int32
 end
 
 module Aux : sig
@@ -103,7 +115,7 @@ module Aux : sig
     id_offset:int32 ->
     dst:int32 ->
     max_bytes:int32 ->
-    int Lwt.t
+    int32 Lwt.t
 
   val store_has :
     durable:Durable.t ->

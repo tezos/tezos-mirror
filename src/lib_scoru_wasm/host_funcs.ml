@@ -45,55 +45,97 @@ let check_key_length key_length =
   if key_length > Durable.max_key_length then raise (Key_too_large key_length)
 
 module Error = struct
-  let store_key_too_large = -1l
+  type t =
+    | Store_key_too_large
+    | Store_invalid_key
+    | Store_not_a_value
+    | Store_invalid_access
+    | Memory_invalid_access
+    | Input_output_too_large
+    | Generic_invalid_access
 
-  let store_invalid_key = -2l
+  let code = function
+    | Store_key_too_large -> -1l
+    | Store_invalid_key -> -2l
+    | Store_not_a_value -> -3l
+    | Store_invalid_access -> -4l
+    | Memory_invalid_access -> -5l
+    | Input_output_too_large -> -6l
+    | Generic_invalid_access -> -7l
 
-  let store_not_a_value = -3l
-
-  let memory_invalid_access = -4l
+  let return e = Lwt.return (code e)
 end
 
-let safe_load_byte memory ofs len =
-  let open Lwt_syntax in
-  Lwt.catch
-    (fun () ->
-      let+ bytes = Memory.load_bytes memory ofs len in
-      Some bytes)
-    (fun _ -> return None)
-
-module Aux = struct
-  let read_input ~input_buffer ~output_buffer ~memory ~rtype_offset
-      ~level_offset ~id_offset ~dst ~max_bytes =
-    let open Lwt.Syntax in
+module Safe_access = struct
+  let guard func =
+    let open Lwt_result_syntax in
     Lwt.catch
       (fun () ->
-        let* {rtype; raw_level; message_counter; payload} =
-          Input_buffer.dequeue input_buffer
-        in
-        let input_size = Bytes.length payload in
-        if Int64.of_int input_size > 4096L then
-          raise (Eval.Crash (Source.no_region, "input too large"))
-        else
+        let*! res = func () in
+        return res)
+      (function
+        | Durable.Out_of_bounds _ -> fail Error.Store_invalid_access
+        | Memory.Bounds -> fail Error.Memory_invalid_access
+        | Durable.Invalid_key _ -> fail Error.Store_invalid_key
+        | _ -> fail Error.Generic_invalid_access)
+
+  let store_bytes memory address payload =
+    guard (fun () -> Memory.store_bytes memory address payload)
+
+  let store_num memory address offset value =
+    guard (fun () -> Memory.store_num memory address offset value)
+
+  let load_bytes memory address size =
+    guard (fun () -> Memory.load_bytes memory address size)
+end
+
+let extract_error_code = function
+  | Error error -> Error.return error
+  | Ok res -> Lwt.return res
+
+module Aux = struct
+  let input_output_max_size = 4096
+
+  let read_input ~input_buffer ~output_buffer ~memory ~rtype_offset
+      ~level_offset ~id_offset ~dst ~max_bytes =
+    let open Lwt_result_syntax in
+    let*! res =
+      Lwt.catch
+        (fun () ->
+          let*! {rtype; raw_level; message_counter; payload} =
+            Input_buffer.dequeue input_buffer
+          in
+          let input_size = Bytes.length payload in
+          let* () =
+            if input_size > input_output_max_size then
+              fail Error.Input_output_too_large
+            else return_unit
+          in
           let payload =
             Bytes.sub payload 0 @@ min input_size (Int32.to_int max_bytes)
           in
-          let* () = Memory.store_bytes memory dst (Bytes.to_string payload) in
-          let* () = Memory.store_num memory rtype_offset 0l (I32 rtype) in
-          let* () = Memory.store_num memory level_offset 0l (I32 raw_level) in
           let* () =
-            Memory.store_num
+            Safe_access.store_bytes memory dst (Bytes.to_string payload)
+          in
+          let* () = Safe_access.store_num memory rtype_offset 0l (I32 rtype) in
+          let* () =
+            Safe_access.store_num memory level_offset 0l (I32 raw_level)
+          in
+          let* () =
+            Safe_access.store_num
               memory
               id_offset
               0l
               (I64 (Z.to_int64 message_counter))
           in
           Output_buffer.set_level output_buffer raw_level ;
-          Lwt.return input_size)
-      (fun exn ->
-        match exn with
-        | Input_buffer.Dequeue_from_empty_queue -> Lwt.return 0
-        | _ -> raise exn)
+          return (Int32.of_int input_size))
+        (fun exn ->
+          match exn with
+          | Input_buffer.Dequeue_from_empty_queue -> return 0l
+          | _ -> return Error.(code Generic_invalid_access))
+    in
+    extract_error_code res
 
   let write_output ~output_buffer ~memory ~src ~num_bytes =
     let open Lwt.Syntax in
@@ -174,11 +216,11 @@ module Aux = struct
   let store_value_size ~durable ~memory ~key_offset ~key_length =
     let open Lwt_syntax in
     let key_len = Int32.to_int key_length in
-    if key_len > Durable.max_key_length then return Error.store_key_too_large
+    if key_len > Durable.max_key_length then Error.return Store_key_too_large
     else
-      let* key = safe_load_byte memory key_offset key_len in
+      let* key = Safe_access.load_bytes memory key_offset key_len in
       match key with
-      | Some key -> (
+      | Ok key -> (
           match Durable.key_of_string_opt key with
           | Some key -> (
               let* bytes = Durable.find_value durable key in
@@ -188,9 +230,9 @@ module Aux = struct
                     Tezos_lazy_containers.Chunked_byte_vector.length bytes
                   in
                   return (Int64.to_int32 size)
-              | None -> return Error.store_not_a_value)
-          | None -> return Error.store_invalid_key)
-      | None -> return Error.memory_invalid_access
+              | None -> Error.return Store_not_a_value)
+          | None -> Error.return Store_invalid_key)
+      | Error i -> Error.return i
 
   let store_read ~durable ~memory ~key_offset ~key_length ~value_offset ~dest
       ~max_bytes =
@@ -242,6 +284,8 @@ module Aux = struct
     Lwt.return (Int32.of_int @@ String.length result)
 end
 
+let value i = Values.(Num (I32 i))
+
 let read_input_type =
   let input_types =
     Types.
@@ -283,7 +327,7 @@ let read_input =
               ~dst
               ~max_bytes
           in
-          Lwt.return (durable, [Values.(Num (I32 (I32.of_int_s x)))])
+          Lwt.return (durable, [value x])
       | _ -> raise Bad_input)
 
 let write_output_name = "tezos_write_output"
