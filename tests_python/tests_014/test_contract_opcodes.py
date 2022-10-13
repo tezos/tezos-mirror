@@ -89,7 +89,8 @@ class TestContractOpcodes:
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 1', '(Some 0xbb)'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 2', '(Some 0xbbcc)'),
             ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 3', 'None'),
-            ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 1 1', '(Some 0xbb)'),
+            ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 2 1', '(Some 0xcc)'),
+            ('slice_bytes.tz', 'Some 0xaabbcc', 'Pair 2 2', 'None'),
             # Stress-test the failure case of slice for a
             # non-trivial gas  consumption
             (

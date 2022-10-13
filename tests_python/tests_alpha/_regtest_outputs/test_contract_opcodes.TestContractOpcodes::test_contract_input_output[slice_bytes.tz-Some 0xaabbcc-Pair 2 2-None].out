@@ -1,37 +1,37 @@
-tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice_bytes.tz-Some 0xaabbcc-Pair 1 1-(Some 0xbb)1]
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice_bytes.tz-Some 0xaabbcc-Pair 2 2-None]
 
 storage
-  (Some 0xbb)
+  None
 emitted operations
   
 big_map diff
   
 trace
   - location: 10 (just consumed gas: 9.298)
-    [ (Pair (Pair 1 1) (Some 0xaabbcc)) ]
+    [ (Pair (Pair 2 2) (Some 0xaabbcc)) ]
   - location: 10 (just consumed gas: 0.010)
-    [ (Pair 1 1)
+    [ (Pair 2 2)
       (Some 0xaabbcc) ]
   - location: 11 (just consumed gas: 0.010)
     [ (Some 0xaabbcc)
-      (Pair 1 1) ]
+      (Pair 2 2) ]
   - location: 13 (just consumed gas: 0)
     [ 0xaabbcc
-      (Pair 1 1) ]
+      (Pair 2 2) ]
   - location: 19 (just consumed gas: 0.010)
-    [ (Pair 1 1)
+    [ (Pair 2 2)
       0xaabbcc ]
   - location: 20 (just consumed gas: 0.010)
-    [ 1
-      1
+    [ 2
+      2
       0xaabbcc ]
   - location: 21 (just consumed gas: 0.026)
-    [ (Some 0xbb) ]
+    [ None ]
   - location: 13 (just consumed gas: 0.015)
-    [ (Some 0xbb) ]
+    [ None ]
   - location: 22 (just consumed gas: 0.010)
     [ {}
-      (Some 0xbb) ]
+      None ]
   - location: 24 (just consumed gas: 0.010)
-    [ (Pair {} (Some 0xbb)) ]
+    [ (Pair {} None) ]
 
