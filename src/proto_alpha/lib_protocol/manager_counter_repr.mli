@@ -57,5 +57,7 @@ val encoding_for_errors : t Data_encoding.t
 module Internal_for_tests : sig
   val of_int : int -> t
 
+  val to_int : t -> int
+
   val add : t -> int -> t
 end

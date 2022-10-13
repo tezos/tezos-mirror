@@ -219,7 +219,11 @@ let gen_2_operation_req :
   let* op1 =
     gen_operation_req {op_cstrs with force_reveal = Some true} subjects
   in
-  let counter = match op1.counter with Some x -> Z.to_int x | None -> 1 in
+  let counter =
+    match op1.counter with
+    | Some x -> Manager_counter.Internal_for_tests.to_int x
+    | None -> 1
+  in
   let op_cstr =
     {
       {op_cstrs with counter = Pure (counter + 2)} with

@@ -45,6 +45,8 @@ module Internal_for_tests = struct
     assert (Compare.Int.(i >= 0)) ;
     Z.of_int i
 
+  let to_int = Z.to_int
+
   let add c i =
     let c = Z.(add c (of_int i)) in
     assert (c >= Z.zero) ;
