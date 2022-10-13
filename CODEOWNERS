@@ -18,19 +18,16 @@
 /src/bin_codec               @raphael-proust
 /src/bin_node                @romain.nl
 /src/bin_openapi             @romain.nl
-/src/bin_proxy_server        @smelc
 /src/bin_snoop               @lrand
 /src/lib_base                @raphael-proust
 /src/lib_benchmark           @lrand
 /src/lib_error_monad         @raphael-proust
 /src/lib_event_logging       @romain.nl
 /src/lib_lwt_result_stdlib   @raphael-proust
-/src/lib_mockup_proxy        @smelc @igarnier
+/src/lib_mockup_proxy        @igarnier
 /src/lib_openapi             @romain.nl
 /src/lib_p2p*                @julien.t @vivienpe
 /src/lib_protocol_environment   @raphael-proust
-/src/lib_proxy               @smelc
-/src/lib_proxy_server_config @smelc
 /src/lib_shell_benchmarks    @lrand
 /src/lib_stdlib              @raphael-proust
 /src/lib_stdlib_unix         @raphael-proust
@@ -84,7 +81,6 @@
 # @raphael-proust = Raphaël Proust
 # @romain.nl = Romain
 # @Saroupille = François Thiré
-# @smelc = Clément Hurlin
 # @smondet = Seb Mondet
 # @sribaroud = Sylvain R.
 # @tomjack = Tom Jack
@@ -93,7 +89,7 @@
 # @vect0r = Victor Allombert
 # @yrg = Yann Regis-Gianas
 #
-* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smelc @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
+* @andrea.cerone @arvidnl @bsall @camlspotter @emturner @eugenz @hans.hoglund @hhugo1 @igarnier @iguerNL @jobjo @julien.t @klakplok @lthms @mbouaziz @mebsout @murbard @naih @NicVolanschi @ole.kruger @paracetamolo @picdc @pirbo @rafoo_ @raphael-proust @romain.nl @Saroupille @smondet @sribaroud @tomjack @vbotbol @vch9 @vect0r @yrg
 
 # CODEOWNERS Owners
 #
