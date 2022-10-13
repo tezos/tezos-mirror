@@ -447,8 +447,8 @@ let test_balance_too_low fee () =
   (* the fee is higher than the balance then raise an error "Balance_too_low" *)
   Incremental.begin_construction b >>=? fun i ->
   if fee > balance1 then
-    Incremental.add_operation ~expect_apply_failure i op >>= fun _res ->
-    return_unit
+    Incremental.add_operation ~expect_apply_failure i op
+    >>=? fun (_res : Incremental.t) -> return_unit
     (* the fee is smaller than the balance, then the transfer is accepted
        but it is not processed, and fees are taken *)
   else
@@ -670,8 +670,8 @@ let transfer_to_itself_with_no_such_entrypoint () =
         return ()
     | _ -> failwith "no such entrypoint should fail"
   in
-  Incremental.add_operation ~expect_apply_failure i transaction >>= fun _res ->
-  return ()
+  Incremental.add_operation ~expect_apply_failure i transaction
+  >>=? fun (_res : Incremental.t) -> return_unit
 
 (** Originates a contract with a [script] and an initial [credit] and
       [storage]. *)
