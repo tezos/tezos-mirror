@@ -60,6 +60,9 @@ let make_data s =
 }
   |}
 
+let empty_implicit_contract_error_rex =
+  rex "^proto\\.[^.]+\\.implicit\\.empty_implicit_contract$"
+
 (** Test sending malformed Micheline as JSON
     to an RPC endpoint.
  *)
@@ -93,7 +96,7 @@ let reject_malformed_micheline =
   in
   (* We're using an implicit contract that doesn't exist by default,
      so, we expect this to fail with the following message. *)
-  if id <> "proto.alpha.implicit.empty_implicit_contract" then
+  if id =~! empty_implicit_contract_error_rex then
     Test.fail
       "Expected empty_implicit_contract failure during global constant \
        registration, but got some other failure.\n\
