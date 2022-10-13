@@ -27,6 +27,13 @@ open Protocol
 open Alpha_context
 
 module type S = sig
+  (** The type for the status of messages in the batcher.  *)
+  type status =
+    | Pending_batch  (** The message is in the queue of the batcher. *)
+    | Batched of L1_operation.hash
+        (** The message has already been batched and sent to the injector in an
+            L1 operation whose hash is given. *)
+
   (** [init config ~signer node_ctxt] initializes and starts the batcher for
       [signer]. If [config.simulation] is [true] (the default), messages added
       to the batcher are simulated in an incremental simulation context. *)
@@ -63,6 +70,11 @@ module type S = sig
 
   (** Shutdown the batcher, waiting for the ongoing request to be processed. *)
   val shutdown : unit -> unit Lwt.t
+
+  (** The status of a message in the batcher. Returns [None] if the message is
+      not known by the batcher (the batcher only keeps the batched status of the
+      last 500000 messages). *)
+  val message_status : L2_message.hash -> (status * string) option tzresult
 end
 
 module Make (Simulation : Simulation.S) : S

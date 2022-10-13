@@ -35,6 +35,8 @@ end
 module Batched_messages = Hash_queue.Make (L2_message.Hash) (L2_batched_message)
 
 module type S = sig
+  type status = Pending_batch | Batched of L1_operation.hash
+
   val init :
     Configuration.batcher ->
     signer:public_key_hash ->
@@ -54,10 +56,14 @@ module type S = sig
   val new_head : Layer1.head -> unit tzresult Lwt.t
 
   val shutdown : unit -> unit Lwt.t
+
+  val message_status : L2_message.hash -> (status * string) option tzresult
 end
 
 module Make (Simulation : Simulation.S) : S = struct
   module PVM = Simulation.PVM
+
+  type status = Pending_batch | Batched of L1_operation.hash
 
   type state = {
     node_ctxt : Node_context.ro;
@@ -397,4 +403,18 @@ module Make (Simulation : Simulation.S) : S = struct
         (* There is no batcher, nothing to do *)
         Lwt.return_unit
     | Ok w -> Worker.shutdown w
+
+  let message_status state msg_hash =
+    match Message_queue.find_opt state.messages msg_hash with
+    | Some msg -> Some (Pending_batch, L2_message.content msg)
+    | None -> (
+        match Batched_messages.find_opt state.batched msg_hash with
+        | Some {content; l1_hash} -> Some (Batched l1_hash, content)
+        | None -> None)
+
+  let message_status msg_hash =
+    let open Result_syntax in
+    let+ w = Lazy.force worker in
+    let state = Worker.state w in
+    message_status state msg_hash
 end
