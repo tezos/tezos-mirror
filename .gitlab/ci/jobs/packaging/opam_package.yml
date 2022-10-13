@@ -328,7 +328,7 @@ opam:octez-proxy-server:
 opam:octez-sc-rollup-client-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: octez-sc-rollup-client-alpha
 
@@ -524,7 +524,7 @@ opam:tezos-benchmark-type-inference-015-PtLimaPt:
 opam:tezos-benchmark-type-inference-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-benchmark-type-inference-alpha
 
@@ -741,7 +741,7 @@ opam:tezos-crypto-dal:
 opam:tezos-dal-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_1
+    - .rules_template__trigger_opam_batch_2
   variables:
     package: tezos-dal-alpha
 
@@ -790,7 +790,7 @@ opam:tezos-embedded-protocol-005-PsBABY5H:
 opam:tezos-embedded-protocol-005-PsBabyM1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_3
+    - .rules_template__trigger_opam_batch_4
   variables:
     package: tezos-embedded-protocol-005-PsBabyM1
 
@@ -1259,7 +1259,7 @@ opam:tezos-protocol-plugin-010-PtGRANAD:
 opam:tezos-protocol-plugin-010-PtGRANAD-registerer:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_2
+    - .rules_template__trigger_opam_batch_3
   variables:
     package: tezos-protocol-plugin-010-PtGRANAD-registerer
 
@@ -1420,7 +1420,7 @@ opam:tezos-sapling:
 opam:tezos-sc-rollup-alpha:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_1
   variables:
     package: tezos-sc-rollup-alpha
 
