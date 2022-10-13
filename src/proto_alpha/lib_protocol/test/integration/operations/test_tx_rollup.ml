@@ -1093,7 +1093,6 @@ let test_valid_deposit () =
   originate b account >>=? fun (b, tx_rollup) ->
   make_deposit b tx_rollup account addr
   >>=? fun (b, (deposit, cumulated_size), _) ->
-  Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun _ctxt ->
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
   let merkle_root =
     Tx_rollup_inbox.Merkle.merklize_list
