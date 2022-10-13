@@ -3179,6 +3179,8 @@ module Sc_rollup : sig
           inclusion_proof option tzresult
 
         val serialized_proof_of_string : string -> serialized_proof
+
+        val inbox_message_counter : t -> Z.t
       end
     end
 

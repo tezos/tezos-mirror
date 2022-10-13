@@ -141,7 +141,7 @@ module V1 : sig
   val encoding : t Data_encoding.t
 
   (** [inbox_level inbox] returns the maximum level of message insertion in
-    [inbox] or its initial level. *)
+      [inbox] or its initial level. *)
   val inbox_level : t -> Raw_level_repr.t
 
   (** A [history_proof] is a [Skip_list.cell] that stores multiple
@@ -403,6 +403,9 @@ module type Merkelized_operations = sig
     (** Allows to create a dumb {!serialized_proof} from a string, instead
         of serializing a proof with {!to_serialized_proof}. *)
     val serialized_proof_of_string : string -> serialized_proof
+
+    (** [inbox_message_counter inbox] returns the [inbox]'s message counter. *)
+    val inbox_message_counter : t -> Z.t
   end
 end
 

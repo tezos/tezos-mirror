@@ -2016,6 +2016,35 @@ let test_refute_invalid_metadata () =
   in
   assert_refute_result ~game_status:expected_game_status incr
 
+(** Test that the protocol adds a [SOL] and [EOL] for each Tezos level,
+    even if no messages are added to the inbox. *)
+let test_sol_and_eol () =
+  let* block, account = context_init Context.T1 in
+  let* first_inbox = Context.Sc_rollup.inbox (B block) in
+  let messages_first_inbox =
+    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter first_inbox
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int messages_first_inbox) in
+
+  (* SOL and EOL are added when no messages are added. *)
+  let* block = Block.bake block in
+  let* second_inbox = Context.Sc_rollup.inbox (B block) in
+  let messages_second_inbox =
+    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter second_inbox
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ 2 (Z.to_int messages_second_inbox) in
+
+  (* SOL and EOL are added when messages are added. *)
+  let* operation = Op.sc_rollup_add_messages (B block) account ["foo"] in
+  let* block = Block.bake ~operation block in
+  let* third_inbox = Context.Sc_rollup.inbox (B block) in
+  let messages_third_inbox =
+    Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter third_inbox
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ 3 (Z.to_int messages_third_inbox) in
+
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -2125,4 +2154,8 @@ let tests =
       "Invalid metadata initialization can be refuted"
       `Quick
       test_refute_invalid_metadata;
+    Tztest.tztest
+      "Test that SOL/EOL are added in the inbox"
+      `Quick
+      test_sol_and_eol;
   ]

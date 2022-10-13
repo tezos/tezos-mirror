@@ -277,6 +277,8 @@ module V1 = struct
 
   let inbox_level inbox = inbox.level
 
+  let inbox_message_counter inbox = inbox.message_counter
+
   let old_levels_messages inbox = inbox.old_levels_messages
 
   let current_level_hash inbox = inbox.current_level_hash ()
@@ -435,6 +437,8 @@ module type Merkelized_operations = sig
       inclusion_proof option tzresult
 
     val serialized_proof_of_string : string -> serialized_proof
+
+    val inbox_message_counter : t -> Z.t
   end
 end
 
@@ -990,6 +994,8 @@ struct
       |> Option.join |> return
 
     let serialized_proof_of_string x = Bytes.of_string x
+
+    let inbox_message_counter = inbox_message_counter
   end
 end
 
