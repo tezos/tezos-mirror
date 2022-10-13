@@ -242,4 +242,5 @@ let reject_bad_commitment ~source (state : State.t)
       let* _, rejection_operation =
         build_rejection state block ~reject_commitment:commitment ~position
       in
-      Injector.add_pending_operation ~source rejection_operation
+      let* _hash = Injector.add_pending_operation ~source rejection_operation in
+      return_unit

@@ -38,7 +38,11 @@ let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
   Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
 
 let commit_block ~operator tx_rollup block =
+  let open Lwt_result_syntax in
   let commit_operation =
     Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
   in
-  Injector.add_pending_operation ~source:operator commit_operation
+  let* _hash =
+    Injector.add_pending_operation ~source:operator commit_operation
+  in
+  return_unit

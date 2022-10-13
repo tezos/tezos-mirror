@@ -155,9 +155,12 @@ module type S = sig
 
   (** Add an operation as pending injection in the injector. If the source is
       not provided, the operation is queued to the worker which handles the
-      corresponding tag. *)
+      corresponding tag. It returns the hash of the operation in the injector
+      queue. *)
   val add_pending_operation :
-    ?source:public_key_hash -> 'a manager_operation -> unit tzresult Lwt.t
+    ?source:public_key_hash ->
+    'a manager_operation ->
+    L1_operation.hash tzresult Lwt.t
 
   (** Notify the injector of a new Tezos head. The injector marks the operations
       appropriately (for instance reverted operations that are part of a

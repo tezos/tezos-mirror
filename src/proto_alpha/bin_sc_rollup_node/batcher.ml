@@ -66,9 +66,13 @@ module Make (Simulation : Simulation.S) : S = struct
     4 + String.length s
 
   let inject_batch state (messages : L2_message.t list) =
+    let open Lwt_result_syntax in
     let messages = List.map L2_message.content messages in
     let operation = Sc_rollup_add_messages {messages} in
-    Injector.add_pending_operation ~source:state.signer operation
+    let* _hash =
+      Injector.add_pending_operation ~source:state.signer operation
+    in
+    return_unit
 
   let inject_batches state = List.iter_es (inject_batch state)
 

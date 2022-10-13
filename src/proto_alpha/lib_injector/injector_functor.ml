@@ -1120,7 +1120,7 @@ module Make (Rollup : PARAMETERS) = struct
     let*! (_pushed : bool) =
       Worker.Queue.push_request w (Request.Add_pending l1_operation)
     in
-    return_unit
+    return l1_operation.hash
 
   let new_tezos_head h reorg =
     let open Lwt_syntax in
