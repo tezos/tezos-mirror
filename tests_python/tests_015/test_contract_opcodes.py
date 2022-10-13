@@ -612,8 +612,8 @@ class TestContractOpcodes:
                 'get_and_update_map.tz',
                 '(Pair None { Elt "1" 1 ; \
             Elt "2" 2 })',
-                '"1"',
-                '(Pair (Some 1) { Elt "2" 2 })',
+                '"2"',
+                '(Pair (Some 2) { Elt "1" 1 })',
             ),
             # Map iter
             (
