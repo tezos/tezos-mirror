@@ -1008,6 +1008,8 @@ type strategy =
   | Lazy  (** A lazy player will not execute all messages. *)
   | Eager  (** A eager player will not cheat until a certain point. *)
   | Keen  (** A keen player will execute more messages. *)
+  | SOL_hater  (** A SOL hater will not execute the SOL input. *)
+  | EOL_hater  (** A EOL hater will not execute the EOL input. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
@@ -1015,6 +1017,8 @@ let pp_strategy fmt = function
   | Lazy -> Format.pp_print_string fmt "Lazy"
   | Eager -> Format.pp_print_string fmt "Eager"
   | Keen -> Format.pp_print_string fmt "Keen"
+  | SOL_hater -> Format.pp_print_string fmt "SOL hater"
+  | EOL_hater -> Format.pp_print_string fmt "EOL hater"
 
 type player = {
   pkh : Signature.Public_key_hash.t;
@@ -1223,6 +1227,25 @@ module Player_client = struct
         in
         let new_levels_and_messages =
           levels_and_messages @ new_levels_and_messages
+        in
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
+    | SOL_hater ->
+        let new_levels_and_messages =
+          List.map
+            (fun (level, messages) -> (level, Stdlib.List.tl messages))
+            levels_and_messages
+        in
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
+    | EOL_hater ->
+        let new_levels_and_messages =
+          List.map
+            (fun (level, messages) ->
+              let rev_messages = List.rev messages in
+              let without_eol = Stdlib.List.tl rev_messages in
+              (level, List.rev without_eol))
+            levels_and_messages
         in
         let _state, tick, our_states = eval_messages new_levels_and_messages in
         return (tick, our_states, new_levels_and_messages)
@@ -1678,6 +1701,18 @@ let test_perfect_against_keen =
 let test_keen_against_perfect =
   test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
 
+let test_sol_hater_against_perfect =
+  test_game ~p1_strategy:SOL_hater ~p2_strategy:Perfect ()
+
+let test_perfect_against_sol_hater =
+  test_game ~p1_strategy:Perfect ~p2_strategy:SOL_hater ()
+
+let test_eol_hater_against_perfect =
+  test_game ~p1_strategy:EOL_hater ~p2_strategy:Perfect ()
+
+let test_perfect_against_eol_hater =
+  test_game ~p1_strategy:Perfect ~p2_strategy:EOL_hater ()
+
 let tests =
   ( "Refutation",
     qcheck_wrap
@@ -1690,6 +1725,10 @@ let tests =
         test_keen_against_perfect;
         test_perfect_against_eager;
         test_eager_against_perfect;
+        test_sol_hater_against_perfect;
+        test_perfect_against_sol_hater;
+        test_eol_hater_against_perfect;
+        test_perfect_against_eol_hater;
       ] )
 
 (** {2 Entry point} *)
