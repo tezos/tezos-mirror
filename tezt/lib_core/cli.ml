@@ -59,6 +59,7 @@ type options = {
   mutable starting_port : int;
   mutable record : string option;
   mutable from_records : string list;
+  mutable resume : string option;
   mutable job : (int * int) option;
   mutable job_count : int;
   mutable suggest_jobs : bool;
@@ -94,6 +95,7 @@ let options =
     starting_port = 16384;
     record = None;
     from_records = [];
+    resume = None;
     job = None;
     job_count = 1;
     suggest_jobs = false;
@@ -384,6 +386,20 @@ let init ?args () =
            tests found in record files. When using --record, the new record \
            which is output does NOT include the input records. When using \
            --junit, reports do NOT include input records." );
+        ( "--resume",
+          Arg.String (fun filename -> options.resume <- Some filename),
+          "<FILE> Start a resumable run or resume from a previous run. <FILE> \
+           is a record file using the same format as --record and \
+           --from-record. If it does not exist, it is considered to be an \
+           empty record file. Before running a test, it is checked whether \
+           this test was already successfully ran according to <FILE>. If it \
+           was, the test is skipped. When using --loop or --loop-count, the \
+           test is skipped as many times as it was successful according to \
+           <FILE>. At the end of the run, <FILE> is updated to be able to \
+           resume from it again." );
+        ( "-r",
+          Arg.String (fun filename -> options.resume <- Some filename),
+          "<FILE> Same as --resume." );
         ( "--job",
           Arg.String set_job,
           "<INDEX>/<COUNT> COUNT must be at least 1 and INDEX must be between \
