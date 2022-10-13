@@ -6,4 +6,100 @@ emitted operations
   
 big_map diff
   
+trace
+  - location: 11 (remaining gas: 1039982.784 units remaining)
+    [ (Pair 10 { Elt "foo" 1 } 1) ]
+  - location: 11 (remaining gas: 1039982.774 units remaining)
+    [ 10
+      (Pair { Elt "foo" 1 } 1) ]
+  - location: 12 (remaining gas: 1039982.764 units remaining)
+    [ (Pair { Elt "foo" 1 } 1)
+      10 ]
+  - location: 13 (remaining gas: 1039982.754 units remaining)
+    [ { Elt "foo" 1 }
+      10 ]
+  - location: 14 (remaining gas: 1039982.754 units remaining)
+    [  ]
+  - location: 17 (remaining gas: 1039982.744 units remaining)
+    [ 0 ]
+  - location: 14 (remaining gas: 1039982.724 units remaining)
+    [ 10
+      0 ]
+  - location: 14 (remaining gas: 1039982.714 units remaining)
+    [ { Elt "foo" 1 }
+      10
+      0 ]
+  - location: 14 (remaining gas: 1039982.714 units remaining)
+    [ { Elt "foo" 1 }
+      10
+      0 ]
+  - location: 20 (remaining gas: 1039982.714 units remaining)
+    [ (Pair "foo" 1)
+      10
+      0 ]
+  - location: 22 (remaining gas: 1039982.704 units remaining)
+    [ 1
+      10
+      0 ]
+  - location: 23 (remaining gas: 1039982.704 units remaining)
+    [ 10
+      0 ]
+  - location: 25 (remaining gas: 1039982.694 units remaining)
+    [ 10
+      10
+      0 ]
+  - location: 23 (remaining gas: 1039982.674 units remaining)
+    [ 1
+      10
+      10
+      0 ]
+  - location: 26 (remaining gas: 1039982.639 units remaining)
+    [ 11
+      10
+      0 ]
+  - location: 27 (remaining gas: 1039982.629 units remaining)
+    [ 11
+      11
+      10
+      0 ]
+  - location: 28 (remaining gas: 1039982.581 units remaining)
+    [ 11
+      10
+      11
+      0 ]
+  - location: 30 (remaining gas: 1039982.581 units remaining)
+    [ 11
+      0 ]
+  - location: 33 (remaining gas: 1039982.546 units remaining)
+    [ 11 ]
+  - location: 30 (remaining gas: 1039982.526 units remaining)
+    [ 10
+      11 ]
+  - location: 30 (remaining gas: 1039982.516 units remaining)
+    [ 11
+      10
+      11 ]
+  - location: 30 (remaining gas: 1039982.516 units remaining)
+    [ 11
+      10
+      11 ]
+  - location: 20 (remaining gas: 1039982.506 units remaining)
+    [ { Elt "foo" 11 }
+      10
+      11 ]
+  - location: 34 (remaining gas: 1039982.506 units remaining)
+    [ 10
+      11 ]
+  - location: 36 (remaining gas: 1039982.496 units remaining)
+    [ 11 ]
+  - location: 34 (remaining gas: 1039982.476 units remaining)
+    [ { Elt "foo" 11 }
+      11 ]
+  - location: 37 (remaining gas: 1039982.466 units remaining)
+    [ (Pair { Elt "foo" 11 } 11) ]
+  - location: 38 (remaining gas: 1039982.456 units remaining)
+    [ {}
+      (Pair { Elt "foo" 11 } 11) ]
+  - location: 40 (remaining gas: 1039982.446 units remaining)
+    [ (Pair {} { Elt "foo" 11 } 11) ]
 

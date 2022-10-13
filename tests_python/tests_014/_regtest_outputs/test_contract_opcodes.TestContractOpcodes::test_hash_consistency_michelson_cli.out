@@ -13,6 +13,20 @@ emitted operations
   
 big_map diff
   
+trace
+  - location: 11 (remaining gas: 1039993.856 units remaining)
+    [ (Pair (Pair 22220000000 "2017-12-13T04:49:00Z" 34) 0x00) ]
+  - location: 11 (remaining gas: 1039993.846 units remaining)
+    [ (Pair 22220000000 "2017-12-13T04:49:00Z" 34) ]
+  - location: 12 (remaining gas: 1039992.673 units remaining)
+    [ 0x0507070080acd2c6a501070700bcc485a30b0022 ]
+  - location: 13 (remaining gas: 1039992.221 units remaining)
+    [ 0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc ]
+  - location: 14 (remaining gas: 1039992.211 units remaining)
+    [ {}
+      0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc ]
+  - location: 16 (remaining gas: 1039992.201 units remaining)
+    [ (Pair {} 0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc) ]
 
 storage
   0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc
@@ -20,4 +34,18 @@ emitted operations
   
 big_map diff
   
+trace
+  - location: 11 (remaining gas: 1039993.856 units remaining)
+    [ (Pair (Pair 22220000000 "2017-12-13T04:49:00Z" 34) 0x00) ]
+  - location: 11 (remaining gas: 1039993.846 units remaining)
+    [ (Pair 22220000000 "2017-12-13T04:49:00Z" 34) ]
+  - location: 12 (remaining gas: 1039992.673 units remaining)
+    [ 0x0507070080acd2c6a501070700bcc485a30b0022 ]
+  - location: 13 (remaining gas: 1039992.221 units remaining)
+    [ 0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc ]
+  - location: 14 (remaining gas: 1039992.211 units remaining)
+    [ {}
+      0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc ]
+  - location: 16 (remaining gas: 1039992.201 units remaining)
+    [ (Pair {} 0x95a69fcbbf773989333dc9b31e246575812dbea19d25089f83a2aeeea16ab4bc) ]
 
