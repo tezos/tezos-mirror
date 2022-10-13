@@ -136,12 +136,19 @@ let gen_pos : cstrs -> int option QCheck2.Gen.t =
       let+ v = int_range ~origin min max in
       Some v
 
-(** Generator for Z.t that is used for counter and gas limit. *)
+(** Generator for Z.t that is used for gas limit. *)
 let gen_z : cstrs -> Z.t option QCheck2.Gen.t =
  fun cstrs ->
   let open QCheck2.Gen in
   let+ v = gen_pos cstrs in
   Option.map Z.of_int v
+
+(** Generator for Manager_counter.t. *)
+let gen_counter : cstrs -> Manager_counter.t option QCheck2.Gen.t =
+ fun cstrs ->
+  let open QCheck2.Gen in
+  let+ v = gen_pos cstrs in
+  Option.map Manager_counter.Internal_for_tests.of_int v
 
 (** Generator for Tez.t. *)
 let gen_tez : cstrs -> Tez.t option QCheck2.Gen.t =
@@ -194,7 +201,7 @@ let gen_operation_req :
  fun {counter; fee; gas_limit; storage_limit; force_reveal; amount} subjects ->
   let open QCheck2.Gen in
   let* kind = gen_kind subjects in
-  let* counter = gen_z counter in
+  let* counter = gen_counter counter in
   let* fee = gen_tez fee in
   let* gas_limit = gen_gas_limit gas_limit in
   let* storage_limit = gen_z storage_limit in
