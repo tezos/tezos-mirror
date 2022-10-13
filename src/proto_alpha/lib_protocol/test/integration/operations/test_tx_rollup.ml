@@ -1634,7 +1634,7 @@ let test_commitment_duplication () =
        check_proto_error_f
          (function Tx_rollup_errors.No_uncommitted_inbox -> true | _ -> false)
          e)
-  >>=? fun _ ->
+  >>=? fun () ->
   (* No charge. *)
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract2 balance2 Tez.zero
   >>=? fun () ->

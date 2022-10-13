@@ -447,7 +447,7 @@ module Machine = struct
           pure ())
         ()
         env.implicit_accounts
-      >>= fun _ ->
+      >>= fun () ->
       get_tzbtc_balance env.cpmm_contract env state
       >>= fun cpmm_tzbtc_balance ->
       assert (specs.cpmm_min_tzbtc_balance <= cpmm_tzbtc_balance) ;
@@ -699,7 +699,7 @@ module MachineBuilder = struct
        >>= fun op -> bake ~invariant ~baker:env.holder [op] env state
       else pure state)
       >>= fun state ->
-      check_state_satisfies_specs env state specs >>= fun _ -> pure (state, env)
+      check_state_satisfies_specs env state specs >>= fun () -> pure (state, env)
   end
 end
 

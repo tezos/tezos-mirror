@@ -72,7 +72,7 @@ let get_happy_path () =
     Global_constants_storage.get context hash >|= Environment.wrap_tzresult
     >>=? fun (_, result_expr) ->
     Test_global_constants.assert_expr_equal __LOC__ expr result_expr
-    >|=? fun _ -> b
+    >|=? fun () -> b
   in
   assert_unchanged b >>=? fun b ->
   let do_many_transfers b =
