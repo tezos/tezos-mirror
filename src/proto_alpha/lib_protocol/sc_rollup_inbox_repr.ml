@@ -897,10 +897,8 @@ struct
   let produce_proof ctxt history inbox (l, n) =
     let open Lwt_tzresult_syntax in
     let deref ptr = History.find ptr history in
-    let compare {hash = _; level} =
-      Lwt.return @@ Raw_level_repr.compare level l
-    in
-    let*! result = Skip_list.search ~deref ~compare ~cell:inbox in
+    let compare {hash = _; level} = Raw_level_repr.compare level l in
+    let result = Skip_list.search ~deref ~compare ~cell:inbox in
     let* inc, history_proof =
       match result with
       | Skip_list.{rev_path; last_cell = Found history_proof} ->

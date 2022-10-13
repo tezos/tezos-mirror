@@ -321,8 +321,6 @@ module History = struct
 
     let compare = Header.compare_slot_id
 
-    let compare_lwt a b = Lwt.return @@ compare a b
-
     let next ~prev_cell ~prev_cell_ptr elt =
       let open Tzresult_syntax in
       let* () =
@@ -336,7 +334,7 @@ module History = struct
 
     let search ~deref ~cell ~target_id =
       search ~deref ~cell ~compare:(fun slot ->
-          compare_lwt slot.Header.id target_id)
+          compare slot.Header.id target_id)
   end
 
   module V1 = struct
@@ -700,7 +698,7 @@ module History = struct
       let Page.{slot_id; page_index = _} = page_id in
       let deref ptr = History_cache.find ptr hist_cache in
       (* We search for a slot whose ID is equal to target_id. *)
-      let*! search_result =
+      let search_result =
         Skip_list.search ~deref ~target_id:slot_id ~cell:slots_hist
       in
       match (page_info, search_result.Skip_list.last_cell) with
