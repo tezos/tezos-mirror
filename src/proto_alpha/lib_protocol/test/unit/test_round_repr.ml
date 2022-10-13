@@ -310,7 +310,7 @@ let round_of_timestamp_perf (duration0_int64, dipr) =
             ~predecessor_timestamp
             ~timestamp
             ~predecessor_round:Round.zero
-          >>? fun _round ->
+          >>? fun (_round : Round.t) ->
           let t1 = Unix.gettimeofday () in
           let time = t1 -. t0 in
           loop_inner (sum +. time) (j - 1)
@@ -349,7 +349,7 @@ let timestamp_of_round_perf (duration0_int64, dipr) =
         ~predecessor_timestamp
         ~predecessor_round:Round.zero
         ~round
-      >>? fun _ts ->
+      >>? fun (_ts : Timestamp.time) ->
       let t1 = Unix.gettimeofday () in
       let time = t1 -. t0 in
       assert (time < 0.01) ;

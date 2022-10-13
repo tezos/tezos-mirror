@@ -455,7 +455,7 @@ let validate_bootstrap_accounts
           if acc >= minimal_stake then raise Exit else return acc)
         Tez.zero
         bootstrap_accounts
-      >>=? fun _ ->
+      >>=? fun (_ : Tez.t) ->
       failwith
         "Insufficient tokens in initial accounts: the amount should be at \
          least minimal_stake")

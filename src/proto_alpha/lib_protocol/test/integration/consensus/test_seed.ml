@@ -579,7 +579,8 @@ let test_cycle_bounds () =
           cycle
   in
   let cycle = root in
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   let future_cycle = add cycle (future_offset + 1) in
   Context.get_bakers ~cycle:future_cycle (B b) >>= fun res ->
   (* the first cycle is special *)
@@ -591,8 +592,9 @@ let test_cycle_bounds () =
   >>=? fun () ->
   Block.bake_until_cycle_end b >>=? fun b ->
   let cycle = add cycle 1 in
-  Context.get_bakers ~cycle:root (B b) >>=? fun _ ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:root (B b) >>=? fun (_ : _ list) ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__
@@ -603,7 +605,7 @@ let test_cycle_bounds () =
   Block.bake_until_n_cycle_end past_offset b >>=? fun b ->
   let cycle = add cycle past_offset in
   Context.get_bakers ~cycle:(Stdlib.Option.get (sub cycle past_offset)) (B b)
-  >>=? fun _ ->
+  >>=? fun (_ : _ list) ->
   Context.get_bakers
     ~cycle:(Stdlib.Option.get (sub cycle (past_offset + 1)))
     (B b)
@@ -614,7 +616,8 @@ let test_cycle_bounds () =
     ~error_info_field:`Message
     (expected_error_message `Past cycle)
   >>=? fun () ->
-  Context.get_bakers ~cycle:(add cycle future_offset) (B b) >>=? fun _ ->
+  Context.get_bakers ~cycle:(add cycle future_offset) (B b)
+  >>=? fun (_ : _ list) ->
   Context.get_bakers ~cycle:(add cycle (future_offset + 1)) (B b) >>= fun res ->
   Assert.proto_error_with_info
     ~loc:__LOC__

@@ -485,7 +485,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   Context.get_constants (I i)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
-  fee +? origination_burn >>?= fun _total_fee ->
+  fee +? origination_burn >>?= fun (_total_fee : Tez.t) ->
   (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   if fee > balance then expect_too_low_balance_error i op

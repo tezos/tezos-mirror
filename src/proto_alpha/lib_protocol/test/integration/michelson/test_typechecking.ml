@@ -286,7 +286,7 @@ let test_parse_comb_type () =
     ctxt
     (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
     pair_nat_a_pair_b_nat_nat_ty
-  >>?= fun _ -> return_unit
+  >>?= fun (_ : context) -> return_unit
 
 let test_unparse_ty loc ctxt expected ty =
   Environment.wrap_tzresult
@@ -323,7 +323,7 @@ let test_unparse_comb_type () =
     ctxt
     (pair_prim [nat_prim; nat_prim; nat_prim])
     pair_nat_nat_nat_ty
-  >>?= fun _ -> return_unit
+  >>?= fun (_ : context) -> return_unit
 
 let test_unparse_comparable_ty loc ctxt expected ty =
   (* unparse_comparable_ty is not exported, the simplest way to call it is to
@@ -365,7 +365,7 @@ let test_unparse_comb_comparable_type () =
     ctxt
     (pair_prim [nat_prim; nat_prim; nat_prim])
     pair_nat_nat_nat_ty
-  >>?= fun _ -> return_unit
+  >>?= fun (_ : context) -> return_unit
 
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
   let elab_conf = Script_ir_translator_config.make ~legacy:false () in
@@ -574,7 +574,7 @@ let test_parse_address () =
     address_t
     (String (-1, "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF%"))
     {destination = scr1; entrypoint = Entrypoint.default}
-  >|=? fun _ctxt -> ()
+  >|=? fun (_ctxt : context) -> ()
 
 let test_unparse_data loc ctxt ty x ~expected_readable ~expected_optimized =
   wrap_error_lwt
@@ -641,7 +641,7 @@ let test_unparse_comb_data () =
     (z, (z, (z, z)))
     ~expected_readable:(pair_prim [z_prim; z_prim; z_prim; z_prim])
     ~expected_optimized:(Micheline.Seq (-1, [z_prim; z_prim; z_prim; z_prim]))
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : context) -> return_unit
 
 (* Generate all the possible syntaxes for pairs *)
 let gen_pairs left right =
@@ -715,7 +715,7 @@ let test_optimal_comb () =
   check_optimal_comb __LOC__ ctxt comb4_ty comb4_v 4 >>=? fun ctxt ->
   pair_ty leaf_ty comb4_ty >>??= fun (Ty_ex_c comb5_ty) ->
   let comb5_v = (leaf_v, comb4_v) in
-  check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5 >>=? fun _ctxt ->
+  check_optimal_comb __LOC__ ctxt comb5_ty comb5_v 5 >>=? fun (_ : context) ->
   return_unit
 
 (* Check that UNPACK on contract is forbidden.

@@ -300,8 +300,8 @@ let test_wrong_signature_in_the_middle () =
            expected to fail."
   in
   Incremental.begin_construction b >>=? fun inc ->
-  Incremental.add_operation ~expect_failure inc operation >>=? fun _inc ->
-  return_unit
+  Incremental.add_operation ~expect_failure inc operation
+  >>=? fun (_inc : Incremental.t) -> return_unit
 
 let expect_inconsistent_counters list =
   if
@@ -368,15 +368,15 @@ let test_inconsistent_counters () =
   (* Canari: Check counters are ok *)
   Op.batch_operations ~source:c1 (B b) [op1; op2; op3; op4] >>=? fun op ->
   Incremental.begin_construction b >>=? fun inc ->
-  Incremental.add_operation inc op >>=? fun _ ->
+  Incremental.add_operation inc op >>=? fun (_ : Incremental.t) ->
   (* Gap in counter in the following op *)
   Op.batch_operations ~source:c1 (B b) [op1; op2; op4] >>=? fun op ->
   Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
-  >>=? fun _ ->
+  >>=? fun (_ : Incremental.t) ->
   (* Same counter used twice in the following op *)
   Op.batch_operations ~source:c1 (B b) [op1; op2; op2'] >>=? fun op ->
   Incremental.add_operation ~expect_failure:expect_inconsistent_counters inc op
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Incremental.t) -> return_unit
 
 let tests =
   [
