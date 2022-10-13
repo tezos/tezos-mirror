@@ -61,6 +61,22 @@ type simulate_input = {
   reveal_pages : string list option;
 }
 
+type inbox_info = {finalized : bool; cemented : bool}
+
+type commitment_info = {
+  commitment : Sc_rollup.Commitment.t;
+  commitment_hash : Sc_rollup.Commitment.Hash.t;
+  published_at : Raw_level.t;
+}
+
+type message_status =
+  | Unknown
+  | Pending_batch
+  | Pending_injection of L1_operation.t
+  | Injected of Injector_sigs.injected_info
+  | Included of Injector_sigs.included_info * inbox_info
+  | Committed of Injector_sigs.included_info * inbox_info * commitment_info
+
 module Encodings = struct
   open Data_encoding
 
@@ -119,6 +135,90 @@ module Encodings = struct
       (req "message" L2_message.encoding)
 
   let batcher_queue = list queued_message
+
+  let inbox_info =
+    conv
+      (fun {finalized; cemented} -> (finalized, cemented))
+      (fun (finalized, cemented) -> {finalized; cemented})
+    @@ obj2 (req "finalized" bool) (req "cemented" bool)
+
+  let commitment_info =
+    conv
+      (fun {commitment; commitment_hash; published_at} ->
+        (commitment, (commitment_hash, published_at)))
+      (fun (commitment, (commitment_hash, published_at)) ->
+        {commitment; commitment_hash; published_at})
+    @@ merge_objs
+         Sc_rollup.Commitment.encoding
+         (obj2
+            (req "hash" Sc_rollup.Commitment.Hash.encoding)
+            (req "published_at" Raw_level.encoding))
+
+  let message_status =
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"unknown"
+          ~description:"The message is not known by the batcher."
+          (obj1 (req "status" (constant "unknown")))
+          (function Unknown -> Some () | _ -> None)
+          (fun () -> Unknown);
+        case
+          (Tag 1)
+          ~title:"pending_batch"
+          ~description:"The message is in the batcher queue."
+          (obj1 (req "status" (constant "pending_batch")))
+          (function Pending_batch -> Some () | _ -> None)
+          (fun () -> Pending_batch);
+        case
+          (Tag 2)
+          ~title:"pending_injection"
+          ~description:"The message is batched but not injected yet."
+          (obj2
+             (req "status" (constant "pending_injection"))
+             (req "operation" L1_operation.encoding))
+          (function Pending_injection op -> Some ((), op) | _ -> None)
+          (fun ((), op) -> Pending_injection op);
+        case
+          (Tag 3)
+          ~title:"injected"
+          ~description:
+            "The message is injected as part of an L1 operation but it is not \
+             included in a block."
+          (merge_objs
+             (obj1 (req "status" (constant "injected")))
+             Injector_sigs.injected_info_encoding)
+          (function Injected info -> Some ((), info) | _ -> None)
+          (fun ((), info) -> Injected info);
+        case
+          (Tag 4)
+          ~title:"included"
+          ~description:"The message is included in an inbox in an L1 block."
+          (merge_objs
+             (obj1 (req "status" (constant "included")))
+             (merge_objs Injector_sigs.included_info_encoding inbox_info))
+          (function
+            | Included (info, inbox_info) -> Some ((), (info, inbox_info))
+            | _ -> None)
+          (fun ((), (info, inbox_info)) -> Included (info, inbox_info));
+        case
+          (Tag 5)
+          ~title:"committed"
+          ~description:"The message is included in a committed inbox on L1."
+          (merge_objs (obj1 (req "status" (constant "committed")))
+          @@ merge_objs Injector_sigs.included_info_encoding
+          @@ merge_objs inbox_info (obj1 (req "commitment" commitment_info)))
+          (function
+            | Committed (info, inbox_info, commitment) ->
+                Some ((), (info, (inbox_info, commitment)))
+            | _ -> None)
+          (fun ((), (info, (inbox_info, commitment))) ->
+            Committed (info, inbox_info, commitment));
+      ]
+
+  let message_status_output =
+    merge_objs (obj1 (opt "content" hex_string)) message_status
 end
 
 module Arg = struct
@@ -506,8 +606,8 @@ module Local = struct
 
   let batcher_message =
     Tezos_rpc.Service.get_service
-      ~description:"List messages present in the batcher's queue"
+      ~description:"Retrieve an L2 message and its status"
       ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.option L2_message.encoding)
+      ~output:Encodings.message_status_output
       (path / "batcher" / "queue" /: Arg.l2_message_hash)
 end

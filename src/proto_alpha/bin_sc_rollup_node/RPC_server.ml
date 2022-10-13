@@ -415,12 +415,115 @@ module Make (Simulation : Simulation.S) (Batcher : Batcher.S) = struct
     let*? queue = Batcher.get_queue () in
     return queue
 
+  (** [commitment_level_of_inbox_level node_ctxt inbox_level] returns the level
+      of the commitment which should include the inbox of level
+      [inbox_level].
+
+      It is computed with the following formula:
+      {v
+      commitment_level(inbox_level) =
+        last_commitment -
+         ((last_commitment - inbox_level) / commitment_period
+          * commitment_period)
+      v}
+  *)
+  let commitment_level_of_inbox_level (node_ctxt : _ Node_context.t) inbox_level
+      =
+    let open Alpha_context in
+    let open Lwt_option_syntax in
+    let+ last_published =
+      Store.Last_published_commitment_level.find node_ctxt.store
+    in
+    let commitment_period =
+      Int32.of_int
+        node_ctxt.protocol_constants.parametric.sc_rollup
+          .commitment_period_in_blocks
+    in
+    let last_published = Raw_level.to_int32 last_published in
+    let open Int32 in
+    div (sub last_published inbox_level) commitment_period
+    |> mul commitment_period |> sub last_published |> Raw_level.of_int32_exn
+
+  let inbox_info_of_level (node_ctxt : _ Node_context.t) inbox_level =
+    let open Alpha_context in
+    let open Lwt_syntax in
+    let* lcc = Store.Last_cemented_commitment_level.find node_ctxt.store in
+    let+ finalized_head = State.get_finalized_head_opt node_ctxt.store in
+    let finalized =
+      match finalized_head with
+      | None -> false
+      | Some {level = finalized_level; _} ->
+          Compare.Int32.(inbox_level <= finalized_level)
+    in
+    let cemented =
+      match lcc with
+      | None -> false
+      | Some lcc -> Compare.Int32.(inbox_level <= Raw_level.to_int32 lcc)
+    in
+    Sc_rollup_services.{finalized; cemented}
+
   let () =
     Local_directory.register1 Sc_rollup_services.Local.batcher_message
-    @@ fun _node_ctxt hash () () ->
+    @@ fun node_ctxt hash () () ->
     let open Lwt_result_syntax in
-    let*? msg = Batcher.find_message hash in
-    return msg
+    let*? batch_status = Batcher.message_status hash in
+    let* status =
+      match batch_status with
+      | None -> return (None, Sc_rollup_services.Unknown)
+      | Some (batch_status, msg) -> (
+          let return status = return (Some msg, status) in
+          match batch_status with
+          | Pending_batch -> return Sc_rollup_services.Pending_batch
+          | Batched l1_hash -> (
+              match Injector.operation_status l1_hash with
+              | None -> return Sc_rollup_services.Unknown
+              | Some (Pending op) ->
+                  return (Sc_rollup_services.Pending_injection op)
+              | Some (Injected info) ->
+                  return (Sc_rollup_services.Injected info)
+              | Some (Included info) -> (
+                  let*! inbox_info =
+                    inbox_info_of_level node_ctxt info.l1_level
+                  in
+                  let*! commitment_level =
+                    commitment_level_of_inbox_level node_ctxt info.l1_level
+                  in
+                  match commitment_level with
+                  | None ->
+                      return (Sc_rollup_services.Included (info, inbox_info))
+                  | Some commitment_level -> (
+                      let*! commitment =
+                        Store.Commitments.find node_ctxt.store commitment_level
+                      in
+                      match commitment with
+                      | None ->
+                          (* Commitment not computed yet for inbox *)
+                          return
+                            (Sc_rollup_services.Included (info, inbox_info))
+                      | Some (commitment, commitment_hash) -> (
+                          (* Commitment computed *)
+                          let*! published_at =
+                            Store.Commitments_published_at_level.find
+                              node_ctxt.store
+                              commitment_hash
+                          in
+                          match published_at with
+                          | None ->
+                              (* Commitment not published yet *)
+                              return
+                                (Sc_rollup_services.Included (info, inbox_info))
+                          | Some published_at ->
+                              (* Commitment published *)
+                              let commitment_info =
+                                Sc_rollup_services.
+                                  {commitment; commitment_hash; published_at}
+                              in
+                              return
+                                (Sc_rollup_services.Committed
+                                   (info, inbox_info, commitment_info)))))))
+    in
+
+    return status
 
   let register node_ctxt =
     List.fold_left
