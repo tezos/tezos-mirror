@@ -115,8 +115,8 @@ let register_migration_test chain_id =
       (Protocol.hash from_protocol, Protocol.hash to_protocol)
   in
   let expected_dictator, expected_period =
-    match chain_id with
-    | Chain_id_ghostnet when to_protocol = Kathmandu ->
+    match (chain_id, to_protocol) with
+    | Chain_id_ghostnet, Kathmandu ->
         ( Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8",
           {
             Voting.index = 1;
@@ -125,7 +125,7 @@ let register_migration_test chain_id =
             position = 2;
             remaining = 1;
           } )
-    | Chain_id_ghostnet when to_protocol = Alpha ->
+    | Chain_id_ghostnet, _ ->
         ( None,
           {
             Voting.index = 1;
@@ -134,7 +134,7 @@ let register_migration_test chain_id =
             position = 7;
             remaining = 0;
           } )
-    | _ ->
+    | Chain_id_mainnet, _ ->
         ( None,
           {
             Voting.index = 1;
