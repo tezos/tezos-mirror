@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
 let warn_if_argv0_name_not_octez () =
   let executable_name = Filename.basename Sys.argv.(0) in
   let prefix = "tezos-" in

@@ -26,6 +26,8 @@
 open Cmdliner
 module Proxy_server_config = Tezos_proxy_server_config.Proxy_server_config
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
 let () =
   (* warn_if_argv0_name_not_octez *)
   let executable_name = Filename.basename Sys.argv.(0) in
