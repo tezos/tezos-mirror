@@ -366,13 +366,15 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let metric =
+let rpc_metrics =
   Prometheus.Summary.v_labels
     ~label_names:["endpoint"; "method"]
     ~help:"RPC endpoint call counts and sum of execution times."
     ~namespace:Tezos_version.Node_version.namespace
     ~subsystem:"rpc"
     "calls"
+
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
 let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
     node (addr, port) =
@@ -404,31 +406,6 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
-  let transform_callback callback connection request body =
-    let open Lwt_result_syntax in
-    let do_call () = callback connection request body in
-    let cohttp_meth = Cohttp.Request.meth request in
-    let uri = Cohttp.Request.uri request in
-    let path = Uri.path uri in
-    let decoded = Resto.Utils.decode_split_path path in
-    let*! description =
-      let* resto_meth =
-        match cohttp_meth with
-        | #Resto.meth as meth -> Lwt.return_ok meth
-        | _ -> Lwt.return_error @@ `Method_not_allowed []
-      in
-      let* uri_desc = RPC_directory.lookup_uri_desc dir () resto_meth decoded in
-      Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
-    in
-    match description with
-    | Ok (uri, meth) ->
-        (* We update the metric only if the URI can succesfully
-           be matched in the directory tree. *)
-        Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
-    | Error _ ->
-        (* Otherwise, the call must be done anyway. *)
-        do_call ()
-  in
   let cors =
     RPC_server.
       {
@@ -443,7 +420,19 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
       ~media_types:(Media_type.Command_line.of_command_line media_types)
       dir
   in
-  let callback = transform_callback (RPC_server.resto_callback server) in
+  let callback (conn : Cohttp_lwt_unix.Server.conn) req body =
+    let path = Cohttp_lwt.Request.uri req |> Uri.path in
+    if path = "/metrics" then
+      let*! response = Metrics_server.callback conn req body in
+      Lwt.return (`Response response)
+    else Tezos_rpc_http_server.RPC_server.resto_callback server conn req body
+  in
+  let update_metrics uri meth =
+    Prometheus.Summary.(time (labels rpc_metrics [uri; meth]) Sys.time)
+  in
+  let callback =
+    RPC_middleware.rpc_metrics_transform_callback ~update_metrics dir callback
+  in
   Lwt.catch
     (fun () ->
       let*! () = RPC_server.launch ~host server ~callback mode in
@@ -473,8 +462,6 @@ let init_rpc (config : Node_config_file.t) node =
               launch_rpc_server ~acl_policy ~media_types config node addr)
             addrs)
     config.rpc.listen_addrs
-
-module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
 let metrics_serve metrics_addrs =
   let open Lwt_result_syntax in
