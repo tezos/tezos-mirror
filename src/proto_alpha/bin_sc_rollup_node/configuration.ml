@@ -63,6 +63,7 @@ type t = {
   dal_node_addr : string;
   dal_node_port : int;
   batcher : batcher;
+  injector_retention_period : int;
 }
 
 let default_data_dir =
@@ -218,6 +219,11 @@ let default_batcher =
     max_batch_elements = default_batcher_max_batch_elements;
     max_batch_size = default_batcher_max_batch_size;
   }
+
+let max_injector_retention_period =
+  5 * 8192 (* Preserved cycles (5) for mainnet *)
+
+let default_injector_retention_period = 2048
 
 let string_of_purpose = function
   | Publish -> "publish"
@@ -484,6 +490,7 @@ let encoding : t Data_encoding.t =
            dal_node_addr;
            dal_node_port;
            batcher;
+           injector_retention_period;
          } ->
       ( ( data_dir,
           sc_rollup_address,
@@ -494,7 +501,7 @@ let encoding : t Data_encoding.t =
           fee_parameters,
           mode,
           loser_mode ),
-        (dal_node_addr, dal_node_port, batcher) ))
+        (dal_node_addr, dal_node_port, batcher, injector_retention_period) ))
     (fun ( ( data_dir,
              sc_rollup_address,
              sc_rollup_node_operators,
@@ -504,7 +511,12 @@ let encoding : t Data_encoding.t =
              fee_parameters,
              mode,
              loser_mode ),
-           (dal_node_addr, dal_node_port, batcher) ) ->
+           (dal_node_addr, dal_node_port, batcher, injector_retention_period) ) ->
+      if injector_retention_period > max_injector_retention_period then
+        Format.ksprintf
+          Stdlib.failwith
+          "injector_retention_period should be smaller than %d"
+          max_injector_retention_period ;
       {
         data_dir;
         sc_rollup_address;
@@ -518,6 +530,7 @@ let encoding : t Data_encoding.t =
         dal_node_addr;
         dal_node_port;
         batcher;
+        injector_retention_period;
       })
     (merge_objs
        (obj9
@@ -562,10 +575,14 @@ let encoding : t Data_encoding.t =
                 test only!)"
              Loser_mode.encoding
              Loser_mode.no_failures))
-       (obj3
+       (obj4
           (dft "DAL node address" string default_dal_node_addr)
           (dft "DAL node port" int16 default_dal_node_port)
-          (dft "batcher" batcher_encoding default_batcher)))
+          (dft "batcher" batcher_encoding default_batcher)
+          (dft
+             "injector_retention_period"
+             uint16
+             default_injector_retention_period)))
 
 let check_mode config =
   let open Result_syntax in
