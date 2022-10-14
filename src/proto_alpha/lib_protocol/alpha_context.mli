@@ -1606,6 +1606,8 @@ module Manager_counter : sig
   val succ : t -> t
 
   val pp : Format.formatter -> t -> unit
+
+  val encoding_for_RPCs : t Data_encoding.t
 end
 
 (** This module re-exports definitions from {!Contract_repr} and
