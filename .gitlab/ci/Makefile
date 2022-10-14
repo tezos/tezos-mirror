@@ -35,6 +35,11 @@ endif
 		poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job ${CI_NODE_INDEX}/${CI_NODE_TOTAL} --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800 ${TESTS} && \
 		./../scripts/ci/merge_coverage.sh
 
+.PHONY: test-pytest-check-regression-files
+test-pytest-check-regression-files:
+	cd ${CI_PROJECT_DIR}/tests_python && \
+		poetry run pytest --on-unknown-regression-files check
+
 .PHONY: test-tezt
 test-tezt:
 ifndef TESTS

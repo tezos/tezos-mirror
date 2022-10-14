@@ -77,6 +77,12 @@ integration:static-binaries:
   script:
     - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-static-binaries
 
+integration:pytest_check_unknown_regression_files:
+  extends:
+    - .pytest_template
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-pytest-check-regression-files
+
 .pytest_integration:
   extends:
     - .pytest_template
