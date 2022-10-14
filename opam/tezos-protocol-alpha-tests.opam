@@ -30,8 +30,10 @@ depends: [
   "tezos-client-base" {with-test}
   "tezos-protocol-environment" {with-test}
   "tezos-stdlib-unix" {with-test}
+  "tezos-scoru-wasm-test-helpers" {with-test}
   "tezos-stdlib" {with-test}
   "tezos-scoru-wasm" {with-test}
+  "tezos-webassembly-interpreter-extra" {with-test}
   "tezt-tezos" {with-test}
 ]
 build: [

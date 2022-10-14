@@ -89,6 +89,12 @@ module type Internal_for_tests = sig
   val set_maximum_reboots_per_input : Z.t -> tree -> tree Lwt.t
 
   val reset_reboot_counter : tree -> tree Lwt.t
+
+  val get_input_buffer :
+    tree -> Tezos_webassembly_interpreter.Input_buffer.t Lwt.t
+
+  val get_output_buffer :
+    tree -> Tezos_webassembly_interpreter.Output_buffer.t Lwt.t
 end
 
 (** This module type defines a WASM VM API used for smart-contract rollups. *)

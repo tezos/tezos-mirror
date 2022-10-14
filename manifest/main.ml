@@ -3142,6 +3142,28 @@ let octez_dal_node_lib =
         octez_protocol_updater |> open_;
       ]
 
+let octez_scoru_wasm_tests_helpers =
+  private_lib
+    "test_scoru_wasm_test_helpers"
+    ~path:"src/lib_scoru_wasm/test/helpers"
+    ~opam:"tezos-scoru-wasm-test-helpers"
+    ~synopsis:"helpers for testing for the scoru-wasm functionality"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix;
+        octez_context_disk;
+        octez_base_test_helpers |> open_;
+        octez_test_helpers;
+        octez_scoru_wasm;
+        qcheck_alcotest;
+        alcotest_lwt;
+        tezt_lib;
+        octez_webassembly_interpreter_extra |> open_;
+      ]
+    ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
+
 let _octez_scoru_wasm_tests =
   test
     "test_scoru_wasm"
@@ -3160,6 +3182,7 @@ let _octez_scoru_wasm_tests =
         qcheck_alcotest;
         alcotest_lwt;
         tezt_lib;
+        octez_scoru_wasm_tests_helpers |> open_;
         octez_webassembly_interpreter_extra |> open_;
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
@@ -3660,9 +3683,13 @@ end = struct
               main |> open_;
               test_helpers |> if_some |> open_;
               alcotest_lwt;
+              octez_scoru_wasm_tests_helpers |> if_ N.(number >= 016) |> open_;
               octez_stdlib |> if_ N.(number >= 013) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_scoru_wasm;
+              octez_webassembly_interpreter_extra
+              |> if_ N.(number >= 016)
+              |> open_;
             ]
           ~dune:
             Dune.

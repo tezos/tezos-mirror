@@ -723,6 +723,16 @@ module Make (T : Tezos_tree_encoding.TREE) :
           {pvm_state with reboot_counter = pvm_state.maximum_reboots_per_input}
         in
         Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+      let get_output_buffer tree =
+        let open Lwt.Syntax in
+        let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+        pvm.buffers.output
+
+      let get_input_buffer tree =
+        let open Lwt.Syntax in
+        let+ pvm = Tree_encoding_runner.decode pvm_state_encoding tree in
+        pvm.buffers.input
     end
   end
 
