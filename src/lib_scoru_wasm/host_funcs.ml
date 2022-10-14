@@ -41,9 +41,6 @@ let retrieve_memory memories =
   | Host_funcs.Available_memories _ ->
       crash_with "caller module must have exactly 1 memory instance"
 
-let check_key_length key_length =
-  if key_length > Durable.max_key_length then raise (Key_too_large key_length)
-
 module Error = struct
   type t =
     | Store_key_too_large
@@ -68,10 +65,7 @@ module Error = struct
   let return e = Lwt.return (code e)
 end
 
-(* Temporary function to prevent removing the old one, for the sake of
-   simplifying the commit history during the refactoring. Will be removed
-   once every function has been removed. *)
-let check_key_length' key_length = key_length > Durable.max_key_length
+let check_key_length key_length = key_length > Durable.max_key_length
 
 module Safe_access = struct
   let guard func =
@@ -99,7 +93,7 @@ end
 let load_key_from_memory key_offset key_length memory =
   let open Lwt_result_syntax in
   let key_length = Int32.to_int key_length in
-  if check_key_length' key_length then fail Error.Store_key_too_large
+  if check_key_length key_length then fail Error.Store_key_too_large
   else
     let* key = Safe_access.load_bytes memory key_offset key_length in
     Safe_access.guard (fun () -> Lwt.return (Durable.key_of_string_exn key))
@@ -315,24 +309,25 @@ module Aux = struct
 
   let store_get_nth_key ~durable ~memory ~key_offset ~key_length ~index ~dst
       ~max_size =
-    let open Lwt.Syntax in
-    let index = Int64.to_int index in
-    let key_length = Int32.to_int key_length in
-    check_key_length key_length ;
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let key = Durable.key_of_string_exn key in
-    let* result = Durable.subtree_name_at durable key index in
-
-    let result_size = String.length result in
-    let max_size = Int32.to_int max_size in
-    let result =
-      if max_size < result_size then String.sub result 0 max_size else result
+    let open Lwt_result_syntax in
+    let*! res =
+      let index = Int64.to_int index in
+      let* key = load_key_from_memory key_offset key_length memory in
+      let* result =
+        Safe_access.guard (fun () -> Durable.subtree_name_at durable key index)
+      in
+      let result_size = String.length result in
+      let max_size = Int32.to_int max_size in
+      let result =
+        if max_size < result_size then String.sub result 0 max_size else result
+      in
+      let+ () =
+        if result <> "" then Safe_access.store_bytes memory dst result
+        else return_unit
+      in
+      Int32.of_int @@ String.length result
     in
-    let* _ =
-      if result <> "" then Memory.store_bytes memory dst result
-      else Lwt.return_unit
-    in
-    Lwt.return (Int32.of_int @@ String.length result)
+    extract_error_code res
 end
 
 let value i = Values.(Num (I32 i))
@@ -601,7 +596,7 @@ let store_get_nth_key =
               ~dst
               ~max_size
           in
-          (durable, [Values.(Num (I32 result))])
+          (durable, [value result])
       | _ -> raise Bad_input)
 
 let store_copy_name = "tezos_store_copy"
