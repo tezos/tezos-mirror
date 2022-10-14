@@ -168,7 +168,7 @@ let pvm_state_encoding =
           Data_encoding.n))
 
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree = struct
+  Wasm_pvm_sig.S with type tree = T.tree = struct
   module Raw = struct
     type tree = T.tree
 
@@ -387,7 +387,7 @@ module Make (T : Tezos_tree_encoding.TREE) :
       | Restarting | Failing -> maximum_reboots_per_input
       | Starting | Running -> reboot_counter
 
-    (** [compute_step_inner pvm_state] does one computation step on [pvm_state]. 
+    (** [compute_step_inner pvm_state] does one computation step on [pvm_state].
         Returns the new state.
      *)
     let compute_step_inner pvm_state =
@@ -458,6 +458,14 @@ module Make (T : Tezos_tree_encoding.TREE) :
          worst tick of the computation.wasm kernel. *)
       let* tree = T.remove tree ["wasm"] in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+
+    let install_boot_sector bs tree =
+      let bs = Tezos_lazy_containers.Chunked_byte_vector.of_string bs in
+      Tree_encoding_runner.encode
+        Tezos_tree_encoding.(
+          scope ["durable"; "kernel"; "boot.wasm"; "_"] chunked_byte_vector)
+        bs
+        tree
 
     let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue =
       let open Lwt.Syntax in
@@ -729,5 +737,5 @@ module Make (T : Tezos_tree_encoding.TREE) :
     end
   end
 
-  include Gather_floppies.Make (T) (Raw)
+  include Raw
 end

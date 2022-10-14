@@ -75,18 +75,18 @@ val find_value :
 val find_value_exn :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
-(** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of 
+(** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of
     the entire subtree at from_key is copied to to_key.*)
 val copy_tree_exn : t -> key -> key -> t Lwt.t
 
-(** [move_tree_exn tree from_key to_key] produces a new tree in which  
+(** [move_tree_exn tree from_key to_key] produces a new tree in which
     the entire subtree at from_key is moved to to_key.*)
 val move_tree_exn : t -> key -> key -> t Lwt.t
 
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
 val count_subtrees : t -> key -> int Lwt.t
 
-(** [subtree_name_at durable key n] returns the name of the n_th subtree 
+(** [subtree_name_at durable key n] returns the name of the n_th subtree
     under [key]. *)
 val subtree_name_at : t -> key -> int -> string Lwt.t
 

@@ -54,16 +54,13 @@ let hex_encode (input : string) : string =
    the kernel must fit into a single Tezos operation.
 *)
 let read_kernel name : string =
-  let module G = Tezos_scoru_wasm.Gather_floppies in
   let open Tezt.Base in
   let kernel_file =
     project_root // Filename.dirname __FILE__
     // "../../src/proto_alpha/lib_protocol/test/integration/wasm_kernel"
     // (name ^ ".wasm")
   in
-  hex_encode
-  @@ Data_encoding.Binary.to_string_exn G.origination_message_encoding
-  @@ G.Complete_kernel (Bytes.of_string @@ read_file kernel_file)
+  hex_encode (read_file kernel_file)
 
 (* Number of levels needed to process a head as finalized. This value should
    be the same as `node_context.block_finality_time`, where `node_context` is
@@ -998,7 +995,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
     let expected_status =
       match kind with
       | "arith" -> "Halted"
-      | "wasm_2_0_0" -> "Computing"
+      | "wasm_2_0_0" -> "Waiting for input message"
       | _ -> raise (Invalid_argument kind)
     in
     Check.(status = expected_status)

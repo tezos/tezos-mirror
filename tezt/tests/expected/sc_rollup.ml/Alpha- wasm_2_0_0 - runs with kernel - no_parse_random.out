@@ -1,8 +1,8 @@
 
-./octez-client --wait none originate sc rollup from bootstrap1 of kind wasm_2_0_0 of type string booting with 000000001eb9a332ba40d043f6cfaf28686153801e5069e1c839abfb20aa1907672634 --burn-cap 9999999
+./octez-client --wait none originate sc rollup from bootstrap1 of kind wasm_2_0_0 of type string booting with b9a332ba40d043f6cfaf28686153801e5069e1c839abfb20aa1907672634 --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3110.589 units (will add 100 for safety)
-Estimated storage: 6690 bytes added (will add 20 for safety)
+Estimated gas: 3110.569 units (will add 100 for safety)
+Estimated storage: 6685 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,25 +12,25 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000711
+    Fee to the baker: ꜩ0.000706
     Expected counter: 1
     Gas limit: 3211
-    Storage limit: 6710 bytes
+    Storage limit: 6705 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000711
-      payload fees(the block proposer) ....... +ꜩ0.000711
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000706
+      payload fees(the block proposer) ....... +ꜩ0.000706
     Smart contract rollup origination:
       Kind: wasm_2_0_0
       Parameter type: string
-      Boot sector Blake2B hash: 'f2f205be728ea7f3dd7bc8c602e40c9aa7eced3d5e7a1ad3a6467d378bae4a91'
+      Boot sector Blake2B hash: 'b491e02fbca4128384e6a38f7e3fef6b534b4cdfa63cc1d8d7964399d165a030'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3110.589
-      Storage size: 6690 bytes
+      Consumed gas: 3110.569
+      Storage size: 6685 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.6725
-        storage fees ........................... +ꜩ1.6725
+        [PUBLIC_KEY_HASH] ... -ꜩ1.67125
+        storage fees ........................... +ꜩ1.67125
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/genesis_info'
@@ -86,13 +86,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"3"
+"2"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"3"
+"2"
 
 ./octez-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -138,13 +138,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"4"
+"3"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"4"
+"3"
 
 ./octez-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -190,13 +190,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"5"
+"4"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"5"
+"4"
 
 ./octez-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -243,13 +243,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"6"
+"5"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"6"
+"5"
 
 ./octez-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -296,13 +296,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"7"
+"6"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"7"
+"6"
 
 ./octez-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -349,13 +349,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"8"
+"7"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"8"
+"7"
 
 ./octez-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -402,13 +402,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"9"
+"8"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"9"
+"8"
 
 ./octez-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -456,13 +456,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"10"
+"9"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"10"
+"9"
 
 ./octez-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -510,13 +510,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"11"
+"10"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"11"
+"10"
 
 ./octez-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
@@ -564,4 +564,4 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"12"
+"11"
