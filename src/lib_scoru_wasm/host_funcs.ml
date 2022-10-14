@@ -66,6 +66,11 @@ module Error = struct
   let return e = Lwt.return (code e)
 end
 
+(* Temporary function to prevent removing the old one, for the sake of
+   simplifying the commit history during the refactoring. Will be removed
+   once every function has been removed. *)
+let check_key_length' key_length = key_length > Durable.max_key_length
+
 module Safe_access = struct
   let guard func =
     let open Lwt_result_syntax in
@@ -88,6 +93,14 @@ module Safe_access = struct
   let load_bytes memory address size =
     guard (fun () -> Memory.load_bytes memory address size)
 end
+
+let load_key_from_memory key_offset key_length memory =
+  let open Lwt_result_syntax in
+  let key_length = Int32.to_int key_length in
+  if check_key_length' key_length then fail Error.Store_key_too_large
+  else
+    let* key = Safe_access.load_bytes memory key_offset key_length in
+    Safe_access.guard (fun () -> Lwt.return (Durable.key_of_string_exn key))
 
 let extract_error_code = function
   | Error error -> Error.return error
@@ -161,18 +174,18 @@ module Aux = struct
   let store_has_value_and_subtrees = 3l
 
   let store_has ~durable ~memory ~key_offset ~key_length =
-    let open Lwt.Syntax in
-    let key_length = Int32.to_int key_length in
-    check_key_length key_length ;
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let key = Durable.key_of_string_exn key in
-    let* value_opt = Durable.find_value durable key in
-    let+ num_subtrees = Durable.count_subtrees durable key in
-    match (value_opt, num_subtrees) with
-    | None, 0 -> store_has_unknown_key
-    | Some _, 1 -> store_has_value_only
-    | None, _ -> store_has_subtrees_only
-    | _ -> store_has_value_and_subtrees
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = load_key_from_memory key_offset key_length memory in
+      let*! value_opt = Durable.find_value durable key in
+      let*! num_subtrees = Durable.count_subtrees durable key in
+      match (value_opt, num_subtrees) with
+      | None, 0 -> return store_has_unknown_key
+      | Some _, 1 -> return store_has_value_only
+      | None, _ -> return store_has_subtrees_only
+      | _ -> return store_has_value_and_subtrees
+    in
+    extract_error_code res
 
   let store_delete ~durable ~memory ~key_offset ~key_length =
     let open Lwt.Syntax in
@@ -431,7 +444,7 @@ let store_has =
               ~key_offset
               ~key_length
           in
-          (durable, [Values.(Num (I32 r))])
+          (durable, [value r])
       | _ -> raise Bad_input)
 
 let store_delete_name = "tezos_store_delete"

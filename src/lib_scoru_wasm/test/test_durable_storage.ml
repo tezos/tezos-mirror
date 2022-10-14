@@ -41,6 +41,9 @@ module Wasm = Wasm_pvm.Make (Tree)
 module Wrapped_tree_runner =
   Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 
+let value_store_key_too_large =
+  Values.(Num (I32 Host_funcs.Error.(code Store_key_too_large)))
+
 let equal_chunks c1 c2 =
   let open Lwt.Syntax in
   let* c1 = Chunked_byte_vector.to_string c1 in
@@ -96,16 +99,16 @@ let test_store_has_key_too_long () =
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ String.length key))]
   in
-  let* _ =
-    assert_invalid_key (fun () ->
-        Eval.invoke
-          ~module_reg
-          ~caller:module_key
-          ~durable
-          host_funcs_registry
-          Host_funcs.Internal_for_tests.store_has
-          values)
+  let* _, res =
+    Eval.invoke
+      ~module_reg
+      ~caller:module_key
+      ~durable
+      host_funcs_registry
+      Host_funcs.Internal_for_tests.store_has
+      values
   in
+  assert (res = [value_store_key_too_large]) ;
   (* We can tell [store_has] that [key] is one byte less long, which makes it valid *)
   let values =
     Values.[Num (I32 src); Num (I32 (Int32.of_int @@ (String.length key - 1)))]
