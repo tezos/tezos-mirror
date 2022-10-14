@@ -106,6 +106,10 @@ let extract_error_code = function
   | Error error -> Error.return error
   | Ok res -> Lwt.return res
 
+let extract_error durable = function
+  | Error error -> Lwt.return (durable, Error.code error)
+  | Ok res -> Lwt.return res
+
 module Aux = struct
   let input_output_max_size = 4096
 
@@ -188,12 +192,13 @@ module Aux = struct
     extract_error_code res
 
   let store_delete ~durable ~memory ~key_offset ~key_length =
-    let open Lwt.Syntax in
-    let key_length = Int32.to_int key_length in
-    check_key_length key_length ;
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let key = Durable.key_of_string_exn key in
-    Durable.delete durable key
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = load_key_from_memory key_offset key_length memory in
+      let+ durable = Safe_access.guard (fun () -> Durable.delete durable key) in
+      (durable, 0l)
+    in
+    extract_error durable res
 
   let store_list_size ~durable ~memory ~key_offset ~key_length =
     let open Lwt.Syntax in
@@ -453,7 +458,7 @@ let store_delete_type =
   let input_types =
     Types.[NumType I32Type; NumType I32Type] |> Vector.of_list
   in
-  let output_types = Vector.of_list [] in
+  let output_types = Vector.of_list [Types.NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
 let store_delete =
@@ -463,14 +468,14 @@ let store_delete =
       | [Values.(Num (I32 key_offset)); Values.(Num (I32 key_length))] ->
           let open Lwt.Syntax in
           let* memory = retrieve_memory memories in
-          let+ durable =
+          let+ durable, code =
             Aux.store_delete
               ~durable:(Durable.of_storage_exn durable)
               ~memory
               ~key_offset
               ~key_length
           in
-          (Durable.to_storage durable, [])
+          (Durable.to_storage durable, [value code])
       | _ -> raise Bad_input)
 
 let store_value_size_name = "tezos_store_value_size"

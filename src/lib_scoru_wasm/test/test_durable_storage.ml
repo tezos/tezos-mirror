@@ -358,7 +358,7 @@ let test_store_delete () =
       Host_funcs.Internal_for_tests.store_delete
       values
   in
-  assert (result = []) ;
+  assert (result = [Values.(Num (I32 0l))]) ;
   let durable = Durable.of_storage_exn durable in
   let* value_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn key

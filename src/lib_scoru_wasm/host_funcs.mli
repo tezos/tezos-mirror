@@ -129,7 +129,7 @@ module Aux : sig
     memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
     key_offset:int32 ->
     key_length:int32 ->
-    Durable.t Lwt.t
+    (Durable.t * int32) Lwt.t
 
   val store_copy :
     durable:Durable.t ->
