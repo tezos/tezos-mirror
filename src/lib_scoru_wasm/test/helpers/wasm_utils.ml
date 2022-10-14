@@ -237,14 +237,6 @@ module Kernels = struct
      `/durable/one/_` is counted among the three
   *)
   let test_store_list_size_kernel = "test-store-list-size"
-
-  (* Kernel checking the behaviour value of store_delete host func.
-
-     This kernel deletes the following paths:
-     - `/durable/one`
-     - `/durable/three/four`
-  *)
-  let test_store_delete_kernel = "test-store-delete"
 end
 
 let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
