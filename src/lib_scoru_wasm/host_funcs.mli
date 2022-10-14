@@ -73,13 +73,15 @@ module Error : sig
     | Store_invalid_access
         (** An access in a value of the durable storage has failed, supposedly
             out of bounds of a value. Has code `-4`. *)
+    | Store_value_size_exceeded
+        (** Writing a value has exceeded 2^31 bytes. Has code `-5`. *)
     | Memory_invalid_access
-        (** An address is out of bound of the memory. Has code `-5`. *)
+        (** An address is out of bound of the memory. Has code `-6`. *)
     | Input_output_too_large
         (** The input or output submitted as an argument of a host function
-            exceeds the authorized limit. Has code `-6`. *)
+            exceeds the authorized limit. Has code `-7`. *)
     | Generic_invalid_access
-        (** Generic error code for unexpected errors. Has code `-7`. *)
+        (** Generic error code for unexpected errors. Has code `-8`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32

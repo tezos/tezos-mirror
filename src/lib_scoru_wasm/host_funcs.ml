@@ -50,6 +50,7 @@ module Error = struct
     | Store_invalid_key
     | Store_not_a_value
     | Store_invalid_access
+    | Store_value_size_exceeded
     | Memory_invalid_access
     | Input_output_too_large
     | Generic_invalid_access
@@ -59,9 +60,10 @@ module Error = struct
     | Store_invalid_key -> -2l
     | Store_not_a_value -> -3l
     | Store_invalid_access -> -4l
-    | Memory_invalid_access -> -5l
-    | Input_output_too_large -> -6l
-    | Generic_invalid_access -> -7l
+    | Store_value_size_exceeded -> -5l
+    | Memory_invalid_access -> -6l
+    | Input_output_too_large -> -7l
+    | Generic_invalid_access -> -8l
 
   let return e = Lwt.return (code e)
 end
@@ -278,20 +280,38 @@ module Aux = struct
     in
     extract_error_code res
 
+  let chunk_max_size = 4069l
+
   let store_write ~durable ~memory ~key_offset ~key_length ~value_offset ~src
       ~num_bytes =
-    let open Lwt_syntax in
-    if num_bytes > 4096l then Lwt.return (durable, 1l)
-    else
-      let value_offset = Int64.of_int32 value_offset in
-      let num_bytes = Int32.to_int num_bytes in
-      let key_length = Int32.to_int key_length in
-      check_key_length key_length ;
-      let* key = Memory.load_bytes memory key_offset key_length in
-      let* payload = Memory.load_bytes memory src num_bytes in
-      let key = Durable.key_of_string_exn key in
-      let+ durable = Durable.write_value_exn durable key value_offset payload in
-      (durable, 0l)
+    let open Lwt_result_syntax in
+    let*! res =
+      if num_bytes > chunk_max_size then return (durable, 1l)
+      else
+        let* key = load_key_from_memory key_offset key_length memory in
+        let*! value_size_err = store_value_size_aux ~durable ~key in
+        let* value_size =
+          match value_size_err with
+          | Ok s -> return s
+          | Error Error.Store_not_a_value -> return 0l
+          | Error e -> fail e
+        in
+        let* () =
+          (* Checks for overflow. *)
+          if value_size > Int32.add value_size num_bytes then
+            fail Error.Store_value_size_exceeded
+          else return ()
+        in
+        let value_offset = Int64.of_int32 value_offset in
+        let num_bytes = Int32.to_int num_bytes in
+        let* payload = Safe_access.load_bytes memory src num_bytes in
+        let+ durable =
+          Safe_access.guard (fun () ->
+              Durable.write_value_exn durable key value_offset payload)
+        in
+        (durable, 0l)
+    in
+    extract_error durable res
 
   let store_get_nth_key ~durable ~memory ~key_offset ~key_length ~index ~dst
       ~max_size =
@@ -769,7 +789,7 @@ let store_write =
           let open Lwt.Syntax in
           let* memory = retrieve_memory memories in
           let durable = Durable.of_storage_exn durable in
-          let+ durable, ret =
+          let+ durable, code =
             Aux.store_write
               ~durable
               ~memory
@@ -779,7 +799,7 @@ let store_write =
               ~src
               ~num_bytes
           in
-          (Durable.to_storage durable, [Values.(Num (I32 ret))])
+          (Durable.to_storage durable, [value code])
       | _ -> raise Bad_input)
 
 let lookup_opt name =
