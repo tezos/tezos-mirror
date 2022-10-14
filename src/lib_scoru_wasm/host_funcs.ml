@@ -264,16 +264,19 @@ module Aux = struct
 
   let store_read ~durable ~memory ~key_offset ~key_length ~value_offset ~dest
       ~max_bytes =
-    let open Lwt_syntax in
-    let value_offset = Int64.of_int32 value_offset in
-    let max_bytes = Int64.of_int32 max_bytes in
-    let key_length = Int32.to_int key_length in
-    check_key_length key_length ;
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let key = Durable.key_of_string_exn key in
-    let* value = Durable.read_value_exn durable key value_offset max_bytes in
-    let+ () = Memory.store_bytes memory dest value in
-    Int32.of_int (String.length value)
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = load_key_from_memory key_offset key_length memory in
+      let value_offset = Int64.of_int32 value_offset in
+      let max_bytes = Int64.of_int32 max_bytes in
+      let* value =
+        Safe_access.guard (fun () ->
+            Durable.read_value_exn durable key value_offset max_bytes)
+      in
+      let* () = Safe_access.store_bytes memory dest value in
+      return (Int32.of_int (String.length value))
+    in
+    extract_error_code res
 
   let store_write ~durable ~memory ~key_offset ~key_length ~value_offset ~src
       ~num_bytes =
@@ -691,7 +694,7 @@ let store_read =
               ~dest
               ~max_bytes
           in
-          (durable, [Values.(Num (I32 len))])
+          (durable, [value len])
       | _ -> raise Bad_input)
 
 let reveal_preimage_name = "tezos_reveal_preimage"
