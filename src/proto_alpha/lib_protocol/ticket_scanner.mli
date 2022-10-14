@@ -99,3 +99,8 @@ val ex_ticket_size :
   (Saturation_repr.may_saturate Saturation_repr.t * Alpha_context.context)
   tzresult
   Lwt.t
+
+(** [ex_token_and_amount_of_ex_ticket ex_ticket] returns the token and amount of
+    the given ticket [ex_ticket]. *)
+val ex_token_and_amount_of_ex_ticket :
+  ex_ticket -> Ticket_token.ex_token * Script_typed_ir.ticket_amount

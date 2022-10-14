@@ -557,3 +557,7 @@ let ex_ticket_size ctxt (Ex_ticket (ty, ticket)) =
   Gas.consume ctxt val_size_cost >>?= fun ctxt ->
   (* gas *)
   return (Saturation_repr.add ty_size val_size, ctxt)
+
+let ex_token_and_amount_of_ex_ticket
+    (Ex_ticket (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
+  (Ticket_token.Ex_token {ticketer; contents_type; contents}, amount)
