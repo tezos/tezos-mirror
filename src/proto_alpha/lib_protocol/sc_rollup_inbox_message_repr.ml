@@ -66,35 +66,40 @@ type internal_inbox_message =
 
 let internal_inbox_message_encoding =
   let open Data_encoding in
+  let kind name = req "internal_inbox_message_kind" (constant name) in
   union
     [
       case
         (Tag 0)
         ~title:"Transfer"
-        (obj4
+        (obj5
+           (kind "transfer")
            (req "payload" Script_repr.expr_encoding)
            (req "sender" Contract_hash.encoding)
            (req "source" Signature.Public_key_hash.encoding)
            (req "destination" Sc_rollup_repr.Address.encoding))
         (function
           | Transfer {payload; sender; source; destination} ->
-              Some (payload, sender, source, destination)
+              Some ((), payload, sender, source, destination)
           | _ -> None)
-        (fun (payload, sender, source, destination) ->
+        (fun ((), payload, sender, source, destination) ->
           Transfer {payload; sender; source; destination});
       case
         (Tag 1)
         ~title:"Start_of_level"
-        empty
+        (obj1 (kind "start_of_level"))
         (function Start_of_level -> Some () | _ -> None)
         (fun () -> Start_of_level);
       case
         (Tag 2)
         ~title:"End_of_level"
-        empty
+        (obj1 (kind "end_of_level"))
         (function End_of_level -> Some () | _ -> None)
         (fun () -> End_of_level);
     ]
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4027
+   We should change the payload of [External] from [bytes] to [string]. *)
 
 type t = Internal of internal_inbox_message | External of string
 
