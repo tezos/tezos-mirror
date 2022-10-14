@@ -360,40 +360,28 @@ let test_rebuild_snapshotable_state () =
     Context_hash.equal hash_input_tree_after_eval hash_input_rebuilded_tree) ;
   return_unit
 
-let test_invalid_key_truncated () =
+let test_unkown_host_function_truncated () =
   let open Lwt_result_syntax in
-  let key =
-    "durable/key/that/should/be/eventually/truncated/in/the/stuck/state"
-    ^ "/for/being/too/long/and/not/fitting/into/the/expected/bytes"
-    ^ "/invalid/because/of/missing/root/slash"
-  in
-  let key_offset = 100 in
-  let key_length = String.length key in
-  (* Let's ensure the key will not fit in the Stuck message. *)
-  assert (key_length > Wasm_pvm_errors.messages_maximum_size) ;
-  (* This module initializes the memory with the key starting at [key_offset].
-     It will fail on `store_has` during `kernel_next` because the key doesn't
-     start with '/'. *)
+  let rollup_safe_core = "rollup_safe_core" in
+  let unknown_function = String.make 100 'a' in
+  (* This module imports an unknown function of length 100, which is the maximum
+     accepted by our interpreter. The error message will be trunctated *)
   let module_ =
     Format.sprintf
       {|
         (module
-          (import "rollup_safe_core" "store_has"
-            (func $store_has (param i32 i32) (result i32))
+          (import "%s" "%s"
+            (func $unkown_function (param i32 i32) (result i32))
           )
           (memory 1)
-          (data (i32.const %d) "%s")
           (export "mem" (memory 0))
           (func (export "kernel_next")
-            (call $store_has (i32.const %d) (i32.const %d))
             (unreachable)
           )
         )
     |}
-      key_offset
-      key
-      key_offset
-      key_length
+      rollup_safe_core
+      unknown_function
   in
   (* Let's first init the tree to compute. *)
   let*! tree = initial_tree ~from_binary:false module_ in
@@ -404,12 +392,18 @@ let test_invalid_key_truncated () =
   in
   let*! tree_stuck = eval_until_input_requested tree_with_dummy_input in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree_stuck in
+  (* The message as originally outputed before being
+     truncated. *)
+  let reason =
+    Format.sprintf "Unexpected import: %s.%s" rollup_safe_core unknown_function
+  in
+  (* Let's check the message will be indeed truncated, otherwise this test is
+     not relevant. *)
+  assert (String.length reason > Wasm_pvm_errors.messages_maximum_size) ;
   (* The final reason for being stuck should be truncated after
      [Wasm_pvm_errors.messages_maximum_size]. *)
-  let reason =
-    String.sub ("Invalid_key: " ^ key) 0 Wasm_pvm_errors.messages_maximum_size
-  in
-  assert (is_stuck ~step:`Eval ~reason state) ;
+  let reason = String.sub reason 0 Wasm_pvm_errors.messages_maximum_size in
+  assert (is_stuck ~step:`Link ~reason state) ;
   return_unit
 
 let test_bulk_noops () =
@@ -787,7 +781,7 @@ let tests =
     tztest
       "Test Stuck state is truncated on long messages"
       `Quick
-      test_invalid_key_truncated;
+      test_unkown_host_function_truncated;
     tztest "Test bulk no-ops function properly" `Quick test_bulk_noops;
     tztest "Test durable store io" `Quick test_durable_store_io;
     tztest "Test reboot" `Quick test_kernel_reboot;
