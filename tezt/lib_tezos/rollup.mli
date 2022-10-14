@@ -216,13 +216,14 @@ end
 
 module Dal : sig
   module Parameters : sig
-    type t = {
-      number_of_shards : int;
+    type cryptobox = Tezos_crypto_dal.Cryptobox.Verifier.parameters = {
       redundancy_factor : int;
-      slot_size : int;
       page_size : int;
-      number_of_slots : int;
+      slot_size : int;
+      number_of_shards : int;
     }
+
+    type t = {cryptobox : cryptobox; number_of_slots : int}
 
     val parameter_file : Protocol.t -> string Lwt.t
 
@@ -252,12 +253,13 @@ module Dal : sig
 
   module Cryptobox = Tezos_crypto_dal.Cryptobox
 
-  val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
+  val make :
+    ?on_error:(string -> Cryptobox.t) -> Parameters.cryptobox -> Cryptobox.t
 
   module Commitment : sig
     val dummy_commitment :
       ?on_error:(string -> Cryptobox.commitment) ->
-      Parameters.t ->
+      Parameters.cryptobox ->
       Cryptobox.t ->
       string ->
       Cryptobox.commitment

@@ -500,13 +500,14 @@ end
 
 module Dal = struct
   module Parameters = struct
-    type t = {
-      number_of_shards : int;
+    type cryptobox = Tezos_crypto_dal.Cryptobox.Verifier.parameters = {
       redundancy_factor : int;
-      slot_size : int;
       page_size : int;
-      number_of_slots : int;
+      slot_size : int;
+      number_of_shards : int;
     }
+
+    type t = {cryptobox : cryptobox; number_of_slots : int}
 
     let parameter_file protocol =
       let args = [(["dal_parametric"; "feature_enable"], `Bool true)] in
@@ -524,10 +525,9 @@ module Dal = struct
       let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
       return
         {
-          number_of_shards;
-          redundancy_factor;
-          slot_size;
-          page_size;
+          cryptobox =
+            Tezos_crypto_dal.Cryptobox.Verifier.
+              {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
         }
   end
@@ -584,22 +584,13 @@ module Dal = struct
   let make
       ?(on_error =
         fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
-      Parameters.
-        {
-          redundancy_factor;
-          number_of_shards;
-          slot_size;
-          page_size;
-          number_of_slots = _;
-        } =
+      cryptobox_params =
     let initialisation_parameters =
       Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-        ~slot_size
+        ~slot_size:cryptobox_params.Parameters.slot_size
     in
     Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
-    match
-      Cryptobox.make {redundancy_factor; slot_size; page_size; number_of_shards}
-    with
+    match Cryptobox.make cryptobox_params with
     | Ok cryptobox -> cryptobox
     | Error (`Fail msg) -> on_error msg
 
@@ -611,9 +602,9 @@ module Dal = struct
     let dummy_commitment
         ?(on_error =
           fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)
-        parameters t message =
+        cryptobox_params t message =
       let padding_length =
-        parameters.Parameters.slot_size - String.length message
+        cryptobox_params.Parameters.slot_size - String.length message
       in
       let padded_message =
         if padding_length > 0 then pad padding_length message else message

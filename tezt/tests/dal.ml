@@ -77,7 +77,7 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
   in
   let* client = Client.init_mockup ~parameter_file ~protocol () in
   let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make parameters in
+  let cryptobox = Rollup.Dal.make parameters.cryptobox in
   let node = Node.create nodes_args in
   let* () = Node.config_init node [] in
   Node.Config_file.update node (fun json ->
@@ -86,7 +86,7 @@ let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
           ~origin:"dal_initialisation"
           (`O
             [
-              ("srs_size", `Float (float_of_int parameters.slot_size));
+              ("srs_size", `Float (float_of_int parameters.cryptobox.slot_size));
               ("activated", `Bool true);
             ])
       in
@@ -219,9 +219,10 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
       protocol_parameters |-> "dal_parametric" |-> "number_of_slots" |> as_int)
   in
   let* parameters = Rollup.Dal.Parameters.from_client client in
-  let cryptobox = Rollup.Dal.make parameters in
+  let cryptobox_params = parameters.cryptobox in
+  let cryptobox = Rollup.Dal.make cryptobox_params in
   let commitment =
-    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox "coucou"
+    Rollup.Dal.Commitment.dummy_commitment cryptobox_params cryptobox "coucou"
   in
   Check.(
     (feature_flag = false)
@@ -269,7 +270,11 @@ let publish_slot ~source ?fee ~index ~commitment node client =
 
 let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
   let commitment =
-    Rollup.Dal.Commitment.dummy_commitment parameters cryptobox message
+    Rollup.Dal.(
+      Commitment.dummy_commitment
+        parameters.Parameters.cryptobox
+        cryptobox
+        message)
   in
   publish_slot ~source ?fee ~index ~commitment
 
@@ -611,17 +616,18 @@ let test_dal_node_rebuild_from_shards =
   let open Tezos_crypto_dal in
   let* node, client, dal_node = init_dal_node protocol in
   let* parameters = Rollup.Dal.Parameters.from_client client in
-  let slot_content = generate_dummy_slot parameters.slot_size in
+  let crypto_params = parameters.cryptobox in
+  let slot_content = generate_dummy_slot crypto_params.slot_size in
   let publish = publish_and_store_slot node client dal_node in
   let* _slot_index, slot_header = publish Constant.bootstrap1 0 slot_content in
   let* () = Client.bake_for_and_wait client in
   let* _level = Node.wait_for_level node 1 in
   let number_of_shards =
-    (parameters.number_of_shards / parameters.redundancy_factor) - 1
+    (crypto_params.number_of_shards / crypto_params.redundancy_factor) - 1
   in
   let downloaded_shard_ids =
     range 0 number_of_shards
-    |> List.map (fun i -> i * parameters.redundancy_factor)
+    |> List.map (fun i -> i * crypto_params.redundancy_factor)
   in
   let* shards =
     Lwt_list.fold_left_s
@@ -641,7 +647,7 @@ let test_dal_node_rebuild_from_shards =
       Cryptobox.IntMap.empty
       downloaded_shard_ids
   in
-  let cryptobox = Rollup.Dal.make parameters in
+  let cryptobox = Rollup.Dal.make parameters.cryptobox in
   let reformed_slot =
     match Cryptobox.polynomial_from_shards cryptobox shards with
     | Ok p -> Cryptobox.polynomial_to_bytes cryptobox p |> Bytes.to_string
