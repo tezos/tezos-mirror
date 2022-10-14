@@ -215,16 +215,19 @@ module Aux = struct
 
   let store_copy ~durable ~memory ~from_key_offset ~from_key_length
       ~to_key_offset ~to_key_length =
-    let open Lwt_syntax in
-    let from_key_length = Int32.to_int from_key_length in
-    let to_key_length = Int32.to_int to_key_length in
-    check_key_length from_key_length ;
-    check_key_length to_key_length ;
-    let* from_key = Memory.load_bytes memory from_key_offset from_key_length in
-    let* to_key = Memory.load_bytes memory to_key_offset to_key_length in
-    let from_key = Durable.key_of_string_exn from_key in
-    let to_key = Durable.key_of_string_exn to_key in
-    Durable.copy_tree_exn durable from_key to_key
+    let open Lwt_result_syntax in
+    let*! res =
+      let* from_key =
+        load_key_from_memory from_key_offset from_key_length memory
+      in
+      let* to_key = load_key_from_memory to_key_offset to_key_length memory in
+      let+ durable =
+        Safe_access.guard (fun () ->
+            Durable.copy_tree_exn durable from_key to_key)
+      in
+      (durable, 0l)
+    in
+    extract_error durable res
 
   let store_move ~durable ~memory ~from_key_offset ~from_key_length
       ~to_key_offset ~to_key_length =
@@ -586,7 +589,7 @@ let store_copy_type =
     Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
     |> Vector.of_list
   in
-  let output_types = Vector.of_list [] in
+  let output_types = Vector.of_list Types.[NumType I32Type] in
   Types.FuncType (input_types, output_types)
 
 let store_copy =
@@ -602,7 +605,7 @@ let store_copy =
           let open Lwt.Syntax in
           let* memory = retrieve_memory memories in
           let durable = Durable.of_storage_exn durable in
-          let+ durable =
+          let+ durable, code =
             Aux.store_copy
               ~durable
               ~memory
@@ -611,7 +614,7 @@ let store_copy =
               ~to_key_offset
               ~to_key_length
           in
-          (Durable.to_storage durable, [])
+          (Durable.to_storage durable, [value code])
       | _ -> raise Bad_input)
 
 let store_move_name = "tezos_store_move"

@@ -526,7 +526,8 @@ let test_store_copy () =
       Host_funcs.Internal_for_tests.store_copy
       values
   in
-  assert (result = []) ;
+  (* If everything goes well, the function returns `0l`. *)
+  assert (result = [Values.(Num (I32 0l))]) ;
   let durable = Durable.of_storage_exn durable in
 
   let* new_value_at_two =
