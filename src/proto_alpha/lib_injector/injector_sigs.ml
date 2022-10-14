@@ -201,10 +201,17 @@ module type S = sig
 
   (** Initializes the injector with the rollup node state, for a list of
       signers, and start the workers. Each signer has its own worker with a
-      queue of operations to inject. *)
+      queue of operations to inject.
+
+      [retention_period] is the number of blocks for which the injector keeps
+      the included information for, must be positive or zero. By default (when
+      [0]), the injector will not keep information longer than necessary. It can
+      be useful to set this value to something [> 0] if we want to retrieve
+      information about operations included on L1 for a given period. *)
   val init :
     #Protocol_client_context.full ->
     data_dir:string ->
+    ?retention_period:int ->
     rollup_node_state ->
     signers:(public_key_hash * injection_strategy * tag list) list ->
     unit tzresult Lwt.t
