@@ -582,7 +582,7 @@ provides a shell with the rollup node and client available in the
    Similarly to other Octez binaries like the baker, there exists a
    rollup node and client for each version of the Tezos protocol. You
    can use the ``014-PtKathma`` binaries on testnets like
-   `Kathmandunet <https://jakartanet.tzkt.io/>_` (``--network
+   `Kathmandunet <https://kathmandunet.tzkt.io//>`_ (``--network
    kathmandunet``). Note that, compared to testnets like Mondaynet or
    Dailynet, Kathmandunet is using the same protocol constants as
    Mainnet, meaning the finality period is 40,000 blocks (about 2

@@ -588,7 +588,7 @@ provides a shell with the rollup node and client available in the
    Similarly to other Octez binaries like the baker, there exists a
    rollup node and client for each version of the Tezos protocol. You
    can use the ``alpha`` binaries on testnets like `Mondaynet or
-   Dailynet <https://teztnets.xyz/>_`. This is the recommended way to
+   Dailynet <https://teztnets.xyz/>`_. This is the recommended way to
    experiment with Transaction Rollups, as the finality period on
    Mondaynet and Dailynet is significantly shorter than on mainnet or
    other testnets.
