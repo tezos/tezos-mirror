@@ -138,15 +138,19 @@ module Aux = struct
     extract_error_code res
 
   let write_output ~output_buffer ~memory ~src ~num_bytes =
-    let open Lwt.Syntax in
-    if num_bytes > 4096l then Lwt.return 1l
-    else
-      let num_bytes = Int32.to_int num_bytes in
-      let* payload = Memory.load_bytes memory src num_bytes in
-      let* () =
-        Output_buffer.set_value output_buffer (Bytes.of_string payload)
-      in
-      Lwt.return 0l
+    let open Lwt_result_syntax in
+    let*! res =
+      if num_bytes > Int32.of_int input_output_max_size then
+        fail Error.Input_output_too_large
+      else
+        let num_bytes = Int32.to_int num_bytes in
+        let* payload = Safe_access.load_bytes memory src num_bytes in
+        let*! () =
+          Output_buffer.set_value output_buffer (Bytes.of_string payload)
+        in
+        return 0l
+    in
+    extract_error_code res
 
   let store_has_unknown_key = 0l
 
@@ -347,7 +351,7 @@ let write_output =
       | [Values.(Num (I32 src)); Values.(Num (I32 num_bytes))] ->
           let* memory = retrieve_memory memories in
           let* x = Aux.write_output ~output_buffer ~memory ~src ~num_bytes in
-          Lwt.return (durable, [Values.(Num (I32 x))])
+          Lwt.return (durable, [value x])
       | _ -> raise Bad_input)
 
 let write_debug_name = "tezos_write_debug"
