@@ -98,11 +98,16 @@ let check_vote_error ?__LOC__ expected_error expected_file_path
       baker
 
 let test_all_per_block_votes =
+  (* This test actually supports protocols >= 012. But unfortunately, because
+     it creates, uses and then deletes a file at a fixed location ([default_votefile]),
+     it cannot be run in parallel with itself for multiple protocols.
+     So we only run it on Alpha. *)
   Protocol.register_test
     ~__FILE__
     ~title:"liquidity baking with per-block votes"
     ~tags:["liquidity"; "baking"; "votes"]
-    ~supports:(Protocol.From_protocol 012)
+    ~supports:
+      (Protocol.Between_protocols (Protocol.number Alpha, Protocol.number Alpha))
   @@ fun protocol ->
   let ( >|= ) = Lwt.( >|= ) in
   let error_prefix = "client." ^ Protocol.encoding_prefix protocol ^ "." in
@@ -111,8 +116,8 @@ let test_all_per_block_votes =
     Test.fail
       ~__LOC__
       "this test will recreate and delete the file %s, which is already \
-       present on your system. This may result from partial run of this test, \
-       in which case the file can safely be removed."
+       present on your system. This may be the result of a partial run of this \
+       test, in which case the file can safely be removed."
       default_votefile ;
 
   let parameters =
