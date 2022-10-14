@@ -63,7 +63,7 @@ module type Internal_for_benchmark = sig
   (** [compute_step_many_until max_step should_continue tree]
       advance forwards the VM in the same manners as [compute_step_many]
       as long as [should_continue] returns true.
-      
+
       Returns the new tree and number of the executed ticks.
 
       /!\ as it allows to redefine the stop condition, this function should
@@ -108,48 +108,18 @@ end
 module type S = sig
   type tree
 
+  include Wasm_vm_sig.Generic with type state := tree
+
   (** [install_boot_sector payload tree] installs the [payload] passed
       as an argument in [tree] so that it is interpreted as the kernel
       to be used by the PVM. *)
   val install_boot_sector : string -> tree -> tree Lwt.t
-
-  (** [compute_step_many ~max_steps tree] forwards the VM by at most [max_step]
-      compute tick, yielding if it reaches the maximum number of ticks for a
-      toplevel kernel call. If the VM is expecting input, it gets stuck. If the
-      VM is already stuck, this function may raise an exception. It is more
-      efficient than [compute_step] if it has to be called for more than one
-      tick, but its resulting tree will be stricly equivalent. 
-      Returns a tuple containing the number of executed ticks and the new tree*)
-  val compute_step_many : max_steps:int64 -> tree -> (tree * int64) Lwt.t
-
-  (** [compute_step tree] forwards the VM by one compute tick. If the VM is expecting
-      input, it gets stuck. If the VM is already stuck, this function may raise
-      an exception. It is strictly equivalent to [compute_step_many ~max_step=1
-      tree]. *)
-  val compute_step : tree -> tree Lwt.t
-
-  (** [set_input_step input_info message tree] forwards the VM by one input
-      tick. If the VM is not expecting input, it gets stuck. If the VM is
-      already stuck, this function may raise an exception. Note at this point
-      the function raises an exception if the VM is not expecting input. *)
-  val set_input_step : input_info -> string -> tree -> tree Lwt.t
-
-  (** [reveal_step reveal_data tree] loads the [reveal_data] in the
-      memory of module of the currently executed function.
-
-      If the VM does not expect any reveal data, this function raises
-      an exception. *)
-  val reveal_step : bytes -> tree -> tree Lwt.t
 
   (** [get_output output state] returns the payload associated with the given
       output. The result is meant to be deserialized using
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
   val get_output : output_info -> tree -> string option Lwt.t
-
-  (** [get_info] provides a typed view of the current machine state. Should not
-      raise. *)
-  val get_info : tree -> info Lwt.t
 
   module Internal_for_benchmark : Internal_for_benchmark with type tree := tree
 

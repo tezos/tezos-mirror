@@ -27,5 +27,7 @@
 val durable_buffers_encoding :
   Tezos_webassembly_interpreter.Eval.buffers Tezos_tree_encoding.t
 
+include Wasm_vm_sig.S
+
 module Make (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.S with type tree = T.tree
