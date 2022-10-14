@@ -901,11 +901,14 @@ let run_with_scheduler scheduler =
   List.iter
     Record.(fun filename -> use_past (input_file filename))
     Cli.options.from_records ;
-  Option.iter
-    Record.(
-      fun filename ->
-        if Sys.file_exists filename then resume_from (input_file filename))
-    Cli.options.resume ;
+  if Cli.options.resume then (
+    if Cli.options.resume_file = None then
+      Cli.options.resume_file <- Some "tezt-resume.json" ;
+    Option.iter
+      Record.(
+        fun filename ->
+          if Sys.file_exists filename then resume_from (input_file filename))
+      Cli.options.resume_file) ;
   (* Apply --job if needed. *)
   select_job () ;
   (* Apply --skip and --only if needed. *)
@@ -1004,6 +1007,6 @@ let run_with_scheduler scheduler =
       Option.iter output_junit Cli.options.junit ;
       let record = Record.current () in
       Option.iter (Record.output_file record) Cli.options.record ;
-      Option.iter (Record.output_file record) Cli.options.resume ;
+      Option.iter (Record.output_file record) Cli.options.resume_file ;
       if Cli.options.time then display_time_summary () ;
       if !aborted then exit 2 else if !a_test_failed then exit 1
