@@ -287,6 +287,37 @@ val init_with_constants2 :
   (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
   Lwt.t
 
+(** [init_with_parameters_gen tup params] returns an initial block parametrised
+    with [params] and the implicit contracts corresponding to its bootstrap
+    accounts. The number of bootstrap accounts, and the structure of the
+    returned contracts, are specified by the [tup] argument. *)
+val init_with_parameters_gen :
+  (Alpha_context.Contract.t, 'contracts) tup ->
+  Parameters.t ->
+  (Block.t * 'contracts) tzresult Lwt.t
+
+(** [init_with_parameters_n params n] returns an initial block parametrized
+    with [params] with [n] initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters_n :
+  Parameters.t ->
+  int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+(** [init_with_parameters1 params] returns an initial block parametrized with
+    [params] with 1 initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters1 :
+  Parameters.t -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+(** [init_with_parameters2 params] returns an initial block parametrized with
+    [params] with two initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters2 :
+  Parameters.t ->
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
+
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)
 val default_raw_context : unit -> Raw_context.t tzresult Lwt.t

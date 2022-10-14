@@ -34,19 +34,9 @@ let () =
   Alcotest_lwt.run
     "protocol > integration > validate"
     [
-      ("sanity checks", Test_manager_operation_validation.sanity_tests);
-      ("Single: gas checks", Test_manager_operation_validation.gas_tests);
-      ("Single: storage checks", Test_manager_operation_validation.storage_tests);
-      ("Single: fees checks", Test_manager_operation_validation.fee_tests);
-      ( "Single: contract checks",
-        Test_manager_operation_validation.contract_tests );
-      ( "Batched: contract checks",
-        Test_batched_manager_operation_validation.contract_tests );
-      ( "Batched: gas checks",
-        Test_batched_manager_operation_validation.gas_tests );
-      ( "Batched: fees checks",
-        Test_batched_manager_operation_validation.fee_tests );
-      ( "Flags: feature flag checks",
-        Test_manager_operation_validation.flags_tests );
+      ("sanity checks", Test_sanity.tests);
+      ("single manager validation", Test_manager_operation_validation.tests);
+      ("batched managers validation", Test_validation_batch.tests);
+      ("one-manager restriction", Test_1m_restriction.tests);
     ]
   |> Lwt_main.run
