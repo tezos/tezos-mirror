@@ -213,9 +213,6 @@ module Kernels = struct
   (* Kernel failing at `kernel_next` invocation. *)
   let unreachable_kernel = "unreachable"
 
-  (* Kernel writing `"hello"` to debug output. *)
-  let test_write_debug_kernel = "test-write-debug"
-
   (* Kernel checking the return of the store_has host func.
 
      This kernel expects a collection of values to exist:

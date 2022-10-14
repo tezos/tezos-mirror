@@ -81,9 +81,31 @@ let should_boot_unreachable_kernel ~max_steps kernel =
       state_after_second_message) ;
   return_ok_unit
 
-let should_run_debug_kernel kernel =
+let should_run_debug_kernel () =
   let open Lwt_syntax in
-  let* tree = initial_tree ~from_binary:true kernel in
+  let module_ =
+    {|
+(module
+ (import "rollup_safe_core" "write_debug"
+         (func $write_debug (param i32 i32)))
+ ;; Durable keys
+ (data (i32.const 100) "hello")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_next")
+       (local $hello_address i32)
+       (local $hello_length i32)
+
+       (local.set $hello_address (i32.const 100))
+       (local.set $hello_length (i32.const 5))
+
+       (call $write_debug (local.get $hello_address) (local.get $hello_length))
+       (nop)
+       )
+ )
+|}
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
   (* Make the first ticks of the WASM PVM (parsing of origination
      message, parsing and init of the kernel), to switch it to
      “Input_requested” mode. *)
@@ -784,10 +806,7 @@ let tests =
       (test_with_kernel
          Kernels.unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
-    tztest
-      "Test write_debug kernel"
-      `Quick
-      (test_with_kernel Kernels.test_write_debug_kernel should_run_debug_kernel);
+    tztest "Test write_debug kernel" `Quick should_run_debug_kernel;
     tztest
       "Test store-has kernel"
       `Quick
