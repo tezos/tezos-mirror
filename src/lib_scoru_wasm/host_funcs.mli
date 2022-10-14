@@ -147,7 +147,7 @@ module Aux : sig
     from_key_length:int32 ->
     to_key_offset:int32 ->
     to_key_length:int32 ->
-    Durable.t Lwt.t
+    (Durable.t * int32) Lwt.t
 
   val store_value_size :
     durable:Durable.t ->
