@@ -201,13 +201,17 @@ module Aux = struct
     extract_error durable res
 
   let store_list_size ~durable ~memory ~key_offset ~key_length =
-    let open Lwt.Syntax in
-    let key_length = Int32.to_int key_length in
-    check_key_length key_length ;
-    let* key = Memory.load_bytes memory key_offset key_length in
-    let key = Durable.key_of_string_exn key in
-    let+ num_subtrees = Durable.count_subtrees durable key in
-    (durable, I64.of_int_s num_subtrees)
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = load_key_from_memory key_offset key_length memory in
+      let+ num_subtrees =
+        Safe_access.guard (fun () -> Durable.count_subtrees durable key)
+      in
+      (durable, I64.of_int_s num_subtrees)
+    in
+    match res with
+    | Error error -> Lwt.return (durable, Int64.of_int32 (Error.code error))
+    | Ok res -> Lwt.return res
 
   let store_copy ~durable ~memory ~from_key_offset ~from_key_length
       ~to_key_offset ~to_key_length =
