@@ -196,9 +196,10 @@ val batcher_queue :
   ?hooks:Process_hooks.t -> t -> (string * string) list Runnable.process
 
 (** [get_batcher_msg client hash] fetches the message whose hash is [hash] from
-    the queue. It fails if the message is not present. *)
+    the queue. It returns the message together with the full JSON response
+    including the status. *)
 val get_batcher_msg :
-  ?hooks:Process_hooks.t -> t -> string -> string Runnable.process
+  ?hooks:Process_hooks.t -> t -> string -> (string * JSON.t) Runnable.process
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :
