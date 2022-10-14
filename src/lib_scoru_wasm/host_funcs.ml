@@ -245,26 +245,22 @@ module Aux = struct
     in
     extract_error durable res
 
+  let store_value_size_aux ~durable ~key =
+    let open Lwt_result_syntax in
+    let* bytes = Safe_access.guard (fun () -> Durable.find_value durable key) in
+    match bytes with
+    | Some bytes ->
+        let size = Tezos_lazy_containers.Chunked_byte_vector.length bytes in
+        return (Int64.to_int32 size)
+    | None -> fail Error.Store_not_a_value
+
   let store_value_size ~durable ~memory ~key_offset ~key_length =
-    let open Lwt_syntax in
-    let key_len = Int32.to_int key_length in
-    if key_len > Durable.max_key_length then Error.return Store_key_too_large
-    else
-      let* key = Safe_access.load_bytes memory key_offset key_len in
-      match key with
-      | Ok key -> (
-          match Durable.key_of_string_opt key with
-          | Some key -> (
-              let* bytes = Durable.find_value durable key in
-              match bytes with
-              | Some bytes ->
-                  let size =
-                    Tezos_lazy_containers.Chunked_byte_vector.length bytes
-                  in
-                  return (Int64.to_int32 size)
-              | None -> Error.return Store_not_a_value)
-          | None -> Error.return Store_invalid_key)
-      | Error i -> Error.return i
+    let open Lwt_result_syntax in
+    let*! res =
+      let* key = load_key_from_memory key_offset key_length memory in
+      store_value_size_aux ~durable ~key
+    in
+    extract_error_code res
 
   let store_read ~durable ~memory ~key_offset ~key_length ~value_offset ~dest
       ~max_bytes =
@@ -512,7 +508,7 @@ let store_value_size =
               ~key_offset
               ~key_length
           in
-          (durable, Values.[Num (I32 res)])
+          (durable, [value res])
       | _ -> raise Bad_input)
 
 let store_list_size_name = "tezos_store_list_size"
