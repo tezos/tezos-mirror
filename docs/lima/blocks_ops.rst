@@ -94,13 +94,11 @@ governance<voting_operations_lima>`.
 Anonymous Operations
 ~~~~~~~~~~~~~~~~~~~~
 
-.. TODO: tezos/tezos#3936 integrate consensus keys operations
-
 This class groups all operations that do not require a signature from
-a Tezos account. They allow to implement different functionalities of
-the protocol, and their common characteristic is that it is desirable
-that the account originating these operation remains anonymous in
-order to avoid censorship.
+a Tezos account (with an exception, detailed below). They implement
+different functionalities of the protocol, and their common
+characteristic is that they allow the account originating these
+operations to remain anonymous in order to avoid censorship.
 
 Two operations in this class implement functionality pertaining to the
 protocol's :doc:`random seeds generation
@@ -141,12 +139,18 @@ conflicting :ref:`consensus operations<consensus_operations_lima>`:
   the evidence consists of the :ref:`block
   headers<block_contents_alpha>` of each of the two offending blocks.
 
-See :ref:`here<slashing_lima>` for further detail on the
-semantics of evidence-providing operations.
+See :ref:`here<slashing_lima>` for further detail on the semantics of
+evidence-providing operations.
 
-Finally, the ``Activation`` operation allows users which participated
-in the Tezos fundraiser to make their :ref:`accounts <Account>`
-operational.
+The ``Activation`` operation allows users which participated in the
+Tezos fundraiser to make their :ref:`accounts <Account>` operational.
+
+Finally, the ``Drain_delegate`` operation allows an active
+consensus-key account, i.e., an account to which a baker delegated its
+consensus-signing responsibility, to **empty** its delegate
+account. This operation is used as a deterrent to ensure that a
+delegate secures its consensus key as much as its manager (or main)
+key.
 
 .. _manager_operations_lima:
 
@@ -172,9 +176,12 @@ manager operations are the only fee-paying and
   of future operations signed by this manager.
 - The ``Transaction`` operation allows users to either transfer tez
   between accounts and/or to invoke a smart contract.
-- The ``Delegation`` operation allows users to :doc:`delegate their
-  stake<proof_of_stake>` to a :ref:`delegate<Delegate>` (a *baker*),
-  or to register themselves as delegates.
+- The ``Delegation`` operation allows users to :ref:`delegate their
+  stake <delegating_coins>` to a :ref:`delegate<Delegate>` (a
+  *baker*), or to register themselves as delegates.
+- The ``Update_consensus_key`` operation allows users to delegate the
+  responsibility of signing blocks and consensus-related operations to
+  another account.
 - The ``Origination`` operation is used to
   :ref:`originate<Origination>`, that is to deploy, smart contracts
   in the Tezos blockchain.
