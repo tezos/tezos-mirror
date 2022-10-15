@@ -41,8 +41,11 @@ type scenario
       (1 action) *)
 val make_scenario_step : string -> Wasm.tree action -> scenario_step
 
-(** [make_scenario kernel_filename list_of_actions] *)
-val make_scenario : string -> scenario_step list -> scenario
+(** [make_scenario scenario_name kernel_path actions] creates a scenario with
+      - a [scenario_name]
+      - the kernel stored at [kernel_path]
+      - a list of [actions] *)
+val make_scenario : string -> string -> scenario_step list -> scenario
 
 (** action corresponding to one top level call of PVM *)
 val exec_loop : Wasm.tree action
@@ -56,5 +59,9 @@ val exec_on_message : string -> Wasm.tree action
       - adding the message in the inbox  *)
 val exec_on_message_from_file : string -> Wasm.tree action
 
-(** [run_scenario my_scenario] runs a scenario on the PVM *)
-val run_scenario : scenario -> unit Lwt.t
+(** Execute a list of scenario with options:
+      - verbose: print info during execution
+      - totals: adds summary data point for each step
+      - irmin: adds data point for decoding / encoding the state *)
+val run_scenarios :
+  ?verbose:bool -> ?totals:bool -> ?irmin:bool -> scenario list -> unit Lwt.t

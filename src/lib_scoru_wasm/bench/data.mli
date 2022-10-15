@@ -23,38 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Utilities used to run the PVM *)
+(** How to collect and store data *)
 
-open Pvm_instance
-open Tezos_scoru_wasm.Wasm_pvm_state
+(** container of the informations on a data point *)
+type datum
 
-(** the different phases in a top level call *)
-type phase = Decoding | Initialising | Linking | Evaluating | Padding
+(** [make_datum scenario section label ticks time] *)
+val make_datum : string -> string -> string -> Z.t -> Measure.time -> datum
 
-(** [run_loop f a] folds [f] on all phases of an exection *)
-val run_loop : ('a -> phase -> 'a Lwt.t) -> 'a -> 'a Lwt.t
+(** container of all data point informations collected during benchmark *)
+type benchmark
 
-val show_phase : phase -> string
+(** initialize en empty benchmark with options
+      - verbose: ouput info during execution (besides csv data in the end)
+      - totals: add to csv data the total time / tick number for each steps
+      - irmin: add data points corresponding to irmin decoding / encoding *)
+val empty_benchmark :
+  ?verbose:bool -> ?totals:bool -> ?irmin:bool -> unit -> benchmark
 
-(** execute the PVM until a the end of a top level call
-      e.g. until a snapshotable state is reached *)
-val finish_top_level_call_on_state :
-  Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+(** [init_scenario scenario_name benchmark] inits an empty benchmark
+      for a given scenario *)
+val init_scenario : string -> benchmark -> benchmark
 
-val execute_on_state :
-  phase -> Internal_state.pvm_state -> (Internal_state.pvm_state * int64) Lwt.t
+(** [switch_section section_name benchmark] open a new section*)
+val switch_section : string -> benchmark -> benchmark
 
-(** [run path k] execute [k] on the content of the file at [path] *)
-val run : Lwt_io.file_name -> (string -> 'a Lwt.t) -> 'a Lwt.t
+(** [add_datum name ticks time benchmark] *)
+val add_datum : string -> Z.t -> Measure.time -> benchmark -> benchmark
 
-val set_input_step : string -> int -> Wasm.tree -> Wasm.tree Lwt.t
+(** [add_tickless_datum label time benchmark]
+      adds a point of data for an action consuming no tick *)
+val add_tickless_datum : string -> Measure.time -> benchmark -> benchmark
 
-(** [read_message "my_file.out"] returns the content of the file,
-      searched in the input repository for messages*)
-val read_message : string -> string
+(** adds final info as a data point in the benchmark *)
+val add_final_info : Measure.time -> Z.t -> benchmark -> benchmark
 
-(** [initial_boot_sector_from_kernel
-        "src/lib_scoru_wasm/bench/inputs/my_kernel.wasm"]
-       initialize a state from a kernel (byte format) *)
-val initial_boot_sector_from_kernel :
-  ?max_tick:int64 -> string -> Wasm.tree Lwt.t
+module Csv : sig
+  (** Output benchmark data in CSV format *)
+  val print_benchmark : benchmark -> unit
+end

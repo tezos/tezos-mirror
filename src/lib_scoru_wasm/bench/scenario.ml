@@ -26,9 +26,38 @@
 open Tezos_scoru_wasm
 open Pvm_instance
 open Wasm_pvm_state
-open Wasm
 
-type 'a run_state = {state : 'a; message_counter : int}
+module Verbose = struct
+  let pp_header_section name before_tick =
+    Printf.printf
+      "=========\n%s \nStart at tick %s\n-----\n%!"
+      name
+      (Z.to_string before_tick)
+
+  let pp_last_tick tree =
+    let open Lwt_syntax in
+    let* after_tick = get_tick_from_tree tree in
+    let* tick_state = Wasm.Internal_for_tests.get_tick_state tree in
+    let _ =
+      Printf.printf
+        "-----\nlast tick: %s %s\n%!"
+        (Z.to_string after_tick)
+        (PP.tick_label tick_state)
+    in
+    return_unit
+
+  let pp_scenario_header name =
+    Printf.printf
+      "****************************************\n Scenario %s\n%!"
+      name
+end
+
+open Wasm
+open Data
+
+type 'a run_state = {benchmark : benchmark; state : 'a; message_counter : int}
+
+let init_run_state benchmark state = {benchmark; state; message_counter = 1}
 
 let lift_action action =
   let open Lwt_syntax in
@@ -36,62 +65,70 @@ let lift_action action =
     let* state = action run_state.state in
     return {run_state with state}
 
+let lift_action_plus action =
+  let open Lwt_syntax in
+  fun run_state ->
+    let* state, plus = action run_state.state in
+    return ({run_state with state}, plus)
+
 let lift_lookup lookup =
   let open Lwt_syntax in
   fun run_state ->
     let* res = lookup run_state.state in
     return res
 
+let lift_add_datum add_datum run_state =
+  let benchmark = add_datum run_state.benchmark in
+  {run_state with benchmark}
+
 type 'a action = 'a run_state -> 'a run_state Lwt.t
 
-type scenario_step = string * tree action
+type scenario_step = {label : string; action : tree action}
 
-type scenario = {kernel : string; actions : scenario_step list}
+type scenario = {name : string; kernel : string; actions : scenario_step list}
 
-let make_scenario kernel actions = {kernel; actions}
+let make_scenario name kernel actions = {name; kernel; actions}
 
-let make_scenario_step (label : string) (action : tree action) : scenario_step =
-  (label, action)
+let make_scenario_step (label : string) (action : tree action) = {label; action}
 
-let run_step name run_state action =
+let run_step ?(verbose = false) run_state {label; action} =
   let open Lwt_syntax in
-  (* Before *)
-  let* info = lift_lookup Wasm.get_info run_state in
-  let _ =
-    Printf.printf
-      "=========\n%s \nStart at tick %s\n-----\n%!"
-      name
-      (Z.to_string info.current_tick)
-  in
-  let* time, run_state = Measure.time (fun () -> action run_state) in
-  let* info = lift_lookup Wasm.get_info run_state in
-  let* tick_state =
-    lift_lookup Wasm.Internal_for_tests.get_tick_state run_state
-  in
-  let _ = Printf.printf "%s took %f s\n%!" name (Measure.to_seconds time) in
-  let _ =
-    Printf.printf
-      "last tick: %s %s\n%!"
-      (Z.to_string info.current_tick)
-      (PP.tick_label tick_state)
-  in
-  return run_state
+  (* before *)
+  let run_state = lift_add_datum (switch_section label) run_state in
+  let* before_tick = lift_lookup get_tick_from_tree run_state in
+  if verbose then Verbose.pp_header_section label before_tick ;
 
-let switch_state_type switch _switch_label a_state =
-  let open Lwt_syntax in
-  let* _, b_state = Measure.time (fun () -> (lift_action switch) a_state) in
-  return b_state
-
-let exec_phase state phase =
-  let open Lwt_syntax in
-  let* a =
-    lift_action
-      (fun s ->
-        let* s, _ = Exec.execute_on_state phase s in
-        return s)
-      state
+  (* Act *)
+  let* time, tick, run_state_after =
+    Measure.time_and_tick (lift_lookup get_tick_from_tree) action run_state
   in
-  return a
+
+  (* after *)
+  let* _ =
+    if verbose then lift_lookup Verbose.pp_last_tick run_state_after
+    else return_unit
+  in
+  return @@ lift_add_datum (Data.add_datum label tick time) run_state_after
+
+let run_pvm_action name run_state action =
+  let open Lwt_syntax in
+  (* Act *)
+  let* time, (run_state_after, tick) =
+    Measure.time (fun () -> action run_state)
+  in
+  return
+  @@ lift_add_datum (Data.add_datum name (Z.of_int64 tick) time) run_state_after
+
+let switch_state_type switch switch_label a_state =
+  let open Lwt_syntax in
+  let* time, b_state = Measure.time (fun () -> (lift_action switch) a_state) in
+  return @@ lift_add_datum (Data.add_tickless_datum switch_label time) b_state
+
+let exec_phase run_state phase =
+  run_pvm_action
+    (Exec.show_phase phase)
+    run_state
+    (lift_action_plus @@ Exec.execute_on_state phase)
 
 let exec_loop tree_run_state =
   let open Lwt_syntax in
@@ -105,7 +142,7 @@ let exec_loop tree_run_state =
   let* tree_run_state =
     switch_state_type
       (fun state ->
-        (* the encode function takes the previous tree encoding as argument *)
+        (* the encode function takes the _previous_ tree encoding as argument *)
         Wasm.Internal_for_benchmark.encode state tree_run_state.state)
       "Encode tree"
       pvm_run_state
@@ -125,19 +162,33 @@ let exec_on_message_from_file message_path run_state =
   let message = Exec.read_message message_path in
   exec_on_message message run_state
 
-let run_scenario scenario =
+let run_scenario ?(verbose = false) ~benchmark scenario =
   let open Lwt_syntax in
-  let kernel = scenario.kernel in
-  let apply_scenario kernel =
-    let rec go run_state = function
-      | [] -> return run_state
-      | (label, action) :: q ->
-          let* tree = run_step label run_state action in
-          go tree q
+  let apply_scenario kernel_bytes =
+    (* init scenario run*)
+    if verbose then Verbose.pp_scenario_header scenario.name ;
+    let* state = Exec.initial_boot_sector_from_kernel kernel_bytes in
+    let benchmark = init_scenario scenario.name benchmark in
+    let run_state = init_run_state benchmark state in
+    (* act*)
+    let* time, run_state =
+      Measure.time (fun () ->
+          Lwt_list.fold_left_s (run_step ~verbose) run_state scenario.actions)
     in
-    let* tree = Exec.initial_boot_sector_from_kernel kernel in
-    let run_state = {state = tree; message_counter = 1} in
-    let* _ = go run_state scenario.actions in
-    return ()
+    (* record *)
+    let* info = lift_lookup Wasm.get_info run_state in
+    return (add_final_info time info.current_tick run_state.benchmark)
   in
-  Exec.run kernel apply_scenario
+  Exec.run scenario.kernel apply_scenario
+
+let run_scenarios ?(verbose = true) ?(totals = true) ?(irmin = true) scenarios =
+  let open Lwt_syntax in
+  let rec go benchmark = function
+    | [] ->
+        Data.Csv.print_benchmark benchmark ;
+        return_unit
+    | t :: q ->
+        let* benchmark = run_scenario ~verbose ~benchmark t in
+        go benchmark q
+  in
+  go (empty_benchmark ~verbose ~totals ~irmin ()) scenarios
