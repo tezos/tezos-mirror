@@ -58,7 +58,7 @@ let test_ticket_updates_in_receipt =
     ~tags:["client"; "michelson"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* create_and_send =
+  let* kt_a =
     Client.originate_contract
       ~alias:"tickets_create_and_send.tz"
       ~amount:Tez.zero
@@ -68,7 +68,7 @@ let test_ticket_updates_in_receipt =
       ~burn_cap:Tez.one
       client
   in
-  let* store_fst_and_rely_snd =
+  let* kt_b =
     Client.originate_contract
       ~alias:"tickets_store_fst_and_rely_snd.tz"
       ~amount:Tez.zero
@@ -79,7 +79,7 @@ let test_ticket_updates_in_receipt =
       ~burn_cap:Tez.one
       client
   in
-  let* receive_and_store =
+  let* kt_c =
     Client.originate_contract
       ~alias:"tickets_receive_and_store.tz"
       ~amount:Tez.one
@@ -95,12 +95,8 @@ let test_ticket_updates_in_receipt =
       ~burn_cap:(Tez.of_int 2)
       ~amount:Tez.zero
       ~giver:"bootstrap2"
-      ~receiver:create_and_send
-      ~arg:
-        (Format.sprintf
-           {|(Pair "%s" "%s")|}
-           store_fst_and_rely_snd
-           receive_and_store)
+      ~receiver:kt_a
+      ~arg:(Format.sprintf {|(Pair "%s" "%s")|} kt_b kt_c)
       ~hooks
       client
   in
