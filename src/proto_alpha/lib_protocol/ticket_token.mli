@@ -30,13 +30,22 @@ open Alpha_context
     a ticket comprises a ticket-token and an amount.
   *)
 
+type 'a parsed_token = {
+  ticketer : Contract.t;
+  contents_type : 'a Script_typed_ir.comparable_ty;
+  contents : 'a;
+}
+
 (** A type for representing existentially quantified ticket-tokens. A
     ticket-token consists of a pair of ticketer and contents. *)
-type ex_token =
-  | Ex_token : {
-      ticketer : Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+type ex_token = Ex_token : 'a parsed_token -> ex_token
 
+(** Unparsed version of [parsed_token].
+    Used to encode/decode ticket-token in receipt, RPC, etc.  *)
+type unparsed_token = {
+  ticketer : Contract.t;
+  contents_type : Script.expr;
+  contents : Script.expr;
+}
+
+val unparsed_token_encoding : unparsed_token Data_encoding.t

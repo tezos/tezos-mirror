@@ -31,15 +31,8 @@ open Alpha_context
 (** Represents that [account]'s storage has delta [amount] for a given ticket *)
 type update = {account : Destination.t; amount : Z.t}
 
-(** A ticket token *)
-type ticket_token = {
-  ticketer : Contract.t;
-  contents_type : Script.expr;
-  contents : Script.expr;
-}
-
 (** List of updates for a [ticket]  *)
-type item = {ticket_token : ticket_token; updates : update list}
+type item = {ticket_token : Ticket_token.unparsed_token; updates : update list}
 
 (** A list of ticket tokens and their corresponding updates *)
 type t = item list
