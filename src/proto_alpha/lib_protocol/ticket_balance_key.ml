@@ -26,6 +26,37 @@
 
 open Alpha_context
 
+let make ctxt ~owner ~ticketer ~contents_type ~contents =
+  let open Lwt_result_syntax in
+  let ticketer_address =
+    Script_typed_ir.
+      {destination = Contract ticketer; entrypoint = Entrypoint.default}
+  in
+  let owner_address =
+    Script_typed_ir.{destination = owner; entrypoint = Entrypoint.default}
+  in
+  let* ticketer, ctxt =
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized_legacy
+      Script_typed_ir.address_t
+      ticketer_address
+  in
+  let* owner, ctxt =
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized_legacy
+      Script_typed_ir.address_t
+      owner_address
+  in
+  Lwt.return
+  @@ Ticket_hash.make
+       ctxt
+       ~ticketer:(Micheline.root ticketer)
+       ~ty:contents_type
+       ~contents
+       ~owner:(Micheline.root owner)
+
 (* This function extracts nodes of:
    - Ticketer
    - Type of content
@@ -49,29 +80,9 @@ let of_ex_token ctxt ~owner
     contents_type
     contents
   >>=? fun (contents, ctxt) ->
-  let ticketer_address =
-    Script_typed_ir.
-      {destination = Contract ticketer; entrypoint = Entrypoint.default}
-  in
-  let owner_address =
-    Script_typed_ir.{destination = owner; entrypoint = Entrypoint.default}
-  in
-  Script_ir_translator.unparse_data
+  make
     ctxt
-    Script_ir_unparser.Optimized_legacy
-    Script_typed_ir.address_t
-    ticketer_address
-  >>=? fun (ticketer, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Script_ir_unparser.Optimized_legacy
-    Script_typed_ir.address_t
-    owner_address
-  >>=? fun (owner, ctxt) ->
-  Lwt.return
-    (Ticket_hash.make
-       ctxt
-       ~ticketer:(Micheline.root ticketer)
-       ~ty
-       ~contents:(Micheline.root contents)
-       ~owner:(Micheline.root owner))
+    ~owner
+    ~ticketer
+    ~contents_type:ty
+    ~contents:(Micheline.root contents)
