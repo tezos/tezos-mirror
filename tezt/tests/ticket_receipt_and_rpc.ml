@@ -26,11 +26,35 @@
 (* Testing
    -------
    Component:    Michelson
-   Invocation:   dune exec tezt/tests/main.exe -- --file ticket_updates_in_receipt.ml
-   Subject:      Regression tests for ticket updates in receipt
+   Invocation:   dune exec tezt/tests/main.exe -- --file ticket_receipt_and_rpc.ml
+   Subject:      Regression tests for ticket receipt and ticket RPC
 *)
 
 let hooks = Tezos_regression.hooks
+
+let check_ticket_balance client ~contract ~ticketer ~content_type ~content
+    ~expected =
+  let post_body =
+    Ezjsonm.value_from_string
+    @@ sf
+         {|{"ticketer": "%s", "content_type": {"prim": "%s"}, "content": {"string": "%s"}}|}
+         ticketer
+         content_type
+         content
+  in
+  let* actual =
+    RPC.Client.call client
+    @@ RPC.post_chain_block_context_contract_ticket_balance
+         ~id:contract
+         ~data:post_body
+         ()
+  in
+  return
+  @@ Check.(
+       (actual = expected)
+         int
+         ~__LOC__
+         ~error_msg:"expected ticket amount %R, got %L")
 
 (* Checks how the ticket updates in receipt look like in various cases, such as:
    - Contract stores multiple tickets of different types.
@@ -51,7 +75,7 @@ let hooks = Tezos_regression.hooks
       tz_a -> KT_A
               (store 1 red and 2 green)
 *)
-let test_ticket_updates_in_receipt =
+let test_ticket_receipt_and_rpc =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Ticket updates in receipt"
@@ -100,6 +124,52 @@ let test_ticket_updates_in_receipt =
       ~hooks
       client
   in
+  (* Check that the ticket balance are expected via [ticket_balance] RPC. *)
+  let* () =
+    check_ticket_balance
+      client
+      ~contract:kt_a
+      ~ticketer:kt_a
+      ~content_type:"string"
+      ~content:"red"
+      ~expected:1
+  in
+  let* () =
+    check_ticket_balance
+      client
+      ~contract:kt_a
+      ~ticketer:kt_a
+      ~content_type:"string"
+      ~content:"green"
+      ~expected:2
+  in
+  let* () =
+    check_ticket_balance
+      client
+      ~contract:kt_a
+      ~ticketer:kt_a
+      ~content_type:"string"
+      ~content:"blue"
+      ~expected:0
+  in
+  let* () =
+    check_ticket_balance
+      client
+      ~contract:kt_b
+      ~ticketer:kt_a
+      ~content_type:"string"
+      ~content:"blue"
+      ~expected:1
+  in
+  let* () =
+    check_ticket_balance
+      client
+      ~contract:kt_c
+      ~ticketer:kt_a
+      ~content_type:"string"
+      ~content:"blue"
+      ~expected:1
+  in
   unit
 
-let register ~protocols = test_ticket_updates_in_receipt protocols
+let register ~protocols = test_ticket_receipt_and_rpc protocols
