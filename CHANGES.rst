@@ -46,6 +46,9 @@ Node
 Client
 ------
 
+- Added command to get contract's balance of ticket with specified ticketer, content type, and content:
+  ``octez-client get ticket balance for <contract> with ticketer '<ticketer>' and type <type> and content <content>``. (MR :gl:`!6491`)
+
 Baker
 -----
 
