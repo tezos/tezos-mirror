@@ -85,6 +85,13 @@ let pp ppf {delegate; consensus_pkh} =
       consensus_pkh ;
   Format.fprintf ppf "@]"
 
+(* Invariant:
+      No two delegates use the same active consensus key at a given time.
+
+   To ensure that, {!Storage.Consensus_keys} contains keys that will be active
+   at cycle `current + preserved_cycles + 1`.
+*)
+
 let check_unused ctxt pkh =
   let open Lwt_tzresult_syntax in
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
