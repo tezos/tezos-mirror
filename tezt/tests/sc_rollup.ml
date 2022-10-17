@@ -3420,7 +3420,15 @@ let register ~kind ~protocols =
     protocols
     ~kind ;
   test_consecutive_commitments protocols ~kind ;
-  test_refutation protocols ~kind ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/4020
+     When looking at the logs of these tests, it appears that they do
+     not come with enough inspection of the state of the rollup to
+     ensure the property they are trying to exhibit.  For instance,
+     just checking that the dishonest player has no stack at the end
+     of the scenario does not prove they have been slashed, and it
+     appeared that in some instances, they haven’t been able to
+     publish a commitment to begin with. *)
+  (* test_refutation protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
   test_outbox_message ~earliness:0 "" protocols ~kind ;
