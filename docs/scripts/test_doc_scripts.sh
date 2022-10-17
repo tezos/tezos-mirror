@@ -35,7 +35,7 @@ where <test-name> can be:
 * install-opam-bionic
 * install-opam-focal
 * compile-release-sources-buster
-* compile-master-sources-buster
+* compile-sources-buster
 * install-python-bionic
 * install-python-focal
 * install-python-buster
@@ -79,10 +79,10 @@ for test_case in "$@"; do
             docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:ubuntu-20.04 /Scripts/install-opam.sh
             ;;
         "compile-release-sources-buster" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh latest-release
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh tezos/tezos latest-release
             ;;
-        "compile-master-sources-buster" )
-            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh master
+        "compile-sources-buster" )
+            docker run --rm -i -v "$DOCS_DIR/introduction":/Scripts ocaml/opam:debian-10 /Scripts/compile-sources.sh tezos/tezos master
             ;;
         "install-python-bionic" )
             docker run --rm -i -v "$DOCS_DIR/developer":/Scripts $UBUNTU_BIONIC /Scripts/install-python-debian-ubuntu.sh

@@ -109,7 +109,7 @@ scriptsindoccheck:
 	scripts/test_doc_scripts.sh install-opam-bionic
 	scripts/test_doc_scripts.sh install-opam-focal
 	scripts/test_doc_scripts.sh compile-release-sources-buster
-	scripts/test_doc_scripts.sh compile-master-sources-buster
+	scripts/test_doc_scripts.sh compile-sources-buster
 
 # build dune targets together to avoid concurrent dunes
 docexes:

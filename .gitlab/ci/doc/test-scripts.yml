@@ -92,13 +92,13 @@ compile_release_sources_buster:
   image: ocaml/opam:debian-10
   extends: .compile_sources_template
   script:
-    - ./docs/introduction/compile-sources.sh latest-release
+    - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
 
-compile_master_sources_buster:
+compile_sources_buster:
   image: ocaml/opam:debian-10
   extends: .compile_sources_template
   script:
-    - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+    - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
 .install_python_debian_ubuntu_template:
   extends:
@@ -106,7 +106,7 @@ compile_master_sources_buster:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+    - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos} ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
 
 install_python_bionic:
   image: public.ecr.aws/lts/ubuntu:18.04_stable
