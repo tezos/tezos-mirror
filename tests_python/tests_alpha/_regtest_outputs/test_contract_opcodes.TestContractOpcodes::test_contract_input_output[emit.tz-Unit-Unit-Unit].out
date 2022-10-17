@@ -16,56 +16,56 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039986.865 units remaining)
+  - location: 7 (just consumed gas: 13.135)
     [ (Pair Unit Unit) ]
-  - location: 7 (remaining gas: 1039986.855 units remaining)
+  - location: 7 (just consumed gas: 0.010)
     [  ]
-  - location: 8 (remaining gas: 1039986.845 units remaining)
+  - location: 8 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 9 (remaining gas: 1039986.835 units remaining)
+  - location: 9 (just consumed gas: 0.010)
     [ 10
       Unit ]
-  - location: 12 (remaining gas: 1039986.825 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ (Left 10)
       Unit ]
-  - location: 14 (remaining gas: 1039986.338 units remaining)
+  - location: 14 (just consumed gas: 0.487)
     [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 15 (remaining gas: 1039986.328 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ "lorem ipsum"
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 18 (remaining gas: 1039986.318 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ (Right "lorem ipsum")
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 20 (remaining gas: 1039985.746 units remaining)
+  - location: 20 (just consumed gas: 0.572)
     [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 24 (remaining gas: 1039985.736 units remaining)
+  - location: 24 (just consumed gas: 0.010)
     [ {}
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 26 (remaining gas: 1039985.726 units remaining)
+  - location: 26 (just consumed gas: 0.010)
     [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d
       {}
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 27 (remaining gas: 1039985.716 units remaining)
+  - location: 27 (just consumed gas: 0.010)
     [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
       0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       Unit ]
-  - location: 28 (remaining gas: 1039985.706 units remaining)
+  - location: 28 (just consumed gas: 0.010)
     [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a
       { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
       Unit ]
-  - location: 29 (remaining gas: 1039985.696 units remaining)
+  - location: 29 (just consumed gas: 0.010)
     [ { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a ;
         0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
       Unit ]
-  - location: 30 (remaining gas: 1039985.686 units remaining)
+  - location: 30 (just consumed gas: 0.010)
     [ (Pair { 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000004076403620368ffff056576656e74ff0505000a ;
               0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe6000001040764046200000007256e756d62657204680000000625776f726473ffff056576656e74ff0508010000000b6c6f72656d20697073756d }
             Unit) ]

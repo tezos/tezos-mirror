@@ -52,14 +52,14 @@ let print_stack ppf = function
            print_expr_unwrapped)
         more
 
-let print_execution_trace ppf trace =
+let print_execution_trace ppf (trace : Script_typed_ir.execution_trace) =
   Format.pp_print_list
     (fun ppf (loc, gas, stack) ->
       Format.fprintf
         ppf
-        "- @[<v 0>location: %d (remaining gas: %a)@,[ @[<v 0>%a ]@]@]"
+        "- @[<v 0>location: %d (just consumed gas: %a)@,[ @[<v 0>%a ]@]@]"
         loc
-        Gas.pp
+        Gas.Arith.pp
         gas
         (Format.pp_print_list (fun ppf e ->
              Format.fprintf ppf "@[<v 0>%a@]" print_expr e))

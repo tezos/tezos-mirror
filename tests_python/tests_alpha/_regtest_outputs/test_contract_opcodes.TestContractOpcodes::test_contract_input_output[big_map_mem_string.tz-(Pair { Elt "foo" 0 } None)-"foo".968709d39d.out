@@ -8,36 +8,36 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["foo"] to 0
 trace
-  - location: 12 (remaining gas: 1039989.032 units remaining)
+  - location: 12 (just consumed gas: 10.968)
     [ (Pair "foo" { Elt "foo" 0 } None) ]
-  - location: 12 (remaining gas: 1039989.022 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ "foo"
       (Pair { Elt "foo" 0 } None) ]
-  - location: 13 (remaining gas: 1039989.022 units remaining)
+  - location: 13 (just consumed gas: 0)
     [ (Pair { Elt "foo" 0 } None) ]
-  - location: 15 (remaining gas: 1039989.012 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ { Elt "foo" 0 } ]
-  - location: 16 (remaining gas: 1039989.002 units remaining)
+  - location: 16 (just consumed gas: 0.010)
     [ { Elt "foo" 0 }
       { Elt "foo" 0 } ]
-  - location: 13 (remaining gas: 1039988.977 units remaining)
+  - location: 13 (just consumed gas: 0.025)
     [ "foo"
       { Elt "foo" 0 }
       { Elt "foo" 0 } ]
-  - location: 17 (remaining gas: 1039988.243 units remaining)
+  - location: 17 (just consumed gas: 0.734)
     [ True
       { Elt "foo" 0 } ]
-  - location: 18 (remaining gas: 1039988.233 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ (Some True)
       { Elt "foo" 0 } ]
-  - location: 19 (remaining gas: 1039988.223 units remaining)
+  - location: 19 (just consumed gas: 0.010)
     [ { Elt "foo" 0 }
       (Some True) ]
-  - location: 20 (remaining gas: 1039988.213 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ (Pair { Elt "foo" 0 } (Some True)) ]
-  - location: 21 (remaining gas: 1039988.203 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ {}
       (Pair { Elt "foo" 0 } (Some True)) ]
-  - location: 23 (remaining gas: 1039988.193 units remaining)
+  - location: 23 (just consumed gas: 0.010)
     [ (Pair {} { Elt "foo" 0 } (Some True)) ]
 

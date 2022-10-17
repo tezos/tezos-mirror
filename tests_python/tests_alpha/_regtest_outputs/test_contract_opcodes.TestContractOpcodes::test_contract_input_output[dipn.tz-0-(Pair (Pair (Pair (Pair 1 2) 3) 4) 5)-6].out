@@ -7,87 +7,87 @@ emitted operations
 big_map diff
   
 trace
-  - location: 15 (remaining gas: 1039986.795 units remaining)
+  - location: 15 (just consumed gas: 13.205)
     [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0) ]
-  - location: 15 (remaining gas: 1039986.785 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) ]
-  - location: 16 (remaining gas: 1039986.775 units remaining)
+  - location: 16 (just consumed gas: 0.010)
     [ (Pair (Pair (Pair 1 2) 3) 4)
       5 ]
-  - location: 17 (remaining gas: 1039986.765 units remaining)
+  - location: 17 (just consumed gas: 0.010)
     [ (Pair (Pair 1 2) 3)
       4
       5 ]
-  - location: 18 (remaining gas: 1039986.755 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ (Pair 1 2)
       3
       4
       5 ]
-  - location: 19 (remaining gas: 1039986.745 units remaining)
+  - location: 19 (just consumed gas: 0.010)
     [ 1
       2
       3
       4
       5 ]
-  - location: 20 (remaining gas: 1039986.745 units remaining)
+  - location: 20 (just consumed gas: 0)
     [  ]
-  - location: 23 (remaining gas: 1039986.735 units remaining)
+  - location: 23 (just consumed gas: 0.010)
     [ 6 ]
-  - location: 20 (remaining gas: 1039986.710 units remaining)
+  - location: 20 (just consumed gas: 0.025)
     [ 5
       6 ]
-  - location: 20 (remaining gas: 1039986.700 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ 4
       5
       6 ]
-  - location: 20 (remaining gas: 1039986.690 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ 3
       4
       5
       6 ]
-  - location: 20 (remaining gas: 1039986.680 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ 2
       3
       4
       5
       6 ]
-  - location: 20 (remaining gas: 1039986.670 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ 1
       2
       3
       4
       5
       6 ]
-  - location: 20 (remaining gas: 1039986.670 units remaining)
+  - location: 20 (just consumed gas: 0)
     [ 1
       2
       3
       4
       5
       6 ]
-  - location: 26 (remaining gas: 1039986.660 units remaining)
+  - location: 26 (just consumed gas: 0.010)
     [ 2
       3
       4
       5
       6 ]
-  - location: 27 (remaining gas: 1039986.650 units remaining)
+  - location: 27 (just consumed gas: 0.010)
     [ 3
       4
       5
       6 ]
-  - location: 28 (remaining gas: 1039986.640 units remaining)
+  - location: 28 (just consumed gas: 0.010)
     [ 4
       5
       6 ]
-  - location: 29 (remaining gas: 1039986.630 units remaining)
+  - location: 29 (just consumed gas: 0.010)
     [ 5
       6 ]
-  - location: 30 (remaining gas: 1039986.620 units remaining)
+  - location: 30 (just consumed gas: 0.010)
     [ 6 ]
-  - location: 31 (remaining gas: 1039986.610 units remaining)
+  - location: 31 (just consumed gas: 0.010)
     [ {}
       6 ]
-  - location: 33 (remaining gas: 1039986.600 units remaining)
+  - location: 33 (just consumed gas: 0.010)
     [ (Pair {} 6) ]
 

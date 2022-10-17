@@ -7,113 +7,113 @@ emitted operations
 big_map diff
   
 trace
-  - location: 8 (remaining gas: 1039988.932 units remaining)
+  - location: 8 (just consumed gas: 11.068)
     [ (Pair { "Hello" ; " " ; "World" ; "!" } "") ]
-  - location: 8 (remaining gas: 1039988.922 units remaining)
+  - location: 8 (just consumed gas: 0.010)
     [ { "Hello" ; " " ; "World" ; "!" } ]
-  - location: 9 (remaining gas: 1039988.912 units remaining)
+  - location: 9 (just consumed gas: 0.010)
     [ ""
       { "Hello" ; " " ; "World" ; "!" } ]
-  - location: 12 (remaining gas: 1039988.902 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ { "Hello" ; " " ; "World" ; "!" }
       "" ]
-  - location: 13 (remaining gas: 1039988.902 units remaining)
+  - location: 13 (just consumed gas: 0)
     [ "Hello"
       "" ]
-  - location: 15 (remaining gas: 1039988.892 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ ""
       "Hello" ]
-  - location: 16 (remaining gas: 1039988.892 units remaining)
+  - location: 16 (just consumed gas: 0)
     [ "Hello" ]
-  - location: 18 (remaining gas: 1039988.882 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ {}
       "Hello" ]
-  - location: 20 (remaining gas: 1039988.872 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ "Hello"
       {} ]
-  - location: 21 (remaining gas: 1039988.862 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ { "Hello" } ]
-  - location: 16 (remaining gas: 1039988.837 units remaining)
+  - location: 16 (just consumed gas: 0.025)
     [ ""
       { "Hello" } ]
-  - location: 22 (remaining gas: 1039988.827 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ { "" ; "Hello" } ]
-  - location: 23 (remaining gas: 1039988.705 units remaining)
+  - location: 23 (just consumed gas: 0.122)
     [ "Hello" ]
-  - location: 13 (remaining gas: 1039988.690 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ " "
       "Hello" ]
-  - location: 15 (remaining gas: 1039988.680 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ "Hello"
       " " ]
-  - location: 16 (remaining gas: 1039988.680 units remaining)
+  - location: 16 (just consumed gas: 0)
     [ " " ]
-  - location: 18 (remaining gas: 1039988.670 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ {}
       " " ]
-  - location: 20 (remaining gas: 1039988.660 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ " "
       {} ]
-  - location: 21 (remaining gas: 1039988.650 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ { " " } ]
-  - location: 16 (remaining gas: 1039988.625 units remaining)
+  - location: 16 (just consumed gas: 0.025)
     [ "Hello"
       { " " } ]
-  - location: 22 (remaining gas: 1039988.615 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ { "Hello" ; " " } ]
-  - location: 23 (remaining gas: 1039988.492 units remaining)
+  - location: 23 (just consumed gas: 0.123)
     [ "Hello " ]
-  - location: 13 (remaining gas: 1039988.477 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ "World"
       "Hello " ]
-  - location: 15 (remaining gas: 1039988.467 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ "Hello "
       "World" ]
-  - location: 16 (remaining gas: 1039988.467 units remaining)
+  - location: 16 (just consumed gas: 0)
     [ "World" ]
-  - location: 18 (remaining gas: 1039988.457 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ {}
       "World" ]
-  - location: 20 (remaining gas: 1039988.447 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ "World"
       {} ]
-  - location: 21 (remaining gas: 1039988.437 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ { "World" } ]
-  - location: 16 (remaining gas: 1039988.412 units remaining)
+  - location: 16 (just consumed gas: 0.025)
     [ "Hello "
       { "World" } ]
-  - location: 22 (remaining gas: 1039988.402 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ { "Hello " ; "World" } ]
-  - location: 23 (remaining gas: 1039988.277 units remaining)
+  - location: 23 (just consumed gas: 0.125)
     [ "Hello World" ]
-  - location: 13 (remaining gas: 1039988.262 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ "!"
       "Hello World" ]
-  - location: 15 (remaining gas: 1039988.252 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ "Hello World"
       "!" ]
-  - location: 16 (remaining gas: 1039988.252 units remaining)
+  - location: 16 (just consumed gas: 0)
     [ "!" ]
-  - location: 18 (remaining gas: 1039988.242 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ {}
       "!" ]
-  - location: 20 (remaining gas: 1039988.232 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ "!"
       {} ]
-  - location: 21 (remaining gas: 1039988.222 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ { "!" } ]
-  - location: 16 (remaining gas: 1039988.197 units remaining)
+  - location: 16 (just consumed gas: 0.025)
     [ "Hello World"
       { "!" } ]
-  - location: 22 (remaining gas: 1039988.187 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ { "Hello World" ; "!" } ]
-  - location: 23 (remaining gas: 1039988.061 units remaining)
+  - location: 23 (just consumed gas: 0.126)
     [ "Hello World!" ]
-  - location: 13 (remaining gas: 1039988.046 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ "Hello World!" ]
-  - location: 24 (remaining gas: 1039988.036 units remaining)
+  - location: 24 (just consumed gas: 0.010)
     [ {}
       "Hello World!" ]
-  - location: 26 (remaining gas: 1039988.026 units remaining)
+  - location: 26 (just consumed gas: 0.010)
     [ (Pair {} "Hello World!") ]
 

@@ -7,7 +7,7 @@ emitted operations
 big_map diff
   
 trace
-  - location: 28 (remaining gas: 1039507.420 units remaining)
+  - location: 28 (just consumed gas: 492.580)
     [ (Pair (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
                   Unit
                   "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -19,7 +19,7 @@ trace
                   {}
                   { DUP ; DROP ; PACK })
             Unit) ]
-  - location: 28 (remaining gas: 1039507.410 units remaining)
+  - location: 28 (just consumed gas: 0.010)
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -30,7 +30,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 29 (remaining gas: 1039507.400 units remaining)
+  - location: 29 (just consumed gas: 0.010)
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -51,7 +51,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 30 (remaining gas: 1039507.390 units remaining)
+  - location: 30 (just consumed gas: 0.010)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             Unit
@@ -63,7 +63,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 31 (remaining gas: 1039507.390 units remaining)
+  - location: 31 (just consumed gas: 0)
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -74,7 +74,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 33 (remaining gas: 1039507.380 units remaining)
+  - location: 33 (just consumed gas: 0.010)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -85,7 +85,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 31 (remaining gas: 1039507.355 units remaining)
+  - location: 31 (just consumed gas: 0.025)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
@@ -97,7 +97,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 34 (remaining gas: 1039506.354 units remaining)
+  - location: 34 (just consumed gas: 1.001)
     [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
       "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
@@ -109,7 +109,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 35 (remaining gas: 1039506.354 units remaining)
+  - location: 35 (just consumed gas: 0)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -120,7 +120,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 37 (remaining gas: 1039505.353 units remaining)
+  - location: 37 (just consumed gas: 1.001)
     [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -131,7 +131,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 38 (remaining gas: 1039184.194 units remaining)
+  - location: 38 (just consumed gas: 321.159)
     [ (Some "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -142,7 +142,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 41 (remaining gas: 1039184.194 units remaining)
+  - location: 41 (just consumed gas: 0)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -153,7 +153,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 41 (remaining gas: 1039184.179 units remaining)
+  - location: 41 (just consumed gas: 0.015)
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -164,7 +164,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 47 (remaining gas: 1039183.178 units remaining)
+  - location: 47 (just consumed gas: 1.001)
     [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -175,7 +175,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 35 (remaining gas: 1039183.153 units remaining)
+  - location: 35 (just consumed gas: 0.025)
     [ 0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
       0x050a00000021004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f
       (Pair Unit
@@ -187,7 +187,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 50 (remaining gas: 1039183.118 units remaining)
+  - location: 50 (just consumed gas: 0.035)
     [ 0
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -198,7 +198,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 51 (remaining gas: 1039183.108 units remaining)
+  - location: 51 (just consumed gas: 0.010)
     [ True
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -209,7 +209,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 52 (remaining gas: 1039183.108 units remaining)
+  - location: 52 (just consumed gas: 0)
     [ (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -219,7 +219,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 52 (remaining gas: 1039183.093 units remaining)
+  - location: 52 (just consumed gas: 0.015)
     [ (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -229,7 +229,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 58 (remaining gas: 1039183.083 units remaining)
+  - location: 58 (just consumed gas: 0.010)
     [ (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -248,7 +248,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 59 (remaining gas: 1039183.073 units remaining)
+  - location: 59 (just consumed gas: 0.010)
     [ Unit
       (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -259,7 +259,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 60 (remaining gas: 1039183.073 units remaining)
+  - location: 60 (just consumed gas: 0)
     [ (Pair Unit
             "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -269,7 +269,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 62 (remaining gas: 1039183.063 units remaining)
+  - location: 62 (just consumed gas: 0.010)
     [ Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -279,7 +279,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 60 (remaining gas: 1039183.038 units remaining)
+  - location: 60 (just consumed gas: 0.025)
     [ Unit
       Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -290,7 +290,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 63 (remaining gas: 1039182.822 units remaining)
+  - location: 63 (just consumed gas: 0.216)
     [ 0x05030b
       Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -301,7 +301,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 64 (remaining gas: 1039182.822 units remaining)
+  - location: 64 (just consumed gas: 0)
     [ Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -311,7 +311,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 66 (remaining gas: 1039182.606 units remaining)
+  - location: 66 (just consumed gas: 0.216)
     [ 0x05030b
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -321,7 +321,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 67 (remaining gas: 1039182.185 units remaining)
+  - location: 67 (just consumed gas: 0.421)
     [ (Some Unit)
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -331,7 +331,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 70 (remaining gas: 1039182.185 units remaining)
+  - location: 70 (just consumed gas: 0)
     [ Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -341,7 +341,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 70 (remaining gas: 1039182.170 units remaining)
+  - location: 70 (just consumed gas: 0.015)
     [ Unit
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -351,7 +351,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 76 (remaining gas: 1039181.954 units remaining)
+  - location: 76 (just consumed gas: 0.216)
     [ 0x05030b
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -361,7 +361,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 64 (remaining gas: 1039181.929 units remaining)
+  - location: 64 (just consumed gas: 0.025)
     [ 0x05030b
       0x05030b
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
@@ -372,7 +372,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 79 (remaining gas: 1039181.894 units remaining)
+  - location: 79 (just consumed gas: 0.035)
     [ 0
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -382,7 +382,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 80 (remaining gas: 1039181.884 units remaining)
+  - location: 80 (just consumed gas: 0.010)
     [ True
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -392,7 +392,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 81 (remaining gas: 1039181.884 units remaining)
+  - location: 81 (just consumed gas: 0)
     [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
             {}
@@ -401,7 +401,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 81 (remaining gas: 1039181.869 units remaining)
+  - location: 81 (just consumed gas: 0.015)
     [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
             {}
@@ -410,7 +410,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 87 (remaining gas: 1039181.859 units remaining)
+  - location: 87 (just consumed gas: 0.010)
     [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
             {}
@@ -427,7 +427,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 88 (remaining gas: 1039181.849 units remaining)
+  - location: 88 (just consumed gas: 0.010)
     [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
@@ -437,7 +437,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 89 (remaining gas: 1039181.849 units remaining)
+  - location: 89 (just consumed gas: 0)
     [ (Pair "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
             None
             {}
@@ -446,7 +446,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 91 (remaining gas: 1039181.839 units remaining)
+  - location: 91 (just consumed gas: 0.010)
     [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       (Pair None
             {}
@@ -455,7 +455,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 89 (remaining gas: 1039181.814 units remaining)
+  - location: 89 (just consumed gas: 0.025)
     [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       (Pair None
@@ -465,7 +465,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 92 (remaining gas: 1039180.913 units remaining)
+  - location: 92 (just consumed gas: 0.901)
     [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
       "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       (Pair None
@@ -475,7 +475,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 93 (remaining gas: 1039180.913 units remaining)
+  - location: 93 (just consumed gas: 0)
     [ "edsigthTzJ8X7MPmNeEwybRAvdxS1pupqcM5Mk4uCuyZAe7uEk68YpuGDeViW8wSXMrCi5CwoNgqs8V2w8ayB5dMJzrYCHhD8C7"
       (Pair None
             {}
@@ -484,7 +484,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 95 (remaining gas: 1039180.012 units remaining)
+  - location: 95 (just consumed gas: 0.901)
     [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
       (Pair None
             {}
@@ -493,7 +493,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 96 (remaining gas: 1039178.182 units remaining)
+  - location: 96 (just consumed gas: 1.830)
     [ (Some "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe")
       (Pair None
             {}
@@ -502,7 +502,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 99 (remaining gas: 1039178.182 units remaining)
+  - location: 99 (just consumed gas: 0)
     [ "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe"
       (Pair None
             {}
@@ -511,7 +511,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 99 (remaining gas: 1039178.167 units remaining)
+  - location: 99 (just consumed gas: 0.015)
     [ "sigXeXB5JD5TaLb3xgTPKjgf9W45judiCmNP9UBdZBdmtHSGBxL1M8ZSUb6LpjGP2MdfUBTB4WHs5APnvyRV1LooU6QHJuDe"
       (Pair None
             {}
@@ -520,7 +520,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 105 (remaining gas: 1039177.266 units remaining)
+  - location: 105 (just consumed gas: 0.901)
     [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
       (Pair None
             {}
@@ -529,7 +529,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 93 (remaining gas: 1039177.241 units remaining)
+  - location: 93 (just consumed gas: 0.025)
     [ 0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
       0x050a0000004049d47dba27bd76208b092f3e500f64818920c817491b8b9094f28c2c2b9c6721b257b8878ce47182122b8ea84aeacd84a8aa28cb1f1fe48a26355a7bca4b8306
       (Pair None
@@ -539,7 +539,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 108 (remaining gas: 1039177.205 units remaining)
+  - location: 108 (just consumed gas: 0.036)
     [ 0
       (Pair None
             {}
@@ -548,7 +548,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 109 (remaining gas: 1039177.195 units remaining)
+  - location: 109 (just consumed gas: 0.010)
     [ True
       (Pair None
             {}
@@ -557,7 +557,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 110 (remaining gas: 1039177.195 units remaining)
+  - location: 110 (just consumed gas: 0)
     [ (Pair None
             {}
             {}
@@ -565,7 +565,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 110 (remaining gas: 1039177.180 units remaining)
+  - location: 110 (just consumed gas: 0.015)
     [ (Pair None
             {}
             {}
@@ -573,7 +573,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 116 (remaining gas: 1039177.170 units remaining)
+  - location: 116 (just consumed gas: 0.010)
     [ (Pair None
             {}
             {}
@@ -588,7 +588,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 117 (remaining gas: 1039177.160 units remaining)
+  - location: 117 (just consumed gas: 0.010)
     [ None
       (Pair None
             {}
@@ -597,7 +597,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 118 (remaining gas: 1039177.160 units remaining)
+  - location: 118 (just consumed gas: 0)
     [ (Pair None
             {}
             {}
@@ -605,7 +605,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 120 (remaining gas: 1039177.150 units remaining)
+  - location: 120 (just consumed gas: 0.010)
     [ None
       (Pair {}
             {}
@@ -613,7 +613,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 118 (remaining gas: 1039177.125 units remaining)
+  - location: 118 (just consumed gas: 0.025)
     [ None
       None
       (Pair {}
@@ -622,7 +622,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 121 (remaining gas: 1039176.909 units remaining)
+  - location: 121 (just consumed gas: 0.216)
     [ 0x050306
       None
       (Pair {}
@@ -631,7 +631,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 122 (remaining gas: 1039176.909 units remaining)
+  - location: 122 (just consumed gas: 0)
     [ None
       (Pair {}
             {}
@@ -639,7 +639,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 124 (remaining gas: 1039176.693 units remaining)
+  - location: 124 (just consumed gas: 0.216)
     [ 0x050306
       (Pair {}
             {}
@@ -647,7 +647,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 125 (remaining gas: 1039176.272 units remaining)
+  - location: 125 (just consumed gas: 0.421)
     [ (Some None)
       (Pair {}
             {}
@@ -655,7 +655,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 129 (remaining gas: 1039176.272 units remaining)
+  - location: 129 (just consumed gas: 0)
     [ None
       (Pair {}
             {}
@@ -663,7 +663,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 129 (remaining gas: 1039176.257 units remaining)
+  - location: 129 (just consumed gas: 0.015)
     [ None
       (Pair {}
             {}
@@ -671,7 +671,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 135 (remaining gas: 1039176.041 units remaining)
+  - location: 135 (just consumed gas: 0.216)
     [ 0x050306
       (Pair {}
             {}
@@ -679,7 +679,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 122 (remaining gas: 1039176.016 units remaining)
+  - location: 122 (just consumed gas: 0.025)
     [ 0x050306
       0x050306
       (Pair {}
@@ -688,7 +688,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 138 (remaining gas: 1039175.981 units remaining)
+  - location: 138 (just consumed gas: 0.035)
     [ 0
       (Pair {}
             {}
@@ -696,7 +696,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 139 (remaining gas: 1039175.971 units remaining)
+  - location: 139 (just consumed gas: 0.010)
     [ True
       (Pair {}
             {}
@@ -704,21 +704,21 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 140 (remaining gas: 1039175.971 units remaining)
+  - location: 140 (just consumed gas: 0)
     [ (Pair {}
             {}
             (Pair 40 -10)
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 140 (remaining gas: 1039175.956 units remaining)
+  - location: 140 (just consumed gas: 0.015)
     [ (Pair {}
             {}
             (Pair 40 -10)
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 146 (remaining gas: 1039175.946 units remaining)
+  - location: 146 (just consumed gas: 0.010)
     [ (Pair {}
             {}
             (Pair 40 -10)
@@ -731,7 +731,7 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 147 (remaining gas: 1039175.936 units remaining)
+  - location: 147 (just consumed gas: 0.010)
     [ {}
       (Pair {}
             {}
@@ -739,294 +739,294 @@ trace
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 148 (remaining gas: 1039175.936 units remaining)
+  - location: 148 (just consumed gas: 0)
     [ (Pair {}
             {}
             (Pair 40 -10)
             (Right "2019-09-09T08:35:33Z")
             {}
             { DUP ; DROP ; PACK }) ]
-  - location: 150 (remaining gas: 1039175.926 units remaining)
+  - location: 150 (just consumed gas: 0.010)
     [ {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 148 (remaining gas: 1039175.901 units remaining)
+  - location: 148 (just consumed gas: 0.025)
     [ {}
       {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 151 (remaining gas: 1039175.685 units remaining)
+  - location: 151 (just consumed gas: 0.216)
     [ 0x050200000000
       {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 152 (remaining gas: 1039175.685 units remaining)
+  - location: 152 (just consumed gas: 0)
     [ {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 154 (remaining gas: 1039175.469 units remaining)
+  - location: 154 (just consumed gas: 0.216)
     [ 0x050200000000
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 155 (remaining gas: 1039174.986 units remaining)
+  - location: 155 (just consumed gas: 0.483)
     [ (Some {})
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 159 (remaining gas: 1039174.986 units remaining)
+  - location: 159 (just consumed gas: 0)
     [ {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 159 (remaining gas: 1039174.971 units remaining)
+  - location: 159 (just consumed gas: 0.015)
     [ {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 165 (remaining gas: 1039174.755 units remaining)
+  - location: 165 (just consumed gas: 0.216)
     [ 0x050200000000
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 152 (remaining gas: 1039174.730 units remaining)
+  - location: 152 (just consumed gas: 0.025)
     [ 0x050200000000
       0x050200000000
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 168 (remaining gas: 1039174.695 units remaining)
+  - location: 168 (just consumed gas: 0.035)
     [ 0
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 169 (remaining gas: 1039174.685 units remaining)
+  - location: 169 (just consumed gas: 0.010)
     [ True
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 170 (remaining gas: 1039174.685 units remaining)
+  - location: 170 (just consumed gas: 0)
     [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 170 (remaining gas: 1039174.670 units remaining)
+  - location: 170 (just consumed gas: 0.015)
     [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 176 (remaining gas: 1039174.660 units remaining)
+  - location: 176 (just consumed gas: 0.010)
     [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 177 (remaining gas: 1039174.650 units remaining)
+  - location: 177 (just consumed gas: 0.010)
     [ {}
       (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 178 (remaining gas: 1039174.650 units remaining)
+  - location: 178 (just consumed gas: 0)
     [ (Pair {} (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 180 (remaining gas: 1039174.640 units remaining)
+  - location: 180 (just consumed gas: 0.010)
     [ {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 178 (remaining gas: 1039174.615 units remaining)
+  - location: 178 (just consumed gas: 0.025)
     [ {}
       {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 181 (remaining gas: 1039174.399 units remaining)
+  - location: 181 (just consumed gas: 0.216)
     [ 0x050200000000
       {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 182 (remaining gas: 1039174.399 units remaining)
+  - location: 182 (just consumed gas: 0)
     [ {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 184 (remaining gas: 1039174.183 units remaining)
+  - location: 184 (just consumed gas: 0.216)
     [ 0x050200000000
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 185 (remaining gas: 1039173.700 units remaining)
+  - location: 185 (just consumed gas: 0.483)
     [ (Some {})
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 189 (remaining gas: 1039173.700 units remaining)
+  - location: 189 (just consumed gas: 0)
     [ {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 189 (remaining gas: 1039173.685 units remaining)
+  - location: 189 (just consumed gas: 0.015)
     [ {}
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 195 (remaining gas: 1039173.469 units remaining)
+  - location: 195 (just consumed gas: 0.216)
     [ 0x050200000000
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 182 (remaining gas: 1039173.444 units remaining)
+  - location: 182 (just consumed gas: 0.025)
     [ 0x050200000000
       0x050200000000
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 198 (remaining gas: 1039173.409 units remaining)
+  - location: 198 (just consumed gas: 0.035)
     [ 0
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 199 (remaining gas: 1039173.399 units remaining)
+  - location: 199 (just consumed gas: 0.010)
     [ True
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 200 (remaining gas: 1039173.399 units remaining)
+  - location: 200 (just consumed gas: 0)
     [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 200 (remaining gas: 1039173.384 units remaining)
+  - location: 200 (just consumed gas: 0.015)
     [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 206 (remaining gas: 1039173.374 units remaining)
+  - location: 206 (just consumed gas: 0.010)
     [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 207 (remaining gas: 1039173.364 units remaining)
+  - location: 207 (just consumed gas: 0.010)
     [ (Pair 40 -10)
       (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 208 (remaining gas: 1039173.364 units remaining)
+  - location: 208 (just consumed gas: 0)
     [ (Pair (Pair 40 -10) (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 210 (remaining gas: 1039173.354 units remaining)
+  - location: 210 (just consumed gas: 0.010)
     [ (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 208 (remaining gas: 1039173.329 units remaining)
+  - location: 208 (just consumed gas: 0.025)
     [ (Pair 40 -10)
       (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 211 (remaining gas: 1039172.631 units remaining)
+  - location: 211 (just consumed gas: 0.698)
     [ 0x0507070028004a
       (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 212 (remaining gas: 1039172.631 units remaining)
+  - location: 212 (just consumed gas: 0)
     [ (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 214 (remaining gas: 1039171.933 units remaining)
+  - location: 214 (just consumed gas: 0.698)
     [ 0x0507070028004a
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 215 (remaining gas: 1039171.230 units remaining)
+  - location: 215 (just consumed gas: 0.703)
     [ (Some (Pair 40 -10))
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 220 (remaining gas: 1039171.230 units remaining)
+  - location: 220 (just consumed gas: 0)
     [ (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 220 (remaining gas: 1039171.215 units remaining)
+  - location: 220 (just consumed gas: 0.015)
     [ (Pair 40 -10)
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 226 (remaining gas: 1039170.517 units remaining)
+  - location: 226 (just consumed gas: 0.698)
     [ 0x0507070028004a
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 212 (remaining gas: 1039170.492 units remaining)
+  - location: 212 (just consumed gas: 0.025)
     [ 0x0507070028004a
       0x0507070028004a
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 229 (remaining gas: 1039170.457 units remaining)
+  - location: 229 (just consumed gas: 0.035)
     [ 0
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 230 (remaining gas: 1039170.447 units remaining)
+  - location: 230 (just consumed gas: 0.010)
     [ True
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 231 (remaining gas: 1039170.447 units remaining)
+  - location: 231 (just consumed gas: 0)
     [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 231 (remaining gas: 1039170.432 units remaining)
+  - location: 231 (just consumed gas: 0.015)
     [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 237 (remaining gas: 1039170.422 units remaining)
+  - location: 237 (just consumed gas: 0.010)
     [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK })
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 238 (remaining gas: 1039170.412 units remaining)
+  - location: 238 (just consumed gas: 0.010)
     [ (Right "2019-09-09T08:35:33Z")
       (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 239 (remaining gas: 1039170.412 units remaining)
+  - location: 239 (just consumed gas: 0)
     [ (Pair (Right "2019-09-09T08:35:33Z") {} { DUP ; DROP ; PACK }) ]
-  - location: 241 (remaining gas: 1039170.402 units remaining)
+  - location: 241 (just consumed gas: 0.010)
     [ (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 239 (remaining gas: 1039170.377 units remaining)
+  - location: 239 (just consumed gas: 0.025)
     [ (Right "2019-09-09T08:35:33Z")
       (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 242 (remaining gas: 1039169.845 units remaining)
+  - location: 242 (just consumed gas: 0.532)
     [ 0x0505080095bbb0d70b
       (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 243 (remaining gas: 1039169.845 units remaining)
+  - location: 243 (just consumed gas: 0)
     [ (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 245 (remaining gas: 1039169.313 units remaining)
+  - location: 245 (just consumed gas: 0.532)
     [ 0x0505080095bbb0d70b
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 246 (remaining gas: 1039168.669 units remaining)
+  - location: 246 (just consumed gas: 0.644)
     [ (Some (Right "2019-09-09T08:35:33Z"))
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 251 (remaining gas: 1039168.669 units remaining)
+  - location: 251 (just consumed gas: 0)
     [ (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 251 (remaining gas: 1039168.654 units remaining)
+  - location: 251 (just consumed gas: 0.015)
     [ (Right "2019-09-09T08:35:33Z")
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 257 (remaining gas: 1039168.122 units remaining)
+  - location: 257 (just consumed gas: 0.532)
     [ 0x0505080095bbb0d70b
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 243 (remaining gas: 1039168.097 units remaining)
+  - location: 243 (just consumed gas: 0.025)
     [ 0x0505080095bbb0d70b
       0x0505080095bbb0d70b
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 260 (remaining gas: 1039168.062 units remaining)
+  - location: 260 (just consumed gas: 0.035)
     [ 0
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 261 (remaining gas: 1039168.052 units remaining)
+  - location: 261 (just consumed gas: 0.010)
     [ True
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 262 (remaining gas: 1039168.052 units remaining)
+  - location: 262 (just consumed gas: 0)
     [ (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 262 (remaining gas: 1039168.037 units remaining)
+  - location: 262 (just consumed gas: 0.015)
     [ (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 268 (remaining gas: 1039168.027 units remaining)
+  - location: 268 (just consumed gas: 0.010)
     [ (Pair {} { DUP ; DROP ; PACK })
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 269 (remaining gas: 1039168.017 units remaining)
+  - location: 269 (just consumed gas: 0.010)
     [ {}
       (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 270 (remaining gas: 1039168.017 units remaining)
+  - location: 270 (just consumed gas: 0)
     [ (Pair {} { DUP ; DROP ; PACK }) ]
-  - location: 272 (remaining gas: 1039168.007 units remaining)
+  - location: 272 (just consumed gas: 0.010)
     [ {}
       { DUP ; DROP ; PACK } ]
-  - location: 270 (remaining gas: 1039167.982 units remaining)
+  - location: 270 (just consumed gas: 0.025)
     [ {}
       {}
       { DUP ; DROP ; PACK } ]
-  - location: 273 (remaining gas: 1039167.766 units remaining)
+  - location: 273 (just consumed gas: 0.216)
     [ 0x050200000000
       {}
       { DUP ; DROP ; PACK } ]
-  - location: 274 (remaining gas: 1039167.766 units remaining)
+  - location: 274 (just consumed gas: 0)
     [ {}
       { DUP ; DROP ; PACK } ]
-  - location: 276 (remaining gas: 1039167.550 units remaining)
+  - location: 276 (just consumed gas: 0.216)
     [ 0x050200000000
       { DUP ; DROP ; PACK } ]
-  - location: 277 (remaining gas: 1039167.067 units remaining)
+  - location: 277 (just consumed gas: 0.483)
     [ (Some {})
       { DUP ; DROP ; PACK } ]
-  - location: 282 (remaining gas: 1039167.067 units remaining)
+  - location: 282 (just consumed gas: 0)
     [ {}
       { DUP ; DROP ; PACK } ]
-  - location: 282 (remaining gas: 1039167.052 units remaining)
+  - location: 282 (just consumed gas: 0.015)
     [ {}
       { DUP ; DROP ; PACK } ]
-  - location: 288 (remaining gas: 1039166.836 units remaining)
+  - location: 288 (just consumed gas: 0.216)
     [ 0x050200000000
       { DUP ; DROP ; PACK } ]
-  - location: 274 (remaining gas: 1039166.811 units remaining)
+  - location: 274 (just consumed gas: 0.025)
     [ 0x050200000000
       0x050200000000
       { DUP ; DROP ; PACK } ]
-  - location: 291 (remaining gas: 1039166.776 units remaining)
+  - location: 291 (just consumed gas: 0.035)
     [ 0
       { DUP ; DROP ; PACK } ]
-  - location: 292 (remaining gas: 1039166.766 units remaining)
+  - location: 292 (just consumed gas: 0.010)
     [ True
       { DUP ; DROP ; PACK } ]
-  - location: 293 (remaining gas: 1039166.766 units remaining)
+  - location: 293 (just consumed gas: 0)
     [ { DUP ; DROP ; PACK } ]
-  - location: 293 (remaining gas: 1039166.751 units remaining)
+  - location: 293 (just consumed gas: 0.015)
     [ { DUP ; DROP ; PACK } ]
-  - location: 299 (remaining gas: 1039166.741 units remaining)
+  - location: 299 (just consumed gas: 0.010)
     [ { DUP ; DROP ; PACK }
       { DUP ; DROP ; PACK } ]
-  - location: 300 (remaining gas: 1039165.612 units remaining)
+  - location: 300 (just consumed gas: 1.129)
     [ 0x05020000000603210320030c
       { DUP ; DROP ; PACK } ]
-  - location: 301 (remaining gas: 1039165.612 units remaining)
+  - location: 301 (just consumed gas: 0)
     [ { DUP ; DROP ; PACK } ]
-  - location: 303 (remaining gas: 1039164.483 units remaining)
+  - location: 303 (just consumed gas: 1.129)
     [ 0x05020000000603210320030c ]
-  - location: 304 (remaining gas: 1039162.397 units remaining)
+  - location: 304 (just consumed gas: 2.086)
     [ (Some { DUP ; DROP ; PACK }) ]
-  - location: 309 (remaining gas: 1039162.397 units remaining)
+  - location: 309 (just consumed gas: 0)
     [ { DUP ; DROP ; PACK } ]
-  - location: 309 (remaining gas: 1039162.382 units remaining)
+  - location: 309 (just consumed gas: 0.015)
     [ { DUP ; DROP ; PACK } ]
-  - location: 315 (remaining gas: 1039161.253 units remaining)
+  - location: 315 (just consumed gas: 1.129)
     [ 0x05020000000603210320030c ]
-  - location: 301 (remaining gas: 1039161.228 units remaining)
+  - location: 301 (just consumed gas: 0.025)
     [ 0x05020000000603210320030c
       0x05020000000603210320030c ]
-  - location: 318 (remaining gas: 1039161.193 units remaining)
+  - location: 318 (just consumed gas: 0.035)
     [ 0 ]
-  - location: 319 (remaining gas: 1039161.183 units remaining)
+  - location: 319 (just consumed gas: 0.010)
     [ True ]
-  - location: 320 (remaining gas: 1039161.183 units remaining)
+  - location: 320 (just consumed gas: 0)
     [  ]
-  - location: 320 (remaining gas: 1039161.168 units remaining)
+  - location: 320 (just consumed gas: 0.015)
     [  ]
-  - location: 326 (remaining gas: 1039161.158 units remaining)
+  - location: 326 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 327 (remaining gas: 1039161.148 units remaining)
+  - location: 327 (just consumed gas: 0.010)
     [ {}
       Unit ]
-  - location: 329 (remaining gas: 1039161.138 units remaining)
+  - location: 329 (just consumed gas: 0.010)
     [ (Pair {} Unit) ]
 

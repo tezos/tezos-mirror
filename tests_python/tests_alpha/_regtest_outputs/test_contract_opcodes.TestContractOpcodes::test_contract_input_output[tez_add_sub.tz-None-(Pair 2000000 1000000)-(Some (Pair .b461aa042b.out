@@ -7,65 +7,65 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (remaining gas: 1039983.005 units remaining)
+  - location: 12 (just consumed gas: 16.995)
     [ (Pair (Pair 2000000 1000000) None) ]
-  - location: 12 (remaining gas: 1039982.995 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ (Pair 2000000 1000000) ]
-  - location: 13 (remaining gas: 1039982.985 units remaining)
+  - location: 13 (just consumed gas: 0.010)
     [ (Pair 2000000 1000000)
       (Pair 2000000 1000000) ]
-  - location: 14 (remaining gas: 1039982.975 units remaining)
+  - location: 14 (just consumed gas: 0.010)
     [ (Pair 2000000 1000000)
       (Pair 2000000 1000000)
       (Pair 2000000 1000000) ]
-  - location: 15 (remaining gas: 1039982.965 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ 2000000
       (Pair 2000000 1000000)
       (Pair 2000000 1000000) ]
-  - location: 16 (remaining gas: 1039982.965 units remaining)
+  - location: 16 (just consumed gas: 0)
     [ (Pair 2000000 1000000)
       (Pair 2000000 1000000) ]
-  - location: 18 (remaining gas: 1039982.955 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ 1000000
       (Pair 2000000 1000000) ]
-  - location: 16 (remaining gas: 1039982.930 units remaining)
+  - location: 16 (just consumed gas: 0.025)
     [ 2000000
       1000000
       (Pair 2000000 1000000) ]
-  - location: 19 (remaining gas: 1039982.910 units remaining)
+  - location: 19 (just consumed gas: 0.020)
     [ 3000000
       (Pair 2000000 1000000) ]
-  - location: 20 (remaining gas: 1039982.910 units remaining)
+  - location: 20 (just consumed gas: 0)
     [ (Pair 2000000 1000000) ]
-  - location: 22 (remaining gas: 1039982.900 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ (Pair 2000000 1000000)
       (Pair 2000000 1000000) ]
-  - location: 23 (remaining gas: 1039982.890 units remaining)
+  - location: 23 (just consumed gas: 0.010)
     [ 2000000
       (Pair 2000000 1000000) ]
-  - location: 24 (remaining gas: 1039982.890 units remaining)
+  - location: 24 (just consumed gas: 0)
     [ (Pair 2000000 1000000) ]
-  - location: 26 (remaining gas: 1039982.880 units remaining)
+  - location: 26 (just consumed gas: 0.010)
     [ 1000000 ]
-  - location: 24 (remaining gas: 1039982.855 units remaining)
+  - location: 24 (just consumed gas: 0.025)
     [ 2000000
       1000000 ]
-  - location: 27 (remaining gas: 1039982.840 units remaining)
+  - location: 27 (just consumed gas: 0.015)
     [ (Some 1000000) ]
-  - location: 29 (remaining gas: 1039982.840 units remaining)
+  - location: 29 (just consumed gas: 0)
     [ 1000000 ]
-  - location: 29 (remaining gas: 1039982.825 units remaining)
+  - location: 29 (just consumed gas: 0.015)
     [ 1000000 ]
-  - location: 20 (remaining gas: 1039982.800 units remaining)
+  - location: 20 (just consumed gas: 0.025)
     [ 3000000
       1000000 ]
-  - location: 35 (remaining gas: 1039982.790 units remaining)
+  - location: 35 (just consumed gas: 0.010)
     [ (Pair 3000000 1000000) ]
-  - location: 36 (remaining gas: 1039982.780 units remaining)
+  - location: 36 (just consumed gas: 0.010)
     [ (Some (Pair 3000000 1000000)) ]
-  - location: 37 (remaining gas: 1039982.770 units remaining)
+  - location: 37 (just consumed gas: 0.010)
     [ {}
       (Some (Pair 3000000 1000000)) ]
-  - location: 39 (remaining gas: 1039982.760 units remaining)
+  - location: 39 (just consumed gas: 0.010)
     [ (Pair {} (Some (Pair 3000000 1000000))) ]
 

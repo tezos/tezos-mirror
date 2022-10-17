@@ -23,13 +23,13 @@ Runtime error in contract [CONTRACT_HASH]:
 At line 13 characters 25 to 28,
 unexpected arithmetic overflow
 trace
-  - location: 14 (remaining gas: 1039991.189 units remaining)
+  - location: 14 (just consumed gas: 8.811)
     [ (Pair (Right (Pair 1 257)) None) ]
-  - location: 14 (remaining gas: 1039991.179 units remaining)
+  - location: 14 (just consumed gas: 0.010)
     [ (Right (Pair 1 257)) ]
-  - location: 15 (remaining gas: 1039991.179 units remaining)
+  - location: 15 (just consumed gas: 0)
     [ (Pair 1 257) ]
-  - location: 20 (remaining gas: 1039991.169 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ 1
       257 ]
 Fatal error:

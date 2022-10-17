@@ -7,55 +7,55 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039986.276 units remaining)
+  - location: 11 (just consumed gas: 13.724)
     [ (Pair "Hi" {} None) ]
-  - location: 11 (remaining gas: 1039986.266 units remaining)
+  - location: 11 (just consumed gas: 0.010)
     [ (Pair "Hi" {} None)
       (Pair "Hi" {} None) ]
-  - location: 12 (remaining gas: 1039986.256 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ (Pair "Hi" {} None)
       (Pair "Hi" {} None)
       (Pair "Hi" {} None) ]
-  - location: 13 (remaining gas: 1039986.246 units remaining)
+  - location: 13 (just consumed gas: 0.010)
     [ "Hi"
       (Pair "Hi" {} None)
       (Pair "Hi" {} None) ]
-  - location: 14 (remaining gas: 1039986.246 units remaining)
+  - location: 14 (just consumed gas: 0)
     [ (Pair "Hi" {} None)
       (Pair "Hi" {} None) ]
-  - location: 17 (remaining gas: 1039986.236 units remaining)
+  - location: 17 (just consumed gas: 0.010)
     [ (Pair {} None)
       (Pair "Hi" {} None) ]
-  - location: 18 (remaining gas: 1039986.226 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ {}
       (Pair "Hi" {} None) ]
-  - location: 14 (remaining gas: 1039986.201 units remaining)
+  - location: 14 (just consumed gas: 0.025)
     [ "Hi"
       {}
       (Pair "Hi" {} None) ]
-  - location: 19 (remaining gas: 1039986.084 units remaining)
+  - location: 19 (just consumed gas: 0.117)
     [ False
       (Pair "Hi" {} None) ]
-  - location: 20 (remaining gas: 1039986.074 units remaining)
+  - location: 20 (just consumed gas: 0.010)
     [ (Some False)
       (Pair "Hi" {} None) ]
-  - location: 21 (remaining gas: 1039986.074 units remaining)
+  - location: 21 (just consumed gas: 0)
     [ (Pair "Hi" {} None) ]
-  - location: 24 (remaining gas: 1039986.064 units remaining)
+  - location: 24 (just consumed gas: 0.010)
     [ (Pair {} None) ]
-  - location: 25 (remaining gas: 1039986.054 units remaining)
+  - location: 25 (just consumed gas: 0.010)
     [ {} ]
-  - location: 21 (remaining gas: 1039986.029 units remaining)
+  - location: 21 (just consumed gas: 0.025)
     [ (Some False)
       {} ]
-  - location: 26 (remaining gas: 1039986.019 units remaining)
+  - location: 26 (just consumed gas: 0.010)
     [ {}
       (Some False) ]
-  - location: 27 (remaining gas: 1039986.009 units remaining)
+  - location: 27 (just consumed gas: 0.010)
     [ (Pair {} (Some False)) ]
-  - location: 28 (remaining gas: 1039985.999 units remaining)
+  - location: 28 (just consumed gas: 0.010)
     [ {}
       (Pair {} (Some False)) ]
-  - location: 30 (remaining gas: 1039985.989 units remaining)
+  - location: 30 (just consumed gas: 0.010)
     [ (Pair {} {} (Some False)) ]
 

@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 1039992.672 units remaining)
+  - location: 9 (just consumed gas: 7.328)
     [ (Pair { "c" ; "b" ; "a" } { "" }) ]
-  - location: 9 (remaining gas: 1039992.662 units remaining)
+  - location: 9 (just consumed gas: 0.010)
     [ { "c" ; "b" ; "a" } ]
-  - location: 10 (remaining gas: 1039992.652 units remaining)
+  - location: 10 (just consumed gas: 0.010)
     [ {}
       { "c" ; "b" ; "a" } ]
-  - location: 12 (remaining gas: 1039992.642 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ { "c" ; "b" ; "a" }
       {} ]
-  - location: 13 (remaining gas: 1039992.642 units remaining)
+  - location: 13 (just consumed gas: 0)
     [ "c"
       {} ]
-  - location: 15 (remaining gas: 1039992.632 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ { "c" } ]
-  - location: 13 (remaining gas: 1039992.617 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ "b"
       { "c" } ]
-  - location: 15 (remaining gas: 1039992.607 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ { "b" ; "c" } ]
-  - location: 13 (remaining gas: 1039992.592 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ "a"
       { "b" ; "c" } ]
-  - location: 15 (remaining gas: 1039992.582 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ { "a" ; "b" ; "c" } ]
-  - location: 13 (remaining gas: 1039992.567 units remaining)
+  - location: 13 (just consumed gas: 0.015)
     [ { "a" ; "b" ; "c" } ]
-  - location: 16 (remaining gas: 1039992.557 units remaining)
+  - location: 16 (just consumed gas: 0.010)
     [ {}
       { "a" ; "b" ; "c" } ]
-  - location: 18 (remaining gas: 1039992.547 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ (Pair {} { "a" ; "b" ; "c" }) ]
 

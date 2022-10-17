@@ -7,35 +7,35 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (remaining gas: 1039988.811 units remaining)
+  - location: 12 (just consumed gas: 11.189)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 12 (remaining gas: 1039988.801 units remaining)
+  - location: 12 (just consumed gas: 0.010)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })
       (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 13 (remaining gas: 1039988.791 units remaining)
+  - location: 13 (just consumed gas: 0.010)
     [ "1"
       (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 14 (remaining gas: 1039988.791 units remaining)
+  - location: 14 (just consumed gas: 0)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 17 (remaining gas: 1039988.781 units remaining)
+  - location: 17 (just consumed gas: 0.010)
     [ (Pair None { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 18 (remaining gas: 1039988.771 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 19 (remaining gas: 1039988.761 units remaining)
+  - location: 19 (just consumed gas: 0.010)
     [ { Elt "1" "one" ; Elt "2" "two" }
       { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 14 (remaining gas: 1039988.736 units remaining)
+  - location: 14 (just consumed gas: 0.025)
     [ "1"
       { Elt "1" "one" ; Elt "2" "two" }
       { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 20 (remaining gas: 1039988.653 units remaining)
+  - location: 20 (just consumed gas: 0.083)
     [ (Some "one")
       { Elt "1" "one" ; Elt "2" "two" } ]
-  - location: 21 (remaining gas: 1039988.643 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ (Pair (Some "one") { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 22 (remaining gas: 1039988.633 units remaining)
+  - location: 22 (just consumed gas: 0.010)
     [ {}
       (Pair (Some "one") { Elt "1" "one" ; Elt "2" "two" }) ]
-  - location: 24 (remaining gas: 1039988.623 units remaining)
+  - location: 24 (just consumed gas: 0.010)
     [ (Pair {} (Some "one") { Elt "1" "one" ; Elt "2" "two" }) ]
 

@@ -118,11 +118,11 @@ type error += Michelson_too_many_recursive_calls
 
 let () =
   let open Data_encoding in
-  let trace_encoding =
+  let trace_encoding : Script_typed_ir.execution_trace encoding =
     list
     @@ obj3
          (req "location" Script.location_encoding)
-         (req "gas" Gas.encoding)
+         (req "gas" Gas.Arith.z_fp_encoding)
          (req "stack" (list Script.expr_encoding))
   in
   (* Reject *)

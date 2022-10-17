@@ -7,87 +7,87 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039963.751 units remaining)
+  - location: 7 (just consumed gas: 36.249)
     [ (Pair Unit Unit) ]
-  - location: 7 (remaining gas: 1039963.741 units remaining)
+  - location: 7 (just consumed gas: 0.010)
     [  ]
-  - location: 8 (remaining gas: 1039963.731 units remaining)
+  - location: 8 (just consumed gas: 0.010)
     [ 5 ]
-  - location: 11 (remaining gas: 1039963.721 units remaining)
+  - location: 11 (just consumed gas: 0.010)
     [ 6
       5 ]
-  - location: 14 (remaining gas: 1039963.686 units remaining)
+  - location: 14 (just consumed gas: 0.035)
     [ 4 ]
-  - location: 15 (remaining gas: 1039963.676 units remaining)
+  - location: 15 (just consumed gas: 0.010)
     [ 4
       4 ]
-  - location: 20 (remaining gas: 1039963.641 units remaining)
+  - location: 20 (just consumed gas: 0.035)
     [ 0 ]
-  - location: 21 (remaining gas: 1039963.631 units remaining)
+  - location: 21 (just consumed gas: 0.010)
     [ True ]
-  - location: 22 (remaining gas: 1039963.631 units remaining)
+  - location: 22 (just consumed gas: 0)
     [  ]
-  - location: 22 (remaining gas: 1039963.616 units remaining)
+  - location: 22 (just consumed gas: 0.015)
     [  ]
-  - location: 28 (remaining gas: 1039963.606 units remaining)
+  - location: 28 (just consumed gas: 0.010)
     [ 6 ]
-  - location: 31 (remaining gas: 1039963.596 units remaining)
+  - location: 31 (just consumed gas: 0.010)
     [ 5
       6 ]
-  - location: 34 (remaining gas: 1039963.561 units remaining)
+  - location: 34 (just consumed gas: 0.035)
     [ 4 ]
-  - location: 35 (remaining gas: 1039963.551 units remaining)
+  - location: 35 (just consumed gas: 0.010)
     [ 4
       4 ]
-  - location: 40 (remaining gas: 1039963.516 units remaining)
+  - location: 40 (just consumed gas: 0.035)
     [ 0 ]
-  - location: 41 (remaining gas: 1039963.506 units remaining)
+  - location: 41 (just consumed gas: 0.010)
     [ True ]
-  - location: 42 (remaining gas: 1039963.506 units remaining)
+  - location: 42 (just consumed gas: 0)
     [  ]
-  - location: 42 (remaining gas: 1039963.491 units remaining)
+  - location: 42 (just consumed gas: 0.015)
     [  ]
-  - location: 48 (remaining gas: 1039963.481 units remaining)
+  - location: 48 (just consumed gas: 0.010)
     [ 12 ]
-  - location: 51 (remaining gas: 1039963.471 units remaining)
+  - location: 51 (just consumed gas: 0.010)
     [ -1
       12 ]
-  - location: 54 (remaining gas: 1039963.436 units remaining)
+  - location: 54 (just consumed gas: 0.035)
     [ 12 ]
-  - location: 55 (remaining gas: 1039963.426 units remaining)
+  - location: 55 (just consumed gas: 0.010)
     [ 12
       12 ]
-  - location: 60 (remaining gas: 1039963.391 units remaining)
+  - location: 60 (just consumed gas: 0.035)
     [ 0 ]
-  - location: 61 (remaining gas: 1039963.381 units remaining)
+  - location: 61 (just consumed gas: 0.010)
     [ True ]
-  - location: 62 (remaining gas: 1039963.381 units remaining)
+  - location: 62 (just consumed gas: 0)
     [  ]
-  - location: 62 (remaining gas: 1039963.366 units remaining)
+  - location: 62 (just consumed gas: 0.015)
     [  ]
-  - location: 68 (remaining gas: 1039963.356 units remaining)
+  - location: 68 (just consumed gas: 0.010)
     [ 12 ]
-  - location: 71 (remaining gas: 1039963.346 units remaining)
+  - location: 71 (just consumed gas: 0.010)
     [ -5
       12 ]
-  - location: 74 (remaining gas: 1039963.311 units remaining)
+  - location: 74 (just consumed gas: 0.035)
     [ 8 ]
-  - location: 75 (remaining gas: 1039963.301 units remaining)
+  - location: 75 (just consumed gas: 0.010)
     [ 8
       8 ]
-  - location: 80 (remaining gas: 1039963.266 units remaining)
+  - location: 80 (just consumed gas: 0.035)
     [ 0 ]
-  - location: 81 (remaining gas: 1039963.256 units remaining)
+  - location: 81 (just consumed gas: 0.010)
     [ True ]
-  - location: 82 (remaining gas: 1039963.256 units remaining)
+  - location: 82 (just consumed gas: 0)
     [  ]
-  - location: 82 (remaining gas: 1039963.241 units remaining)
+  - location: 82 (just consumed gas: 0.015)
     [  ]
-  - location: 88 (remaining gas: 1039963.231 units remaining)
+  - location: 88 (just consumed gas: 0.010)
     [ Unit ]
-  - location: 89 (remaining gas: 1039963.221 units remaining)
+  - location: 89 (just consumed gas: 0.010)
     [ {}
       Unit ]
-  - location: 91 (remaining gas: 1039963.211 units remaining)
+  - location: 91 (just consumed gas: 0.010)
     [ (Pair {} Unit) ]
 

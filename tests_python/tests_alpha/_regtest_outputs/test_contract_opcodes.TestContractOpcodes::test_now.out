@@ -7,15 +7,15 @@ emitted operations
 big_map diff
   
 trace
-  - location: 7 (remaining gas: 1039995.625 units remaining)
+  - location: 7 (just consumed gas: 4.375)
     [ (Pair Unit "2017-07-13T09:19:01Z") ]
-  - location: 7 (remaining gas: 1039995.615 units remaining)
+  - location: 7 (just consumed gas: 0.010)
     [  ]
-  - location: 8 (remaining gas: 1039995.605 units remaining)
+  - location: 8 (just consumed gas: 0.010)
     [ "2021-10-13T10:16:52Z" ]
-  - location: 9 (remaining gas: 1039995.595 units remaining)
+  - location: 9 (just consumed gas: 0.010)
     [ {}
       "2021-10-13T10:16:52Z" ]
-  - location: 11 (remaining gas: 1039995.585 units remaining)
+  - location: 11 (just consumed gas: 0.010)
     [ (Pair {} "2021-10-13T10:16:52Z") ]
 

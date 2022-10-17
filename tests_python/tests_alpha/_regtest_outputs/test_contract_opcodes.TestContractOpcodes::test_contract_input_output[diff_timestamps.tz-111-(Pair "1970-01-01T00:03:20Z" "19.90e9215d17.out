@@ -7,28 +7,28 @@ emitted operations
 big_map diff
   
 trace
-  - location: 9 (remaining gas: 1039992.347 units remaining)
+  - location: 9 (just consumed gas: 7.653)
     [ (Pair (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z") 111) ]
-  - location: 9 (remaining gas: 1039992.337 units remaining)
+  - location: 9 (just consumed gas: 0.010)
     [ (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z") ]
-  - location: 10 (remaining gas: 1039992.327 units remaining)
+  - location: 10 (just consumed gas: 0.010)
     [ (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z")
       (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z") ]
-  - location: 11 (remaining gas: 1039992.317 units remaining)
+  - location: 11 (just consumed gas: 0.010)
     [ "1970-01-01T00:03:20Z"
       (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z") ]
-  - location: 12 (remaining gas: 1039992.317 units remaining)
+  - location: 12 (just consumed gas: 0)
     [ (Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z") ]
-  - location: 14 (remaining gas: 1039992.307 units remaining)
+  - location: 14 (just consumed gas: 0.010)
     [ "1970-01-01T00:00:00Z" ]
-  - location: 12 (remaining gas: 1039992.282 units remaining)
+  - location: 12 (just consumed gas: 0.025)
     [ "1970-01-01T00:03:20Z"
       "1970-01-01T00:00:00Z" ]
-  - location: 15 (remaining gas: 1039992.247 units remaining)
+  - location: 15 (just consumed gas: 0.035)
     [ 200 ]
-  - location: 16 (remaining gas: 1039992.237 units remaining)
+  - location: 16 (just consumed gas: 0.010)
     [ {}
       200 ]
-  - location: 18 (remaining gas: 1039992.227 units remaining)
+  - location: 18 (just consumed gas: 0.010)
     [ (Pair {} 200) ]
 
