@@ -46,17 +46,18 @@ let register_protocol_independent_tests () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Config.register () ;
+  Demo_counter.register () ;
   Injection.register_protocol_independent () ;
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
-  Proxy.register_protocol_independent () ;
-  Config.register () ;
-  Demo_counter.register ()
+  Proxy.register_protocol_independent ()
 
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
+  Iticket_migration.register ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
@@ -75,8 +76,7 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[migrate_from] ;
-  Iticket_migration.register ~migrate_from ~migrate_to
+    ~loser_protocols:[migrate_from]
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
@@ -97,15 +97,17 @@ let register_protocol_tests_that_use_supports_correctly () =
   Big_map_arity.register ~protocols ;
   Bootstrap.register ~protocols ;
   Cache_cache.register protocols ;
-  Client_config.register ~protocols ;
   Client_commands.register ~protocols ;
+  Client_config.register ~protocols ;
   Client_run_view.register ~protocols ;
   Contract_hash_fun.register ~protocols ;
   Create_contract.register ~protocols ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols ;
   Encoding.register ~protocols ;
+  Events.register ~protocols ;
   Forge.register ~protocols ;
+  Ghostnet_dictator_migration.register ~protocols ;
   Global_constants.register ~protocols ;
   Large_metadata.register ~protocols ;
   Light.register ~protocols ;
@@ -117,16 +119,18 @@ let register_protocol_tests_that_use_supports_correctly () =
   Multinode_snapshot.register ~protocols ;
   Node_event_level.register ~protocols ;
   Normalize.register ~protocols ;
+  Operation_validation.register ~protocols ;
+  P2p.register ~protocols ;
   Precheck.register ~protocols ;
   Prevalidator.register ~protocols ;
   Protocol_limits.register ~protocols ;
   Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols ;
-  P2p.register ~protocols ;
+  RPC_test.register protocols ;
   Reject_malformed_micheline.register ~protocols ;
   Replace_by_fees.register ~protocols ;
+  Retro.register ~protocols ;
   Rpc_config_logging.register ~protocols ;
-  RPC_test.register protocols ;
   Run_operation_RPC.register ~protocols ;
   Run_script.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
@@ -136,18 +140,14 @@ let register_protocol_tests_that_use_supports_correctly () =
   Stresstest_command.register ~protocols ;
   Synchronisation_heuristic.register ~protocols ;
   Tenderbake.register ~protocols ;
-  Timelock.register ~protocols ;
+  Testnet_dictator.register ~protocols ;
   Tickets.register ~protocols ;
+  Timelock.register ~protocols ;
   Tx_rollup.register ~protocols ;
   Tx_rollup_l2_node.register ~protocols ;
   Tzip4_view.register ~protocols ;
-  Retro.register ~protocols ;
-  Events.register ~protocols ;
-  Ghostnet_dictator_migration.register ~protocols ;
-  Operation_validation.register ~protocols ;
-  Testnet_dictator.register ~protocols ;
-  Vdf_test.register ~protocols ;
-  Used_paid_storage_spaces.register ~protocols
+  Used_paid_storage_spaces.register ~protocols ;
+  Vdf_test.register ~protocols
 
 (* Regression tests are not easy to maintain for multiple protocols because one needs
    to update and maintain all the expected output files. Some of them, such as
