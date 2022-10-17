@@ -1155,6 +1155,85 @@ function chart_time_required(data) {
     }
 }
 
+function chart_time_required_endorsments(data) {
+    console.log(data)
+    if (!(isEmpty(data))) {
+        var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
+            width = 800 - margin.left - margin.right;//1000, // outer width of chart, in pixels
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        try {
+            try {
+                while (document.getElementById("beta").querySelector("svg")) {
+                    const elements3 = document.getElementById("beta").querySelector("svg");
+                    document.getElementById("beta").removeChild(elements3);
+                }
+            } catch (e) {
+                console.log(e)
+            }
+            var svg = d3.select("body").select("#beta").append("svg").attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+            var x = d3.scaleLinear()
+                .domain(d3.extent(data, function (d) { return d.bloc; }))
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", "translate(0," + (height + 5) + ")")
+                .call(d3.axisBottom(x).ticks(5).tickSizeOuter(0));
+
+
+            var y = d3.scaleLinear()
+                .domain(d3.extent(data, function (d) { return d.t; }))
+                .range([height, 0]);
+            svg.append("g")
+                .attr("transform", "translate(-5,0)")
+                .call(d3.axisLeft(y).tickSizeOuter(0));
+
+            // Add the line
+            svg.append("path")
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", "#69b3a2")
+                .attr("stroke-width", 2)
+                .attr("d", d3.line()
+                    .x(function (d) { return x(d.bloc) })
+                    .y(function (d) { return y(d.t) })
+                )
+
+            // Add the line
+            svg.selectAll("myCircles")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("fill", "#3288BD")
+                .attr("stroke", "none")
+                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cy", function (d) { return y(d.t) })
+                .attr("r", 2);
+
+            svg.append("text")
+                .attr("x", -margin.left + 40)
+                .attr("y", 0)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "start")
+                .text("↑ minimum time(s)");
+
+            svg.append("text")
+                .attr("x", width + margin.right)
+                .attr("y", height)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text(" # bloc →");
+
+        } catch (e) { console.log(e) }
+    } else {
+        alert("erreur")
+    }
+}
+
+
 function chart_consensus_operation_specific_address(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
@@ -1463,4 +1542,181 @@ function keys_in_sorted_order_of_values(dict) {
         (e) => { return e[0] });
 
     return keys
+}
+
+function chart_endorsement_inclusion_based_on_threshold_time(data) {
+    console.log(data)
+    if (!(isEmpty(data))) {
+        var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
+            width = 560 - margin.left - margin.right;//1000, // outer width of chart, in pixels
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        try {
+            try {
+                while (document.getElementById("alpha").querySelector("svg")) {
+                    const elements3 = document.getElementById("alpha").querySelector("svg");
+                    document.getElementById("alpha").removeChild(elements3);
+                }
+            } catch (e) {
+                console.log(e)
+            }
+            const svg = d3.select("body").select("#alpha").append("svg").attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+            var x = d3.scaleLinear()
+                .domain(d3.extent(data, function (d) { return d.bloc; }))
+                .range([0, width]);
+            svg.append("g")
+                .attr("transform", "translate(0," + (height + 5) + ")")
+                .call(d3.axisBottom(x).ticks(5).tickSizeOuter(0));
+
+
+            var y = d3.scaleLinear()
+                .domain(d3.extent(data, function (d) { return 100 * d.pI; }))
+                .range([height, 5]);
+            svg.append("g")
+                .attr("transform", "translate(-5,0)")
+                .call(d3.axisLeft(y).tickSizeOuter(0));
+
+            var colors = d3.scaleLinear()
+                .domain(d3.ticks(0, 4, 6))
+                .range(["#5E4FA2", "#3288BD", "#66C2A5", "#ABDDA4", "#E6F598",
+                    "#FFFFBF", "#FEE08B", "#FDAE61", "#F46D43", "#D53E4F", "#9E0142"]);
+
+            var legend = d3.legendColor().scale(colors);
+
+            svg.append("g").attr("transform", "translate(487,10)").call(legend);
+
+            // Add the line
+            svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("fill", d => colors(d.level))
+                .attr("stroke", "none")
+                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cy", function (d) { return y(100 * d.pI) })
+                .attr("r", 2);
+
+            svg.append("text")
+                .attr("x", -margin.left + 40)
+                .attr("y", 0)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "start")
+                .text("↑ % Endorsements received before threshold time");
+
+            svg.append("text")
+                .attr("x", width + margin.right)
+                .attr("y", height)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text(" # bloc →");
+
+            svg.append("text")
+                .attr("x", width + margin.right)
+                .attr("y", 0)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text("Level:");
+
+
+
+        } catch (e) { console.log(e) }
+    } else {
+        alert("Invalid value. Enter valid threshold and/or valid block level range.")
+    }
+
+}
+
+function chart_endorsement_inclusion_based_on_multiple_threshold_time(data) {
+    if (!(isEmpty(data))) {
+        var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),
+            width = 850 - margin.left - margin.right;//1000, // outer width of chart, in pixels
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        try {
+            try {
+                while (document.getElementById("gamma").querySelector("svg")) {
+                    const elements3 = document.getElementById("gamma").querySelector("svg");
+                    document.getElementById("gamma").removeChild(elements3);
+                }
+            } catch (e) {
+                console.log(e)
+            }
+            const svg = d3.select("body").select("#gamma").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom);
+
+            const svgg = svg.append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+            var sumstat = d3.group(data, d => d.round);
+
+            // Add X axis --> it is a date format
+            var x = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.temps))
+                .range([0, width]);
+            svgg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x).ticks(5));
+
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain([0, 100])
+                .range([height, 0]);
+            svgg.append("g")
+                .attr("transform", "translate(0,0)")
+                .call(d3.axisLeft(y).tickSizeOuter(0));
+
+            // color palette
+            var res = Array.from(sumstat.keys()); // list of group names
+            var color = d3.scaleOrdinal()
+                .domain(res)
+                .range(['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'])
+
+            var legend = d3.legendColor().scale(color);
+
+            svgg.append("g").attr("transform", "translate(" + (width) + ",10)").call(legend);
+
+            svgg.selectAll(".line")
+                .data(sumstat)
+                .join("path")
+                .attr('fill', 'none')
+                .attr('stroke-width', 1.5)
+                .attr('stroke', d => color(d[0]))
+                .attr("d", d => {
+                    return d3.line()
+                        .x(d => x(d.temps))
+                        .y(d => y(100 * d.value))
+                        (d[1])
+                });
+
+            svgg.append("text")
+                .attr("x", -margin.left + 40)
+                .attr("y", -5)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "start")
+                .text("↑ % Endorsements received before threshold time");
+
+            svgg.append("text")
+                .attr("x", width + margin.right)
+                .attr("y", height)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text(" threshold time (seconds) →");
+
+            svgg.append("text")
+                .attr("x", width + 40)
+                .attr("y", 0)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "end")
+                .text("Level:");
+
+
+        } catch (e) { console.log(e) }
+    } else {
+        alert("Invalid value. Enter valid threshold range and/or valid block level range.")
+    }
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Proportion of endorsement received before mutliples threshold times</title>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.3.0/math.min.js></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.4.4/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.13.0/d3-legend.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.27.2/axios.min.js"
+        integrity="sha512-odNmoc1XJy5x1TMVMdC7EMs3IVdItLPlCeL5vSUPN2llYKMJ2eByTTAIiiuqLg+GdNr9hF6z81p27DArRFKT7A=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+    <h1> Proportion of endorsement received before mutliples threshold times </h1>
+    <script type="text/javascript" src="./js/populate_sort_data.js"></script>
+    <script type="text/javascript" src="./js/local_config.js"></script>
+
+    <form>
+        <div>
+            <label for="selectedLevel_begin">First bloc:</label>
+            <input name="level_" id="selectedLevel_begin" type="number" />
+            <span id='tick_begin'></span>
+            <br>
+            <label for="selectedLevel_end">Last bloc:</label>
+            <input name="level_" id="selectedLevel_end" type="number" />
+            <span id='tick_end'></span>
+            <br>
+            <label for="selectedThreshold_begin">lower threshold time(second):</label>
+            <input name="threshold" id="selectedThreshold_beg" type="number" value="1" />
+            <br>
+            <label for="selectedThreshold_end">higher threshold time(second):</label>
+            <input name="threshold" id="selectedThreshold_end" type="number" value="10" />
+            <br>
+            <input type="button" id="submit_" value="Search ">
+
+        </div>
+    </form>
+    <div id="gamma"></div>
+    <script>
+        function main() {
+            try {
+                const params = new Proxy(new URLSearchParams(window.location.search), { // to input parameters in URL
+                    get: (searchParams, prop) => searchParams.get(prop),
+                });
+                // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
+                let first_bloc; // "some_value"
+                let last_bloc;
+                let threshold_low;
+                let threshold_high;
+
+                if ((!(isNaN(parseInt(params.first_bloc)))) && (!(isNaN(parseInt(params.last_bloc)))) && (!(isNaN(parseInt(params.threshold_low)))) && (!(isNaN(parseInt(params.threshold_high))))) {
+                    first_bloc = parseInt(params.first_bloc);
+                    last_bloc = parseInt(params.last_bloc);
+                    threshold_low = parseInt(params.threshold_low);
+                    threshold_high = parseInt(params.threshold_high);
+
+                    document.getElementById("selectedLevel_begin").value = first_bloc;
+                    document.getElementById("selectedLevel_end").value = last_bloc;
+                    document.getElementById("selectedThreshold_beg").value = threshold_low;
+                    document.getElementById("selectedThreshold_end").value = threshold_high;
+
+                    const range_t = range(+threshold_low, +threshold_high);
+                    console.log("ok", range_t)
+                    let dict_data = populate_v1(server_adress, first_bloc, last_bloc).then(dict_data => {
+                        let endorsing_power = get_endorsing_power(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        console.log("endorsing_power", endorsing_power)
+                        console.log("t_op_valide_dict", t_op_valide_dict)
+                        let results = SeriesPercIntegration_w_endorsing_power(range_t, t_op_valide_dict[1], endorsing_power)
+                        chart_endorsement_inclusion_based_on_multiple_threshold_time(results)
+
+                    });
+
+                } else {
+                    var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
+                    var b = a.then(level => {
+                        return populate_v1(server_adress, level - 50, level);
+                    });
+                    threshold_low = 0;
+                    threshold_high = 8;
+                    const range_t = range(+threshold_low, +threshold_high);
+                    Promise.all([a, b]).then(([bloc_value, dict_data]) => {
+                        console.log("ok", range_t)
+
+                        document.getElementById("selectedLevel_begin").value = bloc_value - 50;
+                        document.getElementById("selectedLevel_end").value = bloc_value;
+                        document.getElementById("selectedThreshold_beg").value = 0;
+                        document.getElementById("selectedThreshold_end").value = 8;
+
+                        let endorsing_power = get_endorsing_power(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        console.log("endorsing_power", endorsing_power)
+                        console.log("t_op_valide_dict", t_op_valide_dict)
+                        let results = SeriesPercIntegration_w_endorsing_power(range_t, t_op_valide_dict[0], endorsing_power)
+                        chart_endorsement_inclusion_based_on_multiple_threshold_time(results)
+                    });
+
+                }
+                $('#submit_').mouseup(async function (e) {
+                    if ((!(isNaN(document.getElementById('selectedLevel_begin').value))) && (!(isNaN(document.getElementById('selectedLevel_end').value))) && (!(isNaN(document.getElementById('selectedThreshold_beg').value))) && (!(isNaN(document.getElementById('selectedThreshold_end').value)))) {
+                        window.location = server_adress + "visualization/Comity_size_per_delay.html?threshold_low=" + document.getElementById('selectedThreshold_beg').value + "&threshold_high=" + document.getElementById('selectedThreshold_end').value + "&first_bloc=" + document.getElementById('selectedLevel_begin').value + "&last_bloc=" + document.getElementById('selectedLevel_end').value;
+                    }
+                });
+            } catch (e) {
+                console.log(e)
+            }
+        }
+        main()
+    </script>
