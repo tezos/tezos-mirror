@@ -240,8 +240,8 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
       let outputs = List.length tx.outputs in
       Interp_costs.sapling_verify_update_deprecated ~inputs ~outputs
   | ISplit_ticket _ ->
-      let ticket = accu and (amount_a, amount_b), _ = stack in
-      Interp_costs.split_ticket ticket.amount amount_a amount_b
+      let (amount_a, amount_b), _ = stack in
+      Interp_costs.split_ticket amount_a amount_b
   | IJoin_tickets (_, ty, _) ->
       let ticket_a, ticket_b = accu in
       Interp_costs.join_tickets ty ticket_a ticket_b

@@ -238,27 +238,6 @@ module Models = struct
       ~coeff2:(fv (sf "%s_micheline_int_bytes" name))
       ~coeff3:(fv (sf "%s_micheline_string_bytes" name))
 
-  let split_ticket_model name =
-    let module M = struct
-      type arg_type = int * (int * unit)
-
-      module Def (X : Costlang.S) = struct
-        open X
-
-        type model_type = size -> size -> size
-
-        let arity = Model.arity_2
-
-        let model =
-          lam ~name:"size1" @@ fun size1 ->
-          lam ~name:"size2" @@ fun size2 ->
-          free ~name:(fv (sf "%s_const" name))
-          + (free ~name:(fv (sf "%s_add_coeff" name)) * max size1 size2)
-          + (free ~name:(fv (sf "%s_cmp_coeff" name)) * min size1 size2)
-      end
-    end in
-    (module M : Model.Model_impl with type arg_type = int * (int * unit))
-
   let open_chest_model name =
     let module M = struct
       type arg_type = int * (int * unit)
@@ -446,7 +425,7 @@ let ir_model ?specialization instr_or_cont =
       | N_IComb_get | N_IComb | N_IComb_set | N_IUncomb ->
           model_1 instr_or_cont (affine_model name)
       | N_ITicket | N_IRead_ticket -> model_0 instr_or_cont (const1_model name)
-      | N_ISplit_ticket -> model_2 instr_or_cont (split_ticket_model name)
+      | N_ISplit_ticket -> model_2 instr_or_cont (linear_max_model name)
       | N_IJoin_tickets -> model_4 instr_or_cont (join_tickets_model name)
       | N_ISapling_verify_update ->
           model_2 instr_or_cont (verify_update_model name)
