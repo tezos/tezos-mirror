@@ -2425,7 +2425,6 @@ let estimated_time round_durations ~current_level ~current_round
     ~current_timestamp ~level ~round =
   if Level.(level <= current_level) then Result.return_none
   else
-    Round.of_int round >>? fun round ->
     Round.timestamp_of_round
       round_durations
       ~round
@@ -2458,7 +2457,7 @@ module Baking_rights = struct
   type t = {
     level : Raw_level.t;
     delegate : Signature.Public_key_hash.t;
-    round : int;
+    round : Round.t;
     timestamp : Timestamp.t option;
   }
 
@@ -2472,7 +2471,7 @@ module Baking_rights = struct
       (obj4
          (req "level" Raw_level.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "round" uint16)
+         (req "round" Round.encoding)
          (opt "estimated_time" Timestamp.encoding))
 
   let default_max_round = 64
@@ -2531,16 +2530,17 @@ module Baking_rights = struct
   end
 
   let baking_rights_at_level ctxt max_round level =
-    Baking.baking_rights ctxt level >>=? fun delegates ->
     Round.get ctxt >>=? fun current_round ->
     let current_level = Level.current ctxt in
     let current_timestamp = Timestamp.current ctxt in
     let round_durations = Alpha_context.Constants.round_durations ctxt in
-    let rec loop l acc round =
-      if Compare.Int.(round > max_round) then return (List.rev acc)
+    let rec loop ctxt acc round =
+      if Round.(round > max_round) then
+        (* returns the ctxt with an updated cache of slot holders *)
+        return (ctxt, List.rev acc)
       else
-        let (Misc.LCons (pk, next)) = l in
-        let delegate = Signature.Public_key.hash pk in
+        Stake_distribution.baking_rights_owner ctxt level ~round
+        >>=? fun (ctxt, _slot, (_, delegate)) ->
         estimated_time
           round_durations
           ~current_level
@@ -2550,9 +2550,9 @@ module Baking_rights = struct
           ~round
         >>?= fun timestamp ->
         let acc = {level = level.level; delegate; round; timestamp} :: acc in
-        next () >>=? fun l -> loop l acc (round + 1)
+        loop ctxt acc (Round.succ round)
     in
-    loop delegates [] 0
+    loop ctxt [] Round.zero
 
   let remove_duplicated_delegates rights =
     List.rev @@ fst
@@ -2577,16 +2577,19 @@ module Baking_rights = struct
             cycles
             q.levels
         in
-        let max_round =
-          match q.max_round with
+        Round.of_int
+          (match q.max_round with
           | None -> default_max_round
           | Some max_round ->
               Compare.Int.min
                 max_round
-                (Constants.consensus_committee_size ctxt)
-        in
-        List.map_es (baking_rights_at_level ctxt max_round) levels
-        >|=? fun rights ->
+                (Constants.consensus_committee_size ctxt))
+        >>?= fun max_round ->
+        List.fold_left_map_es
+          (fun ctxt l -> baking_rights_at_level ctxt max_round l)
+          ctxt
+          levels
+        >|=? fun (_ctxt, rights) ->
         let rights =
           if q.all then List.concat rights
           else List.concat_map remove_duplicated_delegates rights
@@ -2699,7 +2702,7 @@ module Endorsing_rights = struct
       ~current_round
       ~current_timestamp
       ~level
-      ~round:0
+      ~round:Round.zero
     >>?= fun estimated_time ->
     let rights =
       Slot.Map.fold
