@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc
 
 type error +=
   | (* `Permanent *)
@@ -63,8 +62,3 @@ val endorsing_rights_by_first_slot :
 
 (** Computes the bonus baking reward depending on the endorsing power. *)
 val bonus_baking_reward : context -> endorsing_power:int -> Tez.t tzresult
-
-(** [baking_rights ctxt level] is the lazy list of contract's
-    public key hashes that are allowed to propose for [level]
-    at each round. *)
-val baking_rights : context -> Level.t -> Consensus_key.t lazy_list
