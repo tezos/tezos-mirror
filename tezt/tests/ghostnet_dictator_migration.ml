@@ -125,7 +125,7 @@ let register_migration_test chain_id =
             position = 2;
             remaining = 1;
           } )
-    | Chain_id_ghostnet, _ ->
+    | Chain_id_ghostnet, Lima ->
         ( None,
           {
             Voting.index = 1;
@@ -134,7 +134,7 @@ let register_migration_test chain_id =
             position = 7;
             remaining = 0;
           } )
-    | Chain_id_mainnet, _ ->
+    | _, _ ->
         ( None,
           {
             Voting.index = 1;
