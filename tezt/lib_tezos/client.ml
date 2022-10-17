@@ -1332,8 +1332,8 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
   |> Process.check
 
 let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
-    ?balance ?self_address ?source ?payer ?gas ?(trace_stack = false) ~prg
-    ~storage ~input client =
+    ?balance ?self_address ?source ?payer ?gas ?(trace_stack = false) ?level
+    ~prg ~storage ~input client =
   spawn_command ?hooks ?protocol_hash client
   @@ optional_switch "no-base-dir-warnings" no_base_dir_warnings
   @ ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
@@ -1342,6 +1342,7 @@ let spawn_run_script ?hooks ?protocol_hash ?(no_base_dir_warnings = false)
   @ optional_arg "balance" Tez.to_string balance
   @ optional_arg "self-address" Fun.id self_address
   @ optional_arg "gas" (fun gas -> string_of_int gas) gas
+  @ optional_arg "level" string_of_int level
   @ optional_switch "trace-stack" trace_stack
 
 let stresstest_estimate_gas ?endpoint client =
@@ -1380,7 +1381,8 @@ let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
   |> Process.check
 
 let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
-    ?self_address ?source ?payer ?gas ?trace_stack ~prg ~storage ~input client =
+    ?self_address ?source ?payer ?gas ?trace_stack ?level ~prg ~storage ~input
+    client =
   let* client_output =
     spawn_run_script
       ?hooks
@@ -1392,6 +1394,7 @@ let run_script ?hooks ?protocol_hash ?no_base_dir_warnings ?balance
       ?self_address
       ?gas
       ?trace_stack
+      ?level
       ~prg
       ~storage
       ~input
