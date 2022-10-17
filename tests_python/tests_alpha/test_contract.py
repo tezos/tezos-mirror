@@ -1,6 +1,5 @@
 import os
 import re
-import itertools
 from typing import List, Union, Any
 import pytest
 
@@ -1635,30 +1634,6 @@ class TestBadAnnotation:
 
         res = client.run_script(contract, 'None', parameter)
         assert res.storage == 'None'
-
-
-@pytest.mark.contract
-class TestOrderInTopLevelDoesNotMatter:
-    @pytest.fixture
-    def contract_splitted_in_top_level_elements(self):
-        return [
-            "parameter nat",
-            "storage unit",
-            "code { CDR; NIL operation; PAIR }",
-        ]
-
-    def test_shuffle(
-        self, client: Client, contract_splitted_in_top_level_elements
-    ):
-        """
-        Test that the storage, code, and parameter sections can appear in any
-        order in a contract script.
-        """
-        for shuffled_list in itertools.permutations(
-            contract_splitted_in_top_level_elements
-        ):
-            contract = ";\n".join(shuffled_list)
-            client.typecheck(contract, file=False)
 
 
 @pytest.mark.slow
