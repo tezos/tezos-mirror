@@ -42,7 +42,7 @@ let wat2wasm code =
 let default_max_tick = 100000L
 
 let initial_tree ?(max_tick = default_max_tick)
-    ?(max_reboots = Wasm_pvm.maximum_reboots_per_input) ?(from_binary = false)
+    ?(max_reboots = Constants.maximum_reboots_per_input) ?(from_binary = false)
     code =
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in

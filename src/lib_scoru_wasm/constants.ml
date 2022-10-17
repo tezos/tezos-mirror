@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,5 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree
+(* The name by which the module is registered. This can be anything as long
+   as we use the same name to lookup from the registry. *)
+let wasm_main_module_name = "main"
+
+(* This is the name of the main function of the module. We require the
+   kernel to expose a function named [kernel_next]. *)
+let wasm_entrypoint = "kernel_next"
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3590
+   An appropriate number should be used,
+   currently 100 times the nb of ticks it takes tx_kernel to init, deposit, then withdraw
+   (so 100x 2 billion ticks) *)
+let wasm_max_tick = Z.of_int 200_000_000_000
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
+   Find an appropriate number of reboots per inputs.
+*)
+let maximum_reboots_per_input = Z.of_int 10
+
+(* Flag used in the durable storage by the kernel to ask a reboot from the PVM
+   without consuming an input. *)
+let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot"
+
+(* The path to where the WASM kernel is stored. *)
+let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
