@@ -60,7 +60,7 @@ val on_event : t -> (event -> unit) -> unit
 
     The resulting promise is fulfilled as soon as the baker has been spawned.  It
     continues running in the background.*)
-val run : t -> unit Lwt.t
+val run : ?event_level:Daemon.Level.default_level -> t -> unit Lwt.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
