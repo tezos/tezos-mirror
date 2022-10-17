@@ -55,7 +55,7 @@ module Make (PVM : Pvm.S) = struct
         ~level:Notice
         ("level", Data_encoding.int31)
         ("message_index", Data_encoding.int31)
-        ("message_tick", Data_encoding.int31)
+        ("message_tick", Data_encoding.int64)
         ("internal", Data_encoding.bool)
   end
 

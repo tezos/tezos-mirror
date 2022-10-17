@@ -334,21 +334,31 @@ module Make
     let* state = read_state tree in
     match state with
     | Broken {current_tick} ->
-        Tree_encoding_runner.encode broken_merklizer (Z.succ current_tick) tree
-    | Halted origination_message -> (
-        match origination_kernel_loading_step origination_message with
-        | Some state -> Tree_encoding_runner.encode state_merklizer state tree
-        | None ->
-            (* We could not interpret [origination_message],
-               meaning the PVM is stuck. *)
-            Tree_encoding_runner.encode broken_merklizer Z.one tree)
+        let+ result =
+          Tree_encoding_runner.encode
+            broken_merklizer
+            (Z.succ current_tick)
+            tree
+        in
+        (result, 1L)
+    | Halted origination_message ->
+        let+ result =
+          match origination_kernel_loading_step origination_message with
+          | Some state -> Tree_encoding_runner.encode state_merklizer state tree
+          | None ->
+              (* We could not interpret [origination_message],
+                 meaning the PVM is stuck. *)
+              Tree_encoding_runner.encode broken_merklizer Z.one tree
+        in
+        (result, 1L)
     | Running state -> (
         let state = increment_ticks state in
         match state.internal_status with
         | Gathering_floppies _ -> raise Compute_step_expected_input
         | Not_gathering_floppies -> wasm_step tree)
 
-  let compute_step tree = compute_step_gen Wasm.compute_step tree
+  let compute_step tree =
+    Lwt.map fst @@ compute_step_gen (Wasm.compute_step_many ~max_steps:1L) tree
 
   (** [set_input_step input message tree] instruments
       [Wasm.set_input_step] to interpret incoming input messages as

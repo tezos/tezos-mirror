@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type failure = {level : int; message_index : int; message_tick : int}
+type failure = {level : int; message_index : int; message_tick : int64}
 
 let failure_encoding =
   let open Data_encoding in
@@ -35,14 +35,14 @@ let failure_encoding =
     (obj3
        (req "level" int31)
        (req "message_index" int31)
-       (req "message_tick" int31))
+       (req "message_tick" int64))
 
 let compare_failure {level; message_index; message_tick} f2 =
   let open Compare.Int in
   match compare level f2.level with
   | 0 -> (
       match compare message_index f2.message_index with
-      | 0 -> compare message_tick f2.message_tick
+      | 0 -> Int64.compare message_tick f2.message_tick
       | n -> n)
   | n -> n
 
@@ -60,7 +60,7 @@ let make s =
         {
           level = int_of_string level;
           message_index = int_of_string message_index;
-          message_tick = int_of_string message_tick;
+          message_tick = Int64.of_string message_tick;
         }
         :: chop rest
     | _ -> raise Not_found

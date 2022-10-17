@@ -1080,7 +1080,7 @@ struct
     struct
       type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
 
-      module Wasm = Tezos_scoru_wasm.Wasm_pvm.Make (struct
+      include Tezos_scoru_wasm.Wasm_pvm.Make (struct
         include Tree
 
         let select = function
@@ -1089,17 +1089,6 @@ struct
 
         let wrap t = PVM_tree t
       end)
-
-      let compute_step (tree : Tree.tree) = Wasm.compute_step tree
-
-      let set_input_step input payload (tree : Tree.tree) =
-        Wasm.set_input_step input payload tree
-
-      let reveal_step = Wasm.reveal_step
-
-      let get_output output (tree : Tree.tree) = Wasm.get_output output tree
-
-      let get_info (tree : Tree.tree) = Wasm.get_info tree
     end
   end
 

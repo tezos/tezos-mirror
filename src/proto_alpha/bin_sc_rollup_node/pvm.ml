@@ -50,6 +50,10 @@ module type S = sig
       outbox of [state]. *)
   val get_outbox : state -> Sc_rollup.output list Lwt.t
 
+  (** [eval_many ~max_steps s0] returns a state [s1] resulting from the
+      execution of up to [~max_steps] steps of the rollup at state [s0]. *)
+  val eval_many : max_steps:int64 -> state -> (state * int64) Lwt.t
+
   (** State storage for this PVM. *)
   module State : sig
     (** [find context] returns the PVM state stored in the [context], if any. *)

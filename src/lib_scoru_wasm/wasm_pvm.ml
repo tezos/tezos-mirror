@@ -387,6 +387,9 @@ module Make (T : Tezos_tree_encoding.TREE) :
       | Restarting | Failing -> maximum_reboots_per_input
       | Starting | Running -> reboot_counter
 
+    (** [compute_step_inner pvm_state] does one computation step on [pvm_state]. 
+        Returns the new state.
+     *)
     let compute_step_inner pvm_state =
       let open Lwt_syntax in
       (* Calculate the next tick state. *)
@@ -424,6 +427,16 @@ module Make (T : Tezos_tree_encoding.TREE) :
       eval_has_finished pvm_state.tick_state
       && not (is_time_for_snapshot pvm_state)
 
+    let measure_executed_ticks (transition : pvm_state -> pvm_state Lwt.t)
+        (initial_state : pvm_state) : (pvm_state * int64) Lwt.t =
+      let open Lwt.Syntax in
+      let open Z in
+      let+ final_state = transition initial_state in
+      let ticks_executed =
+        final_state.current_tick - initial_state.current_tick
+      in
+      (final_state, to_int64 ticks_executed)
+
     let decode tree = Tree_encoding_runner.decode pvm_state_encoding tree
 
     let encode pvm_state tree =
@@ -446,8 +459,7 @@ module Make (T : Tezos_tree_encoding.TREE) :
       let* tree = T.remove tree ["wasm"] in
       Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
 
-    let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue
-        pvm_state =
+    let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue =
       let open Lwt.Syntax in
       assert (max_steps > 0L) ;
       let rec go steps_left pvm_state =
@@ -472,10 +484,13 @@ module Make (T : Tezos_tree_encoding.TREE) :
             go (Int64.pred steps_left) pvm_state
         else Lwt.return pvm_state
       in
-      (* Make sure we perform at least 1 step. The assertion above ensures that
-         we were asked to perform at least 1. *)
-      let* pvm_state = compute_step_inner pvm_state in
-      go (Int64.pred max_steps) pvm_state
+      let one_or_more_steps pvm_state =
+        (* Make sure we perform at least 1 step. The assertion above ensures that
+           we were asked to perform at least 1. *)
+        let* pvm_state = compute_step_inner pvm_state in
+        go (Int64.pred max_steps) pvm_state
+      in
+      measure_executed_ticks one_or_more_steps
 
     let compute_step_many_until ?(max_steps = 1L) should_continue tree =
       let open Lwt.Syntax in
@@ -485,11 +500,12 @@ module Make (T : Tezos_tree_encoding.TREE) :
 
       (* Make sure we perform at least 1 step. The assertion above ensures that
          we were asked to perform at least 1. *)
-      let* pvm_state =
+      let* pvm_state, executed_ticks =
         compute_step_many_until_pvm_state ~max_steps should_continue pvm_state
       in
 
-      encode pvm_state tree
+      let* tree = encode pvm_state tree in
+      Lwt.return (tree, executed_ticks)
 
     let compute_step_many ~max_steps tree =
       let open Lwt_syntax in
@@ -501,7 +517,11 @@ module Make (T : Tezos_tree_encoding.TREE) :
       in
       compute_step_many_until ~max_steps should_continue tree
 
-    let compute_step tree = compute_step_many ~max_steps:1L tree
+    let compute_step tree =
+      let open Lwt.Syntax in
+      let* initial_state = decode tree in
+      let* final_state = compute_step_inner initial_state in
+      encode final_state tree
 
     let get_output output_info tree =
       let open Lwt_syntax in

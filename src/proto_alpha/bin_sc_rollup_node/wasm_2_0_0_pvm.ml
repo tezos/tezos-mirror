@@ -76,6 +76,10 @@ module Impl : Pvm.S = struct
           hash
     | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
     | Computing -> "Computing"
+
+  module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)
+
+  let eval_many = Backend.compute_step_many
 end
 
 include Impl
