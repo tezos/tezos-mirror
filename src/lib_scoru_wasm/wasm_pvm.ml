@@ -25,30 +25,6 @@
 (*****************************************************************************)
 
 open Wasm_pvm_state.Internal_state
-
-(* The name by which the module is registered. This can be anything as long
-   as we use the same name to lookup from the registry. *)
-let wasm_main_module_name = "main"
-
-(* This is the name of the main function of the module. We require the
-   kernel to expose a function named [kernel_next]. *)
-let wasm_entrypoint = "kernel_next"
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3590
-   An appropriate number should be used,
-   currently 100 times the nb of ticks it takes tx_kernel to init, deposit, then withdraw
-   (so 100x 2 billion ticks) *)
-let wasm_max_tick = Z.of_int 200_000_000_000
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
-   Find an appropriate number of reboots per inputs.
-*)
-let maximum_reboots_per_input = Z.of_int 10
-
-(* Flag used in the durable storage by the kernel to ask a reboot from the PVM
-   without consuming an input. *)
-let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot"
-
 module Wasm = Tezos_webassembly_interpreter
 
 type computation_status = Starting | Restarting | Running | Failing | Reboot
@@ -182,9 +158,12 @@ let pvm_state_encoding =
        (option durable_buffers_encoding)
        (scope ["wasm"] tick_state_encoding)
        (value ~default:Z.zero ["pvm"; "last_top_level_call"] Data_encoding.n)
-       (value ~default:wasm_max_tick ["pvm"; "max_nb_ticks"] Data_encoding.n)
        (value
-          ~default:maximum_reboots_per_input
+          ~default:Constants.wasm_max_tick
+          ["pvm"; "max_nb_ticks"]
+          Data_encoding.n)
+       (value
+          ~default:Constants.maximum_reboots_per_input
           ["pvm"; "maximum_reboots_per_input"]
           Data_encoding.n))
 
@@ -194,8 +173,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
     type tree = T.tree
 
     module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
-
-    let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 
     let link_finished (ast : Wasm.Ast.module_) offset =
       offset >= Wasm.Ast.Vector.num_elements ast.it.imports
@@ -217,7 +194,7 @@ module Make (T : Tezos_tree_encoding.TREE) :
       let open Lwt_syntax in
       let+ allows_reboot =
         Lwt.catch
-          (fun () -> Durable.(find_value durable reboot_flag_key))
+          (fun () -> Durable.(find_value durable Constants.reboot_flag_key))
           (function exn -> raise exn)
       in
       allows_reboot <> None
@@ -232,7 +209,7 @@ module Make (T : Tezos_tree_encoding.TREE) :
     let initial_boot_state () =
       Decode
         (Tezos_webassembly_interpreter.Decode.initial_decode_kont
-           ~name:wasm_main_module_name)
+           ~name:Constants.wasm_main_module_name)
 
     let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state)
         =
@@ -245,7 +222,7 @@ module Make (T : Tezos_tree_encoding.TREE) :
       | Snapshot ->
           let* has_reboot_flag = has_reboot_flag durable in
           if has_reboot_flag then
-            let* durable = Durable.(delete durable reboot_flag_key) in
+            let* durable = Durable.(delete durable Constants.reboot_flag_key) in
             return ~durable (initial_boot_state ())
           else
             return
@@ -273,12 +250,12 @@ module Make (T : Tezos_tree_encoding.TREE) :
                  imports_offset = 0l;
                })
       | Decode m ->
-          let* kernel = Durable.find_value_exn durable kernel_key in
+          let* kernel = Durable.find_value_exn durable Constants.kernel_key in
           let* m = Tezos_webassembly_interpreter.Decode.module_step kernel m in
           return (Decode m)
       | Link {ast_module; externs; imports_offset}
         when link_finished ast_module imports_offset ->
-          let self = Wasm.Instance.Module_key wasm_main_module_name in
+          let self = Wasm.Instance.Module_key Constants.wasm_main_module_name in
           let module_reg = Wasm.Instance.ModuleMap.create () in
           (* The module instance will be registered as [self] in
              [module_reg] during the initialization. *)
@@ -311,11 +288,13 @@ module Make (T : Tezos_tree_encoding.TREE) :
           )
       | Init {self; ast_module = _; init_kont = IK_Stop; module_reg} -> (
           let* module_inst =
-            Wasm.Instance.ModuleMap.get wasm_main_module_name module_reg
+            Wasm.Instance.ModuleMap.get
+              Constants.wasm_main_module_name
+              module_reg
           in
           let* extern =
             Wasm.Instance.NameMap.get
-              wasm_entrypoint
+              Constants.wasm_entrypoint
               module_inst.Wasm.Instance.exports
           in
           match extern with
@@ -686,7 +665,9 @@ module Make (T : Tezos_tree_encoding.TREE) :
         let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
         match pvm_state.tick_state with
         | Eval config ->
-            Wasm.Instance.ModuleMap.get wasm_main_module_name config.module_reg
+            Wasm.Instance.ModuleMap.get
+              Constants.wasm_main_module_name
+              config.module_reg
         | _ -> raise (Invalid_argument "get_module_instance")
 
       let is_stuck tree =
