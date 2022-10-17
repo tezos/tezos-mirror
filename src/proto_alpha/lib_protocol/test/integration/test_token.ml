@@ -41,11 +41,9 @@ let wrap e = e >|= Environment.wrap_tzresult
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
 let create_context () =
-  let accounts = Account.generate_accounts 1 in
-  Block.alpha_context accounts >>=? fun ctxt ->
-  match accounts with
-  | [({pkh; _}, _, _)] -> return (ctxt, pkh)
-  | _ -> (* Exactly one account has been generated. *) assert false
+  let (Account.{pkh; _} as account) = Account.new_account () in
+  let bootstrap_account = Account.make_bootstrap_account account in
+  Block.alpha_context [bootstrap_account] >>=? fun ctxt -> return (ctxt, pkh)
 
 let random_amount () =
   match Tez.of_mutez (Int64.add 1L (Random.int64 100L)) with

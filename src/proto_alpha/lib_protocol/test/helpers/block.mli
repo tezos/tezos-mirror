@@ -141,7 +141,7 @@ val genesis :
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
-  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
+  Parameters.bootstrap_account list ->
   block tzresult Lwt.t
 
 val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
@@ -153,7 +153,7 @@ val genesis_with_parameters : Parameters.t -> block tzresult Lwt.t
 val alpha_context :
   ?commitments:Commitment.t list ->
   ?min_proposal_quorum:int32 ->
-  (Account.t * Tez.tez * Signature.Public_key_hash.t option) list ->
+  Parameters.bootstrap_account list ->
   Alpha_context.t tzresult Lwt.t
 
 (**
@@ -289,7 +289,7 @@ val prepare_initial_context_params :
   ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
-  (Account.t * Tez.t * Signature.Public_key_hash.t option) list ->
+  unit ->
   ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
   result

@@ -40,8 +40,9 @@ let random_seed ~rng_state =
   Bytes.init Hacl.Ed25519.sk_size (fun _i ->
       Char.chr (Random.State.int rng_state 256))
 
-let new_account ?seed () =
-  let pkh, pk, sk = Signature.generate_key ~algo:Ed25519 ?seed () in
+let new_account ?(rng_state = Random.State.make_self_init ())
+    ?(seed = random_seed ~rng_state) () =
+  let pkh, pk, sk = Signature.generate_key ~algo:Ed25519 ~seed () in
   let account = {pkh; pk; sk} in
   Signature.Public_key_hash.Table.add known_accounts pkh account ;
   account
@@ -77,37 +78,9 @@ let dummy_account =
 
 let default_initial_balance = Tez.of_mutez_exn 4_000_000_000_000L
 
-let generate_accounts ?rng_state ?(initial_balances = []) ?bootstrap_delegations
-    n : (t * Tez.t * Signature.Public_key_hash.t option) list =
+let generate_accounts ?rng_state n : t list tzresult =
   Signature.Public_key_hash.Table.clear known_accounts ;
-  let amount i =
-    match List.nth_opt initial_balances i with
-    | None -> default_initial_balance
-    | Some a -> Tez.of_mutez_exn a
-  in
-  let rng_state =
-    match rng_state with
-    | None -> Random.State.make_self_init ()
-    | Some state -> state
-  in
-  let delegate_to account =
-    Option.filter_map
-      (fun bootstrap_delegations ->
-        List.find_map
-          (fun (from_pkh, to_pkh) ->
-            if from_pkh = account then Some to_pkh else None)
-          bootstrap_delegations)
-      bootstrap_delegations
-  in
-  List.map
-    (fun i ->
-      let pkh, pk, sk =
-        Signature.generate_key ~algo:Ed25519 ~seed:(random_seed ~rng_state) ()
-      in
-      let account = {pkh; pk; sk} in
-      Signature.Public_key_hash.Table.add known_accounts pkh account ;
-      (account, amount i, delegate_to pkh))
-    (0 -- (n - 1))
+  List.init ~when_negative_length:[] n (fun _i -> new_account ?rng_state ())
 
 let commitment_secret =
   Blinded_public_key_hash.activation_code_of_hex
@@ -127,3 +100,39 @@ let new_commitment ?seed () =
 let pkh_of_contract_exn = function
   | Contract.Implicit pkh -> pkh
   | Originated _ -> assert false
+
+let make_bootstrap_account ?(balance = default_initial_balance)
+    ?(delegate_to = None) ?(consensus_key = None) account =
+  Parameters.
+    {
+      public_key_hash = account.pkh;
+      public_key = Some account.pk;
+      amount = balance;
+      delegate_to;
+      consensus_key;
+    }
+
+let rec make_bootstrap_accounts ?(bootstrap_balances = [])
+    ?(bootstrap_delegations = []) ?(bootstrap_consensus_keys = []) accounts =
+  let decons_of_opt = function x :: xs -> (x, xs) | [] -> (None, []) in
+  let decons = function x :: xs -> (Some x, xs) | [] -> (None, []) in
+  match accounts with
+  | account :: accounts ->
+      let balance, bootstrap_balances = decons bootstrap_balances in
+      let delegate_to, bootstrap_delegations =
+        decons_of_opt bootstrap_delegations
+      in
+      let consensus_key, bootstrap_consensus_keys =
+        decons_of_opt bootstrap_consensus_keys
+      in
+      make_bootstrap_account
+        ?balance:(Option.map Tez.of_mutez_exn balance)
+        ~delegate_to
+        ~consensus_key
+        account
+      :: make_bootstrap_accounts
+           ~bootstrap_balances
+           ~bootstrap_delegations
+           ~bootstrap_consensus_keys
+           accounts
+  | [] -> []

@@ -63,11 +63,11 @@ let mk_tx_rollup ?(nonce = nonce_zero) () =
 (** Creates a context with a single account. Returns the context and the public
     key hash of the account. *)
 let create_context () =
-  let accounts = Account.generate_accounts 1 in
-  Block.alpha_context accounts >>=? fun ctxt ->
-  match accounts with
-  | [({pkh; _}, _, _)] -> return (ctxt, pkh)
-  | _ -> (* Exactly one account has been generated. *) assert false
+  let (Parameters.{public_key_hash; _} as bootstrap_account) =
+    Account.(new_account () |> make_bootstrap_account)
+  in
+  Block.alpha_context [bootstrap_account] >|=? fun ctxt ->
+  (ctxt, public_key_hash)
 
 (** Creates a context, a user contract, and a delegate.
     Returns the context, the user contract, the user account, and the

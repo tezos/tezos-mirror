@@ -36,21 +36,17 @@ open Protocol
 
 (** Creates a dummy raw-context value. *)
 let default_raw_context () =
-  let initial_accounts =
-    Account.generate_accounts ~initial_balances:[100_000_000_000L] 1
+  let open Lwt_result_syntax in
+  let initial_account = Account.new_account () in
+  let bootstrap_account =
+    Account.make_bootstrap_account
+      ~balance:(Alpha_context.Tez.of_mutez_exn 100_000_000_000L)
+      initial_account
   in
-  let bootstrap_accounts =
-    List.map
-      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account
-          (pkh, pk, amount, delegate_to, None))
-      initial_accounts
-  in
-  Block.prepare_initial_context_params initial_accounts
-  >>=? fun (constants, _, _) ->
+  Block.prepare_initial_context_params () >>=? fun (constants, _, _) ->
   let parameters =
     Default_parameters.parameters_of_constants
-      ~bootstrap_accounts
+      ~bootstrap_accounts:[bootstrap_account]
       ~commitments:[]
       constants
   in
@@ -59,19 +55,22 @@ let default_raw_context () =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
   in
   let protocol_param_key = ["protocol_parameters"] in
-  Tezos_protocol_environment.Context.(
-    let empty = Tezos_protocol_environment.Memory_context.empty in
-    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
-    add ctxt protocol_param_key proto_params)
-  >>= fun context ->
+  let*! context =
+    Tezos_protocol_environment.Context.(
+      let empty = Tezos_protocol_environment.Memory_context.empty in
+      let*! ctxt = add empty ["version"] (Bytes.of_string "genesis") in
+      add ctxt protocol_param_key proto_params)
+  in
   let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
-  Init_storage.prepare_first_block
-    Chain_id.zero
-    context
-    ~level:0l
-    ~timestamp:(Time.Protocol.of_seconds 1643125688L)
-    ~typecheck
-  >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e
+  let*! e =
+    Init_storage.prepare_first_block
+      Chain_id.zero
+      context
+      ~level:0l
+      ~timestamp:(Time.Protocol.of_seconds 1643125688L)
+      ~typecheck
+  in
+  Lwt.return @@ Environment.wrap_tzresult e
 
 module String = struct
   type t = string

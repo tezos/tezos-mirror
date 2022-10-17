@@ -40,7 +40,10 @@ val activator_account : account
 
 val dummy_account : account
 
-val new_account : ?seed:Bytes.t -> unit -> account
+(** [new_account ?rng_state ?seed ()] creates a new account with the given [seed] (or
+    [rng_state] to generate the seed) and add it to the global account state.
+*)
+val new_account : ?rng_state:Random.State.t -> ?seed:Bytes.t -> unit -> account
 
 val add_account : t -> unit
 
@@ -51,18 +54,11 @@ val find_alternate : Signature.Public_key_hash.t -> t
 (** 4.000.000.000 tez *)
 val default_initial_balance : Tez.t
 
-(** [generate_accounts ?initial_balances n] : generates [n] random
-    accounts with the initial balance of the [i]th account given by the
-    [i]th value in the list [initial_balances] or otherwise
-    [default_initial_balance] tz (if the list is too short); and add them to the
-    global account state *)
-val generate_accounts :
-  ?rng_state:Random.State.t ->
-  ?initial_balances:int64 list ->
-  ?bootstrap_delegations:
-    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
-  int ->
-  (t * Tez.t * Signature.Public_key_hash.t option) list
+(** [generate_accounts ?rng_state n] first frees the global account state then
+    generates [n] random accounts with [rng_state] to generate the seed and adds
+    them to the global account state.
+*)
+val generate_accounts : ?rng_state:Random.State.t -> int -> t list tzresult
 
 val commitment_secret : Blinded_public_key_hash.activation_code
 
@@ -71,3 +67,28 @@ val new_commitment :
 
 (** Fails if the contract is not an implicit one  *)
 val pkh_of_contract_exn : Contract.t -> Signature.Public_key_hash.t
+
+(** [make_bootstrap_account ~initial_balance ~delegate_to account] creates a
+    {!Parameters.bootstrap_account} from an account with the default or set
+    values. default [initial_balance] is [default_initial_balance],
+    [delegate_to] is [None] and [consensus_key] is [None].
+*)
+val make_bootstrap_account :
+  ?balance:Tez.t ->
+  ?delegate_to:Signature.public_key_hash option ->
+  ?consensus_key:Signature.public_key option ->
+  t ->
+  Parameters.bootstrap_account
+
+(** [make_bootstrap_accounts ~bootstrap_balances ~bootstrap_delegations
+    ~bootstrap_consensus_keys accounts] combines the lists [accounts],
+    [bootstrap_balances], [bootstrap_delegations] and [bootstrap_consensus_keys]
+    to create a list of {!Parameters.bootstrap_account} using
+    [make_bootstrap_account].
+*)
+val make_bootstrap_accounts :
+  ?bootstrap_balances:int64 list ->
+  ?bootstrap_delegations:Signature.public_key_hash option list ->
+  ?bootstrap_consensus_keys:Signature.public_key option list ->
+  t list ->
+  Parameters.bootstrap_account list

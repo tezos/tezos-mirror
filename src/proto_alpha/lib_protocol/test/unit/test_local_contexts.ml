@@ -37,9 +37,10 @@ open Storage_functors
 module A = Alpha_context
 
 let create () =
-  let accounts = Account.generate_accounts 1 in
-  Block.alpha_context accounts >|=? fun alpha_ctxt ->
-  A.Internal_for_tests.to_raw alpha_ctxt
+  let account = Account.new_account () in
+  let bootstrap_account = Account.make_bootstrap_account account in
+  Block.alpha_context [bootstrap_account] >>=? fun alpha_ctxt ->
+  return @@ A.Internal_for_tests.to_raw alpha_ctxt
 
 (* /a/b/c *)
 let dir1 = ["a"; "b"; "c"]

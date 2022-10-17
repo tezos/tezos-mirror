@@ -199,10 +199,7 @@ let check_chunks_count tree expected =
   if count = expected then Lwt_result.return ()
   else failwith "wrong chunks counter, expected %d, got %d" expected count
 
-let operator () =
-  match Account.generate_accounts 1 with
-  | [(account, _, _)] -> account
-  | _ -> assert false
+let operator = Account.new_account
 
 let should_boot_complete_boot_sector boot_sector () =
   let open Tezos_scoru_wasm.Gather_floppies in

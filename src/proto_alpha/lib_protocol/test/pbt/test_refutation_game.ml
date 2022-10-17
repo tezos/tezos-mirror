@@ -239,7 +239,7 @@ let create_ctxt ~first_inputs =
     Context.init3
       ~sc_rollup_enable:true
       ~consensus_threshold:0
-      ~initial_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
+      ~bootstrap_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
       ()
   in
   let* block, sc_rollup, genesis_info =

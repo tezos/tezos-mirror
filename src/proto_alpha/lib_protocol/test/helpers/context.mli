@@ -270,12 +270,12 @@ val tup_hd : ('a, 'elts) tup -> 'elts -> 'a
 type 'accounts init :=
   ?rng_state:Random.State.t ->
   ?commitments:Commitment.t list ->
-  ?initial_balances:int64 list ->
+  ?bootstrap_balances:int64 list ->
+  ?bootstrap_delegations:Signature.Public_key_hash.t option list ->
+  ?bootstrap_consensus_keys:Signature.Public_key.t option list ->
   ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
-  ?bootstrap_delegations:
-    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
   ?liquidity_baking_subsidy:Tez.t ->

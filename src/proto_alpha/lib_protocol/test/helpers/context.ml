@@ -456,26 +456,25 @@ let tup_get : type a r. (a, r) tup -> a list -> r =
   | TList _, l -> l
   | _ -> assert false
 
-let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
-    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts
-    ?bootstrap_delegations ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable
+let init_gen tup ?rng_state ?commitments ?bootstrap_balances
+    ?bootstrap_delegations ?bootstrap_consensus_keys ?consensus_threshold
+    ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
+    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
+    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
+    ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
+    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
-  let accounts =
-    Account.generate_accounts
-      ?rng_state
-      ~initial_balances
-      ?bootstrap_delegations
-      n
-  in
+  Account.generate_accounts ?rng_state n >>?= fun accounts ->
   let contracts =
-    List.map
-      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
+    List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
+  in
+  let bootstrap_accounts =
+    Account.make_bootstrap_accounts
+      ?bootstrap_balances
+      ?bootstrap_delegations
+      ?bootstrap_consensus_keys
       accounts
   in
   Block.genesis
@@ -501,7 +500,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
-    accounts
+    bootstrap_accounts
   >|=? fun blk -> (blk, tup_get tup contracts)
 
 let init_n n = init_gen (TList n)
@@ -514,20 +513,12 @@ let init3 = init_gen T3
 
 let init_with_constants_gen tup constants =
   let n = tup_n tup in
-  let accounts = Account.generate_accounts n in
+  Account.generate_accounts n >>?= fun accounts ->
   let contracts =
-    List.map
-      (fun (a, _, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
-      accounts
+    List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
   in
+  let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   let open Tezos_protocol_alpha_parameters in
-  let bootstrap_accounts =
-    List.map
-      (fun (acc, tez, delegate_to) ->
-        Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
-      accounts
-  in
   let parameters =
     Default_parameters.parameters_of_constants ~bootstrap_accounts constants
   in
@@ -541,22 +532,17 @@ let init_with_constants1 = init_with_constants_gen T1
 let init_with_constants2 = init_with_constants_gen T2
 
 let default_raw_context () =
-  let initial_accounts =
-    Account.generate_accounts ~initial_balances:[100_000_000_000L] 1
-  in
   let open Tezos_protocol_alpha_parameters in
+  let initial_account = Account.new_account () in
   let bootstrap_accounts =
-    List.map
-      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account
-          (pkh, pk, amount, delegate_to, None))
-      initial_accounts
+    Account.make_bootstrap_account
+      ~balance:(Tez.of_mutez_exn 100_000_000_000L)
+      initial_account
   in
-  Block.prepare_initial_context_params initial_accounts
-  >>=? fun (constants, _, _) ->
+  Block.prepare_initial_context_params () >>=? fun (constants, _, _) ->
   let parameters =
     Default_parameters.parameters_of_constants
-      ~bootstrap_accounts
+      ~bootstrap_accounts:[bootstrap_accounts]
       ~commitments:[]
       constants
   in

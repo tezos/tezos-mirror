@@ -29,8 +29,9 @@ open Micheline
 open Michelson_v1_primitives
 
 let create_context () =
-  let accounts = Account.generate_accounts 2 in
-  Block.alpha_context accounts
+  let open Lwt_result_syntax in
+  let*? accounts = Account.generate_accounts 2 in
+  Block.alpha_context (Account.make_bootstrap_accounts accounts)
 
 let expr_to_hash expr =
   let lexpr = Script_repr.lazy_expr expr in

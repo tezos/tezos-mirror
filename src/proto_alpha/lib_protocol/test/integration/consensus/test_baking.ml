@@ -311,7 +311,10 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
      active balance is less or equal the staking balance (see
      [Delegate_sampler.select_distribution_for_cycle]). *)
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
-  Context.init2 ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 ()
+  Context.init2
+    ~bootstrap_balances:[initial_bal1; tpr]
+    ~consensus_threshold:0
+    ()
   >>=? fun (b0, (account1, _account2)) ->
   let pkh1 = Context.Contract.pkh account1 in
   Context.get_constants (B b0)
@@ -336,16 +339,11 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
 
 let test_committee_sampling () =
   let test_distribution max_round distribution =
-    let initial_balances, bounds = List.split distribution in
-    let accounts =
-      Account.generate_accounts ~initial_balances (List.length initial_balances)
-    in
+    let bootstrap_balances, bounds = List.split distribution in
+    Account.generate_accounts (List.length bootstrap_balances)
+    >>?= fun accounts ->
     let bootstrap_accounts =
-      List.map
-        (fun (acc, tez, delegate_to) ->
-          Default_parameters.make_bootstrap_account
-            (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
-        accounts
+      Account.make_bootstrap_accounts ~bootstrap_balances accounts
     in
     let consensus_committee_size = max_round in
     assert (
@@ -368,8 +366,7 @@ let test_committee_sampling () =
     >|=? fun bakers ->
     let stats = Stdlib.Hashtbl.create 10 in
     Stdlib.List.iter2
-      (fun (acc, _, _) bounds ->
-        Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
+      (fun acc bounds -> Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
       accounts
       bounds ;
     List.iter

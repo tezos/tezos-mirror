@@ -318,15 +318,8 @@ let check_constants_consistency constants =
          blocks_per_stake_snapshot")
 
 let prepare_main_init_params ?bootstrap_contracts commitments constants
-    initial_accounts =
+    bootstrap_accounts =
   let open Tezos_protocol_alpha_parameters in
-  let bootstrap_accounts =
-    List.map
-      (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account
-          (pkh, pk, amount, delegate_to, None))
-      initial_accounts
-  in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -344,19 +337,19 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
     add ctxt protocol_param_key proto_params)
 
 let initial_context ?(commitments = []) ?bootstrap_contracts chain_id constants
-    header initial_accounts =
+    header bootstrap_accounts =
   prepare_main_init_params
     ?bootstrap_contracts
     commitments
     constants
-    initial_accounts
+    bootstrap_accounts
   >>= fun ctxt ->
   Main.init chain_id ctxt header >|= Environment.wrap_tzresult
   >|=? fun {context; _} -> context
 
 let initial_alpha_context ?(commitments = []) constants
-    (block_header : Block_header.shell_header) initial_accounts =
-  prepare_main_init_params commitments constants initial_accounts
+    (block_header : Block_header.shell_header) bootstrap_accounts =
+  prepare_main_init_params commitments constants bootstrap_accounts
   >>= fun ctxt ->
   let level = block_header.level in
   let timestamp = block_header.timestamp in
@@ -445,21 +438,19 @@ let genesis_with_parameters parameters =
     context;
   }
 
-let validate_initial_accounts
-    (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list)
-    minimal_stake =
-  if initial_accounts = [] then
+let validate_bootstrap_accounts
+    (bootstrap_accounts : Parameters.bootstrap_account list) minimal_stake =
+  if bootstrap_accounts = [] then
     Stdlib.failwith "Must have one account with minimal_stake to bake" ;
   (* Check there are at least minimal_stake tokens *)
   Lwt.catch
     (fun () ->
       List.fold_left_es
-        (fun acc (_, amount, _) ->
+        (fun acc (Parameters.{amount; _} : Parameters.bootstrap_account) ->
           Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
           if acc >= minimal_stake then raise Exit else return acc)
         Tez.zero
-        initial_accounts
+        bootstrap_accounts
       >>=? fun _ ->
       failwith
         "Insufficient tokens in initial accounts: the amount should be at \
@@ -472,8 +463,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
-    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
-    initial_accounts =
+    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -586,21 +576,6 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       nonce_revelation_threshold;
     }
   in
-  (* Check there are at least minimal_stake tokens *)
-  Lwt.catch
-    (fun () ->
-      List.fold_left_es
-        (fun acc (_, amount, _) ->
-          Environment.wrap_tzresult @@ Tez.( +? ) acc amount >>?= fun acc ->
-          if acc >= constants.minimal_stake then raise Exit else return acc)
-        Tez.zero
-        initial_accounts
-      >>=? fun _ ->
-      failwith
-        "Insufficient tokens in initial accounts: the amount should be at \
-         least minimal_stake")
-    (function Exit -> return_unit | exc -> raise exc)
-  >>=? fun () ->
   check_constants_consistency constants >>=? fun () ->
   let hash =
     Block_hash.of_b58check_exn
@@ -622,9 +597,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~fitness
       ~operations_hash:Operation_list_list_hash.zero
   in
-  validate_initial_accounts initial_accounts constants.minimal_stake
-  (* Perhaps this could return a new type  signifying its name *)
-  >|=? fun _initial_accounts -> (constants, shell, hash)
+  return (constants, shell, hash)
 
 (* if no parameter file is passed we check in the current directory
    where the test is run *)
@@ -636,8 +609,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?tx_rollup_origination_size ?sc_rollup_enable
     ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
     ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold
-    (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
+    (bootstrap_accounts : Parameters.bootstrap_account list) =
   prepare_initial_context_params
     ?consensus_threshold
     ?min_proposal_quorum
@@ -659,15 +631,17 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
-    initial_accounts
+    ()
   >>=? fun (constants, shell, hash) ->
+  validate_bootstrap_accounts bootstrap_accounts constants.minimal_stake
+  >>=? fun () ->
   initial_context
     ?commitments
     ?bootstrap_contracts
     (Chain_id.of_block_hash hash)
     constants
     shell
-    initial_accounts
+    bootstrap_accounts
   >|=? fun context ->
   let contents =
     Forge.make_contents
@@ -684,11 +658,12 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
   }
 
 let alpha_context ?commitments ?min_proposal_quorum
-    (initial_accounts :
-      (Account.t * Tez.t * Signature.Public_key_hash.t option) list) =
-  prepare_initial_context_params ?min_proposal_quorum initial_accounts
+    (bootstrap_accounts : Parameters.bootstrap_account list) =
+  prepare_initial_context_params ?min_proposal_quorum ()
   >>=? fun (constants, shell, _hash) ->
-  initial_alpha_context ?commitments constants shell initial_accounts
+  validate_bootstrap_accounts bootstrap_accounts constants.minimal_stake
+  >>=? fun () ->
+  initial_alpha_context ?commitments constants shell bootstrap_accounts
 
 (********* Baking *************)
 

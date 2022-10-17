@@ -846,7 +846,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
   let initial_balance = 1L in
   context_init
     ~min_proposal_quorum
-    ~initial_balances:[initial_balance; initial_balance; initial_balance]
+    ~bootstrap_balances:[initial_balance; initial_balance; initial_balance]
     10
     ()
   >>=? fun (b, delegates) ->
@@ -901,7 +901,7 @@ let test_supermajority_in_proposal there_is_a_winner () =
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
   let half_tokens = Int64.div total_tokens 2L in
-  context_init ~initial_balances:[1L; half_tokens; half_tokens] 3 ()
+  context_init ~bootstrap_balances:[1L; half_tokens; half_tokens] 3 ()
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {min_proposal_quorum; _}; _} ->
@@ -1088,7 +1088,7 @@ let test_voting_power_updated_each_voting_period () =
   let init_bal2 = 48_000_000_000L in
   let init_bal3 = 40_000_000_000L in
   (* Create three accounts with different amounts *)
-  context_init ~initial_balances:[init_bal1; init_bal2; init_bal3] 3 ()
+  context_init ~bootstrap_balances:[init_bal1; init_bal2; init_bal3] 3 ()
   >>=? fun (genesis, contracts) ->
   let con1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
