@@ -17,9 +17,9 @@ tezos_node=./octez-node
 tezos_client=./octez-client
 
 # Protocol configuration.
-protocol_hash=PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
-protocol_parameters=src/proto_013_PtJakart/parameters/sandbox-parameters.json
-protocol_name=jakarta
+protocol_hash=PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW
+protocol_parameters=src/proto_015_PtLimaPt/parameters/sandbox-parameters.json
+protocol_name=lima
 
 # Secret key to activate the protocol.
 activator_secret_key="unencrypted:edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
