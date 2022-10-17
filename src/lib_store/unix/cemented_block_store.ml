@@ -836,49 +836,48 @@ let trigger_gc cemented_store history_mode =
           in
           trigger_rolling_gc cemented_store cemented_blocks_files offset)
 
+let raw_iter_cemented_file f ({file; _} as cemented_blocks_file) =
+  let open Lwt_syntax in
+  let file_path = Naming.file_path file in
+  Lwt_io.with_file
+    ~flags:[Unix.O_RDONLY; O_CLOEXEC]
+    ~mode:Lwt_io.Input
+    file_path
+    (fun channel ->
+      let nb_blocks = cemented_blocks_file_length cemented_blocks_file in
+      let* first_block_offset = Lwt_io.BE.read_int channel in
+      let* () = Lwt_io.set_position channel (Int64.of_int first_block_offset) in
+      let rec loop n =
+        if n = 0 then Lwt.return_unit
+        else
+          (* Read length *)
+          let* length = Lwt_io.BE.read_int channel in
+          let full_length = 4 (* int32 length *) + length in
+          let block_bytes = Bytes.create full_length in
+          let* () = Lwt_io.read_into_exactly channel block_bytes 4 length in
+          Bytes.set_int32_be block_bytes 0 (Int32.of_int length) ;
+          let* () =
+            f
+              (Data_encoding.Binary.of_bytes_exn
+                 Block_repr.encoding
+                 block_bytes)
+          in
+          loop (pred n)
+      in
+      loop (Int32.to_int nb_blocks))
+
 let iter_cemented_file f ({file; _} as cemented_blocks_file) =
   let open Lwt_result_syntax in
-  protect (fun () ->
-      let file_path = Naming.file_path file in
-      Lwt_io.with_file
-        ~flags:[Unix.O_RDONLY; O_CLOEXEC]
-        ~mode:Lwt_io.Input
-        file_path
-        (fun channel ->
-          let nb_blocks = cemented_blocks_file_length cemented_blocks_file in
-          let*! first_block_offset = Lwt_io.BE.read_int channel in
-          let*! () =
-            Lwt_io.set_position channel (Int64.of_int first_block_offset)
-          in
-          let rec loop n =
-            if n = 0 then Lwt.return_unit
-            else
-              (* Read length *)
-              let*! length = Lwt_io.BE.read_int channel in
-              let full_length = 4 (* int32 length *) + length in
-              let block_bytes = Bytes.create full_length in
-              let*! () =
-                Lwt_io.read_into_exactly channel block_bytes 4 length
-              in
-              Bytes.set_int32_be block_bytes 0 (Int32.of_int length) ;
-              let*! () =
-                f
-                  (Data_encoding.Binary.of_bytes_exn
-                     Block_repr.encoding
-                     block_bytes)
-              in
-              loop (pred n)
-          in
-          Lwt.catch
-            (fun () ->
-              let*! () = loop (Int32.to_int nb_blocks) in
-              return_unit)
-            (fun exn ->
-              Format.kasprintf
-                (fun trace ->
-                  tzfail (Inconsistent_cemented_file (file_path, trace)))
-                "%s"
-                (Printexc.to_string exn))))
+  Lwt.catch
+    (fun () ->
+      let*! () = raw_iter_cemented_file f cemented_blocks_file in
+      return_unit)
+    (fun exn ->
+      Format.kasprintf
+        (fun trace ->
+          tzfail (Inconsistent_cemented_file (Naming.file_path file, trace)))
+        "%s"
+        (Printexc.to_string exn))
 
 let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
     ?genesis_hash cemented_store =

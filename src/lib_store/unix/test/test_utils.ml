@@ -193,7 +193,8 @@ let register_gc store =
 
 let wrap_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.Archive) ?(allow_testchains = true)
-    ?(keep_dir = false) ?(with_gc = true) k _ () : unit Lwt.t =
+    ?(keep_dir = false) ?(with_gc = true) ?block_cache_limit
+    ?(manual_close = false) k _ () : unit Lwt.t =
   let open Lwt_result_syntax in
   let prefix_dir = "tezos_indexed_store_test_" in
   let run f =
@@ -211,6 +212,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
         let context_dir = base_dir // "context" in
         let* store =
           Store.init
+            ?block_cache_limit
             ~patch_context
             ~history_mode
             ~store_dir
@@ -223,13 +225,20 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
           ~on_error:(fun err ->
             let*! pp_store = Store.make_pp_store store in
             Format.eprintf "@[<v>DEBUG:@ %a@]@." pp_store () ;
-            let*! () = Store.close_store store in
+            let*! () =
+              if manual_close then Lwt.return_unit else Store.close_store store
+            in
             Lwt.return (Error err))
           (fun () ->
             let* () = k (store_dir, context_dir) store in
             Format.printf "Invariants check before closing@." ;
-            let* () = check_invariants (Store.main_chain_store store) in
-            let*! () = Store.close_store store in
+            let* () =
+              if manual_close then return_unit
+              else
+                let* () = check_invariants (Store.main_chain_store store) in
+                let*! () = Store.close_store store in
+                return_unit
+            in
             let* store' =
               Store.init
                 ~history_mode
@@ -255,11 +264,18 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
   | Ok r -> Lwt.return r
 
 let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir ?with_gc
-    (name, f) =
+    ?block_cache_limit ?manual_close (name, f) =
   test_case
     name
     speed
-    (wrap_store_init ?patch_context ?history_mode ?keep_dir ?with_gc f)
+    (wrap_store_init
+       ?patch_context
+       ?history_mode
+       ?keep_dir
+       ?with_gc
+       ?block_cache_limit
+       ?manual_close
+       f)
 
 let wrap_simple_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.default) ?(allow_testchains = true)
@@ -512,8 +528,22 @@ let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ?(kind = `Full)
   let blk = List.hd l |> WithExceptions.Option.get ~loc:__LOC__ in
   Lwt.return (List.rev l, blk)
 
+let incr_fitness b =
+  match b with
+  | [] ->
+      let b = Bytes.create 8 in
+      Bytes.set_int32_be b 0 1l ;
+      [b]
+  | [fitness_b] ->
+      let fitness = Bytes.get_int32_be fitness_b 0 in
+      let b = Bytes.create 8 in
+      Bytes.set_int32_be b 0 (Int32.succ fitness) ;
+      [b]
+  | _ -> assert false
+
 let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
-    ?(should_set_head = false) ?(should_commit = false) chain_store n =
+    ?(should_set_head = false) ?(should_commit = false) ?protocol_level
+    ?set_protocol chain_store n =
   let open Lwt_result_syntax in
   let*! root =
     match root with
@@ -531,6 +561,11 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   let*! blocks, _last =
     make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
   in
+  let proto_level =
+    match protocol_level with
+    | None -> Store.Block.proto_level root_b
+    | Some proto_level -> proto_level
+  in
   let* _, _, blocks =
     List.fold_left_es
       (fun (ctxt_opt, last_opt, blocks) b ->
@@ -543,17 +578,24 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
                 ["level"]
                 (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
             in
+            let*! ctxt =
+              match set_protocol with
+              | None -> Lwt.return ctxt
+              | Some proto -> Context_ops.add_protocol ctxt proto
+            in
             let*! ctxt_hash =
               Context_ops.commit ~time:Time.Protocol.epoch ctxt
             in
             let predecessor =
-              Option.value ~default:(Block_repr.predecessor b) last_opt
+              match List.hd blocks with None -> root_b | Some pred -> pred
             in
             let shell =
               {
                 b.contents.header.Block_header.shell with
+                fitness = incr_fitness (Store.Block.fitness predecessor);
+                proto_level;
                 context = ctxt_hash;
-                predecessor;
+                predecessor = Store.Block.hash predecessor;
               }
             in
             let header =
