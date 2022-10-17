@@ -126,7 +126,6 @@ let register_protocol_tests_that_use_supports_correctly () =
   Monitor_operations.register ~protocols ;
   Multinode_snapshot.register ~protocols ;
   Node_event_level.register ~protocols ;
-  Normalize.register ~protocols ;
   Operation_validation.register ~protocols ;
   Order_in_top_level.register ~protocols ;
   P2p.register ~protocols ;
