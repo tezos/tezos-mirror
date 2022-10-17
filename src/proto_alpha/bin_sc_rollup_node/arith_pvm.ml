@@ -56,6 +56,23 @@ module Impl : Pvm.S = struct
     | Waiting_for_metadata -> "Waiting for metadata"
     | Parsing -> "Parsing"
     | Evaluating -> "Evaluating"
+
+  let eval_many ~max_steps initial_state =
+    let rec go state step =
+      let open Lwt.Syntax in
+      let* is_input_required = is_input_state state in
+
+      if is_input_required = No_input_required && step <= max_steps then
+        let open Lwt.Syntax in
+        (* Note: This is not an efficient implementation because the state is
+           decoded/encoded to/from the tree at each step but for Arith PVM
+           it doesn't matter
+        *)
+        let* next_state = eval state in
+        go next_state (Int64.succ step)
+      else Lwt.return (state, step)
+    in
+    go initial_state 0L
 end
 
 include Impl

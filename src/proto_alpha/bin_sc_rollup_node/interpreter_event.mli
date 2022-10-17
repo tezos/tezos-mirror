@@ -43,7 +43,7 @@ module Make (PVM : Pvm.S) : sig
   val intended_failure :
     level:int ->
     message_index:int ->
-    message_tick:int ->
+    message_tick:int64 ->
     internal:bool ->
     unit Lwt.t
 end

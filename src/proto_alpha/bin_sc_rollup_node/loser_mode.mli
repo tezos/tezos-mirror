@@ -43,4 +43,4 @@ val make : string -> t option
    of the rollup node processing of a given inbox [level], a given
    [message_index] and for all [message_ticks]. Ticks are sorted by
    increasing order. *)
-val is_failure : t -> level:int -> message_index:int -> int list
+val is_failure : t -> level:int -> message_index:int -> int64 list

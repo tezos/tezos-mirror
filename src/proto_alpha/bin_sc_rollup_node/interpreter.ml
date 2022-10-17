@@ -59,13 +59,14 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
     Sc_rollup.Metadata.{address; origination_level}
 
-  let consume_fuel = Option.map pred
+  let consume_fuel consumption =
+    Option.map (fun fuel -> Int64.sub fuel consumption)
 
-  let continue_with_fuel fuel state f =
+  let continue_with_fuel consumption fuel state f =
     let open Lwt_result_syntax in
     match fuel with
-    | Some 0 -> return (state, fuel)
-    | _ -> f (consume_fuel fuel) state
+    | Some 0L -> return (state, fuel)
+    | _ -> f (consume_fuel consumption fuel) state
 
   (** [eval_until_input ~metadata level message_index ~fuel start_tick
       failing_ticks state] advances a PVM [state] until it wants more
@@ -77,10 +78,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let eval_until_input ~metadata data_dir level message_index ~fuel start_tick
       failing_ticks state =
     let open Lwt_result_syntax in
-    let eval_tick tick failing_ticks state =
+    let eval_tick fuel_left tick failing_ticks state =
+      let max_steps =
+        match fuel_left with None -> Int64.max_int | Some v -> Int64.max 0L v
+      in
       let normal_eval state =
-        let*! state = PVM.eval state in
-        return (state, failing_ticks)
+        let*! state, executed_ticks = PVM.eval_many ~max_steps state in
+        return (state, executed_ticks, failing_ticks)
       in
       let failure_insertion_eval state failing_ticks' =
         let*! () =
@@ -91,24 +95,28 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
             ~internal:true
         in
         let*! state = PVM.Internal_for_tests.insert_failure state in
-        return (state, failing_ticks')
+        return (state, 1L, failing_ticks')
       in
       match failing_ticks with
       | xtick :: failing_ticks' when xtick = tick ->
           failure_insertion_eval state failing_ticks'
       | _ -> normal_eval state
     in
-    let rec go fuel tick failing_ticks state =
+    let rec go fuel_left current_tick failing_ticks state =
       let*! input_request = PVM.is_input_state state in
-      match fuel with
-      | Some 0 -> return (state, fuel, tick, failing_ticks)
+      match fuel_left with
+      | Some 0L -> return (state, fuel_left, current_tick, failing_ticks)
       | None | Some _ -> (
           match input_request with
           | No_input_required ->
-              let* next_state, failing_ticks =
-                eval_tick tick failing_ticks state
+              let* next_state, executed_ticks, failing_ticks =
+                eval_tick fuel_left current_tick failing_ticks state
               in
-              go (consume_fuel fuel) (tick + 1) failing_ticks next_state
+              go
+                (consume_fuel executed_ticks fuel_left)
+                (Int64.add current_tick executed_ticks)
+                failing_ticks
+                next_state
           | Needs_reveal (Reveal_raw_data hash) -> (
               match Reveals.get ~data_dir ~pvm_name:PVM.name ~hash with
               | None ->
@@ -117,13 +125,21 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                   let*! next_state =
                     PVM.set_input (Reveal (Raw_data data)) state
                   in
-                  go (consume_fuel fuel) (tick + 1) failing_ticks next_state)
+                  go
+                    (consume_fuel 1L fuel_left)
+                    (Int64.succ current_tick)
+                    failing_ticks
+                    next_state)
           | Needs_reveal Reveal_metadata ->
               let*! next_state =
                 PVM.set_input (Reveal (Metadata metadata)) state
               in
-              go (consume_fuel fuel) (tick + 1) failing_ticks next_state
-          | _ -> return (state, fuel, tick, failing_ticks))
+              go
+                (consume_fuel 1L fuel_left)
+                (Int64.succ current_tick)
+                failing_ticks
+                next_state
+          | _ -> return (state, fuel_left, current_tick, failing_ticks))
     in
     go fuel start_tick failing_ticks state
 
@@ -148,11 +164,11 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         level
         message_index
         ~fuel
-        0
+        0L
         failing_ticks
         state
     in
-    continue_with_fuel fuel state @@ fun fuel state ->
+    continue_with_fuel tick fuel state @@ fun fuel state ->
     let* input, failing_ticks =
       match failing_ticks with
       | xtick :: failing_ticks' ->
@@ -216,6 +232,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                   }
               in
               let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
+
               let failing_ticks =
                 Loser_mode.is_failure
                   loser_mode
@@ -366,7 +383,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         if Raw_level.(event.level > level) then return None
         else
           let tick_distance =
-            Sc_rollup.Tick.distance tick event.tick |> Z.to_int
+            Sc_rollup.Tick.distance tick event.tick |> Z.to_int64
           in
           (* TODO: #3384
              We assume that [StateHistory] correctly stores enough

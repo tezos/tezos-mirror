@@ -429,7 +429,7 @@ let test_bulk_noops () =
   let* base_tree = set_input_step "dummy_input" 0 base_tree in
 
   let rec goto_snapshot ticks tree_slow =
-    let* tree_fast = Wasm.compute_step_many ~max_steps:ticks base_tree in
+    let* tree_fast, _ = Wasm.compute_step_many ~max_steps:ticks base_tree in
     let* tree_slow = Wasm.compute_step tree_slow in
 
     assert (
@@ -448,7 +448,7 @@ let test_bulk_noops () =
   assert (snapshot_info.input_request = Input_required) ;
 
   (* Try to advance past the snapshot point. *)
-  let* tree_fast =
+  let* tree_fast, _ =
     Wasm.compute_step_many ~max_steps:(Int64.mul ticks 2L) base_tree
   in
 
