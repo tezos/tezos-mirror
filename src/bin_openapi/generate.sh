@@ -13,8 +13,8 @@
 cd "$(dirname "$0")"/../.. || exit
 
 # Tezos binaries.
-tezos_node=./tezos-node
-tezos_client=./tezos-client
+tezos_node=./octez-node
+tezos_client=./octez-client
 
 # Protocol configuration.
 protocol_hash=PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY
@@ -29,8 +29,8 @@ rpc_port=8732
 
 # Temporary files.
 tmp=openapi-tmp
-data_dir=$tmp/tezos-sandbox
-client_dir=$tmp/tezos-client
+data_dir=$tmp/octez-sandbox
+client_dir=$tmp/octez-client
 api_json=$tmp/rpc-api.json
 proto_api_json=$tmp/proto-api.json
 mempool_api_json=$tmp/mempool-api.json
