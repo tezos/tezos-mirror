@@ -53,7 +53,7 @@ let init_account (ctxt, balance_updates)
     amount
   >>=? fun (ctxt, new_balance_updates) ->
   (match public_key with
-  | Some public_key ->
+  | Some public_key -> (
       Contract_manager_storage.reveal_manager_key
         ctxt
         public_key_hash
@@ -64,11 +64,10 @@ let init_account (ctxt, balance_updates)
         contract
         (Some (Option.value ~default:public_key_hash delegate_to))
       >>=? fun ctxt ->
-      (match consensus_key with
+      match consensus_key with
       | None -> return ctxt
       | Some consensus_key ->
           Delegate_consensus_key.init ctxt public_key_hash consensus_key)
-      >>=? fun ctxt -> return ctxt
   | None ->
       fail_when
         (Option.is_some delegate_to)

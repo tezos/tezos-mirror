@@ -85,20 +85,27 @@ let pp ppf {delegate; consensus_pkh} =
       consensus_pkh ;
   Format.fprintf ppf "@]"
 
-let check_inactive ctxt pkh =
+(* Invariant:
+      No two delegates use the same active consensus key at a given time.
+
+   To ensure that, {!Storage.Consensus_keys} contains keys that will be active
+   at cycle `current + preserved_cycles + 1`.
+*)
+
+let check_unused ctxt pkh =
   let open Lwt_tzresult_syntax in
   let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
   fail_when is_active Invalid_consensus_key_update_active
 
-let set_inactive = Storage.Consensus_keys.remove
+let set_unused = Storage.Consensus_keys.remove
 
-let set_active = Storage.Consensus_keys.add
+let set_used = Storage.Consensus_keys.add
 
 let init ctxt delegate pk =
   let open Lwt_tzresult_syntax in
   let pkh = Signature.Public_key.hash pk in
-  let* () = check_inactive ctxt pkh in
-  let*! ctxt = set_active ctxt pkh in
+  let* () = check_unused ctxt pkh in
+  let*! ctxt = set_used ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
 let active_pubkey ctxt delegate =
@@ -170,12 +177,12 @@ let register_update ctxt delegate pk =
       (Invalid_consensus_key_update_noop first_active_cycle)
   in
   let pkh = Signature.Public_key.hash pk in
-  let* () = check_inactive ctxt pkh in
-  let*! ctxt = set_active ctxt pkh in
+  let* () = check_unused ctxt pkh in
+  let*! ctxt = set_used ctxt pkh in
   let* {consensus_pkh = old_pkh; _} =
     active_pubkey_for_cycle ctxt delegate update_cycle
   in
-  let*! ctxt = set_inactive ctxt old_pkh in
+  let*! ctxt = set_unused ctxt old_pkh in
   let*! ctxt =
     Storage.Contract.Pending_consensus_keys.add
       (ctxt, Contract_repr.Implicit delegate)

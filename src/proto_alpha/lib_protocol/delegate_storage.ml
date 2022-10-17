@@ -250,8 +250,9 @@ let delegated_balance ctxt delegate =
 
 let drain ctxt ~delegate ~destination =
   let open Lwt_tzresult_syntax in
+  let destination_contract = Contract_repr.Implicit destination in
   let*! is_destination_allocated =
-    Contract_storage.allocated ctxt (Contract_repr.Implicit destination)
+    Contract_storage.allocated ctxt destination_contract
   in
   let delegate_contract = Contract_repr.Implicit delegate in
   let* ctxt, _, balance_updates1 =
@@ -265,13 +266,13 @@ let drain ctxt ~delegate ~destination =
   let* manager_balance = spendable_balance ctxt delegate in
   let*? one_percent = Tez_repr.(manager_balance /? 100L) in
   let fees = Tez_repr.(max one one_percent) in
-  let*? transfered = Tez_repr.(manager_balance -? fees) in
+  let*? transferred = Tez_repr.(manager_balance -? fees) in
   let* ctxt, balance_updates2 =
     Token.transfer
       ctxt
       (`Contract delegate_contract)
-      (`Contract (Contract_repr.Implicit destination))
-      transfered
+      (`Contract destination_contract)
+      transferred
   in
   return
     ( ctxt,
