@@ -1468,7 +1468,7 @@ let normalize_mode_to_string = function
   | Optimized -> "Optimized"
   | Optimized_legacy -> "Optimized_legacy"
 
-let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
+let spawn_normalize_data ?hooks ?mode ?(legacy = false) ~data ~typ client =
   let mode_cmd =
     Option.map normalize_mode_to_string mode
     |> Option.map (fun s -> ["--unparsing-mode"; s])
@@ -1478,13 +1478,13 @@ let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
     @ Option.value ~default:[] mode_cmd
     @ if legacy then ["--legacy"] else []
   in
-  spawn_command client cmd
+  spawn_command ?hooks client cmd
 
-let normalize_data ?mode ?legacy ~data ~typ client =
-  spawn_normalize_data ?mode ?legacy ~data ~typ client
+let normalize_data ?hooks ?mode ?legacy ~data ~typ client =
+  spawn_normalize_data ?hooks ?mode ?legacy ~data ~typ client
   |> Process.check_and_read_stdout
 
-let spawn_normalize_script ?mode ~script client =
+let spawn_normalize_script ?hooks ?mode ~script client =
   let mode_cmd =
     Option.map normalize_mode_to_string mode
     |> Option.map (fun s -> ["--unparsing-mode"; s])
@@ -1492,10 +1492,11 @@ let spawn_normalize_script ?mode ~script client =
   let cmd =
     ["normalize"; "script"; script] @ Option.value ~default:[] mode_cmd
   in
-  spawn_command client cmd
+  spawn_command ?hooks client cmd
 
-let normalize_script ?mode ~script client =
-  spawn_normalize_script ?mode ~script client |> Process.check_and_read_stdout
+let normalize_script ?hooks ?mode ~script client =
+  spawn_normalize_script ?hooks ?mode ~script client
+  |> Process.check_and_read_stdout
 
 let spawn_typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   let gas_cmd =
