@@ -44,6 +44,13 @@ open Alpha_context
 val pack_operation :
   Context.t -> signature option -> 'a contents_list -> packed_operation
 
+val sign :
+  ?watermark:Signature.watermark ->
+  Signature.secret_key ->
+  Context.t ->
+  packed_contents_list ->
+  packed_operation
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
