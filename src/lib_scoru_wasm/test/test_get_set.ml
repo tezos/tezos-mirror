@@ -177,7 +177,15 @@ let test_set_input () =
       "hello"
       tree
   in
-  let* result_input = Tree_encoding_runner.decode inp_encoding tree in
+  let* buffers =
+    Tree_encoding_runner.decode
+      (Tezos_tree_encoding.option Wasm_pvm.durable_buffers_encoding)
+      tree
+  in
+  let buffers =
+    match buffers with Some buffers -> buffers | None -> assert false
+  in
+  let* result_message = Input_buffer.dequeue buffers.input in
   let* current_tick = Tree_encoding_runner.decode current_tick_encoding tree in
   let expected_info =
     let open Wasm_pvm_state in
@@ -189,7 +197,7 @@ let test_set_input () =
   let* actual_info = Wasm.get_info tree in
   assert (actual_info = expected_info) ;
   assert (current_tick = Z.one) ;
-  assert (result_input = "hello") ;
+  assert (Bytes.to_string result_message.payload = "hello") ;
   Lwt_result_syntax.return_unit
 
 (** Given a [config] whose output has a given payload at position (0,0), if we
