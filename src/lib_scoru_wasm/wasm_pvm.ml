@@ -53,155 +53,147 @@ module Wasm = Tezos_webassembly_interpreter
 
 type computation_status = Starting | Restarting | Running | Failing | Reboot
 
+module Parsing = Binary_parser_encodings
+
+let host_funcs =
+  let registry = Wasm.Host_funcs.empty () in
+  Host_funcs.register_host_funcs registry ;
+  registry
+
+let tick_state_encoding =
+  let open Tezos_tree_encoding in
+  tagged_union
+    ~default:(fun () -> Snapshot)
+    (value [] Data_encoding.string)
+    [
+      case
+        "decode"
+        Parsing.Decode.encoding
+        (function Decode m -> Some m | _ -> None)
+        (fun m -> Decode m);
+      case
+        "link"
+        (tup3
+           ~flatten:true
+           (scope ["ast_module"]
+           @@ Parsing.(no_region_encoding Module.module_encoding))
+           (scope
+              ["externs"]
+              (int32_lazy_vector
+                 (value [] Data_encoding.int32)
+                 Wasm_encoding.extern_encoding))
+           (value ["imports_offset"] Data_encoding.int32))
+        (function
+          | Link {ast_module; externs; imports_offset} ->
+              Some (ast_module, externs, imports_offset)
+          | _ -> None)
+        (fun (ast_module, externs, imports_offset) ->
+          Link {ast_module; externs; imports_offset});
+      case
+        "init"
+        (tup4
+           ~flatten:true
+           (scope ["self"] Wasm_encoding.module_key_encoding)
+           (scope ["ast_module"]
+           @@ Parsing.(no_region_encoding Module.module_encoding))
+           (scope ["init_kont"] (Init_encodings.init_kont_encoding ~host_funcs))
+           (scope ["modules"] Wasm_encoding.module_instances_encoding))
+        (function
+          | Init {self; ast_module; init_kont; module_reg} ->
+              Some (self, ast_module, init_kont, module_reg)
+          | _ -> None)
+        (fun (self, ast_module, init_kont, module_reg) ->
+          Init {self; ast_module; init_kont; module_reg});
+      case
+        "eval"
+        (Wasm_encoding.config_encoding ~host_funcs)
+        (function Eval eval_config -> Some eval_config | _ -> None)
+        (fun eval_config -> Eval eval_config);
+      case
+        "stuck"
+        (value [] Wasm_pvm_errors.encoding)
+        (function Stuck err -> Some err | _ -> None)
+        (fun err -> Stuck err);
+      case
+        "snapshot"
+        (value [] Data_encoding.unit)
+        (function Snapshot -> Some () | _ -> None)
+        (fun () -> Snapshot);
+    ]
+
+let durable_buffers_encoding =
+  Tezos_tree_encoding.(scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
+
+let pvm_state_encoding =
+  let open Tezos_tree_encoding in
+  conv
+    (fun ( last_input_info,
+           current_tick,
+           reboot_counter,
+           durable,
+           buffers,
+           tick_state,
+           last_top_level_call,
+           max_nb_ticks,
+           maximum_reboots_per_input ) ->
+      {
+        last_input_info;
+        current_tick;
+        reboot_counter =
+          Option.value ~default:maximum_reboots_per_input reboot_counter;
+        durable;
+        buffers =
+          (*`Gather_floppies` uses `get_info`, that decodes the state of the
+            PVM, which at the start of the rollup doesn't exist. *)
+          Option.value_f
+            ~default:Tezos_webassembly_interpreter.Eval.buffers
+            buffers;
+        tick_state;
+        last_top_level_call;
+        max_nb_ticks;
+        maximum_reboots_per_input;
+      })
+    (fun {
+           last_input_info;
+           current_tick;
+           reboot_counter;
+           durable;
+           buffers;
+           tick_state;
+           last_top_level_call;
+           max_nb_ticks;
+           maximum_reboots_per_input;
+         } ->
+      ( last_input_info,
+        current_tick,
+        Some reboot_counter,
+        durable,
+        Some buffers,
+        tick_state,
+        last_top_level_call,
+        max_nb_ticks,
+        maximum_reboots_per_input ))
+    (tup9
+       ~flatten:true
+       (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
+       (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
+       (value_option ["wasm"; "reboot_counter"] Data_encoding.n)
+       (scope ["durable"] Durable.encoding)
+       (option durable_buffers_encoding)
+       (scope ["wasm"] tick_state_encoding)
+       (value ~default:Z.zero ["pvm"; "last_top_level_call"] Data_encoding.n)
+       (value ~default:wasm_max_tick ["pvm"; "max_nb_ticks"] Data_encoding.n)
+       (value
+          ~default:maximum_reboots_per_input
+          ["pvm"; "maximum_reboots_per_input"]
+          Data_encoding.n))
+
 module Make (T : Tezos_tree_encoding.TREE) :
   Gather_floppies.S with type tree = T.tree = struct
   module Raw = struct
     type tree = T.tree
 
     module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (T)
-    module Parsing = Binary_parser_encodings
-
-    let host_funcs =
-      let registry = Wasm.Host_funcs.empty () in
-      Host_funcs.register_host_funcs registry ;
-      registry
-
-    let tick_state_encoding =
-      let open Tezos_tree_encoding in
-      tagged_union
-        ~default:(fun () -> Snapshot)
-        (value [] Data_encoding.string)
-        [
-          case
-            "decode"
-            Parsing.Decode.encoding
-            (function Decode m -> Some m | _ -> None)
-            (fun m -> Decode m);
-          case
-            "link"
-            (tup3
-               ~flatten:true
-               (scope ["ast_module"]
-               @@ Parsing.(no_region_encoding Module.module_encoding))
-               (scope
-                  ["externs"]
-                  (int32_lazy_vector
-                     (value [] Data_encoding.int32)
-                     Wasm_encoding.extern_encoding))
-               (value ["imports_offset"] Data_encoding.int32))
-            (function
-              | Link {ast_module; externs; imports_offset} ->
-                  Some (ast_module, externs, imports_offset)
-              | _ -> None)
-            (fun (ast_module, externs, imports_offset) ->
-              Link {ast_module; externs; imports_offset});
-          case
-            "init"
-            (tup4
-               ~flatten:true
-               (scope ["self"] Wasm_encoding.module_key_encoding)
-               (scope ["ast_module"]
-               @@ Parsing.(no_region_encoding Module.module_encoding))
-               (scope
-                  ["init_kont"]
-                  (Init_encodings.init_kont_encoding ~host_funcs))
-               (scope ["modules"] Wasm_encoding.module_instances_encoding))
-            (function
-              | Init {self; ast_module; init_kont; module_reg} ->
-                  Some (self, ast_module, init_kont, module_reg)
-              | _ -> None)
-            (fun (self, ast_module, init_kont, module_reg) ->
-              Init {self; ast_module; init_kont; module_reg});
-          case
-            "eval"
-            (Wasm_encoding.config_encoding ~host_funcs)
-            (function Eval eval_config -> Some eval_config | _ -> None)
-            (fun eval_config -> Eval eval_config);
-          case
-            "stuck"
-            (value [] Wasm_pvm_errors.encoding)
-            (function Stuck err -> Some err | _ -> None)
-            (fun err -> Stuck err);
-          case
-            "snapshot"
-            (value [] Data_encoding.unit)
-            (function Snapshot -> Some () | _ -> None)
-            (fun () -> Snapshot);
-        ]
-
-    let durable_buffers_encoding =
-      Tezos_tree_encoding.(
-        scope ["pvm"; "buffers"] Wasm_encoding.buffers_encoding)
-
-    let pvm_state_encoding =
-      let open Tezos_tree_encoding in
-      conv
-        (fun ( last_input_info,
-               current_tick,
-               reboot_counter,
-               durable,
-               buffers,
-               tick_state,
-               last_top_level_call,
-               max_nb_ticks,
-               maximum_reboots_per_input ) ->
-          {
-            last_input_info;
-            current_tick;
-            reboot_counter =
-              Option.value ~default:maximum_reboots_per_input reboot_counter;
-            durable;
-            buffers =
-              (*`Gather_floppies` uses `get_info`, that decodes the state of the
-                PVM, which at the start of the rollup doesn't exist. *)
-              Option.value_f
-                ~default:Tezos_webassembly_interpreter.Eval.buffers
-                buffers;
-            tick_state;
-            last_top_level_call;
-            max_nb_ticks;
-            maximum_reboots_per_input;
-          })
-        (fun {
-               last_input_info;
-               current_tick;
-               reboot_counter;
-               durable;
-               buffers;
-               tick_state;
-               last_top_level_call;
-               max_nb_ticks;
-               maximum_reboots_per_input;
-             } ->
-          ( last_input_info,
-            current_tick,
-            Some reboot_counter,
-            durable,
-            Some buffers,
-            tick_state,
-            last_top_level_call,
-            max_nb_ticks,
-            maximum_reboots_per_input ))
-        (tup9
-           ~flatten:true
-           (value_option ["wasm"; "input"] Wasm_pvm_sig.input_info_encoding)
-           (value ~default:Z.zero ["wasm"; "current_tick"] Data_encoding.n)
-           (value_option ["wasm"; "reboot_counter"] Data_encoding.n)
-           (scope ["durable"] Durable.encoding)
-           (option durable_buffers_encoding)
-           (scope ["wasm"] tick_state_encoding)
-           (value
-              ~default:Z.zero
-              ["pvm"; "last_top_level_call"]
-              Data_encoding.n)
-           (value
-              ~default:wasm_max_tick
-              ["pvm"; "max_nb_ticks"]
-              Data_encoding.n)
-           (value
-              ~default:maximum_reboots_per_input
-              ["pvm"; "maximum_reboots_per_input"]
-              Data_encoding.n))
 
     let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
 
