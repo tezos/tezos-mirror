@@ -1245,34 +1245,13 @@ module Player_client = struct
         let _state, tick, our_states = eval_inputs new_levels_and_inputs in
         return (tick, our_states, new_levels_and_inputs)
 
-  let gen_raw_level =
-    let open QCheck2.Gen in
-    let* level = map Int32.abs int32 in
-    return (Raw_level.of_int32_exn level)
-
-  let gen_rollup =
-    let open QCheck2.Gen in
-    let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
-    return (Sc_rollup_repr.Address.hash_bytes [bytes])
-
-  let gen_metadata =
-    let open QCheck2.Gen in
-    let* address = gen_rollup in
-    let* origination_level = gen_raw_level in
-    return Metadata.{address; origination_level}
-
   (** [gen ~rollup ~level_min ~level_max player levels_and_inputs] generates
       a {!player_client} based on {!player.strategy}. *)
   let gen ~rollup ~origination_level ~level_min ~level_max player
       levels_and_inputs =
     let open QCheck2.Gen in
     let ctxt = empty_memory_ctxt "foo" in
-    let* metadata =
-      match player.strategy with
-      | Perfect | Lazy | Eager | Keen ->
-          return Sc_rollup.Metadata.{address = rollup; origination_level}
-      | Random -> gen_metadata
-    in
+    let metadata = Sc_rollup.Metadata.{address = rollup; origination_level} in
     let* tick, our_states, levels_and_inputs =
       gen_our_states
         ~metadata
