@@ -221,9 +221,34 @@ let should_run_store_has_kernel () =
 (* The `should_run_store_list_size_kernel` asserts
    whether the tree has three subtrees. Note that the `_` subtree is included
    and so, after adding the `four` subtree the state will become stuck.*)
-let should_run_store_list_size_kernel kernel =
+let should_run_store_list_size_kernel () =
   let open Lwt_syntax in
-  let* tree = initial_tree ~from_binary:true kernel in
+  let module_ =
+    {|
+(module
+ (import "rollup_safe_core" "store_list_size"
+         (func $store_list_size (param i32 i32) (result i64)))
+ ;; Durable keys
+ (data (i32.const 100) "/one")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_next")
+       (local $one_address i32)
+       (local $one_length i32)
+
+       (local.set $one_address (i32.const 100))
+       (local.set $one_length (i32.const 4))
+
+       (call $store_list_size
+             (local.get $one_address) (local.get $one_length))
+       (i64.ne (i64.const 3))
+       (if (then unreachable))
+       (nop)
+       )
+ )
+  |}
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["one"; "three"] in
@@ -869,9 +894,7 @@ let tests =
     tztest
       "Test store-list-size kernel"
       `Quick
-      (test_with_kernel
-         Kernels.test_store_list_size_kernel
-         should_run_store_list_size_kernel);
+      should_run_store_list_size_kernel;
     tztest "Test store-delete kernel" `Quick should_run_store_delete_kernel;
     tztest "Test snapshotable state" `Quick test_snapshotable_state;
     tztest

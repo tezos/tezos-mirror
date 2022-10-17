@@ -212,18 +212,6 @@ let retrieve_memory module_reg =
 module Kernels = struct
   (* Kernel failing at `kernel_next` invocation. *)
   let unreachable_kernel = "unreachable"
-
-  (* Kernel checking the return value of store_list_size host func.
-
-     This kernel expects a collection of values to exist:
-     - `/durable/one/_`
-     - `/durable/one/two`
-     - `/durable/one/three`
-
-     and asserts that `store_list_size(/one) = 3`. Note that the root subtree
-     `/durable/one/_` is counted among the three
-  *)
-  let test_store_list_size_kernel = "test-store-list-size"
 end
 
 let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
