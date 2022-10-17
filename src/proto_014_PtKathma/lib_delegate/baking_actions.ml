@@ -215,6 +215,11 @@ let sign_block_header state proposer unsigned_block_header =
 
 let inject_block ~state_recorder state block_to_bake ~updated_state =
   let {predecessor; round; delegate; kind} = block_to_bake in
+  Events.(
+    emit
+      prepare_forging_block
+      (Int32.succ predecessor.shell.level, round, delegate))
+  >>= fun () ->
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let simulation_mode = state.global_state.validation_mode in
