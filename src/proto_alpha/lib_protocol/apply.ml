@@ -286,6 +286,7 @@ let update_script_storage_and_ticket_balances ctxt ~self_contract storage
     lazy_storage_diff ticket_diffs operations =
   Contract.update_script_storage ctxt self_contract storage lazy_storage_diff
   >>=? fun ctxt ->
+  let self_contract = Contract.Originated self_contract in
   Ticket_accounting.update_ticket_balances
     ctxt
     ~self_contract
@@ -391,7 +392,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
                  ctxt ) ->
       update_script_storage_and_ticket_balances
         ctxt
-        ~self_contract:contract
+        ~self_contract:contract_hash
         storage
         lazy_storage_diff
         ticket_diffs
@@ -401,7 +402,7 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
         ctxt
         ~storage_diff:ticket_table_size_diff
       >>=? fun (ticket_paid_storage_diff, ctxt) ->
-      Fees.record_paid_storage_space ctxt contract
+      Fees.record_paid_storage_space ctxt contract_hash
       >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
       Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
       >>=? fun originated_contracts ->
@@ -530,7 +531,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
-  Fees.record_paid_storage_space ctxt contract
+  Fees.record_paid_storage_space ctxt contract_hash
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
   let result =
     {
@@ -707,7 +708,6 @@ let apply_manager_operation :
     Lwt.t =
  fun ctxt_before_op ~source ~chain_id operation ->
   let source_contract = Contract.Implicit source in
-  Contract.must_exist ctxt_before_op source_contract >>=? fun () ->
   Gas.consume ctxt_before_op Michelson_v1_gas.Cost_of.manager_operation
   >>?= fun ctxt ->
   (* Note that [ctxt_before_op] will be used again later to compute
@@ -1035,8 +1035,7 @@ let apply_manager_operation :
             {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
           [] )
   | Increase_paid_storage {amount_in_bytes; destination} ->
-      let contract = Contract.Originated destination in
-      Contract.increase_paid_storage ctxt contract ~amount_in_bytes
+      Contract.increase_paid_storage ctxt destination ~amount_in_bytes
       >>=? fun ctxt ->
       let payer = `Contract (Contract.Implicit source) in
       Fees.burn_storage_increase_fees ctxt ~payer amount_in_bytes
@@ -2410,7 +2409,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                (* update CPMM storage *)
                update_script_storage_and_ticket_balances
                  ctxt
-                 ~self_contract:liquidity_baking_cpmm_contract
+                 ~self_contract:liquidity_baking_cpmm_contract_hash
                  storage
                  lazy_storage_diff
                  ticket_diffs
@@ -2418,7 +2417,7 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                >>=? fun (ticket_table_size_diff, ctxt) ->
                Fees.record_paid_storage_space
                  ctxt
-                 liquidity_baking_cpmm_contract
+                 liquidity_baking_cpmm_contract_hash
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                Ticket_balance.adjust_storage_space
                  ctxt

@@ -47,7 +47,7 @@ val record_global_constant_storage_space :
     and the additional (and unpaid) space consumed since the last call
     of this function on this [contract]. *)
 val record_paid_storage_space :
-  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
+  Raw_context.t -> Contract_hash.t -> (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
 
 (** [check_storage_limit ctxt ~storage_limit] raises the [Storage_limit_too_high]
      error iff [storage_limit] is negative or greater the constant

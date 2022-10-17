@@ -4081,7 +4081,7 @@ module Withdraw = struct
     Nat_ticket.init_deposit amount block tx_rollup account1
     >>=? fun (operation, block, deposit_contract) ->
     Block.bake ~operation block >>=? fun block ->
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script:
         (Format.sprintf
            {| parameter (ticket %s);
@@ -4123,7 +4123,7 @@ module Withdraw = struct
       (account1, account2, tx_rollup, deposit_contract, withdraw_contract, b)
 
   let originate_forge_withdraw_deposit_contract account block =
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script:
         {| parameter (or (pair %default nat nat)
                          (or (ticket %withdraw nat)
@@ -4256,7 +4256,7 @@ module Withdraw = struct
                deposit_contract,
                withdraw_contract,
                block ) ->
-    Contract_helpers.originate_contract_from_string
+    Contract_helpers.originate_contract_from_string_hash
       ~script:
         (Format.sprintf
            {| parameter (ticket %s);
@@ -4282,7 +4282,7 @@ module Withdraw = struct
       ~loc:__LOC__
       block
       token_one
-      (Contract withdraw_contract)
+      (Contract (Originated withdraw_contract))
       None
     >>=? fun () ->
     assert_ticket_balance ~loc:__LOC__ block token_one (Contract account1) None
@@ -4380,7 +4380,7 @@ module Withdraw = struct
       ~loc:__LOC__
       block
       token_one
-      (Contract withdraw_contract)
+      (Contract (Originated withdraw_contract))
       None
     >>=? fun () ->
     assert_ticket_balance
@@ -4417,7 +4417,7 @@ module Withdraw = struct
         (WithExceptions.Option.get ~loc:__LOC__
         @@ Ticket_amount.of_z
         @@ Script_int.of_int64 int64_half_amount)
-      ~destination:withdraw_contract
+      ~destination:(Originated withdraw_contract)
       ~entrypoint
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
@@ -4462,7 +4462,7 @@ module Withdraw = struct
       ~loc:__LOC__
       block
       token_one
-      (Contract withdraw_contract)
+      (Contract (Originated withdraw_contract))
       (Some (Int64.to_int int64_half_amount))
     >>=? fun () ->
     assert_ticket_balance ~loc:__LOC__ block token_one (Contract account1) None
@@ -4492,7 +4492,7 @@ module Withdraw = struct
         (WithExceptions.Option.get ~loc:__LOC__
         @@ Ticket_amount.of_z
         @@ Script_int.of_int64 int64_half_amount)
-      ~destination:withdraw_dropping_contract
+      ~destination:(Originated withdraw_dropping_contract)
       ~entrypoint
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
@@ -4517,7 +4517,7 @@ module Withdraw = struct
       ~loc:__LOC__
       block
       token_one
-      (Contract withdraw_contract)
+      (Contract (Originated withdraw_contract))
       (Some (Int64.to_int int64_half_amount))
     >>=? fun () ->
     assert_ticket_balance ~loc:__LOC__ block token_one (Contract account1) None
@@ -4737,7 +4737,7 @@ module Withdraw = struct
       tx_rollup
       committed_level
       context_hash
-      [{ticket_info with ticketer = withdraw_contract}]
+      [{ticket_info with ticketer = Originated withdraw_contract}]
     >>=? fun operation ->
     Incremental.add_operation
       ~expect_apply_failure:
@@ -4904,7 +4904,7 @@ module Withdraw = struct
         ~ty:(Script.lazy_expr Nat_ticket.ty)
         ~ticketer:deposit_contract
         ~amount:qty
-        ~destination:withdraw_contract
+        ~destination:(Originated withdraw_contract)
         ~entrypoint:Entrypoint.default
     in
     (* Execute withdraw with half amount *)
@@ -5460,7 +5460,7 @@ module Withdraw = struct
           |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
         ~fee:Tez.one
         account
-        forge_withdraw_deposit_contract
+        (Originated forge_withdraw_deposit_contract)
         (Tez.of_mutez_exn 0L)
       >>=? fun operation -> Block.bake ~operation block
     in
@@ -5478,14 +5478,14 @@ module Withdraw = struct
           |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
         ~fee:Tez.one
         account
-        forge_withdraw_deposit_contract
+        (Originated forge_withdraw_deposit_contract)
         (Tez.of_mutez_exn 0L)
       >>=? fun operation -> Block.bake ~operation block
     in
     let dispatch_ticket block =
       Nat_ticket.withdrawal
         (B block)
-        ~ticketer:forge_withdraw_deposit_contract
+        ~ticketer:(Originated forge_withdraw_deposit_contract)
         ~claimer:account
         tx_rollup
       >>=? fun (withdraw, ticket_info) ->
@@ -5522,24 +5522,24 @@ module Withdraw = struct
         ~source:account
         ~contents:(Script.lazy_expr Nat_ticket.contents)
         ~ty:(Script.lazy_expr Nat_ticket.ty)
-        ~ticketer:forge_withdraw_deposit_contract
+        ~ticketer:(Originated forge_withdraw_deposit_contract)
         ~amount:
           (WithExceptions.Option.get ~loc:__LOC__
           @@ Ticket_amount.of_zint
           @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
-        ~destination:forge_withdraw_deposit_contract
+        ~destination:(Originated forge_withdraw_deposit_contract)
         ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
       >>=? fun operation -> Block.bake ~operation block
     in
     let token_one =
-      Nat_ticket.ex_token ~ticketer:forge_withdraw_deposit_contract
+      Nat_ticket.ex_token ~ticketer:(Originated forge_withdraw_deposit_contract)
     in
     let assert_contract_ticket_balance ~__LOC__ block balance =
       assert_ticket_balance
         ~loc:__LOC__
         block
         token_one
-        (Contract forge_withdraw_deposit_contract)
+        (Contract (Originated forge_withdraw_deposit_contract))
         balance
     in
     let assert_account_ticket_balance ~__LOC__ block balance =

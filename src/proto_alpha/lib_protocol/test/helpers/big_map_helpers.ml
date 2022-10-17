@@ -33,7 +33,7 @@ let make_big_map block ~source ~key_type ~value_type key_values =
   let key_type = Expr.from_string key_type in
   let value_type = Expr.from_string value_type in
   let* operation, originated =
-    Op.contract_origination (B block) source ~script:Op.dummy_script
+    Op.contract_origination_hash (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* incr = Incremental.begin_construction block in

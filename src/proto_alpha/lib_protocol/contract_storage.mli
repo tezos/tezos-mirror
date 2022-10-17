@@ -103,7 +103,7 @@ val get_counter :
 
 val get_script_code :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   (Raw_context.t * Script_repr.lazy_expr option) tzresult Lwt.t
 
 val get_script :
@@ -113,7 +113,7 @@ val get_script :
 
 val get_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   (Raw_context.t * Script_repr.expr option) tzresult Lwt.t
 
 module Legacy_big_map_diff : sig
@@ -143,7 +143,7 @@ end
 
 val update_script_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   Script_repr.expr ->
   Lazy_storage_diff.diffs option ->
   Raw_context.t tzresult Lwt.t
@@ -192,7 +192,7 @@ val set_paid_storage_space_and_return_fees_to_pay :
 (** Enable a payer to increase the paid storage of a contract by some amount. *)
 val increase_paid_storage :
   Raw_context.t ->
-  Contract_repr.t ->
+  Contract_hash.t ->
   amount_in_bytes:Z.t ->
   Raw_context.t tzresult Lwt.t
 

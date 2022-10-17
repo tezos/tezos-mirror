@@ -501,7 +501,9 @@ let increment_counter c manager =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   Storage.Contract.Counter.update c contract (Z.succ contract_counter)
 
-let get_script_code c contract = Storage.Contract.Code.find c contract
+let get_script_code c contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
+  Storage.Contract.Code.find c contract
 
 let get_script c contract_hash =
   let contract = Contract_repr.Originated contract_hash in
@@ -512,7 +514,8 @@ let get_script c contract_hash =
   | Some code, Some storage -> return (c, Some {Script_repr.code; storage})
   | None, Some _ | Some _, None -> failwith "get_script"
 
-let get_storage ctxt contract =
+let get_storage ctxt contract_hash =
+  let contract = Contract_repr.Originated contract_hash in
   Storage.Contract.Storage.find ctxt contract >>=? function
   | ctxt, None -> return (ctxt, None)
   | ctxt, Some storage ->
@@ -555,7 +558,8 @@ let check_allocated_and_get_balance c pkh =
   | None -> fail (Empty_implicit_contract pkh)
   | Some balance -> return balance
 
-let update_script_storage c contract storage lazy_storage_diff =
+let update_script_storage c contract_hash storage lazy_storage_diff =
+  let contract = Contract_repr.Originated contract_hash in
   let storage = Script_repr.lazy_expr storage in
   update_script_lazy_storage c lazy_storage_diff
   >>=? fun (c, lazy_storage_size_diff) ->
@@ -634,7 +638,8 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
     Storage.Contract.Paid_storage_space.update c contract new_storage_space
     >|=? fun c -> (to_pay, c)
 
-let increase_paid_storage c contract ~amount_in_bytes:storage_incr =
+let increase_paid_storage c contract_hash ~amount_in_bytes:storage_incr =
+  let contract = Contract_repr.Originated contract_hash in
   Storage.Contract.Paid_storage_space.get c contract
   >>=? fun already_paid_space ->
   let new_storage_space = Z.add already_paid_space storage_incr in
