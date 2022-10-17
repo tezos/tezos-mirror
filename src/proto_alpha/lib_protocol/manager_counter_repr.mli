@@ -54,6 +54,13 @@ val encoding_for_RPCs : t Data_encoding.t
 (** Encoding for a counter to be used in errors. *)
 val encoding_for_errors : t Data_encoding.t
 
+(** To be used in client injection only. *)
+module Internal_for_injection : sig
+  (** Converts a string to a counter.
+      Returns [None] if the string does not represent a valid counter. *)
+  val of_string : string -> t option
+end
+
 module Internal_for_tests : sig
   val of_int : int -> t
 
