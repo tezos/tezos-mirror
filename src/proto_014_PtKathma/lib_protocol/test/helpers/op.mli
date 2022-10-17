@@ -29,6 +29,13 @@ open Alpha_context
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
    Improve documentation of the operation helpers *)
 
+val sign :
+  ?watermark:Signature.watermark ->
+  Signature.secret_key ->
+  Context.t ->
+  packed_contents_list ->
+  packed_operation
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->

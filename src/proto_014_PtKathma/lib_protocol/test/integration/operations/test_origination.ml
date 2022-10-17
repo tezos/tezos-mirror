@@ -210,6 +210,108 @@ let test_counter () =
     res
     "Invalid counter (already used) in a manager operation"
 
+let test_unparsable_script () =
+  let open Lwt_result_syntax in
+  let* b, contract = Context.init1 ~consensus_threshold:0 () in
+  let open Alpha_context in
+  (* Craft an ill-typed origination's contract. *)
+  let pkh =
+    match contract with Implicit pkh -> pkh | Originated _ -> assert false
+  in
+  let dummy_expr =
+    Script.lazy_expr
+      Environment.Micheline.(strip_locations (Int ((), Z.of_int 123)))
+  in
+  let script = Script.{code = dummy_expr; storage = dummy_expr} in
+  let origination = Origination {delegate = None; script; credit = Tez.one} in
+  let gas_limit =
+    Gas.Arith.integral_of_int_exn
+      (49_000
+     + Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation)
+  in
+  let op =
+    Contents_list
+      (Single
+         (Manager_operation
+            {
+              source = pkh;
+              fee = Tez.one;
+              counter = Z.of_int 1;
+              operation = origination;
+              gas_limit;
+              storage_limit = Z.zero;
+            }))
+  in
+  let encoded_op =
+    Data_encoding.Binary.to_bytes_exn Operation.contents_list_encoding op
+    |> Bytes.to_string
+  in
+  let* account = Account.find pkh in
+  let ill_typed_op =
+    Data_encoding.Binary.of_string_exn
+      Operation.contents_list_encoding
+      encoded_op
+    |> Op.sign account.sk (B b)
+  in
+  (* Ensure that the application fails with [Ill_typed_contract]. *)
+  let* i = Incremental.begin_construction b in
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:(function
+        | Environment.Ecoproto_error (Script_tc_errors.Ill_typed_contract _)
+          :: _ ->
+            return_unit
+        | trace ->
+            failwith
+              "Expected error trace [Ill_typed_contract], but got:@\n%a"
+              pp_print_trace
+              trace)
+      i
+      ill_typed_op
+  in
+  (* Craft an unparsable lazy expr. *)
+  let encoded_dummy_expr =
+    let b =
+      Data_encoding.Binary.to_bytes_exn Script.lazy_expr_encoding dummy_expr
+    in
+    assert (Hex.to_bytes_exn (`Hex "0000000300bb01") = b) ;
+    Bytes.to_string b
+  in
+  let unparsable_dummy_expr =
+    Hex.to_bytes_exn (`Hex "00000003ffffff") |> Bytes.to_string
+  in
+  let unparsable_operation =
+    let encoded_bad_op =
+      Re.(
+        replace_string
+          ~all:true
+          (compile (str encoded_dummy_expr))
+          encoded_op
+          ~by:unparsable_dummy_expr)
+    in
+    Data_encoding.Binary.of_string_exn
+      Operation.contents_list_encoding
+      encoded_bad_op
+    |> Op.sign account.sk (B b)
+  in
+  (* Ensure that the operation is valid but the application fails with
+     [Lazy_script_decode]. *)
+  let* _i =
+    Incremental.add_operation
+      ~expect_apply_failure:(function
+        (* Lazy_script_decode is not exposed so we only make sure that
+           the application indeed fails. *)
+        | [Environment.Ecoproto_error _] -> return_unit
+        | trace ->
+            failwith
+              "Expected error trace [Lazy_script_decode], but got:@\n%a"
+              pp_print_trace
+              trace)
+      i
+      unparsable_operation
+  in
+  return_unit
+
 (******************************************************)
 
 let tests =
@@ -224,4 +326,5 @@ let tests =
       test_not_tez_in_contract_to_pay_fee;
     Tztest.tztest "multiple originations" `Quick test_multiple_originations;
     Tztest.tztest "counter" `Quick test_counter;
+    Tztest.tztest "unparsable script" `Quick test_unparsable_script;
   ]
