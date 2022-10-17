@@ -1212,6 +1212,13 @@ val spawn_normalize_script :
   t ->
   Process.t
 
+(** Run [octez-client normalize type ..]*)
+val normalize_type : ?hooks:Process_hooks.t -> typ:string -> t -> string Lwt.t
+
+(** Same as [normalize_type], but do not wait for the process to exit. *)
+val spawn_normalize_type :
+  ?hooks:Process_hooks.t -> typ:string -> t -> Process.t
+
 (** Run [octez-client typecheck data ..]*)
 val typecheck_data :
   data:string -> typ:string -> ?gas:int -> ?legacy:bool -> t -> unit Lwt.t

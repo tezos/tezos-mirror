@@ -1509,6 +1509,12 @@ let spawn_typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   in
   spawn_command client cmd
 
+let spawn_normalize_type ?hooks ~typ client =
+  spawn_command ?hooks client ["normalize"; "type"; typ]
+
+let normalize_type ?hooks ~typ client =
+  spawn_normalize_type ?hooks ~typ client |> Process.check_and_read_stdout
+
 let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
   spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
 
