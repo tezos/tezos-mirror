@@ -131,33 +131,91 @@ let add_value ?(content = "a very long value") tree key_steps =
     value
     tree
 
-let should_run_store_has_kernel kernel =
+let should_run_store_has_kernel () =
   let open Lwt_syntax in
-  let* tree = initial_tree ~from_binary:true kernel in
+  let module_ =
+    {|
+(module
+ (import "rollup_safe_core" "store_has"
+         (func $store_has (param i32 i32) (result i32)))
+ ;; Durable keys
+ (data (i32.const 100) "/hi/bye/hello/other")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func $assert_eq
+       (param $address i32) (param $length i32) (param $expected i32)
+       (call $store_has (local.get $address) (local.get $length))
+       (local.get $expected)
+       (i32.ne)
+       (if (then unreachable))
+       )
+ (func (export "kernel_next")
+       (local $hi_address i32)
+       (local $hi_length i32)
+       (local $hi_bye_length i32)
+       (local $hello_address i32)
+       (local $hello_length i32)
+       (local $hello_other_length i32)
+
+       (local.set $hi_address (i32.const 100))
+       (local.set $hi_length (i32.const 3))
+       (local.set $hi_bye_length (i32.const 7))
+       (local.set $hello_address (i32.const 107))
+       (local.set $hello_length (i32.const 6))
+       (local.set $hello_other_length (i32.const 12))
+
+       (call $assert_eq
+             (local.get $hi_address)
+             (local.get $hi_length) (i32.const 2)) ;; Subtree = 2
+       (call $assert_eq
+             (local.get $hi_address)
+             (local.get $hi_bye_length)
+             (i32.const 1)) ;; Value = 1
+       (call $assert_eq
+             (local.get $hello_address)
+             (local.get $hello_length) (i32.const 3)) ;; ValueWithSubtree = 3
+       (call $assert_eq
+             (local.get $hello_address)
+             (local.get $hello_other_length)
+             (i32.const 0)) ;; UnknownKey = 0
+       (nop)
+       )
+ )
+  |}
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
   let* tree = add_value tree ["hi"; "bye"] in
   let* tree = add_value tree ["hello"] in
   let* tree = add_value tree ["hello"; "universe"] in
-  (* Make the first ticks of the WASM PVM (parsing of origination
-     message, parsing and init of the kernel), to switch it to
-     “Input_requested” mode. *)
+  (* Make the first ticks of the WASM PVM (parsing of origination message), to
+     switch it to “Input_requested” mode. *)
   let* tree = eval_until_input_requested tree in
   let* state_before_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
   (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
   assert (not @@ is_stuck state_before_first_message) ;
-  (* We now delete the path ["hello"; "universe"] - this will cause the kernel
-     assertion on this path to fail, and the PVM should become stuck. *)
+  (* We first evaluate the kernel normally, and it shouldn't fail. *)
   let* tree = set_input_step "test" 0 tree in
-  let* tree =
-    Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "_"]
-  in
   let* tree = eval_until_input_requested tree in
   let* state_after_first_message =
     Wasm.Internal_for_tests.get_tick_state tree
   in
+  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
+  assert (not @@ is_stuck state_after_first_message) ;
+  let* tree = set_input_step "test" 1 tree in
+  (* We now delete the path ["hello"; "universe"] - this will cause gthe kernel
+     assertion on this path to fail, and the PVM should become stuck on the
+     third assert in the kernel. *)
+  let* tree =
+    Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "_"]
+  in
+  let* tree = eval_until_input_requested tree in
+  let* state_after_second_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
   (* The kernel is now expected to fail, the PVM should be in stuck state. *)
-  assert (is_stuck state_after_first_message) ;
+  assert (is_stuck state_after_second_message) ;
   return_ok_unit
 
 (* The `should_run_store_list_size_kernel` asserts
@@ -807,12 +865,7 @@ let tests =
          Kernels.unreachable_kernel
          (should_boot_unreachable_kernel ~max_steps:Int64.max_int));
     tztest "Test write_debug kernel" `Quick should_run_debug_kernel;
-    tztest
-      "Test store-has kernel"
-      `Quick
-      (test_with_kernel
-         Kernels.test_store_has_kernel
-         should_run_store_has_kernel);
+    tztest "Test store-has kernel" `Quick should_run_store_has_kernel;
     tztest
       "Test store-list-size kernel"
       `Quick

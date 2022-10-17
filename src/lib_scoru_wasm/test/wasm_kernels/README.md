@@ -40,18 +40,6 @@ cp target/wasm32-unknown-unknown/release/test_kernel.wasm unreachable.wasm
 wasm-strip unreachable.wasm
 ```
 
-## [test-store-has.wasm](./test-store-has.wasm)
-This kernel is designed to test the `store_has` host function behaviour, on different keys in *durable storage*.
-
-It may be originated directly within a boot sector.
-
-To build the `test-store-has.wasm` kernel, run the following from the checked-out `trili/kernel` repo:
-```shell
-git checkout 4788b8a882efbc9c19621ab43d617b2bdd5b1baf
-
-./scripts/build-unit-kernel.sh "test-store-has"
-```
-
 ## [test-store-list-size.wasm](./test-store-list-size.wasm)
 This kernel is designed to test the `store_list_size` host function behaviour, on different keys in *durable storage*.
 
