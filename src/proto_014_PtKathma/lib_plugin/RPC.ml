@@ -2804,20 +2804,25 @@ module Validators = struct
         path
   end
 
-  let endorsing_slots_at_level ctxt level =
-    Baking.endorsing_rights ctxt level >|=? fun (_, rights) ->
-    Signature.Public_key_hash.Map.fold
-      (fun delegate slots acc -> {level = level.level; delegate; slots} :: acc)
-      (rights :> Slot.t list Signature.Public_key_hash.Map.t)
-      []
+  let add_endorsing_slots_at_level (ctxt, acc) level =
+    Baking.endorsing_rights ctxt level >|=? fun (ctxt, rights) ->
+    ( ctxt,
+      Signature.Public_key_hash.Map.fold
+        (fun delegate slots acc ->
+          {level = level.level; delegate; slots} :: acc)
+        (rights :> Slot.t list Signature.Public_key_hash.Map.t)
+        acc )
 
   let register () =
     Registration.register0 ~chunked:true S.validators (fun ctxt q () ->
         let levels =
           requested_levels ~default_level:(Level.current ctxt) ctxt [] q.levels
         in
-        List.concat_map_es (endorsing_slots_at_level ctxt) levels
-        >|=? fun rights ->
+        List.fold_left_es
+          add_endorsing_slots_at_level
+          (ctxt, [])
+          (List.rev levels)
+        >|=? fun (_ctxt, rights) ->
         match q.delegates with
         | [] -> rights
         | _ :: _ as delegates ->
