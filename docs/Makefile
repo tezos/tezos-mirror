@@ -86,6 +86,10 @@ linkcheck: html
 	@$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) >$@;\
 		RESULT=$$?; cat $(BUILDDIR)/output.txt; exit $$RESULT
 
+.PHONY: fixlinkcheck
+fixlinkcheck:
+	@scripts/update_links.sh
+
 .PHONY: redirectcheck
 redirectcheck: html
 	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
