@@ -549,7 +549,7 @@ let fetch_messages_from_block client =
    tree which must have the same root hash as the one stored by the
    protocol in the context.
 *)
-let test_rollup_inbox_of_rollup_node variant scenario ~kind =
+let test_rollup_inbox_of_rollup_node ~variant scenario ~kind =
   test_scenario
     {
       variant = Some variant;
@@ -2770,14 +2770,9 @@ let test_refutation_reward_and_punishment ~kind =
 
    The input depends on the PVM.
 *)
-let test_outbox_message_generic ?regression ?expected_error skip earliness
-    entrypoint input_message expected_storage kind =
+let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
+    ?entrypoint ~input_message ~expected_storage ~kind =
   let commitment_period = 2 and challenge_window = 5 in
-  let variant =
-    Option.some
-    @@ (if entrypoint = "" then "" else entrypoint)
-    ^ "_" ^ string_of_int earliness
-  in
   test_scenario
     ?regression
     ~kind
@@ -2785,7 +2780,12 @@ let test_outbox_message_generic ?regression ?expected_error skip earliness
     ~challenge_window
     {
       tags = ["outbox"];
-      variant;
+      variant =
+        Some
+          (Format.sprintf
+             "entrypoint: %%%s, earliness: %d"
+             (Option.value ~default:"default" entrypoint)
+             earliness);
       description = "an outbox message should be executable";
     }
   @@ fun sc_rollup_node sc_rollup _node client ->
@@ -2845,7 +2845,6 @@ let test_outbox_message_generic ?regression ?expected_error skip earliness
       let outbox_level = 4 in
       let destination = address in
       let parameters = "37" in
-      let entrypoint = if entrypoint = "" then None else Some entrypoint in
       Sc_rollup_client.outbox_proof_single
         sc_client
         ?expected_error
@@ -2884,14 +2883,17 @@ let test_outbox_message_generic ?regression ?expected_error skip earliness
         return ()
     | Some _ -> return ()
 
-let test_outbox_message ?regression ?expected_error ~earliness entrypoint ~kind
+let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
     =
   let skip, input_message, expected_storage =
-    let entrypoint = if entrypoint = "" then entrypoint else "%" ^ entrypoint in
     match kind with
     | "arith" ->
         ( false,
-          (fun contract_address -> "37 " ^ contract_address ^ entrypoint),
+          (fun contract_address ->
+            Printf.sprintf
+              "37 %s%s"
+              contract_address
+              (match entrypoint with Some e -> "%" ^ e | None -> "")),
           "37" )
     | "wasm_2_0_0" ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790
@@ -2905,12 +2907,12 @@ let test_outbox_message ?regression ?expected_error ~earliness entrypoint ~kind
   test_outbox_message_generic
     ?regression
     ?expected_error
-    skip
-    earliness
-    entrypoint
-    input_message
-    expected_storage
-    kind
+    ~skip
+    ~earliness
+    ?entrypoint
+    ~input_message
+    ~expected_storage
+    ~kind
 
 let test_rpcs ~kind =
   test_scenario
@@ -3010,7 +3012,11 @@ let register ~kind ~protocols =
   test_rollup_node_running ~kind protocols ;
   test_rollup_get_genesis_info ~kind protocols ;
   test_rollup_inbox_size ~kind protocols ;
-  test_rollup_inbox_of_rollup_node ~kind "basic" basic_scenario protocols ;
+  test_rollup_inbox_of_rollup_node
+    ~kind
+    ~variant:"basic"
+    basic_scenario
+    protocols ;
   test_rpcs ~kind protocols ;
   (* See above at definition of sc_rollup_node_stops_scenario:
 
@@ -3022,12 +3028,12 @@ let register ~kind ~protocols =
   *)
   test_rollup_inbox_of_rollup_node
     ~kind
-    "disconnects"
+    ~variant:"disconnects"
     sc_rollup_node_disconnects_scenario
     protocols ;
   test_rollup_inbox_of_rollup_node
     ~kind
-    "handles_chain_reorg"
+    ~variant:"handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
     protocols ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
@@ -3118,18 +3124,17 @@ let register ~kind ~protocols =
   (* test_refutation protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
-  test_outbox_message ~earliness:0 "" protocols ~kind ;
-  test_outbox_message ~earliness:0 "aux" protocols ~kind ;
+  test_outbox_message ~earliness:0 protocols ~kind ;
+  test_outbox_message ~earliness:0 ~entrypoint:"aux" protocols ~kind ;
   test_outbox_message
     ~expected_error:(Base.rex ".*Invalid claim about outbox")
     ~earliness:5
-    ""
     protocols
     ~kind ;
   test_outbox_message
     ~expected_error:(Base.rex ".*Invalid claim about outbox")
     ~earliness:5
-    "aux"
+    ~entrypoint:"aux"
     protocols
     ~kind
 
