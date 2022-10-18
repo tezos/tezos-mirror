@@ -25,4 +25,4 @@
 (*****************************************************************************)
 
 module Make (T : Tezos_tree_encoding.TREE) :
-  Gather_floppies.S with type tree = T.tree
+  Wasm_pvm_sig.S with type tree = T.tree

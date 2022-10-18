@@ -41,4 +41,4 @@ This sequence of operations was run:
 "0"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/status
-"Computing"
+"Waiting for input message"

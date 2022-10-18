@@ -47,6 +47,5 @@ let () =
       ("Max nb of ticks", Test_fixed_nb_ticks.tests);
       ("Hash correspondence", Test_hash_consistency.tests);
       ("Reveal", Test_reveal.tests);
-      ("Gather floppies", Test_gather_floppies.tests);
     ]
   |> Lwt_main.run

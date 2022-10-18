@@ -108,6 +108,11 @@ end
 module type S = sig
   type tree
 
+  (** [install_boot_sector payload tree] installs the [payload] passed
+      as an argument in [tree] so that it is interpreted as the kernel
+      to be used by the PVM. *)
+  val install_boot_sector : string -> tree -> tree Lwt.t
+
   (** [compute_step_many ~max_steps tree] forwards the VM by at most [max_step]
       compute tick, yielding if it reaches the maximum number of ticks for a
       toplevel kernel call. If the VM is expecting input, it gets stuck. If the

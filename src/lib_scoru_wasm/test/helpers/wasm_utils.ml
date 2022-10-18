@@ -47,17 +47,8 @@ let initial_tree ?(max_tick = default_max_tick)
   let open Lwt.Syntax in
   let max_tick_Z = Z.of_int64 max_tick in
   let* empty_tree = empty_tree () in
-  let* code = if from_binary then Lwt.return code else wat2wasm code in
-  let boot_sector =
-    Data_encoding.Binary.to_string_exn
-      Gather_floppies.origination_message_encoding
-      (Gather_floppies.Complete_kernel (String.to_bytes code))
-  in
-  let* tree =
-    Wasm.Internal_for_tests.initial_tree_from_boot_sector
-      ~empty_tree
-      boot_sector
-  in
+  let* boot_sector = if from_binary then Lwt.return code else wat2wasm code in
+  let* tree = Wasm.install_boot_sector boot_sector empty_tree in
   let* tree = Wasm.Internal_for_tests.set_max_nb_ticks max_tick_Z tree in
   Wasm.Internal_for_tests.set_maximum_reboots_per_input max_reboots tree
 

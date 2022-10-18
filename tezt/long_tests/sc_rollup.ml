@@ -54,16 +54,13 @@ let hex_encode (input : string) : string =
    the kernel must fit into a single Tezos operation.
 *)
 let read_kernel name : string =
-  let module G = Tezos_scoru_wasm.Gather_floppies in
   let open Tezt.Base in
   let kernel_file =
     project_root // Filename.dirname __FILE__
     // "../../src/proto_alpha/lib_protocol/test/integration/wasm_kernel"
     // (name ^ ".wasm")
   in
-  hex_encode
-  @@ Data_encoding.Binary.to_string_exn G.origination_message_encoding
-  @@ G.Complete_kernel (Bytes.of_string @@ read_file kernel_file)
+  hex_encode (read_file kernel_file)
 
 type sc_rollup_constants = {
   origination_size : int;

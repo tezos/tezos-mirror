@@ -38,7 +38,6 @@ open Tezos_micheline.Micheline
 open Michelson_v1_primitives
 open Tezos_webassembly_interpreter
 module Context = Tezos_context_memory.Context_binary
-open Tezos_scoru_wasm
 open Wasm_utils
 
 module Proof_encoding =
@@ -104,23 +103,6 @@ let test_initial_state_hash_wasm_pvm () =
       expected
       Sc_rollup.State_hash.pp
       hash
-
-let test_incomplete_kernel_chunk_limit () =
-  let open Lwt_result_syntax in
-  let operator = Account.new_account () in
-  let chunk_size = Tezos_scoru_wasm.Gather_floppies.chunk_size in
-  let chunk_too_big = Bytes.make (chunk_size + 10) 'a' in
-  let signature = Signature.sign operator.Account.sk chunk_too_big in
-  let floppy =
-    Tezos_scoru_wasm.Gather_floppies.{chunk = chunk_too_big; signature}
-  in
-  match
-    Data_encoding.Binary.to_string_opt
-      Tezos_scoru_wasm.Gather_floppies.floppy_encoding
-      floppy
-  with
-  | None -> return_unit
-  | Some _ -> failwith "encoding of a floppy with a chunk too large should fail"
 
 let test_metadata_size () =
   let address = Sc_rollup_repr.Address.of_bytes_exn (Bytes.make 20 '\000') in
@@ -207,21 +189,11 @@ let test_output () =
   let parsed =
     match parsed.it with Script.Textual m -> m | _ -> assert false
   in
-  let*! code = Encode.encode parsed in
-  let boot_sector =
-    Data_encoding.Binary.to_string_exn
-      Gather_floppies.origination_message_encoding
-      (Gather_floppies.Complete_kernel (String.to_bytes code))
-  in
-  let*! tree =
-    Wasm.Internal_for_tests.initial_tree_from_boot_sector
-      ~empty_tree
-      boot_sector
-  in
+  let*! boot_sector = Encode.encode parsed in
+  let*! tree = Wasm.install_boot_sector boot_sector empty_tree in
   let*! tree =
     Wasm.Internal_for_tests.set_max_nb_ticks (Z.of_int64 50_000_000L) tree
   in
-  let*! tree = eval_until_input_requested tree in
   let transactions = make_transactions () in
   let out =
     Sc_rollup_outbox_message_repr.(Atomic_transaction_batch {transactions})
@@ -266,10 +238,6 @@ let tests =
       "initial state hash for Wasm"
       `Quick
       test_initial_state_hash_wasm_pvm;
-    Tztest.tztest
-      "encoding of a floppy with a chunk too large should fail"
-      `Quick
-      test_incomplete_kernel_chunk_limit;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
     Tztest.tztest "test output proofs" `Quick test_output;
   ]
