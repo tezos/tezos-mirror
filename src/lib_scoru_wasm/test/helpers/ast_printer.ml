@@ -429,7 +429,7 @@ let pp_reveal out = function
       Format.fprintf
         out
         "Reveal_raw_data (%s)"
-        (Reveal.input_hash_to_string hash)
+        (Reveal.reveal_hash_to_string hash)
   | Reveal_metadata -> Format.fprintf out "Reveal_metadata"
 
 let pp_invoke_step_kont out = function

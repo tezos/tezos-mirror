@@ -108,7 +108,7 @@ let test_reveal_preimage_gen preimage max_bytes =
            preimage. Since the memory is left blank, we are looking
            for the zero hash *)
         let zero_hash =
-          Reveal.input_hash_from_string_exn (String.make 32 '\000')
+          Reveal.reveal_hash_from_string_exn (String.make 32 '\000')
         in
         assert (hash = zero_hash) ;
         return_unit

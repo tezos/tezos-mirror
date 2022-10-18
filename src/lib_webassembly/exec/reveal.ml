@@ -1,10 +1,10 @@
-exception Invalid_input_hash
+exception Invalid_reveal_hash
 
-type input_hash = string
+type reveal_hash = string
 
-let input_hash_from_string_exn str =
-  if String.length str = 32 then str else raise Invalid_input_hash
+let reveal_hash_from_string_exn str =
+  if String.length str = 32 then str else raise Invalid_reveal_hash
 
-let input_hash_to_string hash = hash
+let reveal_hash_to_string hash = hash
 
-type reveal = Reveal_raw_data of input_hash | Reveal_metadata
+type reveal = Reveal_raw_data of reveal_hash | Reveal_metadata

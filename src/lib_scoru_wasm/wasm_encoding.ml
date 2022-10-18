@@ -987,10 +987,10 @@ let packed_frame_stack_encoding =
        (scope ["frame"] frame_encoding)
        (scope ["label_kont"] packed_label_kont_encoding))
 
-let input_hash_encoding =
+let reveal_hash_encoding =
   conv
-    Reveal.input_hash_from_string_exn
-    Reveal.input_hash_to_string
+    Reveal.reveal_hash_from_string_exn
+    Reveal.reveal_hash_to_string
     (value [] (Data_encoding.Fixed.string 32))
 
 let reveal_encoding =
@@ -999,7 +999,7 @@ let reveal_encoding =
     [
       case
         "Reveal_raw_data"
-        input_hash_encoding
+        reveal_hash_encoding
         (function Reveal.Reveal_raw_data hash -> Some hash | _ -> None)
         (fun hash -> Reveal_raw_data hash);
       case

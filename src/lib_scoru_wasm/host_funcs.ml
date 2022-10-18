@@ -727,7 +727,7 @@ let reveal_preimage_parse_args memories args =
   | Values.[Num (I32 hash_addr); Num (I32 base); Num (I32 max_bytes)] ->
       let* memory = retrieve_memory memories in
       let+ hash = Memory.load_bytes memory hash_addr 32 in
-      ( Reveal.(Reveal_raw_data (input_hash_from_string_exn hash)),
+      ( Reveal.(Reveal_raw_data (reveal_hash_from_string_exn hash)),
         Host_funcs.{base; max_bytes} )
   | _ -> raise Bad_input
 
