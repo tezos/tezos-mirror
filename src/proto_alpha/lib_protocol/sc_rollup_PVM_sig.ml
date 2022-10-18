@@ -165,6 +165,20 @@ module Input_hash =
       let size = Some 20
     end)
 
+module Reveal_hash =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Sc_rollup_reveal_data_hash"
+
+      let title = "A smart contract rollup reveal hash"
+
+      let b58check_prefix =
+        "\003\250\187\088\008" (* "scrh1(55)" decoded from Base58. *)
+
+      let size = Some 32
+    end)
+
 type reveal = Reveal_raw_data of Input_hash.t | Reveal_metadata
 
 let reveal_encoding =
