@@ -565,8 +565,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
       let open Wasm_pvm_state in
       let {inbox_level; message_counter} = input_info in
       let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
-      let level = Int32.to_string raw_level in
-      let id = Z.to_string message_counter in
       let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
       let* tick_state =
         match pvm_state.tick_state with
@@ -611,13 +609,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
       in
       (* See {{Note tick state clean-up}} *)
       let* tree = T.remove tree ["wasm"] in
-      (* Encode the input in the tree under [input/level/id]. *)
-      let* tree =
-        Tree_encoding_runner.encode
-          (Tezos_tree_encoding.value ["input"; level; id] Data_encoding.string)
-          message
-          tree
-      in
       (* Increase the current tick counter and mark that no input is required. *)
       let pvm_state =
         {
