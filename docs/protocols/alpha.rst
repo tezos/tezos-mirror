@@ -32,6 +32,9 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Add RPC to get contract's balance of ticket with specified ticketer, content type, and content:
+  ``POST /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/ticket_balance``. (MR :gl:`!6488`)
+
 Operation receipts
 ------------------
 

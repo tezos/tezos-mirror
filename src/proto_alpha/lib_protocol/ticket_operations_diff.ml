@@ -239,7 +239,7 @@ let add_transfer_to_token_map ctxt token_map {destination; tickets} =
   List.fold_left_es
     (fun (token_map, ctxt) ticket ->
       let ticket_token, amount =
-        Ticket_token.token_and_amount_of_ex_ticket ticket
+        Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
       in
       Ticket_token_map.add ctxt ~ticket_token ~destination ~amount token_map)
     (token_map, ctxt)

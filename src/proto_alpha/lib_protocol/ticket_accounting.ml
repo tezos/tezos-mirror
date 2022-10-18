@@ -78,7 +78,9 @@ let ticket_balances_of_value ctxt ~include_lazy ty value =
   >>=? fun (tickets, ctxt) ->
   List.fold_left_e
     (fun (acc, ctxt) ticket ->
-      let token, amount = Ticket_token.token_and_amount_of_ex_ticket ticket in
+      let token, amount =
+        Ticket_scanner.ex_token_and_amount_of_ex_ticket ticket
+      in
       Gas.consume ctxt Ticket_costs.Constants.cost_collect_tickets_step
       >|? fun ctxt ->
       ( (token, Script_int.to_zint (amount :> Script_int.n Script_int.num))

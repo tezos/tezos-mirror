@@ -25,15 +25,28 @@
 
 open Alpha_context
 
-type ex_token =
-  | Ex_token : {
-      ticketer : Contract.t;
-      contents_type : 'a Script_typed_ir.comparable_ty;
-      contents : 'a;
-    }
-      -> ex_token
+type 'a parsed_token = {
+  ticketer : Contract.t;
+  contents_type : 'a Script_typed_ir.comparable_ty;
+  contents : 'a;
+}
 
-let token_and_amount_of_ex_ticket
-    (Ticket_scanner.Ex_ticket
-      (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
-  (Ex_token {ticketer; contents_type; contents}, amount)
+type ex_token = Ex_token : 'a parsed_token -> ex_token
+
+type unparsed_token = {
+  ticketer : Contract.t;
+  contents_type : Script.expr;
+  contents : Script.expr;
+}
+
+let unparsed_token_encoding =
+  let open Data_encoding in
+  conv
+    (fun {ticketer; contents_type; contents} ->
+      (ticketer, contents_type, contents))
+    (fun (ticketer, contents_type, contents) ->
+      {ticketer; contents_type; contents})
+    (obj3
+       (req "ticketer" Contract.encoding)
+       (req "content_type" Script.expr_encoding)
+       (req "content" Script.expr_encoding))

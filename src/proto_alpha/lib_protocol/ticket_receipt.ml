@@ -23,15 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type update = {account : Destination_repr.t; amount : Z.t}
+open Alpha_context
 
-type ticket_token = {
-  ticketer : Contract_repr.t;
-  contents_type : Script_repr.expr;
-  contents : Script_repr.expr;
-}
+type update = {account : Destination.t; amount : Z.t}
 
-type item = {ticket_token : ticket_token; updates : update list}
+type item = {ticket_token : Ticket_token.unparsed_token; updates : update list}
 
 type t = item list
 
@@ -40,19 +36,7 @@ let update_encoding =
   conv
     (fun {account; amount} -> (account, amount))
     (fun (account, amount) -> {account; amount})
-    (obj2 (req "account" Destination_repr.encoding) (req "amount" z))
-
-let ticket_token_encoding =
-  let open Data_encoding in
-  conv
-    (fun {ticketer; contents_type; contents} ->
-      (ticketer, contents_type, contents))
-    (fun (ticketer, contents_type, contents) ->
-      {ticketer; contents_type; contents})
-    (obj3
-       (req "ticketer" Contract_repr.encoding)
-       (req "content_type" Script_repr.expr_encoding)
-       (req "content" Script_repr.expr_encoding))
+    (obj2 (req "account" Destination.encoding) (req "amount" z))
 
 let item_encoding =
   let open Data_encoding in
@@ -60,7 +44,7 @@ let item_encoding =
     (fun {ticket_token; updates} -> (ticket_token, updates))
     (fun (ticket_token, updates) -> {ticket_token; updates})
     (obj2
-       (req "ticket_token" ticket_token_encoding)
+       (req "ticket_token" Ticket_token.unparsed_token_encoding)
        (req "updates" (list update_encoding)))
 
 let encoding = Data_encoding.list item_encoding

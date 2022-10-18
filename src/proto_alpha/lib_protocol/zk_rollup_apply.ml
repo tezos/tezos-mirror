@@ -188,7 +188,7 @@ let transaction_to_zk_rollup ~ctxt ~parameters_ty ~parameters ~dst_rollup ~since
          {payload_size = ticket_size; limit})
   in
   let ex_token, ticket_amount =
-    Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+    Ticket_scanner.ex_token_and_amount_of_ex_ticket ex_ticket
   in
   (* Compute the ticket hash with zk rollup as owner *)
   let* ticket_hash, ctxt =

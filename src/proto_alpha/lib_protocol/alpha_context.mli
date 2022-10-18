@@ -4910,25 +4910,6 @@ module Ticket_balance : sig
   end
 end
 
-(** This module re-exports definitions from {!Ticket_receipt_repr}. *)
-module Ticket_receipt : sig
-  type update = {account : Destination.t; amount : Z.t}
-
-  type ticket_token = {
-    ticketer : Contract.t;
-    contents_type : Script.expr;
-    contents : Script.expr;
-  }
-
-  type item = {ticket_token : ticket_token; updates : update list}
-
-  type t = item list
-
-  val item_encoding : item Data_encoding.t
-
-  val encoding : t Data_encoding.t
-end
-
 module First_level_of_protocol : sig
   (** Get the level of the first block of this protocol. *)
   val get : context -> Raw_level.t tzresult Lwt.t

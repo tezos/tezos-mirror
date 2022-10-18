@@ -452,7 +452,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~payer
        {payload_size = ticket_size; limit})
   >>=? fun () ->
   let ex_token, ticket_amount =
-    Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+    Ticket_scanner.ex_token_and_amount_of_ex_ticket ex_ticket
   in
   Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
   >>=? fun (ticket_hash, ctxt) ->

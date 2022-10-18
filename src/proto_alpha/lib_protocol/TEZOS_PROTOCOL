@@ -106,7 +106,6 @@
         "Migration_repr",
         "Carbonated_map_costs",
         "Carbonated_map",
-        "Ticket_receipt_repr",
 
         "Raw_context_intf",
         "Raw_context",
@@ -204,6 +203,8 @@
         "Michelson_v1_gas",
         "Script_list",
         "Script_tc_context",
+        "Ticket_token",
+        "Ticket_receipt",
         "Apply_operation_result",
         "Apply_internal_results",
         "Apply_results",
@@ -215,7 +216,6 @@
         "Script_tc_errors_registration",
         "Ticket_costs",
         "Ticket_scanner",
-        "Ticket_token",
         "Ticket_balance_key",
         "Ticket_lazy_storage_diff",
 

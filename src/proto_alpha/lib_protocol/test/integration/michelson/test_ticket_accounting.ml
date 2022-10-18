@@ -121,7 +121,7 @@ let assert_equal_ticket_receipt ~loc given expected =
     @@ let*? ticketer = Contract.of_b58check ticketer in
        let contents = Expr.from_string (Printf.sprintf "%S" content) in
        let contents_type = Expr.from_string "string" in
-       let ticket_token = Ticket_receipt.{ticketer; contents_type; contents} in
+       let ticket_token = Ticket_token.{ticketer; contents_type; contents} in
        let updates =
          List.map
            (fun (account, amount) ->

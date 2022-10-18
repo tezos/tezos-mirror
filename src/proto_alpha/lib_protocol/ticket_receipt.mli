@@ -23,21 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
+
 (** A module for representing the increase/decrease of tickets in the storage.
     It will be used to display ticket update information in the operation receipt. *)
 
 (** Represents that [account]'s storage has delta [amount] for a given ticket *)
-type update = {account : Destination_repr.t; amount : Z.t}
-
-(** A ticket token *)
-type ticket_token = {
-  ticketer : Contract_repr.t;
-  contents_type : Script_repr.expr;
-  contents : Script_repr.expr;
-}
+type update = {account : Destination.t; amount : Z.t}
 
 (** List of updates for a [ticket]  *)
-type item = {ticket_token : ticket_token; updates : update list}
+type item = {ticket_token : Ticket_token.unparsed_token; updates : update list}
 
 (** A list of ticket tokens and their corresponding updates *)
 type t = item list

@@ -609,10 +609,6 @@ module Ticket_balance = struct
   include Ticket_storage
 end
 
-module Ticket_receipt = struct
-  include Ticket_receipt_repr
-end
-
 module Token = Token
 module Cache = Cache_repr
 

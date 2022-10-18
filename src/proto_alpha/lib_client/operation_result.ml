@@ -533,7 +533,7 @@ let pp_ticket_receipt ppf ticket_receipt =
       updates
   in
   let pp_item ppf {ticket_token; updates} =
-    let {ticketer; contents_type; contents} = ticket_token in
+    let Ticket_token.{ticketer; contents_type; contents} = ticket_token in
     Format.fprintf
       ppf
       "Ticketer: %a@,Content type: %a@,Content: %a@,%a"

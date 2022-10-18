@@ -140,7 +140,7 @@ let to_ticket_receipt ctxt ~owner ticket_token_map =
         let ty = Script.strip_annotations ty_unstripped in
         let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost ty) in
         let contents_type = Micheline.strip_locations ty in
-        let ticket_token = Ticket_receipt.{ticketer; contents_type; contents} in
+        let ticket_token = Ticket_token.{ticketer; contents_type; contents} in
         let update =
           Ticket_receipt.{ticket_token; updates = [{account = owner; amount}]}
         in

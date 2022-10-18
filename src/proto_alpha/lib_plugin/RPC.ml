@@ -1698,6 +1698,17 @@ module Contract = struct
         ~query:RPC_query.empty
         ~output:(option z)
         RPC_path.(path /: Contract.rpc_arg / "storage" / "paid_space")
+
+    let ticket_balance =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:
+          "Access the contract's balance of ticket with specified ticketer, \
+           content type, and content."
+        ~query:RPC_query.empty
+        ~input:Ticket_token.unparsed_token_encoding
+        ~output:n
+        RPC_path.(path /: Contract.rpc_arg / "ticket_balance")
   end
 
   let get_contract contract f =
@@ -1756,7 +1767,22 @@ module Contract = struct
       S.get_paid_storage_space
       (fun ctxt contract () () ->
         get_contract contract @@ fun _ ->
-        Contract.paid_storage_space ctxt contract >>=? return_some)
+        Contract.paid_storage_space ctxt contract >>=? return_some) ;
+    Registration.register1
+      ~chunked:false
+      S.ticket_balance
+      (fun ctxt contract () Ticket_token.{ticketer; contents_type; contents} ->
+        let open Lwt_result_syntax in
+        let* ticket_hash, ctxt =
+          Ticket_balance_key.make
+            ctxt
+            ~owner:(Contract contract)
+            ~ticketer
+            ~contents_type:(Micheline.root contents_type)
+            ~contents:(Micheline.root contents)
+        in
+        let* amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
+        return @@ Option.value amount ~default:Z.zero)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
@@ -1794,6 +1820,9 @@ module Contract = struct
       (Contract.Originated contract)
       ()
       ()
+
+  let ticket_balance ctxt block contract key =
+    RPC_context.make_call1 S.ticket_balance ctxt block contract () key
 end
 
 module Big_map = struct

@@ -132,7 +132,6 @@
   Migration_repr
   Carbonated_map_costs
   Carbonated_map
-  Ticket_receipt_repr
   Raw_context_intf
   Raw_context
   Storage_costs
@@ -218,6 +217,8 @@
   Michelson_v1_gas
   Script_list
   Script_tc_context
+  Ticket_token
+  Ticket_receipt
   Apply_operation_result
   Apply_internal_results
   Apply_results
@@ -229,7 +230,6 @@
   Script_tc_errors_registration
   Ticket_costs
   Ticket_scanner
-  Ticket_token
   Ticket_balance_key
   Ticket_lazy_storage_diff
   Tx_rollup_parameters
@@ -398,7 +398,6 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
-  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -485,6 +484,8 @@
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
@@ -496,7 +497,6 @@
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
   ticket_scanner.ml ticket_scanner.mli
-  ticket_token.ml ticket_token.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
@@ -645,7 +645,6 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
-  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -732,6 +731,8 @@
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
@@ -743,7 +744,6 @@
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
   ticket_scanner.ml ticket_scanner.mli
-  ticket_token.ml ticket_token.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
@@ -897,7 +897,6 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
-  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -984,6 +983,8 @@
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
+  ticket_token.ml ticket_token.mli
+  ticket_receipt.ml ticket_receipt.mli
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
@@ -995,7 +996,6 @@
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_costs.ml ticket_costs.mli
   ticket_scanner.ml ticket_scanner.mli
-  ticket_token.ml ticket_token.mli
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
