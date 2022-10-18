@@ -27,7 +27,7 @@ type error +=
   | Splitting_failed of string
   | Merging_failed of string
   | Invalid_slot_header of string * string
-  | Missing_shards
+  | Missing_shards of {provided : int; required : int}
   | Illformed_shard
   | Slot_not_found
   | Illformed_pages
@@ -66,11 +66,18 @@ let () =
     ~id:"dal.node.missing_shards"
     ~title:"Missing shards"
     ~description:"Some shards are missing"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Some shards are missing. Store is invalid.")
-    Data_encoding.(unit)
-    (function Missing_shards -> Some () | _ -> None)
-    (fun () -> Missing_shards) ;
+    ~pp:(fun ppf (provided, required) ->
+      Format.fprintf
+        ppf
+        "Some shards are missing, expected at least %d, found %d. Store is \
+         invalid."
+        provided
+        required)
+    Data_encoding.(obj2 (req "provided" int31) (req "required" int31))
+    (function
+      | Missing_shards {provided; required} -> Some (provided, required)
+      | _ -> None)
+    (fun (provided, required) -> Missing_shards {provided; required}) ;
   register_error_kind
     `Permanent
     ~id:"dal.node.slot_not_found"
@@ -157,28 +164,21 @@ let split_and_store watcher dal_constants store slot =
       Lwt.return_ok slot_header
   | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
-let get_shard store slot_header shard_id =
-  let open Lwt_result_syntax in
-  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
-  let* share =
-    Lwt.catch
-      (fun () ->
-        let*! r = Store.get store (share_path slot_header shard_id) in
-        return r)
-      (function
-        | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
-  in
-  let*? share = decode_share share in
-  return Cryptobox.{index = shard_id; share}
-
-let check_shards initial_constants shards =
+let check_slot_consistency dal_parameters shards =
   let open Result_syntax in
   if shards = [] then fail [Slot_not_found]
-  else if
-    Compare.List_length_with.(
-      shards = initial_constants.Cryptobox.number_of_shards)
-  then Ok ()
-  else fail [Missing_shards]
+  else
+    let required_shards =
+      dal_parameters.Cryptobox.number_of_shards
+      / dal_parameters.Cryptobox.redundancy_factor
+    in
+    if Compare.List_length_with.(shards >= required_shards) then Ok ()
+    else
+      fail
+        [
+          Missing_shards
+            {provided = List.length shards; required = required_shards};
+        ]
 
 let polynomial_from_shards dal_constants shards =
   match Cryptobox.polynomial_from_shards dal_constants shards with
@@ -196,27 +196,66 @@ let save_shards store watcher dal_constants slot_header shards =
   in
   save store watcher slot_header shards
 
-let get_slot initial_constants dal_constants store slot_header =
+let fold_stored_shards ~check_shards store dal_parameters f init slot_header =
   let open Lwt_result_syntax in
   let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
-  let*? () = check_shards initial_constants shards in
+  let*? () =
+    if check_shards then check_slot_consistency dal_parameters shards else Ok ()
+  in
+  List.fold_left_es
+    (fun shards (i, tree) ->
+      let i = int_of_string i in
+      let* share =
+        match Store.Tree.destruct tree with
+        | `Node _ -> fail [Illformed_shard]
+        | `Contents (c, _metadata) ->
+            catch_es (fun () ->
+                let*! share = Store.Tree.Contents.force_exn c in
+                return share)
+      in
+      let*? share = decode_share share in
+      return (f i share shards))
+    init
+    shards
+
+module Shard_id_set = Set.Make (Int)
+
+let get_shard store slot_header shard_id =
+  let open Lwt_result_syntax in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
+  let* share =
+    Lwt.catch
+      (fun () ->
+        let*! r = Store.get store (share_path slot_header shard_id) in
+        return r)
+      (function
+        | Invalid_argument _ -> fail [Slot_not_found] | e -> fail [Exn e])
+  in
+  let*? share = decode_share share in
+  return Cryptobox.{index = shard_id; share}
+
+let get_shards store dal_parameters slot_header shard_ids =
+  fold_stored_shards
+    ~check_shards:false
+    store
+    dal_parameters
+    (fun id share acc ->
+      if Shard_id_set.mem id shard_ids then Cryptobox.{index = id; share} :: acc
+      else acc)
+    []
+    slot_header
+
+let get_slot dal_parameters dal_constants store slot_header =
+  let open Lwt_result_syntax in
   let* shards =
-    List.fold_left_es
-      (fun shards (i, tree) ->
-        let i = int_of_string i in
-        let* share =
-          match Store.Tree.destruct tree with
-          | `Node _ -> fail [Illformed_shard]
-          | `Contents (c, _metadata) ->
-              protect @@ fun () ->
-              let*! share = Store.Tree.Contents.force_exn c in
-              return share
-        in
-        let*? share = decode_share share in
-        return (Cryptobox.IntMap.add i share shards))
+    fold_stored_shards
+      ~check_shards:true
+      store
+      dal_parameters
+      Cryptobox.IntMap.add
       Cryptobox.IntMap.empty
-      shards
+      slot_header
   in
   let*? polynomial = polynomial_from_shards dal_constants shards in
   let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
