@@ -131,6 +131,15 @@ let get_endorser ctxt =
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
+let get_endorser_slot ctxt pkh =
+  get_endorsers ctxt >|=? fun endorsers ->
+  List.find_map
+    (function
+      | {Plugin.RPC.Validators.delegate; slots; _} ->
+          if Signature.Public_key_hash.(delegate = pkh) then Some slots
+          else None)
+    endorsers
+
 let get_endorser_n ctxt n =
   Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun endorsers ->
   let endorser =
@@ -511,25 +520,47 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
-let init_with_constants_gen tup constants =
-  let n = tup_n tup in
-  Account.generate_accounts n >>?= fun accounts ->
+let create_bootstrap_accounts n =
+  let open Result_syntax in
+  let* accounts = Account.generate_accounts n in
   let contracts =
     List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
   in
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
-  let open Tezos_protocol_alpha_parameters in
-  let parameters =
-    Default_parameters.parameters_of_constants ~bootstrap_accounts constants
-  in
-  Block.genesis_with_parameters parameters >|=? fun blk ->
-  (blk, tup_get tup contracts)
+  return (bootstrap_accounts, contracts)
 
-let init_with_constants_n consts n = init_with_constants_gen (TList n) consts
+let init_with_constants_gen tup constants =
+  let open Lwt_result_syntax in
+  let n = tup_n tup in
+  let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let parameters =
+    Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
+      ~bootstrap_accounts
+      constants
+  in
+  let* blk = Block.genesis_with_parameters parameters in
+  return (blk, tup_get tup contracts)
+
+let init_with_constants_n constants n =
+  init_with_constants_gen (TList n) constants
 
 let init_with_constants1 = init_with_constants_gen T1
 
 let init_with_constants2 = init_with_constants_gen T2
+
+let init_with_parameters_gen tup parameters =
+  let open Lwt_result_syntax in
+  let n = tup_n tup in
+  let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let parameters = Parameters.{parameters with bootstrap_accounts} in
+  let* blk = Block.genesis_with_parameters parameters in
+  return (blk, tup_get tup contracts)
+
+let init_with_parameters_n params n = init_with_parameters_gen (TList n) params
+
+let init_with_parameters1 = init_with_parameters_gen T1
+
+let init_with_parameters2 = init_with_parameters_gen T2
 
 let default_raw_context () =
   let open Tezos_protocol_alpha_parameters in

@@ -38,13 +38,26 @@ val get_level : t -> Raw_level.t tzresult
     build one (in the [Block] case). *)
 val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
 
+(** Given a context, returns the list of endorsers charactized by
+    the [level], the public key hash of the [delegate], its [consensus_key]
+    and its assigned [slots].
+    see {! Plugin.RPC.Validator.t}. *)
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
+(** Return the two first elements of the list returns by [get_endorsers]. *)
 val get_first_different_endorsers :
   t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
 
+(** Return the first element of the list returns by [get_endorsers]. *)
 val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
+(** Given a delegate public key hash [del], and a context [ctxt],
+    if [del] is in [get_endorsers ctxt] returns the [slots] of [del] otherwise
+    return [None]. *)
+val get_endorser_slot :
+  t -> public_key_hash -> Slot.t list option tzresult Lwt.t
+
+(** Return the [n]th element of the list returns by [get_endorsers]. *)
 val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 val get_endorsing_power_for_delegate :
@@ -338,6 +351,37 @@ val init_with_constants1 :
 
 val init_with_constants2 :
   Constants.Parametric.t ->
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
+
+(** [init_with_parameters_gen tup params] returns an initial block parametrised
+    with [params] and the implicit contracts corresponding to its bootstrap
+    accounts. The number of bootstrap accounts, and the structure of the
+    returned contracts, are specified by the [tup] argument. *)
+val init_with_parameters_gen :
+  (Alpha_context.Contract.t, 'contracts) tup ->
+  Parameters.t ->
+  (Block.t * 'contracts) tzresult Lwt.t
+
+(** [init_with_parameters_n params n] returns an initial block parametrized
+    with [params] with [n] initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters_n :
+  Parameters.t ->
+  int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+(** [init_with_parameters1 params] returns an initial block parametrized with
+    [params] with one initialized account and the associated implicit
+    contract. *)
+val init_with_parameters1 :
+  Parameters.t -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+(** [init_with_parameters2 params] returns an initial block parametrized with
+    [params] with two initialized accounts and the associated implicit
+    contracts *)
+val init_with_parameters2 :
+  Parameters.t ->
   (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
   Lwt.t
 

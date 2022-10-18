@@ -1,8 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executables
- (names main test_1m_restriction)
+(executable
+ (name main)
  (libraries
   alcotest-lwt
   tezos-base
@@ -10,7 +10,8 @@
   qcheck-alcotest
   tezos-client-014-PtKathma
   tezos-014-PtKathma-test-helpers
-  tezos-base-test-helpers)
+  tezos-base-test-helpers
+  tezos-protocol-plugin-014-PtKathma)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -18,14 +19,10 @@
   -open Tezos_protocol_014_PtKathma
   -open Tezos_client_014_PtKathma
   -open Tezos_014_PtKathma_test_helpers
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_plugin_014_PtKathma))
 
 (rule
  (alias runtest)
  (package tezos-protocol-014-PtKathma-tests)
  (action (run %{dep:./main.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-014-PtKathma-tests)
- (action (run %{dep:./test_1m_restriction.exe})))

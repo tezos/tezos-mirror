@@ -27,13 +27,16 @@
     -------
     Component:  Protocol (validate manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/test_1m_restriction.exe
+                src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/main.exe \
+                -- test "^one-manager"
     Subject:    1M restriction in validation of manager operation.
 *)
 
 open Protocol
 open Manager_operation_helpers
 open Generators
+
+let count = 100
 
 (** Local default values for the tests. *)
 let ctxt_cstrs_default =
@@ -88,7 +91,7 @@ let print_ops_pair (ctxt_req, op_req, mode) =
 
 (** The application of a valid operation succeeds, at least, to perform
    the fee payment. *)
-let positive_validated_op =
+let positive_tests =
   let gen =
     QCheck2.Gen.triple
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -96,9 +99,9 @@ let positive_validated_op =
       Generators.gen_mode
   in
   wrap
-    ~count:1000
+    ~count
     ~print:print_one_op
-    ~name:"Positive validated op"
+    ~name:"positive validated op"
     ~gen
     (fun (ctxt_req, operation_req, mode) ->
       let open Lwt_result_syntax in
@@ -110,7 +113,7 @@ let positive_validated_op =
 (** Under 1M restriction, neither a block nor a prevalidator's valid
     pool should contain two operations with the same manager. It
     raises a Manager_restriction error. *)
-let negative_validated_two_ops_of_same_manager =
+let two_op_from_same_manager_tests =
   let gen =
     QCheck2.Gen.quad
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -133,9 +136,9 @@ let negative_validated_two_ops_of_same_manager =
           err
   in
   wrap
-    ~count:1000
+    ~count
     ~print:print_two_ops
-    ~name:"Negative -- 1M"
+    ~name:"check conflicts between managers."
     ~gen
     (fun (ctxt_req, operation_req, operation_req2, mode) ->
       let open Lwt_result_syntax in
@@ -147,7 +150,7 @@ let negative_validated_two_ops_of_same_manager =
 
 (** Under 1M restriction, a batch of two operations cannot be replaced
    by two single operations. *)
-let negative_batch_of_two_is_not_two_single =
+let batch_is_not_singles_tests =
   let gen =
     QCheck2.Gen.triple
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -158,16 +161,16 @@ let negative_batch_of_two_is_not_two_single =
   in
   let expect_failure _ = return_unit in
   wrap
-    ~count:1000
+    ~count
     ~print:print_ops_pair
-    ~name:"Batch is not sequence of Single"
+    ~name:"batch is not sequence of Single"
     ~gen
     (fun (ctxt_req, operation_req, mode) ->
       let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op (fst operation_req) infos in
       let* op2 = select_op (snd operation_req) infos in
-      let source = contract_of infos.accounts.source in
+      let source = contract_of (get_source infos) in
       let* batch =
         Op.batch_operations ~source (B infos.ctxt.block) [op1; op2]
       in
@@ -178,7 +181,7 @@ let negative_batch_of_two_is_not_two_single =
 (** The applications of two covalid operations in a certain context
    succeed, at least, to perform the fee payment of both, in whatever
    application order. *)
-let valid_context_free =
+let conflict_free_tests =
   let gen =
     QCheck2.Gen.quad
       (Generators.gen_ctxt_req ctxt_cstrs_default)
@@ -187,9 +190,9 @@ let valid_context_free =
       Generators.gen_mode
   in
   wrap
-    ~count:1000
+    ~count
     ~print:print_two_ops
-    ~name:"Under 1M, co-valid ops commute"
+    ~name:"under 1M, co-valid ops commute"
     ~gen
     (fun (ctxt_req, operation_req, operation_req', mode) ->
       let open Lwt_result_syntax in
@@ -201,10 +204,10 @@ let valid_context_free =
           accounts =
             {
               infos.accounts with
-              source =
+              sources =
                 (match infos.accounts.del with
                 | None -> assert false
-                | Some s -> s);
+                | Some s -> [s]);
             };
         }
       in
@@ -215,28 +218,11 @@ let valid_context_free =
 
 open Lib_test.Qcheck2_helpers
 
-let positive_tests = qcheck_wrap [positive_validated_op]
-
-let two_op_from_same_manager_tests =
-  qcheck_wrap [negative_validated_two_ops_of_same_manager]
-
-let batch_is_not_singles_tests =
-  qcheck_wrap [negative_batch_of_two_is_not_two_single]
-
-let conflict_free_tests = qcheck_wrap [valid_context_free]
-
-let qcheck_tests = ("Positive tests", positive_tests)
-
-let qcheck_tests2 =
-  ("Only one manager op per manager", two_op_from_same_manager_tests)
-
-let qcheck_tests3 =
-  ("A batch differs from a sequence", batch_is_not_singles_tests)
-
-let qcheck_tests4 =
-  ("Fee payment of two covalid operations commute", conflict_free_tests)
-
-let () =
-  Alcotest.run
-    "1M QCheck"
-    [qcheck_tests; qcheck_tests2; qcheck_tests3; qcheck_tests4]
+let tests : (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) trace =
+  qcheck_wrap_lwt
+    [
+      positive_tests;
+      two_op_from_same_manager_tests;
+      batch_is_not_singles_tests;
+      conflict_free_tests;
+    ]

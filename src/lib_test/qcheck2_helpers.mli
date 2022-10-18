@@ -23,13 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Wrap QCheck tests into Alcotests. *)
+(** Wrap QCheck tests into Alcotest. *)
 val qcheck_wrap :
   ?verbose:bool ->
   ?long:bool ->
   ?rand:Random.State.t ->
   QCheck2.Test.t list ->
   unit Alcotest.test_case list
+
+(** Wrap QCheck tests into Alcotest_lwt. *)
+val qcheck_wrap_lwt :
+  ?verbose:bool ->
+  ?long:bool ->
+  ?rand:Random.State.t ->
+  QCheck2.Test.t list ->
+  (string * [`Quick | `Slow] * (unit -> unit Lwt.t)) list
 
 (** [qcheck_make_result ?print ?pp_error ?count ?check ~name ~gen f]
     is a wrapper around {!QCheck2.Test.make} where [f] returns a
@@ -57,6 +65,19 @@ val qcheck_make_lwt :
   name:string ->
   gen:'a QCheck2.Gen.t ->
   ('a -> bool Lwt.t) ->
+  QCheck2.Test.t
+
+(** [qcheck_make_result_lwt ?print ?count ~extract ~name ~gen f] is
+    the combination of [qcheck_make_result] and [qcheck_make_lwt]. *)
+val qcheck_make_result_lwt :
+  ?count:int ->
+  ?print:'a QCheck2.Print.t ->
+  ?pp_error:(Format.formatter -> 'b -> unit) ->
+  ?check:((bool, 'b) result -> bool) ->
+  extract:((bool, 'b) result Lwt.t -> (bool, 'b) result) ->
+  name:string ->
+  gen:'a QCheck2.Gen.t ->
+  ('a -> (bool, 'b) result Lwt.t) ->
   QCheck2.Test.t
 
 (** [qcheck_eq_tests ~eq ~gen ~eq_name] returns

@@ -27,94 +27,14 @@
     -------
     Component:  Protocol (validate manager)
     Invocation: dune exec \
-                src/proto_alpha/lib_protocol/test/integration/validate/main.exe \
-                -- test "^Single"
+                src/proto_015_PtLimaPt/lib_protocol/test/integration/validate/main.exe \
+                -- test "^single"
     Subject:    Validation of manager operation.
 *)
 
 open Protocol
 open Alpha_context
 open Manager_operation_helpers
-
-(** The goal of this test is to ensure that [select_op] generate the
-   wanted kind of manager operation
-
-    Note: if a new manager operation kind is added in the protocol,
-   [Manager_operation_helpers.manager_operation_kind] should be
-   extended. You will also have to extend
-   [Manager_operation_helpers.select_op] with a new `mk` for this new
-   operation. Finally the list [Manager_operation_helpers.subjects]
-   should also be extended to run the validate test on the new manager
-   operation kind. *)
-let ensure_kind infos kind =
-  let open Lwt_result_syntax in
-  let* op =
-    select_op
-      {(operation_req_default kind) with force_reveal = Some false}
-      infos
-  in
-  let (Operation_data {contents; _}) = op.protocol_data in
-  match contents with
-  | Single (Manager_operation {operation; _}) -> (
-      match (operation, kind) with
-      | Transaction _, K_Transaction
-      | Reveal _, K_Reveal
-      | Origination _, K_Origination
-      | Delegation _, K_Delegation
-      | Delegation _, K_Undelegation
-      | Delegation _, K_Self_delegation
-      | Register_global_constant _, K_Register_global_constant
-      | Set_deposits_limit _, K_Set_deposits_limit
-      | Update_consensus_key _, K_Update_consensus_key
-      | Increase_paid_storage _, K_Increase_paid_storage
-      | Tx_rollup_origination, K_Tx_rollup_origination
-      | Tx_rollup_submit_batch _, K_Tx_rollup_submit_batch
-      | Tx_rollup_commit _, K_Tx_rollup_commit
-      | Tx_rollup_return_bond _, K_Tx_rollup_return_bond
-      | Tx_rollup_finalize_commitment _, K_Tx_rollup_finalize
-      | Tx_rollup_remove_commitment _, K_Tx_rollup_remove_commitment
-      | Tx_rollup_rejection _, K_Tx_rollup_reject
-      | Tx_rollup_dispatch_tickets _, K_Tx_rollup_dispatch_tickets
-      | Transfer_ticket _, K_Transfer_ticket
-      | Sc_rollup_originate _, K_Sc_rollup_origination
-      | Sc_rollup_add_messages _, K_Sc_rollup_add_messages
-      | Sc_rollup_cement _, K_Sc_rollup_cement
-      | Sc_rollup_publish _, K_Sc_rollup_publish
-      | Sc_rollup_refute _, K_Sc_rollup_refute
-      | Sc_rollup_timeout _, K_Sc_rollup_timeout
-      | Sc_rollup_execute_outbox_message _, K_Sc_rollup_execute_outbox_message
-      | Sc_rollup_recover_bond _, K_Sc_rollup_recover_bond
-      | Dal_publish_slot_header _, K_Dal_publish_slot_header
-      | Zk_rollup_origination _, K_Zk_rollup_origination
-      | Zk_rollup_publish _, K_Zk_rollup_publish ->
-          return_unit
-      | ( ( Transaction _ | Origination _ | Register_global_constant _
-          | Delegation _ | Set_deposits_limit _ | Update_consensus_key _
-          | Increase_paid_storage _ | Reveal _ | Tx_rollup_origination
-          | Tx_rollup_submit_batch _ | Tx_rollup_commit _
-          | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-          | Tx_rollup_remove_commitment _ | Tx_rollup_dispatch_tickets _
-          | Transfer_ticket _ | Tx_rollup_rejection _ | Sc_rollup_originate _
-          | Sc_rollup_publish _ | Sc_rollup_cement _ | Sc_rollup_add_messages _
-          | Sc_rollup_refute _ | Sc_rollup_timeout _
-          | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
-          | Dal_publish_slot_header _ | Sc_rollup_dal_slot_subscribe _
-          | Zk_rollup_origination _ | Zk_rollup_publish _ ),
-          _ ) ->
-          assert false)
-  | Single _ -> assert false
-  | Cons _ -> assert false
-
-let ensure_manager_operation_coverage () =
-  let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
-  List.iter_es (fun kind -> ensure_kind infos kind) subjects
-
-let test_ensure_manager_operation_coverage () =
-  Tztest.tztest
-    (Format.sprintf "Ensure manager_operation coverage")
-    `Quick
-    (fun () -> ensure_manager_operation_coverage ())
 
 (** {2 Negative tests assert the case where validate must fail} *)
 
@@ -142,9 +62,8 @@ let low_gas_limit_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_low_gas_limit kind () =
+let test_low_gas_limit infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {
@@ -155,12 +74,6 @@ let test_low_gas_limit kind () =
       infos
   in
   low_gas_limit_diagnostic infos [op]
-
-let generate_low_gas_limit () =
-  create_Tztest
-    test_low_gas_limit
-    "Gas_limit too low."
-    gas_consumer_in_validate_subjects
 
 (** Validate fails if the gas limit is too high.
 
@@ -179,9 +92,8 @@ let high_gas_limit_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_high_gas_limit kind () =
+let test_high_gas_limit infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {
@@ -193,9 +105,6 @@ let test_high_gas_limit kind () =
       infos
   in
   high_gas_limit_diagnostic infos [op]
-
-let generate_high_gas_limit () =
-  create_Tztest test_high_gas_limit "Gas_limit too high." subjects
 
 (** Validate fails if the storage limit is too high.
 
@@ -215,9 +124,8 @@ let high_storage_limit_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_high_storage_limit kind () =
+let test_high_storage_limit infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {
@@ -228,9 +136,6 @@ let test_high_storage_limit kind () =
       infos
   in
   high_storage_limit_diagnostic infos [op]
-
-let generate_high_storage_limit () =
-  create_Tztest test_high_gas_limit "Storage_limit too high." subjects
 
 (** Validate fails if the counter is in the future.
 
@@ -252,9 +157,8 @@ let high_counter_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_high_counter kind () =
+let test_high_counter infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {
@@ -265,9 +169,6 @@ let test_high_counter kind () =
       infos
   in
   high_counter_diagnostic infos [op]
-
-let generate_high_counter () =
-  create_Tztest test_high_counter "Counter too high." subjects
 
 (** Validate fails if the counter is in the past.
 
@@ -289,13 +190,12 @@ let low_counter_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_low_counter kind () =
+let test_low_counter infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* current_counter =
     Context.Contract.counter
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   let* op =
     select_op
@@ -307,9 +207,6 @@ let test_low_counter kind () =
       infos
   in
   low_counter_diagnostic infos [op]
-
-let generate_low_counter () =
-  create_Tztest test_low_counter "Counter too low." subjects
 
 (** Validate fails if the source is not allocated.
 
@@ -331,21 +228,17 @@ let not_allocated_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_not_allocated kind () =
+let test_not_allocated infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* op =
     select_op
       {(operation_req_default kind) with force_reveal = Some false}
       {
         infos with
-        accounts = {infos.accounts with source = Account.(new_account ())};
+        accounts = {infos.accounts with sources = [Account.(new_account ())]};
       }
   in
   not_allocated_diagnostic infos [op]
-
-let generate_not_allocated () =
-  create_Tztest test_not_allocated "Not allocated source." subjects
 
 (** Validate fails if the source is unrevealed.
 
@@ -368,21 +261,14 @@ let unrevealed_key_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_unrevealed_key kind () =
+let test_unrevealed_key infos kind =
   let open Lwt_result_syntax in
-  let* infos = init_ctxt {ctxt_req_default with reveal_accounts = false} in
   let* op =
     select_op
       {(operation_req_default kind) with force_reveal = Some false}
       infos
   in
   unrevealed_key_diagnostic infos [op]
-
-let generate_unrevealed_key () =
-  create_Tztest
-    test_unrevealed_key
-    "Unrevealed source (find_manager_public_key)."
-    revealed_subjects
 
 (** Validate fails if the source balance is not enough to pay the fees.
 
@@ -405,9 +291,8 @@ let high_fee_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_high_fee kind () =
+let test_high_fee infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let*? fee = Tez.(one +? one) |> Environment.wrap_tzresult in
   let* op =
     select_op
@@ -419,9 +304,6 @@ let test_high_fee kind () =
       infos
   in
   high_fee_diagnostic infos [op]
-
-let generate_tests_high_fee () =
-  create_Tztest test_high_fee "Balance too low for fee payment." subjects
 
 (** Validate fails if the fee payment empties the balance of a
     delegated implicit contract.
@@ -447,13 +329,12 @@ let emptying_delegated_implicit_diagnostic (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure
 
-let test_emptying_delegated_implicit kind () =
+let test_empty_implicit infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_ctxt_with_delegation () in
   let* fee =
     Context.Contract.balance
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   let* op =
     select_op
@@ -465,12 +346,6 @@ let test_emptying_delegated_implicit kind () =
       infos
   in
   emptying_delegated_implicit_diagnostic infos [op]
-
-let generate_tests_emptying_delegated_implicit () =
-  create_Tztest
-    test_emptying_delegated_implicit
-    "Just enough funds to empty a delegated source."
-    revealed_subjects
 
 (** Validate fails if there is not enough available gas in the block.
 
@@ -504,12 +379,8 @@ let exceeding_block_gas_diagnostic ~mode (infos : infos) op =
   in
   validate_ko_diagnostic infos op expect_failure ~mode
 
-let test_exceeding_block_gas ~mode kind () =
+let test_exceeding_block_gas ~mode infos kind =
   let open Lwt_result_syntax in
-  let ctxt_req =
-    {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
-  in
-  let* infos = init_ctxt ctxt_req in
   let* operation =
     select_op
       {
@@ -523,18 +394,6 @@ let test_exceeding_block_gas ~mode kind () =
       infos
   in
   exceeding_block_gas_diagnostic ~mode infos [operation]
-
-let generate_tests_exceeding_block_gas () =
-  create_Tztest
-    (test_exceeding_block_gas ~mode:Construction)
-    "Too much gas consumption."
-    subjects
-
-let generate_tests_exceeding_block_gas_mp_mode () =
-  create_Tztest
-    (test_exceeding_block_gas ~mode:Mempool)
-    "Too much gas consumption in mempool mode."
-    subjects
 
 (** {2 Positive tests} *)
 
@@ -561,14 +420,33 @@ let generate_tests_exceeding_block_gas_mp_mode () =
      - the balance is at least decreased by fee,
      - the available gas in the block decreased by gas limit. *)
 
-(** Fee payment that emptying a self_delegated implicit. *)
-let test_emptying_self_delegated_implicit kind () =
+(** Fee payment*)
+let test_validate infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_ctxt_with_self_delegation () in
+  let* counter =
+    Context.Contract.counter
+      (B infos.ctxt.block)
+      (contract_of (get_source infos))
+  in
+  let* op =
+    select_op
+      {
+        (operation_req_default kind) with
+        force_reveal = Some true;
+        counter = Some counter;
+      }
+      infos
+  in
+  let* _ = validate_diagnostic infos [op] in
+  return_unit
+
+(** Fee payment that emptying a self_delegated implicit. *)
+let test_emptying_self_delegate infos kind =
+  let open Lwt_result_syntax in
   let* fee =
     Context.Contract.balance
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   let* op =
     select_op
@@ -582,12 +460,6 @@ let test_emptying_self_delegated_implicit kind () =
   let* _ = only_validate_diagnostic infos [op] in
   return_unit
 
-let generate_tests_emptying_self_delegated_implicit () =
-  create_Tztest
-    test_emptying_self_delegated_implicit
-    "Validate and empties a self-delegated source."
-    subjects
-
 (** Minimum gas cost to pass the validation:
     - cost_of_manager_operation for the generic part
     - 100 (empiric) for the specific part (script decoding or hash costs) *)
@@ -595,13 +467,12 @@ let empiric_minimal_gas_cost_for_validate =
   Gas.Arith.integral_of_int_exn
     (Michelson_v1_gas.Internal_for_tests.int_cost_of_manager_operation + 100)
 
-let test_emptying_undelegated_implicit kind () =
+let test_empty_undelegate infos kind =
   let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
   let* fee =
     Context.Contract.balance
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   let* op =
     select_op
@@ -616,15 +487,9 @@ let test_emptying_undelegated_implicit kind () =
   let* _ = only_validate_diagnostic infos [op] in
   return_unit
 
-let generate_tests_emptying_undelegated_implicit () =
-  create_Tztest
-    test_emptying_undelegated_implicit
-    "Validate and empties an undelegated source."
-    subjects
-
 (** No gas consumer with the minimal gas limit for manager operations
    passes validate. *)
-let test_low_gas_limit_no_consumer kind () =
+let test_low_gas_limit_no_consumer kind =
   let open Lwt_result_syntax in
   let* infos = default_init_ctxt () in
   let* op =
@@ -637,36 +502,6 @@ let test_low_gas_limit_no_consumer kind () =
       infos
   in
   validate_diagnostic infos [op]
-
-let generate_low_gas_limit_no_consumer () =
-  create_Tztest
-    test_low_gas_limit
-    "passes validate with minimal gas limit for manager operations."
-    gas_consumer_in_validate_subjects
-
-(** Fee payment.*)
-let test_validate kind () =
-  let open Lwt_result_syntax in
-  let* infos = default_init_ctxt () in
-  let* counter =
-    Context.Contract.counter
-      (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
-  in
-  let* op =
-    select_op
-      {
-        (operation_req_default kind) with
-        force_reveal = Some true;
-        counter = Some counter;
-      }
-      infos
-  in
-  let* _ = validate_diagnostic infos [op] in
-  return_unit
-
-let generate_tests_validate () =
-  create_Tztest test_validate "Validate." subjects
 
 (* Feature flags.*)
 
@@ -707,26 +542,12 @@ let flag_expect_failure flags errs =
    In order to forge Toru, Scoru or Dal operation when the correspondong
    feature is disable, we use a [infos_op] with default requirements,
    so that we have a Tx_rollup.t and a Sc_rollup.t. *)
-let test_feature_flags flags kind () =
+let test_feature_flags infos kind =
   let open Lwt_result_syntax in
-  let* infos_op = default_init_ctxt () in
-  let* infos = default_init_with_flags flags in
-  let infos =
-    {
-      infos with
-      ctxt =
-        {
-          infos.ctxt with
-          tx_rollup = infos_op.ctxt.tx_rollup;
-          sc_rollup = infos_op.ctxt.sc_rollup;
-          zk_rollup = infos_op.ctxt.zk_rollup;
-        };
-    }
-  in
   let* counter =
     Context.Contract.counter
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   let* op =
     select_op
@@ -736,7 +557,8 @@ let test_feature_flags flags kind () =
       }
       infos
   in
-  let* _ =
+  let flags = infos.flags in
+  let* () =
     if is_disabled flags kind then
       validate_ko_diagnostic infos [op] (flag_expect_failure flags)
     else
@@ -745,51 +567,66 @@ let test_feature_flags flags kind () =
   in
   return_unit
 
-let generate_dal_flag () =
-  create_Tztest
-    (test_feature_flags disabled_dal)
-    "Validate with dal disabled."
-    subjects
-
-let generate_scoru_flag () =
-  create_Tztest
-    (test_feature_flags disabled_scoru)
-    "Validate with scoru disabled."
-    subjects
-
-let generate_toru_flag () =
-  create_Tztest
-    (test_feature_flags disabled_toru)
-    "Validate with toru disabled."
-    subjects
-
-let generate_zkru_flag () =
-  create_Tztest
-    (test_feature_flags disabled_zkru)
-    "Validate with zkru disabled."
-    subjects
-
-let sanity_tests =
-  test_ensure_manager_operation_coverage () :: generate_tests_validate ()
-
-let gas_tests =
-  generate_low_gas_limit () @ generate_high_gas_limit ()
-  @ generate_tests_exceeding_block_gas ()
-  @ generate_tests_exceeding_block_gas_mp_mode ()
-  @ generate_low_gas_limit_no_consumer ()
-
-let storage_tests = generate_high_storage_limit ()
-
-let fee_tests =
-  generate_tests_high_fee ()
-  @ generate_tests_emptying_delegated_implicit ()
-  @ generate_tests_emptying_self_delegated_implicit ()
-  @ generate_tests_emptying_undelegated_implicit ()
-
-let contract_tests =
-  generate_high_counter () @ generate_low_counter () @ generate_not_allocated ()
-  @ generate_unrevealed_key ()
-
-let flags_tests =
-  generate_dal_flag () @ generate_toru_flag () @ generate_scoru_flag ()
-  @ generate_zkru_flag ()
+let tests =
+  let mk_default () = default_init_ctxt () in
+  let mk_reveal () =
+    init_ctxt {ctxt_req_default with reveal_accounts = false}
+  in
+  let mk_deleg () = default_ctxt_with_delegation () in
+  let mk_gas () =
+    init_ctxt {ctxt_req_default with hard_gas_limit_per_block = Some gb_limit}
+  in
+  let mk_self_deleg () = default_ctxt_with_self_delegation () in
+  let mk_flags flags () =
+    let open Lwt_result_syntax in
+    let* infos_op = default_init_ctxt () in
+    let* infos = default_init_with_flags flags in
+    let infos =
+      {
+        infos with
+        ctxt =
+          {
+            infos.ctxt with
+            tx_rollup = infos_op.ctxt.tx_rollup;
+            sc_rollup = infos_op.ctxt.sc_rollup;
+            zk_rollup = infos_op.ctxt.zk_rollup;
+          };
+      }
+    in
+    return infos
+  in
+  let all = subjects in
+  let gas_consum = gas_consumer_in_validate_subjects in
+  let revealed = revealed_subjects in
+  List.map
+    (fun (name, f, subjects, info_builder) ->
+      make_tztest name f subjects info_builder)
+    [
+      (* Expected validation failure *)
+      ("gas limit too low", test_low_gas_limit, gas_consum, mk_default);
+      ("gas limit too high", test_high_gas_limit, all, mk_default);
+      ("storage limit too high", test_high_storage_limit, all, mk_default);
+      ("counter too high", test_high_counter, all, mk_default);
+      ("counter too low", test_low_counter, all, mk_default);
+      ("unallocated source", test_not_allocated, all, mk_default);
+      ("unrevealed source", test_unrevealed_key, revealed, mk_reveal);
+      ("balance too low for fee payment", test_high_fee, all, mk_default);
+      ("empty delegate source", test_empty_implicit, revealed, mk_deleg);
+      ( "too much gas consumption in block",
+        test_exceeding_block_gas ~mode:Construction,
+        all,
+        mk_gas );
+      (* Expected validation success *)
+      ("fees are taken when valid", test_validate, all, mk_default);
+      ("empty self-delegate", test_emptying_self_delegate, all, mk_self_deleg);
+      ( "too much gas consumption in mempool",
+        test_exceeding_block_gas ~mode:Mempool,
+        all,
+        mk_gas );
+      ("empty undelegated source", test_empty_undelegate, all, mk_default);
+      ("minimal gas for manager", test_low_gas_limit, gas_consum, mk_default);
+      ("check dal disabled", test_feature_flags, all, mk_flags disabled_dal);
+      ("check toru disabled", test_feature_flags, all, mk_flags disabled_toru);
+      ("check scoru disabled", test_feature_flags, all, mk_flags disabled_scoru);
+      ("check zkru disabled", test_feature_flags, all, mk_flags disabled_zkru);
+    ]

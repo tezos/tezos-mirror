@@ -448,6 +448,18 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
+let create_bootstrap_accounts n =
+  let accounts = Account.generate_accounts n in
+  let open Tezos_protocol_014_PtKathma_parameters in
+  List.fold_left
+    (fun (boostrap_account, contracts) (account, tez, delegate_to) ->
+      ( Default_parameters.make_bootstrap_account
+          (Account.(account.pkh), Account.(account.pk), tez, delegate_to)
+        :: boostrap_account,
+        Alpha_context.Contract.Implicit Account.(account.pkh) :: contracts ))
+    ([], [])
+    accounts
+
 let init_with_constants_gen tup constants =
   let n = tup_n tup in
   let accounts = Account.generate_accounts n in
@@ -475,6 +487,19 @@ let init_with_constants_n consts n = init_with_constants_gen (TList n) consts
 let init_with_constants1 = init_with_constants_gen T1
 
 let init_with_constants2 = init_with_constants_gen T2
+
+let init_with_parameters_gen tup parameters =
+  let n = tup_n tup in
+  let bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let parameters = Parameters.{parameters with bootstrap_accounts} in
+  Block.genesis_with_parameters parameters >|=? fun blk ->
+  (blk, tup_get tup contracts)
+
+let init_with_parameters_n params n = init_with_parameters_gen (TList n) params
+
+let init_with_parameters1 = init_with_parameters_gen T1
+
+let init_with_parameters2 = init_with_parameters_gen T2
 
 let default_raw_context () =
   let initial_accounts =

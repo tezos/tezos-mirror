@@ -3559,8 +3559,8 @@ end = struct
       in
       let _integration_validate =
         only_if N.(number >= 014) @@ fun () ->
-        tests
-          ["main"; "test_1m_restriction"]
+        test
+          "main"
           ~path:(path // "lib_protocol/test/integration/validate")
           ~opam:(sf "tezos-protocol-%s-tests" name_dash)
           ~deps:
@@ -3573,6 +3573,7 @@ end = struct
               client |> if_some |> open_;
               test_helpers |> if_some |> open_;
               octez_base_test_helpers |> open_;
+              plugin |> if_some |> open_;
             ]
       in
       let _integration =
@@ -3618,6 +3619,7 @@ end = struct
             (3, "test_carbonated_map", N.(number >= 013));
             (3, "test_zk_rollup_encoding", N.(number >= 015));
             (3, "test_dal_slot_proof", N.(number >= 016));
+            (3, "test_compare_operations", N.(number >= 015));
           ]
           |> List.filter_map (fun (i, n, b) -> if b then Some (i, n) else None)
         in

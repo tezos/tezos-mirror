@@ -115,3 +115,7 @@ module Range : sig
   val rev_fold_es :
     ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
 end
+
+module Internal_for_tests : sig
+  val of_int : int -> t tzresult
+end

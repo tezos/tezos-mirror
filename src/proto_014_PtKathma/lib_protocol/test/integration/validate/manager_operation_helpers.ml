@@ -40,29 +40,31 @@ let half_gb_limit = Gas.Arith.(integral_of_int_exn 50_000)
 (** Context abstraction in a test. *)
 type ctxt = {
   block : Block.t;
-  originated_contract : Contract_hash.t;
+  bootstraps : public_key_hash list;
+  originated_contract : Contract_hash.t option;
   tx_rollup : Tx_rollup.t option;
   sc_rollup : Sc_rollup.t option;
 }
 
-(** Accounts manipulated in the tests.
-   By convention, each field name specifies the role
-   of the account in a test. It is the case in most of the tests.
-   In smart contructors of operations, it happens that in impossible case,
-   [source] is used as a dummy value.
-   In some test that requires a second source, [del] will be used as the second
-   source. *)
+(** Accounts manipulated in the tests. By convention, each field name
+   specifies the role of the account in a test. It is the case in most
+   of the tests. In operations smart contructors, it happens that in
+   impossible case, [source] is used as a dummy value. In some test that
+   requires a second source, [del] will be used as the second source. *)
 type accounts = {
-  source : Account.t;
+  sources : Account.t list;
   dest : Account.t option;
   del : Account.t option;
   tx : Account.t option;
   sc : Account.t option;
 }
 
+(** Feature flags requirements for a context setting for a test. *)
+type feature_flags = {dal : bool; scoru : bool; toru : bool}
+
 (** Infos describes the information of the setting for a test: the
    context and used accounts. *)
-type infos = {ctxt : ctxt; accounts : accounts}
+type infos = {ctxt : ctxt; accounts : accounts; flags : feature_flags}
 
 (** This type should be extended for each new manager_operation kind
     added in the protocol. See
@@ -77,8 +79,8 @@ type manager_operation_kind =
   | K_Undelegation
   | K_Self_delegation
   | K_Set_deposits_limit
-  | K_Reveal
   | K_Increase_paid_storage
+  | K_Reveal
   | K_Tx_rollup_origination
   | K_Tx_rollup_submit_batch
   | K_Tx_rollup_commit
@@ -109,15 +111,13 @@ type operation_req = {
   amount : Tez.t option;
 }
 
-(** Feature flags requirements for a context setting for a test. *)
-type feature_flags = {dal : bool; scoru : bool; toru : bool}
-
 (** The requirements for a context setting for a test. *)
 type ctxt_req = {
   hard_gas_limit_per_block : Gas.Arith.integral option;
   fund_src : Tez.t option;
   fund_dest : Tez.t option;
   fund_del : Tez.t option;
+  reveal_accounts : bool;
   fund_tx : Tez.t option;
   fund_sc : Tez.t option;
   flags : feature_flags;
@@ -146,6 +146,7 @@ let ctxt_req_default_to_flag flags =
     fund_src = Some Tez.one;
     fund_dest = Some Tez.one;
     fund_del = Some Tez.one;
+    reveal_accounts = true;
     fund_tx = Some Tez.one;
     fund_sc = Some Tez.one;
     flags;
@@ -164,8 +165,7 @@ let operation_req_default kind =
     amount = None;
   }
 
-(** {2 String of datatypes} *)
-
+(** {2 String_of data} *)
 let kind_to_string = function
   | K_Transaction -> "Transaction"
   | K_Delegation -> "Delegation"
@@ -174,8 +174,8 @@ let kind_to_string = function
   | K_Set_deposits_limit -> "Set deposits limit"
   | K_Origination -> "Origination"
   | K_Register_global_constant -> "Register global constant"
-  | K_Reveal -> "Revelation"
   | K_Increase_paid_storage -> "Increase paid storage"
+  | K_Reveal -> "Revelation"
   | K_Tx_rollup_origination -> "Tx_rollup_origination"
   | K_Tx_rollup_submit_batch -> "Tx_rollup_submit_batch"
   | K_Tx_rollup_commit -> "Tx_rollup_commit"
@@ -242,6 +242,7 @@ let pp_ctxt_req pp
       fund_src;
       fund_dest;
       fund_del;
+      reveal_accounts;
       fund_tx;
       fund_sc;
       flags;
@@ -253,6 +254,7 @@ let pp_ctxt_req pp
      fund_src: %a tz@,\
      fund_dest: %a tz@,\
      fund_del: %a tz@,\
+     reveal_accounts: %b tz@,\
      fund_tx: %a tz@,\
      fund_sc: %a tz@,\
      dal_flag: %a@,\
@@ -267,6 +269,7 @@ let pp_ctxt_req pp
     fund_dest
     (pp_opt Tez.pp)
     fund_del
+    reveal_accounts
     (pp_opt Tez.pp)
     fund_tx
     (pp_opt Tez.pp)
@@ -362,9 +365,8 @@ let originate_sc_rollup block rollup_account =
 
 (** {2 Setting's context construction} *)
 
-let fund_account block bootstrap account fund =
+let fund_account_op block bootstrap account fund counter =
   let open Lwt_result_syntax in
-  let* counter = Context.Contract.counter (B block) bootstrap in
   let* fund =
     match fund with
     | None -> return Tez.one
@@ -374,7 +376,7 @@ let fund_account block bootstrap account fund =
           Lwt.return (Environment.wrap_tzresult Tez.(source_balance -? one))
         else return fund
   in
-  let* operation =
+  let+ op =
     Op.transaction
       ~counter
       ~gas_limit:Op.High
@@ -383,23 +385,74 @@ let fund_account block bootstrap account fund =
       (Contract.Implicit account)
       fund
   in
+  (op, Z.succ counter)
+
+let fund_account block bootstrap account fund =
+  let open Lwt_result_syntax in
+  let* counter = Context.Contract.counter (B block) bootstrap in
+  let* operation, (_counter : counter) =
+    fund_account_op block bootstrap account fund counter
+  in
   let*! b = Block.bake ~operation block in
   match b with Error _ -> failwith "Funding account error" | Ok b -> return b
 
-(** The generic setting for a test is built up according to a context
-   requirement. It provides a context and accounts where the accounts
-   have been created and funded according to the context
-   requirements.*)
-let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
- fun {
-       hard_gas_limit_per_block;
-       fund_src;
-       fund_dest;
-       fund_del;
-       fund_tx;
-       fund_sc;
-       flags;
-     } ->
+(** Set the constants according to a [ctxt_req] in an existing parameters. *)
+let manager_parameters : Parameters.t -> ctxt_req -> Parameters.t =
+ fun params {hard_gas_limit_per_block; flags; _} ->
+  let hard_gas_limit_per_block =
+    match hard_gas_limit_per_block with
+    | Some gb -> gb
+    | None -> Gas.Arith.(integral_of_int_exn 5_200_000)
+  in
+  let dal = {params.constants.dal with feature_enable = flags.dal} in
+  let tx_rollup =
+    {
+      params.constants.tx_rollup with
+      sunset_level = Int32.max_int;
+      enable = flags.toru;
+    }
+  in
+  let sc_rollup = {params.constants.sc_rollup with enable = flags.scoru} in
+  let constants =
+    {params.constants with hard_gas_limit_per_block; dal; tx_rollup; sc_rollup}
+  in
+  {params with constants}
+
+(** Initial a context with the constants extracted from a context requirements
+    and 7 bootstrap accounts. *)
+let init_ctxt_only ctxtreq =
+  let open Lwt_result_syntax in
+  let initial_params =
+    Tezos_protocol_014_PtKathma_parameters.Default_parameters
+    .parameters_of_constants
+      {Context.default_test_constants with consensus_threshold = 0}
+  in
+  let* block, contracts =
+    Context.init_with_parameters_n (manager_parameters initial_params ctxtreq) 7
+  in
+  return
+    ( block,
+      List.map
+        (function Contract.Implicit pkh -> pkh | Originated _ -> assert false)
+        contracts )
+
+(** Build a generic setting for a test according to a context requirement
+    on an existing context with 7 bootstraps accounts. *)
+let init_infos :
+    ctxt_req -> Block.t -> public_key_hash list -> infos tzresult Lwt.t =
+ fun ctxtreq block bootstraps ->
+  let {
+    fund_src;
+    fund_dest;
+    fund_del;
+    fund_tx;
+    fund_sc;
+    flags;
+    reveal_accounts;
+    _;
+  } =
+    ctxtreq
+  in
   let open Lwt_result_syntax in
   let create_and_fund ?originate_rollup block bootstrap fund =
     match fund with
@@ -416,18 +469,18 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
         in
         (block, Some account, rollup)
   in
-  let* block, bootstraps =
-    Context.init_n
-      6
-      ~consensus_threshold:0
-      ?hard_gas_limit_per_block
-      ~tx_rollup_enable:flags.toru
-      ~tx_rollup_sunset_level:Int32.max_int
-      ~sc_rollup_enable:flags.scoru
-      ~dal_enable:flags.dal
-      ()
+  let reveal_accounts_operations b l =
+    List.filter_map_es
+      (function
+        | None -> return_none
+        | Some account ->
+            let* op = Op.revelation ~gas_limit:Low (B b) account.Account.pk in
+            return_some op)
+      l
   in
-  let get_bootstrap bootstraps n = Stdlib.List.nth bootstraps n in
+  let get_bootstrap bootstraps n =
+    Contract.Implicit (Stdlib.List.nth bootstraps n)
+  in
   let source = Account.new_account () in
   let* block =
     fund_account block (get_bootstrap bootstraps 0) source.pkh fund_src
@@ -441,8 +494,7 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   let* block, tx, tx_rollup =
     if flags.toru then
       create_and_fund
-        ~originate_rollup:(fun infos account ->
-          originate_tx_rollup infos account)
+        ~originate_rollup:originate_tx_rollup
         block
         (get_bootstrap bootstraps 3)
         fund_tx
@@ -451,8 +503,7 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   let* block, sc, sc_rollup =
     if flags.scoru then
       create_and_fund
-        ~originate_rollup:(fun infos account ->
-          originate_sc_rollup infos account)
+        ~originate_rollup:originate_sc_rollup
         block
         (get_bootstrap bootstraps 4)
         fund_sc
@@ -461,30 +512,58 @@ let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
   let* create_contract_hash, originated_contract =
     Op.contract_origination_hash
       (B block)
-      (get_bootstrap bootstraps 5)
+      (get_bootstrap bootstraps 6)
       ~fee:Tez.zero
       ~script:Op.dummy_script
   in
-  let+ block = Block.bake ~operation:create_contract_hash block in
-  let ctxt = {block; originated_contract; tx_rollup; sc_rollup} in
-  {ctxt; accounts = {source; dest; del; tx; sc}}
+  let* reveal_operations =
+    if reveal_accounts then
+      reveal_accounts_operations block [Some source; dest; del]
+    else return []
+  in
+  let operations = create_contract_hash :: reveal_operations in
+  let+ block = Block.bake ~operations block in
+  let ctxt =
+    {
+      block;
+      bootstraps;
+      originated_contract = Some originated_contract;
+      tx_rollup;
+      sc_rollup;
+    }
+  in
+  {ctxt; accounts = {sources = [source]; dest; del; tx; sc}; flags}
+
+(** The generic setting for a test is built up according to a context
+   requirement. It provides a context and accounts where the accounts
+   have been created and funded according to the context
+   requirements.*)
+let init_ctxt : ctxt_req -> infos tzresult Lwt.t =
+ fun ctxtreq ->
+  let open Lwt_result_syntax in
+  let* block, bootstraps = init_ctxt_only ctxtreq in
+  init_infos ctxtreq block bootstraps
+
+(** return the first source from the list of sources in [infos] accounts. *)
+let get_source infos =
+  match infos.accounts.sources with source :: _ -> source | [] -> assert false
 
 (** In addition of building up a context according to a context
     requirement, source is self-delegated.
 
-    See [init_ctxt] description. *)
+   see [init_ctxt] description. *)
 let ctxt_with_self_delegation : ctxt_req -> infos tzresult Lwt.t =
  fun ctxt_req ->
   let open Lwt_result_syntax in
   let* infos = init_ctxt ctxt_req in
-  let+ block = self_delegate infos.ctxt.block infos.accounts.source.pkh in
+  let+ block = self_delegate infos.ctxt.block (get_source infos).pkh in
   let ctxt = {infos.ctxt with block} in
   {infos with ctxt}
 
 (** In addition of building up a context accordning to a context
     requirement, source delegates to del.
 
-    See [init_ctxt] description. *)
+   See [init_ctxt] description. *)
 let ctxt_with_delegation : ctxt_req -> infos tzresult Lwt.t =
  fun ctxt_req ->
   let open Lwt_result_syntax in
@@ -494,7 +573,7 @@ let ctxt_with_delegation : ctxt_req -> infos tzresult Lwt.t =
     | None -> failwith "Delegate account should be funded"
     | Some a -> return a
   in
-  let+ block = delegation infos.ctxt.block infos.accounts.source delegate in
+  let+ block = delegation infos.ctxt.block (get_source infos) delegate in
   let ctxt = {infos.ctxt with block} in
   {infos with ctxt}
 
@@ -509,7 +588,7 @@ let default_ctxt_with_delegation () = ctxt_with_delegation ctxt_req_default
 
 (** {2 Smart constructors} *)
 
-(** Smart contructors to forge manager operations according to
+(** Smart constructors to forge manager operations according to
    operation requirements in a test setting. *)
 
 let mk_transaction (oinfos : operation_req) (infos : infos) =
@@ -520,10 +599,10 @@ let mk_transaction (oinfos : operation_req) (infos : infos) =
     ?gas_limit:oinfos.gas_limit
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     (contract_of
        (match infos.accounts.dest with
-       | None -> infos.accounts.source
+       | None -> get_source infos
        | Some dest -> dest))
     (match oinfos.amount with None -> Tez.zero | Some amount -> amount)
 
@@ -535,10 +614,10 @@ let mk_delegation (oinfos : operation_req) (infos : infos) =
     ?counter:oinfos.counter
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     (Some
        (match infos.accounts.del with
-       | None -> infos.accounts.source.pkh
+       | None -> (get_source infos).pkh
        | Some delegate -> delegate.pkh))
 
 let mk_undelegation (oinfos : operation_req) (infos : infos) =
@@ -549,7 +628,7 @@ let mk_undelegation (oinfos : operation_req) (infos : infos) =
     ?counter:oinfos.counter
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     None
 
 let mk_self_delegation (oinfos : operation_req) (infos : infos) =
@@ -560,8 +639,8 @@ let mk_self_delegation (oinfos : operation_req) (infos : infos) =
     ?counter:oinfos.counter
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
-    (Some infos.accounts.source.pkh)
+    (contract_of (get_source infos))
+    (Some (get_source infos).pkh)
 
 let mk_origination (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -574,7 +653,7 @@ let mk_origination (oinfos : operation_req) (infos : infos) =
       ?storage_limit:oinfos.storage_limit
       ~script:Op.dummy_script
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   op
 
@@ -586,7 +665,7 @@ let mk_register_global_constant (oinfos : operation_req) (infos : infos) =
     ?gas_limit:oinfos.gas_limit
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    ~source:(contract_of infos.accounts.source)
+    ~source:(contract_of (get_source infos))
     ~value:(Script_repr.lazy_expr (Expr.from_string "Pair 1 2"))
 
 let mk_set_deposits_limit (oinfos : operation_req) (infos : infos) =
@@ -597,10 +676,19 @@ let mk_set_deposits_limit (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?counter:oinfos.counter
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     None
 
 let mk_increase_paid_storage (oinfos : operation_req) (infos : infos) =
+  let open Lwt_result_syntax in
+  let* destination =
+    match infos.ctxt.originated_contract with
+    | None ->
+        failwith
+          "infos should be initialized with an origniated contract to be able \
+           to add an increase_paid_storage operation."
+    | Some c -> return c
+  in
   Op.increase_paid_storage
     ?force_reveal:oinfos.force_reveal
     ?counter:oinfos.counter
@@ -608,13 +696,13 @@ let mk_increase_paid_storage (oinfos : operation_req) (infos : infos) =
     ?gas_limit:oinfos.gas_limit
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    ~source:(contract_of infos.accounts.source)
-    ~destination:infos.ctxt.originated_contract
+    ~source:(contract_of (get_source infos))
+    ~destination
     Z.one
 
 let mk_reveal (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
-  let* pk = get_pk (B infos.ctxt.block) (contract_of infos.accounts.source) in
+  let* pk = get_pk (B infos.ctxt.block) (contract_of (get_source infos)) in
   Op.revelation
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit
@@ -633,7 +721,7 @@ let mk_tx_rollup_origination (oinfos : operation_req) (infos : infos) =
       ?storage_limit:oinfos.storage_limit
       ?force_reveal:oinfos.force_reveal
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
   in
   op
 
@@ -648,6 +736,7 @@ let sc_rollup_of = function
 let mk_tx_rollup_submit_batch (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
   let* tx_rollup = tx_rollup_of infos.ctxt.tx_rollup in
+
   Op.tx_rollup_submit_batch
     ?fee:oinfos.fee
     ?gas_limit:oinfos.gas_limit
@@ -655,7 +744,7 @@ let mk_tx_rollup_submit_batch (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
     "batch"
 
@@ -677,7 +766,7 @@ let mk_tx_rollup_commit (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
     commitement
 
@@ -691,7 +780,7 @@ let mk_tx_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
 
 let mk_tx_rollup_finalize (oinfos : operation_req) (infos : infos) =
@@ -704,7 +793,7 @@ let mk_tx_rollup_finalize (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
 
 let mk_tx_rollup_remove_commitment (oinfos : operation_req) (infos : infos) =
@@ -717,7 +806,7 @@ let mk_tx_rollup_remove_commitment (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
 
 let mk_tx_rollup_reject (oinfos : operation_req) (infos : infos) =
@@ -751,7 +840,7 @@ let mk_tx_rollup_reject (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     tx_rollup
     Tx_rollup_level.root
     message
@@ -771,19 +860,19 @@ let mk_transfer_ticket (oinfos : operation_req) (infos : infos) =
     ?gas_limit:oinfos.gas_limit
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    ~source:(contract_of infos.accounts.source)
+    ~source:(contract_of (get_source infos))
     ~contents:(Script.lazy_expr (Expr.from_string "1"))
     ~ty:(Script.lazy_expr (Expr.from_string "nat"))
     ~ticketer:
       (contract_of
          (match infos.accounts.tx with
-         | None -> infos.accounts.source
+         | None -> get_source infos
          | Some tx -> tx))
-    Z.zero
+    Z.one
     ~destination:
       (contract_of
          (match infos.accounts.dest with
-         | None -> infos.accounts.source
+         | None -> get_source infos
          | Some dest -> dest))
     Entrypoint.default
 
@@ -798,12 +887,12 @@ let mk_tx_rollup_dispacth_ticket (oinfos : operation_req) (infos : infos) =
         ticketer =
           contract_of
             (match infos.accounts.dest with
-            | None -> infos.accounts.source
+            | None -> get_source infos
             | Some dest -> dest);
         amount = Tx_rollup_l2_qty.of_int64_exn 10L;
         claimer =
           (match infos.accounts.dest with
-          | None -> infos.accounts.source.pkh
+          | None -> (get_source infos).pkh
           | Some dest -> dest.pkh);
       }
   in
@@ -814,7 +903,7 @@ let mk_tx_rollup_dispacth_ticket (oinfos : operation_req) (infos : infos) =
     ?gas_limit:oinfos.gas_limit
     ?storage_limit:oinfos.storage_limit
     (B infos.ctxt.block)
-    ~source:(contract_of infos.accounts.source)
+    ~source:(contract_of (get_source infos))
     ~message_index:0
     ~message_result_path:Tx_rollup_commitment.Merkle.dummy_path
     tx_rollup
@@ -832,7 +921,7 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
       ?storage_limit:oinfos.storage_limit
       ?force_reveal:oinfos.force_reveal
       (B infos.ctxt.block)
-      (contract_of infos.accounts.source)
+      (contract_of (get_source infos))
       Sc_rollup.Kind.Example_arith
       ""
       (Script.lazy_expr (Expr.from_string "1"))
@@ -840,15 +929,15 @@ let mk_sc_rollup_origination (oinfos : operation_req) (infos : infos) =
   op
 
 let sc_dummy_commitment =
-  let number_of_messages =
-    match Sc_rollup.Number_of_messages.of_int32 3l with
-    | None -> assert false
-    | Some x -> x
-  in
   let number_of_ticks =
     match Sc_rollup.Number_of_ticks.of_int32 3000l with
     | None -> assert false
     | Some x -> x
+  in
+  let number_of_messages =
+    match Sc_rollup.Number_of_messages.of_int32 3l with
+    | Some x -> x
+    | None -> Stdlib.failwith "Bad Number_of_messages"
   in
   Sc_rollup.Commitment.
     {
@@ -869,7 +958,7 @@ let mk_sc_rollup_publish (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     sc_dummy_commitment
 
@@ -883,7 +972,7 @@ let mk_sc_rollup_cement (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     (Sc_rollup.Commitment.hash sc_dummy_commitment)
 
@@ -900,13 +989,13 @@ let mk_sc_rollup_refute (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     (match infos.accounts.dest with
-    | None -> infos.accounts.source.pkh
+    | None -> (get_source infos).pkh
     | Some dest -> dest.pkh)
     refutation
-    false
+    true
 
 let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
   let open Lwt_result_syntax in
@@ -918,7 +1007,7 @@ let mk_sc_rollup_add_messages (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     [""]
 
@@ -932,12 +1021,12 @@ let mk_sc_rollup_timeout (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     (Sc_rollup.Game.Index.make
-       infos.accounts.source.pkh
+       (get_source infos).pkh
        (match infos.accounts.dest with
-       | None -> infos.accounts.source.pkh
+       | None -> (get_source infos).pkh
        | Some dest -> dest.pkh))
 
 let mk_sc_rollup_execute_outbox_message (oinfos : operation_req) (infos : infos)
@@ -951,7 +1040,7 @@ let mk_sc_rollup_execute_outbox_message (oinfos : operation_req) (infos : infos)
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
     (Sc_rollup.Commitment.hash sc_dummy_commitment)
     ~outbox_level:(Raw_level.of_int32_exn 0l)
@@ -969,7 +1058,7 @@ let mk_sc_rollup_return_bond (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     sc_rollup
 
 let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
@@ -996,7 +1085,7 @@ let mk_dal_publish_slot_header (oinfos : operation_req) (infos : infos) =
     ?storage_limit:oinfos.storage_limit
     ?force_reveal:oinfos.force_reveal
     (B infos.ctxt.block)
-    (contract_of infos.accounts.source)
+    (contract_of (get_source infos))
     slot
 
 (** {2 Helpers for generation of generic check tests by manager operation} *)
@@ -1013,8 +1102,8 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Undelegation -> mk_undelegation
     | K_Self_delegation -> mk_self_delegation
     | K_Set_deposits_limit -> mk_set_deposits_limit
-    | K_Reveal -> mk_reveal
     | K_Increase_paid_storage -> mk_increase_paid_storage
+    | K_Reveal -> mk_reveal
     | K_Tx_rollup_origination -> mk_tx_rollup_origination
     | K_Tx_rollup_submit_batch -> mk_tx_rollup_submit_batch
     | K_Tx_rollup_commit -> mk_tx_rollup_commit
@@ -1034,30 +1123,38 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Sc_rollup_recover_bond -> mk_sc_rollup_return_bond
     | K_Dal_publish_slot_header -> mk_dal_publish_slot_header
   in
+
   mk_op op_req infos
 
-let create_Tztest ?hd_msg test tests_msg operations =
-  let tl_msg k =
-    let sk = kind_to_string k in
-    match hd_msg with None -> sk | Some hd -> Format.sprintf "%s, %s" hd sk
-  in
-  List.map
-    (fun kind ->
-      Tztest.tztest
-        (Format.sprintf "%s [%s]" tests_msg (tl_msg kind))
-        `Quick
-        (fun () -> test kind ()))
-    operations
+let make_tztest ?(fmt = Format.std_formatter) name test subjects info_builder =
+  let open Lwt_result_syntax in
+  Tztest.tztest name `Quick (fun () ->
+      let* infos = info_builder () in
+      List.iter_es
+        (fun kind ->
+          Format.fprintf fmt "%s: %s@." name (kind_to_string kind) ;
+          test infos kind)
+        subjects)
 
-let rec create_Tztest_batches test tests_msg operations =
-  let hdmsg k = Format.sprintf "%s" (kind_to_string k) in
-  let aux hd_msg test operations =
-    create_Tztest ~hd_msg test tests_msg operations
-  in
-  match operations with
-  | [] -> []
-  | kop :: kops as ops ->
-      aux (hdmsg kop) (test kop) ops @ create_Tztest_batches test tests_msg kops
+let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects
+    info_builder =
+  let open Lwt_result_syntax in
+  Tztest.tztest name `Quick (fun () ->
+      let* infos = info_builder () in
+      List.iter_es
+        (fun kind1 ->
+          let k1s = kind_to_string kind1 in
+          List.iter_es
+            (fun kind2 ->
+              Format.fprintf
+                fmt
+                "%s: [%s ; %s]@."
+                name
+                k1s
+                (kind_to_string kind2) ;
+              test infos kind1 kind2)
+            subjects)
+        subjects)
 
 (** {2 Diagnostic helpers.} *)
 
@@ -1100,7 +1197,7 @@ let manager_content_infos op =
   | _ -> failwith "Should only handle manager operation"
 
 (** We need a way to get the available gas in a context of type
-    block. *)
+   block. *)
 let available_gas = function
   | Context.I inc -> Some (Gas.block_level (Incremental.alpha_ctxt inc))
   | B _ -> None
@@ -1118,10 +1215,10 @@ let witness ctxt source =
 
 (** According to the witness in pre-state and the probes, computes the
     expected outputs. In any mode the expected witness:
-   - the balance of source should be the one in the pre-state minus
-   the fee of probes,
-   - the counter of source should be the one in the pre-state plus
-   the number of counter in probes.
+    - the balance of source should be the one in the pre-state minus
+    the fee of probes,
+    - the counter of source should be the one in the pre-state plus
+    the number of counter in probes.
 
     Concerning the expected available gas in the block: - In
    [Application] mode, it cannot be computed, so we do not expect any,
@@ -1335,7 +1432,7 @@ let validate_ko_diagnostic ?(mode = Construction) (infos : infos) ops
       | Error tr -> expect_failure tr
       | _ -> failwith "Block application was expected to fail")
 
-(** List of operation kind that must run on generic tests. This list
+(** List of operation kinds that must run on generic tests. This list
    should be extended for each new manager_operation kind. *)
 let subjects =
   [
@@ -1365,7 +1462,6 @@ let subjects =
     K_Sc_rollup_timeout;
     K_Sc_rollup_execute_outbox_message;
     K_Sc_rollup_recover_bond;
-    K_Dal_publish_slot_header;
   ]
 
 let is_consumer = function
@@ -1390,8 +1486,8 @@ let revealed_subjects =
 
 let is_disabled flags = function
   | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
-  | K_Undelegation | K_Self_delegation | K_Set_deposits_limit | K_Reveal
-  | K_Increase_paid_storage ->
+  | K_Undelegation | K_Self_delegation | K_Set_deposits_limit
+  | K_Increase_paid_storage | K_Reveal ->
       false
   | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
   | K_Tx_rollup_return_bond | K_Tx_rollup_finalize
