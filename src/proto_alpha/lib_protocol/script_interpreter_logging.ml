@@ -1737,7 +1737,6 @@ let log_entry logger ctxt gas k sty accu stack =
   logger.log_entry k ctxt (kinstr_location k) sty (accu, stack)
 
 let log_exit logger ctxt gas loc_prev k sty accu stack =
-  let _loc = kinstr_location k in
   let ctxt = Local_gas_counter.update_context gas ctxt in
   logger.log_exit k ctxt loc_prev sty (accu, stack)
 

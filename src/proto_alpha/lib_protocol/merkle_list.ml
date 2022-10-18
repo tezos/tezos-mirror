@@ -31,7 +31,7 @@ let max_depth ~count_limit =
   let log2 n = Z.numbits (Z.of_int n) in
   log2 count_limit
 
-let _ =
+let () =
   register_error_kind
     `Temporary
     ~id:"Merkle_list_invalid_position"

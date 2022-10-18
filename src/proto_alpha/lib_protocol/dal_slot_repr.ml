@@ -230,7 +230,7 @@ module History = struct
   end
 
   module Content_prefix = struct
-    let _prefix = "dash1"
+    let (_prefix : string) = "dash1"
 
     (* 32 *)
     let b58check_prefix = "\002\224\072\094\219" (* dash1(55) *)
@@ -248,7 +248,7 @@ module History = struct
   (* Pointers of the skip lists are used to encode the content and the
      backpointers. *)
   module Pointer_prefix = struct
-    let _prefix = "dask1"
+    let (_prefix : string) = "dask1"
 
     (* 32 *)
     let b58check_prefix = "\002\224\072\115\035" (* dask1(55) *)
