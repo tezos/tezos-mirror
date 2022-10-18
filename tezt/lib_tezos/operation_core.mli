@@ -74,20 +74,32 @@ val make : branch:string -> signer:Account.key -> kind:kind -> JSON.u -> t
 (** [json t] gives the json representation of an unsigned operation. *)
 val json : t -> JSON.u
 
-(** [hex ?(signature=None) t client] computes the binary
-   representation of an operation as an hexadecimal string. If
-   [signature] is given, the hexadecimal represents the signed
-   version of the operation. [client] is used to construct the binary
-   representation of [t].
+(** [hex ?(protocol=None) ?(signature=None) t client] computes the binary
+    representation of an operation as a hexadecimal string. If [protocol] is
+    given, the binary representation is computed using the encoding of operation
+    from the [protocol]. Otherwise, a call to the [forge_operations] RPC is done
+    to compute the binary representation. If [signature] is given, the
+    hexadecimal represents the signed version of the operation. [client] is used
+    to construct the binary representation of [t].
 
-   @param signature controls whether a signature should be attached
-   to the operation. *)
-val hex : ?signature:Tezos_crypto.Signature.t -> t -> Client.t -> Hex.t Lwt.t
+    @param protocol controls whether the encoding of a protocol should be used
+    to compute the binary representation of the operation rather than calling
+    the [forge_operations] RPC to compute it.
+
+    @param signature controls whether a signature should be attached
+    to the operation. *)
+val hex :
+  ?protocol:Protocol.t ->
+  ?signature:Tezos_crypto.Signature.t ->
+  t ->
+  Client.t ->
+  Hex.t Lwt.t
 
 (** [sign t client] signs the raw representation of operation [t] by
    its signer (see {!val:make}). [client] is used to construct the
    binary representation of [t]. *)
-val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
+val sign :
+  ?protocol:Protocol.t -> t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 
 (** [inject ?(request=`Inject) ?(force=false) ?(signature=None)
    ?(error=None) t] injects an operation into the node. The node is
@@ -106,6 +118,10 @@ val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
    the prevalidator. If [false], the call fails if the prevalidator
    classified the operation with an error.
 
+   @param protocol Allow using the operation encoding rather than using the
+   [forge_operations] RPC to compute the hexadecimal representation of the
+   operations.
+
    @param signature Allows to give manually the signature of the
    operation. The operation is signed when the signature is omitted.
 
@@ -114,6 +130,7 @@ val sign : t -> Client.t -> Tezos_crypto.Signature.t Lwt.t
 val inject :
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
+  ?protocol:Protocol.t ->
   ?signature:Tezos_crypto.Signature.t ->
   ?error:rex ->
   t ->
@@ -127,6 +144,7 @@ val inject :
    function should be used mainly when the time for injecting
    operations matters. *)
 val inject_operations :
+  ?protocol:Protocol.t ->
   ?request:[`Inject | `Notify] ->
   ?force:bool ->
   ?error:rex ->

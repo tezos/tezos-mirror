@@ -45,27 +45,43 @@ let make ~branch ~signer ~kind contents =
 
 let json t = `O [("branch", Ezjsonm.string t.branch); ("contents", t.contents)]
 
-let raw t client =
+let raw ?protocol t client =
   match t.raw with
-  | None ->
-      let* raw =
-        RPC.Client.call client
-        @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
-        |> Lwt.map JSON.as_string
-      in
-      t.raw <- Some (`Hex raw) ;
-      return (`Hex raw)
+  | None -> (
+      match protocol with
+      | None ->
+          let* raw =
+            RPC.Client.call client
+            @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
+            |> Lwt.map JSON.as_string
+          in
+          t.raw <- Some (`Hex raw) ;
+          return (`Hex raw)
+      | Some p -> (
+          let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+          match Data_encoding.Registration.find name with
+          | None -> Test.fail "%s encoding was not found" name
+          | Some registered -> (
+              match
+                Data_encoding.Registration.bytes_of_json registered (json t)
+              with
+              | None ->
+                  Test.fail
+                    "encoding of %s with %s failed"
+                    (Ezjsonm.to_string (json t))
+                    name
+              | Some bytes -> return (Hex.of_bytes bytes))))
   | Some raw -> return raw
 
-let hex ?signature t client =
-  let* (`Hex raw) = raw t client in
+let hex ?protocol ?signature t client =
+  let* (`Hex raw) = raw ?protocol t client in
   match signature with
   | None -> return (`Hex raw)
   | Some signature ->
       let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
       return (`Hex (raw ^ signature))
 
-let sign ({kind; signer; _} as t) client =
+let sign ?protocol ({kind; signer; _} as t) client =
   let watermark =
     match kind with
     | Consensus {chain_id} ->
@@ -73,7 +89,7 @@ let sign ({kind; signer; _} as t) client =
           (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
     | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
-  let* hex = hex t client in
+  let* hex = hex ?protocol t client in
   let bytes = Hex.to_bytes hex in
   return (Account.sign_bytes ~watermark ~signer bytes)
 
@@ -90,14 +106,14 @@ let hash t client : [`OpHash of string] Lwt.t =
   let hash = Tezos_operation.hash op in
   return (`OpHash (Tezos_crypto.Operation_hash.to_string hash))
 
-let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
-    [`OpHash of string] Lwt.t =
+let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
+    client : [`OpHash of string] Lwt.t =
   let* signature =
     match signature with
     | None -> sign t client
     | Some signature -> return signature
   in
-  let* (`Hex op) = hex ~signature t client in
+  let* (`Hex op) = hex ?protocol ~signature t client in
   let inject_rpc =
     if force then RPC.post_private_injection_operation
     else RPC.post_injection_operation
@@ -122,11 +138,11 @@ let inject ?(request = `Inject) ?(force = false) ?signature ?error t client :
       let* () = Process.check_error ~msg process in
       hash t client
 
-let inject_operations ?(request = `Inject) ?(force = false) ?error t client :
-    [`OpHash of string] list Lwt.t =
+let inject_operations ?protocol ?(request = `Inject) ?(force = false) ?error t
+    client : [`OpHash of string] list Lwt.t =
   let forge op =
-    let* signature = sign op client in
-    hex ~signature op client
+    let* signature = sign ?protocol op client in
+    hex ?protocol ~signature op client
   in
   let* ops = Lwt_list.map_s forge t in
   let waiter =
