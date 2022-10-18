@@ -212,39 +212,6 @@ let retrieve_memory module_reg =
 module Kernels = struct
   (* Kernel failing at `kernel_next` invocation. *)
   let unreachable_kernel = "unreachable"
-
-  (* Kernel writing `"hello"` to debug output. *)
-  let test_write_debug_kernel = "test-write-debug"
-
-  (* Kernel checking the return of the store_has host func.
-
-     This kernel expects a collection of values to exist:
-     - `/durable/hi/bye`
-     - `/durable/hello`
-     - `/durable/hello/universe`
-     and asserts that `store_has` returns the correct type for each.
-  *)
-  let test_store_has_kernel = "test-store-has"
-
-  (* Kernel checking the return value of store_list_size host func.
-
-     This kernel expects a collection of values to exist:
-     - `/durable/one/_`
-     - `/durable/one/two`
-     - `/durable/one/three`
-
-     and asserts that `store_list_size(/one) = 3`. Note that the root subtree
-     `/durable/one/_` is counted among the three
-  *)
-  let test_store_list_size_kernel = "test-store-list-size"
-
-  (* Kernel checking the behaviour value of store_delete host func.
-
-     This kernel deletes the following paths:
-     - `/durable/one`
-     - `/durable/three/four`
-  *)
-  let test_store_delete_kernel = "test-store-delete"
 end
 
 let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
