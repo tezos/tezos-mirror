@@ -203,6 +203,11 @@ let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
   let* () = Client.bake_for_and_wait client in
   return sc_rollup
 
+let originate_sc_rollups ~kind n client =
+  fold n String_set.empty (fun _i addrs ->
+      let* addr = originate_sc_rollup ~kind client in
+      return (String_set.add addr addrs))
+
 (* Configuration of a rollup node
    ------------------------------
 
@@ -676,17 +681,6 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _sc_rollup node client =
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
 *)
-let with_fresh_rollups ~kind n f node client =
-  let rec go n addrs k =
-    if n < 1 then k addrs
-    else
-      with_fresh_rollup
-        ~kind
-        (fun addr _ -> go (n - 1) (String_set.add addr addrs) k)
-        node
-        client
-  in
-  go n String_set.empty f
 
 let test_rollup_list ~kind =
   register_test
@@ -694,7 +688,7 @@ let test_rollup_list ~kind =
     ~tags:["sc_rollup"; "list"]
     ~title:"list originated rollups"
   @@ fun protocol ->
-  setup ~protocol @@ fun node client ->
+  setup ~protocol @@ fun _node client ->
   let* rollups =
     RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
   in
@@ -705,24 +699,19 @@ let test_rollup_list ~kind =
         failwith "Expected initial list of originated SCORUs to be empty"
     | [] -> ()
   in
-  with_fresh_rollups
-    ~kind
-    10
-    (fun scoru_addresses ->
-      let* () = Client.bake_for_and_wait client in
-      let* rollups =
-        RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
-      in
-      let rollups =
-        JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
-      in
-      Check.(
-        (rollups = scoru_addresses)
-          (comparable_module (module String_set))
-          ~error_msg:"%L %R") ;
-      unit)
-    node
-    client
+  let* scoru_addresses = originate_sc_rollups ~kind 10 client in
+  let* () = Client.bake_for_and_wait client in
+  let* rollups =
+    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
+  in
+  let rollups =
+    JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
+  in
+  Check.(
+    (rollups = scoru_addresses)
+      (comparable_module (module String_set))
+      ~error_msg:"%L %R") ;
+  unit
 
 (* Make sure the rollup node boots into the initial state.
    -------------------------------------------------------
