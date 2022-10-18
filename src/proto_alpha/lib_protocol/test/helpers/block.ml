@@ -719,8 +719,45 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = finalize_validation validation_state in
   finalize_application application_state shell_header
 
+let detect_manager_failure :
+    type kind. kind Apply_results.operation_metadata -> _ =
+  let rec detect_manager_failure :
+      type kind. kind Apply_results.contents_result_list -> _ =
+    let open Apply_results in
+    let open Apply_operation_result in
+    let open Apply_internal_results in
+    let detect_manager_failure_single (type kind)
+        (Manager_operation_result
+           {operation_result; internal_operation_results; _} :
+          kind Kind.manager Apply_results.contents_result) =
+      let detect_manager_failure (type kind)
+          (result : (kind, _, _) operation_result) =
+        match result with
+        | Applied _ -> Ok ()
+        | Skipped _ -> assert false
+        | Backtracked (_, None) ->
+            (* there must be another error for this to happen *)
+            Ok ()
+        | Backtracked (_, Some errs) -> Error errs
+        | Failed (_, errs) -> Error errs
+      in
+      detect_manager_failure operation_result >>? fun () ->
+      List.iter_e
+        (fun (Internal_operation_result (_, r)) -> detect_manager_failure r)
+        internal_operation_results
+    in
+    function
+    | Single_result (Manager_operation_result _ as res) ->
+        detect_manager_failure_single res
+    | Single_result _ -> Ok ()
+    | Cons_result (res, rest) ->
+        detect_manager_failure_single res >>? fun () ->
+        detect_manager_failure rest
+  in
+  fun {contents} -> detect_manager_failure contents
+
 let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
-    header ?(operations = []) pred =
+    ~allow_manager_failures header ?(operations = []) pred =
   let open Environment.Error_monad in
   ( (match baking_mode with
     | Application ->
@@ -750,10 +787,16 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
                     size %d"
                    operation_size
                    Constants_repr.max_operation_data_length))) ;
-        validate_and_apply_operation vstate op >|= Environment.wrap_tzresult
-        >|=? fun (state, _result) -> state)
+        validate_and_apply_operation vstate op >>=? fun (state, result) ->
+        if allow_manager_failures then return state
+        else
+          match result with
+          | No_operation_metadata -> return state
+          | Operation_metadata metadata ->
+              detect_manager_failure metadata >>?= fun () -> return state)
       vstate
       operations
+    >|= Environment.wrap_tzresult
     >>=? fun vstate ->
     finalize_validation_and_application vstate (Some header.shell)
     >|= Environment.wrap_tzresult
@@ -762,12 +805,18 @@ let apply_with_metadata ?(policy = By_round 0) ?(check_size = true) ~baking_mode
   let hash = Block_header.hash header in
   ({hash; header; operations; context}, result)
 
-let apply header ?(operations = []) pred =
-  apply_with_metadata header ~operations pred ~baking_mode:Application
+let apply header ?(operations = []) ?(allow_manager_failures = false) pred =
+  apply_with_metadata
+    header
+    ~operations
+    pred
+    ~baking_mode:Application
+    ~allow_manager_failures
   >>=? fun (t, _metadata) -> return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ?check_size ~baking_mode ?liquidity_baking_toggle_vote pred =
+    ?payload_round ?check_size ~baking_mode ?(allow_manager_failures = false)
+    ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
     | Some op, Some ops -> Some (op :: ops)
@@ -785,14 +834,22 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
-  apply_with_metadata ?policy ?check_size ~baking_mode header ?operations pred
+  apply_with_metadata
+    ?policy
+    ?check_size
+    ~baking_mode
+    ~allow_manager_failures
+    header
+    ?operations
+    pred
 
-let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
-    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote ?check_size
-    pred =
+let bake ?(baking_mode = Application) ?(allow_manager_failures = false)
+    ?payload_round ?locked_round ?policy ?timestamp ?operation ?operations
+    ?liquidity_baking_toggle_vote ?check_size pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
+    ~allow_manager_failures
     ?locked_round
     ?policy
     ?timestamp

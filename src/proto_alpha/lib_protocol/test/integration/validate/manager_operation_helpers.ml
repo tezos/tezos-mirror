@@ -330,30 +330,19 @@ let self_delegate block pkh =
   let+ _ = Assert.equal_pkh ~loc:__LOC__ del pkh in
   block
 
-let delegation block delegator delegate =
+let delegation block source delegate =
   let open Lwt_result_syntax in
   let delegate_pkh = delegate.Account.pkh in
-  let contract_delegator = contract_of delegator in
-  let contract_delegate = contract_of delegate in
+  let contract_source = contract_of source in
   let* operation =
     Op.delegation
       ~force_reveal:true
       (B block)
-      contract_delegate
+      contract_source
       (Some delegate_pkh)
   in
   let* block = Block.bake block ~operation in
-  let* operation =
-    Op.delegation
-      ~force_reveal:true
-      (B block)
-      contract_delegator
-      (Some delegate_pkh)
-  in
-  let* block = Block.bake block ~operation in
-  let* del_opt_new =
-    Context.Contract.delegate_opt (B block) contract_delegator
-  in
+  let* del_opt_new = Context.Contract.delegate_opt (B block) contract_source in
   let* del = Assert.get_some ~loc:__LOC__ del_opt_new in
   let+ _ = Assert.equal_pkh ~loc:__LOC__ del delegate_pkh in
   block
@@ -364,7 +353,9 @@ let originate_tx_rollup block rollup_account =
   let* rollup_origination, tx_rollup =
     Op.tx_rollup_origination ~force_reveal:true (B block) rollup_contract
   in
-  let+ block = Block.bake ~operation:rollup_origination block in
+  let+ block =
+    Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
+  in
   (block, tx_rollup)
 
 let originate_sc_rollup block rollup_account =
@@ -379,7 +370,9 @@ let originate_sc_rollup block rollup_account =
       ~boot_sector:""
       ~parameters_ty:(Script.lazy_expr (Expr.from_string "1"))
   in
-  let+ block = Block.bake ~operation:rollup_origination block in
+  let+ block =
+    Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
+  in
   (block, sc_rollup)
 
 module ZKOperator = Dummy_zk_rollup.Operator (struct
@@ -401,7 +394,9 @@ let originate_zk_rollup block rollup_account =
       ~init_state:ZKOperator.init_state
       ~nb_ops:1
   in
-  let+ block = Block.bake ~operation:rollup_origination block in
+  let+ block =
+    Block.bake ~allow_manager_failures:true ~operation:rollup_origination block
+  in
   (block, zk_rollup)
 
 (** {2 Setting's context construction} *)
@@ -632,7 +627,8 @@ let ctxt_with_delegation : ctxt_req -> infos tzresult Lwt.t =
     | None -> failwith "Delegate account should be funded"
     | Some a -> return a
   in
-  let+ block = delegation infos.ctxt.block (get_source infos) delegate in
+  let* block = delegation infos.ctxt.block delegate delegate in
+  let+ block = delegation block (get_source infos) delegate in
   let ctxt = {infos.ctxt with block} in
   {infos with ctxt}
 
@@ -1447,7 +1443,7 @@ let pre_state_of_mode ~mode infos =
 (** In [Construction] and [Mempool] mode, the post-state is
    incrementally built upon a pre-state, whereas in the [Application]
    mode it is obtained by baking. *)
-let post_state_of_mode ~mode ctxt ops infos =
+let post_state_of_mode ?(only_validate = false) ~mode ctxt ops infos =
   let open Lwt_result_syntax in
   match (mode, ctxt) with
   | (Construction | Mempool), Context.I inc_pre ->
@@ -1455,7 +1451,13 @@ let post_state_of_mode ~mode ctxt ops infos =
       let+ block = Incremental.finalize_block inc_post in
       (Context.I inc_post, {infos with ctxt = {infos.ctxt with block}})
   | Application, Context.B b ->
-      let+ block = Block.bake ~baking_mode:Application ~operations:ops b in
+      let+ block =
+        Block.bake
+          ~allow_manager_failures:only_validate
+          ~baking_mode:Application
+          ~operations:ops
+          b
+      in
       (Context.B block, {infos with ctxt = {infos.ctxt with block}})
   | Application, Context.I _ ->
       failwith "In Application mode, context should not be an Incremental"
@@ -1471,7 +1473,9 @@ let post_state_of_mode ~mode ctxt ops infos =
 let validate_with_diagnostic ~only_validate ~mode (infos : infos) ops =
   let open Lwt_result_syntax in
   let* ctxt_pre = pre_state_of_mode ~mode infos in
-  let* ctxt_post, infos = post_state_of_mode ~mode ctxt_pre ops infos in
+  let* ctxt_post, infos =
+    post_state_of_mode ~only_validate ~mode ctxt_pre ops infos
+  in
   let _ = observe_list ~only_validate ~mode ctxt_pre ctxt_post ops in
   return infos
 
@@ -1525,7 +1529,11 @@ let validate_ko_diagnostic ?(mode = Construction) (infos : infos) ops
       return_unit
   | Application -> (
       let*! res =
-        Block.bake ~baking_mode:Application ~operations:ops infos.ctxt.block
+        Block.bake
+          ~allow_manager_failures:true
+          ~baking_mode:Application
+          ~operations:ops
+          infos.ctxt.block
       in
       match res with
       | Error tr -> expect_failure tr

@@ -185,22 +185,27 @@ val get_construction_vstate :
 val apply :
   Block_header.block_header ->
   ?operations:Operation.packed list ->
+  ?allow_manager_failures:bool ->
   t ->
   t tzresult Lwt.t
 
-(**
-   [bake b] returns a block [b'] which has as predecessor block [b].
-   Optional parameter [policy] allows to pick the next baker in
-   several ways. If [check_size] is [true] (the default case), then
-   the function checks that the operations passed as arguments satisfy
-   the size limit of Tezos operations, as defined in the protocol.
-   This function bundles together [forge_header], [sign_header] and [apply].
-   These functions should be used instead of bake to craft unusual blocks for
-   testing together with setters for properties of the headers.
-   For examples see seed.ml or double_baking.ml
+(** [bake b] returns a block [b'] which has as predecessor block [b].
+    Optional parameter [policy] allows to pick the next baker in
+    several ways. If [check_size] is [true] (the default case), then
+    the function checks that the operations passed as arguments satisfy
+    the size limit of Tezos operations, as defined in the protocol.
+    This function bundles together [forge_header], [sign_header] and
+    [apply].  These functions should be used instead of bake to craft
+    unusual blocks for testing together with setters for properties of
+    the headers.  Setting [allow_manager_failures] (default=false),
+    allows baking blocks with manager operation(s) that are valid but
+    that could fail during their application. If this is not set, the
+    block is correctly baked but the operations' application will fail
+    silently.  For examples see seed.ml or double_baking.ml
 *)
 val bake :
   ?baking_mode:baking_mode ->
+  ?allow_manager_failures:bool ->
   ?payload_round:Round.t option ->
   ?locked_round:Alpha_context.Round.t option ->
   ?policy:baker_policy ->
