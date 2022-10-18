@@ -172,10 +172,43 @@ let should_run_store_list_size_kernel kernel =
   assert (is_stuck state_after_second_message) ;
   return_ok_unit
 
-let should_run_store_delete_kernel kernel =
+let should_run_store_delete_kernel () =
+  let module_ =
+    {|
+(module
+ (import "rollup_safe_core" "store_delete"
+         (func $store_delete (param i32 i32) (result i32)))
+ ;; Durable keys
+ (data (i32.const 100) "/one") ;; /one
+ (data (i32.const 104) "/two") ;; /two
+ (data (i32.const 108) "/three") ;; /three
+ (data (i32.const 114) "/four") ;; /four
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_next")
+       (local $one_address i32)
+       (local $one_length i32)
+       (local $four_address i32)
+       (local $four_length i32)
+
+       (local.set $one_address (i32.const 100))
+       (local.set $one_length (i32.const 4))
+       (local.set $four_address (i32.const 108)) ;; /three + /four
+       (local.set $four_length (i32.const 11)) ;; length(/three) + length(/four)
+
+       (call $store_delete (local.get $one_address) (local.get $one_length))
+       (drop)
+       (call $store_delete (local.get $four_address) (local.get $four_length))
+       (drop)
+       (nop)
+       )
+ )
+
+|}
+  in
   let open Lwt_syntax in
   let open Test_encodings_util in
-  let* tree = initial_tree ~from_binary:true kernel in
+  let* tree = initial_tree ~from_binary:false module_ in
   let* tree = add_value tree ["one"] in
   let* tree = add_value tree ["one"; "two"] in
   let* tree = add_value tree ["three"] in
@@ -767,12 +800,7 @@ let tests =
       (test_with_kernel
          Kernels.test_store_list_size_kernel
          should_run_store_list_size_kernel);
-    tztest
-      "Test store-delete kernel"
-      `Quick
-      (test_with_kernel
-         Kernels.test_store_delete_kernel
-         should_run_store_delete_kernel);
+    tztest "Test store-delete kernel" `Quick should_run_store_delete_kernel;
     tztest "Test snapshotable state" `Quick test_snapshotable_state;
     tztest
       "Test rebuild snapshotable state"

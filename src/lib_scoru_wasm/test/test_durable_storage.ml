@@ -358,7 +358,7 @@ let test_store_delete () =
       Host_funcs.Internal_for_tests.store_delete
       values
   in
-  assert (result = []) ;
+  assert (result = [Values.(Num (I32 0l))]) ;
   let durable = Durable.of_storage_exn durable in
   let* value_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn key
@@ -526,7 +526,8 @@ let test_store_copy () =
       Host_funcs.Internal_for_tests.store_copy
       values
   in
-  assert (result = []) ;
+  (* If everything goes well, the function returns `0l`. *)
+  assert (result = [Values.(Num (I32 0l))]) ;
   let durable = Durable.of_storage_exn durable in
 
   let* new_value_at_two =
@@ -577,7 +578,6 @@ let test_store_move () =
 
   let from_offset = src in
   let from_length = Int32.of_int @@ String.length from_key in
-  Printf.printf "fl= %li" from_length ;
   let to_offset = Int32.(add from_offset from_length) in
   let to_length = Int32.of_int @@ String.length to_key in
   let values =
@@ -598,7 +598,8 @@ let test_store_move () =
       Host_funcs.Internal_for_tests.store_move
       values
   in
-  assert (result = []) ;
+  (* If everything goes well, the function returns `0l`. *)
+  assert (result = [Values.(Num (I32 0l))]) ;
   let durable = Durable.of_storage_exn durable in
   let* empty_from_tree_opt =
     Durable.find_value durable @@ Durable.key_of_string_exn from_key
