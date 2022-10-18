@@ -305,7 +305,7 @@ let import_command =
     (prefixes ["import"] @@ stop)
     (fun (data_dir, filename, pvm_name) cctxt ->
       let hash = Reveals.import ~data_dir ~filename ~pvm_name in
-      cctxt#message "%a" Protocol.Alpha_context.Sc_rollup.Input_hash.pp hash
+      cctxt#message "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
       >>= return)
 
 let sc_rollup_commands () =

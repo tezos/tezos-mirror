@@ -56,7 +56,7 @@ open Protocol.Alpha_context
 val get :
   data_dir:string ->
   pvm_name:string ->
-  hash:Sc_rollup.Input_hash.t ->
+  hash:Sc_rollup.Reveal_hash.t ->
   string option
 
 (** [import ~data_dir ~pvm_name ~filename] turns the content of ~filename
@@ -66,4 +66,4 @@ val import :
   data_dir:string ->
   pvm_name:string ->
   filename:string ->
-  Sc_rollup.Input_hash.t
+  Sc_rollup.Reveal_hash.t

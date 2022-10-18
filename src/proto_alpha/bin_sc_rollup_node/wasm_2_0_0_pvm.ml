@@ -72,7 +72,7 @@ module Impl : Pvm.S = struct
     | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
         Format.asprintf
           "Waiting for preimage reveal %a"
-          Sc_rollup.Input_hash.pp
+          Sc_rollup.Reveal_hash.pp
           hash
     | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
     | Computing -> "Computing"

@@ -602,18 +602,18 @@ module Make (Context : P) :
     end)
 
     module Required_reveal = Make_var (struct
-      type t = PS.Input_hash.t option
+      type t = PS.Reveal_hash.t option
 
       let initial = None
 
-      let encoding = Data_encoding.option PS.Input_hash.encoding
+      let encoding = Data_encoding.option PS.Reveal_hash.encoding
 
       let name = "required_pre_image_hash"
 
       let pp fmt v =
         match v with
         | None -> Format.fprintf fmt "<none>"
-        | Some h -> PS.Input_hash.pp fmt h
+        | Some h -> PS.Reveal_hash.pp fmt h
     end)
 
     module Metadata = Make_var (struct
@@ -1175,7 +1175,7 @@ module Make (Context : P) :
         if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
         then
           let hash = String.sub x 5 (len - 5) in
-          match PS.Input_hash.of_b58check_opt hash with
+          match PS.Reveal_hash.of_b58check_opt hash with
           | None -> stop_evaluating false
           | Some hash ->
               let* () = Required_reveal.set (Some hash) in

@@ -237,14 +237,14 @@ module V2_0_0 = struct
       | Input_required -> Waiting_for_input_message
       | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
           match
-            Input_hash.of_bytes_opt
+            Reveal_hash.of_bytes_opt
               (Bytes.of_string (Wasm_2_0_0.input_hash_to_string hash))
           with
           | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
           | None ->
               (* In case of an invalid hash, the rollup is
                  blocked. Any commitment will be invalid. *)
-              Waiting_for_reveal (Reveal_raw_data Input_hash.zero))
+              Waiting_for_reveal (Reveal_raw_data Reveal_hash.zero))
       | Reveal_required Wasm_2_0_0.Reveal_metadata ->
           Waiting_for_reveal Reveal_metadata
 

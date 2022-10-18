@@ -179,7 +179,7 @@ module Reveal_hash =
       let size = Some 32
     end)
 
-type reveal = Reveal_raw_data of Input_hash.t | Reveal_metadata
+type reveal = Reveal_raw_data of Reveal_hash.t | Reveal_metadata
 
 let reveal_encoding =
   let open Data_encoding in
@@ -189,7 +189,7 @@ let reveal_encoding =
       (Tag 0)
       (obj2
          (req "reveal_kind" (constant "reveal_raw_data"))
-         (req "input_hash" Input_hash.encoding))
+         (req "input_hash" Reveal_hash.encoding))
       (function Reveal_raw_data s -> Some ((), s) | _ -> None)
       (fun ((), s) -> Reveal_raw_data s)
   and case_metadata =
@@ -260,7 +260,7 @@ let input_request_encoding =
     ]
 
 let pp_reveal fmt = function
-  | Reveal_raw_data hash -> Input_hash.pp fmt hash
+  | Reveal_raw_data hash -> Reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
@@ -282,7 +282,7 @@ let pp_input_request fmt request =
 
 let reveal_equal p1 p2 =
   match (p1, p2) with
-  | Reveal_raw_data h1, Reveal_raw_data h2 -> Input_hash.equal h1 h2
+  | Reveal_raw_data h1, Reveal_raw_data h2 -> Reveal_hash.equal h1 h2
   | Reveal_raw_data _, _ -> false
   | Reveal_metadata, Reveal_metadata -> true
   | Reveal_metadata, _ -> false

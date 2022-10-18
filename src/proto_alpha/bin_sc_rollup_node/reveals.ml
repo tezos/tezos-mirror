@@ -36,7 +36,7 @@ let save_string filename s =
 
 let path data_dir pvm_name hash =
   let hash =
-    Format.asprintf "%a" Protocol.Alpha_context.Sc_rollup.Input_hash.pp hash
+    Format.asprintf "%a" Protocol.Alpha_context.Sc_rollup.Reveal_hash.pp hash
   in
   Filename.(concat (concat data_dir pvm_name) hash)
 
@@ -119,9 +119,9 @@ module Arith = struct
           let cell =
             match successor_hash with
             | None -> chunk
-            | Some h -> Format.asprintf "%s hash:%a" chunk Input_hash.pp h
+            | Some h -> Format.asprintf "%s hash:%a" chunk Reveal_hash.pp h
           in
-          let hash = Input_hash.hash_string [cell] in
+          let hash = Reveal_hash.hash_string [cell] in
           aux (Some hash) ((cell, hash) :: linked_chunks) rev_chunks
     in
     aux None [] rev_chunks
