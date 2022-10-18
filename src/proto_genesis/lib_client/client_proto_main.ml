@@ -46,25 +46,40 @@ let bake cctxt ?timestamp block command sk =
   Client_keys.append cctxt sk ~watermark:(Block_header chain_id) blk
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
-let int64_parameter =
+let int32_parameter =
   Clic.parameter (fun _ p ->
-      try return (Int64.of_string p) with _ -> failwith "Cannot read int64")
+      try return (Int32.of_string p) with _ -> failwith "Cannot read int32")
 
 let file_parameter =
   Clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
 
-let fitness_from_int64 fitness =
+let fitness_from_int32 fitness =
   (* definition taken from src/proto_alpha/lib_protocol/src/constants_repr.ml *)
-  let version_number = "\000" in
-  (* definitions taken from src/proto_alpha/lib_protocol/src/fitness_repr.ml *)
-  let int64_to_bytes i =
-    let b = Bytes.create 8 in
-    TzEndian.set_int64 b 0 i ;
+  let version_number = "\002" in
+  let int32_to_bytes i =
+    let b = Bytes.create 4 in
+    TzEndian.set_int32 b 0 i ;
     b
   in
-  [Bytes.of_string version_number; int64_to_bytes fitness]
+  (* Tenderbake-compatible fitness format.
+
+     Using tenderbake's locked rounds to bump genesis fitness is a
+     "hack". Doing so will allow tenderbake protocols to parse the
+     genesis' produced fitness but will not impact block delays. When
+     a tenderbake protocol parses the fitness: level, round and
+     predecessor round have a semantics. However, locked-round can be
+     used as it only impacts reproposal at the same level but, as
+     reproposal blocks may only be produced from the previous protocol
+     (i.e. genesis), there is no side-effect. *)
+  [
+    Bytes.of_string version_number (* version *);
+    int32_to_bytes 0l (* level *);
+    int32_to_bytes fitness (* locked-round *);
+    int32_to_bytes (-1l) (* predecessor round *);
+    int32_to_bytes 0l (* round *);
+  ]
 
 let timestamp_arg =
   Clic.arg
@@ -119,7 +134,7 @@ let commands () =
       @@ param
            ~name:"fitness"
            ~desc:"Hardcoded fitness of the first block (integer)"
-           int64_parameter
+           int32_parameter
       @@ prefixes ["and"; "key"]
       @@ Client_keys.Secret_key.source_param
            ~name:"password"
@@ -136,7 +151,7 @@ let commands () =
            sk
            param_json_file
            (cctxt : Client_context.full) ->
-        let fitness = fitness_from_int64 fitness in
+        let fitness = fitness_from_int32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
@@ -161,7 +176,7 @@ let commands () =
            ~name:"fitness"
            ~desc:
              "Hardcoded fitness of the first block of the testchain (integer)"
-           int64_parameter
+           int32_parameter
       @@ prefixes ["and"; "key"]
       @@ Client_keys.Secret_key.source_param
            ~name:"password"
@@ -173,7 +188,7 @@ let commands () =
            file_parameter
       @@ stop)
       (fun (timestamp, delay) hash fitness sk param_json_file cctxt ->
-        let fitness = fitness_from_int64 fitness in
+        let fitness = fitness_from_int32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
