@@ -192,12 +192,10 @@ let make_module_inst list_key_vals src =
   in
   let memories = Lazy_vector.Int32Vector.cons memory module_inst.memories in
   let module_inst = {module_inst with memories} in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
   Instance.update_module_ref module_reg module_key module_inst ;
-  (module_reg, module_key, host_funcs_registry)
+  (module_reg, module_key, Host_funcs.all)
 
 let retrieve_memory module_reg =
   let open Lwt_syntax in

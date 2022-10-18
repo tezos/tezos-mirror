@@ -855,6 +855,11 @@ let register_host_funcs registry =
       (store_write_name, store_write);
     ]
 
+let all =
+  let registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
+  register_host_funcs registry ;
+  registry
+
 module Internal_for_tests = struct
   let metadata_size = Int32.to_int metadata_size
 

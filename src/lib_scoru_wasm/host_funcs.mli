@@ -37,22 +37,9 @@ val lookup_opt :
   Tezos_webassembly_interpreter.Ast.name ->
   Tezos_webassembly_interpreter.Instance.extern option
 
-(** [register_host_funcs] registers all the PVMs host functions into a WASM
-    interpreter's registry, using the names expected by {!lookup}.
-
-    Currently, the registered functions are:
-    - [read_input]:
-      It has to be invoked with a list
-      of 5 values representing rtype_offset, level_offset, id_offset,
-      dst and max_bytes, otherwise it raises the [Bad_input] exception.
-
-      When invoked, it write the content of an input message into the
-      memory of a [module_inst]. It also checks that the input payload
-      is no larger than the input is not too large. Finally, it returns
-      returns a singleton value list containing the size of the
-      input_buffer payload. *)
-val register_host_funcs :
-  Tezos_webassembly_interpreter.Host_funcs.registry -> unit
+(** [all] represents all registered host functions that are important for the
+    SCORU WASM PVM. *)
+val all : Tezos_webassembly_interpreter.Host_funcs.registry
 
 exception Bad_input
 

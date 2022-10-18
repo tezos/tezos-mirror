@@ -31,11 +31,6 @@ type computation_status = Starting | Restarting | Running | Failing | Reboot
 
 module Parsing = Binary_parser_encodings
 
-let host_funcs =
-  let registry = Wasm.Host_funcs.empty () in
-  Host_funcs.register_host_funcs registry ;
-  registry
-
 let tick_state_encoding =
   let open Tezos_tree_encoding in
   tagged_union
@@ -72,7 +67,9 @@ let tick_state_encoding =
            (scope ["self"] Wasm_encoding.module_key_encoding)
            (scope ["ast_module"]
            @@ Parsing.(no_region_encoding Module.module_encoding))
-           (scope ["init_kont"] (Init_encodings.init_kont_encoding ~host_funcs))
+           (scope
+              ["init_kont"]
+              (Init_encodings.init_kont_encoding ~host_funcs:Host_funcs.all))
            (scope ["modules"] Wasm_encoding.module_instances_encoding))
         (function
           | Init {self; ast_module; init_kont; module_reg} ->
@@ -82,7 +79,7 @@ let tick_state_encoding =
           Init {self; ast_module; init_kont; module_reg});
       case
         "eval"
-        (Wasm_encoding.config_encoding ~host_funcs)
+        (Wasm_encoding.config_encoding ~host_funcs:Host_funcs.all)
         (function Eval eval_config -> Some eval_config | _ -> None)
         (fun eval_config -> Eval eval_config);
       case
@@ -286,7 +283,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           (* Clear the values and the locals in the frame. *)
           let eval_config =
             Wasm.Eval.config
-              host_funcs
+              Host_funcs.all
               self
               module_reg
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.empty ())
@@ -310,7 +307,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           ~module_reg
           ~self
           buffers
-          host_funcs
+          Host_funcs.all
           ast_module
           init_kont
       in
