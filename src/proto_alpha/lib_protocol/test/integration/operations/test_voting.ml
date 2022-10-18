@@ -1634,14 +1634,14 @@ let test_too_many_proposals_in_one_operation () =
   let open Lwt_result_syntax in
   let* b0, proposer0 = context_init1 () in
   let protos = Array.to_list protos in
-  let* _ =
-    try
-      let* _ = Op.proposals (B b0) proposer0 protos in
+  Lwt.catch
+    (fun () ->
+      let* (_ : packed_operation) = Op.proposals (B b0) proposer0 protos in
       failwith
-        "Encoding of proposals operation with too many proposals should fail"
-    with Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
-  in
-  return_unit
+        "Encoding of proposals operation with too many proposals should fail")
+    (function
+      | Data_encoding.Binary.(Write_error List_invalid_length) -> return_unit
+      | exn -> Lwt.fail exn)
 
 (* Bake blocks with various valid Proposals operations, and observe
    that their effects are correctly applied. *)
