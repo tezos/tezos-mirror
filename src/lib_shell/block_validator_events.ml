@@ -65,7 +65,7 @@ let validating_block =
   declare_1
     ~section
     ~name:"validating_block"
-    ~msg:"balidating block {hash}"
+    ~msg:"validating block {hash}"
     ~level:Debug
     ~pp1:Tezos_crypto.Block_hash.pp
     ("hash", Tezos_crypto.Block_hash.encoding)
