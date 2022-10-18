@@ -25,7 +25,7 @@
 
 (** Definitions used in files with actual tests *)
 
-module Store = Tezos_proxy.Local_context
+module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 open Lib_test.Qcheck2_helpers
 

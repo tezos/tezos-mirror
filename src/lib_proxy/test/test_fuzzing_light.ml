@@ -34,7 +34,7 @@
                   width and depth of structures is fine-tuned.
 *)
 
-module Store = Tezos_proxy.Local_context
+module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 open Lib_test.Qcheck2_helpers
 
@@ -57,7 +57,7 @@ let irmin_tree_gen =
   let+ entries = small_list (pair (small_list string) bytes_gen) in
   List.fold_left_s
     (fun built_tree (path, bytes) -> Store.Tree.add built_tree path bytes)
-    (Store.Tree.empty Store.empty)
+    (Tezos_context_memory.make_empty_tree ())
     entries
   |> Lwt_main.run
 
@@ -170,7 +170,7 @@ module AddTree = struct
           Store.Tree.find_tree tree' key |> Lwt_main.run
         in
         match tree_opt_set_at_key with
-        | None -> check_tree_eq (Store.Tree.empty Store.empty) added
+        | None -> check_tree_eq (Tezos_context_memory.make_empty_tree ()) added
         | Some tree_set_at_key -> check_tree_eq added tree_set_at_key)
 end
 

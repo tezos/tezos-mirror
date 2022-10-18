@@ -26,7 +26,7 @@
 (** Module providing the light's mode implementation of Proxy.CORE *)
 
 module Logger = Light_logger.Logger
-module Store = Local_context
+module Store = Tezos_context_memory.Context
 module Consensus = Light_consensus
 module Block_services = Tezos_shell_services.Block_services
 module Proof = Tezos_context_sigs.Context.Proof_types
@@ -72,7 +72,7 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
     let mk_empty_irmin () : irmin Lwt.t =
       let open Lwt_syntax in
       let+ repo = Store.Tree.make_repo () in
-      let root = Store.Tree.empty Store.empty in
+      let root = Store.Tree.empty (Tezos_context_memory.make_empty_context ()) in
       {repo; root}
 
     (* Don't update the irmin ref when looking for key, so as not to add the

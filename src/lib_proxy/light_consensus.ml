@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Store = Local_context
+module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 
 module Storelike = struct
