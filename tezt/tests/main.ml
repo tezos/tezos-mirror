@@ -57,7 +57,6 @@ let register_protocol_independent_tests () =
 (* Tests related to protocol migration. *)
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
-  Iticket_migration.register ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
@@ -77,6 +76,12 @@ let register_protocol_migration_tests () =
     ~from_protocol:migrate_to
     ~to_protocol:Demo
     ~loser_protocols:[migrate_from]
+
+(* Tests related to one-off protocol migrations used in the past. *)
+let register_older_protocol_migration_tests () =
+  Iticket_migration.register
+    ~migrate_from:Protocol.Kathmandu
+    ~migrate_to:Protocol.Lima
 
 (* Register tests that use [Protocol.register_test] and for which we rely on
    [?supports] to decide which protocols the tests should run on.
@@ -166,6 +171,7 @@ let register_protocol_specific_because_regression_tests () =
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
+  register_older_protocol_migration_tests () ;
   register_protocol_tests_that_use_supports_correctly () ;
   register_protocol_specific_because_regression_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
