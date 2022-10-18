@@ -110,7 +110,7 @@ let read_input () =
   assert (output_level = 2l) ;
   assert (output_id = Z.of_int (-1)) ;
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
-  assert (result = 5) ;
+  assert (result = 5l) ;
   let* m = Memory.load_bytes memory 0l 1 in
   assert (m = "\001") ;
   let* m = Memory.load_bytes memory 4l 1 in
@@ -140,7 +140,39 @@ let read_input_no_messages () =
       ~max_bytes:36000l
   in
   assert (Input_buffer.num_elements input_buffer = Z.zero) ;
-  assert (result = 0) ;
+  assert (result = 0l) ;
+  Lwt.return @@ Result.return_unit
+
+let read_input_too_large () =
+  let open Lwt.Syntax in
+  let lim = Types.(MemoryType {min = 100l; max = Some 1000l}) in
+  let memory = Memory.alloc lim in
+  let input_buffer = Input_buffer.alloc () in
+  let output_buffer = Output_buffer.alloc () in
+  let* () =
+    Input_buffer.enqueue
+      input_buffer
+      {
+        rtype = 1l;
+        raw_level = 2l;
+        message_counter = Z.of_int 2;
+        payload = Bytes.make 5000 '\000';
+      }
+  in
+  assert (Input_buffer.num_elements input_buffer = Z.one) ;
+  let* result =
+    Host_funcs.Aux.read_input
+      ~input_buffer
+      ~output_buffer
+      ~memory
+      ~rtype_offset:0l
+      ~level_offset:4l
+      ~id_offset:10l
+      ~dst:50l
+      ~max_bytes:36000l
+  in
+  assert (Input_buffer.num_elements input_buffer = Z.zero) ;
+  assert (result = Host_funcs.Error.(code Input_output_too_large)) ;
   Lwt.return @@ Result.return_unit
 
 let test_host_fun () =
@@ -204,5 +236,6 @@ let tests =
     tztest "Write input" `Quick write_input;
     tztest "Read input" `Quick read_input;
     tztest "Read input no messages" `Quick read_input_no_messages;
+    tztest "Read input too large" `Quick read_input_too_large;
     tztest "Host read input" `Quick test_host_fun;
   ]

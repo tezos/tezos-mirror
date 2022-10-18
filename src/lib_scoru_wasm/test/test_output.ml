@@ -152,7 +152,8 @@ let test_write_host_fun () =
       values
   in
   let* level, id = Output_buffer.get_id output in
-  assert (result = Values.[Num (I32 1l)]) ;
+  assert (
+    result = Values.[Num (I32 Host_funcs.Error.(code Input_output_too_large))]) ;
   assert (level = 2l) ;
   assert (id = Z.zero) ;
   Lwt.return @@ Result.return_unit
