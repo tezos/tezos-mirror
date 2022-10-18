@@ -207,8 +207,6 @@ let test_get_output () =
   let open Lwt_syntax in
   let* tree = initialise_tree () in
   let* tree = add_input_info tree ~inbox_level:5 ~message_counter:10 in
-  let host_funcs = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs ;
   let output = Output_buffer.alloc () in
   Output_buffer.set_level output 0l ;
   let* () = Output_buffer.set_value output @@ Bytes.of_string "hello" in

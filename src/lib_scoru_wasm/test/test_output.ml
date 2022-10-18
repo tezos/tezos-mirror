@@ -105,8 +105,6 @@ let test_write_host_fun () =
         Num (I32 0l); Num (I32 4l); Num (I32 10l); Num (I32 50l); Num (I32 3600l);
       ]
   in
-  let host_funcs_registry = Tezos_webassembly_interpreter.Host_funcs.empty () in
-  Host_funcs.register_host_funcs host_funcs_registry ;
 
   let module_reg = Instance.ModuleMap.create () in
   let module_key = Instance.Module_key "test" in
@@ -116,7 +114,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      host_funcs_registry
+      Host_funcs.all
       ~input
       ~output
       Host_funcs.Internal_for_tests.read_input
@@ -128,7 +126,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      host_funcs_registry
+      Host_funcs.all
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
@@ -145,7 +143,7 @@ let test_write_host_fun () =
     Eval.invoke
       ~module_reg
       ~caller:module_key
-      host_funcs_registry
+      Host_funcs.all
       ~input
       ~output
       Host_funcs.Internal_for_tests.write_output
