@@ -2826,7 +2826,7 @@ let test_outbox_message_generic ?regression ?expected_error skip earliness
     let* storage = Client.contract_storage address client in
     return
     @@ Check.(
-         (storage = expected_storage)
+         (String.trim storage = expected_storage)
            string
            ~error_msg:"Invalid contract storage: expecting '%R', got '%L'.")
   in
@@ -2892,12 +2892,12 @@ let test_outbox_message ?regression ?expected_error ~earliness entrypoint ~kind
     | "arith" ->
         ( false,
           (fun contract_address -> "37 " ^ contract_address ^ entrypoint),
-          "37\n" )
+          "37" )
     | "wasm_2_0_0" ->
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790
            For the moment, the WASM PVM has no support for
            output. Hence, the storage is unchanged.*)
-        (true, Fun.const "", "0\n")
+        (true, Fun.const "", "0")
     | _ ->
         (* There is no other PVM in the protocol. *)
         assert false
