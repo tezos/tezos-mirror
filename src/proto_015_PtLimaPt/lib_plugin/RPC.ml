@@ -3105,7 +3105,9 @@ module Endorsing_rights = struct
         rights
         []
     in
-    return {level = level.level; delegates_rights = rights; estimated_time}
+    (* returns the ctxt with an updated cache of slot holders *)
+    return
+      (ctxt, {level = level.level; delegates_rights = rights; estimated_time})
 
   let register () =
     Registration.register0 ~chunked:true S.endorsing_rights (fun ctxt q () ->
@@ -3117,8 +3119,8 @@ module Endorsing_rights = struct
             cycles
             q.levels
         in
-        List.map_es (endorsing_rights_at_level ctxt) levels
-        >|=? fun rights_per_level ->
+        List.fold_left_map_es endorsing_rights_at_level ctxt levels
+        >|=? fun (_ctxt, rights_per_level) ->
         let rights_per_level =
           match q.consensus_keys with
           | [] -> rights_per_level
