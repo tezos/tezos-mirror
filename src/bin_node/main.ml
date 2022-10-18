@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
 let warn_if_argv0_name_not_octez () =
   let executable_name = Filename.basename Sys.argv.(0) in
   let prefix = "tezos-" in
@@ -38,7 +40,8 @@ let warn_if_argv0_name_not_octez () =
     in
     Format.eprintf
       "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-       The executable with name %s has been renamed to %s. The name %s is now@,\
+       The executable with name @{<kwd>%s@} has been renamed to @{<kwd>%s@}. \
+       The name @{<kwd>%s@} is now@,\
        deprecated, and it will be removed in a future release. Please update@,\
        your scripts to use the new name.@]@\n\
        @."
