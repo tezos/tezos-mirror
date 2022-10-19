@@ -2892,6 +2892,7 @@ let octez_benchmark =
         ocaml_migrate_parsetree;
         opam_only "hashcons" V.True;
       ]
+    ~inline_tests:ppx_expect
 
 let octez_benchmark_examples =
   public_lib

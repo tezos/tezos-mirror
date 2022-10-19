@@ -39,6 +39,8 @@ module Codegen_helpers = struct
 
   let pvar x = Pat.var (loc_str x)
 
+  let saturated name = ["S"; name]
+
   let call f args =
     let f = WithExceptions.Option.get ~loc:__LOC__ @@ Longident.unflatten f in
     let args = List.map (fun x -> (Asttypes.Nolabel, x)) args in
@@ -59,10 +61,12 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let false_ = Exp.construct (loc_ident "false") None
 
-  let int i = Exp.constant (Const.int i)
+  let int i = call (saturated "safe_int") [Exp.constant (Const.int i)]
 
   let float f =
-    call ["int_of_float"] [Exp.constant @@ Const.float (string_of_float f)]
+    call
+      (saturated "safe_int")
+      [call ["int_of_float"] [Exp.constant @@ Const.float (string_of_float f)]]
 
   let ( + ) x y = call ["+"] [x; y]
 
@@ -72,9 +76,9 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let ( / ) x y = call ["/"] [x; y]
 
-  let max x y = call ["max"] [x; y]
+  let max x y = call (saturated "max") [x; y]
 
-  let min x y = call ["min"] [x; y]
+  let min x y = call (saturated "min") [x; y]
 
   let log2 x = call ["log2"] [x]
 
@@ -86,9 +90,9 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
 
   let eq x y = call ["="] [x; y]
 
-  let shift_left i bits = call ["lsl"] [i; int bits]
+  let shift_left i bits = call ["lsl"] [i; Exp.constant (Const.int bits)]
 
-  let shift_right i bits = call ["lsr"] [i; int bits]
+  let shift_right i bits = call ["lsr"] [i; Exp.constant (Const.int bits)]
 
   let lam ~name f =
     let patt = pvar name in
@@ -105,20 +109,67 @@ module Codegen : Costlang.S with type 'a repr = Parsetree.expression = struct
   let if_ cond ift iff = Exp.ifthenelse cond ift (Some iff)
 end
 
-let make_module bindings =
+let detach_funcs =
+  let open Parsetree in
+  let rec aux acc expr =
+    match expr with
+    | {
+     pexp_desc = Pexp_fun (_, _, {ppat_desc = Ppat_var {txt = arg; _}; _}, expr');
+     _;
+    } ->
+        aux (arg :: acc) expr'
+    | _ -> (acc, expr)
+  in
+  aux []
+
+let rec restore_funcs (acc, expr) =
   let open Ast_helper in
-  let structure_items =
-    List.map
-      (fun (name, expr) ->
-        let name = Printf.sprintf "cost_%s" name in
-        Str.value Asttypes.Nonrecursive [Vb.mk (Codegen_helpers.pvar name) expr])
-      bindings
+  match acc with
+  | arg :: acc ->
+      let expr = Exp.fun_ Nolabel None (Codegen_helpers.pvar arg) expr in
+      restore_funcs (acc, expr)
+  | [] -> expr
+
+let generate_let_binding =
+  let open Ast_helper in
+  let open Codegen_helpers in
+  let let_open_in x expr = Exp.open_ (Opn.mk (Mod.ident (loc_ident x))) expr in
+  fun name expr ->
+    let args, expr = detach_funcs expr in
+    let expr =
+      List.fold_left
+        (fun e arg ->
+          let var = ident arg in
+          let patt = pvar arg in
+          Exp.let_
+            Nonrecursive
+            [Vb.mk patt (call (saturated "safe_int") [var])]
+            e)
+        expr
+        args
+    in
+    let expr = let_open_in "S.Syntax" expr in
+    let expr = restore_funcs (args, expr) in
+    Str.value Asttypes.Nonrecursive [Vb.mk (pvar name) expr]
+
+let make_module structure_items =
+  let open Ast_helper in
+  let open Codegen_helpers in
+  let suppress_unused_open_warning =
+    Str.attribute
+      (Attr.mk
+         (loc_str "warning")
+         (PStr [Str.eval (Exp.constant (Const.string "-33"))]))
+  in
+  let rename_saturation_repr =
+    Str.module_
+      (Mb.mk (loc (Some "S")) (Mod.ident (loc_ident "Saturation_repr")))
   in
   Str.module_
     (Mb.mk (Codegen_helpers.loc (Some "Generated"))
-    @@ Mod.structure structure_items)
-
-let pp_expr fmtr expr = Pprintast.expression fmtr expr
+    @@ Mod.structure
+         (suppress_unused_open_warning :: rename_saturation_repr
+        :: structure_items))
 
 let pp_structure_item fmtr generated = Pprintast.structure fmtr [generated]
 
@@ -141,7 +192,7 @@ let save_solution (s : solution) (fn : string) =
 (* ------------------------------------------------------------------------- *)
 
 let codegen (Model.For_codegen model) (sol : solution)
-    (transform : Costlang.transform) =
+    (transform : Costlang.transform) (name : string) =
   let subst fv =
     match Free_variable.Map.find fv sol with
     | None ->
@@ -163,13 +214,110 @@ let codegen (Model.For_codegen model) (sol : solution)
       let module M = (val model) in
       let module M = M.Def (Subst_impl) in
       let expr = Lift_then_print.prj @@ Impl.prj @@ Subst_impl.prj M.model in
-      Some expr
+      Some (generate_let_binding name expr)
 
 let codegen_module models sol transform =
   let items =
     List.filter_map
       (fun (name, model) ->
-        codegen model sol transform |> Option.map (fun expr -> (name, expr)))
+        let name = Printf.sprintf "cost_%s" name in
+        codegen model sol transform name)
       models
   in
   make_module items
+
+let%expect_test "basic_printing" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"tmp1" (int 42) @@ fun tmp1 ->
+    let_ ~name:"tmp2" (int 43) @@ fun tmp2 -> x + y + tmp1 + tmp2
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in
+        let tmp1 = S.safe_int 42 in
+        let tmp2 = S.safe_int 43 in ((x + y) + tmp1) + tmp2 |}]
+
+let%expect_test "anonymous_int_literals" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> x + y + int 42 + int 43
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in ((x + y) + (S.safe_int 42)) + (S.safe_int 43) |}]
+
+let%expect_test "let_bound_lambda" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y ->
+    let_ ~name:"incr" (lam ~name:"x" (fun x -> x + int 1)) @@ fun incr ->
+    app incr x + app incr y
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in
+        let y = S.safe_int y in
+        let incr x = x + (S.safe_int 1) in (incr x) + (incr y) |}]
+
+let%expect_test "ill_typed_higher_order" =
+  let open Codegen in
+  let term =
+    lam ~name:"incr" @@ fun incr ->
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> app incr x + app incr y
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name incr x y =
+      let open S.Syntax in
+        let incr = S.safe_int incr in
+        let x = S.safe_int x in let y = S.safe_int y in (incr x) + (incr y) |}]
+
+let%expect_test "if_conditional_operator" =
+  let open Codegen in
+  let term =
+    lam ~name:"x" @@ fun x ->
+    lam ~name:"y" @@ fun y -> if_ (lt x y) y x
+  in
+  let item = generate_let_binding "name" term in
+  Format.printf "%a" pp_structure_item item ;
+  [%expect
+    {|
+    let name x y =
+      let open S.Syntax in
+        let x = S.safe_int x in let y = S.safe_int y in if x < y then y else x |}]
+
+let%expect_test "module_generation" =
+  let open Codegen in
+  let term = lam ~name:"x" @@ fun x -> x in
+  let module_ = make_module [generate_let_binding "func_name" term] in
+  Format.printf "%a" pp_structure_item module_ ;
+  [%expect
+    {|
+    module Generated =
+      struct
+        [@@@warning "-33"]
+        module S = Saturation_repr
+        let func_name x = let open S.Syntax in let x = S.safe_int x in x
+      end |}]
