@@ -471,7 +471,7 @@ module History = struct
 
 
 *)
-    type proof =
+    type proof_repr =
       | Page_confirmed of {
           target_cell : history;
               (** [target_cell] is a cell whose content contains the slot to
@@ -533,11 +533,11 @@ module History = struct
           (** The case where the slot's page doesn't exist or is not
               confirmed on L1. *)
 
-    let proof_encoding =
+    let proof_repr_encoding =
       let open Data_encoding in
       let case_page_confirmed =
         case
-          ~title:"confirmed dal page proof"
+          ~title:"confirmed dal page proof representation"
           (Tag 0)
           (obj5
              (req "kind" (constant "confirmed"))
@@ -553,7 +553,7 @@ module History = struct
             Page_confirmed {target_cell; inc_proof; page_data; page_proof})
       and case_page_unconfirmed =
         case
-          ~title:"unconfirmed dal page proof"
+          ~title:"unconfirmed dal page proof representation"
           (Tag 1)
           (obj4
              (req "kind" (constant "unconfirmed"))
@@ -570,37 +570,87 @@ module History = struct
 
       union [case_page_confirmed; case_page_unconfirmed]
 
+    (** Proof's type is set to bytes and not a structural datatype because 
+        when a proof appears in a tezos operation or in an rpc, a user can not
+        reasonably understand the proof, thus it eases the work of people decoding
+        the proof by only supporting bytes and not the whole structured proof. *)
+
+    type proof = bytes
+
+    (** DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4084
+        DAL proof's encoding should be bounded *)
+    let proof_encoding = Data_encoding.bytes
+
+    type error += Dal_invalid_proof_serialization
+
+    let () =
+      register_error_kind
+        `Permanent
+        ~id:"Dal_slot_repr.invalid_proof_serialization"
+        ~title:"Dal invalid proof serialization"
+        ~description:"Error occured during dal proof serialization"
+        Data_encoding.unit
+        (function Dal_invalid_proof_serialization -> Some () | _ -> None)
+        (fun () -> Dal_invalid_proof_serialization)
+
+    let serialize_proof proof =
+      match Data_encoding.Binary.to_bytes_opt proof_repr_encoding proof with
+      | None -> error Dal_invalid_proof_serialization
+      | Some serialized_proof -> ok serialized_proof
+
+    type error += Dal_invalid_proof_deserialization
+
+    let () =
+      register_error_kind
+        `Permanent
+        ~id:"Dal_slot_repr.invalid_proof_deserialization"
+        ~title:"Dal invalid proof deserialization"
+        ~description:"Error occured during dal proof deserialization"
+        Data_encoding.unit
+        (function Dal_invalid_proof_deserialization -> Some () | _ -> None)
+        (fun () -> Dal_invalid_proof_deserialization)
+
+    let deserialize_proof proof =
+      match Data_encoding.Binary.of_bytes_opt proof_repr_encoding proof with
+      | None -> error Dal_invalid_proof_deserialization
+      | Some deserialized_proof -> ok deserialized_proof
+
     let pp_inclusion_proof = Format.pp_print_list pp_history
 
     let pp_history_opt = Format.pp_print_option pp_history
 
-    let pp_proof fmt p =
-      match p with
-      | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
-          Format.fprintf
-            fmt
-            "Page_confirmed (target_cell=%a, data=%s,@ inc_proof:[size=%d |@ \
-             path=%a]@ page_proof:%a)"
-            pp_history
-            target_cell
-            (Bytes.to_string page_data)
-            (List.length inc_proof)
-            pp_inclusion_proof
-            inc_proof
-            Page.pp_proof
-            page_proof
-      | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
-          Format.fprintf
-            fmt
-            "Page_unconfirmed (prev_cell = %a | next_cell = %a | \
-             prev_inc_proof:[size=%d@ | path=%a])"
-            pp_history
-            prev_cell
-            pp_history_opt
-            next_cell_opt
-            (List.length next_inc_proof)
-            pp_inclusion_proof
-            next_inc_proof
+    let pp_proof ~serialized fmt p =
+      if serialized then Format.pp_print_string fmt (Bytes.to_string p)
+      else
+        match deserialize_proof p with
+        | Error msg -> Error_monad.pp_trace fmt msg
+        | Ok proof -> (
+            match proof with
+            | Page_confirmed {target_cell; inc_proof; page_data; page_proof} ->
+                Format.fprintf
+                  fmt
+                  "Page_confirmed (target_cell=%a, data=%s,@ \
+                   inc_proof:[size=%d |@ path=%a]@ page_proof:%a)"
+                  pp_history
+                  target_cell
+                  (Bytes.to_string page_data)
+                  (List.length inc_proof)
+                  pp_inclusion_proof
+                  inc_proof
+                  Page.pp_proof
+                  page_proof
+            | Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof} ->
+                Format.fprintf
+                  fmt
+                  "Page_unconfirmed (prev_cell = %a | next_cell = %a | \
+                   prev_inc_proof:[size=%d@ | path=%a])"
+                  pp_history
+                  prev_cell
+                  pp_history_opt
+                  next_cell_opt
+                  (List.length next_inc_proof)
+                  pp_inclusion_proof
+                  next_inc_proof)
 
     type error += Dal_proof_error of string
 
@@ -682,11 +732,12 @@ module History = struct
               (List.is_empty inc_proof)
               (dal_proof_error "The inclusion proof cannot be empty")
           in
-          (* All checks succeeded. We return a `Page_confirmed` proof. *)
-          let status =
-            Page_confirmed {inc_proof; target_cell; page_data; page_proof}
+          (* All checks succeeded. We return a serialized `Page_confirmed` proof. *)
+          let*? page_confirmed =
+            serialize_proof
+            @@ Page_confirmed {inc_proof; target_cell; page_data; page_proof}
           in
-          return (status, Some page_data)
+          return (page_confirmed, Some page_data)
       | None, Nearest {lower = prev_cell; upper = next_cell_opt} ->
           (* There is no previously confirmed slot in the skip list whose ID
              corresponds to the {published_level; slot_index} information
@@ -711,8 +762,11 @@ module History = struct
                 in
                 return @@ List.rev rev_next_inc_proof
           in
-          return
-            (Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof}, None)
+          let*? page_unconfirmed =
+            serialize_proof
+            @@ Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof}
+          in
+          return (page_unconfirmed, None)
       | None, Found _ ->
           proof_error
             "The page ID's slot is confirmed, but no page content and proof \
@@ -744,8 +798,9 @@ module History = struct
            path)
         (dal_proof_error "verify_proof: invalid inclusion Dal proof.")
 
-    let verify_proof dal_params page_id snapshot proof =
+    let verify_proof dal_params page_id snapshot serialized_proof =
       let open Lwt_tzresult_syntax in
+      let*? proof = deserialize_proof serialized_proof in
       let Page.{slot_id; page_index = _} = page_id in
       match proof with
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
@@ -835,11 +890,14 @@ module History = struct
     module Internal_for_tests = struct
       let content = Skip_list.content
 
-      let proof_statement_is proof expected =
-        match (expected, proof) with
-        | `Confirmed, Page_confirmed _ | `Unconfirmed, Page_unconfirmed _ ->
-            true
-        | _ -> false
+      let proof_statement_is serialized_proof expected =
+        match deserialize_proof serialized_proof with
+        | Error _ -> false
+        | Ok proof -> (
+            match (expected, proof) with
+            | `Confirmed, Page_confirmed _ | `Unconfirmed, Page_unconfirmed _ ->
+                true
+            | _ -> false)
     end
   end
 

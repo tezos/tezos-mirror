@@ -202,7 +202,7 @@ struct
         failwith
           "Expected to have a %s page proof. Got %a@."
           (proof_status_to_string proof_status)
-          Hist.pp_proof
+          (Hist.pp_proof ~serialized:false)
           proof
     in
     assert_content_is
