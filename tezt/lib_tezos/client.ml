@@ -731,7 +731,7 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
 
 let id = ref 0
 
-let spawn_gen_keys ?alias client =
+let spawn_gen_keys ?alias ?sig_alg client =
   let alias =
     match alias with
     | None ->
@@ -739,10 +739,12 @@ let spawn_gen_keys ?alias client =
         sf "tezt_%d" !id
     | Some alias -> alias
   in
-  (spawn_command client ["gen"; "keys"; alias], alias)
+  ( spawn_command client @@ ["gen"; "keys"; alias]
+    @ optional_arg "sig" Fun.id sig_alg,
+    alias )
 
-let gen_keys ?alias client =
-  let p, alias = spawn_gen_keys ?alias client in
+let gen_keys ?alias ?sig_alg client =
+  let p, alias = spawn_gen_keys ?alias ?sig_alg client in
   let* () = Process.check p in
   return alias
 
@@ -776,8 +778,8 @@ let list_known_addresses client =
   in
   return addresses
 
-let gen_and_show_keys ?alias client =
-  let* alias = gen_keys ?alias client in
+let gen_and_show_keys ?alias ?sig_alg client =
+  let* alias = gen_keys ?alias ?sig_alg client in
   show_address ~alias client
 
 let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
@@ -1492,6 +1494,20 @@ let spawn_normalize_script ?mode ~script client =
 
 let normalize_script ?mode ~script client =
   spawn_normalize_script ?mode ~script client |> Process.check_and_read_stdout
+
+let spawn_typecheck_data ~data ~typ ?gas ?(legacy = false) client =
+  let gas_cmd =
+    Option.map Int.to_string gas |> Option.map (fun g -> ["--gas"; g])
+  in
+  let cmd =
+    ["typecheck"; "data"; data; "against"; "type"; typ]
+    @ Option.value ~default:[] gas_cmd
+    @ if legacy then ["--legacy"] else []
+  in
+  spawn_command client cmd
+
+let typecheck_data ~data ~typ ?gas ?(legacy = false) client =
+  spawn_typecheck_data ~data ~typ ?gas ~legacy client |> Process.check
 
 let spawn_typecheck_script ~script ?(details = false) ?(emacs = false)
     ?(no_print_source = false) ?gas ?(legacy = false) client =
