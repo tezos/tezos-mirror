@@ -1495,6 +1495,18 @@ let get_contract_hash ?hooks ~contract client =
   spawn_get_contract_hash ?hooks ~contract client
   |> Process.check_and_read_stdout
 
+let spawn_hash_scripts ?hooks ?(display_names = false) scripts client =
+  spawn_command ?hooks client
+  @@ ["hash"; "script"] @ scripts
+  @ optional_switch "display-names" display_names
+
+let hash_scripts ?hooks ?display_names scripts client =
+  let* output =
+    spawn_hash_scripts ?hooks ?display_names scripts client
+    |> Process.check_and_read_stdout
+  in
+  return (String.split_on_char '\n' output)
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd

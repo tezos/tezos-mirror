@@ -1179,6 +1179,18 @@ val get_contract_hash :
 val spawn_get_contract_hash :
   ?hooks:Process_hooks.t -> contract:string -> t -> Process.t
 
+(** Run [octez-client hash script ..] with a list of scripts to hash *)
+val hash_scripts :
+  ?hooks:Process_hooks.t ->
+  ?display_names:bool ->
+  string list ->
+  t ->
+  string list Lwt.t
+
+(** Same as [hash_scripts], but do not wait for the process to exit. *)
+val spawn_hash_scripts :
+  ?hooks:Process_hooks.t -> ?display_names:bool -> string list -> t -> Process.t
+
 (** Run [octez-client normalize data .. of type ...]*)
 val normalize_data :
   ?hooks:Process_hooks.t ->
