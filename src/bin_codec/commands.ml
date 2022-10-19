@@ -226,6 +226,37 @@ let commands () =
                           ]))))
         in
         Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:"Dump a json description of a given registered encodings."
+      (args1
+      @@ switch
+           ~doc:
+             "Output json descriptions without extraneous whitespace characters"
+           ~long:"compact"
+           ())
+      (prefix "dump" @@ prefix "encoding"
+      @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
+      @@ stop)
+      (fun minify registered_encoding (cctxt : #Client_context.printer) ->
+        let* () =
+          cctxt#message
+            "%s"
+            (Json.to_string
+               ~minify
+               (`O
+                 [
+                   ( "json",
+                     Json.construct
+                       Json.schema_encoding
+                       (Registration.json_schema registered_encoding) );
+                   ( "binary",
+                     Json.construct
+                       Binary_schema.encoding
+                       (Registration.binary_schema registered_encoding) );
+                 ]))
+        in
+        Lwt_result_syntax.return_unit);
     (* JSON -> Binary *)
     command
       ~group
