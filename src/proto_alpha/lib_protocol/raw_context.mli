@@ -423,7 +423,3 @@ module Dal : sig
      [endorser] for the current level. *)
   val shards : t -> endorser:Signature.Public_key_hash.t -> int list
 end
-
-module Migration_from_Kathmandu : sig
-  val reset_samplers : t -> t tzresult
-end
