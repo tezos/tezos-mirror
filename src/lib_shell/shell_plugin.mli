@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,7 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Type of a protocol-specific mempool filter plug-in. *)
+(** Type of a protocol-specific mempool filter plugin.
+
+    This is compatible with the plugins of protocols Lima and up. For
+    Kathmandu and older protocols, see {!Legacy_mempool_plugin.FILTER}. *)
 module type FILTER = sig
   module Proto : Registered_protocol.T
 
@@ -168,8 +172,25 @@ module Undefined_metrics_plugin (P : sig
   val hash : Tezos_crypto.Protocol_hash.t
 end) : METRICS
 
-(** Registers a mempool filters plug-in for a specific protocol (according to its [Proto.hash]). *)
+(** Juggling between recent filter version {!FILTER}, designed for
+    Lima (environment V7) and newer protocols, and legacy filter
+    version {!Legacy_mempool_plugin.FILTER}. *)
+type filter_t =
+  | Recent of (module FILTER)
+  | Legacy of (module Legacy_mempool_plugin.FILTER)
+
+(** Dummy filter that does nothing. *)
+val no_filter : (module Registered_protocol.T) -> filter_t
+
+(** Register a mempool filter plugin for a specific protocol
+    (according to its [Proto.hash]). The protocol must be Lima or a
+    more recent one. *)
 val register_filter : (module FILTER) -> unit
+
+(** Register a mempool filter plugin for a specific protocol
+    (according to its [Proto.hash]). The protocol must be Kathmandu
+    or older. *)
+val register_legacy_filter : (module Legacy_mempool_plugin.FILTER) -> unit
 
 (** Registers a RPC plug-in for a specific protocol *)
 val register_rpc : (module RPC) -> unit
@@ -178,7 +199,7 @@ val register_rpc : (module RPC) -> unit
 val register_metrics : (module METRICS) -> unit
 
 (** Looks for a mempool filter plug-in for a specific protocol. *)
-val find_filter : Tezos_crypto.Protocol_hash.t -> (module FILTER) option
+val find_filter : Tezos_crypto.Protocol_hash.t -> filter_t option
 
 (** Looks for an rpc plug-in for a specific protocol. *)
 val find_rpc : Tezos_crypto.Protocol_hash.t -> (module RPC) option

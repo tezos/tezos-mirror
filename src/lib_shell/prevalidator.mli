@@ -55,7 +55,7 @@ type t
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   Shell_limits.prevalidator_limits ->
-  (module Shell_plugin.FILTER) ->
+  Shell_plugin.filter_t ->
   Distributed_db.chain_db ->
   t tzresult Lwt.t
 

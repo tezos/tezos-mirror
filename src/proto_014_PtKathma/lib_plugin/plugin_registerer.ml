@@ -39,7 +39,7 @@ module Metrics = struct
   let hash = Registerer.Registered.hash
 end
 
-let () = Shell_plugin.register_filter (module Filter)
+let () = Shell_plugin.register_legacy_filter (module Filter)
 
 let () = Shell_plugin.register_rpc (module RPC)
 

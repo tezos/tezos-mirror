@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -96,7 +97,8 @@ module type RPC = sig
     Tezos_protocol_environment.rpc_context Tezos_rpc.Directory.directory
 end
 
-module No_filter (Proto : Registered_protocol.T) = struct
+module No_filter (Proto : Registered_protocol.T) :
+  FILTER with module Proto = Proto = struct
   module Proto = Proto
 
   module Mempool = struct
@@ -148,22 +150,11 @@ struct
   let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
 end
 
-let filter_table : (module FILTER) Tezos_crypto.Protocol_hash.Table.t =
-  Tezos_crypto.Protocol_hash.Table.create 5
-
 let rpc_table : (module RPC) Tezos_crypto.Protocol_hash.Table.t =
   Tezos_crypto.Protocol_hash.Table.create 5
 
 let metrics_table : (module METRICS) Tezos_crypto.Protocol_hash.Table.t =
   Tezos_crypto.Protocol_hash.Table.create 5
-
-let register_filter (module Filter : FILTER) =
-  assert (
-    not (Tezos_crypto.Protocol_hash.Table.mem filter_table Filter.Proto.hash)) ;
-  Tezos_crypto.Protocol_hash.Table.add
-    filter_table
-    Filter.Proto.hash
-    (module Filter)
 
 let register_rpc (module Rpc : RPC) =
   assert (not (Tezos_crypto.Protocol_hash.Table.mem rpc_table Rpc.Proto.hash)) ;
@@ -174,8 +165,6 @@ let register_metrics (module Metrics : METRICS) =
     metrics_table
     Metrics.hash
     (module Metrics)
-
-let find_filter = Tezos_crypto.Protocol_hash.Table.find filter_table
 
 let find_rpc = Tezos_crypto.Protocol_hash.Table.find rpc_table
 
@@ -189,3 +178,29 @@ let safe_find_metrics hash =
         let hash = hash
       end) in
       Lwt.return (module Metrics : METRICS)
+
+type filter_t =
+  | Recent of (module FILTER)
+  | Legacy of (module Legacy_mempool_plugin.FILTER)
+
+let is_recent_proto (module Proto : Registered_protocol.T) =
+  Proto.(compare environment_version V7 >= 0)
+
+let no_filter (module Proto : Registered_protocol.T) =
+  if is_recent_proto (module Proto) then Recent (module No_filter (Proto))
+  else Legacy (module Legacy_mempool_plugin.No_filter (Proto))
+
+let filter_table : filter_t Tezos_crypto.Protocol_hash.Table.t =
+  Tezos_crypto.Protocol_hash.Table.create 5
+
+let add_to_filter_table proto_hash (filter : filter_t) =
+  assert (not (Tezos_crypto.Protocol_hash.Table.mem filter_table proto_hash)) ;
+  Tezos_crypto.Protocol_hash.Table.add filter_table proto_hash filter
+
+let register_filter (module Filter : FILTER) =
+  add_to_filter_table Filter.Proto.hash (Recent (module Filter))
+
+let register_legacy_filter (module Filter : Legacy_mempool_plugin.FILTER) =
+  add_to_filter_table Filter.Proto.hash (Legacy (module Filter))
+
+let find_filter = Tezos_crypto.Protocol_hash.Table.find filter_table

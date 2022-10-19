@@ -384,9 +384,7 @@ let safe_get_prevalidator_filter hash =
             hash
       | Some protocol ->
           let* () = Events.(emit prevalidator_filter_not_found) hash in
-          let (module Proto) = protocol in
-          let module Filter = Shell_plugin.No_filter (Proto) in
-          return_ok (module Filter : Shell_plugin.FILTER))
+          return_ok (Shell_plugin.no_filter protocol))
 
 let instantiate_prevalidator parameters set_prevalidator block chain_db =
   let open Lwt_syntax in
@@ -395,8 +393,8 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
     let* new_protocol =
       Store.Block.protocol_hash parameters.chain_store block
     in
-    let* (module Filter) = safe_get_prevalidator_filter new_protocol in
-    Prevalidator.create parameters.prevalidator_limits (module Filter) chain_db
+    let* filter = safe_get_prevalidator_filter new_protocol in
+    Prevalidator.create parameters.prevalidator_limits filter chain_db
   in
   match r with
   | Error errs ->

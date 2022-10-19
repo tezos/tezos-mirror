@@ -47,7 +47,7 @@ val make :
   Shell_limits.prevalidator_limits ->
   Distributed_db.chain_db ->
   Tezos_crypto.Chain_id.t ->
-  (module Shell_plugin.FILTER) ->
+  (module Legacy_mempool_plugin.FILTER) ->
   Prevalidator_internal_common.t
 
 (**/**)
@@ -94,7 +94,7 @@ module Internal_for_tests : sig
     ('protocol_data, 'prevalidation_t) types_state_shell
 
   module Make
-      (Filter : Shell_plugin.FILTER)
+      (Filter : Legacy_mempool_plugin.FILTER)
       (Prevalidation_t : Legacy_prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state
