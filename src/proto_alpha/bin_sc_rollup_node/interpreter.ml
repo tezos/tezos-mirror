@@ -75,8 +75,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       some [message_index] at a given [level] and this is the
       [start_tick] of this message processing. If some [failing_ticks]
       are planned by the loser mode, they will be made. *)
-  let eval_until_input ~metadata data_dir level message_index ~fuel start_tick
-      failing_ticks state =
+  let eval_until_input ~metadata ~dal_endorsement_lag data_dir store level
+      message_index ~fuel start_tick failing_ticks state =
     let open Lwt_result_syntax in
     let eval_tick fuel_left tick failing_ticks state =
       let max_steps =
@@ -139,7 +139,23 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                 (Int64.succ current_tick)
                 failing_ticks
                 next_state
-          | _ -> return (state, fuel_left, current_tick, failing_ticks))
+          | Needs_reveal (Request_dal_page page_id) ->
+              let* content_opt =
+                Dal_pages_request.page_content
+                  ~dal_endorsement_lag
+                  store
+                  page_id
+              in
+              let*! next_state =
+                PVM.set_input (Reveal (Dal_page content_opt)) state
+              in
+              go
+                (consume_fuel 1L fuel)
+                (Int64.succ current_tick)
+                failing_ticks
+                next_state
+          | Initial | First_after _ ->
+              return (state, fuel, current_tick, failing_ticks))
     in
     go fuel start_tick failing_ticks state
 
@@ -154,13 +170,15 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       step that requires an input. This function is controlled by
       some [fuel] and may introduce intended failures at some given
       [failing_ticks]. *)
-  let feed_input ~metadata data_dir level message_index ~fuel ~failing_ticks
-      state input =
+  let feed_input ~metadata ~dal_endorsement_lag data_dir store level
+      message_index ~fuel ~failing_ticks state input =
     let open Lwt_result_syntax in
     let* state, fuel, tick, failing_ticks =
       eval_until_input
         ~metadata
+        ~dal_endorsement_lag
         data_dir
+        store
         level
         message_index
         ~fuel
@@ -188,7 +206,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let* state, fuel, _tick, _failing_ticks =
       eval_until_input
         ~metadata
+        ~dal_endorsement_lag
         data_dir
+        store
         level
         message_index
         ~fuel
@@ -198,7 +218,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     in
     return (state, fuel)
 
-  let eval_block_inbox ~metadata ?fuel
+  let eval_block_inbox ~metadata ~dal_endorsement_lag ?fuel
       Node_context.{data_dir; store; loser_mode; _} hash state =
     let open Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
@@ -242,7 +262,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
               let* state, fuel =
                 feed_input
                   ~metadata
+                  ~dal_endorsement_lag
                   data_dir
+                  store
                   level
                   message_counter
                   ~fuel
@@ -290,8 +312,16 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     (* Retrieve the previous PVM state from store. *)
     let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
     let metadata = metadata node_ctxt in
+    let dal_endorsement_lag =
+      node_ctxt.protocol_constants.parametric.dal.endorsement_lag
+    in
     let* state, num_messages, inbox_level, _fuel =
-      eval_block_inbox ~metadata node_ctxt hash predecessor_state
+      eval_block_inbox
+        ~metadata
+        ~dal_endorsement_lag
+        node_ctxt
+        hash
+        predecessor_state
     in
 
     (* Write final state to store. *)
@@ -381,8 +411,17 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         Layer1.{hash = predecessor_hash; level = pred_level}
     in
     let metadata = metadata node_ctxt in
+    let dal_endorsement_lag =
+      node_ctxt.protocol_constants.parametric.dal.endorsement_lag
+    in
     let* state, _counter, _level, _fuel =
-      eval_block_inbox ~metadata ~fuel:tick_distance node_ctxt hash state
+      eval_block_inbox
+        ~metadata
+        ~dal_endorsement_lag
+        ~fuel:tick_distance
+        node_ctxt
+        hash
+        state
     in
     return state
 
