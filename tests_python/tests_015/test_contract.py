@@ -1,5 +1,4 @@
 import os
-import re
 from typing import List, Union, Any
 import pytest
 
@@ -10,7 +9,6 @@ from tools.utils import originate
 from .contract_paths import (
     CONTRACT_PATH,
     ILLTYPED_CONTRACT_PATH,
-    all_contracts,
     all_legacy_contracts,
 )
 
@@ -1071,30 +1069,6 @@ class TestNonRegression:
             0,
         )
         assert op1.storage_size == op2.storage_size
-
-
-@pytest.mark.slow
-@pytest.mark.contract
-@pytest.mark.regression
-class TestScriptHashRegression:
-    @pytest.mark.parametrize(
-        "client_regtest_custom_scrubber",
-        [[(re.escape(CONTRACT_PATH), '[CONTRACT_PATH]')]],
-        indirect=True,
-    )
-    def test_contract_hash(self, client_regtest_custom_scrubber: Client):
-        client = client_regtest_custom_scrubber
-        contracts = all_contracts()
-        contracts.sort()
-        for contract in contracts:
-            assert contract.endswith(
-                '.tz'
-            ), "test contract should have .tz extension"
-
-        client.hash_script(
-            [os.path.join(CONTRACT_PATH, contract) for contract in contracts],
-            display_names=True,
-        )
 
 
 @pytest.mark.contract

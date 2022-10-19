@@ -152,6 +152,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Run_script.register ~protocols ;
   Runtime_script_failure.register ~protocols ;
   Sapling.register ~protocols ;
+  Script_hash_regression.register ~protocols ;
   Self_address_transfer.register ~protocols ;
   Script_conversion.register ~protocols ;
   Signer_test.register ~protocols ;
