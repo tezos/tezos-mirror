@@ -32,11 +32,11 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Kathmandunet::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Limanet::
 
-  tezos-node config init --data-dir ~/tezos-kathmandunet --network kathmandunet
-  tezos-node identity generate --data-dir ~/tezos-kathmandunet
-  tezos-node run --data-dir ~/tezos-kathmandunet
+  tezos-node config init --data-dir ~/tezos-limanet --network limanet
+  tezos-node identity generate --data-dir ~/tezos-limanet
+  tezos-node run --data-dir ~/tezos-limanet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -56,15 +56,17 @@ the following built-in networks:
 
 - ``kathmandunet`` (available from version 14.0)
 
+- ``limanet`` (available from version 15.0)
+
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Kathmandunet::
+it runs on Limanet::
 
-  tezos-node run --data-dir ~/tezos-kathmandunet --network kathmandunet
+  tezos-node run --data-dir ~/tezos-limanet --network limanet
 
-This command will fail with an error if the configured network is not Kathmandunet.
+This command will fail with an error if the configured network is not Limanet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
@@ -197,11 +199,11 @@ Alias Versus Explicit Configuration
 
 If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Kathmandunet, it will contain something like::
+to connect to Limanet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "kathmandunet"
+    "network": "limanet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -213,7 +215,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``kathmandunet``. Instead,
+no longer contain an alias such as ``mainnet`` or ``limanet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.

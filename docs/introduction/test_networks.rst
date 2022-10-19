@@ -33,6 +33,21 @@ network listed there, including the active test networks described
 below, have independent faucets. Enter the public key hash of any test
 account on the website to receive test tokens.
 
+Limanet
+=======
+
+- Built-in network alias: ``limanet`` (see :ref:`builtin_networks`)
+
+  * Available from version 15.0.
+
+Limanet is a test network which runs the Lima protocol.
+Limanet will run until Lima is refused through the amendment process
+or (accepted and then) replaced by another protocol on Mainnet.
+
+On Limanet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
 Kathmandunet
 ============
 
