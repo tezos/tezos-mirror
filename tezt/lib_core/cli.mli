@@ -102,6 +102,8 @@ type options = {
   mutable starting_port : int;
   mutable record : string option;
   mutable from_records : string list;
+  mutable resume_file : string option;
+  mutable resume : bool;
   mutable job : (int * int) option;
   mutable job_count : int;
   mutable suggest_jobs : bool;

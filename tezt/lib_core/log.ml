@@ -60,6 +60,8 @@ let channel =
     starting_port = _;
     record = _;
     from_records = _;
+    resume_file = _;
+    resume = _;
     job = _;
     job_count = _;
     suggest_jobs;

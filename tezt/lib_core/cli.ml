@@ -59,6 +59,8 @@ type options = {
   mutable starting_port : int;
   mutable record : string option;
   mutable from_records : string list;
+  mutable resume_file : string option;
+  mutable resume : bool;
   mutable job : (int * int) option;
   mutable job_count : int;
   mutable suggest_jobs : bool;
@@ -94,6 +96,8 @@ let options =
     starting_port = 16384;
     record = None;
     from_records = [];
+    resume_file = None;
+    resume = false;
     job = None;
     job_count = 1;
     suggest_jobs = false;
@@ -384,6 +388,22 @@ let init ?args () =
            tests found in record files. When using --record, the new record \
            which is output does NOT include the input records. When using \
            --junit, reports do NOT include input records." );
+        ( "--resume-file",
+          Arg.String (fun filename -> options.resume_file <- Some filename),
+          "<FILE> Record test results to FILE for use with --resume. When \
+           using --resume, test results that existed in FILE are kept, \
+           contrary to --record." );
+        ( "--resume",
+          Arg.Unit (fun () -> options.resume <- true),
+          " Resume from a previous run. This reads the resume file located at \
+           --resume-file to resume from it. If --resume-file is not specified, \
+           --resume implies --resume-file tezt-resume.json. If the resume file \
+           does not exist, act as if it was empty. Before running a test, it \
+           is checked whether this test was already successfully ran according \
+           to the resume file. If it was, the test is skipped. When using \
+           --loop or --loop-count, the test is skipped as many times as it was \
+           successful according to the resume file." );
+        ("-r", Arg.Unit (fun () -> options.resume <- true), " Same as --resume.");
         ( "--job",
           Arg.String set_job,
           "<INDEX>/<COUNT> COUNT must be at least 1 and INDEX must be between \
@@ -402,9 +422,9 @@ let init ?args () =
            at all." );
         ( "--job-count",
           Arg.Int set_job_count,
-          "<COUNT> Run COUNT tests in parallel, in separate processes.\n\
-           With --suggest-jobs, set the number of target jobs for \
-           --suggest-jobs instead (default is 1)." );
+          "<COUNT> Run COUNT tests in parallel, in separate processes. With \
+           --suggest-jobs, set the number of target jobs for --suggest-jobs \
+           instead (default is 1)." );
         ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
         ( "--suggest-jobs",
           Arg.Unit (fun () -> options.suggest_jobs <- true),

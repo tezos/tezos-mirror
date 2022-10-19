@@ -86,6 +86,8 @@ module Summed_durations : sig
 
   val total_nanoseconds : t -> int64
 
+  val count : t -> int
+
   val encode : t -> JSON.u
 
   (* May raise [JSON.Error]. *)
@@ -114,18 +116,24 @@ end = struct
 
   let total_nanoseconds {total_time; count = _} = total_time
 
+  let count {count; _} = count
+
   let encode {total_time; count} =
-    `O
-      [
-        ("total_time", `String (Int64.to_string total_time));
-        ("count", `String (string_of_int count));
-      ]
+    if total_time = 0L && count = 0 then `Null
+    else
+      `O
+        [
+          ("total_time", `String (Int64.to_string total_time));
+          ("count", `String (string_of_int count));
+        ]
 
   let decode (json : JSON.t) =
-    {
-      total_time = JSON.(json |-> "total_time" |> as_int64);
-      count = JSON.(json |-> "count" |> as_int);
-    }
+    if JSON.is_null json then zero
+    else
+      {
+        total_time = JSON.(json |-> "total_time" |> as_int64);
+        count = JSON.(json |-> "count" |> as_int);
+      }
 end
 
 (* Field [id] is used to be able to iterate on tests in order of registration.
@@ -504,8 +512,11 @@ module Record = struct
     failed_runs : Summed_durations.t;
   }
 
+  let encode_obj fields =
+    `O (List.filter (function _, `Null -> false | _ -> true) fields)
+
   let encode_test {file; title; tags; successful_runs; failed_runs} : JSON.u =
-    `O
+    encode_obj
       [
         ("file", `String file);
         ("title", `String title);
@@ -566,7 +577,7 @@ module Record = struct
 
   (* Read a record and update the time information of registered tests
      that appear in this record. *)
-  let use (record : t) =
+  let use_past (record : t) =
     let update_test (recorded_test : test) =
       match String_map.find_opt recorded_test.title !registered with
       | None ->
@@ -579,6 +590,21 @@ module Record = struct
           test.past_records_failed_runs <-
             Summed_durations.(
               test.past_records_failed_runs + recorded_test.failed_runs)
+    in
+    List.iter update_test record
+
+  (* Same as [use_past] but for --resume: ignore failed runs, and update
+     current session instead of past records. *)
+  let resume_from (record : t) =
+    let update_test (recorded_test : test) =
+      match String_map.find_opt recorded_test.title !registered with
+      | None ->
+          (* Test no longer exists or was not selected, ignoring. *)
+          ()
+      | Some test ->
+          test.session_successful_runs <-
+            Summed_durations.(
+              test.session_successful_runs + recorded_test.successful_runs)
     in
     List.iter update_test record
 end
@@ -873,8 +899,16 @@ let run_with_scheduler scheduler =
     exit 3) ;
   (* Read records. *)
   List.iter
-    Record.(fun filename -> use (input_file filename))
+    Record.(fun filename -> use_past (input_file filename))
     Cli.options.from_records ;
+  if Cli.options.resume then (
+    if Cli.options.resume_file = None then
+      Cli.options.resume_file <- Some "tezt-resume.json" ;
+    Option.iter
+      Record.(
+        fun filename ->
+          if Sys.file_exists filename then resume_from (input_file filename))
+      Cli.options.resume_file) ;
   (* Apply --job if needed. *)
   select_job () ;
   (* Apply --skip and --only if needed. *)
@@ -907,7 +941,7 @@ let run_with_scheduler scheduler =
       (* [aborted] is used to exit with the right error code in case of Ctrl+C.
          It implies [stop]. *)
       let aborted = ref false in
-      let next_test () =
+      let rec next_test () =
         if !stop then None
         else
           match Queue.take_opt test_queue with
@@ -916,8 +950,15 @@ let run_with_scheduler scheduler =
               | Count n when !refills >= n -> None
               | Count _ | Infinite ->
                   refill_queue () ;
-                  Queue.take_opt test_queue)
-          | Some _ as x -> x
+                  if Queue.is_empty test_queue then None else next_test ())
+          | Some (test, test_instance) as x ->
+              if
+                Summed_durations.count test.session_successful_runs
+                >= test_instance.iteration
+              then
+                (* Test was successful in the past according to --resume, skip. *)
+                next_test ()
+              else x
       in
       let a_test_failed = ref false in
       let on_worker_available () =
@@ -964,6 +1005,8 @@ let run_with_scheduler scheduler =
       @@ fun () ->
       (* Output reports. *)
       Option.iter output_junit Cli.options.junit ;
-      Option.iter Record.(output_file (current ())) Cli.options.record ;
+      let record = Record.current () in
+      Option.iter (Record.output_file record) Cli.options.record ;
+      Option.iter (Record.output_file record) Cli.options.resume_file ;
       if Cli.options.time then display_time_summary () ;
       if !aborted then exit 2 else if !a_test_failed then exit 1
