@@ -362,10 +362,10 @@ let next_reboot_counter {reboot_counter; maximum_reboots_per_input; _} status =
   | Restarting | Failing -> maximum_reboots_per_input
   | Starting | Running -> reboot_counter
 
-(** [compute_step_inner pvm_state] does one computation step on [pvm_state].
+(** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.
 *)
-let compute_step_inner pvm_state =
+let compute_step pvm_state =
   let open Lwt_syntax in
   (* Calculate the next tick state. *)
   let* durable, tick_state, status = next_tick_state pvm_state in
@@ -430,17 +430,118 @@ let compute_step_many_until_pvm_state ?(max_steps = 1L) should_continue =
         in
         go (Int64.sub steps_left (Z.to_int64 bulk_ticks)) pvm_state
       else
-        let* pvm_state = compute_step_inner pvm_state in
+        let* pvm_state = compute_step pvm_state in
         go (Int64.pred steps_left) pvm_state
     else Lwt.return pvm_state
   in
   let one_or_more_steps pvm_state =
     (* Make sure we perform at least 1 step. The assertion above ensures that
        we were asked to perform at least 1. *)
-    let* pvm_state = compute_step_inner pvm_state in
+    let* pvm_state = compute_step pvm_state in
     go (Int64.pred max_steps) pvm_state
   in
   measure_executed_ticks one_or_more_steps
+
+let should_compute pvm_state =
+  let open Lwt.Syntax in
+  let+ input_request_val = input_request pvm_state in
+  match input_request_val with
+  | Reveal_required _ | Input_required -> false
+  | No_input_required -> true
+
+let compute_step_many ~max_steps pvm_state =
+  compute_step_many_until_pvm_state ~max_steps should_compute pvm_state
+
+let set_input_step input_info message pvm_state =
+  let open Lwt_syntax in
+  let open Wasm_pvm_state in
+  let {inbox_level; message_counter} = input_info in
+  let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
+  let+ tick_state =
+    match pvm_state.tick_state with
+    | Snapshot ->
+        let+ () =
+          Wasm.Input_buffer.(
+            enqueue
+              pvm_state.buffers.input
+              {
+                (* This is to distinguish (0) Inbox inputs from (1)
+                   DAL/Slot_header inputs. *)
+                rtype = 0l;
+                raw_level;
+                message_counter;
+                payload = String.to_bytes message;
+              })
+        in
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
+           The goal is to read a complete inbox. *)
+        (* Go back to decoding *)
+        initial_boot_state ()
+    | Decode _ ->
+        Lwt.return
+          (Stuck
+             (Wasm_pvm_errors.invalid_state "No input required during decoding"))
+    | Link _ ->
+        Lwt.return
+          (Stuck (Wasm_pvm_errors.invalid_state "No input required during link"))
+    | Init _ ->
+        Lwt.return
+          (Stuck
+             (Wasm_pvm_errors.invalid_state
+                "No input required during initialization"))
+    | Eval _ ->
+        Lwt.return
+          (Stuck
+             (Wasm_pvm_errors.invalid_state
+                "No input required during evaluation"))
+    | Stuck _ -> Lwt.return pvm_state.tick_state
+  in
+  (* Increase the current tick counter and mark that no input is required. *)
+  {pvm_state with tick_state; current_tick = Z.succ pvm_state.current_tick}
+
+let reveal_step payload pvm_state =
+  let open Lwt_syntax in
+  let open Tezos_webassembly_interpreter in
+  let return tick_state =
+    Lwt.return
+      {pvm_state with current_tick = Z.succ pvm_state.current_tick; tick_state}
+  in
+  match pvm_state.tick_state with
+  | Eval config ->
+      let* config = Eval.reveal_step config.module_reg payload config in
+      return (Eval config)
+  | Decode _ ->
+      return
+        (Stuck
+           (Wasm_pvm_errors.invalid_state "No reveal expected during decoding"))
+  | Link _ ->
+      return
+        (Stuck (Wasm_pvm_errors.invalid_state "No reveal expected during link"))
+  | Init _ ->
+      return
+        (Stuck
+           (Wasm_pvm_errors.invalid_state
+              "No reveal expected during initialization"))
+  | Snapshot ->
+      return
+        (Stuck
+           (Wasm_pvm_errors.invalid_state
+              "No reveal expected during snapshotting"))
+  | Stuck _ -> return pvm_state.tick_state
+
+let get_output output_info output =
+  let open Lwt_syntax in
+  let open Wasm_pvm_state in
+  let {outbox_level; message_index} = output_info in
+  let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
+  let+ payload = Wasm.Output_buffer.get output outbox_level message_index in
+  Bytes.to_string payload
+
+let get_info ({current_tick; last_input_info; _} as pvm_state) =
+  let open Lwt_syntax in
+  let+ input_request = input_request pvm_state in
+  Wasm_pvm_state.
+    {current_tick; last_input_read = last_input_info; input_request}
 
 module Make (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.S with type tree = T.tree = struct
@@ -495,150 +596,46 @@ module Make (T : Tezos_tree_encoding.TREE) :
       Lwt.return (tree, executed_ticks)
 
     let compute_step_many ~max_steps tree =
-      let open Lwt_syntax in
-      let should_continue pvm_state =
-        let* input_request_val = input_request pvm_state in
-        match input_request_val with
-        | Reveal_required _ | Input_required -> return false
-        | No_input_required -> return true
-      in
-      compute_step_many_until ~max_steps should_continue tree
+      compute_step_many_until ~max_steps should_compute tree
 
     let compute_step tree =
       let open Lwt.Syntax in
       let* initial_state = decode tree in
-      let* final_state = compute_step_inner initial_state in
+      let* final_state = compute_step initial_state in
       encode final_state tree
 
     let get_output output_info tree =
       let open Lwt_syntax in
-      let open Wasm_pvm_state in
-      let {outbox_level; message_index} = output_info in
-      let outbox_level = Bounded.Non_negative_int32.to_value outbox_level in
       let* candidate =
         Tree_encoding_runner.decode
           (Tezos_tree_encoding.option durable_buffers_encoding)
           tree
       in
-      try
-        match candidate with
-        | Some {output; _} ->
-            let+ payload =
-              Wasm.Output_buffer.get output outbox_level message_index
-            in
-            Some (Bytes.to_string payload)
-        | None -> Lwt.return None
-      with _ -> Lwt.return None
+      Lwt.catch
+        (fun () ->
+          match candidate with
+          | Some {output; _} ->
+              let+ result = get_output output_info output in
+              Some result
+          | None -> Lwt.return None)
+        (fun _ -> Lwt.return None)
 
     let get_info tree =
       let open Lwt_syntax in
-      let* ({current_tick; last_input_info; _} as pvm) =
-        Tree_encoding_runner.decode pvm_state_encoding tree
-      in
-      let+ input_request = input_request pvm in
-      Wasm_pvm_state.
-        {current_tick; last_input_read = last_input_info; input_request}
+      let* pvm_state = decode tree in
+      get_info pvm_state
 
     let set_input_step input_info message tree =
       let open Lwt_syntax in
-      let open Wasm_pvm_state in
-      let {inbox_level; message_counter} = input_info in
-      let raw_level = Bounded.Non_negative_int32.to_value inbox_level in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let* tick_state =
-        match pvm_state.tick_state with
-        | Snapshot ->
-            let+ () =
-              Wasm.Input_buffer.(
-                enqueue
-                  pvm_state.buffers.input
-                  {
-                    (* This is to distinguish (0) Inbox inputs from (1)
-                       DAL/Slot_header inputs. *)
-                    rtype = 0l;
-                    raw_level;
-                    message_counter;
-                    payload = String.to_bytes message;
-                  })
-            in
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
-               The goal is to read a complete inbox. *)
-            (* Go back to decoding *)
-            initial_boot_state ()
-        | Decode _ ->
-            Lwt.return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No input required during decoding"))
-        | Link _ ->
-            Lwt.return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state "No input required during link"))
-        | Init _ ->
-            Lwt.return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No input required during initialization"))
-        | Eval _ ->
-            Lwt.return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No input required during evaluation"))
-        | Stuck _ -> Lwt.return pvm_state.tick_state
-      in
-      (* See {{Note tick state clean-up}} *)
-      let* tree = T.remove tree ["wasm"] in
-      (* Increase the current tick counter and mark that no input is required. *)
-      let pvm_state =
-        {
-          pvm_state with
-          tick_state;
-          current_tick = Z.succ pvm_state.current_tick;
-        }
-      in
-      (* Encode the new pvm-state in the tree. *)
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      let* pvm_state = decode tree in
+      let* pvm_state = set_input_step input_info message pvm_state in
+      encode pvm_state tree
 
     let reveal_step payload tree =
       let open Lwt_syntax in
-      let open Tezos_webassembly_interpreter in
-      let* pvm_state = Tree_encoding_runner.decode pvm_state_encoding tree in
-      let* pvm_state =
-        let return tick_state =
-          Lwt.return
-            {
-              pvm_state with
-              current_tick = Z.succ pvm_state.current_tick;
-              tick_state;
-            }
-        in
-        match pvm_state.tick_state with
-        | Eval config ->
-            let* config = Eval.reveal_step config.module_reg payload config in
-            return (Eval config)
-        | Decode _ ->
-            return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No reveal expected during decoding"))
-        | Link _ ->
-            return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No reveal expected during link"))
-        | Init _ ->
-            return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No reveal expected during initialization"))
-        | Snapshot ->
-            return
-              (Stuck
-                 (Wasm_pvm_errors.invalid_state
-                    "No reveal expected during snapshotting"))
-        | Stuck _ -> return pvm_state.tick_state
-      in
-      Tree_encoding_runner.encode pvm_state_encoding pvm_state tree
+      let* pvm_state = decode tree in
+      let* pvm_state = reveal_step payload pvm_state in
+      encode pvm_state tree
 
     module Internal_for_benchmark = struct
       let decode = decode
