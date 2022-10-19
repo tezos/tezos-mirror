@@ -588,6 +588,11 @@ module Dal = struct
       make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
       json |> JSON.encode
 
+    let shards ~slot_header shard_ids =
+      let data = `A (List.map (fun i -> `Float (float_of_int i)) shard_ids) in
+      make ~data POST ["shards"; slot_header] (fun json ->
+          JSON.(json |> as_list |> List.map encode))
+
     let dac_store_preimage preimage =
       let preimage =
         JSON.parse
