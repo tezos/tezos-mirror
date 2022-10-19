@@ -511,7 +511,9 @@ const resume_obs = function (data, t_baker, delegate = "") {
     Object.entries(data).forEach(([k, v]) => {
         if (k in t_baker) {
             var tr_round = document.createElement('tr');
-            tr_round.appendChild(document.createTextNode("Round:" + k));
+            var td_round = document.createElement('td');
+            td_round.appendChild(document.createTextNode("Round: " + k));
+            tr_round.appendChild(td_round);
             tbdy.appendChild(tr_round);
 
             let valid = ["Valids", (v["endorsements"]["valid"]).length];
@@ -734,7 +736,9 @@ const replaceDelegate = function (data) {
 
             Object.entries(resolve).forEach(([k, v]) => {
                 var tr_round = document.createElement('tr');
-                tr_round.appendChild(document.createTextNode("Round:" + k));
+                var td_round = document.createElement('td');
+                td_round.appendChild(document.createTextNode("Round: " + k));
+                tr_round.appendChild(td_round);
                 tbdy.appendChild(tr_round);
 
                 var tr_deleg = document.createElement('tr');
