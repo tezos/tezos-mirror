@@ -43,6 +43,24 @@ To update from sources::
 
 If you are using Docker instead, use the ``v15.0-rc1`` Docker images of Tezos.
 
+Then upgrade your storage by following the instructions in `Context Pruning Requirements`_.
+
+Context Pruning Requirements
+----------------------------
+
+The first pruning operation for nodes that have been running for a
+long time can take a while and use a significant amount of memory. To
+avoid this, it is recommended to import a fresh snapshot before
+running the Octez 15.0 node for the first time. You can refer to
+:ref:`the snapshot documentation <importing_a_snapshot>` to get
+instructions regarding the snapshot import command.
+
+Also, note that data directories that have been created by Octez
+versions 12.4 or earlier do not support context pruning. If you run a
+node on such a data directory you will get a warning. This is another
+reason to import a fresh snapshot before running the Octez 15.0 node
+for the first time, to ensure that the context can be pruned.
+
 Changelog
 ---------
 

@@ -9,6 +9,8 @@ import/export feature: snapshots.  This procedure allows to gather all
 the data necessary to bootstrap a node from a single file within few
 minutes.
 
+.. _importing_a_snapshot:
+
 Importing a snapshot
 --------------------
 
