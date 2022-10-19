@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "14.0"
+    "version": "15.0~rc1"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1205,24 +1205,17 @@
                           ]
                         },
                         {
-                          "title": "kathmandunet",
-                          "type": "string",
-                          "enum": [
-                            "kathmandunet"
-                          ]
-                        },
-                        {
-                          "title": "jakartanet",
-                          "type": "string",
-                          "enum": [
-                            "jakartanet"
-                          ]
-                        },
-                        {
                           "title": "ghostnet",
                           "type": "string",
                           "enum": [
                             "ghostnet"
+                          ]
+                        },
+                        {
+                          "title": "kathmandunet",
+                          "type": "string",
+                          "enum": [
+                            "kathmandunet"
                           ]
                         },
                         {
@@ -1300,6 +1293,30 @@
                       "items": {
                         "$ref": "#/components/schemas/unistring"
                       }
+                    },
+                    "dal": {
+                      "description": "USE FOR TESTING PURPOSE ONLY. Configuration for the data-availibility layer",
+                      "type": "object",
+                      "properties": {
+                        "activated": {
+                          "type": "boolean"
+                        },
+                        "srs_size": {
+                          "nullable": true,
+                          "oneOf": [
+                            {
+                              "title": "Some",
+                              "type": "integer",
+                              "minimum": -1073741824,
+                              "maximum": 1073741823
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "activated",
+                        "srs_size"
+                      ]
                     }
                   }
                 }
@@ -7549,6 +7566,20 @@
                               "enum": [
                                 "release"
                               ]
+                            },
+                            {
+                              "title": "RC_dev",
+                              "type": "object",
+                              "properties": {
+                                "rc_dev": {
+                                  "type": "integer",
+                                  "minimum": -1073741824,
+                                  "maximum": 1073741823
+                                }
+                              },
+                              "required": [
+                                "rc_dev"
+                              ]
                             }
                           ]
                         }
@@ -10109,7 +10140,7 @@
                 "properties": {
                   "additional_cycles": {
                     "title": "additional cycles",
-                    "description": "Number of additional cycles preserved below the savepoint. By default: 5 additional cycles will be stored.",
+                    "description": "Number of additional cycles preserved below the savepoint. By default: 1 additional cycles will be stored.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000
@@ -10134,7 +10165,7 @@
                 "properties": {
                   "additional_cycles": {
                     "title": "additional cycles",
-                    "description": "Number of additional cycles preserved below the savepoint. By default: 5 additional cycles will be stored.",
+                    "description": "Number of additional cycles preserved below the savepoint. By default: 1 additional cycles will be stored.",
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 1000
