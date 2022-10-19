@@ -362,6 +362,7 @@ module Manager = struct
         dest : string;
         parameters : transfer_parameters option;
       }
+    | Origination of {code : JSON.u; storage : JSON.u; balance : int}
     | Dal_publish_slot_header of {
         level : int;
         index : int;
@@ -387,6 +388,9 @@ module Manager = struct
 
   let dal_publish_slot_header ~level ~index ~commitment ~proof =
     Dal_publish_slot_header {level; index; commitment; proof}
+
+  let origination ?(init_balance = 0) ~code ~init_storage () =
+    Origination {code; storage = init_storage; balance = init_balance}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
@@ -421,6 +425,13 @@ module Manager = struct
           ("destination", `String dest);
         ]
         @ parameters
+    | Origination {code; storage; balance} ->
+        let script = `O [("code", code); ("storage", storage)] in
+        [
+          ("kind", `String "origination");
+          ("balance", json_of_tez balance);
+          ("script", script);
+        ]
     | Dal_publish_slot_header {level; index; commitment; proof} ->
         let slot_header =
           `O
@@ -493,7 +504,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Dal_publish_slot_header _ | Delegation _ ->
+    | Reveal _ | Origination _ | Dal_publish_slot_header _ | Delegation _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in

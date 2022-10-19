@@ -265,6 +265,11 @@ module Manager : sig
      mutez. *)
   val transfer : ?dest:Account.key -> ?amount:int -> unit -> payload
 
+  (** [origination ?(init_balance=0) ~code ~init_storage ()]
+     builds an origination operation. *)
+  val origination :
+    ?init_balance:int -> code:JSON.u -> init_storage:JSON.u -> unit -> payload
+
   (** [call ~dest ~amount:0 ~entrypoint ~arg ()] builds a smart contract call
       operation to the [entrypoint] with the provided Michelson argument
       [arg]. Note that the amount is expressed in mutez. *)
