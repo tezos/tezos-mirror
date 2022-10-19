@@ -10,13 +10,13 @@ function onlyUnique(value, index, self) {
     return self.indexOf(value) === index;
 }
 
-function populate_v1(server_adress, beg, end) {
+function populate_v1(server_address, beg, end) {
     let dict_data = {};
-    var range_bloc = range(beg, end);
+    var range_block = range(beg, end);
     return Promise.all(
-        range_bloc.map((height) => {
+        range_block.map((height) => {
             return axios
-                .get(server_adress + height + ".json")
+                .get(server_address + height + ".json")
                 .then(json_data => {
                     dict_data[height] = json_data.data;
                 }, error => { console.log(error) })
@@ -25,8 +25,8 @@ function populate_v1(server_adress, beg, end) {
 }
 
 const populate_v0 = function (server, beg, end, directories, dict_data) {
-    var range_bloc = range(beg, end);
-    range_bloc.forEach((a) => {
+    var range_block = range(beg, end);
+    range_block.forEach((a) => {
         Object.entries(directories).forEach(([k, v]) => {
             if ((+a) <= v[1] && (+a) >= v[0]) {
                 try {
@@ -36,7 +36,7 @@ const populate_v0 = function (server, beg, end, directories, dict_data) {
                             dict_data[a] = json_data.data;
                         })
                 } catch {
-                    console.log("bloc: " + a + " est introuvable");
+                    console.log("block: " + a + " is missing");
                 }
             }
         })
@@ -44,8 +44,8 @@ const populate_v0 = function (server, beg, end, directories, dict_data) {
     return dict_data
 }
 
-function get_info_bloc(dict_data) {
-    let t_delai_bloc = {};
+function get_info_block(dict_data) {
+    let t_delai_block = {};
     let max_round = 0;
     let t_baker = {}
     Object.entries(dict_data).forEach(([va, v]) => {
@@ -53,7 +53,7 @@ function get_info_bloc(dict_data) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
-                if (("reception_time" in element) && ("timestamp" in element)) t_delai_bloc[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
+                if (("reception_time" in element) && ("timestamp" in element)) t_delai_block[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
                 if (round > max_round) {
                     max_round = round
@@ -61,13 +61,13 @@ function get_info_bloc(dict_data) {
             });
         }
     });
-    return [t_delai_bloc, t_baker, max_round]
+    return [t_delai_block, t_baker, max_round]
 }
 function delegate_delays_distribution_of_operations(dict_data, delegate) {
-    let t_valide = []
+    let t_valid = []
     let complete_delays = delays_distribution_of_operations(dict_data)
     let delays_endorsement = complete_delays[1]
-    let delays_pre_endorsement = complete_delays[0]
+    let delays_preendorsement = complete_delays[0]
     Object.entries(dict_data).forEach(([va, v]) => {
         let t_baker = {};
         if ("blocks" in v) {
@@ -85,42 +85,42 @@ function delegate_delays_distribution_of_operations(dict_data, delegate) {
                         if ("round" in operation) round_cib = operation["round"];
                         if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                             let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
-                            if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                let t_op_pre_valide_i = delays_pre_endorsement[va][round_cib]
-                                t_op_pre_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_pre_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_pre_valide_i)).toPrecision(3)
-                                t_valide.push({ "type": "preendo", "bloc": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valide_i).toPrecision(3) })
+                            if (("kind" in operation) && (va in delays_preendorsement) && (round_cib in delays_preendorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                let t_op_pre_valid_i = delays_preendorsement[va][round_cib]
+                                t_op_pre_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_pre_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_pre_valid_i)).toPrecision(3)
+                                t_valid.push({ "type": "preendo", "block": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valid_i).toPrecision(3) })
                             }
                             else if ((va in delays_endorsement) && (round_cib in delays_endorsement[va])) {
-                                let t_op_valide_i = delays_endorsement[va][round_cib]
-                                t_op_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_valide_i)).toPrecision(3)
-                                t_valide.push({ "type": "endo", "bloc": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valide_i).toPrecision(3) })
+                                let t_op_valid_i = delays_endorsement[va][round_cib]
+                                t_op_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_valid_i)).toPrecision(3)
+                                t_valid.push({ "type": "endo", "block": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valid_i).toPrecision(3) })
                             }
                         }
                     })
             }
         })
     });
-    return t_valide
+    return t_valid
 }
 
 function delays_distribution_of_operations(dict_data) {
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                t_op_valide_i[round] = [];
-                t_op_pre_valide_i[round] = []
+                t_op_valid_i[round] = [];
+                t_op_pre_valid_i[round] = []
 
             })
         }
@@ -132,18 +132,18 @@ function delays_distribution_of_operations(dict_data) {
                     if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                         let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
                         if (("kind" in operation)) {
-                            t_op_pre_valide_i[round_cib].push(delay);
+                            t_op_pre_valid_i[round_cib].push(delay);
                         }
                         else {
-                            t_op_valide_i[round_cib].push(delay);
+                            t_op_valid_i[round_cib].push(delay);
                         }
                     }
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
-    return [t_op_pre_valide, t_op_valide]
+    return [t_op_pre_valid, t_op_valid]
 }
 
 function classify_operations(dict_data, delegate = "") {
@@ -156,7 +156,7 @@ function classify_operations(dict_data, delegate = "") {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                if (!(round in operations_logs)) operations_logs[round] = { "approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] }, "pre_approbations": { "valide": [], "manque": [], "oublie": [], "sequestre": [], "invalide": [], "inconnu": [] } }
+                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "unknown": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "unknown": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
@@ -164,58 +164,58 @@ function classify_operations(dict_data, delegate = "") {
                         baker_ops["operations"].forEach((operation) => {
                             let round_cib = 0;
                             if ("round" in operation) round_cib = operation["round"];
-                            //Valide
+                            //Valid
                             if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                                 let delay = new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds();
                                 if (("kind" in operation)) {
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["pre_approbations"]["valide"].push(baker_ops["delegate"]);
+                                    if (delegate == "") { // To look at operation of a specific delegate
+                                        operations_logs[round_cib]["preendorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["pre_approbations"]["valide"].push(height);
+                                        operations_logs[round_cib]["preendorsements"]["valid"].push(height);
                                     }
                                 }
                                 else {
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["approbations"]["valide"].push(baker_ops["delegate"]);
+                                    if (delegate == "") { // To look at operation of a specific delegate
+                                        operations_logs[round_cib]["endorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["approbations"]["valide"].push(height);
+                                        operations_logs[round_cib]["endorsements"]["valid"].push(height);
                                     }
                                 }
                             }
                             //If the Operation is valid, the reception time does not exist or is null, but the operation is still included in the chain => preendo/endo ESCROW
                             if ((round_cib in t_baker) && (!("errors" in operation)) && ((!("reception_time" in operation)) || (operation["reception_time"] == null))) {
                                 if (("kind" in operation)) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["pre_approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                    if (delegate == "") { // To look at operation of a specific delegate
+                                        operations_logs[round_cib]["preendorsements"]["sequestered"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["pre_approbations"]["sequestre"].push(height);
+                                        operations_logs[round_cib]["preendorsements"]["sequestered"].push(height);
                                     }
                                 }
                                 else if ("included_in_blocks" in operation) {
-                                    if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["approbations"]["sequestre"].push(baker_ops["delegate"]);
+                                    if (delegate == "") { // To look at operation of a specific delegate
+                                        operations_logs[round_cib]["endorsements"]["sequestered"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["approbations"]["sequestre"].push(height);
+                                        operations_logs[round_cib]["endorsements"]["sequestered"].push(height);
                                     }
                                 }
                             }
                             //If the OP is valid, reception time has a value, but the operation is not included in the block => endo forgotten
                             if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) && (!("included_in_blocks" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
-                                if (delegate == "") { // To look at operation of a specific delegate 
-                                    operations_logs[round_cib]["approbations"]["oublie"].push(baker_ops["delegate"]);
+                                if (delegate == "") { // To look at operation of a specific delegate
+                                    operations_logs[round_cib]["endorsements"]["lost"].push(baker_ops["delegate"]);
                                 } else if (baker_ops["delegate"] == delegate) {
-                                    operations_logs[round_cib]["approbations"]["oublie"].push(height);
+                                    operations_logs[round_cib]["endorsements"]["lost"].push(height);
                                 }
                             }
                             // // How do we deal with invalids ope?? If error other than: op received before candidate block
                         });
                     }
-                    else { // 0 operations => // => bloc missed by delegate
+                    else { // 0 operations => // => block missed by delegate
                         console.log(operations_logs)
-                        if (delegate == "") { // To look at operation of a specific delegate 
-                            operations_logs[0]["approbations"]["manque"].push(baker_ops["delegate"])
+                        if (delegate == "") { // To look at operation of a specific delegate
+                            operations_logs[0]["endorsements"]["missed"].push(baker_ops["delegate"])
                         } else if (baker_ops["delegate"] == delegate) {
-                            operations_logs[0]["approbations"]["manque"].push(height)
+                            operations_logs[0]["endorsements"]["missed"].push(height)
                         }
                     }
 
@@ -227,27 +227,27 @@ function classify_operations(dict_data, delegate = "") {
 }
 
 
-const percIntegration = function (threshold, t_op_pre_valide) {
-    console.log(t_op_pre_valide[2412550])
+const percIntegration = function (threshold, t_op_pre_valid) {
+    console.log(t_op_pre_valid[2412550])
     let t_cible = threshold;
     var pI_level = {};
     var d3_pI_level = [];
-    Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
-        pI_level[bloc] = {};
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
+        pI_level[block] = {};
         try {
-            console.log(typeof (v_bloc))
-            Object.entries(v_bloc).forEach(([level, v_level]) => {
-                //for (let [level, v_level] of Object.entries(v_bloc)) {
-                var card_valide_tcible = 0;
+            console.log(typeof (v_block))
+            Object.entries(v_block).forEach(([level, v_level]) => {
+                //for (let [level, v_level] of Object.entries(v_block)) {
+                var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(element => {
                     if (element <= t_cible) {
-                        card_valide_tcible += 1;
+                        card_valid_tcible += 1;
                     }
                 });
 
-                if (isNaN(card_valide_tcible / v_level.length) == false) {
-                    pI_level[bloc][level] = (card_valide_tcible / (v_level.length))
-                    d3_pI_level.push({ bloc: bloc, level: level, pI: (card_valide_tcible / v_level.length) })
+                if (isNaN(card_valid_tcible / v_level.length) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (v_level.length))
+                    d3_pI_level.push({ block: block, level: level, pI: (card_valid_tcible / v_level.length) })
                 }
             });
         } catch (e) { console.log(e) }
@@ -256,56 +256,56 @@ const percIntegration = function (threshold, t_op_pre_valide) {
     return d3_pI_level
 }
 
-const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
+const TimeForPercIntegration = function (threshold, t_op_pre_valid) {
     let l_ = threshold / 100;
     const qd_ = 25; // number of slots for this block, before including endorsing power
     var t_min_ = {};
     var d3_t_min_ = [];
-    Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         try {
-            var last_round_ = Object.keys(v_bloc).map(Number);
+            var last_round_ = Object.keys(v_block).map(Number);
             console.log(last_round_);
             if (last_round_.length != 1) {
                 last_round_.sort(function (a, b) {
                     return a - b
                 });
             }
-            var block_fin = v_bloc[last_round_[last_round_.length - 1]]; // This graph is based on the valid rounds, i.e. the last round of each block
+            var block_fin = v_block[last_round_[last_round_.length - 1]]; // This graph is based on the valid rounds, i.e. the last round of each block
             console.log(block_fin);
             block_fin.sort(function (a, b) {
                 return a - b;
             });// sort the receipt delay vector, in ascending order
-            seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date on which we have the minimum number of pre endo for the round to be valid 
-            t_min_[bloc] = seuil_validation;
+            seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date on which we have the minimum number of pre endo for the round to be valid
+            t_min_[block] = seuil_validation;
             if (isNaN(seuil_validation) == false) {
-                d3_t_min_.push({ bloc: (+bloc), t: (+seuil_validation) });
+                d3_t_min_.push({ block: (+block), t: (+seuil_validation) });
             }
         }
         catch (e) {
-            console.log(bloc, ": ", e)
+            console.log(block, ": ", e)
         }
     });
     return d3_t_min_
 
 }
 
-const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure endorsing power 
+const SeriesPercIntegration = function (t_cibles, t_op_pre_valid) {//Inclure endorsing power
     var t_pI = [];
     t_cibles.forEach((t_cible) => {
         var pI_level = {}; // For each threshold time, a dictionary keeps the amount of pre-endo received, x block and y round
-        var l_rounds = []; // 
-        Object.entries(t_op_pre_valide).forEach(([bloc, v_bloc]) => {
-            pI_level[bloc] = {};
-            Object.entries(v_bloc).forEach(([level, v_level]) => {
+        var l_rounds = []; //
+        Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
+            pI_level[block] = {};
+            Object.entries(v_block).forEach(([level, v_level]) => {
                 l_rounds.push(level);
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 for (const element of v_level) {
                     if (element <= t_cible) {
-                        card_valide_tcible += 1;
+                        card_valid_tcible += 1;
                     }
                 }
-                if (isNaN(card_valide_tcible / v_level.length) == false) {
-                    pI_level[bloc][level] = (card_valide_tcible / (v_level.length))
+                if (isNaN(card_valid_tcible / v_level.length) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (v_level.length))
                 }
             })
         });
@@ -327,13 +327,13 @@ const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure en
 
 
 
-function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
+function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
     if (!(isEmpty(data)) && (!([[undefined, undefined]].includesArray(data)))) {
         var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
             width = 1000, // outer width of chart, in pixels
-            height = 400; // outer height of chart, in pixels 
-        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du niveau dernièrement observé 
-            console.log(niveau + " supprimer si round 0 !!!");
+            height = 400; // outer height of chart, in pixels
+        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du level dernièrement observé
+            console.log(level + " supprimer si round 0 !!!");
             const e = document.querySelector("p");
             while (e.firstChild) {
                 e.removeChild(e.lastChild);
@@ -372,10 +372,10 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
         }
 
         bins2 = d3.bin().thresholds(maxValue - minValue)(data[1]);
-        bins3 = d3.bin().thresholds(maxValue - minValue)([delai_recep_bloc_]);
+        bins3 = d3.bin().thresholds(maxValue - minValue)([recep_block_time]);
         console.log(bins3);
 
-        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([delai_recep_bloc_])); // aide à définir x: Mauavise idéé 
+        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([recep_block_time])); // aide à définir x: Mauvaise idée
 
         x = d3.scaleLinear()
             .domain([0, bins_tot[bins_tot.length - 1].x1])
@@ -421,7 +421,7 @@ function chart_delays_for_a_block(dom, data, niveau, round, delai_recep_bloc_) {
             .attr("text-anchor", "middle")
             .style("font-size", "15px")
             .style("text-decoration", "underline")
-            .text("Histogram of block # " + niveau + " reception delays, for round = " + round);
+            .text("Histogram of reception times for block " + level + "at round " + round);
 
         svg.append("text")
             .attr("x", -margin.left + 40)
@@ -457,7 +457,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
             Object.entries(v1).forEach(([k2, v2]) => {
                 var new_v2 = [];
                 for (const element of v2) {
-                    var adress_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
+                    var address_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
                     new_v2.push(element + " ");
                 }
                 data[level][k1][k2] = new_v2;
@@ -466,8 +466,8 @@ const resume_obs = function (data, t_baker, delegate = "") {
         })
     });
     var body = document.getElementById("resume");
-    var titre_ = document.createElement('h2');
-    titre_.appendChild(document.createTextNode("summary of operations received"));
+    var title_ = document.createElement('h2');
+    title_.appendChild(document.createTextNode("Summary of operations received"));
     try {
         while (document.getElementById("resume").querySelector("h2")) {
             const elements2 = document.getElementById("resume").querySelector("h2")
@@ -484,78 +484,77 @@ const resume_obs = function (data, t_baker, delegate = "") {
     tbl.setAttribute('border', '1');
     var tbdy = document.createElement('tbody');
 
-    let manque = ["missed", (data["0"]["approbations"]["manque"]).length, data["0"]["approbations"]["manque"]];// à revoir : le fait que j'introduit "1" n'est pas bon 
-    let entete;
+    let missed = ["Missed", (data["0"]["endorsements"]["missed"]).length, data["0"]["endorsements"]["missed"]];// à revoir : le fait que j'introduit "1" n'est pas bon
+    let header;
     if (delegate == "") {
-        entete = ["Type", "Proportion", "Addresses of corresponding delegates"];
+        header = ["Type", "Proportion", "Addresses of corresponding delegates"];
     } else {
-        entete = ["Type", "Proportion", "Corresponding blocs"];
-
+        header = ["Type", "Proportion", "Corresponding blocks"];
     }
 
-    var tr_manque = document.createElement('tr');
-    var tr_entete = document.createElement('tr');
+    var tr_missed = document.createElement('tr');
+    var tr_header = document.createElement('tr');
 
-    entete.forEach((element) => {
+    header.forEach((element) => {
         var th = document.createElement('th');
         th.appendChild(document.createTextNode(element));
-        tr_entete.appendChild(th);
+        tr_header.appendChild(th);
     })
-    tbdy.appendChild(tr_entete);
+    tbdy.appendChild(tr_header);
 
-    manque.forEach((element) => {
+    missed.forEach((element) => {
         var td = document.createElement('td');
         td.appendChild(document.createTextNode(element));
-        tr_manque.appendChild(td);
+        tr_missed.appendChild(td);
     })
-    tbdy.appendChild(tr_manque);
+    tbdy.appendChild(tr_missed);
 
     Object.entries(data).forEach(([k, v]) => {
         if (k in t_baker) {
             var tr_round = document.createElement('tr');
-            tr_round.appendChild(document.createTextNode("round:" + k));
+            tr_round.appendChild(document.createTextNode("Round:" + k));
             tbdy.appendChild(tr_round);
 
-            let valide = ["valids", (v["approbations"]["valide"]).length];
-            var tr_valide = document.createElement('tr');
-            valide.forEach((element) => {
+            let valid = ["Valids", (v["endorsements"]["valid"]).length];
+            var tr_valid = document.createElement('tr');
+            valid.forEach((element) => {
                 var td = document.createElement('td');
 
                 td.appendChild(document.createTextNode(element));
-                tr_valide.appendChild(td);
+                tr_valid.appendChild(td);
             })
-            tbdy.appendChild(tr_valide);
+            tbdy.appendChild(tr_valid);
 
-            let oublie = ["forgotten", (v["approbations"]["oublie"]).length, v["approbations"]["oublie"]];
-            var tr_oublie = document.createElement('tr');
-            oublie.forEach((element) => {
+            let lost = ["Losts", (v["endorsements"]["lost"]).length, v["endorsements"]["lost"]];
+            var tr_lost = document.createElement('tr');
+            lost.forEach((element) => {
                 var td = document.createElement('td');
                 td.appendChild(document.createTextNode(element));
-                tr_oublie.appendChild(td);
+                tr_lost.appendChild(td);
             })
-            tbdy.appendChild(tr_oublie);
+            tbdy.appendChild(tr_lost);
 
-            let invalide = ["invalids", (v["approbations"]["invalide"]).length, v["approbations"]["invalide"]];
-            var tr_invalide = document.createElement('tr');
-            invalide.forEach((element) => {
+            let invalid = ["Invalids", (v["endorsements"]["invalid"]).length, v["endorsements"]["invalid"]];
+            var tr_invalid = document.createElement('tr');
+            invalid.forEach((element) => {
                 var td = document.createElement('td');
                 td.appendChild(document.createTextNode(element));
-                tr_invalide.appendChild(td);
+                tr_invalid.appendChild(td);
             })
-            tbdy.appendChild(tr_invalide);
+            tbdy.appendChild(tr_invalid);
 
-            let inconnu = ["Unknown", (v["approbations"]["inconnu"]).length, v["approbations"]["inconnu"]];
-            var tr_inconnu = document.createElement('tr');
-            inconnu.forEach((element) => {
+            let unknown = ["Unknown", (v["endorsements"]["unknown"]).length, v["endorsements"]["unknown"]];
+            var tr_unknown = document.createElement('tr');
+            unknown.forEach((element) => {
                 var td = document.createElement('td');
                 td.appendChild(document.createTextNode(element));
-                tr_inconnu.appendChild(td);
+                tr_unknown.appendChild(td);
             })
         }
     });
 
     tbl.appendChild(tbdy);
-    body.appendChild(titre_);
+    body.appendChild(title_);
     body.appendChild(tbl);
 
 }
@@ -564,7 +563,7 @@ function chart_preendorsement_inclusion_based_on_multiple_threshold_time(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),
             width = 850 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("gamma").querySelector("svg")) {
@@ -675,22 +674,22 @@ const replaceDelegate = function (data) {
             console.log(data);
 
             for (let i = 1; i < lgth; i++) {
-                replaceDelegate_[i] = { "entrants": [], "sortants": [] };
+                replaceDelegate_[i] = { "incoming": [], "outgoing": [] };
                 console.log(replaceDelegate_);
             }
 
             for (let i = 1; i < lgth; i++) {
                 console.log(data[i]);
-                let delegate_next = data[i]["pre_approbations"]["valide"];
-                let delegate_prec = data[i - 1]["pre_approbations"]["valide"];
+                let delegate_next = data[i]["preendorsements"]["valid"];
+                let delegate_prec = data[i - 1]["preendorsements"]["valid"];
                 for (let x of delegate_prec) {
                     if (delegate_next.includes(x) == false) {
-                        replaceDelegate_[i]["sortants"].push(x);
+                        replaceDelegate_[i]["outgoing"].push(x);
                     }
                 }
                 for (let x of delegate_next) {
                     if (delegate_prec.includes(x) == false) {
-                        replaceDelegate_[i]["entrants"].push(x);
+                        replaceDelegate_[i]["incoming"].push(x);
                     }
                 }
             }
@@ -715,32 +714,32 @@ const replaceDelegate = function (data) {
                 //console.log(e)
             }
 
-            var titre_2 = document.createElement('h2');
-            titre_2.appendChild(document.createTextNode("summary of incoming/outgoing delegates in each round"));
-            body.appendChild(titre_2);
+            var title_2 = document.createElement('h2');
+            title_2.appendChild(document.createTextNode("Summary of incoming/outgoing delegates in each round"));
+            body.appendChild(title_2);
 
             var tbl = document.createElement('table');
             tbl.style.width = '100%';
             tbl.setAttribute('border', '1');
             var tbdy = document.createElement('tbody');
 
-            var tr_entete = document.createElement('tr');
-            let entete = ["# of incoming delegates", "adresses of incoming delegates", "# of outgoing delegates", "adresses of outgoing delegates"];
+            var tr_header = document.createElement('tr');
+            let header = ["Number of incoming delegates", "Addresses of incoming delegates", "Number of outgoing delegates", "Addresses of outgoing delegates"];
 
-            entete.forEach((element) => {
+            header.forEach((element) => {
                 var th = document.createElement('th');
                 th.appendChild(document.createTextNode(element));
-                tr_entete.appendChild(th);
+                tr_header.appendChild(th);
             })
-            tbdy.appendChild(tr_entete);
+            tbdy.appendChild(tr_header);
 
             Object.entries(resolve).forEach(([k, v]) => {
                 var tr_round = document.createElement('tr');
-                tr_round.appendChild(document.createTextNode("round:" + k));
+                tr_round.appendChild(document.createTextNode("Round:" + k));
                 tbdy.appendChild(tr_round);
 
                 var tr_deleg = document.createElement('tr');
-                let deleg_ = [v["entrants"].length, v["entrants"], v["sortants"].length, v["sortants"]];
+                let deleg_ = [v["incoming"].length, v["incoming"], v["outgoing"].length, v["outgoing"]];
                 deleg_.forEach((element) => {
                     var td = document.createElement('td');
                     td.appendChild(document.createTextNode(element));
@@ -759,7 +758,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
             width = 560 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("alpha").querySelector("svg")) {
@@ -776,7 +775,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
                     "translate(" + margin.left + "," + margin.top + ")");
 
             var x = d3.scaleLinear()
-                .domain(d3.extent(data, function (d) { return d.bloc; }))
+                .domain(d3.extent(data, function (d) { return d.block; }))
                 .range([0, width]);
             svg.append("g")
                 .attr("transform", "translate(0," + (height + 5) + ")")
@@ -806,7 +805,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
                 .append("circle")
                 .attr("fill", d => colors(d.level))
                 .attr("stroke", "none")
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(100 * d.pI) })
                 .attr("r", 2);
 
@@ -822,7 +821,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # bloc →");
+                .text(" # block →");
 
             svg.append("text")
                 .attr("x", width + margin.right)
@@ -845,7 +844,7 @@ function chart_time_required(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
             width = 800 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("beta").querySelector("svg")) {
@@ -862,7 +861,7 @@ function chart_time_required(data) {
                     "translate(" + margin.left + "," + margin.top + ")");
 
             var x = d3.scaleLinear()
-                .domain(d3.extent(data, function (d) { return d.bloc; }))
+                .domain(d3.extent(data, function (d) { return d.block; }))
                 .range([0, width]);
             svg.append("g")
                 .attr("transform", "translate(0," + (height + 5) + ")")
@@ -883,7 +882,7 @@ function chart_time_required(data) {
                 .attr("stroke", "#69b3a2")
                 .attr("stroke-width", 2)
                 .attr("d", d3.line()
-                    .x(function (d) { return x(d.bloc) })
+                    .x(function (d) { return x(d.block) })
                     .y(function (d) { return y(d.t) })
                 )
 
@@ -894,7 +893,7 @@ function chart_time_required(data) {
                 .append("circle")
                 .attr("fill", "#3288BD")
                 .attr("stroke", "none")
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(d.t) })
                 .attr("r", 2);
 
@@ -910,7 +909,7 @@ function chart_time_required(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # bloc →");
+                .text(" # block →");
 
         } catch (e) { console.log(e) }
     } else {
@@ -923,7 +922,7 @@ function chart_consensus_operation_specific_address(data) {
         //console.log(data)
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("dataviz").querySelector("svg")) {
@@ -941,7 +940,7 @@ function chart_consensus_operation_specific_address(data) {
                 .attr("transform",
                     "translate(" + margin.left + "," + margin.top + ")");
 
-            var myX = d3.map(data, d => d.bloc)
+            var myX = d3.map(data, d => d.block)
             var myY = d3.map(data, d => d.timestamp_delay)
             //console.log("my", myX, myY);
 
@@ -950,7 +949,7 @@ function chart_consensus_operation_specific_address(data) {
 
             // Add X axis --> it is a date format
             var x = d3.scaleLinear()
-                .domain(d3.extent(data, d => d.bloc))
+                .domain(d3.extent(data, d => d.block))
                 .range([0, width]);
             svgg.append("g")
                 .attr("transform", "translate(0," + height + ")")
@@ -984,13 +983,13 @@ function chart_consensus_operation_specific_address(data) {
 
             svgg.append('g')
                 .selectAll("dot")
-                .data(data, function (d) { return d.bloc + ':' + d.timestamp_delay; })
+                .data(data, function (d) { return d.block + ':' + d.timestamp_delay; })
                 .enter()
                 .append("circle")
                 .attr("fill", "#000000")
                 .attr("stroke", "none")
                 .attr('stroke-width', 1.5)
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(d.timestamp_delay) })
                 .attr("r", 3)
                 .style("fill", function (d) { return color(d.cat) })
@@ -1003,7 +1002,7 @@ function chart_consensus_operation_specific_address(data) {
                         .attr("id", "tooltip")
                         .attr("x", xPosition)
                         .attr("y", yPosition)
-                        .text("Bloc: " + d.bloc)
+                        .text("Block: " + d.block)
 
                 })
                 .on("mouseout", function () {
@@ -1025,7 +1024,7 @@ function chart_consensus_operation_specific_address(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # Bloc →");
+                .text(" # Block →");
 
             svgg.append("text")
                 .attr("x", width + 40)
@@ -1037,7 +1036,7 @@ function chart_consensus_operation_specific_address(data) {
         } catch (e) { console.log(e) }
     }
     else {
-        alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc \n No Graph. \nIt can be due to:\n - not producing any valid operations")
+        alert("No result.\nIt can be due to:\n - No slot for this address during this period\n -Invalid address or range of block\n No Graph.\nIt can be due to:\n - not producing any valid operations")
         try {
             while (document.getElementById("dataviz").querySelector("svg")) {
                 const elements3 = document.getElementById("dataviz").querySelector("svg");
@@ -1054,7 +1053,7 @@ function chart_time_mean_deviation(data) {
         //console.log(data)
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("ecart_moyenne").querySelector("svg")) {
@@ -1072,7 +1071,7 @@ function chart_time_mean_deviation(data) {
                 .attr("transform",
                     "translate(" + margin.left + "," + margin.top + ")");
 
-            var myX = d3.map(data, d => d.bloc)
+            var myX = d3.map(data, d => d.block)
             var myY = d3.map(data, d => d.deviation_from_the_mean)
             //console.log("my", myX, myY);
 
@@ -1081,7 +1080,7 @@ function chart_time_mean_deviation(data) {
 
             // Add X axis --> it is a date format
             var x = d3.scaleLinear()
-                .domain(d3.extent(data, d => d.bloc))
+                .domain(d3.extent(data, d => d.block))
                 .range([0, width]);
             svgg.append("g")
                 .attr("transform", "translate(0," + height/2 + ")")
@@ -1123,13 +1122,13 @@ function chart_time_mean_deviation(data) {
 
             svgg.append('g')
                 .selectAll("dot")
-                .data(data, function (d) { return d.bloc + ':' + d.deviation_from_the_mean; })
+                .data(data, function (d) { return d.block + ':' + d.deviation_from_the_mean; })
                 .enter()
                 .append("circle")
                 .attr("fill", "#000000")
                 .attr("stroke", "none")
                 .attr('stroke-width', 1.5)
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(d.deviation_from_the_mean) })
                 .attr("r", 3)
                 .style("fill", function (d) { return color(d.cat) })
@@ -1142,7 +1141,7 @@ function chart_time_mean_deviation(data) {
                         .attr("id", "tooltip")
                         .attr("x", xPosition)
                         .attr("y", yPosition)
-                        .text("Bloc: " + d.bloc)
+                        .text("Block: " + d.block)
 
                 })
                 .on("mouseout", function () {
@@ -1157,14 +1156,14 @@ function chart_time_mean_deviation(data) {
                 .attr("y", -5)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "start")
-                .text("↑ deviation from the mean of all operation reception times for this block (seconds)");
+                .text("↑ Deviation from the mean of all operation reception times for this block (seconds)");
 
             svgg.append("text")
                 .attr("x", width + margin.right - 120)
                 .attr("y", height/2)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # Bloc →");
+                .text(" # Block →");
 
             svgg.append("text")
                 .attr("x", width + 40)
@@ -1176,7 +1175,7 @@ function chart_time_mean_deviation(data) {
         } catch (e) { console.log(e) }
     }
     else {
-        alert("No result. \nIt can be due to:\n - No slot for this address during this period \n -Invalid address or range of bloc \n No Graph. \nIt can be due to:\n - not producing any valid operations")
+        alert("No result.\nIt can be due to:\n - No slot for this address during this period\n -Invalid address or range of block\n No Graph.\nIt can be due to:\n - not producing any valid operations")
         try {
             while (document.getElementById("ecart_moyenne").querySelector("svg")) {
                 const elements3 = document.getElementById("ecart_moyenne").querySelector("svg");
@@ -1197,4 +1196,3 @@ Array.prototype.includesArray = function (arr) {
 }
 
 const average = arr => arr.reduce((p, c) => p + c, 0) / arr.length;
-
