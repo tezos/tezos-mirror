@@ -98,6 +98,8 @@ Node
 - Add third user-activated upgrade to the ``--network ghostnet`` built-in
   network alias (at level 1191936 for Kathmandu).
 
+- Added the built-in network alias for Limanet (``--network limanet``).
+
 Client
 ------
 
