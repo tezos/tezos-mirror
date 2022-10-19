@@ -31,6 +31,8 @@ Node
 - Improved the response time of RPCs computing the (baking/endorsing)
   rights of delegates
 
+- Added the built-in network alias for Limanet (``--network limanet``).
+
 Client
 ------
 
