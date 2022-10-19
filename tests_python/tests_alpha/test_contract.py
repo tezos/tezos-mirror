@@ -1873,25 +1873,6 @@ class TestScriptHashRegression:
 
 
 @pytest.mark.contract
-class TestScriptHashOrigination:
-    def test_contract_hash_with_origination(
-        self, client: Client, session: dict
-    ):
-        script = ID_SCRIPT_LITERAL
-        originate(
-            client,
-            session,
-            contract=script,
-            init_storage='Unit',
-            amount=1000,
-            contract_name='dummy_contract',
-        )
-        [(hash1, _)] = client.hash_script([script])
-        hash2 = client.get_script_hash('dummy_contract')
-        assert hash1 == hash2
-
-
-@pytest.mark.contract
 class TestScriptHashMultiple:
     """Test octez-client hash script with diffent number and type of
     arguments"""
