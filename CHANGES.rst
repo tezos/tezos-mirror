@@ -28,6 +28,9 @@ Node
 - Fixed the restoration of protocols table when restoring from a
   inconsistent data directory.
 
+- Improved the response time of RPCs computing the (baking/endorsing)
+  rights of delegates
+
 Client
 ------
 

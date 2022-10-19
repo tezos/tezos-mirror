@@ -25,7 +25,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-open Misc
 
 type error +=
   | (* `Permanent *)
@@ -68,15 +67,6 @@ let bonus_baking_reward ctxt ~endorsing_power =
     (Insufficient_endorsing_power {endorsing_power; consensus_threshold})
   >>? fun () ->
   Tez.(baking_reward_bonus_per_slot *? Int64.of_int extra_endorsing_power)
-
-let baking_rights c level =
-  let rec f c round =
-    Stake_distribution.baking_rights_owner c level ~round
-    >>=? fun (c, _slot, consensus_pk) ->
-    return
-      (LCons (Consensus_key.pkh consensus_pk, fun () -> f c (Round.succ round)))
-  in
-  f c Round.zero
 
 type ordered_slots = {
   delegate : Signature.public_key_hash;

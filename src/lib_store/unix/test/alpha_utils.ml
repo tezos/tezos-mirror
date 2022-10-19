@@ -207,7 +207,10 @@ let get_next_baker_by_round rpc_ctxt round block =
     Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~max_round:(round + 1) block
   in
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; _} =
-    List.find (fun {Plugin.RPC.Baking_rights.round = p; _} -> p = round) bakers
+    List.find
+      (fun {Plugin.RPC.Baking_rights.round = p; _} ->
+        Round.to_int32 p = Int32.of_int round)
+      bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
@@ -220,6 +223,7 @@ let get_next_baker_by_account rpc_ctxt pkh block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; timestamp; round; _} =
     List.hd bakers |> WithExceptions.Option.get ~loc:__LOC__
   in
+  let*? round = Round.to_int round |> Environment.wrap_tzresult in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let get_next_baker_excluding rpc_ctxt excludes block =
@@ -232,6 +236,7 @@ let get_next_baker_excluding rpc_ctxt excludes block =
       bakers
     |> WithExceptions.Option.get ~loc:__LOC__
   in
+  let*? round = Round.to_int round |> Environment.wrap_tzresult in
   return (pkh, round, WithExceptions.Option.get ~loc:__LOC__ timestamp)
 
 let dispatch_policy rpc_ctxt = function
