@@ -86,6 +86,7 @@ module Internal_state = struct
         module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
       }
     | Stuck of Wasm_pvm_errors.t
+    | Padding
     | Snapshot
 
   type pvm_state = {

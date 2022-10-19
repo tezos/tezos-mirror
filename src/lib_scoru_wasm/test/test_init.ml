@@ -56,12 +56,9 @@ let test_memory0_export () =
       |}
   in
   let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
-  let+ stuck, _ = eval_until_stuck good_module_tree in
-  assert (
-    check_error
-      ~expected_kind:`Eval
-      ~expected_reason:"unreachable executed"
-      stuck)
+  let*! tree = eval_until_input_requested good_module_tree in
+  let*! stuck_flag = has_stuck_flag tree in
+  return (assert stuck_flag)
 
 let test_module_name_size () =
   let open Lwt_result_syntax in
@@ -97,12 +94,9 @@ let test_module_name_size () =
       stuck) ;
   let*! good_module_tree = initial_tree (build_module 512) in
   let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
-  let+ stuck, _ = eval_until_stuck good_module_tree in
-  assert (
-    check_error
-      ~expected_kind:`Eval
-      ~expected_reason:"unreachable executed"
-      stuck)
+  let*! tree = eval_until_input_requested good_module_tree in
+  let*! stuck_flag = has_stuck_flag tree in
+  return (assert stuck_flag)
 
 let test_imports () =
   let open Lwt_result_syntax in
@@ -163,12 +157,9 @@ let test_imports () =
     initial_tree (build_module good_module_name good_item_name)
   in
   let*! good_module_tree = set_input_step "dummy_input" 0 good_module_tree in
-  let+ stuck, _ = eval_until_stuck good_module_tree in
-  assert (
-    check_error
-      ~expected_kind:`Eval
-      ~expected_reason:"unreachable executed"
-      stuck)
+  let*! tree = eval_until_input_requested good_module_tree in
+  let*! stuck_flag = has_stuck_flag tree in
+  return (assert stuck_flag)
 
 let test_host_func_start_restriction () =
   let open Lwt_result_syntax in

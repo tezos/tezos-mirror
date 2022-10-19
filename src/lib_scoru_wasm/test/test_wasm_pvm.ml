@@ -48,37 +48,25 @@ let should_boot_unreachable_kernel ~max_steps kernel =
   (* running until waiting for input *)
   let* tree = eval_until_input_requested ~max_steps tree in
   let* info_after_first_message = Wasm.get_info tree in
-  let* state_after_first_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The kernel is expected to fail, then ths PVM should be in stuck state, and
+  (* The kernel is expected to fail, then ths PVM should
      have failed during the evaluation when evaluating a `Unreachable`
      instruction. *)
-  assert (
-    is_stuck
-      ~step:`Eval
-      ~reason:"unreachable executed"
-      state_after_first_message) ;
-
+  let* stuck_flag = has_stuck_flag tree in
+  assert stuck_flag ;
   (* Feeding it with one input *)
   let* tree = set_input_step "test" 1 tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
   let* info_after_second_message = Wasm.get_info tree in
-  let* state_after_second_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The PVM should still be in `Stuck` state, but can still receive inputs and
-     go forward, hence the tick after the second message should be greater. *)
+  (* The PVM should still have the `stuck` tag on, but can still receive inputs
+     and go forward, hence the tick after the second message should be greater.
+  *)
   assert (
     Z.lt
       info_after_first_message.current_tick
       info_after_second_message.current_tick) ;
-  assert (
-    is_stuck
-      ~step:`Eval
-      ~reason:"unreachable executed"
-      state_after_second_message) ;
+  let* stuck_flag = has_stuck_flag tree in
+  assert stuck_flag ;
   return_ok_unit
 
 let should_run_debug_kernel () =
@@ -114,11 +102,9 @@ let should_run_debug_kernel () =
   let* tree = set_input_step "test" 0 tree in
   (* running until waiting for input *)
   let* tree = eval_until_input_requested tree in
-  let* state_after_first_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
+  let* stuck_flag = has_stuck_flag tree in
   (* The kernel should not fail. *)
-  assert (not @@ is_stuck state_after_first_message) ;
+  assert (not stuck_flag) ;
   return_ok_unit
 
 let add_value ?(content = "a very long value") tree key_steps =
@@ -190,19 +176,17 @@ let should_run_store_has_kernel () =
   (* Make the first ticks of the WASM PVM (parsing of origination message), to
      switch it to “Input_requested” mode. *)
   let* tree = eval_until_input_requested tree in
-  let* state_before_first_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
-  assert (not @@ is_stuck state_before_first_message) ;
+  (* The kernel is not expected to fail, the PVM should not have stuck state on.
+      *)
+  let* stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
   (* We first evaluate the kernel normally, and it shouldn't fail. *)
   let* tree = set_input_step "test" 0 tree in
   let* tree = eval_until_input_requested tree in
-  let* state_after_first_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
-  assert (not @@ is_stuck state_after_first_message) ;
+  (* The kernel is not expected to fail, the PVM should not have stuck state on.
+      *)
+  let* stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
   let* tree = set_input_step "test" 1 tree in
   (* We now delete the path ["hello"; "universe"] - this will cause gthe kernel
      assertion on this path to fail, and the PVM should become stuck on the
@@ -211,16 +195,14 @@ let should_run_store_has_kernel () =
     Test_encodings_util.Tree.remove tree ["durable"; "hello"; "universe"; "_"]
   in
   let* tree = eval_until_input_requested tree in
-  let* state_after_second_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The kernel is now expected to fail, the PVM should be in stuck state. *)
-  assert (is_stuck state_after_second_message) ;
+  (* The kernel is now expected to fail, the PVM should have stuck tag on. *)
+  let* stuck_flag = has_stuck_flag tree in
+  assert stuck_flag ;
   return_ok_unit
 
 (* The `should_run_store_list_size_kernel` asserts
    whether the tree has three subtrees. Note that the `_` subtree is included
-   and so, after adding the `four` subtree the state will become stuck.*)
+   and so, after adding the `four` subtree the state will receive the stuck tag.*)
 let should_run_store_list_size_kernel () =
   let open Lwt_syntax in
   let module_ =
@@ -270,11 +252,9 @@ let should_run_store_list_size_kernel () =
   let* tree = set_input_step "test" 1 tree in
   let* tree = add_value tree ["one"; "four"] in
   let* tree = eval_until_input_requested tree in
-  let* state_after_second_message =
-    Wasm.Internal_for_tests.get_tick_state tree
-  in
-  (* The kernel is now expected to fail, the PVM should be in stuck state. *)
-  assert (is_stuck state_after_second_message) ;
+  (* The kernel is now expected to fail, the PVM should have the stuck tag. *)
+  let* stuck_flag = has_stuck_flag tree in
+  assert stuck_flag ;
   return_ok_unit
 
 let should_run_store_delete_kernel () =
@@ -333,9 +313,9 @@ let should_run_store_delete_kernel () =
   let* tree = eval_until_input_requested tree in
   let* tree = set_input_step "moving forward" 0 tree in
   let* tree = eval_until_input_requested tree in
-  let* state = Wasm.Internal_for_tests.get_tick_state tree in
-  (* The kernel is not expected to fail, the PVM should not be in stuck state. *)
-  assert (not @@ is_stuck state) ;
+  (* The kernel is not expected to fail, the PVM should not have stuck flag. *)
+  let* stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
   (* The paths /one & /three/four will have been deleted. *)
   let* result = Tree.find_tree tree ["durable"; "one"] in
   assert (Option.is_none result) ;
@@ -513,7 +493,9 @@ let build_snapshot_wasm_state_from_set_input
       (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
       tree
   in
+
   let snapshot_tick = Z.(max_tick + current_tick) in
+
   let* tree =
     Test_encodings_util.Tree_encoding_runner.encode
       (Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n)
@@ -601,7 +583,6 @@ let test_rebuild_snapshotable_state () =
   let*! rebuilded_tree_without_wasm =
     build_snapshot_wasm_state_from_set_input tree_without_wasm
   in
-
   (* Both hash should be exactly the same. *)
   let hash_tree_after_eval = Test_encodings_util.Tree.hash tree_after_eval in
   let hash_rebuilded_tree = Test_encodings_util.Tree.hash rebuilded_tree in
@@ -698,12 +679,11 @@ let test_bulk_noops () =
   let rec goto_snapshot ticks tree_slow =
     let* tree_fast, _ = Wasm.compute_step_many ~max_steps:ticks base_tree in
     let* tree_slow = Wasm.compute_step tree_slow in
-
     assert (
       Context_hash.(Test_encodings_util.Tree.(hash tree_fast = hash tree_slow))) ;
 
-    let* stuck = Wasm_utils.Wasm.Internal_for_tests.is_stuck tree_fast in
-    assert (Option.is_none stuck) ;
+    let* stuck_flag = has_stuck_flag tree_fast in
+    assert (not stuck_flag) ;
 
     let* state = Wasm.Internal_for_tests.get_tick_state tree_slow in
     if state = Snapshot then Lwt.return (ticks, tree_slow)
@@ -799,8 +779,8 @@ let test_durable_store_io () =
   (* Set input and eval again. *)
   let*! tree = set_input_step "dummy_input" 0 tree in
   let*! tree = eval_until_input_requested tree in
-  let*! state = Wasm.Internal_for_tests.get_tick_state tree in
-  assert (not @@ is_stuck state) ;
+  let*! stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
 
   (* We should now have a byte written to '/to/value' *)
   let*! durable = wrap_as_durable_storage tree in
@@ -975,7 +955,8 @@ let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
   (* If the expected number of reboots from the PVM is lower than the maximum
      asked by the kernel itself, this should lead to a stuck state with
      `Too_many_reboots`. *)
-  if reboots <= pvm_max_reboots then assert (not @@ is_stuck state)
+  let*! stuck_flag = has_stuck_flag tree in
+  if reboots <= pvm_max_reboots then assert (not stuck_flag)
   else assert (is_stuck ~step:`Too_many_reboots state) ;
 
   let*! durable = wrap_as_durable_storage tree in

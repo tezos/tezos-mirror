@@ -51,6 +51,11 @@ let has_reboot_flag durable =
   in
   allows_reboot <> None
 
+let has_stuck_flag durable =
+  let open Lwt_syntax in
+  let+ stuck = Durable.(find_value durable Constants.stuck_flag_key) in
+  Option.is_some stuck
+
 let mark_for_reboot reboot_counter durable =
   let open Lwt_syntax in
   if Z.Compare.(reboot_counter <= Z.zero) then return Failing
@@ -80,10 +85,11 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           ~status:Failing
           (Stuck
              (Wasm_pvm_errors.invalid_state "snapshot is an input tick state"))
-  | _ when eval_has_finished tick_state && is_time_for_snapshot pvm_state ->
-      (* We have an empty set of admin instructions, we can either reboot
-         without consuming another input if the flag has been set or read a
-         new input. *)
+  | Padding when is_time_for_snapshot pvm_state ->
+      (* The state is Padding which means that either the calculation finished
+         or it was trapped. Since we are at snapshot time we will either return
+         a stuck because too many reboots happened if the flag has been set or
+          snapshot. *)
       let* status = mark_for_reboot pvm_state.reboot_counter durable in
       (* Execution took too many reboot *)
       if status = Failing then return ~status (Stuck Too_many_reboots)
@@ -175,17 +181,17 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       return (Init {self; ast_module; init_kont; module_reg})
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
-      return tick_state
-  | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped msg); _}; _} ->
-      return
-        ~status:Failing
-        (Stuck
-           (Wasm_pvm_errors.Eval_error
-              {
-                raw_exception =
-                  Wasm_pvm_errors.truncate_message "trapped execution";
-                explanation = Some (Wasm_pvm_errors.truncate_message msg.it);
-              }))
+      let* has_stuck_flag = has_stuck_flag durable in
+      if has_stuck_flag then
+        let* durable = Durable.(delete durable Constants.stuck_flag_key) in
+        return ~durable Padding
+      else return Padding
+  | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped _msg); _}; _} ->
+      let* durable =
+        Durable.write_value_exn durable Constants.stuck_flag_key 0L ""
+      in
+      return ~durable Padding
+  | Padding -> return Padding
   | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in
@@ -206,7 +212,7 @@ let next_tick_state pvm_state =
           | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
           | Init _ -> Init_error error
           | Eval _ -> Eval_error error
-          | Stuck _ | Snapshot -> Unknown_error error.raw_exception)
+          | Stuck _ | Snapshot | Padding -> Unknown_error error.raw_exception)
       | `Unknown raw_exception -> Unknown_error raw_exception
     in
     Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
@@ -286,6 +292,7 @@ let compute_step_many_until ?(max_steps = 1L) should_continue =
         let pvm_state =
           {
             pvm_state with
+            tick_state = Padding;
             current_tick = Z.add pvm_state.current_tick bulk_ticks;
           }
         in
@@ -348,7 +355,7 @@ let set_input_step input_info message pvm_state =
           (Stuck
              (Wasm_pvm_errors.invalid_state
                 "No input required during evaluation"))
-    | Stuck _ -> Lwt.return pvm_state.tick_state
+    | Stuck _ | Padding -> Lwt.return pvm_state.tick_state
   in
   (* Increase the current tick counter and mark that no input is required. *)
   {pvm_state with tick_state; current_tick = Z.succ pvm_state.current_tick}
@@ -381,7 +388,7 @@ let reveal_step payload pvm_state =
         (Stuck
            (Wasm_pvm_errors.invalid_state
               "No reveal expected during snapshotting"))
-  | Stuck _ -> return pvm_state.tick_state
+  | Stuck _ | Padding -> return pvm_state.tick_state
 
 let get_output output_info output =
   let open Lwt_syntax in

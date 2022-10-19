@@ -94,6 +94,11 @@ let tick_state_encoding =
         (value [] Data_encoding.unit)
         (function Snapshot -> Some () | _ -> None)
         (fun () -> Snapshot);
+      case
+        "padding"
+        (value [] Data_encoding.unit)
+        (function Padding -> Some () | _ -> None)
+        (fun () -> Padding);
     ]
 
 let durable_buffers_encoding =
