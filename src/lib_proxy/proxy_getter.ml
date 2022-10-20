@@ -104,7 +104,9 @@ let rec raw_context_to_tree (raw : Proof.raw_context) : Local.tree option Lwt.t
       in
       let* dir =
         String.Map.bindings map
-        |> List.fold_left_s add_to_tree (Tezos_context_memory.make_empty_tree ())
+        |> List.fold_left_s
+             add_to_tree
+             (Tezos_context_memory.make_empty_tree ())
       in
       if Local.Tree.is_empty dir then return_none else return_some dir
 
