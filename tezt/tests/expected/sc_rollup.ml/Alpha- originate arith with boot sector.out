@@ -1,8 +1,8 @@
 
 ./octez-client --wait none originate sc rollup from bootstrap1 of kind arith of type string booting with '10 10 10 + +' --burn-cap 9999999
 Node is bootstrapped.
-Estimated gas: 3110.497 units (will add 100 for safety)
-Estimated storage: 6667 bytes added (will add 20 for safety)
+Estimated gas: 2909.973 units (will add 100 for safety)
+Estimated storage: 6536 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,25 +12,25 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000682
+    Fee to the baker: ꜩ0.000661
     Expected counter: 1
-    Gas limit: 3211
-    Storage limit: 6687 bytes
+    Gas limit: 3010
+    Storage limit: 6556 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000682
-      payload fees(the block proposer) ....... +ꜩ0.000682
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000661
+      payload fees(the block proposer) ....... +ꜩ0.000661
     Smart contract rollup origination:
       Kind: arith
       Parameter type: string
       Boot sector Blake2B hash: '8eb6ccf70902fcd3fa2040cf27dda202a71d85625516f22a0c9c67fc86057a7b'
       This smart contract rollup origination was successfully applied
-      Consumed gas: 3110.497
-      Storage size: 6667 bytes
+      Consumed gas: 2909.973
+      Storage size: 6536 bytes
       Address: [SC_ROLLUP_HASH]
       Genesis commitment hash: [SC_ROLLUP_COMMITMENT_HASH]
       Balance updates:
-        [PUBLIC_KEY_HASH] ... -ꜩ1.66675
-        storage fees ........................... +ꜩ1.66675
+        [PUBLIC_KEY_HASH] ... -ꜩ1.634
+        storage fees ........................... +ꜩ1.634
 
 
 ./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/boot_sector'
