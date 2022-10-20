@@ -1392,3 +1392,49 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
           handle_manager result
       | Cons_result (Manager_operation_result _, _) as result ->
           handle_manager result)
+
+let is_manager_operation op =
+  match Operation.acceptable_pass op with
+  | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
+  | None -> false
+
+(** [conflict_handler config] returns a conflict handler for
+    {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
+
+    - For non-manager operations, we select the greater operation
+      according to {!Operation.compare}.
+
+    - A manager operation is replaced only when the new operation's
+      fee and fee/gas ratio both exceed the old operation's by at least a
+      factor of [config.replace_by_fee_factor] (see {!better_fees_and_ratio}).
+
+    Precondition: both operations must be individually valid (because
+    of the call to {!Operation.compare}). *)
+let conflict_handler config : Mempool.conflict_handler =
+ fun ~existing_operation ~new_operation ->
+  let (_ : Tezos_crypto.Operation_hash.t), old_op = existing_operation in
+  let (_ : Tezos_crypto.Operation_hash.t), new_op = new_operation in
+  if is_manager_operation old_op && is_manager_operation new_op then
+    let new_op_is_better =
+      let open Result_syntax in
+      let {protocol_data = Operation_data old_protocol_data; _} = old_op in
+      let {protocol_data = Operation_data new_protocol_data; _} = new_op in
+      let* old_fee, old_gas_limit =
+        get_manager_operation_gas_and_fee old_protocol_data.contents
+      in
+      let* new_fee, new_gas_limit =
+        get_manager_operation_gas_and_fee new_protocol_data.contents
+      in
+      return
+        (better_fees_and_ratio
+           config
+           old_gas_limit
+           old_fee
+           new_gas_limit
+           new_fee)
+    in
+    match new_op_is_better with
+    | Ok b when b -> `Replace
+    | Ok _ | Error _ -> `Keep
+  else if Operation.compare existing_operation new_operation < 0 then `Replace
+  else `Keep
