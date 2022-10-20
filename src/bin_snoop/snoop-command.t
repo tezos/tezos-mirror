@@ -1,13 +1,13 @@
 Missing config file prints
   $ ./main_snoop.exe benchmark N_IBlake2b_alpha and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
-  Model N_IOpt_map_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ILambda_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KIter_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KList_enter_body_alpha already registered for code generation! (overloaded instruction?) Ignoring.
-  Model N_KMap_enter_body_alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Benchmarking with the following options:
   { options = { seed=self-init;
                 bench #=1;

@@ -65,6 +65,9 @@ val has_prefix : prefix:string -> string -> bool
 (** Some (input with [prefix] removed), if string has [prefix], else [None] *)
 val remove_prefix : prefix:string -> string -> string option
 
+(** Some (input with [suffix] removed), if string has [suffix], else [None] *)
+val remove_suffix : suffix:string -> string -> string option
+
 (** Length of common prefix of input strings *)
 val common_prefix : string -> string -> int
 

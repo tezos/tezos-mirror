@@ -389,7 +389,7 @@ let codegen_cmd solution model_name codegen_options =
             exit 1
         | Some s -> s
       in
-      Format.printf "%a@." Codegen.pp_structure_item code
+      Format.printf "%a@." Codegen.pp_model code
 
 let codegen_all_cmd solution regexp codegen_options =
   let () = Format.eprintf "regexp: %s@." regexp in
@@ -408,7 +408,7 @@ let codegen_all_cmd solution regexp codegen_options =
         ((module Transform) : Costlang.transform)
   in
   let result = Codegen.codegen_module models sol transform in
-  Codegen.pp_structure_item Format.std_formatter result
+  Codegen.pp_module Format.std_formatter result
 
 (* -------------------------------------------------------------------------- *)
 (* Entrypoint *)
