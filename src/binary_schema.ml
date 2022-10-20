@@ -572,7 +572,8 @@ module Encoding = struct
          :: kind_enum_cases ())
 
   let unsigned_integer_encoding =
-    string_enum [("Uint30", `Uint30); ("Uint16", `Uint16); ("Uint8", `Uint8)]
+    string_enum
+      [("N", `N); ("Uint30", `Uint30); ("Uint16", `Uint16); ("Uint8", `Uint8)]
 
   let field_descr_encoding =
     let dynamic_layout_encoding = dynamic_size layout_encoding in

@@ -623,4 +623,180 @@ let%expect_test _ =
                  { "name": "r", "layout": { "kind": "Zero_width" },
                    "data_kind": { "size": 0, "kind": "Fixed" }, "kind": "named" } ] },
          "fields": [] } |}] ;
+  let list_with_length_16 = Data_encoding.(list_with_length `Uint16 uint8) in
+  dump list_with_length_16 ;
+  [%expect
+    {|
+    +-----------------+----------+--------------------------------------------------+
+    | Name            | Size     | Contents                                         |
+    +=================+==========+==================================================+
+    | Unnamed field 0 | 2 bytes  | unsigned 16-bit integer                          |
+    +-----------------+----------+--------------------------------------------------+
+    | Unnamed field 1 | Variable | sequence of at most 65535 unsigned 8-bit integer |
+    +-----------------+----------+--------------------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "size": "Uint16", "kind": "Int" }, "kind": "anon",
+                 "data_kind": { "size": 2, "kind": "Fixed" } },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "Seq",
+                     "length_limit": { "kind": "at-most", "at_most": 65535 } },
+                 "kind": "anon", "data_kind": { "kind": "Variable" } } ] },
+       "fields": [] } |}] ;
+  let list_with_length_n = Data_encoding.(list_with_length `N uint8) in
+  dump list_with_length_n ;
+  [%expect
+    {|
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Name            | Size                 | Contents                                              |
+    +=================+======================+=======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                  |
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 unsigned 8-bit integer |
+    +-----------------+----------------------+-------------------------------------------------------+
+
+
+    N.t
+    ***
+
+    A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order.
+
+    +------+----------------------+----------+
+    | Name | Size                 | Contents |
+    +======+======================+==========+
+    | N.t  | Determined from data | bytes    |
+    +------+----------------------+----------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "N.t", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" }, "kind": "Seq",
+                     "length_limit": { "kind": "at-most", "at_most": 1073741823 } },
+                 "kind": "anon", "data_kind": { "kind": "Variable" } } ] },
+       "fields":
+         [ { "description":
+               { "title": "N.t",
+                 "description":
+                   "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order." },
+             "encoding":
+               { "fields":
+                   [ { "name": "N.t", "layout": { "kind": "Bytes" },
+                       "data_kind": { "kind": "Dynamic" }, "kind": "named" } ] } } ] } |}] ;
+  let list_with_length_n_2 =
+    Data_encoding.(tup2 (list_with_length `N uint8) (list_with_length `N int64))
+  in
+  dump list_with_length_n_2 ;
+  [%expect
+    {|
+    +-----------------+----------------------+----------+
+    | Name            | Size                 | Contents |
+    +=================+======================+==========+
+    | Unnamed field 0 | Determined from data | $X_0     |
+    +-----------------+----------------------+----------+
+    | Unnamed field 1 | Determined from data | $X_1     |
+    +-----------------+----------------------+----------+
+
+
+    N.t
+    ***
+
+    A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order.
+
+    +------+----------------------+----------+
+    | Name | Size                 | Contents |
+    +======+======================+==========+
+    | N.t  | Determined from data | bytes    |
+    +------+----------------------+----------+
+
+
+    X_0
+    ***
+
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Name            | Size                 | Contents                                              |
+    +=================+======================+=======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                  |
+    +-----------------+----------------------+-------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 unsigned 8-bit integer |
+    +-----------------+----------------------+-------------------------------------------------------+
+
+
+    X_1
+    ***
+
+    +-----------------+----------------------+------------------------------------------------------+
+    | Name            | Size                 | Contents                                             |
+    +=================+======================+======================================================+
+    | Unnamed field 0 | Determined from data | $N.t                                                 |
+    +-----------------+----------------------+------------------------------------------------------+
+    | Unnamed field 1 | Variable             | sequence of at most 1073741823 signed 64-bit integer |
+    +-----------------+----------------------+------------------------------------------------------+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "layout": { "name": "X_0", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } },
+               { "layout": { "name": "X_1", "kind": "Ref" }, "kind": "anon",
+                 "data_kind": { "kind": "Dynamic" } } ] },
+       "fields":
+         [ { "description":
+               { "title": "N.t",
+                 "description":
+                   "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order." },
+             "encoding":
+               { "fields":
+                   [ { "name": "N.t", "layout": { "kind": "Bytes" },
+                       "data_kind": { "kind": "Dynamic" }, "kind": "named" } ] } },
+           { "description": { "title": "X_0" },
+             "encoding":
+               { "fields":
+                   [ { "layout": { "name": "N.t", "kind": "Ref" },
+                       "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                     { "layout":
+                         { "layout": { "size": "Uint8", "kind": "Int" },
+                           "kind": "Seq",
+                           "length_limit":
+                             { "kind": "at-most", "at_most": 1073741823 } },
+                       "kind": "anon", "data_kind": { "kind": "Variable" } } ] } },
+           { "description": { "title": "X_1" },
+             "encoding":
+               { "fields":
+                   [ { "layout": { "name": "N.t", "kind": "Ref" },
+                       "kind": "anon", "data_kind": { "kind": "Dynamic" } },
+                     { "layout":
+                         { "layout": { "size": "Int64", "kind": "Int" },
+                           "kind": "Seq",
+                           "length_limit":
+                             { "kind": "at-most", "at_most": 1073741823 } },
+                       "kind": "anon", "data_kind": { "kind": "Variable" } } ] } } ] } |}] ;
+  let dynamic_size_n =
+    Data_encoding.(dynamic_size ~kind:`N (Variable.list uint8))
+  in
+  dump dynamic_size_n ;
+  [%expect
+    {|
+    +-----------------------+----------------------+------------------------------------+
+    | Name                  | Size                 | Contents                           |
+    +=======================+======================+====================================+
+    | # bytes in next field | Determined from data | $N.t                               |
+    +-----------------------+----------------------+------------------------------------+
+    | Unnamed field 0       | Variable             | sequence of unsigned 8-bit integer |
+    +-----------------------+----------------------+------------------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "kind": "dyn", "num_fields": 1, "size": "N" },
+               { "layout":
+                   { "layout": { "size": "Uint8", "kind": "Int" },
+                     "kind": "Seq" }, "kind": "anon",
+                 "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
   ()

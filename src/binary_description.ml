@@ -330,13 +330,6 @@ let describe (type x) (encoding : x Encoding.t) =
         let fields, refs =
           fields None recursives references encoding.encoding
         in
-        let fields, refs =
-          match kind with
-          | `N ->
-              let layout, refs = layout None recursives refs N in
-              ([Binary_schema.Anonymous_field (classify_desc N, layout)], refs)
-          | _ -> (fields, references)
-        in
         (Dynamic_size_field (None, List.length fields, kind) :: fields, refs)
     | Check_size {encoding; _} ->
         fields ref_name recursives references encoding.encoding
