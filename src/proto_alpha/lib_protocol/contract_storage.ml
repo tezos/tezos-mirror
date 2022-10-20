@@ -97,8 +97,8 @@ let () =
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)
-        (req "expected" z)
-        (req "found" z))
+        (req "expected" Manager_counter_repr.encoding_for_errors)
+        (req "found" Manager_counter_repr.encoding_for_errors))
     (function
       | Counter_in_the_future {contract; expected; found} ->
           Some (contract, expected, found)
@@ -123,8 +123,8 @@ let () =
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)
-        (req "expected" z)
-        (req "found" z))
+        (req "expected" Manager_counter_repr.encoding_for_errors)
+        (req "found" Manager_counter_repr.encoding_for_errors))
     (function
       | Counter_in_the_past {contract; expected; found} ->
           Some (contract, expected, found)
