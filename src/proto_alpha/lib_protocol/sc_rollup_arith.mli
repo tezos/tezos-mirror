@@ -25,6 +25,11 @@
 
 (** This module provides a temporary toy rollup to be used as a demo. *)
 
+(*
+   FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
+   Use EOL/SOL once merged to import Dal pages.
+*)
+
 (**
 
    This rollup is a stack machine equipped with addition.
@@ -45,6 +50,13 @@
    - a symbol [+] pops two integers [x] and [y] and pushes [x + y] on
      the stack ;
 
+   - an input [hash:<HASH>] is interpreted as a directive to request the DAC
+     data whose hash is <HASH> ;
+
+   - an input [dal:<LVL>:<SID>:<PID>] is interpreted as a directive to request
+     the DAL page whose index is <PID> belonging to slot index <SID> confirmed
+     at level <LVL> (i.e published at level LVL - endorsement_lag) ;
+
    If a message is not syntactically correct or does not evaluate
    correctly, the machine stops its evaluation and waits for the next
    message.
@@ -58,7 +70,6 @@
    The machine exposes extra operations to be used in the rollup node.
 
 *)
-
 module type S = sig
   include Sc_rollup_PVM_sig.S
 
