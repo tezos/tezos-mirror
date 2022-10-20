@@ -49,7 +49,3 @@ val init_first_cycles :
   Raw_context.t ->
   origin:Receipt_repr.update_origin ->
   (Raw_context.t * Receipt_repr.balance_updates) tzresult Lwt.t
-
-module Migration_from_Kathmandu : sig
-  val update : Raw_context.t -> Raw_context.t tzresult Lwt.t
-end

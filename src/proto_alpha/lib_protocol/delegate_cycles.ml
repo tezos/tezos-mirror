@@ -280,35 +280,3 @@ let init_first_cycles ctxt ~origin =
   >>=? fun ctxt ->
   let cycle = (Raw_context.current_level ctxt).cycle in
   freeze_deposits ~origin ~new_cycle:cycle ~balance_updates:[] ctxt
-
-module Migration_from_Kathmandu = struct
-  let update_delegate pkh ctxt =
-    let open Lwt_tzresult_syntax in
-    let*? ctxt = ctxt in
-    let* pk = Contract_manager_storage.get_manager_key ctxt pkh in
-    Delegate_consensus_key.init ctxt pkh pk
-
-  let update ctxt =
-    let open Lwt_tzresult_syntax in
-    let* ctxt =
-      Delegate_storage.fold
-        ctxt
-        ~order:`Undefined
-        ~f:update_delegate
-        ~init:(ok ctxt)
-    in
-    let*! cycles =
-      Storage.Migration_from_Kathmandu.Delegate_sampler_state.keys ctxt
-    in
-    let*! ctxt =
-      Storage.Migration_from_Kathmandu.Delegate_sampler_state.clear ctxt
-    in
-    let*? ctxt = Raw_context.Migration_from_Kathmandu.reset_samplers ctxt in
-    let* ctxt =
-      List.fold_left_es
-        Delegate_sampler.Migration_from_Kathmandu.update_sampler
-        ctxt
-        cycles
-    in
-    return ctxt
-end

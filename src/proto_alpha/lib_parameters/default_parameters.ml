@@ -237,8 +237,26 @@ let constants_mainnet =
          max_lookahead_in_blocks = 30_000l;
          max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
          max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+         (* The default number of required sections in a dissection *)
          number_of_sections_in_dissection = 32;
          timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+         (* We store multiple cemented commitments because we want to
+             allow the execution of outbox messages against cemented
+             commitments that are older than the last cemented commitment.
+             The execution of an outbox message is a manager operation,
+             and manager operations are kept in the mempool for one
+             hour. Hence we only need to ensure that an outbox message
+             can be validated against a cemented commitment produced in the
+             last hour. If we assume that the rollup is operating without
+             issues, that is no commitments are being refuted and commitments
+             are published and cemented regularly by one rollup node, we can
+             expect commitments to be cemented approximately every 15
+             minutes, or equivalently we can expect 5 commitments to be
+             published in one hour (at minutes 0, 15, 30, 45 and 60).
+             Therefore, we need to keep 5 cemented commitments to guarantee
+             that the execution of an outbox operation can always be
+             validated against a cemented commitment while it is in the
+             mempool. *)
          max_number_of_stored_cemented_commitments = 5;
        });
     zk_rollup =

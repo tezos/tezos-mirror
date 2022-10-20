@@ -136,12 +136,12 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Kathmandu -> Some Alpha
+  | Kathmandu -> Some Lima
   | Lima -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Kathmandu
+  | Alpha -> Some Lima
   | Lima -> Some Kathmandu
   | Kathmandu -> None
 

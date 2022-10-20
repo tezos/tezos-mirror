@@ -237,21 +237,3 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
   | Some outdated_cycle ->
       Delegate_sampler_state.remove_existing ctxt outdated_cycle
       >>=? fun ctxt -> Seed_storage.remove_for_cycle ctxt outdated_cycle
-
-module Migration_from_Kathmandu = struct
-  let update_sampler ctxt cycle =
-    let open Lwt_tzresult_syntax in
-    let* stakes = Stake_storage.get_selected_distribution ctxt cycle in
-    let* stakes_pk =
-      List.fold_left_es
-        (fun acc (delegate, stake) ->
-          Delegate_consensus_key.active_pubkey ctxt delegate >>=? fun pk ->
-          return ((pk, Tez_repr.to_mutez stake) :: acc))
-        []
-        stakes
-    in
-    let state = Sampler.create stakes_pk in
-    Delegate_sampler_state.init ctxt cycle state >>=? fun ctxt ->
-    Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
-    Lwt.return (Raw_context.init_sampler_for_cycle ctxt cycle seed state)
-end

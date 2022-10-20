@@ -83,7 +83,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Kathmandu_014
+type previous_protocol = Genesis of Parameters_repr.t | Lima_015
 
 val prepare_first_block :
   level:int32 ->
@@ -422,8 +422,4 @@ module Dal : sig
   (** [shards ctxt ~endorser] returns the shard assignment for the
      [endorser] for the current level. *)
   val shards : t -> endorser:Signature.Public_key_hash.t -> int list
-end
-
-module Migration_from_Kathmandu : sig
-  val reset_samplers : t -> t tzresult
 end

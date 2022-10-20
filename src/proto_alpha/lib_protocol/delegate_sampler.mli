@@ -68,8 +68,3 @@ val clear_outdated_sampling_data :
 
 val select_distribution_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
-module Migration_from_Kathmandu : sig
-  val update_sampler :
-    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-end
