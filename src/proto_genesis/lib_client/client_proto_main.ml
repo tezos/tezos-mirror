@@ -48,14 +48,19 @@ let bake cctxt ?timestamp block command sk =
 
 let int32_parameter =
   Clic.parameter (fun _ p ->
-      try return (Int32.of_string p) with _ -> failwith "Cannot read int32")
+      match Int32.of_string p with
+      | i32 ->
+          if Compare.Int32.(i32 < 0l) then
+            failwith "Cannot provide a negative int32"
+          else return i32
+      | exception _ -> failwith "Cannot read int32")
 
 let file_parameter =
   Clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
 
-let fitness_from_int32 fitness =
+let fitness_from_uint32 fitness =
   (* definition taken from src/proto_alpha/lib_protocol/src/constants_repr.ml *)
   let version_number = "\002" in
   let int32_to_bytes i =
@@ -65,20 +70,27 @@ let fitness_from_int32 fitness =
   in
   (* Tenderbake-compatible fitness format.
 
-     Using tenderbake's locked rounds to bump genesis fitness is a
-     "hack". Doing so will allow tenderbake protocols to parse the
-     genesis' produced fitness but will not impact block delays. When
-     a tenderbake protocol parses the fitness: level, round and
-     predecessor round have a semantics. However, locked-round can be
-     used as it only impacts reproposal at the same level but, as
-     reproposal blocks may only be produced from the previous protocol
-     (i.e. genesis), there is no side-effect. *)
+     We encode the genesis fitness using tenderbake's fitness format.
+     In order to do that, we need to select a tenderbake's fitness
+     field that won't break tenderbake invariants. When a tenderbake
+     protocol parses the fitness: [level], [locked_round], [round] and
+     [predecessor_round]. [level] cannot be used as tenderbake
+     protocols might not be able to produce higher fitness; if
+     present, [locked_round] must be lower or equal than [round],
+     [predecessor_round] starts at 0xffffffff which cannot be simply
+     incremented; [round] thus may be used but will impact block
+     delays. *)
+  (* We use (fitness - 1) as the most common way to call this command
+     is by providing a fitness of 1 and we don't want block
+     delays. Therefore, we want an argument of 1 to result in a round
+     0. *)
+  let fitness_to_round = Int32.(max 0l (pred fitness)) in
   [
     Bytes.of_string version_number (* version *);
     int32_to_bytes 0l (* level *);
-    int32_to_bytes fitness (* locked-round *);
+    Bytes.empty (* locked-round *);
     int32_to_bytes (-1l) (* predecessor round *);
-    int32_to_bytes 0l (* round *);
+    int32_to_bytes fitness_to_round (* round *);
   ]
 
 let timestamp_arg =
@@ -151,7 +163,7 @@ let commands () =
            sk
            param_json_file
            (cctxt : Client_context.full) ->
-        let fitness = fitness_from_int32 fitness in
+        let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
@@ -188,7 +200,7 @@ let commands () =
            file_parameter
       @@ stop)
       (fun (timestamp, delay) hash fitness sk param_json_file cctxt ->
-        let fitness = fitness_from_int32 fitness in
+        let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->
         let protocol_parameters =
