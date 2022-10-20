@@ -350,6 +350,7 @@ let publish_commitment ?(src = Constant.bootstrap1.public_key_hash) ~commitment
 *)
 let test_origination ~kind =
   test_l1_scenario
+    ~regression:true
     {
       variant = None;
       tags = ["origination"];
@@ -779,8 +780,10 @@ let test_rollup_node_boots_into_initial_state ~kind =
     ~error_msg:"Unexpected PVM status (%L = %R)" ;
   unit
 
-let test_rollup_node_advances_pvm_state ~title ?boot_sector ~internal ~kind =
+let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
+    ~internal ~kind =
   test_full_scenario
+    ?regression
     {
       variant = Some (if internal then "internal" else "external");
       tags = ["pvm"];
@@ -926,6 +929,7 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
 *)
 let test_rollup_node_advances_pvm_state ~kind ?boot_sector ~internal =
   test_rollup_node_advances_pvm_state
+    ~regression:true
     ~title:"node advances PVM state with messages"
     ?boot_sector
     ~internal
@@ -1922,6 +1926,7 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
      should be rewritten in a unit test maybe ?
   *)
   test_l1_scenario
+    ~regression:true
     ~boot_sector:boot_sector1
     ~kind
     {
@@ -2648,6 +2653,7 @@ let test_refutation_reward_and_punishment ~kind =
     ~kind
     ~timeout:timeout_period
     ~commitment_period
+    ~regression:true
     {
       tags = ["refutation"; "reward"; "punishment"];
       variant = None;
@@ -2926,6 +2932,7 @@ let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
 
 let test_rpcs ~kind =
   test_full_scenario
+    ~regression:true
     ~kind
     {
       tags = ["rpc"; "api"];
@@ -3133,8 +3140,13 @@ let register ~kind ~protocols =
   (* test_refutation protocols ~kind ; *)
   test_late_rollup_node protocols ~kind ;
   test_interrupt_rollup_node protocols ~kind ;
-  test_outbox_message ~earliness:0 protocols ~kind ;
-  test_outbox_message ~earliness:0 ~entrypoint:"aux" protocols ~kind ;
+  test_outbox_message ~regression:true ~earliness:0 protocols ~kind ;
+  test_outbox_message
+    ~regression:true
+    ~earliness:0
+    ~entrypoint:"aux"
+    protocols
+    ~kind ;
   test_outbox_message
     ~expected_error:(Base.rex ".*Invalid claim about outbox")
     ~earliness:5
