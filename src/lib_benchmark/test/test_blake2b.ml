@@ -95,17 +95,19 @@ let () =
            (Model.For_codegen model)
            solution
            (module Costlang.Identity)
+           "blake2b_model"
        with
       | None -> assert false
-      | Some code ->
-          Format.printf "let blake2b_model = %a@." Codegen.pp_expr code) ;
+      | Some code -> Format.printf "%a@." Codegen.pp_structure_item code) ;
       let module FPT = Fixed_point_transform.Apply (struct
         let options = {Fixed_point_transform.default_options with precision = 5}
       end) in
-      match Codegen.codegen (Model.For_codegen model) solution (module FPT) with
+      match
+        Codegen.codegen
+          (Model.For_codegen model)
+          solution
+          (module FPT)
+          "blake2b_model_fixed_point"
+      with
       | None -> assert false
-      | Some code ->
-          Format.printf
-            "let blake2b_model_fixed_point = %a@."
-            Codegen.pp_expr
-            code)
+      | Some code -> Format.printf "%a@." Codegen.pp_structure_item code)
