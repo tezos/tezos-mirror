@@ -214,6 +214,8 @@
   Gas_input_size
   Script_typed_ir_size
   Script_typed_ir_size_costs
+  Michelson_v1_gas_costs_generated
+  Michelson_v1_gas_costs
   Michelson_v1_gas
   Script_list
   Script_tc_context
@@ -481,6 +483,8 @@
   gas_input_size.ml gas_input_size.mli
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
@@ -728,6 +732,8 @@
   gas_input_size.ml gas_input_size.mli
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
@@ -980,6 +986,8 @@
   gas_input_size.ml gas_input_size.mli
   script_typed_ir_size.ml script_typed_ir_size.mli
   script_typed_ir_size_costs.ml script_typed_ir_size_costs.mli
+  michelson_v1_gas_costs_generated.ml
+  michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
   script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli

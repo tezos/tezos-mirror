@@ -200,6 +200,8 @@
         "Gas_input_size",
         "Script_typed_ir_size",
         "Script_typed_ir_size_costs",
+        "Michelson_v1_gas_costs_generated",
+        "Michelson_v1_gas_costs",
         "Michelson_v1_gas",
         "Script_list",
         "Script_tc_context",
