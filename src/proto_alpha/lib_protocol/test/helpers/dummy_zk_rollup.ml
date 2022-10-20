@@ -274,11 +274,13 @@ module V (L : LIB) = struct
       ~rollup_id op =
     let* old_state = input ~public:true @@ Input.bool old_state in
     let* new_state = input ~public:true @@ Input.bool new_state in
-    let* _fee =
+    let* (_fee : scalar repr) =
       input ~public:true
       @@ E.((fee_encoding ~safety:Bounded_e.Unsafe).input) fee
     in
-    let* _exit_validity = input ~public:true @@ Input.bool exit_validity in
+    let* (_exit_validity : bool repr) =
+      input ~public:true @@ Input.bool exit_validity
+    in
     let* rollup_id =
       input ~public:true @@ E.(tezos_pkh_encoding.input) rollup_id
     in
@@ -291,7 +293,7 @@ module V (L : LIB) = struct
   let predicate_batch ~old_state ~new_state ~fees ~rollup_id ops =
     let* old_state = input ~public:true @@ Input.bool old_state in
     let* new_state = input ~public:true @@ Input.bool new_state in
-    let* _fees =
+    let* (_fees : scalar repr) =
       input ~public:true
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in
@@ -312,7 +314,7 @@ module V (L : LIB) = struct
   let predicate_fees ~old_state ~new_state ~fees =
     let* old_state = input ~public:true @@ Input.bool old_state in
     let* new_state = input ~public:true @@ Input.bool new_state in
-    let* _fees =
+    let* (_fees : scalar repr) =
       input ~public:true
       @@ E.((amount_encoding ~safety:Bounded_e.Unsafe).input) fees
     in

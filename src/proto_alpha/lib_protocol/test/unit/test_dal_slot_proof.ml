@@ -88,7 +88,7 @@ struct
       ~mk_level:(fun id -> Raw_level_repr.succ id.H.published_level)
       ~mk_slot_index:(fun id -> id.H.index)
       ~check_result:(fun res ->
-        let* _skip_list = Assert.get_ok ~__LOC__ res in
+        let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
         return_unit)
 
   (** This test attempts to add a slot on top of genesis cell zero which satisfies
@@ -100,7 +100,7 @@ struct
       ~mk_level:(fun id -> id.H.published_level)
       ~mk_slot_index:(fun id -> succ_slot_index id.H.index)
       ~check_result:(fun res ->
-        let* _skip_list = Assert.get_ok ~__LOC__ res in
+        let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
         return_unit)
 
   (** This test attempts to add two slots on top of genesis cell zero which satisfies
@@ -119,7 +119,7 @@ struct
             Raw_level_repr.(succ (succ id.H.published_level)))
           ~mk_slot_index:(fun id -> id.H.index)
           ~check_result:(fun res ->
-            let* _skip_list = Assert.get_ok ~__LOC__ res in
+            let* (_skip_list : Hist.t) = Assert.get_ok ~__LOC__ res in
             return_unit))
 
   (* Tests of construct/verify proofs that confirm/unconfirm pages on top of

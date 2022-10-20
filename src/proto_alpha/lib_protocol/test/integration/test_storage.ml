@@ -128,7 +128,7 @@ let create_indexed_subcontext_int64
 
 let must_failwith f_prog error =
   try
-    let _ = f_prog () in
+    let () = f_prog () in
     Alcotest.fail "Unexpected successful result"
   with exc ->
     if exc = error then Lwt.return_unit
@@ -141,8 +141,12 @@ let must_failwith f_prog error =
 let test_register_single_data () =
   let f_prog () =
     let context = create_context "context1" in
-    let _single_data = create_single_data_storage "single_data" context in
-    create_single_data_storage "single_data" context
+    (create_single_data_storage "single_data" context
+      :> (module Single_data_storage))
+    |> ignore ;
+    (create_single_data_storage "single_data" context
+      :> (module Single_data_storage))
+    |> ignore
   in
   let error =
     Invalid_argument
@@ -159,9 +163,13 @@ let test_register_named_subcontext () =
   let f_prog () =
     let context = create_context "context2" in
     let subcontext = create_subcontext "sub_context" context in
-    let _single_data = create_single_data_storage "error_register" subcontext in
+    (create_single_data_storage "error_register" subcontext
+      :> (module Single_data_storage))
+    |> ignore ;
     let subcontext = create_subcontext "error_register" subcontext in
-    create_single_data_storage "single_data2" subcontext
+    (create_single_data_storage "single_data2" subcontext
+      :> (module Single_data_storage))
+    |> ignore
   in
   let error =
     Invalid_argument
@@ -177,8 +185,11 @@ let test_register_named_subcontext () =
 let test_register_indexed_subcontext () =
   let f_prog () =
     let context = create_context "context3" in
-    let _ = create_single_data_storage "single_value" context in
-    create_indexed_subcontext_int32 context
+    (create_single_data_storage "single_value" context
+      :> (module Single_data_storage))
+    |> ignore ;
+    (create_indexed_subcontext_int32 context :> (module Data_set_storage))
+    |> ignore
   in
   let error =
     Invalid_argument
@@ -195,8 +206,10 @@ let test_register_indexed_subcontext () =
 let test_register_indexed_subcontext_2 () =
   let f_prog () =
     let context = create_context "context4" in
-    let _ = create_indexed_subcontext_int32 context in
-    create_indexed_subcontext_int64 context
+    (create_indexed_subcontext_int32 context :> (module Data_set_storage))
+    |> ignore ;
+    (create_indexed_subcontext_int64 context :> (module Data_set_storage))
+    |> ignore
   in
   let error =
     Invalid_argument

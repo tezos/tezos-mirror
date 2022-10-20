@@ -244,7 +244,9 @@ let machine_validation_tests =
         extract_qcheck_tzresult
           (let invariant = validate_consistency in
            let* state, env = ValidationMachine.build ~invariant specs in
-           let* _ = ValidationMachine.run ~invariant scenario env state in
+           let* (_ : ValidationMachine.t) =
+             ValidationMachine.run ~invariant scenario env state
+           in
            return_unit));
     QCheck2.Test.make
       ~count:10
@@ -255,7 +257,9 @@ let machine_validation_tests =
         extract_qcheck_tzresult
           (let invariant = validate_storage in
            let* state, env = ConcreteMachine.build ~invariant specs in
-           let* _ = ConcreteMachine.run ~invariant scenario env state in
+           let* (_ : Block.t) =
+             ConcreteMachine.run ~invariant scenario env state
+           in
            return_unit));
     QCheck2.Test.make
       ~count:50_000
@@ -266,7 +270,9 @@ let machine_validation_tests =
         extract_qcheck_tzresult
           (let invariant = positive_pools in
            let state, env = SymbolicMachine.build ~invariant specs in
-           let _ = SymbolicMachine.run ~invariant scenario env state in
+           let (_ : SymbolicMachine.t) =
+             SymbolicMachine.run ~invariant scenario env state
+           in
            return_unit));
   ]
 
@@ -282,7 +288,7 @@ let economic_tests =
       (Liquidity_baking_generator.gen_adversary_scenario 1_000_000 1_000_000 50)
       (fun (specs, attacker, scenario) ->
         let state, env = SymbolicMachine.build ~subsidy:0L specs in
-        let _ =
+        let (_ : SymbolicMachine.t) =
           run_and_check (one_balance_decreases attacker env) scenario env state
         in
         true);
@@ -293,7 +299,7 @@ let economic_tests =
       (Liquidity_baking_generator.gen_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
         let state, env = SymbolicMachine.build ~subsidy:0L specs in
-        let _ =
+        let (_ : SymbolicMachine.t) =
           run_and_check (is_remove_liquidity_consistent env) scenario env state
         in
         true);
@@ -304,13 +310,13 @@ let economic_tests =
       (Liquidity_baking_generator.gen_scenario 1_000_000 1_000_000 50)
       (fun (specs, scenario) ->
         let state, env = SymbolicMachine.build ~subsidy:0L specs in
-        let _ =
+        let (_ : SymbolicMachine.t) =
           run_and_check (is_share_price_increasing env) scenario env state
         in
         true);
   ]
 
-let _ =
+let () =
   let open Lib_test.Qcheck2_helpers in
   Alcotest.run
     "protocol > pbt > liquidity baking"

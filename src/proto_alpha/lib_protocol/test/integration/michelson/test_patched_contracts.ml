@@ -165,7 +165,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     let* block, _contracts = Context.init3 () in
     let* inc = Incremental.begin_construction block in
     let ctxt = Incremental.alpha_ctxt inc in
-    let* _ =
+    let* _code, _ctxt =
       Lwt.map Environment.wrap_tzresult
       @@ Script_ir_translator.parse_code
            ~elab_conf:Script_ir_translator_config.(make ~legacy:false ())

@@ -298,11 +298,21 @@ let batch_incons_counters infos kind1 kind2 =
           err
   in
   let* i = Incremental.begin_construction infos.ctxt.block in
-  let* _ = Incremental.add_operation ~expect_failure i batch_same in
-  let* _ = Incremental.add_operation ~expect_failure i batch_in_the_future in
-  let* _ = Incremental.add_operation ~expect_failure i batch_missing_one in
-  let* _ = Incremental.add_operation ~expect_failure i batch_inverse in
-  let* _ = Incremental.add_operation ~expect_failure i batch_in_the_past in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_failure i batch_same
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_failure i batch_in_the_future
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_failure i batch_missing_one
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_failure i batch_inverse
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_failure i batch_in_the_past
+  in
   return_unit
 
 (** A batch that consumes all the balance for fees can only face the total
@@ -361,7 +371,9 @@ let batch_emptying_balance_in_the_middle infos kind1 kind2 =
           Error_monad.pp_print_trace
           err
   in
-  let* _ = Incremental.add_operation i case1 ~expect_failure in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation i case1 ~expect_failure
+  in
   return_unit
 
 (** A batch that consumes all the balance for fees only at the end of
@@ -417,8 +429,8 @@ let batch_empty_at_end infos kind1 kind2 =
       (Context.B infos.ctxt.block)
       [reveal; op_case2; op2_case2]
   in
-  let* _ = validate_diagnostic infos [case2] in
-  let* _ = validate_diagnostic infos [case3] in
+  let* (_ : infos) = validate_diagnostic infos [case2] in
+  let* (_ : infos) = validate_diagnostic infos [case3] in
   return_unit
 
 (** Simple reveal followed by a transaction. *)
@@ -454,8 +466,8 @@ let batch_reveal_transaction infos =
       (Context.B infos.ctxt.block)
       [reveal; transaction]
   in
-  let* _i = Incremental.begin_construction infos.ctxt.block in
-  let* _ = validate_diagnostic infos [batch] in
+  let* (_i : Incremental.t) = Incremental.begin_construction infos.ctxt.block in
+  let* (_ : infos) = validate_diagnostic infos [batch] in
   return_unit
 
 (** A batch of manager operation must not exceed the initial available gas in the block. *)
@@ -539,9 +551,15 @@ let batch_exceeding_block_gas ~mempool_mode infos kind1 kind2 =
           Error_monad.pp_print_trace
           err
   in
-  let* _ = Incremental.add_operation i case1 ~expect_failure in
-  let* _ = Incremental.add_operation i case3 ~expect_failure in
-  let* _ = Incremental.add_operation i case2 ~expect_failure in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation i case1 ~expect_failure
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation i case3 ~expect_failure
+  in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation i case2 ~expect_failure
+  in
   return_unit
 
 let make_tztest_batched ?(fmt = Format.std_formatter) name test subjects

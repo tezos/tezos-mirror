@@ -53,13 +53,13 @@ let test_destruct_sc_bond_id_repr () =
     | Some id -> Ok (Bond_id_repr.Sc_rollup_bond_id id)
     | None -> Error "Not an sc address"
   in
-  let* _ =
+  let* () =
     assert_bond_id_result_equal
       ~loc:__LOC__
       (destruct sc_rollup_address1)
       (sc_bond sc_rollup_address1)
   in
-  let* _ =
+  let* () =
     assert_bond_id_result_equal
       ~loc:__LOC__
       (destruct sc_rollup_address2)
@@ -80,13 +80,13 @@ let test_destruct_tx_bond_id_repr () =
     | Some id -> Ok (Bond_id_repr.Tx_rollup_bond_id id)
     | None -> Error "Not a tx address"
   in
-  let* _ =
+  let* () =
     assert_bond_id_result_equal
       ~loc:__LOC__
       (destruct tx_rollup_address1)
       (tx_bond tx_rollup_address1)
   in
-  let* _ =
+  let* () =
     assert_bond_id_result_equal
       ~loc:__LOC__
       (destruct tx_rollup_address2)
@@ -101,7 +101,7 @@ let test_destruct_invalid_bond_id_repr () =
   let invalid_address = "asdfasdfasdf" in
   let empty_address = "" in
   let destruct = Bond_id_repr.Internal_for_test.destruct in
-  let* _ =
+  let* () =
     Assert.is_error ~loc:__LOC__ ~pp:Bond_id_repr.pp (destruct invalid_address)
   in
   Assert.is_error ~loc:__LOC__ ~pp:Bond_id_repr.pp (destruct empty_address)
@@ -124,9 +124,9 @@ let test_roundtrip () =
   let tx_rollup_address2 = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi" in
   let sc_rollup_address1 = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF" in
   let sc_rollup_address2 = "scr1Ew52VCdi6nF1JuokRGMqfmSeiAEXymW2m" in
-  let* _ = rountrip_test __LOC__ tx_rollup_address1 in
-  let* _ = rountrip_test __LOC__ tx_rollup_address2 in
-  let* _ = rountrip_test __LOC__ sc_rollup_address1 in
+  let* () = rountrip_test __LOC__ tx_rollup_address1 in
+  let* () = rountrip_test __LOC__ tx_rollup_address2 in
+  let* () = rountrip_test __LOC__ sc_rollup_address1 in
   rountrip_test __LOC__ sc_rollup_address2
 
 let tests =

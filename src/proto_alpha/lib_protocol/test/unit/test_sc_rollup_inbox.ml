@@ -220,7 +220,7 @@ module Tree = struct
   let commit_tree context key tree =
     let open Lwt_syntax in
     let* ctxt = Tezos_context_memory.Context.add_tree context key tree in
-    let* _ = commit ~time:Time.Protocol.epoch ~message:"" ctxt in
+    let* (_ : value_key) = commit ~time:Time.Protocol.epoch ~message:"" ctxt in
     return ()
 
   let lookup_tree context hash =

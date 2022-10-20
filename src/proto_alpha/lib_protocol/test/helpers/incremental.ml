@@ -277,5 +277,5 @@ let finalize_block st =
 let assert_validate_operation_fails expect_failure op block =
   let open Lwt_result_syntax in
   let* i = begin_construction block in
-  let* _i = validate_operation ~expect_failure i op in
+  let* (_i : incremental) = validate_operation ~expect_failure i op in
   return_unit

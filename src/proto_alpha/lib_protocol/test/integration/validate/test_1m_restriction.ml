@@ -108,7 +108,7 @@ let positive_tests =
       let open Lwt_result_syntax in
       let* infos = init_ctxt ctxt_req in
       let* op = select_op operation_req infos in
-      let* _infos = wrap_mode ~only_validate:true infos [op] mode in
+      let* (_infos : infos) = wrap_mode ~only_validate:true infos [op] mode in
       return_true)
 
 (** Under 1M restriction, neither a block nor a prevalidator's valid
@@ -146,7 +146,7 @@ let two_op_from_same_manager_tests =
       let* infos = init_ctxt ctxt_req in
       let* op1 = select_op operation_req infos in
       let* op2 = select_op operation_req2 infos in
-      let* _ = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
+      let* () = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
 (** Under 1M restriction, a batch of two operations cannot be replaced
@@ -175,8 +175,8 @@ let batch_is_not_singles_tests =
       let* batch =
         Op.batch_operations ~source (B infos.ctxt.block) [op1; op2]
       in
-      let* _ = only_validate_diagnostic ~mode infos [batch] in
-      let* _ = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [batch] in
+      let* () = validate_ko_diagnostic ~mode infos [op1; op2] expect_failure in
       return_true)
 
 (** The applications of two covalid operations in a certain context
@@ -213,8 +213,8 @@ let conflict_free_tests =
         }
       in
       let* op2 = select_op operation_req' infos2 in
-      let* _ = only_validate_diagnostic ~mode infos [op1; op2] in
-      let* _ = only_validate_diagnostic ~mode infos [op2; op1] in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [op1; op2] in
+      let* (_ : infos) = only_validate_diagnostic ~mode infos [op2; op1] in
       return_true)
 
 open Lib_test.Qcheck2_helpers

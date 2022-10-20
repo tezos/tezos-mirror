@@ -238,7 +238,7 @@ module Test_Big_map = struct
     let* kvs1 = check_key_values ~loc:__LOC__ ~num_elements:20 () in
     let* kvs2 = check_key_values ~loc:__LOC__ ~num_elements:20 ~length:100 () in
     let* () = assert_equal_key_values ~loc:__LOC__ kvs1 kvs2 in
-    let* _ =
+    let* (_ : _ list) =
       check_key_values ~loc:__LOC__ ~num_elements:100 ~offset:100 ~length:1 ()
     in
     (* Offset greater than the length. *)

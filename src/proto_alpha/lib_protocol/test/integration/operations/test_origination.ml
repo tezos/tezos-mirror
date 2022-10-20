@@ -255,7 +255,7 @@ let test_unparsable_script () =
   in
   (* Ensure that the application fails with [Ill_typed_contract]. *)
   let* i = Incremental.begin_construction b in
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:(function
         | Environment.Ecoproto_error (Script_tc_errors.Ill_typed_contract _)
@@ -296,7 +296,7 @@ let test_unparsable_script () =
   in
   (* Ensure that the operation is valid but the application fails with
      [Lazy_script_decode]. *)
-  let* _i =
+  let* (_i : Incremental.t) =
     Incremental.add_operation
       ~expect_apply_failure:(function
         | [Environment.Ecoproto_error Script.Lazy_script_decode] -> return_unit

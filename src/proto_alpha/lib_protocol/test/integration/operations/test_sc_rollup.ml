@@ -691,7 +691,9 @@ let test_publish_fails_on_backtrack () =
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_staker_backtracked]"
   in
-  let* _ = Incremental.add_operation ~expect_apply_failure i operation2 in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure i operation2
+  in
   return_unit
 
 (** [test_cement_fails_on_conflict] creates a rollup and then publishes
@@ -729,7 +731,9 @@ let test_cement_fails_on_conflict () =
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_disputed]"
   in
-  let* _ = Incremental.add_operation ~expect_apply_failure i cement_op in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure i cement_op
+  in
   return_unit
 
 let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
@@ -744,7 +748,9 @@ let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
   let* i = Incremental.begin_construction b in
   let* i, hash = hash_commitment i commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
-  let* _ = Incremental.add_operation ?expect_apply_failure i cement_op in
+  let* (_ : Incremental.t) =
+    Incremental.add_operation ?expect_apply_failure i cement_op
+  in
   return_unit
 
 (** [test_challenge_window_period_boundaries] checks that cementing a commitment
@@ -1536,7 +1542,9 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
           "It should have failed with \
            [Sc_rollup_max_number_of_messages_reached_for_commitment_period"
   in
-  let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
+  let* (_incr : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure incr op
+  in
   return_unit
 
 let add_op block op =
@@ -1593,7 +1601,7 @@ let test_timeout () =
   let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
   (* Testing to send a timeout before it's allowed. There is one block left
      before timeout is allowed, that is, the current block. *)
-  let* _incr =
+  let* (_incr : Incremental.t) =
     let expected_block_left = 0l in
     let expect_apply_failure = function
       | Environment.Ecoproto_error
@@ -1859,7 +1867,9 @@ let test_dissection_during_final_move () =
         return_unit
     | _ -> failwith "It should have failed with [Dissecting_during_final_move]"
   in
-  let* _incr = Incremental.add_operation ~expect_apply_failure incr p2_op in
+  let* (_incr : Incremental.t) =
+    Incremental.add_operation ~expect_apply_failure incr p2_op
+  in
   return_unit
 
 let init_arith_state ~boot_sector =

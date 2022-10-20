@@ -84,7 +84,7 @@ module Test_raw_level_repr = struct
      | Error _ -> return_unit)
     >>=? fun () ->
     try
-      let _ = Raw_level_repr.of_int32_exn int32v in
+      let (_ : Raw_level_repr.t) = Raw_level_repr.of_int32_exn int32v in
       failwith "Negative int32s should not be coerced into raw_level"
     with Invalid_argument _ -> return_unit
 

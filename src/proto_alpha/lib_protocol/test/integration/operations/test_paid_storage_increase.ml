@@ -233,7 +233,7 @@ let test_effectiveness () =
       contract_dst
       Tez.zero
   in
-  let+ _inc = Incremental.add_operation inc op in
+  let+ (_inc : Incremental.t) = Incremental.add_operation inc op in
   ()
 
 let tests =

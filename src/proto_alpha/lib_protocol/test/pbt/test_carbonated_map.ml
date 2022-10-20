@@ -327,7 +327,7 @@ let test_find_existing =
   int_map_test "Find all elements" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let* kvs, _ = CM.to_list ctxt map in
-  let* _ =
+  let* (_ : CM.context) =
     List.fold_left_e
       (fun ctxt (k, v) ->
         let* v_opt, ctxt = CM.find ctxt k map in

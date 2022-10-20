@@ -149,14 +149,12 @@ let test_check_path () =
   in
   let elements_array = Array.of_list elements in
   let t = List.fold_left snoc_tr nil elements in
-  let _ =
-    Stdlib.List.init n (fun pos ->
-        let* path = compute_path t pos in
-        let* b = check_path path pos elements_array.(pos) (ML.root t) in
-        assert b ;
-        return_unit)
-  in
-  return_unit
+  Stdlib.List.init n (fun pos ->
+      let* path = compute_path t pos in
+      let* b = check_path path pos elements_array.(pos) (ML.root t) in
+      assert b ;
+      return_unit)
+  |> Environment.Error_monad.Tzresult_syntax.join
 
 (* Check that a path is only valid for the position for which it
    was computed *)
@@ -169,13 +167,11 @@ let test_check_path_wrong_pos () =
   let elements_array = Array.of_list elements in
   let t = List.fold_left snoc_tr ML.nil elements in
   let* path = compute_path t (n - 1) in
-  let _ =
-    Stdlib.List.init (n - 2) (fun pos ->
-        let* b = check_path path pos elements_array.(pos) (ML.root t) in
-        assert (not b) ;
-        return_unit)
-  in
-  return_unit
+  Stdlib.List.init (n - 2) (fun pos ->
+      let* b = check_path path pos elements_array.(pos) (ML.root t) in
+      assert (not b) ;
+      return_unit)
+  |> Environment.Error_monad.Tzresult_syntax.join
 
 (* Check that a computed path is invalidated by a tree update  *)
 let test_check_invalidated_path () =
