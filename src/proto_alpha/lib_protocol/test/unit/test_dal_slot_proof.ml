@@ -318,7 +318,7 @@ struct
       Tztest.tztest (mk_title title) `Quick test_function
     in
     let qcheck2 title gen test =
-      Tztest.tztest_qcheck2 ~name:(mk_title title) ~count:1 gen test
+      Tztest.tztest_qcheck2 ~name:(mk_title title) ~count:2 gen test
     in
     let bool = QCheck2.Gen.bool in
     let ordering_tests =
@@ -399,4 +399,21 @@ let tests =
 
     let dal_parameters = constants_mainnet.dal
   end) in
-  Sandbox.tests @ Test.tests @ Mainnet.tests
+  let module Custom = Make (struct
+    let name = "custom"
+
+    let dal_parameters =
+      let dal_mainnet = constants_mainnet.dal in
+      {
+        dal_mainnet with
+        cryptobox_parameters =
+          Dal_helpers.derive_dal_parameters
+            dal_mainnet.cryptobox_parameters
+            ~redundancy_factor:4
+            ~constants_divider:64;
+      }
+  end) in
+  (* TODO/DAL: Enable these tests to cover more protocol parameters if we manage
+     to run DAL crypto part faster. *)
+  ignore @@ Sandbox.tests @ Test.tests @ Mainnet.tests ;
+  Custom.tests

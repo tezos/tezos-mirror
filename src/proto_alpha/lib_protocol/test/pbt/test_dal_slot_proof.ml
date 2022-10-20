@@ -228,5 +228,24 @@ let () =
 
     let dal_parameters = constants_mainnet.dal
   end) in
-  let tests = Sandbox.tests @ Test.tests @ Mainnet.tests in
+  let module Custom = Make (struct
+    let name = "custom"
+
+    let count = 5
+
+    let dal_parameters =
+      let dal_mainnet = constants_mainnet.dal in
+      {
+        dal_mainnet with
+        cryptobox_parameters =
+          Dal_helpers.derive_dal_parameters
+            dal_mainnet.cryptobox_parameters
+            ~redundancy_factor:4
+            ~constants_divider:64;
+      }
+  end) in
+  (* TODO/DAL: Enable these tests to cover more protocol parameters if we manage
+     to run DAL crypto part faster. *)
+  ignore @@ Sandbox.tests @ Test.tests @ Mainnet.tests ;
+  let tests = Custom.tests in
   Alcotest_lwt.run "Refutation_game" tests |> Lwt_main.run
