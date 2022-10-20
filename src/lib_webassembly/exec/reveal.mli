@@ -1,10 +1,10 @@
-exception Invalid_input_hash
+exception Invalid_reveal_hash
 
-type input_hash
+type reveal_hash
 
-(** @raise Invalid_input_hash *)
-val input_hash_from_string_exn : string -> input_hash
+(** @raise Invalid_reveal_hash *)
+val reveal_hash_from_string_exn : string -> reveal_hash
 
-val input_hash_to_string : input_hash -> string
+val reveal_hash_to_string : reveal_hash -> string
 
-type reveal = Reveal_raw_data of input_hash | Reveal_metadata
+type reveal = Reveal_raw_data of reveal_hash | Reveal_metadata

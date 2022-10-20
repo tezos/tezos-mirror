@@ -196,9 +196,9 @@ let valid ~metadata snapshot commit_level ~pvm_name proof =
            input request."
     | ( Some (Reveal_proof (Raw_data_proof data)),
         Needs_reveal (Reveal_raw_data expected_hash) ) ->
-        let data_hash = Sc_rollup_PVM_sig.Input_hash.hash_string [data] in
+        let data_hash = Sc_rollup_PVM_sig.Reveal_hash.hash_string [data] in
         check
-          (Sc_rollup_PVM_sig.Input_hash.equal data_hash expected_hash)
+          (Sc_rollup_PVM_sig.Reveal_hash.equal data_hash expected_hash)
           "Invalid reveal"
     | Some (Reveal_proof Metadata_proof), Needs_reveal Reveal_metadata ->
         return_unit
@@ -215,7 +215,7 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
-  val reveal : Sc_rollup_PVM_sig.Input_hash.t -> string option
+  val reveal : Sc_rollup_PVM_sig.Reveal_hash.t -> string option
 
   module Inbox_with_history : sig
     include

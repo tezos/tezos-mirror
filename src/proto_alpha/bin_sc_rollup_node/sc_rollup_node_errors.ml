@@ -40,7 +40,7 @@ type error +=
     }
   | Missing_PVM_state of Block_hash.t * Int32.t
   | Cannot_checkout_context of Block_hash.t * string option
-  | Cannot_retrieve_reveal of Sc_rollup.Input_hash.t
+  | Cannot_retrieve_reveal of Sc_rollup.Reveal_hash.t
 
 type error +=
   | Lost_game of
@@ -245,8 +245,8 @@ let () =
       Format.fprintf
         ppf
         "The node cannot retrieve a reveal for hash %a"
-        Sc_rollup.Input_hash.pp
+        Sc_rollup.Reveal_hash.pp
         hash)
-    Data_encoding.(obj1 (req "hash" Sc_rollup.Input_hash.encoding))
+    Data_encoding.(obj1 (req "hash" Sc_rollup.Reveal_hash.encoding))
     (function Cannot_retrieve_reveal hash -> Some hash | _ -> None)
     (fun hash -> Cannot_retrieve_reveal hash)

@@ -37,9 +37,9 @@ This sequence of operations was run:
 { "level": 2,
   "commitment_hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
-./octez-client --wait none send sc rollup message 'text:["hash:scd1C1PeCnVMC9jDsDjzEW1Ez9GWS97TLJLxA\n"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
+./octez-client --wait none send sc rollup message 'text:["hash:scrh12kkMqK9bHNXruyMnrcFsfyBqdBwdsZqjrVm6fYahM4tWRXKANu\n"]' from bootstrap2 to '[SC_ROLLUP_HASH]'
 Node is bootstrapped.
-Estimated gas: 1877.317 units (will add 100 for safety)
+Estimated gas: 1877.623 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -50,17 +50,17 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000514
+    Fee to the baker: ꜩ0.000532
     Expected counter: 1
     Gas limit: 1978
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000514
-      payload fees(the block proposer) ....... +ꜩ0.000514
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000532
+      payload fees(the block proposer) ....... +ꜩ0.000532
     Smart contract rollup messages submission:
       Address: [SC_ROLLUP_HASH]
       This smart contract rollup messages submission was successfully applied
-      Consumed gas: 1877.445
+      Consumed gas: 1877.751
       Resulting inbox state: { rollup = [SC_ROLLUP_HASH]
                                level = 3
                                current messages hash  = [SC_ROLLUP_INBOX_HASH]
