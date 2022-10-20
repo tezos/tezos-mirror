@@ -34,4 +34,6 @@ let pp = Z.pp_print
 
 let encoding_for_storage = Data_encoding.z
 
+let encoding_for_operation = Data_encoding.(check_size 10 n)
+
 let encoding_for_RPCs = Data_encoding.n

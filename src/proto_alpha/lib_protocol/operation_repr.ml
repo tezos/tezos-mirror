@@ -1605,7 +1605,7 @@ module Encoding = struct
     obj5
       (req "source" Signature.Public_key_hash.encoding)
       (req "fee" Tez_repr.encoding)
-      (req "counter" (check_size 10 n))
+      (req "counter" Manager_counter_repr.encoding_for_operation)
       (req "gas_limit" (check_size 10 Gas_limit_repr.Arith.n_integral_encoding))
       (req "storage_limit" (check_size 10 n))
 
