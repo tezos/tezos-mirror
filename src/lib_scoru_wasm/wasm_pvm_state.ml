@@ -99,4 +99,6 @@ module Internal_state = struct
     maximum_reboots_per_input : Z.t;
         (** Number of reboots between two inputs. *)
   }
+
+  type computation_status = Starting | Restarting | Running | Failing | Reboot
 end
