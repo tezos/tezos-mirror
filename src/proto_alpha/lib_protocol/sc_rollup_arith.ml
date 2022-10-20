@@ -976,6 +976,7 @@ module Make (Context : P) :
         let* () = Metadata.set (Some metadata) in
         let* () = Status.set Waiting_for_input_message in
         return ()
+    | Dal_page _ -> assert false
 
   let ticked m =
     let open Monad.Syntax in
@@ -1254,7 +1255,8 @@ module Make (Context : P) :
                 (internal_error
                    "Invalid set_input: expecting a raw data reveal, got an \
                     inbox message or a reveal metadata.")
-                state)
+                state
+          | Some (PS.Reveal (Dal_page _)) -> assert false)
       | PS.Needs_reveal Reveal_metadata -> (
           match input_given with
           | Some (PS.Reveal (Metadata _) as metadata) ->
@@ -1264,7 +1266,9 @@ module Make (Context : P) :
                 (internal_error
                    "Invalid set_input: expecting a metadata reveal, got an \
                     inbox message or a raw data reveal.")
-                state)
+                state
+          | Some (PS.Reveal (Dal_page _)) -> assert false)
+      | PS.Needs_reveal (Request_dal_page _) -> assert false
     in
     return (state, request)
 

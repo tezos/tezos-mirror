@@ -83,6 +83,88 @@ module Make (Interpreter : Interpreter.S) :
     in
     Injector.add_pending_operation ~source refute_operation
 
+  (** This function computes the inclusion/membership proof of the page
+      identified by [page_id] in the slot whose data are provided in
+      [slot_data]. *)
+  let page_membership_proof params page_index slot_data =
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4048
+       Rely on DAL node to compute page membership proof and drop
+       the dal-crypto dependency from the rollup node. *)
+    let proof =
+      let open Result_syntax in
+      (* The computation of the page's proof below can be a bit costly. In fact,
+         it involves initialising a cryptobox environment and some non-trivial
+         crypto processing. *)
+      let* dal = Cryptobox.make params in
+      let* polynomial = Cryptobox.polynomial_from_slot dal slot_data in
+      Cryptobox.prove_page dal polynomial page_index
+    in
+    let open Lwt_result_syntax in
+    match proof with
+    | Ok proof -> return proof
+    | Error e ->
+        failwith
+          "%s"
+          (match e with
+          | `Fail s -> "Fail " ^ s
+          | `Segment_index_out_of_range -> "Segment_index_out_of_range"
+          | `Slot_wrong_size s -> "Slot_wrong_size: " ^ s)
+
+  (** When the PVM is waiting for a Dal page input, this function attempts to
+      retrieve the page's content from the store, the data of its slot. Then it
+      computes the proof that the page is part of the slot and returns the
+      content along with the proof.
+
+      If the PVM is not waiting for a Dal page input, or if the slot is known to
+      be unconfirmed on L1, this function returns [None]. If the data of the
+      slot are not saved to the store, the function returns a failure
+      in the error monad. *)
+  let page_info_from_pvm_state store ~dal_endorsement_lag
+      (dal_params : Dal.parameters) start_state =
+    let open Lwt_result_syntax in
+    let*! input_request = PVM.is_input_state start_state in
+    match input_request with
+    | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
+        let Dal.Page.{slot_id; page_index} = page_id in
+        let* pages =
+          Dal_pages_request.slot_pages ~dal_endorsement_lag store slot_id
+        in
+        if List.is_empty pages then (* The slot is not confirmed *)
+          return_none
+        else
+          let pages_per_slot = dal_params.slot_size / dal_params.page_size in
+          (* check invariant that pages' length is correct. *)
+          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4031
+             It's better to do the check when the slots are saved into disk. *)
+          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+             This check is not resilient to dal parameters change. *)
+          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4033
+             This check would be useless if we guarantee atomicity (at least in
+             the interface) when retrieveing a slot's pages: all the pages, or
+             nothing. *)
+          if List.compare_length_with pages pages_per_slot <> 0 then
+            failwith
+              "Unexpected number of pages for slot %a. Got %d instead of %d"
+              Dal.Slot.Header.pp_id
+              slot_id
+              (List.length pages)
+              pages_per_slot
+          else
+            match List.nth_opt pages page_index with
+            | Some content ->
+                let* page_proof =
+                  page_membership_proof dal_params page_index
+                  @@ Bytes.concat Bytes.empty pages
+                in
+                return_some (content, page_proof)
+            | None ->
+                failwith
+                  "Page index %d too big or negative.\n\
+                   Number of pages in a slot is %d."
+                  page_index
+                  pages_per_slot)
+    | _ -> return_none
+
   let generate_proof node_ctxt game start_state =
     let open Lwt_result_syntax in
     (* NOTE: [snapshot_level] and [snapshot_hash] below refer to the level
@@ -95,7 +177,7 @@ module Make (Interpreter : Interpreter.S) :
     let*! snapshot_hash =
       State.hash_of_level node_ctxt.Node_context.store snapshot_level_int32
     in
-    let snaphsot_head =
+    let snapshot_head =
       Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
     in
     let* snapshot_inbox = Inbox.inbox_of_hash node_ctxt snapshot_hash in
@@ -114,10 +196,10 @@ module Make (Interpreter : Interpreter.S) :
       >|= Environment.wrap_tzresult
     in
     let* dal_slots_history =
-      Dal_slots_tracker.slots_history_of_hash node_ctxt snaphsot_head
+      Dal_slots_tracker.slots_history_of_hash node_ctxt snapshot_head
     in
     let* dal_slots_history_cache =
-      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snaphsot_head
+      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snapshot_head
     in
     (* We fetch the value of protocol constants at block snapshot_hash
        where the game started. *)
@@ -131,7 +213,13 @@ module Make (Interpreter : Interpreter.S) :
     let dal_parameters = dal_l1_parameters.cryptobox_parameters in
     let dal_endorsement_lag = dal_l1_parameters.endorsement_lag in
 
-    let* page_info = return_none in
+    let* page_info =
+      page_info_from_pvm_state
+        ~dal_endorsement_lag
+        node_ctxt.store
+        dal_parameters
+        start_state
+    in
     let module P = struct
       include PVM
 

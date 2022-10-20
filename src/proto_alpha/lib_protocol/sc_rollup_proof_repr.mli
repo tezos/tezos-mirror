@@ -49,8 +49,14 @@ open Sc_rollup_repr
 type reveal_proof =
   | Raw_data_proof of string
       (** The existence of reveal for a given hash when the
-          [input_requested] is the [Needs_for_reveal]. *)
+          [input_requested] is the [Needs_reveal Reveal_raw_data]. *)
   | Metadata_proof
+  | Dal_page_proof of {
+      page_id : Dal_slot_repr.Page.t;
+      proof : Dal_slot_repr.History.proof;
+    }
+      (** The existence or not of a confirmed slot for a given page ID when the
+          [input_requested] is the [Needs_reveal Request_dal_page]. *)
 
 (** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
@@ -161,6 +167,9 @@ module type PVM_with_context_and_state = sig
     val history : Sc_rollup_inbox_repr.History.t
   end
 
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+     This interface might not be resilient to dal parameters changes
+     (cryptobox parameters or dal_endorsement_lag for instance). *)
   module Dal_with_history : sig
     (** The reference/snapshot cell of the DAL skip list that stores
         confirmed slots. *)
@@ -179,7 +188,7 @@ module type PVM_with_context_and_state = sig
         is not confirmed, the value of [page_info] should be [None].
 
         In case the proof doesn't involve DAL inputs, the value of [page_info]
-        is irrelevant. *)
+        is [None]. *)
     val page_info :
       (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
 

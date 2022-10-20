@@ -87,5 +87,20 @@ let dal_finalisation ctxt =
     ~default:(fun ctxt -> return (ctxt, None))
     (fun ctxt ->
       Dal.Slot.finalize_current_slot_headers ctxt >>= fun ctxt ->
+      (* The fact that slots confirmation is done at finalization is very
+         important for the assumptions made by the Dal refutation game. In fact:
+         - {!Dal.Slot.finalize_current_slot_headers} updates the Dal skip list
+         at block finalization, by inserting newly confirmed slots;
+         - {!Sc_rollup.Game.initial}, called when applying a manager operation
+         that starts a refutation game, makes a snapshot of the Dal skip list
+         to use it as a reference if the refutation proof involves a Dal input.
+
+         If confirmed Dal slots are inserted into the skip list during operations
+         application, adapting how refutation games are made might be needed
+         to e.g.,
+         - use the same snapshotted skip list as a reference by L1 and rollup-node;
+         - disallow proofs involving pages of slots that have been confirmed at the
+           level where the game started.
+      *)
       Dal.Slot.finalize_pending_slot_headers ctxt
       >|=? fun (ctxt, slot_availability) -> (ctxt, Some slot_availability))

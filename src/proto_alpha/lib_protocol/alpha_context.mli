@@ -3045,7 +3045,10 @@ module Sc_rollup : sig
     payload : Inbox_message.serialized;
   }
 
-  type reveal_data = Raw_data of string | Metadata of Metadata.t
+  type reveal_data =
+    | Raw_data of string
+    | Metadata of Metadata.t
+    | Dal_page of Dal.Page.content option
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -3063,7 +3066,10 @@ module Sc_rollup : sig
 
   module Reveal_hash : S.HASH
 
-  type reveal = Reveal_raw_data of Reveal_hash.t | Reveal_metadata
+  type reveal =
+    | Reveal_raw_data of Reveal_hash.t
+    | Reveal_metadata
+    | Request_dal_page of Dal.Page.t
 
   type input_request =
     | No_input_required
@@ -3565,7 +3571,13 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type reveal_proof = Raw_data_proof of string | Metadata_proof
+    type reveal_proof =
+      | Raw_data_proof of string
+      | Metadata_proof
+      | Dal_page_proof of {
+          page_id : Dal.Page.t;
+          proof : Dal.Slots_history.proof;
+        }
 
     type input_proof =
       | Inbox_proof of {

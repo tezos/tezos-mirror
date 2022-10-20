@@ -1003,6 +1003,9 @@ let validity_final_move dal_parameters ~dal_endorsement_lag ~first_move
   let*! res =
     let {inbox_snapshot; inbox_level; pvm_name; dal_snapshot; _} = game in
     let*! valid =
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+         This function is not resilient to dal parameters changes
+         (cryptobox parameters or dal_endorsement_lag for instance). *)
       Sc_rollup_proof_repr.valid
         ~metadata
         inbox_snapshot
