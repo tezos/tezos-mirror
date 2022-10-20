@@ -209,8 +209,9 @@ module Raw_context_tests = struct
     let* address =
       Zk_rollup_repr.Address.from_nonce (Origination_nonce.incr nonce) |> wrap
     in
-    let*! _e = Zk_rollup_storage.add_to_pending ctx address [op] >>= wrap in
-    return_unit
+    let*! e = Zk_rollup_storage.add_to_pending ctx address [op] >>= wrap in
+    let expected_message = "Storage error (fatal internal error)" in
+    Assert.proto_error_with_info ~loc:__LOC__ e expected_message
 end
 
 let tests =
