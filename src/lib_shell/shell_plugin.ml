@@ -53,24 +53,6 @@ module type FILTER = sig
 
     val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
 
-    val precheck :
-      config ->
-      filter_state:state ->
-      validation_state:Proto.validation_state ->
-      Tezos_crypto.Operation_hash.t ->
-      Proto.operation ->
-      nb_successful_prechecks:int ->
-      [ `Passed_precheck of
-        state
-        * Proto.validation_state
-        * [ `No_replace
-          | `Replace of
-            Tezos_crypto.Operation_hash.t
-            * Prevalidator_classification.error_classification ]
-      | `Undecided
-      | Prevalidator_classification.error_classification ]
-      Lwt.t
-
     val pre_filter :
       config ->
       filter_state:state ->
@@ -79,14 +61,6 @@ module type FILTER = sig
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
-
-    val post_filter :
-      config ->
-      filter_state:state ->
-      validation_state_before:Proto.validation_state ->
-      validation_state_after:Proto.validation_state ->
-      Proto.operation * Proto.operation_receipt ->
-      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
 
     val add_operation_and_enforce_mempool_bound :
       ?replace:Tezos_crypto.Operation_hash.t ->
@@ -135,16 +109,8 @@ module No_filter (Proto : Registered_protocol.T) :
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () =
       Lwt_result_syntax.return_unit
 
-    let precheck _ ~filter_state:_ ~validation_state:_ _ _
-        ~nb_successful_prechecks:_ =
-      Lwt.return `Undecided
-
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
       Lwt.return @@ `Passed_prefilter (`Low [])
-
-    let post_filter _ ~filter_state ~validation_state_before:_
-        ~validation_state_after:_ _ =
-      Lwt.return (`Passed_postfilter filter_state)
 
     let add_operation_and_enforce_mempool_bound ?replace:_ _ _ filter_state _ =
       Lwt_result.return (filter_state, `No_replace)

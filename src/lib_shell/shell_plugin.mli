@@ -65,44 +65,6 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Tezos_crypto.Operation_hash.t -> state
 
-    (** [precheck config ~filter_state ~validation_state oph op
-        ~nb_successful_prechecks]
-        should be used to decide whether an operation can be gossiped to the
-        network without executing it. This is a wrapper around
-        [Proto.precheck_manager] and [Proto.check_signature]. This
-        function hereby has a similar return type.
-
-        Returns [`Passed_precheck `No_replace] if the operation was successfully
-        prechecked. In case the operation is successfully prechecked
-        but replaces an already prechecked operation [old_oph], the
-        result [`Passed_precheck (`Replace (old_oph, clasification))] is
-        returned, where [classification] is the new classifiation of the
-        replaced operation. If the function returns [`Undecided] it means that
-        [apply_operation] should be called.
-
-        This function takes a filter [state] and a [Proto.validation_state]
-        as parameters, and returns them updated if the operation has been
-        successfully [prechecked]. It also takes an under-approximation
-        [nb_successful_prechecks] of the number of times the given operation
-        has been successfully prechecked. *)
-    val precheck :
-      config ->
-      filter_state:state ->
-      validation_state:Proto.validation_state ->
-      Tezos_crypto.Operation_hash.t ->
-      Proto.operation ->
-      nb_successful_prechecks:int ->
-      [ `Passed_precheck of
-        state
-        * Proto.validation_state
-        * [ `No_replace
-          | `Replace of
-            Tezos_crypto.Operation_hash.t
-            * Prevalidator_classification.error_classification ]
-      | `Undecided
-      | Prevalidator_classification.error_classification ]
-      Lwt.t
-
     (** [pre_filter config ~filter_state ?validation_state_before operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
@@ -122,22 +84,6 @@ module type FILTER = sig
       [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
-
-    (** [post_filter config ~filter_state ~validation_state_before
-        ~validation_state_after (operation_data, operation_receipt)]
-        is called after a call to [Prevalidation.apply_operation] in the
-        prevalidator, on operations that did not fail. It returns
-        [`Passed_postfilter] if the operation passes the filter. It returns
-        [`Refused] otherwise. This function both takes a [filter_state] as
-        parameter and returns a [filter_state], because it can update it while
-        executing. *)
-    val post_filter :
-      config ->
-      filter_state:state ->
-      validation_state_before:Proto.validation_state ->
-      validation_state_after:Proto.validation_state ->
-      Proto.operation * Proto.operation_receipt ->
-      [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
 
     (** Add an operation to the filter {!state}.
 
