@@ -96,7 +96,7 @@ module Event = struct
       ~section
       ~name:"cleaning_up_after_failure"
       ~msg:"cleaning up directory \"{directory}\" after failure."
-      ~level:Notice
+      ~level:Error
       ("directory", Data_encoding.string)
 
   let export_unspecified_hash =
