@@ -634,7 +634,7 @@ let credit_only_call_from_token c contract amount =
       Stake_storage.add_contract_stake c contract amount
 
 let init c =
-  Storage.Contract.Global_counter.init c Z.zero >>=? fun c ->
+  Storage.Contract.Global_counter.init c Manager_counter_repr.init >>=? fun c ->
   Lazy_storage_diff.init c
 
 let used_storage_space c contract =

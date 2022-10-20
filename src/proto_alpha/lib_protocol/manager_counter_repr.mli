@@ -30,3 +30,6 @@
     a manager operation is applied, the value of the counter of
     its manager is checked and incremented. *)
 type t = Z.t
+
+(** Initial value for a counter (zero). *)
+val init : t
