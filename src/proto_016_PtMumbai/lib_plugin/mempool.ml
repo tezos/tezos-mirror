@@ -1392,3 +1392,137 @@ let post_filter config ~(filter_state : state) ~validation_state_before:_
           handle_manager result
       | Cons_result (Manager_operation_result _, _) as result ->
           handle_manager result)
+
+let add_manager_op_and_enforce_mempool_bound validation_state config
+    filter_state oph (op : 'manager_kind Kind.manager operation) =
+  let open Lwt_result_syntax in
+  let*? fee, gas_limit =
+    Result.map_error
+      (fun err -> `Refused (Environment.wrap_tztrace err))
+      (get_manager_operation_gas_and_fee op.protocol_data.contents)
+  in
+  let* replacement, weight =
+    match
+      check_minimal_weight
+        ~validation_state
+        config
+        filter_state
+        ~fee
+        ~gas_limit
+        (Operation_data op.protocol_data)
+    with
+    | `Weight_ok (`No_replace, weight) ->
+        (* The mempool is not full: no need to replace any operation. *)
+        return (`No_replace, weight)
+    | `Weight_ok (`Replace min_weight_oph, weight) ->
+        (* The mempool is full yet the new operation has enough weight
+           to be included: the old operation with the lowest weight is
+           reclassified as [Branch_delayed]. *)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
+           branch_delayed ring is bounded to 1000, so we may loose
+           operations. We can probably do better. *)
+        let replace_err =
+          Environment.wrap_tzerror Removed_fees_too_low_for_mempool
+        in
+        let replacement =
+          `Replace (min_weight_oph, `Branch_delayed [replace_err])
+        in
+        return (replacement, weight)
+    | `Fail err ->
+        (* The mempool is full and the weight of the new operation is
+           too low: raise the error returned by {!check_minimal_weight}. *)
+        fail err
+  in
+  let weight = match weight with [x] -> x | _ -> assert false in
+  let info = {manager_op = Manager_op op; gas_limit; fee; weight} in
+  let filter_state = add_manager_op filter_state oph info replacement in
+  return (filter_state, replacement)
+
+(** If the provided operation is a manager operation, add it to the
+    filter_state. If the mempool is full, either return an error if the
+    operation does not have enough weight to be included, or return the
+    operation with minimal weight that gets removed to make room.
+
+    Do nothing on non-manager operations.
+
+    If [replace] is provided, then it is removed from [filter_state]
+    before processing [op]. (If [replace] is a non-manager operation,
+    this does nothing since it was never in [filter_state] to begin with.)
+    Note that when this happens, the mempool can no longer be full after
+    the operation has been removed, so this function always returns
+    [`No_replace].
+
+    This function is designed to be called by the shell each time a
+    new operation has been validated by the protocol. It will be
+    removed in the future once the shell is able to bound the number of
+    operations in the mempool by itself. *)
+let add_operation_and_enforce_mempool_bound ?replace validation_state config
+    filter_state (oph, op) =
+  let filter_state =
+    match replace with
+    | Some replace_oph ->
+        (* If the operation to replace is not a manager operation, then
+           it cannot be present in the [filter_state]. But then,
+           [remove] does nothing anyway. *)
+        remove ~filter_state replace_oph
+    | None -> filter_state
+  in
+  let {protocol_data = Operation_data protocol_data; _} = op in
+  let call_manager protocol_data =
+    add_manager_op_and_enforce_mempool_bound
+      validation_state
+      config
+      filter_state
+      oph
+      {shell = op.shell; protocol_data}
+  in
+  match protocol_data.contents with
+  | Single (Manager_operation _) -> call_manager protocol_data
+  | Cons (Manager_operation _, _) -> call_manager protocol_data
+  | Single _ -> return (filter_state, `No_replace)
+
+let is_manager_operation op =
+  match Operation.acceptable_pass op with
+  | Some pass -> Compare.Int.equal pass Operation_repr.manager_pass
+  | None -> false
+
+(** [conflict_handler config] returns a conflict handler for
+    {!Mempool.add_operation} (see {!Mempool.conflict_handler}).
+
+    - For non-manager operations, we select the greater operation
+      according to {!Operation.compare}.
+
+    - A manager operation is replaced only when the new operation's
+      fee and fee/gas ratio both exceed the old operation's by at least a
+      factor of [config.replace_by_fee_factor] (see {!better_fees_and_ratio}).
+
+    Precondition: both operations must be individually valid (because
+    of the call to {!Operation.compare}). *)
+let conflict_handler config : Mempool.conflict_handler =
+ fun ~existing_operation ~new_operation ->
+  let (_ : Tezos_crypto.Operation_hash.t), old_op = existing_operation in
+  let (_ : Tezos_crypto.Operation_hash.t), new_op = new_operation in
+  if is_manager_operation old_op && is_manager_operation new_op then
+    let new_op_is_better =
+      let open Result_syntax in
+      let {protocol_data = Operation_data old_protocol_data; _} = old_op in
+      let {protocol_data = Operation_data new_protocol_data; _} = new_op in
+      let* old_fee, old_gas_limit =
+        get_manager_operation_gas_and_fee old_protocol_data.contents
+      in
+      let* new_fee, new_gas_limit =
+        get_manager_operation_gas_and_fee new_protocol_data.contents
+      in
+      return
+        (better_fees_and_ratio
+           config
+           old_gas_limit
+           old_fee
+           new_gas_limit
+           new_fee)
+    in
+    match new_op_is_better with
+    | Ok b when b -> `Replace
+    | Ok _ | Error _ -> `Keep
+  else if Operation.compare existing_operation new_operation < 0 then `Replace
+  else `Keep

@@ -138,6 +138,46 @@ module type FILTER = sig
       validation_state_after:Proto.validation_state ->
       Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
+
+    (** Add an operation to the filter {!state}.
+
+        The operation should have been previously validated by the protocol.
+
+        This function is responsible for bounding the number of
+        manager operations in the mempool. If the mempool is full and
+        the input operation is a manager operation, then it is compared
+        with the already present operation with minimal weight. Then
+        either the minimal operation is replaced, or the new operation
+        is rejected.
+
+        If successful, return the updated state and possibly the
+        replaced minimal operation, otherwise return the error
+        classification for the new operation.
+
+        If [replace] is provided, then it is removed from the state
+        before processing the new operation (in which case the mempool
+        can no longer be full, so this function will succeed and return
+        [`No_replace]). *)
+    val add_operation_and_enforce_mempool_bound :
+      ?replace:Tezos_crypto.Operation_hash.t ->
+      Proto.validation_state ->
+      config ->
+      state ->
+      Tezos_crypto.Operation_hash.t * Proto.operation ->
+      ( state
+        * [ `No_replace
+          | `Replace of
+            Tezos_crypto.Operation_hash.t
+            * Prevalidator_classification.error_classification ],
+        Prevalidator_classification.error_classification )
+      result
+      Lwt.t
+
+    (** Return a conflict handler for [Proto.Mempool.add_operation].
+
+        See the documentation of type [Mempool.conflict_handler] in
+        e.g. [lib_protocol_environment/sigs/v8/updater.mli]. *)
+    val conflict_handler : config -> Proto.Mempool.conflict_handler
   end
 end
 

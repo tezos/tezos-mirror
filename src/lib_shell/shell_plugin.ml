@@ -87,6 +87,23 @@ module type FILTER = sig
       validation_state_after:Proto.validation_state ->
       Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
+
+    val add_operation_and_enforce_mempool_bound :
+      ?replace:Tezos_crypto.Operation_hash.t ->
+      Proto.validation_state ->
+      config ->
+      state ->
+      Tezos_crypto.Operation_hash.t * Proto.operation ->
+      ( state
+        * [ `No_replace
+          | `Replace of
+            Tezos_crypto.Operation_hash.t
+            * Prevalidator_classification.error_classification ],
+        Prevalidator_classification.error_classification )
+      result
+      Lwt.t
+
+    val conflict_handler : config -> Proto.Mempool.conflict_handler
   end
 end
 
@@ -128,6 +145,14 @@ module No_filter (Proto : Registered_protocol.T) :
     let post_filter _ ~filter_state ~validation_state_before:_
         ~validation_state_after:_ _ =
       Lwt.return (`Passed_postfilter filter_state)
+
+    let add_operation_and_enforce_mempool_bound ?replace:_ _ _ filter_state _ =
+      Lwt_result.return (filter_state, `No_replace)
+
+    let conflict_handler _ ~existing_operation ~new_operation =
+      if Proto.compare_operations existing_operation new_operation < 0 then
+        `Replace
+      else `Keep
   end
 end
 
