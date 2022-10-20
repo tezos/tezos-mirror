@@ -405,7 +405,7 @@ let test_rollup_node_running ~kind =
     | Some sc_rollup_from_rpc -> JSON.as_string sc_rollup_from_rpc
   in
   let* sc_rollup_from_client =
-    Sc_rollup_client.sc_rollup_address rollup_client
+    Sc_rollup_client.sc_rollup_address ~hooks rollup_client
   in
   if sc_rollup_from_rpc <> sc_rollup then
     failwith
@@ -1146,8 +1146,10 @@ let mode_publish mode publishes sc_rollup_node sc_rollup_client sc_rollup node
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node level
   and* _ = Sc_rollup_node.wait_for_level sc_rollup_other_node level in
   Log.info "Both rollup nodes have reached level %d." level ;
-  let* state_hash = Sc_rollup_client.state_hash sc_rollup_client
-  and* state_hash_other = Sc_rollup_client.state_hash sc_rollup_other_client in
+  let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client
+  and* state_hash_other =
+    Sc_rollup_client.state_hash ~hooks sc_rollup_other_client
+  in
   Check.((state_hash = state_hash_other) string)
     ~error_msg:
       "State hash of other rollup node is %R but the first rollup node has %L" ;

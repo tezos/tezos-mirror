@@ -49,7 +49,7 @@ val create :
 
 (** [sc_rollup_address client] returns the smart contract rollup
    address of the node associated to the [client]. *)
-val sc_rollup_address : t -> string Lwt.t
+val sc_rollup_address : ?hooks:Process.hooks -> t -> string Lwt.t
 
 (** [rpc_get client path] issues a GET request for [path]. *)
 val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
