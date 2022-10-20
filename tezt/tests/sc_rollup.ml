@@ -3152,6 +3152,12 @@ let register ~protocols =
   test_rollup_client_show_address protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_generate_keys protocols ~kind:"wasm_2_0_0" ;
   test_rollup_client_list_keys protocols ~kind:"wasm_2_0_0" ;
+  test_valid_dispute_dissection ~kind:"arith" protocols ;
+  test_refutation_reward_and_punishment protocols ~kind:"arith" ;
+  test_timeout ~kind:"arith" protocols ;
+  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit
+    ~kind:"arith"
+    protocols ;
   (* Specific Arith PVM tezts *)
   test_rollup_origination_boot_sector
     ~boot_sector:"10 10 10 + +"
@@ -3177,10 +3183,4 @@ let register ~protocols =
   test_rollup_arith_uses_reveals protocols ~kind:"arith" ;
   (* Shared tezts - will be executed for both PVMs. *)
   register ~kind:"wasm_2_0_0" ~protocols ;
-  register ~kind:"arith" ~protocols ;
-  test_no_cementation_if_parent_not_lcc_or_if_disputed_commit
-    ~kind:"arith"
-    protocols ;
-  test_valid_dispute_dissection ~kind:"arith" protocols ;
-  test_timeout ~kind:"arith" protocols ;
-  test_refutation_reward_and_punishment protocols ~kind:"arith"
+  register ~kind:"arith" ~protocols
