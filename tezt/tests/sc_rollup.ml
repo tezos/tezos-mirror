@@ -600,7 +600,7 @@ let basic_scenario sc_rollup_node _rollup_client _sc_rollup _node client =
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
-  return ()
+  unit
 
 (* Reactivate when the following TODO is fixed:
 
@@ -625,7 +625,7 @@ let _sc_rollup_node_stops_scenario sc_rollup_node _node client =
   let* _ =
     Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node expected_level
   in
-  return ()
+  unit
 
 let sc_rollup_node_disconnects_scenario sc_rollup_node _rollup_client _sc_rollup
     node client =
@@ -648,7 +648,7 @@ let sc_rollup_node_disconnects_scenario sc_rollup_node _rollup_client _sc_rollup
   let* _ =
     Sc_rollup_node.wait_for_level sc_rollup_node (level + num_messages)
   in
-  return ()
+  unit
 
 let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
     node client =
@@ -682,14 +682,14 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
     (* +2 blocks for [node'] *)
     let* _ = Node.wait_for_level node' 5 in
     Log.info "Nodes are following distinct branches." ;
-    return ()
+    unit
   in
 
   let trigger_reorg () =
     let* () = Client.Admin.connect_address client ~peer:node' in
     let* _ = Node.wait_for_level node 5 in
     Log.info "Nodes are synchronized again." ;
-    return ()
+    unit
   in
 
   let* () = divergence () in
@@ -697,7 +697,7 @@ let sc_rollup_node_handles_chain_reorg sc_rollup_node _rollup_client _sc_rollup
   (* After bringing [node'] back, our SCORU node should see that there is a more attractive head at
      level 5. *)
   let* _ = Sc_rollup_node.wait_for_level ~timeout:3. sc_rollup_node 5 in
-  return ()
+  unit
 
 (* One can retrieve the list of originated SCORUs.
    -----------------------------------------------
@@ -873,7 +873,7 @@ let test_rollup_node_advances_pvm_state ~title ?boot_sector ~internal ~kind =
             (value = i + ((i + 2) * 2))
               int
               ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
-          return ()
+          unit
       | "wasm_2_0_0" ->
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/3729
 
@@ -883,7 +883,7 @@ let test_rollup_node_advances_pvm_state ~title ?boot_sector ~internal ~kind =
                 no_parse_random.wasm           - Stuck state due to parse error
                 no_parse_bad_fingerprint.wasm  - Stuck state due to parse error
           *)
-          return ()
+          unit
       | _otherwise -> raise (Invalid_argument kind)
     in
 
@@ -897,11 +897,11 @@ let test_rollup_node_advances_pvm_state ~title ?boot_sector ~internal ~kind =
       Check.int
       ~error_msg:"Tick counter did not advance (%L >= %R)" ;
 
-    Lwt.return_unit
+    unit
   in
   let* () = Lwt_list.iter_s test_message (range 1 10) in
 
-  Lwt.return_unit
+  unit
 
 let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
   test_rollup_node_advances_pvm_state
@@ -944,7 +944,7 @@ let test_rollup_node_advances_pvm_state ~kind ?boot_sector ~internal =
 
 let bake_levels ?hook n client =
   fold n () @@ fun i () ->
-  let* () = match hook with None -> return () | Some hook -> hook i in
+  let* () = match hook with None -> unit | Some hook -> hook i in
   Client.bake_for_and_wait client
 
 let eq_commitment_typ =
@@ -997,7 +997,7 @@ let check_published_commitment_in_l1 ?(allow_non_published = false)
     if force_new_level then
       (* Triggers injection into the L1 context *)
       bake_levels 1 client
-    else Lwt.return_unit
+    else unit
   in
   let* commitment_in_l1 =
     match published_commitment with
@@ -1014,7 +1014,7 @@ let check_published_commitment_in_l1 ?(allow_non_published = false)
   check_commitment_eq
     (commitment_in_l1, "in L1")
     (published_commitment, "published") ;
-  Lwt.return_unit
+  unit
 
 let test_commitment_scenario ?commitment_period ?challenge_window
     ?(extra_tags = []) ~variant =
@@ -1229,7 +1229,7 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
     ~error_msg:
       "Commitment has been published at a level different than expected (%L = \
        %R)" ;
-  Lwt.return_unit
+  unit
 
 let commitments_messages_reset sc_rollup_node sc_rollup_client sc_rollup _node
     client =
@@ -1386,7 +1386,7 @@ let commitment_stored_robust_to_failures sc_rollup_node sc_rollup_client
   check_commitment_eq
     (Option.map (fun (_, c, _) -> c) stored_commitment, "stored in first node")
     (Option.map (fun (_, c, _) -> c) stored_commitment', "stored in second node") ;
-  return ()
+  unit
 
 let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
     client =
@@ -1453,7 +1453,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
         (init_level + levels_to_commitment - 1 + num_empty_blocks)
     in
     Log.info "Nodes are following distinct branches." ;
-    return ()
+    unit
   in
 
   let trigger_reorg () =
@@ -1464,7 +1464,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
         (init_level + levels_to_commitment - 1 + num_empty_blocks)
     in
     Log.info "Nodes are synchronized again." ;
-    return ()
+    unit
   in
 
   let* () = divergence () in
@@ -1757,7 +1757,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
         "Predecessor fo commitment published by rollup_node2 should be the \
          cemented commitment (%L = %R)"
   in
-  return ()
+  unit
 
 (* Test that the level when a commitment was first published is fetched correctly
    by rollup nodes. *)
@@ -1859,7 +1859,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
         "Rollup nodes do not agree on level when commitment was first \
          published (%L = %R)"
   in
-  return ()
+  unit
 
 (* Check that the SC rollup is correctly originated with a boot sector.
    -------------------------------------------------------
@@ -2020,7 +2020,7 @@ let test_rollup_arith_uses_reveals ~kind =
   in
   Check.(
     (value = nadd) int ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
-  return ()
+  unit
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/4147
 
@@ -2078,7 +2078,7 @@ let test_rollup_client_generate_keys ~kind =
   let alias = "test_key" in
   let* () = Sc_rollup_client.generate_keys ~alias rollup_client in
   let* _account = Sc_rollup_client.show_address ~alias rollup_client in
-  return ()
+  unit
 
 (* Check that the client can list keys.
    ------------------------------------
@@ -2193,11 +2193,11 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   let stop_loser level =
     if List.mem level stop_loser_at then
       Sc_rollup_node.terminate sc_rollup_node2
-    else return ()
+    else unit
   in
 
   let rec consume_inputs i = function
-    | [] -> return ()
+    | [] -> unit
     | inputs :: next_batches as all ->
         let level = start_level + i in
         let* () = stop_loser level in
@@ -2243,7 +2243,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~kind
   Log.info "Checking that we can still retrieve state from rollup node" ;
   (* This is a way to make sure the rollup node did not crash *)
   let* _value = Sc_rollup_client.state_hash ~hooks sc_client1 in
-  return ()
+  unit
 
 let rec swap i l =
   if i <= 0 then l
@@ -2611,7 +2611,7 @@ let test_late_rollup_node =
   let* () = Sc_rollup_node.run sc_rollup_node in
   let* () = bake_levels 30 client in
   let* _status = Sc_rollup_node.wait_for_level ~timeout:2. sc_rollup_node 95 in
-  return ()
+  unit
 
 (* Test interruption of rollup node before the first inbox is processed. Upon
    restart the node should not complain that an inbox is missing. *)
@@ -2863,7 +2863,7 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
     match (answer, expected_error) with
     | Some _, Some _ -> assert false
     | None, None -> failwith "Unexpected error during proof generation"
-    | None, Some _ -> return ()
+    | None, Some _ -> unit
     | Some {commitment_hash; proof}, None ->
         let*! () =
           Client.Sc_rollup.execute_outbox_message
@@ -2876,7 +2876,7 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
         in
         Client.bake_for client
   in
-  if skip then return ()
+  if skip then unit
   else
     let* target_contract_address = originate_target_contract () in
     let* () = perform_rollup_execution_and_cement target_contract_address in
@@ -2886,8 +2886,8 @@ let test_outbox_message_generic ?regression ?expected_error ~skip ~earliness
         let* () =
           check_contract_execution target_contract_address expected_storage
         in
-        return ()
-    | Some _ -> return ()
+        unit
+    | Some _ -> unit
 
 let test_outbox_message ?regression ?expected_error ~earliness ?entrypoint ~kind
     =
