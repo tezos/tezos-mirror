@@ -629,11 +629,10 @@ and admin_instr_gen ~module_reg =
 
 let input_buffer_gen =
   let gen_message =
-    let* rtype = int32 in
     let* raw_level = int32 in
     let* message_counter = map Z.of_int small_nat in
     let+ payload = map Bytes.of_string (small_string ~gen:char) in
-    Input_buffer.{rtype; raw_level; message_counter; payload}
+    Input_buffer.{raw_level; message_counter; payload}
   in
   let* messages = vector_z_gen gen_message in
   let+ num_elements = small_nat in

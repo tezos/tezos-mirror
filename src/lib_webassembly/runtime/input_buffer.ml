@@ -1,5 +1,4 @@
 type message = {
-  rtype : int32;
   raw_level : int32;
   message_counter : Z.t; [@printer Z.pp_print]
   payload : bytes;
