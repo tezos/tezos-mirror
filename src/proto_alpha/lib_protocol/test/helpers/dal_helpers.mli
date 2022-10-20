@@ -28,6 +28,16 @@ open Protocol
 (** Returns an object of type {!Cryptobox.t} from the given DAL paramters. *)
 val mk_cryptobox : Cryptobox.parameters -> Cryptobox.t tzresult
 
+(** Derive new DAL parameters from the given ones by:
+    - setting the given redundancy factor ;
+    - dividing the other fields by the given factor.
+*)
+val derive_dal_parameters :
+  Cryptobox.parameters ->
+  redundancy_factor:int ->
+  constants_divider:int ->
+  Cryptobox.parameters
+
 module Make (P : sig
   val dal_parameters : Alpha_context.Constants.Parametric.dal
 
