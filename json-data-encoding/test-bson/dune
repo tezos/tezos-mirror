@@ -1,0 +1,4 @@
+(tests
+ (names test_bson_relaxation)
+ (libraries json-data-encoding json-data-encoding-bson crowbar alcotest)
+ (package json-data-encoding-bson))
