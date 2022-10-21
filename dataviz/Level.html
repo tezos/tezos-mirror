@@ -41,10 +41,12 @@
                     get: (searchParams, prop) => searchParams.get(prop),
                 });
                 // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
-                let block_value = parseInt(params.block); // "some_value"
-                //console.log()
-                if(block_value){
+                let block_value; // "some_value"
+                if (!(isNaN(parseInt(params.block)))) {
+                    block_value = parseInt(params.block);
+                    document.getElementById("selectedLevel").value = block_value;             
                     let dict_data = populate_v1(server_adress, block_value, block_value).then(dict_data => {
+                        console.log(dict_data)
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_block(dict_data);
@@ -58,36 +60,33 @@
                         }
 
                     });
-                }
-                // parameter from URL         
-                // parameter to URL : https://stackoverflow.com/questions/7097573/is-it-possible-to-update-a-url-link-based-on-user-text-input
-
-                var link = document.getElementById('reflectedlink');
-                var input = document.getElementById('selectedLevel');
-                input.onchange = input.onkeyup = function () {
-                    link.search = "bloc="+ encodeURIComponent(input.value);
-                    link.firstChild.data = link.href;
-                    //window.history.replaceState("", "Endorsement reception delays", link.firstChild.data);
-                };
-
-                // parameter to URL          
-                $('form').keyup(function (e) {
-                    var va = document.getElementById('selectedLevel').value; e.target.value;
-                    let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
+                } else {//take most recent height 
+                    var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
+                    var b= a.then(level=>{
+                        return populate_v1(server_adress, level, level);
+                    });
+                    Promise.all([a,b]).then(([block_value,dict_data])=>{
+                        console.log([block_value,dict_data])
+                        document.getElementById("selectedLevel").value = block_value;             
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
-                        let logs_operation = classify_operations(dict_data)
-                        let result = get_info_block(dict_data);
-                        let t_delay_block = result[0]
-                        let t_baker = result[1]
-                        let max_round = result[2]
-                        resume_obs(logs_operation, t_baker);
-                        replaceDelegate(logs_operation);
-                        for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delay_block[i]);
-                        }
+                            let logs_operation = classify_operations(dict_data)
+                            let result = get_info_block(dict_data);
+                            let t_delay_block = result[0]
+                            let t_baker = result[1]
+                            let max_round = result[2]
+                            resume_obs(logs_operation, t_baker);
+                            replaceDelegate(logs_operation);
+                            for (let i = 0; i <= max_round; i++) {
+                                chart_delays_for_a_block('p', [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]], block_value, i, t_delay_block[i]);
+                            }
 
                     });
-                });
+
+                }
+                
+                $('#go').click(function (e) {
+                    window.location = server_adress+"visualization/Level.html?block="+document.getElementById('selectedLevel').value;
+                })
 
                 $('#plus').click(function (e) {
                     var va = document.getElementById('selectedLevel').value; e.target.value;

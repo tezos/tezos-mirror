@@ -9,6 +9,19 @@ function range(start, end) {
 function onlyUnique(value, index, self) {
     return self.indexOf(value) === index;
 }
+const getHead = function(server){
+    let level;
+    return axios
+        .get(server+"head.json")
+        .then(json => {
+            let json_data=json.data
+            level= json_data["level"]
+            console.log(level)
+        })
+        .then(_=>{return level-1}) 
+        .catch(error => { console.error(error); throw error; });
+
+}
 
 function populate_v1(server_address, beg, end) {
     let dict_data = {};
@@ -336,7 +349,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                             }
                             //If the OP is valid, reception time has a value, but the operation is not included in the block => endo forgotten
                             if ((!("kind" in operation)) && (round_cib in t_baker) && (!("errors" in operation)) && (!("included_in_blocks" in operation)) && ("reception_time" in operation) && (!("kind" in operation))) {
-                                if (delegate == "") { // To look at operation of a specific delegate
+                                if (delegate == "") { // To look at operation of a specific delegate 
                                     operations_logs[round_cib]["endorsements"]["lost"].push(baker_ops["delegate"]);
                                 } else if (baker_ops["delegate"] == delegate) {
                                     operations_logs[round_cib]["endorsements"]["lost"].push(height);
@@ -347,7 +360,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                     }
                     else { // 0 operations => // => block missed by delegate
                         console.log(operations_logs)
-                        if (delegate == "") { // To look at operation of a specific delegate
+                        if (delegate == "") { // To look at operation of a specific delegate 
                             operations_logs[0]["endorsements"]["missed"].push(baker_ops["delegate"])
                         } else if (baker_ops["delegate"] == delegate) {
                             operations_logs[0]["endorsements"]["missed"].push(height)
@@ -538,7 +551,6 @@ const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_val
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
                         card_valide_tcible += endorsing_power[block][delegate];
-                        //console.log(card_valide_tcible,endorsing_power[bloc][delegate], typeof(endorsing_power[bloc][delegate]))
                     }
                 });
                 if (isNaN(card_valide_tcible / sumValues(endorsing_power[block])) == false) {
@@ -568,8 +580,8 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
     if (!(isEmpty(data)) && (!([[undefined, undefined]].includesArray(data)))) {
         var margin = ({ top: 25, right: 30, bottom: 30, left: 40 }),
             width = 1000, // outer width of chart, in pixels
-            height = 400; // outer height of chart, in pixels
-        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { // SI on passe au round suivant, alors on supprime les graphs du level dernièrement observé
+            height = 400; // outer height of chart, in pixels 
+        if ((round == 0) && (typeof (document.querySelector("p")) != 'undefined' && document.querySelector("p") != null)) { //Clean screen 
             console.log(level + " supprimer si round 0 !!!");
             const e = document.querySelector("p");
             while (e.firstChild) {
@@ -612,7 +624,7 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
         bins3 = d3.bin().thresholds(maxValue - minValue)([recep_block_time]);
         console.log(bins3);
 
-        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([recep_block_time])); // aide à définir x: Mauvaise idée
+        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([recep_block_time]));
 
         x = d3.scaleLinear()
             .domain([0, bins_tot[bins_tot.length - 1].x1])
@@ -704,7 +716,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
                 var new_v2 = [];
                 for (const element of v2) {
                     var address_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
-                    new_v2.push(" " + element);
+                    new_v2.push(element + " ");
                 }
                 data[level][k1][k2] = new_v2;
             })
@@ -730,7 +742,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
     tbl.setAttribute('border', '1');
     var tbdy = document.createElement('tbody');
 
-    let missed = ["Missed", (data["0"]["endorsements"]["missed"]).length, data["0"]["endorsements"]["missed"]];// à revoir : le fait que j'introduit "1" n'est pas bon
+    let missed = ["Missed", (data["0"]["endorsements"]["missed"]).length, data["0"]["endorsements"]["missed"]];
     let header;
     if (delegate == "") {
         header = ["Type", "Proportion", "Addresses of corresponding delegates"];
@@ -1190,7 +1202,7 @@ function chart_time_required_endorsments(data) {
                     "translate(" + margin.left + "," + margin.top + ")");
 
             var x = d3.scaleLinear()
-                .domain(d3.extent(data, function (d) { return d.bloc; }))
+                .domain(d3.extent(data, function (d) { return d.block; }))
                 .range([0, width]);
             svg.append("g")
                 .attr("transform", "translate(0," + (height + 5) + ")")
@@ -1211,7 +1223,7 @@ function chart_time_required_endorsments(data) {
                 .attr("stroke", "#69b3a2")
                 .attr("stroke-width", 2)
                 .attr("d", d3.line()
-                    .x(function (d) { return x(d.bloc) })
+                    .x(function (d) { return x(d.block) })
                     .y(function (d) { return y(d.t) })
                 )
 
@@ -1222,7 +1234,7 @@ function chart_time_required_endorsments(data) {
                 .append("circle")
                 .attr("fill", "#3288BD")
                 .attr("stroke", "none")
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(d.t) })
                 .attr("r", 2);
 
@@ -1238,7 +1250,7 @@ function chart_time_required_endorsments(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # bloc →");
+                .text(" # block →");
 
         } catch (e) { console.log(e) }
     } else {
@@ -1624,7 +1636,7 @@ function chart_endorsement_inclusion_based_on_threshold_time(data) {
                 .append("circle")
                 .attr("fill", d => colors(d.level))
                 .attr("stroke", "none")
-                .attr("cx", function (d) { return x(d.bloc) })
+                .attr("cx", function (d) { return x(d.block) })
                 .attr("cy", function (d) { return y(100 * d.pI) })
                 .attr("r", 2);
 
