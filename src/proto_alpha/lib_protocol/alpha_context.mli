@@ -2486,6 +2486,7 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
+(** This module re-exports definitions from {!Delegate_consensus_key}. *)
 module Consensus_key : sig
   type pk = {
     delegate : Signature.Public_key_hash.t;
@@ -2506,7 +2507,7 @@ module Consensus_key : sig
 end
 
 (** This module re-exports definitions from {!Delegate_storage},
-   {!Delegate_missed_endorsements_storage},
+   {!Delegate_consensus_key}, {!Delegate_missed_endorsements_storage},
    {!Delegate_slashed_deposits_storage}, {!Delegate_cycles}. *)
 module Delegate : sig
   val frozen_deposits_limit :

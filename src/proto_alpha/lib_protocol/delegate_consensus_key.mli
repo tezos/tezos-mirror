@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Management of a delegate's consensus key, the one used to sign
+    blocks and consensus operations.  It is responsible for maintaining
+    the tables {!Storage.Consensus_keys},
+    {!Storage.Contract.Consensus_key}, and
+    {!Storage.Contract.Pending_consensus_keys}. *)
+
 type error +=
   | Invalid_consensus_key_update_noop of Cycle_repr.t
   | Invalid_consensus_key_update_active

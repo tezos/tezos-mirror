@@ -168,7 +168,7 @@ represented as *cemented cycles* and will stay as it is for ever. Only
 the rest of the file contains data relative to the snapshot's target
 block, such as the current incomplete cycle and the block's associated
 ledger state. This canonical representation is well suited for
-distributing snapshots through `IPFS <https://ipfs.io/>`_.
+distributing snapshots through `IPFS <https://ipfs.tech/>`_.
 
 
 Export capabilities
