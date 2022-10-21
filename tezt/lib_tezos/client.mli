@@ -1152,6 +1152,42 @@ val spawn_run_script :
   t ->
   Process.t
 
+(** Run [octez-client run script .. on storage .. and input ..] on the script
+    name [n] for a given protocol [p].
+
+    This function passes [n] and [p] to [Contract.find]. See the documentation
+    there for more info.
+
+    Returns the new storage as a string.
+
+    Fails if the new storage cannot be extracted from the output. *)
+val run_script_at :
+  ?hooks:Process.hooks ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  string list ->
+  Protocol.t ->
+  string Lwt.t
+
+(** Same as [run_script_at] but do not wait for the process to exit. *)
+val spawn_run_script_at :
+  ?hooks:Process.hooks ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  string list ->
+  Protocol.t ->
+  Process.t
+
 (** Run [octez-client register global constant value from src].
     Returns the address hash of the new constant. *)
 val register_global_constant :
