@@ -63,7 +63,7 @@ function get_info_block(dict_data, msec = false) {
     return [t_delay_block, t_baker, max_round]
 }
 function delegate_delays_distribution_of_operations(dict_data, delegate, msec = false) {
-    let t_valide = []
+    let t_valid = []
     let complete_delays = delays_distribution_of_operations(dict_data, msec)
     let delays_endorsement = complete_delays[1]
     let delays_pre_endorsement = complete_delays[0]
@@ -91,42 +91,42 @@ function delegate_delays_distribution_of_operations(dict_data, delegate, msec = 
                             }
 
                             if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                let t_op_pre_valide_i = delays_pre_endorsement[va][round_cib]
-                                console.log(t_op_pre_valide_i)
-                                t_op_pre_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_pre_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_pre_valide_i)).toPrecision(6)
-                                t_valide.push({ "type": "preendo", "block": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valide_i) })
+                                let t_op_pre_valid_i = delays_pre_endorsement[va][round_cib]
+                                console.log(t_op_pre_valid_i)
+                                t_op_pre_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_pre_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_pre_valid_i)).toPrecision(6)
+                                t_valid.push({ "type": "preendo", "block": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valid_i) })
                             }
                             else if ((va in delays_endorsement) && (round_cib in delays_endorsement[va])) {
-                                let t_op_valide_i = delays_endorsement[va][round_cib]
-                                t_op_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_valide_i)).toPrecision(6)
-                                t_valide.push({ "type": "endo", "block": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valide_i) })
+                                let t_op_valid_i = delays_endorsement[va][round_cib]
+                                t_op_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_valid_i)).toPrecision(6)
+                                t_valid.push({ "type": "endo", "block": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valid_i) })
                             }
                         }
                     })
             }
         })
     });
-    return t_valide
+    return t_valid
 }
 
 function delays_distribution_of_operations(dict_data, msec = false) {
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                t_op_valide_i[round] = [];
-                t_op_pre_valide_i[round] = []
+                t_op_valid_i[round] = [];
+                t_op_pre_valid_i[round] = []
 
             })
         }
@@ -143,34 +143,34 @@ function delays_distribution_of_operations(dict_data, msec = false) {
                             delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
                         }
                         if (("kind" in operation)) {
-                            t_op_pre_valide_i[round_cib].push(delay);
+                            t_op_pre_valid_i[round_cib].push(delay);
                         }
                         else {
-                            t_op_valide_i[round_cib].push(delay);
+                            t_op_valid_i[round_cib].push(delay);
                         }
                     }
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
-    return [t_op_pre_valide, t_op_valide]
+    return [t_op_pre_valid, t_op_valid]
 }
 
 function delays_distribution_of_operations_w_delegate(dict_data, msec = false) {// instead of returning an array of delays, it returns a dict with delegate address as key and delay as value.
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
         if ("blocks" in v) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                t_op_valide_i[round] = {};
-                t_op_pre_valide_i[round] = {}
+                t_op_valid_i[round] = {};
+                t_op_pre_valid_i[round] = {}
 
             })
         }
@@ -187,18 +187,18 @@ function delays_distribution_of_operations_w_delegate(dict_data, msec = false) {
                             delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
                         }
                         if (("kind" in operation)) {
-                            t_op_pre_valide_i[round_cib][baker_ops["delegate"]] = delay;
+                            t_op_pre_valid_i[round_cib][baker_ops["delegate"]] = delay;
                         }
                         else {
-                            t_op_valide_i[round_cib][baker_ops["delegate"]] = delay;
+                            t_op_valid_i[round_cib][baker_ops["delegate"]] = delay;
                         }
                     }
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
-    return [t_op_pre_valide, t_op_valide]
+    return [t_op_pre_valid, t_op_valid]
 }
 
 function get_endorsing_power(dict_data) {
@@ -217,24 +217,24 @@ function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) 
     //Get nodes name  
 
     let nodes_used = []; // we store keys, used on server, to differentitate them
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
 
         Object.entries(nodes_used).forEach((node_) => {
 
-            t_op_valide_i[node_] = {};
-            t_op_pre_valide_i[node_] = {};
+            t_op_valid_i[node_] = {};
+            t_op_pre_valid_i[node_] = {};
             if ("blocks" in v) {
                 v["blocks"].forEach((element) => {
                     let round = 0;
                     if ("round" in element) round = element["round"];
                     if ("timestamp" in element) nodes_t_op[node_]["t_baker"][round] = new Date(element["timestamp"][node_]);
-                    nodes_t_op[node_]["t_op_valide_i"][round] = [];
-                    nodes_t_op[node_]["t_op_pre_valide_i"][round] = []
+                    nodes_t_op[node_]["t_op_valid_i"][round] = [];
+                    nodes_t_op[node_]["t_op_pre_valid_i"][round] = []
 
                 })
             }
@@ -253,17 +253,17 @@ function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) 
                                 delay = (new Date(new Date(operation["reception_time"][node_]) - t_baker[node_][round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"][node_]) - t_baker[round_cib][node_]).getMilliseconds();
                             }
                             if (("kind" in operation)) {
-                                t_op_pre_valide_i[node_][round_cib].push(delay);
+                                t_op_pre_valid_i[node_][round_cib].push(delay);
                             }
                             else {
-                                t_op_valide_i[node_][round_cib].push(delay);
+                                t_op_valid_i[node_][round_cib].push(delay);
                             }
                         }
                     })
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
     return nodes_t_op
 
@@ -280,7 +280,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valide": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valide": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] } }
+                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
@@ -288,7 +288,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                         baker_ops["operations"].forEach((operation) => {
                             let round_cib = 0;
                             if ("round" in operation) round_cib = operation["round"];
-                            //Valide
+                            //Valid
                             if ((round_cib in t_baker) && ("reception_time" in operation) && (operation["reception_time"] != null)) {
                                 let delay;
                                 if (msec == false) {
@@ -299,16 +299,16 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                                 }
                                 if (("kind" in operation)) {
                                     if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["preendorsements"]["valide"].push(baker_ops["delegate"]);
+                                        operations_logs[round_cib]["preendorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
                                         //operations_logs[round_cib]["pre_approbations"]["valide"].push(height); //We don't look at preendo resume for adress.html
                                     }
                                 }
                                 else {
                                     if (delegate == "") { // To look at operation of a specific delegate 
-                                        operations_logs[round_cib]["endorsements"]["valide"].push(baker_ops["delegate"]);
+                                        operations_logs[round_cib]["endorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
-                                        operations_logs[round_cib]["endorsements"]["valide"].push(height);
+                                        operations_logs[round_cib]["endorsements"]["valid"].push(height);
                                     }
                                 }
                             }
@@ -340,7 +340,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                             // // How do we deal with invalids ope?? If error other than: op received before candidate block
                         });
                     }
-                    else { // 0 operations => // => bloc missed by delegate
+                    else { // 0 operations => // => block missed by delegate
                         console.log(operations_logs)
                         if (delegate == "") { // To look at operation of a specific delegate 
                             operations_logs[0]["endorsements"]["missed"].push(baker_ops["delegate"])
@@ -357,26 +357,26 @@ function classify_operations(dict_data, delegate = "", msec = false) {
 }
 
 
-const percIntegration = function (threshold, t_op_pre_valide) {
-    console.log(t_op_pre_valide[2412550])
+const percIntegration = function (threshold, t_op_pre_valid) {
+    console.log(t_op_pre_valid[2412550])
     let t_cible = threshold;
     var pI_level = {};
     var d3_pI_level = [];
-    Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         pI_level[block] = {};
         try {
             console.log(typeof (v_block))
             Object.entries(v_block).forEach(([level, v_level]) => {
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(element => {
                     if (element <= t_cible) {
-                        card_valide_tcible += 1;
+                        card_valid_tcible += 1;
                     }
                 });
 
-                if (isNaN(card_valide_tcible / v_level.length) == false) {
-                    pI_level[block][level] = (card_valide_tcible / (v_level.length))
-                    d3_pI_level.push({ block: block, level: level, pI: (card_valide_tcible / v_level.length) })
+                if (isNaN(card_valid_tcible / v_level.length) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (v_level.length))
+                    d3_pI_level.push({ block: block, level: level, pI: (card_valid_tcible / v_level.length) })
                 }
             });
         } catch (e) { console.log(e) }
@@ -385,25 +385,25 @@ const percIntegration = function (threshold, t_op_pre_valide) {
     return d3_pI_level
 }
 
-const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valide, endorsing_power) {
-    console.log(t_op_pre_valide[2412550])
+const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valid, endorsing_power) {
+    console.log(t_op_pre_valid[2412550])
     let t_cible = threshold;
     var pI_level = {};
     var d3_pI_level = [];
-    Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         pI_level[block] = {};
         try {
             Object.entries(v_block).forEach(([level, v_level]) => {
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
-                        card_valide_tcible += endorsing_power[block][delegate];
-                        console.log(card_valide_tcible, endorsing_power[block][delegate], typeof (endorsing_power[block][delegate]))
+                        card_valid_tcible += endorsing_power[block][delegate];
+                        console.log(card_valid_tcible, endorsing_power[block][delegate], typeof (endorsing_power[block][delegate]))
                     }
                 });
-                if (isNaN(card_valide_tcible / sumValues(endorsing_power[block])) == false) {
-                    pI_level[block][level] = (card_valide_tcible / (sumValues(endorsing_power[block])))
-                    d3_pI_level.push({ block: block, level: level, pI: (card_valide_tcible / sumValues(endorsing_power[block])) })
+                if (isNaN(card_valid_tcible / sumValues(endorsing_power[block])) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (sumValues(endorsing_power[block])))
+                    d3_pI_level.push({ block: block, level: level, pI: (card_valid_tcible / sumValues(endorsing_power[block])) })
                 }
             });
         } catch (e) { console.log(e) }
@@ -412,12 +412,12 @@ const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valide, 
     return d3_pI_level
 }
 
-const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
+const TimeForPercIntegration = function (threshold, t_op_pre_valid) {
     let l_ = threshold / 100;
     const qd_ = 25; // number of slots for this block, before including endorsing power
     var t_min_ = {};
     var d3_t_min_ = [];
-    Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         try {
             var last_round_ = Object.keys(v_block).map(Number);
             console.log(last_round_);
@@ -445,11 +445,11 @@ const TimeForPercIntegration = function (threshold, t_op_pre_valide) {
 
 }
 
-const TimeForPercIntegration_w_endorsing_power = function (threshold, t_op_pre_valide, endorsing_power) {
+const TimeForPercIntegration_w_endorsing_power = function (threshold, t_op_pre_valid, endorsing_power) {
     let l_ = threshold / 100;
     var t_min_ = {};
     var d3_t_min_ = [];
-    Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+    Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         try {
             const qd_ = sumValues(endorsing_power[block]); // number of slots for this block, before including endorsing power
             console.log("tot_endorsing_pow", qd_)
@@ -481,23 +481,23 @@ const TimeForPercIntegration_w_endorsing_power = function (threshold, t_op_pre_v
 
 
 
-const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure endorsing power 
+const SeriesPercIntegration = function (t_cibles, t_op_pre_valid) {//Inclure endorsing power 
     var t_pI = [];
     t_cibles.forEach((t_cible) => {
         var pI_level = {}; // For each threshold time, a dictionary keeps the amount of pre-endo received, x block and y round
         var l_rounds = []; // 
-        Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+        Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
             pI_level[block] = {};
             Object.entries(v_block).forEach(([level, v_level]) => {
                 l_rounds.push(level);
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 for (const element of v_level) {
                     if (element <= t_cible) {
-                        card_valide_tcible += 1;
+                        card_valid_tcible += 1;
                     }
                 }
-                if (isNaN(card_valide_tcible / v_level.length) == false) {
-                    pI_level[block][level] = (card_valide_tcible / (v_level.length))
+                if (isNaN(card_valid_tcible / v_level.length) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (v_level.length))
                 }
             })
         });
@@ -517,23 +517,23 @@ const SeriesPercIntegration = function (t_cibles, t_op_pre_valide) {//Inclure en
 }
 
 
-const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_valide, endorsing_power) {//Inclure endorsing power 
+const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_valid, endorsing_power) {//Inclure endorsing power 
     var t_pI = [];
     t_cibles.forEach((t_cible) => {
         var pI_level = {}; // For each threshold time, a dictionary keeps the amount of pre-endo received, x block and y round
         var l_rounds = []; // 
-        Object.entries(t_op_pre_valide).forEach(([block, v_block]) => {
+        Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
             pI_level[block] = {};
             Object.entries(v_block).forEach(([level, v_level]) => {
                 l_rounds.push(level);
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
-                        card_valide_tcible += endorsing_power[block][delegate];
+                        card_valid_tcible += endorsing_power[block][delegate];
                     }
                 });
-                if (isNaN(card_valide_tcible / sumValues(endorsing_power[block])) == false) {
-                    pI_level[block][level] = (card_valide_tcible / (sumValues(endorsing_power[block])))
+                if (isNaN(card_valid_tcible / sumValues(endorsing_power[block])) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (sumValues(endorsing_power[block])))
                 }
             })
         });
@@ -551,8 +551,6 @@ const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_val
     })
     return t_pI
 }
-
-
 
 
 function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
@@ -653,7 +651,7 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .attr("text-anchor", "middle")
             .style("font-size", "17px")
             .style("text-decoration", "underline")
-            .text("Reception times for block " + level + "at round " + round);
+            .text("Reception times for block " + level + " at round " + round);
 
         svg.append("text")
             .attr("x", -margin.left + 40)
@@ -724,8 +722,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
     if (delegate == "") {
         header = ["Type", "Proportion", "Addresses of corresponding delegates"];
     } else {
-        header = ["Type", "Proportion", "Corresponding blocs"];
-
+        header = ["Type", "Proportion", "Corresponding blocks"];
     }
 
     var tr_missed = document.createElement('tr');
@@ -753,15 +750,15 @@ const resume_obs = function (data, t_baker, delegate = "") {
             tr_round.appendChild(td_round);
             tbdy.appendChild(tr_round);
 
-            let valide = ["Valids", (v["endorsements"]["valide"]).length];
-            var tr_valide = document.createElement('tr');
-            valide.forEach((element) => {
+            let valid = ["Valids", (v["endorsements"]["valid"]).length];
+            var tr_valid = document.createElement('tr');
+            valid.forEach((element) => {
                 var td = document.createElement('td');
 
                 td.appendChild(document.createTextNode(element));
-                tr_valide.appendChild(td);
+                tr_valid.appendChild(td);
             })
-            tbdy.appendChild(tr_valide);
+            tbdy.appendChild(tr_valid);
 
             let lost = ["Losts", (v["endorsements"]["lost"]).length, v["endorsements"]["lost"]];
             var tr_lost = document.createElement('tr');
@@ -802,7 +799,7 @@ function chart_preendorsement_inclusion_based_on_multiple_threshold_time(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),
             width = 850 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("gamma").querySelector("svg")) {
@@ -919,8 +916,8 @@ const replaceDelegate = function (data) {
 
             for (let i = 1; i < lgth; i++) {
                 console.log(data[i]);
-                let delegate_next = data[i]["preendorsements"]["valide"];
-                let delegate_prec = data[i - 1]["preendorsements"]["valide"];
+                let delegate_next = data[i]["preendorsements"]["valid"];
+                let delegate_prec = data[i - 1]["preendorsements"]["valid"];
                 for (let x of delegate_prec) {
                     if (delegate_next.includes(x) == false) {
                         replaceDelegate_[i]["outgoing"].push(x);
@@ -963,7 +960,7 @@ const replaceDelegate = function (data) {
             var tbdy = document.createElement('tbody');
 
             var tr_header = document.createElement('tr');
-            let header = ["Number of incoming delegates", "address of incoming delegates", "Number of outgoing delegates", "address of outgoing delegates"];
+            let header = ["Number of incoming delegates", "Addresses of incoming delegates", "Number of outgoing delegates", "Addresses of outgoing delegates"];
 
             header.forEach((element) => {
                 var th = document.createElement('th');
@@ -999,7 +996,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
             width = 560 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("alpha").querySelector("svg")) {
@@ -1085,7 +1082,7 @@ function chart_time_required(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 60, bottom: 30, left: 40 }),
             width = 800 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 400 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("beta").querySelector("svg")) {
@@ -1241,7 +1238,7 @@ function chart_consensus_operation_specific_address(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("dataviz").querySelector("svg")) {
@@ -1368,7 +1365,7 @@ function chart_time_mean_deviation(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 220, bottom: 30, left: 40 }),
             width = 870 - margin.left - margin.right;//1000, // outer width of chart, in pixels
-        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels 
+        height = 500 - margin.top - margin.bottom;//400; // outer height of chart, in pixels
         try {
             try {
                 while (document.getElementById("ecart_moyenne").querySelector("svg")) {
@@ -1446,7 +1443,7 @@ function chart_time_mean_deviation(data) {
                         .attr("id", "tooltip")
                         .attr("x", xPosition)
                         .attr("y", yPosition)
-                        .text("Bloc: " + d.block)
+                        .text("Block: " + d.block)
 
                 })
                 .on("mouseout", function () {
