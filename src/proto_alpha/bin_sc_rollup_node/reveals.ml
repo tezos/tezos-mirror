@@ -28,6 +28,8 @@ module Reveal_hash = Protocol.Alpha_context.Sc_rollup.Reveal_hash
 type error +=
   | Wrong_hash of {found : Reveal_hash.t; expected : Reveal_hash.t}
   | Could_not_open_preimage_file of String.t
+  | Empty_reveal_data
+  | PVM_not_supported of Protocol.Alpha_context.Sc_rollup.Kind.t
 
 let () =
   register_error_kind
@@ -63,7 +65,31 @@ let () =
     Data_encoding.(obj1 (req "hash" string))
     (function
       | Could_not_open_preimage_file filename -> Some filename | _ -> None)
-    (fun filename -> Could_not_open_preimage_file filename)
+    (fun filename -> Could_not_open_preimage_file filename) ;
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_node_empty_reveal_data"
+    ~title:"Empty revelation data"
+    ~description:"Empty revelation data."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string ppf "Tried to import or use empty revelation data.")
+    Data_encoding.unit
+    (function Empty_reveal_data -> Some () | _ -> None)
+    (fun () -> Empty_reveal_data) ;
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_node_reveal_data_not_supported"
+    ~title:"Revelation data not supported for PVM"
+    ~description:"Revelation data not supported for PVM."
+    ~pp:(fun ppf kind ->
+      Format.fprintf
+        ppf
+        "Revelation data not supported for PVM %s"
+        (Protocol.Alpha_context.Sc_rollup.Kind.name_of kind))
+    Data_encoding.(
+      obj1 (req "pvm_kind" Protocol.Alpha_context.Sc_rollup.Kind.encoding))
+    (function PVM_not_supported k -> Some k | _ -> None)
+    (fun k -> PVM_not_supported k)
 
 type source = String of string | File of string
 
@@ -207,21 +233,27 @@ module Arith = struct
     close_input input ;
     linked_hashed_chunks
 
+  let first_hash = function
+    | (hash, _) :: _ -> ok hash
+    | [] -> error Empty_reveal_data
+
   let import data_dir source =
     ensure_dir_exists data_dir pvm_name ;
     let linked_hashed_chunks = chunkify source in
     List.iter
       (fun (hash, data) -> save_string (path data_dir pvm_name hash) data)
       linked_hashed_chunks ;
-    Stdlib.List.hd linked_hashed_chunks |> fst
+    first_hash linked_hashed_chunks
 
   let chunkify source =
+    let open Result_syntax in
     let linked_hashed_chunks = chunkify source in
     let chunks_map =
       linked_hashed_chunks |> List.to_seq
       |> Protocol.Alpha_context.Sc_rollup.Reveal_hash.Map.of_seq
     in
-    (chunks_map, Stdlib.List.hd linked_hashed_chunks |> fst)
+    let+ hash = first_hash linked_hashed_chunks in
+    (chunks_map, hash)
 end
 
 let import ~data_dir (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
@@ -231,9 +263,9 @@ let import ~data_dir (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t)
   | Wasm_2_0_0 ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/4067
          Add support for multiple revelation data serialization schemes *)
-      Stdlib.failwith "Not supported yet"
+      error (PVM_not_supported pvm_kind)
 
 let chunkify (pvm_kind : Protocol.Alpha_context.Sc_rollup.Kind.t) source =
   match pvm_kind with
   | Example_arith -> Arith.chunkify source
-  | Wasm_2_0_0 -> Stdlib.failwith "Not supported yet"
+  | Wasm_2_0_0 -> error (PVM_not_supported pvm_kind)

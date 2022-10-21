@@ -79,7 +79,7 @@ val import :
   data_dir:string ->
   Sc_rollup.Kind.t ->
   filename:string ->
-  Sc_rollup.Reveal_hash.t
+  Sc_rollup.Reveal_hash.t tzresult
 
 (** [chunkify pvm_kind source] turns the content of ~filename into a chunk of
     pages of (at most) 4KB. It returns the map of chunks and the hash of the
@@ -87,4 +87,4 @@ val import :
 val chunkify :
   Sc_rollup.Kind.t ->
   source ->
-  string Sc_rollup.Reveal_hash.Map.t * Sc_rollup.Reveal_hash.t
+  (string Sc_rollup.Reveal_hash.Map.t * Sc_rollup.Reveal_hash.t) tzresult
