@@ -139,7 +139,8 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Context.get_bakers (B blk_a) >>=? fun bakers ->
   let baker = Context.get_first_different_baker delegate bakers in
-  Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+  Context.Delegate.full_balance (B blk_a) baker
+  >>=? fun (_full_balance : Tez.t) ->
   Block.bake ~policy:(By_account baker) ~operation blk_a
   >>=? fun blk_with_evidence1 ->
   block_fork blk_with_evidence1 >>=? fun (blk_30, blk_40) ->
@@ -269,7 +270,7 @@ let test_different_delegates () =
     (B blk_2)
     ()
   >>=? fun e_b ->
-  Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun _ ->
+  Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun (_ : Block.t) ->
   double_endorsement (B blk_b) e_a e_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
@@ -467,7 +468,8 @@ let test_two_double_endorsement_evidences_leads_to_duplicate_denunciation () =
   let operation2 = double_endorsement (B genesis) endorsement_b endorsement_a in
   Context.get_bakers (B blk_a) >>=? fun bakers ->
   let baker = Context.get_first_different_baker delegate bakers in
-  Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+  Context.Delegate.full_balance (B blk_a) baker
+  >>=? fun (_full_balance : Tez.t) ->
   Block.bake
     ~policy:(By_account baker)
     ~operations:[operation; operation2]

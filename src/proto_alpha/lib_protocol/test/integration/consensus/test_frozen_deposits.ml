@@ -218,7 +218,7 @@ let test_set_too_high_limit () =
   Op.set_deposits_limit (B genesis) contract1 (Some max_limit)
   >>=? fun operation ->
   Incremental.add_operation ~expect_apply_failure b operation >>=? fun b ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 let test_unset_limit () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
@@ -412,7 +412,7 @@ let test_unfreeze_deposits_after_deactivation () =
         (Tez.(frozen_deposits = zero) && Tez.(balance = initial_balance))
       >>=? fun () -> loop b (pred n)
   in
-  loop genesis cycles_to_bake >>=? fun _b -> return_unit
+  loop genesis cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
 
 let test_frozen_deposits_with_delegation () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
@@ -478,7 +478,7 @@ let test_frozen_deposits_with_delegation () =
   in
   (* Check that frozen deposits do not change for a sufficient period of
      time *)
-  loop b cycles_to_bake >>=? fun _b -> return_unit
+  loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
 
 let test_frozen_deposits_with_overdelegation () =
   Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
@@ -558,7 +558,7 @@ let test_frozen_deposits_with_overdelegation () =
   in
   (* Check that frozen deposits do not change for a sufficient period of
      time *)
-  loop b cycles_to_bake >>=? fun _b -> return_unit
+  loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
 
 let test_set_limit_with_overdelegation () =
   let constants = {constants with frozen_deposits_percentage = 10} in
@@ -627,7 +627,7 @@ let test_set_limit_with_overdelegation () =
   in
   (* Check that frozen deposits do not change for a sufficient period of
      time *)
-  loop b cycles_to_bake >>=? fun _b -> return_unit
+  loop b cycles_to_bake >>=? fun (_b : Block.t) -> return_unit
 
 (** This test fails when [to_cycle] in [Delegate.freeze_deposits] is smaller than
    [new_cycle + preserved_cycles]. *)
@@ -662,7 +662,8 @@ let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
   Op.transaction ~force_reveal:true (B b) contract1 contract2 balance1
   >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
-  Block.bake_until_n_cycle_end constants.preserved_cycles b >>=? fun _ ->
+  Block.bake_until_n_cycle_end constants.preserved_cycles b
+  >>=? fun (_ : Block.t) ->
   (* By this time, after [preserved_cycles] passed after [account1] has emptied
         its spendable balance, because [account1] had a big staking balance at
         cycle 0, at this cycle it has a big active stake, and so its

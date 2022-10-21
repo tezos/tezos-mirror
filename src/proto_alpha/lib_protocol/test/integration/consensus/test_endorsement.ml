@@ -54,7 +54,7 @@ let inject_the_first_endorsement () =
 
 (** Apply a single endorsement from the slot 0 endorser. *)
 let test_simple_endorsement () =
-  inject_the_first_endorsement () >>=? fun _ -> return_unit
+  inject_the_first_endorsement () >>=? fun (_, _) -> return_unit
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -72,7 +72,7 @@ let test_negative_slot () =
         ~endorsed_block:b
         (B genesis)
         ()
-      >>=? fun _ ->
+      >>=? fun (_ : _ operation) ->
       failwith "negative slot should not be accepted by the binary format")
     (function
       | Data_encoding.Binary.Write_error _ -> return_unit | e -> Lwt.fail e)
@@ -419,10 +419,11 @@ let test_preendorsement_endorsement_same_level () =
   >>=? fun i ->
   Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_endo ->
   let op_endo = Alpha_context.Operation.pack op_endo in
-  Incremental.add_operation i op_endo >>=? fun _i ->
+  Incremental.add_operation i op_endo >>=? fun (_i : Incremental.t) ->
   Op.preendorsement ~endorsed_block:b1 (B genesis) () >>=? fun op_preendo ->
   let op_preendo = Alpha_context.Operation.pack op_preendo in
-  Incremental.add_operation i op_preendo >>=? fun _i -> return ()
+  Incremental.add_operation i op_preendo >>=? fun (_i : Incremental.t) ->
+  return_unit
 
 (** Test for endorsement injection with wrong slot in mempool mode. This
     test is expected to fail *)
@@ -476,7 +477,7 @@ let test_endorsement_grandparent () =
   let op2 = Alpha_context.Operation.pack op2 in
   (* Both should be accepted by the mempool *)
   Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op2 >>=? fun _i -> return ()
+  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
 
 (** Double inclusion of grandparent endorsement *)
 let test_double_endorsement_grandparent () =
@@ -499,7 +500,7 @@ let test_double_endorsement_grandparent () =
     res
     "Double inclusion of consensus operation"
   >>=? fun () ->
-  Incremental.add_operation i op2 >>=? fun _i -> return ()
+  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
 
 (** Endorsement of grandparent on same slot as parent *)
 let test_endorsement_grandparent_same_slot () =
@@ -517,7 +518,7 @@ let test_endorsement_grandparent_same_slot () =
   let op2 = Alpha_context.Operation.pack op2 in
   (* Both should be accepted by the mempool *)
   Incremental.add_operation i op1 >>=? fun i ->
-  Incremental.add_operation i op2 >>=? fun _i -> return ()
+  Incremental.add_operation i op2 >>=? fun (_i : Incremental.t) -> return_unit
 
 (** Endorsement of grandparent in application mode should be rejected *)
 let test_endorsement_grandparent_application () =

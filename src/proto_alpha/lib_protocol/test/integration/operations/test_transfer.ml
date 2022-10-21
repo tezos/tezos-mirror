@@ -91,7 +91,7 @@ let single_transfer ?fee ?expect_apply_failure amount =
     contract_2
     amount
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Single transfer without fee. *)
 let test_block_with_a_single_transfer () = single_transfer Tez.one
@@ -136,7 +136,7 @@ let test_transfer_to_originate_with_fee () =
   Incremental.begin_construction b >>=? fun i ->
   transfer_and_check_balances ~loc:__LOC__ i ~fee contract new_contract amount
   >>=? fun (i, _) ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
@@ -151,7 +151,7 @@ let test_transfer_amount_of_contract_balance () =
   (* transfer all the tez inside contract 1 *)
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 balance
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer to oneself. *)
 let test_transfers_to_self () =
@@ -173,7 +173,7 @@ let test_transfers_to_self () =
     ~fee
     contract
     ten_tez
-  >>=? fun _ -> return_unit
+  >>=? fun (_, _) -> return_unit
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
@@ -188,8 +188,9 @@ let test_missing_transaction () =
   (* Do the transfer 3 times from source contract to destination contract *)
   n_transactions 3 i contract_1 contract_2 amount >>=? fun i ->
   (* do the fourth transfer from source contract to destination contract *)
-  Op.transaction (I i) contract_1 contract_2 amount >>=? fun _ ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Op.transaction (I i) contract_1 contract_2 amount
+  >>=? fun (_ : packed_operation) ->
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_zero_implicit_with_bal_src_as_fee () =
@@ -241,7 +242,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   Op.transaction (B b) ~fee:bal_src src new_contract Tez.zero
   >>=? fun operation ->
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
-  Block.bake ~operation b >>=? fun _ -> return_unit
+  Block.bake ~operation b >>=? fun (_ : Block.t) -> return_unit
 
 (** Transfer one tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_one_to_implicit_with_bal_src_as_fee () =
@@ -262,7 +263,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
           Assert.test_error_encodings err ;
           return_unit
       | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Incremental.t) -> return_unit
 
 (********************)
 (* The following tests are for different kind of contracts:
@@ -307,7 +308,7 @@ let test_transfer_from_implicit_to_implicit_contract () =
     dest
     amount2
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Implicit to originated. *)
 let test_transfer_from_implicit_to_originated_contract () =
@@ -340,7 +341,7 @@ let test_transfer_from_implicit_to_originated_contract () =
   (* transfer from implicit contract to originated contract *)
   transfer_and_check_balances ~loc:__LOC__ i src new_contract amount2
   >>=? fun (i, _) ->
-  Incremental.finalize_block i >>=? fun _ -> return_unit
+  Incremental.finalize_block i >>=? fun (_ : Block.t) -> return_unit
 
 (********************)
 (* Slow tests case *)
@@ -352,7 +353,7 @@ let multiple_transfer n ?fee amount =
   >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** 1- Create a block with two contracts;
     2- Apply 100 transfers.
@@ -392,7 +393,7 @@ let test_block_with_multiple_transfers_with_without_fee () =
   n_transactions 50 ~fee:ten b contracts.(7) contracts.(5) twenty >>=? fun b ->
   n_transactions 30 ~fee:ten b contracts.(0) contracts.(7) hundred >>=? fun b ->
   n_transactions 20 ~fee:ten b contracts.(1) contracts.(0) twenty >>=? fun b ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
@@ -406,7 +407,7 @@ let test_build_a_chain () =
       >>=? fun (b, _) -> Incremental.finalize_block b)
     b
     (1 -- 10)
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Block.t) -> return_unit
 
 (*********************************************************************)
 (* Expected error test cases                                         *)
@@ -487,9 +488,7 @@ let test_balance_too_low_two_transfers fee () =
       :: _ ->
         Assert.test_error_encodings err ;
         return_unit
-    | t ->
-        failwith "Unexpected error: %a" Error_monad.pp_print_trace t
-        >>=? fun _ -> return_unit
+    | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
   in
   Incremental.begin_construction b >>=? fun i ->
   Incremental.add_operation ~expect_apply_failure i operation >>=? fun i ->
@@ -523,7 +522,8 @@ let test_add_the_same_operation_twice () =
   >>=? fun (i, op_transfer) ->
   Incremental.finalize_block i >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
-  Op.transaction (I i) contract_1 contract_2 ten_tez >>=? fun _ ->
+  Op.transaction (I i) contract_1 contract_2 ten_tez
+  >>=? fun (_ : packed_operation) ->
   Incremental.add_operation i op_transfer >>= fun b ->
   Assert.proto_error ~loc:__LOC__ b (function
       | Contract_storage.Counter_in_the_past _ as err ->
@@ -554,7 +554,7 @@ let test_ownership_sender () =
   let imcontract_1 = Alpha_context.Contract.Implicit manager.pkh in
   transfer_and_check_balances ~loc:__LOC__ b imcontract_1 contract_2 Tez.one
   >>=? fun (b, _) ->
-  Incremental.finalize_block b >>=? fun _ -> return_unit
+  Incremental.finalize_block b >>=? fun (_ : Block.t) -> return_unit
 
 (*********************************************************************)
 (* Random transfer *)
@@ -591,12 +591,12 @@ let test_random_transfer () =
       b
       source
       amount
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
   else
     Incremental.begin_construction ~policy:(Block.Excluding [source_pkh]) b
     >>=? fun i ->
-    transfer_and_check_balances ~loc:__LOC__ i source dest amount >>=? fun _ ->
-    return_unit
+    transfer_and_check_balances ~loc:__LOC__ i source dest amount
+    >>=? fun (_, _) -> return_unit
 
 (** Transfer random transactions. *)
 let test_random_multi_transactions () =

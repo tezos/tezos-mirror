@@ -1192,13 +1192,13 @@ let test_voting_power_updated_each_voting_period () =
     Int64.sub expected_power_of_baker_1 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
-  >>=? fun _ ->
+  >>=? fun () ->
   (* Assert voting power of baker2 has increased by [amount] *)
   let expected_power_of_baker_2 =
     Int64.add expected_power_of_baker_2 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
-  >>=? fun _ ->
+  >>=? fun () ->
   (* Retrieve voting power of baker3 *)
   get_voting_power block baker3 >>=? fun power ->
   let power_of_baker_3 = power in

@@ -80,7 +80,7 @@ module Raw_context_tests = struct
         ctx)
       ctx
       (0 -- 99)
-    >>=? fun _ctx -> return_unit
+    >>=? fun (_ctx : Raw_context.t) -> return_unit
 
   (* Nullifiers don't check for duplicates are it's done by verify_update,
      however committing to disk twice the same nf causes a storage error by
@@ -327,7 +327,7 @@ module Raw_context_tests = struct
         i + 1)
       0
       roots_ctx
-    >>=? fun _ ->
+    >>=? fun (_ : int) ->
     (* Add roots w/o increasing the level *)
     let roots_same_level =
       WithExceptions.List.init ~loc:__LOC__ 10 (fun _ -> gen_root ())
@@ -344,7 +344,7 @@ module Raw_context_tests = struct
         (i + 1, ctx))
       (0, ctx)
       roots_same_level
-    >>=? fun _ -> return_unit
+    >>=? fun (_, _) -> return_unit
 
   let test_get_memo_size () =
     Context.init1 () >>=? fun (b, _contract) ->
@@ -386,7 +386,7 @@ module Alpha_context_tests = struct
         ~bound_data:""
         ps
     in
-    verify_update ctx vt ~memo_size:0 |> assert_some >>=? fun _ ->
+    verify_update ctx vt ~memo_size:0 |> assert_some >>=? fun (_, _) ->
     verify_update ctx vt ~memo_size:1 |> assert_none
 
   (* Bench the proving and validation time of shielding and transferring several
@@ -425,7 +425,7 @@ module Alpha_context_tests = struct
         verify_update ctx ~id vt |> assert_some >|=? fun (ctx, _id) -> ctx)
       ctx
       vts
-    >|=? fun _ctx ->
+    >|=? fun (_ctx : context) ->
     let vtime_transfers = Unix.gettimeofday () -. start in
     Printf.printf "valdtr_txs %f\n" vtime_transfers
 
@@ -466,7 +466,7 @@ module Alpha_context_tests = struct
         ctx)
       ctx
       vts
-    >|=? fun _ctx ->
+    >|=? fun (_ctx : context) ->
     let vtime_transfers = Unix.gettimeofday () -. start in
     Printf.printf "valdtr_txs %f\n" vtime_transfers
 
@@ -732,7 +732,7 @@ module Interpreter_tests = struct
       ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
-    >>=? fun _incr ->
+    >>=? fun (_incr : Incremental.t) ->
     (* Here we fail by changing the field bound_data*)
     let orginal_transac =
       Tezos_sapling.Forge.forge_transaction
@@ -767,7 +767,7 @@ module Interpreter_tests = struct
       ~expect_apply_failure:(fun _ -> return_unit)
       incr
       operation
-    >>=? fun _incr -> return_unit
+    >>=? fun (_incr : Incremental.t) -> return_unit
 
   let test_push_sapling_state_should_be_forbidden () =
     init ()
@@ -780,7 +780,7 @@ module Interpreter_tests = struct
       src
       block
       baker
-    >>=? fun _ ->
+    >>=? fun (_, _, _) ->
     (* Originating the next contract should fail *)
     originate_contract_hash
       "contracts/sapling_push_sapling_state.tz"
@@ -1021,7 +1021,7 @@ module Interpreter_tests = struct
       Tez.zero
       ~parameters
     >>=? fun operation ->
-    next_block b operation >>=? fun _b -> return_unit
+    next_block b operation >>=? fun (_b : Block.t) -> return_unit
 
   (* We use a contrac with two states. Its parameter is two transactions and a
      bool. The two transactions are tested valid against the two states, but
@@ -1157,7 +1157,7 @@ module Interpreter_tests = struct
     let dst_2 = Contract.Originated dst_2 in
     Op.transaction ~gas_limit:Max ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
-    next_block b operation >>=? fun _b -> return_unit
+    next_block b operation >>=? fun (_b : Block.t) -> return_unit
 end
 
 let tests =

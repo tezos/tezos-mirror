@@ -49,7 +49,7 @@ let generate_init_state () =
   in
   ValidationMachine.build
     {cpmm_min_xtz_balance; cpmm_min_tzbtc_balance; accounts_balances}
-  >>=? fun _ -> return_unit
+  >>=? fun (_, _) -> return_unit
 
 (* The script hash of
 

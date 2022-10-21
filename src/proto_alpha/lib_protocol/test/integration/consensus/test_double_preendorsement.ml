@@ -328,7 +328,8 @@ end = struct
     in
     Context.get_bakers (B blk_a) >>=? fun bakers ->
     let baker = Context.get_first_different_baker delegate bakers in
-    Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+    Context.Delegate.full_balance (B blk_a) baker
+    >>=? fun (_full_balance : Tez.t) ->
     Block.bake
       ~policy:(By_account baker)
       ~operations:[operation; operation2]

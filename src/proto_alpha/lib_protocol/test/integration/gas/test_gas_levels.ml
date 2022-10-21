@@ -417,7 +417,7 @@ let test_consume_exactly_all_block_gas () =
         [(src, dst, Alpha_context.Gas.Arith.integral_of_int_exn 1040000)])
       src_list
   in
-  bake_operations_with_gas block lld >>=? fun _ -> return ()
+  bake_operations_with_gas block lld >>=? fun (_, _, _) -> return_unit
 
 (** Tests the consumption of more than the block gas level with many single
     operations, should fail *)
@@ -523,8 +523,8 @@ let test_emptying_account_gas () =
         return_unit
     | err -> failwith "got unexpected error: %a" pp_print_trace err
   in
-  Incremental.add_operation ~expect_apply_failure i op >>=? fun _i ->
-  return_unit
+  Incremental.add_operation ~expect_apply_failure i op
+  >>=? fun (_i : Incremental.t) -> return_unit
 
 let quick (what, how) = Tztest.tztest what `Quick how
 

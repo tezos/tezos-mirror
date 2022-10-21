@@ -362,7 +362,7 @@ let test_just_in_time_double_baking_evidence () =
   let operation = double_baking (B blk) blk_a.header blk_b.header in
   (* We include the denunciation in the previous to last block of the
      cycle. *)
-  Block.bake ~operation blk >>=? fun _ -> return_unit
+  Block.bake ~operation blk >>=? fun (_ : Block.t) -> return_unit
 
 (** Check that an invalid double baking evidence that exposes two
     block baking with same level made by different bakers fails. *)

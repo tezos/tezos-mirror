@@ -83,7 +83,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
     source
     Account.default_initial_balance
     total_fee_plus_deposits
-  >>=? fun _ ->
+  >>=? fun () ->
   (* check the balance of the originate contract is equal to credit *)
   Assert.balance_is ~loc:__LOC__ (B b) new_contract credit
 
@@ -159,7 +159,7 @@ let test_not_tez_in_contract_to_pay_fee () =
   let pkh1 = Context.Contract.pkh contract_1 in
   Block.bake ~policy:(Excluding [pkh1]) ~operation b >>=? fun b ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract_1 balance amount
-  >>=? fun _ ->
+  >>=? fun () ->
   (* use this source contract to create an originate contract where it requires
      to pay a fee and add an amount of credit into this new contract *)
   Op.contract_origination

@@ -343,7 +343,7 @@ let activation_init () =
     baked. *)
 let test_simple_init_with_commitments () =
   activation_init () >>=? fun (blk, _contract, _secrets) ->
-  Block.bake blk >>=? fun _ -> return_unit
+  Block.bake blk >>=? fun (_ : Block.t) -> return_unit
 
 (** A single activation *)
 let test_single_activation () =
@@ -378,7 +378,7 @@ let test_multi_activation_1 () =
       >|=? fun () -> blk)
     blk
     secrets
-  >>=? fun _ -> return_unit
+  >>=? fun (_ : Block.t) -> return_unit
 
 (** All of the 10 activations occur in one bake. *)
 let test_multi_activation_2 () =

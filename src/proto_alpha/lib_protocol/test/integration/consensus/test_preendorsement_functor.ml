@@ -94,8 +94,7 @@ end = struct
   (** OK: bake a block "_b2_1" at round 1, containing a PQC and a locked
     round of round 0 *)
   let include_preendorsement_in_block_with_locked_round () =
-    aux_simple_preendorsement_inclusion ~loc:__LOC__ () >>=? fun _ ->
-    return_unit
+    aux_simple_preendorsement_inclusion ~loc:__LOC__ ()
 
   (** KO: bake a block "_b2_1" at round 1, containing a PQC and a locked
     round of round 0. But the preendorsement is on a bad branch *)

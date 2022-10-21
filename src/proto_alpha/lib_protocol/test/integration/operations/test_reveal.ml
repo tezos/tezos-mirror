@@ -126,8 +126,8 @@ let test_transfer_fees_emptying_after_reveal_batched () =
         return_unit
     | _ -> assert false
   in
-  Incremental.add_operation ~expect_apply_failure inc op >>=? fun _inc ->
-  return_unit
+  Incremental.add_operation ~expect_apply_failure inc op
+  >>=? fun (_inc : Incremental.t) -> return_unit
 
 (* We assert that the changes introduced in !5182, splitting the
    application of Reveal operations into a pre-checking and

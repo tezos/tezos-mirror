@@ -83,7 +83,8 @@ let test_bake_n_cycles n () =
   let open Block in
   let policy = By_round 0 in
   Context.init1 ~consensus_threshold:0 () >>=? fun (block, _contract) ->
-  Block.bake_until_n_cycle_end ~policy n block >>=? fun _block -> return ()
+  Block.bake_until_n_cycle_end ~policy n block >>=? fun (_block : block) ->
+  return_unit
 
 (** Check that, after one or two voting periods, the voting power of a baker is
    updated according to the rewards it receives for baking the blocks in the
