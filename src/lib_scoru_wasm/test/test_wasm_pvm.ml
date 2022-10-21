@@ -345,6 +345,141 @@ let should_run_store_delete_kernel () =
   assert (Option.is_some result) ;
   return_ok_unit
 
+let assert_store_value tree path expected_value =
+  let open Lwt_syntax in
+  let open Tezos_lazy_containers in
+  let* durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let* value = Durable.find_value durable (Durable.key_of_string_exn path) in
+  let+ value = Option.map_s Chunked_byte_vector.to_string value in
+  assert (Option.equal String.equal value expected_value)
+
+(* store_move *)
+let should_run_store_move_kernel () =
+  let open Lwt_syntax in
+  let from_path = "/a/b" in
+  let from_path_location = 100 in
+  let to_path = "/a/b/c" in
+  let to_path_location = from_path_location + String.length from_path in
+  let module_ =
+    Format.sprintf
+      {|
+(module
+  (type (;0;) (func (param i32 i32 i32 i32) (result i32)))
+  (import "rollup_safe_core" "store_move" (func $store_move (type 0)))
+  (func (export "kernel_next")
+    (local i32)
+    (call $store_move
+      (i32.const %d)
+      (i32.const %d)
+      (i32.const %d)
+      (i32.const %d))
+    drop)
+  (memory (;0;) 17)
+  (export "memory" (memory 0))
+  (data (;0;) (i32.const %d) "%s%s"))
+    |}
+      (* store_move args *)
+      from_path_location
+      (String.length from_path)
+      to_path_location
+      (String.length to_path)
+      (* data block *)
+      from_path_location
+      from_path
+      to_path
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = add_value tree ["a"; "b"] ~content:"ab" in
+  let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
+  let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
+  let* tree = add_value tree ["e"; "f"] ~content:"ef" in
+  (* run the first ticks (parsing and origination) *)
+  let* tree = eval_until_input_requested tree in
+  let* state_before_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_before_first_message) ;
+  (* consume a message and run kernel_next until we need next message *)
+  let* tree = set_input_step "test" 0 tree in
+  let* tree = eval_until_input_requested tree in
+  let* state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_after_first_message) ;
+  (* Test that values have been moved, and that original location has been
+   * overwritten or removed *)
+  let* () = assert_store_value tree "/a/b/c" (Some "ab") in
+  let* () = assert_store_value tree "/a/b/c/c" (Some "abc") in
+  let* () = assert_store_value tree "/a/b/c/d" (Some "abd") in
+  let* () = assert_store_value tree "/e/f" (Some "ef") in
+  let* () = assert_store_value tree "/a/b" None in
+  let* () = assert_store_value tree "/a/b/d" None in
+  return_ok_unit
+
+(* store_copy *)
+let should_run_store_copy_kernel () =
+  let open Lwt_syntax in
+  let from_path = "/a/b" in
+  let from_path_location = 100 in
+  let to_path = "/a/b/c" in
+  let to_path_location = from_path_location + String.length from_path in
+  let module_ =
+    Format.sprintf
+      {|
+(module
+  (type (;0;) (func (param i32 i32 i32 i32) (result i32)))
+  (import "rollup_safe_core" "store_copy" (func $store_move (type 0)))
+  (func (export "kernel_next")
+    (local i32)
+    (call $store_move
+      (i32.const %d)
+      (i32.const %d)
+      (i32.const %d)
+      (i32.const %d))
+    drop)
+  (memory (;0;) 17)
+  (export "memory" (memory 0))
+  (data (;0;) (i32.const %d) "%s%s"))
+    |}
+      (* store_move args *)
+      from_path_location
+      (String.length from_path)
+      to_path_location
+      (String.length to_path)
+      (* data block *)
+      from_path_location
+      from_path
+      to_path
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
+  let* tree = add_value tree ["a"; "b"] ~content:"ab" in
+  let* tree = add_value tree ["a"; "b"; "c"] ~content:"abc" in
+  let* tree = add_value tree ["a"; "b"; "d"] ~content:"abd" in
+  let* tree = add_value tree ["e"; "f"] ~content:"ef" in
+  (* run the first ticks (parsing and origination) *)
+  let* tree = eval_until_input_requested tree in
+  let* state_before_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_before_first_message) ;
+  (* consume a message and run kernel_next until we need next message *)
+  let* tree = set_input_step "test" 0 tree in
+  let* tree = eval_until_input_requested tree in
+  let* state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_after_first_message) ;
+  (* Test that values have been copied, and that original location has been
+     preserved where it is not overwritten. *)
+  let* () = assert_store_value tree "/a/b/c" (Some "ab") in
+  let* () = assert_store_value tree "/a/b/c/c" (Some "abc") in
+  let* () = assert_store_value tree "/a/b/c/d" (Some "abd") in
+  let* () = assert_store_value tree "/a/b/d" (Some "abd") in
+  let* () = assert_store_value tree "/e/f" (Some "ef") in
+  let* () = assert_store_value tree "/a/b" (Some "ab") in
+  return_ok_unit
+
 (* This function can build snapshotable state out of a tree. It currently
    assumes it follows a tree resulting from `set_input_step`.*)
 let build_snapshot_wasm_state_from_set_input
@@ -896,6 +1031,8 @@ let tests =
       `Quick
       should_run_store_list_size_kernel;
     tztest "Test store-delete kernel" `Quick should_run_store_delete_kernel;
+    tztest "Test store-move kernel" `Quick should_run_store_move_kernel;
+    tztest "Test store-copy kernel" `Quick should_run_store_copy_kernel;
     tztest "Test snapshotable state" `Quick test_snapshotable_state;
     tztest
       "Test rebuild snapshotable state"
