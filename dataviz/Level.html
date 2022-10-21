@@ -43,22 +43,22 @@
                     get: (searchParams, prop) => searchParams.get(prop),
                 });
                 // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
-                let bloc_value; // "some_value"
-                if (!(isNaN(parseInt(params.bloc)))) {
-                    bloc_value = parseInt(params.bloc);
-                    document.getElementById("selectedLevel").value = bloc_value;             
-                    let dict_data = populate_v1(server_adress, bloc_value, bloc_value).then(dict_data => {
+                let block_value; // "some_value"
+                if (!(isNaN(parseInt(params.block)))) {
+                    block_value = parseInt(params.block);
+                    document.getElementById("selectedLevel").value = block_value;             
+                    let dict_data = populate_v1(server_adress, block_value, block_value).then(dict_data => {
                         console.log(dict_data)
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
-                        let result = get_info_bloc(dict_data);
-                        let t_delai_bloc = result[0]
+                        let result = get_info_block(dict_data);
+                        let t_delay_block = result[0]
                         let t_baker = result[1]
                         let max_round = result[2]
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][bloc_value][i], ditribution_delays[1][bloc_value][i]], bloc_value, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]], block_value, i, t_delay_block[i]);
                         }
 
                     });
@@ -67,19 +67,19 @@
                     var b= a.then(level=>{
                         return populate_v1(server_adress, level, level);
                     });
-                    Promise.all([a,b]).then(([bloc_value,dict_data])=>{
-                        console.log([bloc_value,dict_data])
-                        document.getElementById("selectedLevel").value = bloc_value;             
+                    Promise.all([a,b]).then(([block_value,dict_data])=>{
+                        console.log([block_value,dict_data])
+                        document.getElementById("selectedLevel").value = block_value;             
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                             let logs_operation = classify_operations(dict_data)
-                            let result = get_info_bloc(dict_data);
-                            let t_delai_bloc = result[0]
+                            let result = get_info_block(dict_data);
+                            let t_delay_block = result[0]
                             let t_baker = result[1]
                             let max_round = result[2]
                             resume_obs(logs_operation, t_baker);
                             replaceDelegate(logs_operation);
                             for (let i = 0; i <= max_round; i++) {
-                                chart_delays_for_a_block('p', [ditribution_delays[0][bloc_value][i], ditribution_delays[1][bloc_value][i]], bloc_value, i, t_delai_bloc[i]);
+                                chart_delays_for_a_block('p', [ditribution_delays[0][block_value][i], ditribution_delays[1][block_value][i]], block_value, i, t_delay_block[i]);
                             }
 
                     });
@@ -87,7 +87,7 @@
                 }
                 
                 $('#go').click(function (e) {
-                    window.location = server_adress+"visualization/Level.html?bloc="+document.getElementById('selectedLevel').value;
+                    window.location = server_adress+"visualization/Level.html?block="+document.getElementById('selectedLevel').value;
                 })
 
                 $('#plus').click(function (e) {
@@ -96,14 +96,14 @@
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
                         let ditribution_delays = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
-                        let result = get_info_bloc(dict_data);
-                        let t_delai_bloc = result[0]
+                        let result = get_info_block(dict_data);
+                        let t_delay_block = result[0]
                         let t_baker = result[1]
                         let max_round = result[2]
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [ditribution_delays[0][va][i], ditribution_delays[1][va][i]], va, i, t_delay_block[i]);
                         }
                     });
                 });
@@ -114,15 +114,15 @@
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
                         let distrib_t = delays_distribution_of_operations(dict_data)
                         let logs_operation = classify_operations(dict_data)
-                        let result = get_info_bloc(dict_data);
-                        let t_delai_bloc = result[0]
+                        let result = get_info_block(dict_data);
+                        let t_delay_block = result[0]
                         let t_baker = result[1]
                         let max_round = result[2]
                         console.log(t_baker)
                         resume_obs(logs_operation, t_baker);
                         replaceDelegate(logs_operation);
                         for (let i = 0; i <= max_round; i++) {
-                            chart_delays_for_a_block('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delai_bloc[i]);
+                            chart_delays_for_a_block('p', [distrib_t[0][va][i], distrib_t[1][va][i]], va, i, t_delay_block[i]);
                         }
                     });
                 });
