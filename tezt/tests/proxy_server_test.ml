@@ -142,7 +142,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
       ~alias:"originated_contract_advanced"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_perf.tz"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/big_map_all.tz"
       ~init
       ~burn_cap:Tez.(of_int 9999999)
       client
