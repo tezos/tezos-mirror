@@ -32,11 +32,11 @@
    This module is designed to:
 
    1. provide a space-efficient representation for proofs of inbox
-   inclusions (only for inboxes obtained at the end of block
-   validation) ;
+      inclusions (only for inboxes obtained at the end of block
+      validation) ;
 
    2. offer an efficient function to add a new batch of messages in the
-   inbox at the current level.
+      inbox at the current level.
 
    To solve (1), we use a proof tree H which is implemented by a merkelized skip
    list allowing for compact inclusion proofs (See {!skip_list_repr.ml}).
