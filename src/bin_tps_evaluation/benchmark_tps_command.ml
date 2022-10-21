@@ -228,7 +228,6 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
            new accounts along the way. We do not want that, so we set it to
            0. *)
       ~fresh_probability:0.0
-      ~single_op_per_pkh_per_block:true
       ~smart_contract_parameters
       ~source_aliases:(make_delegates Constants.default_bootstraps_count)
         (* It is essential not to pass all accounts via aliases because every
