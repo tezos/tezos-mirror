@@ -20,7 +20,6 @@ const getHead = function(server){
         })
         .then(_=>{return level-1}) 
         .catch(error => { console.error(error); throw error; });
-
 }
 
 function populate_v1(server_address, beg, end) {
