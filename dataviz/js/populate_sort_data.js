@@ -894,7 +894,7 @@ function chart_preendorsement_inclusion_based_on_multiple_threshold_time(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text("Threshold time (seconds) →");
+                .text(" Threshold time (seconds) →");
 
             svgg.append("text")
                 .attr("x", width + 40)
