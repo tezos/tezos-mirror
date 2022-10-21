@@ -77,8 +77,12 @@ let reveal_returned_size tree =
   | Eval
       Tezos_webassembly_interpreter.Eval.
         {
-          step_kont =
-            SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
+          config =
+            {
+              step_kont =
+                SK_Next (_, _, LS_Craft_frame (_, Inv_stop {code = vs, _; _}));
+              _;
+            };
           _;
         } -> (
       let* hd = Tezos_lazy_containers.Lazy_vector.Int32Vector.get 0l vs in

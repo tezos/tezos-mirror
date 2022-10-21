@@ -76,9 +76,14 @@ let tick_state_encoding =
           Init {self; ast_module; init_kont; module_reg});
       case
         "eval"
-        (Wasm_encoding.config_encoding ~host_funcs:Host_funcs.all)
-        (function Eval eval_config -> Some eval_config | _ -> None)
-        (fun eval_config -> Eval eval_config);
+        (tup2
+           ~flatten:true
+           (scope ["config"]
+           @@ Wasm_encoding.config_encoding ~host_funcs:Host_funcs.all)
+           (scope ["modules"] Wasm_encoding.module_instances_encoding))
+        (function
+          | Eval {config; module_reg} -> Some (config, module_reg) | _ -> None)
+        (fun (config, module_reg) -> Eval {config; module_reg});
       case
         "stuck"
         (value [] Wasm_pvm_errors.encoding)

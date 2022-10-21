@@ -81,7 +81,10 @@ module Internal_state = struct
         init_kont : Tezos_webassembly_interpreter.Eval.init_kont;
         module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
       }
-    | Eval of Tezos_webassembly_interpreter.Eval.config
+    | Eval of {
+        config : Tezos_webassembly_interpreter.Eval.config;
+        module_reg : Tezos_webassembly_interpreter.Instance.module_reg;
+      }
     | Stuck of Wasm_pvm_errors.t
     | Snapshot
 
