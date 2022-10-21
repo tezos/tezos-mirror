@@ -569,10 +569,10 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             }
 
         }
-        const svg = d3.select("body").select(dom).append("svg").attr("height", height).attr("viewBox", [0, 0, width, height]);
+        const svg = d3.select("body").select(dom).append("svg").attr("height", height+20).attr("viewBox", [0, 0, width, height]);
 
-        const xAxis = svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`);
-        const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);
+        const xAxis = svg.append("g").attr("transform", `translate(0, ${height - margin.bottom})`);
+        const yAxis = svg.append("g").attr("transform", `translate(${margin.left}, 0)`);
         const graph = svg.append("g").attr("fill", "steelblue");
 
         let minValue = Object.values(data[0])[0]; //We calculate the Range of time values measured for a block, in order to adjust the display dimensions
@@ -651,9 +651,9 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .attr("x", (width / 2))
             .attr("y", 15)
             .attr("text-anchor", "middle")
-            .style("font-size", "15px")
+            .style("font-size", "17px")
             .style("text-decoration", "underline")
-            .text("Histogram of reception times for block " + level + "at round " + round);
+            .text("Reception times for block " + level + "at round " + round);
 
         svg.append("text")
             .attr("x", -margin.left + 40)
@@ -664,10 +664,10 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
 
         svg.append("text")
             .attr("x", width)
-            .attr("y", height)
+            .attr("y", height+15)
             .attr("fill", "currentColor")
             .attr("text-anchor", "end")
-            .text("reception times (seconds) →");
+            .text("Reception times (seconds) →");
 
         svg.append("circle").attr("cx", width - 170).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
         svg.append("circle").attr("cx", width - 170).attr("cy", 60).attr("r", 6).style("fill", "#404080")
@@ -873,7 +873,7 @@ function chart_preendorsement_inclusion_based_on_multiple_threshold_time(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" threshold time (seconds) →");
+                .text(" Threshold time (seconds) →");
 
             svgg.append("text")
                 .attr("x", width + 40)
