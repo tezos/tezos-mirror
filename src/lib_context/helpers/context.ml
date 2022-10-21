@@ -203,12 +203,6 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
     in
     fun () -> Store.Repo.v @@ Irmin_pack.config @@ random_store_name ()
 
-  let shallow repo kinded_hash =
-    let kinded_hash =
-      match kinded_hash with `Node n -> `Node n | `Value v -> `Contents (v, ())
-    in
-    Store.Tree.shallow repo kinded_hash
-
   let kinded_key t =
     match Store.Tree.key t with
     | (None | Some (`Node _)) as r -> r

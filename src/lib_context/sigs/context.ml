@@ -558,12 +558,6 @@ module type TEZOS_CONTEXT = sig
 
     val make_repo : unit -> repo Lwt.t
 
-    (** [shallow repo k] is the "shallow" tree having key [k] based on the
-        repository [repo]. A shallow tree is a tree that exists in an underlying
-        backend repository, but has not yet been loaded into memory from that
-        backend. *)
-    val shallow : repo -> kinded_key -> tree
-
     val is_shallow : tree -> bool
 
     val kinded_key : tree -> kinded_key option
