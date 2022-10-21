@@ -162,14 +162,17 @@ module Internal_for_tests = struct
   let update_num_and_size_of_messages = update_num_and_size_of_messages
 end
 
-let init ctxt =
-  let open Lwt_result_syntax in
-  let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
-  let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
-  Store.Inbox.init ctxt inbox
-
 let add_start_of_level ctxt =
   add_internal_message ctxt Sc_rollup_inbox_message_repr.Start_of_level
 
 let add_end_of_level ctxt =
   add_internal_message ctxt Sc_rollup_inbox_message_repr.End_of_level
+
+let init ctxt =
+  let open Lwt_result_syntax in
+  let ({level; _} : Level_repr.t) = Raw_context.current_level ctxt in
+  let*! inbox = Sc_rollup_inbox_repr.empty (Raw_context.recover ctxt) level in
+  let* ctxt = Store.Inbox.init ctxt inbox in
+  let* _inbox, _diff, ctxt = add_start_of_level ctxt in
+  let* _inbox, _diff, ctxt = add_end_of_level ctxt in
+  return ctxt

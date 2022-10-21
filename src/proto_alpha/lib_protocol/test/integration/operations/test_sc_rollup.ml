@@ -2020,11 +2020,13 @@ let test_refute_invalid_metadata () =
     even if no messages are added to the inbox. *)
 let test_sol_and_eol () =
   let* block, account = context_init Context.T1 in
+
+  (* SOL and EOL are added in the first inbox. *)
   let* first_inbox = Context.Sc_rollup.inbox (B block) in
   let messages_first_inbox =
     Sc_rollup.Inbox.Internal_for_tests.inbox_message_counter first_inbox
   in
-  let* () = Assert.equal_int ~loc:__LOC__ 0 (Z.to_int messages_first_inbox) in
+  let* () = Assert.equal_int ~loc:__LOC__ 2 (Z.to_int messages_first_inbox) in
 
   (* SOL and EOL are added when no messages are added. *)
   let* block = Block.bake block in
