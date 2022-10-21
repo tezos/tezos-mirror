@@ -669,12 +669,12 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .attr("text-anchor", "end")
             .text("reception times (seconds) →");
 
-        svg.append("circle").attr("cx", width - 130).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
-        svg.append("circle").attr("cx", width - 130).attr("cy", 60).attr("r", 6).style("fill", "#404080")
-        svg.append("text").attr("x", width - 110).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-        svg.append("text").attr("x", width - 110).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
-        svg.append("circle").attr("cx", width - 130).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
-        svg.append("text").attr("x", width - 110).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("circle").attr("cx", width - 170).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
+        svg.append("circle").attr("cx", width - 170).attr("cy", 60).attr("r", 6).style("fill", "#404080")
+        svg.append("text").attr("x", width - 150).attr("y", 30).text(" Preendorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("text").attr("x", width - 150).attr("y", 60).text("Endorsements").style("font-size", "15px").attr("alignment-baseline", "middle")
+        svg.append("circle").attr("cx", width - 170).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
+        svg.append("text").attr("x", width - 150).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
 
         xAxis.call(d3.axisBottom(x))
             .selectAll("text")
