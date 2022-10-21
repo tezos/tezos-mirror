@@ -157,36 +157,28 @@ let level_mempool =
   Re.seq [Re.str "/"; Re.group (Re.rep1 Re.digit); Re.str "/mempool"]
   |> Re.whole_string |> Re.compile
 
+let get_summery_query =
+  Caqti_request.Infix.(
+    Caqti_type.(unit ->! tup3 int32 int32 Sql_requests.Type.time_protocol))
+    "SELECT level, round, timestamp FROM blocks ORDER BY level, round LIMIT 1"
+
 let get_summary db_pool =
   let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
-  let query =
-    Caqti_request.Infix.(Caqti_type.(unit ->! int32))
-      "SELECT COUNT (DISTINCT level) FROM operations"
-  in
-  let nb_level_operations_e =
+  let* max_level, round, timestamp =
     Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find query ())
+      (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find get_summery_query ())
       db_pool
   in
-  let query =
-    Caqti_request.Infix.(Caqti_type.(unit ->! int32))
-      "SELECT COUNT (DISTINCT level) FROM endorsing_rights"
-  in
-  let nb_level_rights_e =
-    Caqti_lwt.Pool.use
-      (fun (module Db : Caqti_lwt.CONNECTION) -> Db.find query ())
-      db_pool
-  in
-  let* nb_level_operations = nb_level_operations_e in
-  let* nb_level_rights = nb_level_rights_e in
   return
-    (Format.sprintf
+    (Format.asprintf
        "<!DOCTYPE html><html><head><title>Teztale \
-        status</title></head><body><p>%li levels in rights tables</p><p>%li \
-        levels in operations tables</p><p><a href=\"visualization/\">Vizualize \
-        data</a></p></body></html>"
-       nb_level_rights
-       nb_level_operations)
+        status</title></head><body><h1>Teztale status</h1><p>Highest recorded \
+        block is level %li round %li (%a)</p><p><a \
+        href=\"visualization/\">Vizualize data</a></p></body></html>"
+       max_level
+       round
+       Tezos_base.Time.Protocol.pp_hum
+       timestamp)
 
 let get_head db_pool =
   let query =
