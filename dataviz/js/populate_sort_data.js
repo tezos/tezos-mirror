@@ -687,14 +687,13 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
 }
 
 const resume_obs = function (data, t_baker, delegate = "") {
-    console.log(data);
     Object.entries(data).forEach(([level, el]) => {
         Object.entries(el).forEach(([k1, v1]) => {
             Object.entries(v1).forEach(([k2, v2]) => {
                 var new_v2 = [];
                 for (const element of v2) {
                     var address_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
-                    new_v2.push(element + " ");
+                    new_v2.push(" "+element);
                 }
                 data[level][k1][k2] = new_v2;
             })
