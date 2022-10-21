@@ -1083,7 +1083,7 @@ function chart_preendorsement_inclusion_based_on_threshold_time(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # block →");
+                .text(" # Block →");
 
             svg.append("text")
                 .attr("x", width + margin.right)
@@ -1171,7 +1171,7 @@ function chart_time_required(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # block →");
+                .text(" # Block →");
 
         } catch (e) { console.log(e) }
     } else {
@@ -1249,7 +1249,7 @@ function chart_time_required_endorsments(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" # block →");
+                .text(" # Block →");
 
         } catch (e) { console.log(e) }
     } else {
@@ -1744,7 +1744,7 @@ function chart_endorsement_inclusion_based_on_multiple_threshold_time(data) {
                 .attr("y", height)
                 .attr("fill", "currentColor")
                 .attr("text-anchor", "end")
-                .text(" threshold time (seconds) →");
+                .text(" Threshold time (seconds) →");
 
             svgg.append("text")
                 .attr("x", width + 40)
