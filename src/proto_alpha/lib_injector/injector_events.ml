@@ -179,6 +179,14 @@ module Make (Rollup : Injector_sigs.PARAMETERS) = struct
       ("operation", L1_operation.encoding)
       ~pp1:L1_operation.pp
 
+  let retry_operation =
+    declare_1
+      ~name:"retry_operation"
+      ~msg:"Retry {operation}"
+      ~level:Notice
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+
   let included =
     declare_3
       ~name:"included"

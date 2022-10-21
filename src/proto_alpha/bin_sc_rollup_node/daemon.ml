@@ -261,6 +261,9 @@ module Make (PVM : Pvm.S) = struct
     let* reorg =
       Layer1.get_tezos_reorg_for_new_head node_ctxt.l1_ctxt old_head head
     in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/3348
+       Rollback state information on reorganization, i.e. for
+       reorg.old_chain. *)
     let*! () = Daemon_event.processing_heads_iteration reorg.new_chain in
     let* () = List.iter_es (process_head node_ctxt) reorg.new_chain in
     let* () = notify_injector node_ctxt head reorg in

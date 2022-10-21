@@ -134,14 +134,6 @@ module Parameters = struct
      Decide if some operations must all succeed *)
   let batch_must_succeed _ = `At_least_one
 
-  let ignore_failing_operation : type kind. kind manager_operation -> _ =
-    function
-    | Tx_rollup_remove_commitment _ | Tx_rollup_finalize_commitment _ ->
-        (* We can keep these operations as there will be at most one of them in
-           the queue at any given time. *)
-        `Ignore_keep
-    | _ -> `Don't_ignore
-
   (** Returns [true] if an included operation should be re-queued for injection
     when the block in which it is included is reverted (due to a
     reorganization). *)
@@ -169,6 +161,24 @@ module Parameters = struct
               Tx_rollup_commitment_hash.(
                 l2_block.L2block.header.commitment = commit_hash))
     | _ -> return_true
+
+  let retry_unsuccessful_operation (type kind) state
+      (op : kind manager_operation) status =
+    let open Lwt_syntax in
+    match status with
+    | Backtracked | Skipped ->
+        (* Always retry backtracked or skipped operations *)
+        return Retry
+    | Other_branch ->
+        let+ retry = requeue_reverted_operation state op in
+        if retry then Retry else Forget
+    | Failed error -> (
+        match op with
+        | Tx_rollup_remove_commitment _ | Tx_rollup_finalize_commitment _ ->
+            (* We can keep these operations as there will be at most one of them
+               in the queue at any given time. *)
+            return Retry
+        | _ -> return (Abort error))
 
   let operation_tag (type kind) (operation : kind manager_operation) =
     match operation with

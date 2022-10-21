@@ -19,6 +19,7 @@ depends: [
   "tezos-client-base"
   "tezos-workers"
   "tezos-shell"
+  "tezos-layer2-utils-alpha"
 ]
 build: [
   ["rm" "-r" "vendors"]
