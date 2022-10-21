@@ -66,7 +66,7 @@ function delegate_delays_distribution_of_operations(dict_data, delegate, msec = 
     let t_valid = []
     let complete_delays = delays_distribution_of_operations(dict_data, msec)
     let delays_endorsement = complete_delays[1]
-    let delays_pre_endorsement = complete_delays[0]
+    let delays_preendorsement = complete_delays[0]
     Object.entries(dict_data).forEach(([va, v]) => {
         let t_baker = {};
         if ("blocks" in v) {
@@ -90,8 +90,8 @@ function delegate_delays_distribution_of_operations(dict_data, delegate, msec = 
                                 delay = (new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"]) - t_baker[round_cib]).getMilliseconds();
                             }
 
-                            if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                let t_op_pre_valid_i = delays_pre_endorsement[va][round_cib]
+                            if (("kind" in operation) && (va in delays_preendorsement) && (round_cib in delays_preendorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
+                                let t_op_pre_valid_i = delays_preendorsement[va][round_cib]
                                 console.log(t_op_pre_valid_i)
                                 t_op_pre_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
                                 let position_of_delegate = 1 + t_op_pre_valid_i.indexOf(delay)
