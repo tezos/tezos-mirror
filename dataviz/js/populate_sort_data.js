@@ -108,19 +108,19 @@ function delegate_delays_distribution_of_operations(dict_data, delegate, msec = 
                             }
 
                             if (("kind" in operation) && (va in delays_pre_endorsement) && (round_cib in delays_pre_endorsement[va])) { // preendo  if (round_cib != max_round) { <= aller chercher round cib
-                                let t_op_pre_valide_i = delays_pre_endorsement[va][round_cib]
-                                console.log(t_op_pre_valide_i)
-                                t_op_pre_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_pre_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_pre_valide_i)).toPrecision(6)
-                                t_valid.push({ "type": "preendo", "block": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valide_i)})
+                                let t_op_pre_valid_i = delays_pre_endorsement[va][round_cib]
+                                console.log(t_op_pre_valid_i)
+                                t_op_pre_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_pre_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_pre_valid_i)).toPrecision(6)
+                                t_valid.push({ "type": "preendo", "block": va, "timestamp_delay": delay, cat: "Preendorsement round " + round_cib, "position_in_sample": position_of_delegate, "size_of_sample": t_op_pre_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_pre_valid_i) })
                             }
                             else if ((va in delays_endorsement) && (round_cib in delays_endorsement[va])) {
-                                let t_op_valide_i = delays_endorsement[va][round_cib]
-                                t_op_valide_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
-                                let position_of_delegate = 1 + t_op_valide_i.indexOf(delay)
-                                let deviation_from_mean = (delay - average(t_op_valide_i)).toPrecision(6)
-                                t_valid.push({ "type": "endo", "block": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valide_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valide_i) })
+                                let t_op_valid_i = delays_endorsement[va][round_cib]
+                                t_op_valid_i.sort(function (a, b) { return a - b }); // sort number in ascending order:
+                                let position_of_delegate = 1 + t_op_valid_i.indexOf(delay)
+                                let deviation_from_mean = (delay - average(t_op_valid_i)).toPrecision(6)
+                                t_valid.push({ "type": "endo", "block": va, "timestamp_delay": delay, cat: "Endorsement", "position in sample": position_of_delegate, "size_of_sample": t_op_valid_i.length, "deviation_from_the_mean": deviation_from_mean, "mean_of_sample": average(t_op_valid_i) })
                             }
                         }
                     })
@@ -234,24 +234,24 @@ function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) 
     //Get nodes name  
 
     let nodes_used = []; // we store keys, used on server, to differentitate them
-    let t_op_valide = {};
-    let t_op_pre_valide = {};
+    let t_op_valid = {};
+    let t_op_pre_valid = {};
     Object.entries(dict_data).forEach(([va, v]) => {
-        let t_op_valide_i = {};
-        let t_op_pre_valide_i = {};
+        let t_op_valid_i = {};
+        let t_op_pre_valid_i = {};
         let t_baker = {};
 
         Object.entries(nodes_used).forEach((node_) => {
 
-            t_op_valide_i[node_] = {};
-            t_op_pre_valide_i[node_] = {};
+            t_op_valid_i[node_] = {};
+            t_op_pre_valid_i[node_] = {};
             if ("blocks" in v) {
                 v["blocks"].forEach((element) => {
                     let round = 0;
                     if ("round" in element) round = element["round"];
                     if ("timestamp" in element) nodes_t_op[node_]["t_baker"][round] = new Date(element["timestamp"][node_]);
-                    nodes_t_op[node_]["t_op_valide_i"][round] = [];
-                    nodes_t_op[node_]["t_op_pre_valide_i"][round] = []
+                    nodes_t_op[node_]["t_op_valid_i"][round] = [];
+                    nodes_t_op[node_]["t_op_pre_valid_i"][round] = []
 
                 })
             }
@@ -270,17 +270,17 @@ function delays_distribution_of_operations_multi_nodes(dict_data, msec = false) 
                                 delay = (new Date(new Date(operation["reception_time"][node_]) - t_baker[node_][round_cib]).getSeconds() * 1000) + new Date(new Date(operation["reception_time"][node_]) - t_baker[round_cib][node_]).getMilliseconds();
                             }
                             if (("kind" in operation)) {
-                                t_op_pre_valide_i[node_][round_cib].push(delay);
+                                t_op_pre_valid_i[node_][round_cib].push(delay);
                             }
                             else {
-                                t_op_valide_i[node_][round_cib].push(delay);
+                                t_op_valid_i[node_][round_cib].push(delay);
                             }
                         }
                     })
                 })
         })
-        t_op_pre_valide[va] = t_op_pre_valide_i;
-        t_op_valide[va] = t_op_valide_i;
+        t_op_pre_valid[va] = t_op_pre_valid_i;
+        t_op_valid[va] = t_op_valid_i;
     })
     return nodes_t_op
 
@@ -297,7 +297,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "unknown": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "unknown": [] } }
+                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
@@ -315,14 +315,14 @@ function classify_operations(dict_data, delegate = "", msec = false) {
 
                                 }
                                 if (("kind" in operation)) {
-                                    if (delegate == "") { // To look at operation of a specific delegate
+                                    if (delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["preendorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
                                         //operations_logs[round_cib]["pre_approbations"]["valide"].push(height); //We don't look at preendo resume for adress.html
                                     }
                                 }
                                 else {
-                                    if (delegate == "") { // To look at operation of a specific delegate
+                                    if (delegate == "") { // To look at operation of a specific delegate 
                                         operations_logs[round_cib]["endorsements"]["valid"].push(baker_ops["delegate"]);
                                     } else if (baker_ops["delegate"] == delegate) {
                                         operations_logs[round_cib]["endorsements"]["valid"].push(height);
@@ -384,7 +384,6 @@ const percIntegration = function (threshold, t_op_pre_valid) {
         try {
             console.log(typeof (v_block))
             Object.entries(v_block).forEach(([level, v_level]) => {
-                //for (let [level, v_level] of Object.entries(v_block)) {
                 var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(element => {
                     if (element <= t_cible) {
@@ -411,7 +410,6 @@ const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valid, e
         pI_level[block] = {};
         try {
             Object.entries(v_block).forEach(([level, v_level]) => {
-                //for (let [level, v_level] of Object.entries(v_bloc)) {
                 var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
@@ -505,7 +503,7 @@ const SeriesPercIntegration = function (t_cibles, t_op_pre_valid) {//Inclure end
     var t_pI = [];
     t_cibles.forEach((t_cible) => {
         var pI_level = {}; // For each threshold time, a dictionary keeps the amount of pre-endo received, x block and y round
-        var l_rounds = []; //
+        var l_rounds = []; // 
         Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
             pI_level[block] = {};
             Object.entries(v_block).forEach(([level, v_level]) => {
@@ -546,14 +544,14 @@ const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_val
             pI_level[block] = {};
             Object.entries(v_block).forEach(([level, v_level]) => {
                 l_rounds.push(level);
-                var card_valide_tcible = 0;
+                var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(([delegate, element]) => {
                     if (element <= t_cible) {
-                        card_valide_tcible += endorsing_power[block][delegate];
+                        card_valid_tcible += endorsing_power[block][delegate];
                     }
                 });
-                if (isNaN(card_valide_tcible / sumValues(endorsing_power[block])) == false) {
-                    pI_level[block][level] = (card_valide_tcible / (sumValues(endorsing_power[block])))
+                if (isNaN(card_valid_tcible / sumValues(endorsing_power[block])) == false) {
+                    pI_level[block][level] = (card_valid_tcible / (sumValues(endorsing_power[block])))
                 }
             })
         });
@@ -571,8 +569,6 @@ const SeriesPercIntegration_w_endorsing_power = function (t_cibles, t_op_pre_val
     })
     return t_pI
 }
-
-
 
 
 function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
