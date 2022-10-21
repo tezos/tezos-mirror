@@ -79,7 +79,8 @@ let get_next_baker_by_round round block =
   let {Plugin.RPC.Baking_rights.delegate = pkh; consensus_key; timestamp; _} =
     WithExceptions.Option.get ~loc:__LOC__
     @@ List.find
-         (fun {Plugin.RPC.Baking_rights.round = r; _} -> r = round)
+         (fun {Plugin.RPC.Baking_rights.round = r; _} ->
+           Round.to_int32 r = Int32.of_int round)
          bakers
   in
   ( pkh,
@@ -100,6 +101,7 @@ let get_next_baker_by_account pkh block =
              round;
              _;
            } ->
+  Environment.wrap_tzresult (Round.to_int round) >>?= fun round ->
   return
     ( pkh,
       consensus_key,
@@ -107,7 +109,7 @@ let get_next_baker_by_account pkh block =
       WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
 
 let get_next_baker_excluding excludes block =
-  Plugin.RPC.Baking_rights.get rpc_ctxt block >|=? fun bakers ->
+  Plugin.RPC.Baking_rights.get rpc_ctxt block >>=? fun bakers ->
   let {
     Plugin.RPC.Baking_rights.delegate = pkh;
     consensus_key;
@@ -125,10 +127,12 @@ let get_next_baker_excluding excludes block =
                 excludes))
          bakers
   in
-  ( pkh,
-    consensus_key,
-    round,
-    WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
+  Environment.wrap_tzresult (Round.to_int round) >>?= fun round ->
+  return
+    ( pkh,
+      consensus_key,
+      round,
+      WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
 let dispatch_policy = function
   | By_round r -> get_next_baker_by_round r

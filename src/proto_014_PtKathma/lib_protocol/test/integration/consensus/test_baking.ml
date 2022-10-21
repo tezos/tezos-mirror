@@ -189,7 +189,7 @@ let get_contract_for_pkh contracts pkh =
     [b2].  *)
 let test_rewards_block_and_payload_producer () =
   Context.init_n ~consensus_threshold:1 10 () >>=? fun (genesis, contracts) ->
-  Context.get_baker (B genesis) ~round:0 >>=? fun baker_b1 ->
+  Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   get_contract_for_pkh contracts baker_b1 >>=? fun baker_b1_contract ->
   Block.bake ~policy:(By_round 0) genesis >>=? fun b1 ->
   Context.get_endorsers (B b1) >>=? fun endorsers ->
@@ -219,7 +219,7 @@ let test_rewards_block_and_payload_producer () =
   Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.zero
   >>=? fun tx ->
   Block.bake ~policy:(By_round 0) ~operations:(tx :: endos) b1 >>=? fun b2 ->
-  Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
+  Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
   Context.Delegate.current_frozen_deposits (B b2) baker_b2
@@ -255,7 +255,7 @@ let test_rewards_block_and_payload_producer () =
       >|=? Operation.pack)
     preendorsers
   >>=? fun preendos ->
-  Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
+  Context.get_baker (B b1) ~round:Round.zero >>=? fun baker_b2 ->
   Context.get_bakers (B b1) >>=? fun bakers ->
   let baker_b2' = Context.get_first_different_baker baker_b2 bakers in
   Block.bake
@@ -285,7 +285,7 @@ let test_rewards_block_and_payload_producer () =
   Context.Contract.balance (B b2') baker_b2'_contract >>=? fun bal' ->
   Context.Delegate.current_frozen_deposits (B b2') baker_b2'
   >>=? fun frozen_deposits' ->
-  Context.get_baker (B genesis) ~round:0 >>=? fun baker_b1 ->
+  Context.get_baker (B genesis) ~round:Round.zero >>=? fun baker_b1 ->
   let reward_for_b1' =
     if Signature.Public_key_hash.equal baker_b2' baker_b1 then baking_reward
     else Tez.zero

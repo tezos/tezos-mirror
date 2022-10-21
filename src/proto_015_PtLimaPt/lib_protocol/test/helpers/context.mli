@@ -62,7 +62,7 @@ val get_bakers :
   t ->
   public_key_hash list tzresult Lwt.t
 
-val get_baker : t -> round:int -> public_key_hash tzresult Lwt.t
+val get_baker : t -> round:Round.t -> public_key_hash tzresult Lwt.t
 
 val get_first_different_baker :
   public_key_hash -> public_key_hash trace -> public_key_hash
