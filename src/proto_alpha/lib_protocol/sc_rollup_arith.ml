@@ -927,10 +927,14 @@ module Make (Context : P) :
       match Sc_rollup_inbox_message_repr.deserialize payload with
       | Error _ -> None
       | Ok (External payload) -> Some payload
-      | Ok (Internal {payload; _}) -> (
-          match Micheline.root payload with
-          | String (_, payload) -> Some payload
-          | _ -> None)
+      | Ok (Internal internal_inbox_message) -> (
+          match internal_inbox_message with
+          | Transfer {payload; _} -> (
+              match Micheline.root payload with
+              | String (_, payload) -> Some payload
+              | _ -> None)
+          | Start_of_level -> None
+          | End_of_level -> None)
     in
     match payload with
     | Some payload ->

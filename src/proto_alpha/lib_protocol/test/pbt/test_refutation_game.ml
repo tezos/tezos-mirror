@@ -36,6 +36,7 @@ open Protocol
 open Alpha_context
 open Sc_rollup
 open Lib_test.Qcheck2_helpers
+open Sc_rollup_helpers
 
 (** {2 Utils} *)
 
@@ -61,11 +62,6 @@ let tick_of_int_exn ?(__LOC__ = __LOC__) n =
 
 let number_of_ticks_of_int64_exn ?(__LOC__ = __LOC__) n =
   WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_value n)
-
-let make_external_inbox_message str =
-  WithExceptions.Result.get_ok
-    ~loc:__LOC__
-    Inbox_message.(External str |> serialize)
 
 let game_status_of_refute_op_result = function
   | [
@@ -208,7 +204,7 @@ let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
      in
      Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
 
-let originate_rollup originator messager ~first_inputs block =
+let originate_rollup originator block =
   let open Lwt_result_syntax in
   let* origination_operation, sc_rollup =
     Op.sc_rollup_origination
@@ -218,19 +214,15 @@ let originate_rollup originator messager ~first_inputs block =
       ~boot_sector:""
       ~parameters_ty:(Script.lazy_expr @@ Expr.from_string "unit")
   in
-  let* add_message_operation =
-    Op.sc_rollup_add_messages (B block) messager sc_rollup first_inputs
-  in
-  let* block =
-    Block.bake ~operations:[origination_operation; add_message_operation] block
-  in
+  let* block = Block.bake ~operations:[origination_operation] block in
+  let* inbox = Context.Sc_rollup.inbox (B block) in
   let+ genesis_info = Context.Sc_rollup.genesis_info (B block) sc_rollup in
-  (block, sc_rollup, genesis_info)
+  (block, sc_rollup, inbox, genesis_info)
 
-(** [create_ctxt account1 account2] creates a context where
-    an arith rollup was originated, and both [account1] and [account2] owns
-    enough tez to stake on a commitment. *)
-let create_ctxt ~first_inputs =
+(** [create_ctxt ()] creates a context where an arith rollup was originated,
+    and both [account1] and [account2] owns enough tez to stake on a
+    commitment. *)
+let create_ctxt () =
   WithExceptions.Result.get_ok ~loc:__LOC__
   @@ Lwt_main.run
   @@
@@ -242,10 +234,10 @@ let create_ctxt ~first_inputs =
       ~bootstrap_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
       ()
   in
-  let* block, sc_rollup, genesis_info =
-    originate_rollup account3 account1 ~first_inputs block
+  let* block, sc_rollup, inbox, genesis_info =
+    originate_rollup account3 block
   in
-  return (block, sc_rollup, genesis_info, (account1, account2, account3))
+  return (block, sc_rollup, inbox, genesis_info, (account1, account2, account3))
 
 (** {2 Context free generators} *)
 
@@ -284,13 +276,13 @@ let gen_tick ?(lower_bound = 0) ?(upper_bound = 10_000) () =
   let+ tick = lower_bound -- upper_bound in
   tick_of_int_exn ~__LOC__ tick
 
-(** [gen_arith_pvm_inputs ~gen_size] is a `correct list` generator.
+(** [gen_arith_pvm_messages ~gen_size] is a `correct list` generator.
     It generates a list of strings that are either integers or `+` to be
     consumed by the arithmetic PVM.
     If a `+` is found then the previous two element of the stack are poped
     then added and the result is pushed to the stack. In particular,
     lists like `[1 +]` are incorrect. *)
-let gen_arith_pvm_inputs ~gen_size =
+let gen_arith_pvm_messages ~gen_size =
   let open QCheck2.Gen in
   (* To preserve the correctness invariant, genlist is a recursive generator
      that produce a pair `(stack_size, state_list)` where  state_list is a
@@ -330,31 +322,12 @@ let gen_arith_pvm_inputs ~gen_size =
   let+ inputs = sized_size gen_size @@ fix produce_inputs in
   snd inputs |> List.rev |> String.concat " "
 
-(** Generate a list of arith pvm inputs for a level *)
-let gen_arith_pvm_inputs_for_level ?(level_min = 0) ?(level_max = 1_000) () =
-  let open QCheck2.Gen in
-  let* level = level_min -- level_max in
-  let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
-  let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
-  return (level, input :: inputs)
-
-(** Generate a list of level and associated arith pvm inputs. *)
-let gen_arith_pvm_inputs_for_levels ?(nonempty_inputs = false) ?level_min
-    ?level_max () =
-  let open QCheck2.Gen in
-  let rec aux () =
-    let* res =
-      let+ inputs_per_level =
-        small_list (gen_arith_pvm_inputs_for_level ?level_min ?level_max ())
-      in
-      List.sort_uniq
-        (fun (l, _) (l', _) -> Compare.Int.compare l l')
-        inputs_per_level
-    in
-    if nonempty_inputs && Compare.List_length_with.(res = 0) then aux ()
-    else return res
-  in
-  aux ()
+(** Generate a list of level and associated arith pvm messages. *)
+let gen_arith_pvm_messages_for_levels ~start_level ~max_level =
+  gen_messages_for_levels
+    ~start_level
+    ~max_level
+    (gen_arith_pvm_messages ~gen_size:(QCheck2.Gen.pure 0))
 
 (** Dissection helpers and tests *)
 module Dissection = struct
@@ -813,7 +786,7 @@ end
 
 (** {2. ArithPVM utils} *)
 
-module ArithPVM = Sc_rollup_helpers.Arith_pvm
+module ArithPVM = Arith_pvm
 
 module Tree_inbox = struct
   open Inbox
@@ -893,12 +866,6 @@ module Arith_test_pvm = struct
     let* state = initial_state (init_context ()) in
     state_hash state
 
-  let mk_input level message_counter msg =
-    let payload = make_external_inbox_message msg in
-    let level = Int32.of_int level in
-    Sc_rollup.Inbox_message
-      {payload; message_counter; inbox_level = Raw_level.of_int32_exn level}
-
   let consume_fuel = Option.map pred
 
   let continue_with_fuel ~our_states ~(tick : int) fuel state f =
@@ -955,19 +922,18 @@ module Arith_test_pvm = struct
     in
     return (state, fuel, tick, our_states)
 
-  let eval_inbox ?fuel ~level ~inputs ~tick state =
+  let eval_inbox ?fuel ~messages ~tick state =
     let open Lwt_result_syntax in
-    List.fold_left_i_es
-      (fun message_counter (state, fuel, tick, our_states) input ->
-        let input = mk_input level (Z.of_int message_counter) input in
+    List.fold_left_es
+      (fun (state, fuel, tick, our_states) {input; message = _} ->
         let*! state, fuel, tick, our_states =
           feed_input ~fuel ~our_states ~tick state input
         in
         return (state, fuel, tick, our_states))
       (state, fuel, tick, [])
-      inputs
+      messages
 
-  let eval_levels_and_inputs ~metadata ?fuel ctxt levels_and_inputs =
+  let eval_levels_and_messages ~metadata ?fuel ctxt levels_and_messages =
     let open Lwt_result_syntax in
     let*! state = initial_state ctxt in
     let*! state_hash = state_hash state in
@@ -985,13 +951,13 @@ module Arith_test_pvm = struct
     (* 3. We evaluate the inbox. *)
     let* state, _fuel, tick, our_states =
       List.fold_left_es
-        (fun (state, fuel, tick, our_states) (level, inputs) ->
+        (fun (state, fuel, tick, our_states) (_level, messages) ->
           let* state, fuel, tick, our_states' =
-            eval_inbox ?fuel ~level ~inputs ~tick state
+            eval_inbox ?fuel ~messages ~tick state
           in
           return (state, fuel, tick, our_states @ our_states'))
         (state, fuel, tick, our_states)
-        levels_and_inputs
+        levels_and_messages
     in
     let our_states =
       List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
@@ -1006,22 +972,27 @@ module Arith_test_pvm = struct
 end
 
 (** Construct the inbox for the protocol side. *)
-let construct_inbox_proto block rollup levels_and_inputs contract =
+let construct_inbox_proto block levels_and_messages contract =
   let open Lwt_result_syntax in
   List.fold_left_es
-    (fun block (level, payloads) ->
-      let*? current_level = Context.get_level (B block) in
-      let diff_with_level =
-        Raw_level.(diff (of_int32_exn (Int32.of_int level)) current_level)
-        |> Int32.to_int
+    (fun block (_inbox_level, (messages : message list)) ->
+      let messages =
+        List.filter_map
+          (fun {message; _} ->
+            match message with
+            | `Message message -> Some message
+            | `SOL | `EOL -> (* Those are added by the protocol. *) None)
+          messages
       in
-      let* block = Block.bake_n (diff_with_level - 1) block in
-      let* operation_add_message =
-        Op.sc_rollup_add_messages (B block) contract rollup payloads
-      in
-      Block.bake ~operation:operation_add_message block)
+      match messages with
+      | [] -> Block.bake block
+      | messages ->
+          let* operation_add_message =
+            Op.sc_rollup_add_messages (B block) contract messages
+          in
+          Block.bake ~operation:operation_add_message block)
     block
-    levels_and_inputs
+    levels_and_messages
 
 (** Kind of strategy a player can play
 
@@ -1037,6 +1008,8 @@ type strategy =
   | Lazy  (** A lazy player will not execute all messages. *)
   | Eager  (** A eager player will not cheat until a certain point. *)
   | Keen  (** A keen player will execute more messages. *)
+  | SOL_hater  (** A SOL hater will not execute the SOL input. *)
+  | EOL_hater  (** A EOL hater will not execute the EOL input. *)
 
 let pp_strategy fmt = function
   | Random -> Format.pp_print_string fmt "Random"
@@ -1044,6 +1017,8 @@ let pp_strategy fmt = function
   | Lazy -> Format.pp_print_string fmt "Lazy"
   | Eager -> Format.pp_print_string fmt "Eager"
   | Keen -> Format.pp_print_string fmt "Keen"
+  | SOL_hater -> Format.pp_print_string fmt "SOL hater"
+  | EOL_hater -> Format.pp_print_string fmt "EOL hater"
 
 type player = {
   pkh : Signature.Public_key_hash.t;
@@ -1071,25 +1046,26 @@ type player_client = {
     * Store_inbox.tree option
     * Inbox.History.t
     * Inbox.t;
-  levels_and_inputs : (int * string list) list;
+  levels_and_messages : (Raw_level.t * message list) list;
   metadata : Metadata.t;
 }
 
-let pp_levels_and_inputs ppf levels_and_inputs =
+let pp_levels_and_messages ppf levels_and_messages =
   Format.(
     (pp_print_list
-       (fun ppf (level, inputs) ->
+       (fun ppf (level, messages) ->
          fprintf
            ppf
-           "level %d, inputs %a"
+           "level %a, messages: %a"
+           Raw_level.pp
            level
-           (pp_print_list pp_print_string)
-           inputs)
+           (pp_print_list pp_message)
+           messages)
        ppf)
-      levels_and_inputs)
+      levels_and_messages)
 
 let pp_player_client ppf
-    {player; states; final_tick; inbox = _; levels_and_inputs; metadata} =
+    {player; states; final_tick; inbox = _; levels_and_messages; metadata} =
   Format.fprintf
     ppf
     "@[<v 2>player:@,\
@@ -1114,19 +1090,12 @@ let pp_player_client ppf
     Tick.pp
     final_tick
     (* inbox *)
-    pp_levels_and_inputs
-    levels_and_inputs
+    pp_levels_and_messages
+    levels_and_messages
     Sc_rollup.Metadata.pp
     metadata
 
 module Player_client = struct
-  (** Transform inputs to payloads. *)
-  let levels_and_payloads levels_and_inputs =
-    List.map
-      (fun (level, inputs) ->
-        (level, List.map make_external_inbox_message inputs))
-      levels_and_inputs
-
   let empty_memory_ctxt id =
     let open Lwt_syntax in
     Lwt_main.run
@@ -1140,16 +1109,22 @@ module Player_client = struct
      test/unit/test_sc_rollup_inbox. The main difference is: we use
      [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
      former. *)
-  let construct_inbox ctxt levels_and_payloads ~rollup ~origination_level =
+  let construct_inbox ~inbox ctxt levels_and_messages ~origination_level =
     let open Lwt_syntax in
     let open Store_inbox in
-    let* inbox = empty ctxt rollup origination_level in
     let history = Inbox.History.empty ~capacity:10000L in
     let rec aux history inbox level_tree = function
       | [] -> return (ctxt, level_tree, history, inbox)
-      | (level, payloads) :: rst ->
-          let level = Int32.of_int level |> Raw_level.of_int32_exn in
-          let () = assert (Raw_level.(origination_level <= level)) in
+      | ((level, messages) : Raw_level.t * message list) :: rst ->
+          assert (Raw_level.(origination_level < level)) ;
+          let payloads =
+            List.map
+              (fun {input; _} ->
+                match input with
+                | Inbox_message {payload; _} -> payload
+                | Reveal _ -> (* We don't produce any reveals. *) assert false)
+              messages
+          in
           let* res =
             lift @@ add_messages ctxt history inbox level payloads level_tree
           in
@@ -1158,111 +1133,142 @@ module Player_client = struct
           in
           aux history inbox (Some level_tree) rst
     in
-    aux history inbox None levels_and_payloads
+    aux history inbox None levels_and_messages
 
-  (** Construct an inbox based on [levels_and_inputs] in the player context. *)
-  let construct_inbox ~origination_level ctxt rollup levels_and_inputs =
+  (** Construct an inbox based on [levels_and_messages] in the player context. *)
+  let construct_inbox ~inbox ~origination_level ctxt levels_and_messages =
     Lwt_main.run
-    @@ construct_inbox
-         ~origination_level
-         ctxt
-         ~rollup
-         (levels_and_payloads levels_and_inputs)
+    @@ construct_inbox ~inbox ~origination_level ctxt levels_and_messages
 
-  (** Generate [our_states] for [levels_and_inputs] based on the strategy.
-      It needs [level_min] and [level_max] in case it will need to generate
+  (** Generate [our_states] for [levels_and_messages] based on the strategy.
+      It needs [start_level] and [max_level] in case it will need to generate
       new inputs. *)
-  let gen_our_states ~metadata ctxt strategy ?level_min ?level_max
-      levels_and_inputs =
+  let gen_our_states ~metadata ctxt strategy ~start_level ~max_level
+      levels_and_messages =
     let open QCheck2.Gen in
-    let eval_inputs levels_and_inputs =
+    let eval_messages
+        (levels_and_messages : (Raw_level.t * message trace) trace) =
       Lwt_main.run
       @@
       let open Lwt_result_syntax in
       let*! r =
-        Arith_test_pvm.eval_levels_and_inputs ~metadata ctxt levels_and_inputs
+        Arith_test_pvm.eval_levels_and_messages
+          ~metadata
+          ctxt
+          levels_and_messages
       in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
     match strategy with
     | Perfect ->
-        (* The perfect player does not lie, evaluates correctly the inputs. *)
-        let _state, tick, our_states = eval_inputs levels_and_inputs in
-        return (tick, our_states, levels_and_inputs)
+        (* The perfect player does not lie, evaluates correctly the messages. *)
+        let _state, tick, our_states = eval_messages levels_and_messages in
+        return (tick, our_states, levels_and_messages)
     | Random ->
-        (* Random player generates its own list of inputs. *)
-        let* new_levels_and_inputs =
-          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        (* Random player generates its own list of messages. *)
+        let* new_levels_and_messages =
+          gen_arith_pvm_messages_for_levels ~start_level ~max_level
         in
-        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
-        return (tick, our_states, new_levels_and_inputs)
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
     | Lazy ->
-        (* Lazy player removes inputs from [levels_and_inputs]. *)
-        let n = List.length levels_and_inputs in
+        (* Lazy player removes messages from [levels_and_messages]. *)
+        let n = List.length levels_and_messages in
         let* remove_k = 1 -- n in
-        let new_levels_and_inputs =
-          List.take_n (n - remove_k) levels_and_inputs
+        let new_levels_and_messages =
+          List.take_n (n - remove_k) levels_and_messages
         in
-        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
-        return (tick, our_states, new_levels_and_inputs)
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
     | Eager ->
         (* Eager player executes correctly the inbox until a certain point. *)
         let nb_of_input =
           List.fold_left
-            (fun acc (_level, inputs) -> acc + List.length inputs)
+            (fun acc (_level, messages) -> acc + List.length messages)
             0
-            levels_and_inputs
+            levels_and_messages
         in
         let* corrupt_at_k = 0 -- (nb_of_input - 1) in
-        let new_input = "42 7 +" in
+        let message = "42 7 +" in
         (* Once an input is corrupted, everything after will be corrupted
            as well. *)
-        let new_levels_and_inputs =
+        let new_levels_and_messages =
           let idx = ref (-1) in
           List.map
-            (fun (level, inputs) ->
-              ( level,
+            (fun (inbox_level, messages) ->
+              ( inbox_level,
                 List.map
-                  (fun input ->
+                  (fun x ->
                     incr idx ;
-                    if !idx = corrupt_at_k then new_input else input)
-                  inputs ))
-            levels_and_inputs
+                    if !idx = corrupt_at_k then
+                      let input =
+                        match x.input with
+                        | Inbox_message {inbox_level; message_counter; _} ->
+                            make_external_input
+                              ~inbox_level
+                              ~message_counter
+                              message
+                        | _ -> (* We don't produce any reveals. *) assert false
+                      in
+                      {x with input}
+                    else x)
+                  messages ))
+            levels_and_messages
         in
-        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
-        return (tick, our_states, new_levels_and_inputs)
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
     | Keen ->
         (* Keen player will add more messages. *)
-        let* new_levels_and_inputs =
-          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        let* offset = 1 -- 5 in
+        let* new_levels_and_messages =
+          gen_arith_pvm_messages_for_levels
+            ~start_level:max_level
+            ~max_level:(max_level + offset)
         in
-        let new_levels_and_inputs = new_levels_and_inputs @ levels_and_inputs in
-        let new_levels_and_inputs =
-          List.sort_uniq
-            (fun (l, _) (l', _) -> Compare.Int.compare l l')
-            new_levels_and_inputs
+        let new_levels_and_messages =
+          levels_and_messages @ new_levels_and_messages
         in
-        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
-        return (tick, our_states, new_levels_and_inputs)
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
+    | SOL_hater ->
+        let new_levels_and_messages =
+          List.map
+            (fun (level, messages) -> (level, Stdlib.List.tl messages))
+            levels_and_messages
+        in
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
+    | EOL_hater ->
+        let new_levels_and_messages =
+          List.map
+            (fun (level, messages) ->
+              let rev_messages = List.rev messages in
+              let without_eol = Stdlib.List.tl rev_messages in
+              (level, List.rev without_eol))
+            levels_and_messages
+        in
+        let _state, tick, our_states = eval_messages new_levels_and_messages in
+        return (tick, our_states, new_levels_and_messages)
 
-  (** [gen ~rollup ~level_min ~level_max player levels_and_inputs] generates
-      a {!player_client} based on {!player.strategy}. *)
-  let gen ~rollup ~origination_level ~level_min ~level_max player
-      levels_and_inputs =
+  (** [gen ~inbox ~rollup ~origination_level ~start_level ~max_level player
+      levels_and_messages] generates a {!player_client} based on
+      its {!player.strategy}. *)
+  let gen ~inbox ~rollup ~origination_level ~start_level ~max_level player
+      levels_and_messages =
     let open QCheck2.Gen in
     let ctxt = empty_memory_ctxt "foo" in
     let metadata = Sc_rollup.Metadata.{address = rollup; origination_level} in
-    let* tick, our_states, levels_and_inputs =
+    let* tick, our_states, levels_and_messages =
       gen_our_states
         ~metadata
         ctxt
         player.strategy
-        ~level_min
-        ~level_max
-        levels_and_inputs
+        ~start_level
+        ~max_level
+        levels_and_messages
     in
     let inbox =
-      construct_inbox ~origination_level ctxt rollup levels_and_inputs
+      construct_inbox ~inbox ~origination_level ctxt levels_and_messages
     in
     return
       {
@@ -1270,7 +1276,7 @@ module Player_client = struct
         final_tick = tick;
         states = our_states;
         inbox;
-        levels_and_inputs;
+        levels_and_messages;
         metadata;
       }
 end
@@ -1325,11 +1331,11 @@ let build_proof ~player_client start_tick (game : Game.t) =
   let fuel = tick_to_int_exn start_tick in
   let metadata = player_client.metadata in
   let*! r =
-    Arith_test_pvm.eval_levels_and_inputs
+    Arith_test_pvm.eval_levels_and_messages
       ~metadata
       ~fuel
       (Arith_test_pvm.init_context ())
-      player_client.levels_and_inputs
+      player_client.levels_and_messages
   in
   let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
   let module P = struct
@@ -1425,10 +1431,7 @@ let play_until_game_result ~refuter_client ~defender_client ~rollup block =
     | Ongoing ->
         let* block = Incremental.finalize_block incr in
         play ~player_turn:opponent ~opponent:player_turn block
-    | Ended (Loser {reason = _; loser}) as game_result ->
-        let () =
-          Format.printf "@,ending result: %a@," Game.pp_status game_result
-        in
+    | Ended (Loser {reason = _; loser}) ->
         if loser = Account.pkh_of_contract_exn refuter_client.player.contract
         then return Defender_wins
         else return Refuter_wins
@@ -1464,17 +1467,12 @@ let make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 =
     It generates inputs for the rollup, and creates the players' interpretation
     of these inputs in a {!player_client} for [p1_strategy] and [p2_strategy].
 *)
-let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
+let gen_game ~p1_strategy ~p2_strategy =
   let open QCheck2.Gen in
   (* If there is no good player, we do not care about the result. *)
   assert (p1_strategy = Perfect || p2_strategy = Perfect) ;
-  let* first_inputs =
-    let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
-    let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
-    return (input :: inputs)
-  in
-  let block, rollup, genesis_info, (contract1, contract2, contract3) =
-    create_ctxt ~first_inputs
+  let block, rollup, inbox, genesis_info, (contract1, contract2, contract3) =
+    create_ctxt ()
   in
   let p1, p2 = make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 in
 
@@ -1487,32 +1485,33 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   let origination_level =
     Raw_level.to_int32 genesis_info.level |> Int32.to_int
   in
-  let level_min = origination_level + 1 in
-  let level_max = origination_level + commitment_period - 1 in
-  let* levels_and_inputs =
-    gen_arith_pvm_inputs_for_levels ?nonempty_inputs ~level_min ~level_max ()
+  let start_level = origination_level + 1 in
+  let max_level = start_level + commitment_period - 1 in
+  let* levels_and_messages =
+    gen_arith_pvm_messages_for_levels ~start_level ~max_level
   in
   let* p1_client =
     Player_client.gen
+      ~inbox
       ~origination_level:genesis_info.level
-      ~level_min
-      ~level_max
+      ~start_level
+      ~max_level
       ~rollup
       p1
-      ((origination_level, first_inputs) :: levels_and_inputs)
+      levels_and_messages
   in
   let* p2_client =
     Player_client.gen
+      ~inbox
       ~origination_level:genesis_info.level
-      ~level_min
-      ~level_max
+      ~start_level
+      ~max_level
       ~rollup
       p2
-      ((origination_level, first_inputs) :: levels_and_inputs)
+      levels_and_messages
   in
   let* p1_start = bool in
   let commitment_level = origination_level + commitment_period in
-  let* additional_payloads = small_list (string_size (1 -- 15)) in
   return
     ( block,
       rollup,
@@ -1522,32 +1521,66 @@ let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
       p2_client,
       contract3,
       p1_start,
-      levels_and_inputs,
-      additional_payloads )
+      levels_and_messages )
 
-(** [prepare_game block lcc originated_level p1_client p2_client
-    inputs_and_levels] prepares a context where [p1_client] and [p2_client]
+(** Shrinker is really slow. Deactivating it. *)
+let gen_game ~p1_strategy ~p2_strategy =
+  let open QCheck2.Gen in
+  make_primitive
+    ~gen:(fun rand -> generate1 ~rand (gen_game ~p1_strategy ~p2_strategy))
+    ~shrink:(fun _ -> Seq.empty)
+
+(** [prepare_game block rollup lcc commitment_level p1_client p2_client contract
+    levels_and_messages] prepares a context where [p1_client] and [p2_client]
     are in conflict for one commitment.
-    It creates the protocol inbox using [inputs_and_levels]. *)
-let prepare_game block rollup lcc commitment_level p1_client p2_client contract
-    levels_and_inputs =
+    It creates the protocol inbox using [levels_and_messages]. *)
+let prepare_game ~p1_start block rollup lcc commitment_level p1_client p2_client
+    contract levels_and_messages =
   let open Lwt_result_syntax in
-  let* block = construct_inbox_proto block rollup levels_and_inputs contract in
-  let* operation_publish_commitment_p1 =
+  let* block = construct_inbox_proto block levels_and_messages contract in
+  let* p1_commitment =
     operation_publish_commitment (B block) rollup lcc commitment_level p1_client
   in
-  let* operation_publish_commitment_p2 =
+  let* p2_commitment =
     operation_publish_commitment (B block) rollup lcc commitment_level p2_client
   in
-  Block.bake
-    ~operations:
-      [operation_publish_commitment_p1; operation_publish_commitment_p2]
-    block
+  let commit_then_commit_and_refute ~defender_commitment ~refuter_commitment
+      (refuter, defender) =
+    let* start_game =
+      Op.sc_rollup_refute
+        (B block)
+        refuter.player.contract
+        rollup
+        defender.player.pkh
+        None
+    in
+    let* refuter_batch =
+      Op.batch_operations
+        ~recompute_counters:true
+        ~source:refuter.player.contract
+        (B block)
+        [refuter_commitment; start_game]
+    in
+    let* block =
+      Block.bake ~operations:[defender_commitment; refuter_batch] block
+    in
+    return (block, refuter, defender)
+  in
+  if p1_start then
+    commit_then_commit_and_refute
+      ~defender_commitment:p2_commitment
+      ~refuter_commitment:p1_commitment
+      (p1_client, p2_client)
+  else
+    commit_then_commit_and_refute
+      ~defender_commitment:p1_commitment
+      ~refuter_commitment:p2_commitment
+      (p2_client, p1_client)
 
 (** Create a test of [p1_strategy] against [p2_strategy]. One of them
     must be a {!Perfect} player, otherwise, we do not care about which
     cheater wins. *)
-let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
+let test_game ~p1_strategy ~p2_strategy () =
   let name =
     Format.asprintf
       "%a against %a"
@@ -1566,8 +1599,7 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
              p2_client,
              _contract3,
              p1_start,
-             levels_and_inputs,
-             _additional_payloads ) ->
+             levels_and_messages ) ->
       let level =
         WithExceptions.Result.get_ok ~loc:__LOC__ @@ Context.get_level (B block)
       in
@@ -1597,11 +1629,11 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
         pp_player_client
         p2_client
         (if p1_start then "p1" else "p2")
-        pp_levels_and_inputs
-        levels_and_inputs)
-    ~count:200
+        pp_levels_and_messages
+        levels_and_messages)
+    ~count:100
     ~name
-    ~gen:(gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy ())
+    ~gen:(gen_game ~p1_strategy ~p2_strategy)
     (fun ( block,
            rollup,
            commitment_level,
@@ -1610,8 +1642,7 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
            p2_client,
            contract3,
            p1_start,
-           levels_and_inputs,
-           additional_payloads ) ->
+           levels_and_messages ) ->
       let open Lwt_result_syntax in
       (* Otherwise, there is no conflict. *)
       QCheck2.assume
@@ -1623,8 +1654,9 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
                 Tick.equal t1 t2 && State_hash.equal state_hash1 state_hash2)
               p1_head
               p2_head)) ;
-      let* block =
+      let* block, refuter, defender =
         prepare_game
+          ~p1_start
           block
           rollup
           lcc
@@ -1632,44 +1664,7 @@ let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
           p1_client
           p2_client
           contract3
-          levels_and_inputs
-      in
-      let refuter, defender =
-        if p1_start then (p1_client, p2_client) else (p2_client, p1_client)
-      in
-      let* operation_start_game =
-        Op.sc_rollup_refute
-          (B block)
-          refuter.player.contract
-          rollup
-          defender.player.pkh
-          None
-      in
-      let* block =
-        match additional_payloads with
-        | [] -> Block.bake ~operation:operation_start_game block
-        | payloads ->
-            (* Add messages before starting the game. *)
-            let* operation_add_messages1 =
-              Op.sc_rollup_add_messages
-                (B block)
-                defender.player.contract
-                rollup
-                payloads
-            in
-            (* Start the game in between adding messages so the latest protocol
-               inbox is no longer equal to the player's view on inbox. *)
-            let* operation_add_messages2 =
-              Op.sc_rollup_add_messages (B block) contract3 rollup payloads
-            in
-            Block.bake
-              ~operations:
-                [
-                  operation_add_messages1;
-                  operation_start_game;
-                  operation_add_messages2;
-                ]
-              block
+          levels_and_messages
       in
       let* game_result =
         play_until_game_result
@@ -1689,22 +1684,34 @@ let test_random_against_perfect =
   test_game ~p1_strategy:Random ~p2_strategy:Perfect ()
 
 let test_perfect_against_lazy =
-  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Lazy ()
+  test_game ~p1_strategy:Perfect ~p2_strategy:Lazy ()
 
 let test_lazy_against_perfect =
-  test_game ~nonempty_inputs:true ~p1_strategy:Lazy ~p2_strategy:Perfect ()
+  test_game ~p1_strategy:Lazy ~p2_strategy:Perfect ()
 
 let test_perfect_against_eager =
-  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Eager ()
+  test_game ~p1_strategy:Perfect ~p2_strategy:Eager ()
 
 let test_eager_against_perfect =
-  test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
+  test_game ~p1_strategy:Eager ~p2_strategy:Perfect ()
 
 let test_perfect_against_keen =
   test_game ~p1_strategy:Perfect ~p2_strategy:Keen ()
 
 let test_keen_against_perfect =
   test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
+
+let test_sol_hater_against_perfect =
+  test_game ~p1_strategy:SOL_hater ~p2_strategy:Perfect ()
+
+let test_perfect_against_sol_hater =
+  test_game ~p1_strategy:Perfect ~p2_strategy:SOL_hater ()
+
+let test_eol_hater_against_perfect =
+  test_game ~p1_strategy:EOL_hater ~p2_strategy:Perfect ()
+
+let test_perfect_against_eol_hater =
+  test_game ~p1_strategy:Perfect ~p2_strategy:EOL_hater ()
 
 let tests =
   ( "Refutation",
@@ -1714,10 +1721,14 @@ let tests =
         test_random_against_perfect;
         test_perfect_against_lazy;
         test_lazy_against_perfect;
-        test_perfect_against_eager;
-        test_eager_against_perfect;
         test_perfect_against_keen;
         test_keen_against_perfect;
+        test_perfect_against_eager;
+        test_eager_against_perfect;
+        test_sol_hater_against_perfect;
+        test_perfect_against_sol_hater;
+        test_eol_hater_against_perfect;
+        test_perfect_against_eol_hater;
       ] )
 
 (** {2 Entry point} *)

@@ -664,9 +664,7 @@ let generate_sc_rollup_originate =
 
 let generate_sc_rollup_add_messages =
   let open QCheck2.Gen in
-  let+ rollup = random_sc_rollup in
-  let messages = [] in
-  Sc_rollup_add_messages {rollup; messages}
+  return (Sc_rollup_add_messages {messages = []})
 
 let sc_dummy_commitment =
   let number_of_ticks =

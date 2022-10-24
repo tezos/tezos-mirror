@@ -511,10 +511,8 @@ and _ manager_operation =
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
-  (* [Sc_rollup_add_messages] adds messages to a given rollup's
-      inbox. *)
+  (* [Sc_rollup_add_messages] adds messages to the smart rollups' inbox. *)
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup_repr.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation

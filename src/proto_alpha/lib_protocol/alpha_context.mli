@@ -3004,11 +3004,15 @@ module Sc_rollup : sig
 
   (** See {!Sc_rollup_inbox_message_repr}. *)
   module Inbox_message : sig
-    type internal_inbox_message = {
-      payload : Script.expr;
-      sender : Contract_hash.t;
-      source : public_key_hash;
-    }
+    type internal_inbox_message =
+      | Transfer of {
+          payload : Script.expr;
+          sender : Contract_hash.t;
+          source : public_key_hash;
+          destination : t;
+        }
+      | Start_of_level
+      | End_of_level
 
     type t = Internal of internal_inbox_message | External of string
 
@@ -3034,6 +3038,12 @@ module Sc_rollup : sig
   type reveal_data = Raw_data of string | Metadata of Metadata.t
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
+
+  val pp_inbox_message : Format.formatter -> inbox_message -> unit
+
+  val pp_reveal_data : Format.formatter -> reveal_data -> unit
+
+  val pp_input : Format.formatter -> input -> unit
 
   val input_equal : input -> input -> bool
 
@@ -3067,9 +3077,6 @@ module Sc_rollup : sig
     val equal : t -> t -> bool
 
     val inbox_level : t -> Raw_level.t
-
-    val refresh_commitment_period :
-      commitment_period:int32 -> level:Raw_level.t -> t -> t
 
     type history_proof
 
@@ -3126,7 +3133,7 @@ module Sc_rollup : sig
         tree option ->
         (History.t * history_proof) tzresult Lwt.t
 
-      val take_snapshot : current_level:Raw_level.t -> t -> history_proof
+      val take_snapshot : t -> history_proof
 
       type inclusion_proof
 
@@ -3160,7 +3167,7 @@ module Sc_rollup : sig
         Raw_level.t * Z.t ->
         (proof * inbox_message option) tzresult Lwt.t
 
-      val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level.t -> t Lwt.t
+      val empty : inbox_context -> Raw_level.t -> t Lwt.t
 
       module Internal_for_tests : sig
         val eq_tree : tree -> tree -> bool
@@ -3172,6 +3179,8 @@ module Sc_rollup : sig
           inclusion_proof option tzresult
 
         val serialized_proof_of_string : string -> serialized_proof
+
+        val inbox_message_counter : t -> Z.t
       end
     end
 
@@ -3212,17 +3221,21 @@ module Sc_rollup : sig
       Merkelized_operations with type tree = P.tree and type inbox_context = P.t
 
     val add_external_messages :
-      context -> rollup -> string list -> (t * Z.t * context) tzresult Lwt.t
+      context -> string list -> (t * Z.t * context) tzresult Lwt.t
 
-    val add_internal_message :
+    val add_deposit :
       context ->
-      rollup ->
       payload:Script.expr ->
       sender:Contract_hash.t ->
       source:public_key_hash ->
+      destination:rollup ->
       (t * Z.t * context) tzresult Lwt.t
 
-    val inbox : context -> rollup -> (t * context) tzresult Lwt.t
+    val add_start_of_level : context -> (t * Z.t * context) tzresult Lwt.t
+
+    val add_end_of_level : context -> (t * Z.t * context) tzresult Lwt.t
+
+    val get_inbox : context -> (t * context) tzresult Lwt.t
   end
 
   module Outbox : sig
@@ -3551,6 +3564,7 @@ module Sc_rollup : sig
           proof : Inbox.serialized_proof;
         }
       | Reveal_proof of reveal_proof
+      | First_inbox_message
 
     type t = {pvm_step : wrapped_proof; input_proof : input_proof option}
 
@@ -4396,7 +4410,6 @@ and _ manager_operation =
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
-      rollup : Sc_rollup.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation

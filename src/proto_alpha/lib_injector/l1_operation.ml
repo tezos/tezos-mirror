@@ -160,13 +160,11 @@ module Manager_operation = struct
           level
           (Format.pp_print_list pp_rollup_reveal)
           tickets_info
-    | Sc_rollup_add_messages {rollup; messages} ->
+    | Sc_rollup_add_messages {messages} ->
         Format.fprintf
           ppf
-          "publishing %d messages to rollup %a inbox"
+          "publishing %d messages to smart rollups' inbox"
           (List.length messages)
-          Sc_rollup.Address.pp
-          rollup
     | Sc_rollup_cement {rollup; commitment} ->
         Format.fprintf
           ppf

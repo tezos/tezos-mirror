@@ -109,7 +109,7 @@ module Make (PVM : Pvm.S) = struct
       (result : kind Apply_results.manager_operation_result) =
     let open Lwt_result_syntax in
     let is_for_my_rollup : type kind. kind manager_operation -> bool = function
-      | Sc_rollup_add_messages {rollup; _}
+      | Sc_rollup_add_messages _ -> true
       | Sc_rollup_cement {rollup; _}
       | Sc_rollup_publish {rollup; _}
       | Sc_rollup_refute {rollup; _}

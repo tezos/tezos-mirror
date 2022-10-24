@@ -245,7 +245,7 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup : sig
-  val inbox : t -> Sc_rollup.t -> Sc_rollup.Inbox.t tzresult Lwt.t
+  val inbox : t -> Sc_rollup.Inbox.t tzresult Lwt.t
 
   val commitment :
     t ->

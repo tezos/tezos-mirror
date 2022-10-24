@@ -1910,13 +1910,6 @@ module Sc_rollup = struct
         ~output:Data_encoding.string
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "boot_sector")
 
-    let inbox =
-      RPC_service.get_service
-        ~description:"Inbox for a smart-contract rollup"
-        ~query:RPC_query.empty
-        ~output:Sc_rollup.Inbox.encoding
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "inbox")
-
     let genesis_info =
       RPC_service.get_service
         ~description:
@@ -1970,13 +1963,6 @@ module Sc_rollup = struct
         RPC_path.(
           path /: Sc_rollup.Address.rpc_arg / "dal_slot_subscriptions"
           /: Raw_level.rpc_arg)
-
-    let root =
-      RPC_service.get_service
-        ~description:"List of all originated smart contract rollups"
-        ~query:RPC_query.empty
-        ~output:(Data_encoding.list Sc_rollup.Address.encoding)
-        path
 
     let ongoing_refutation_game =
       let query =
@@ -2070,15 +2056,31 @@ module Sc_rollup = struct
         ~query
         ~output
         RPC_path.(path /: Sc_rollup.Address.rpc_arg / "can_be_cemented")
+
+    let path_sc_rollups : RPC_context.t RPC_path.context =
+      RPC_path.(open_root / "context" / "sc_rollups")
+
+    let root =
+      RPC_service.get_service
+        ~description:"List of all originated smart contract rollups"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.list Sc_rollup.Address.encoding)
+        path_sc_rollups
+
+    let inbox =
+      RPC_service.get_service
+        ~description:"Inbox for the smart contract rollups"
+        ~query:RPC_query.empty
+        ~output:Sc_rollup.Inbox.encoding
+        RPC_path.(path_sc_rollups / "inbox")
   end
 
   let kind ctxt block sc_rollup_address =
     RPC_context.make_call1 S.kind ctxt block sc_rollup_address ()
 
   let register_inbox () =
-    Registration.register1 ~chunked:true S.inbox (fun ctxt rollup () () ->
-        Sc_rollup.Inbox.inbox ctxt rollup >>=? fun (inbox, _ctxt) ->
-        return inbox)
+    Registration.register0 ~chunked:true S.inbox (fun ctxt () () ->
+        Sc_rollup.Inbox.get_inbox ctxt >>=? fun (inbox, _ctxt) -> return inbox)
 
   let register_kind () =
     Registration.opt_register1 ~chunked:true S.kind @@ fun ctxt address () () ->
@@ -2241,8 +2243,7 @@ module Sc_rollup = struct
 
   let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
-  let inbox ctxt block sc_rollup_address =
-    RPC_context.make_call1 S.inbox ctxt block sc_rollup_address () ()
+  let inbox ctxt block = RPC_context.make_call0 S.inbox ctxt block () ()
 
   let genesis_info ctxt block sc_rollup_address =
     RPC_context.make_call1 S.genesis_info ctxt block sc_rollup_address () ()

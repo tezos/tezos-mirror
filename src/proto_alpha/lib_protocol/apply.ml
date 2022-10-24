@@ -642,9 +642,9 @@ let apply_internal_operation_contents :
       (* Adding the message to the inbox. Note that it is safe to ignore the
          size diff since only its hash and meta data are stored in the context.
          See #3232. *)
-      Sc_rollup.Inbox.add_internal_message
+      Sc_rollup.Inbox.add_deposit
         ctxt
-        destination
+        ~destination
         ~payload
         ~sender
         ~source:payer
@@ -1314,8 +1314,8 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_add_messages {rollup; messages} ->
-      Sc_rollup.Inbox.add_external_messages ctxt rollup messages
+  | Sc_rollup_add_messages {messages} ->
+      Sc_rollup.Inbox.add_external_messages ctxt messages
       >>=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
@@ -2515,6 +2515,7 @@ let begin_application ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode =
     Application
       {
@@ -2569,6 +2570,7 @@ let begin_full_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode =
     Full_construction
       {
@@ -2603,6 +2605,7 @@ let begin_partial_construction ctxt chain_id ~migration_balance_updates
   let* ctxt, liquidity_baking_operations_results, liquidity_baking_toggle_ema =
     apply_liquidity_baking_subsidy ctxt ~toggle_vote
   in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_start_of_level ctxt in
   let mode = Partial_construction {predecessor_level; predecessor_fitness} in
   return
     {
@@ -2691,6 +2694,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
   let* ctxt, dal_slot_availability = Dal_apply.dal_finalisation ctxt in
+  let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_end_of_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in

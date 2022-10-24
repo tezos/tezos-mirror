@@ -54,11 +54,52 @@ let () =
     (function Error_decode_inbox_message -> Some () | _ -> None)
     (fun () -> Error_decode_inbox_message)
 
-type internal_inbox_message = {
-  payload : Script_repr.expr;
-  sender : Contract_hash.t;
-  source : Signature.public_key_hash;
-}
+type internal_inbox_message =
+  | Transfer of {
+      payload : Script_repr.expr;
+      sender : Contract_hash.t;
+      source : Signature.public_key_hash;
+      destination : Sc_rollup_repr.Address.t;
+    }
+  | Start_of_level
+  | End_of_level
+
+let internal_inbox_message_encoding =
+  let open Data_encoding in
+  let kind name = req "internal_inbox_message_kind" (constant name) in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Transfer"
+        (obj5
+           (kind "transfer")
+           (req "payload" Script_repr.expr_encoding)
+           (req "sender" Contract_hash.encoding)
+           (req "source" Signature.Public_key_hash.encoding)
+           (req "destination" Sc_rollup_repr.Address.encoding))
+        (function
+          | Transfer {payload; sender; source; destination} ->
+              Some ((), payload, sender, source, destination)
+          | _ -> None)
+        (fun ((), payload, sender, source, destination) ->
+          Transfer {payload; sender; source; destination});
+      case
+        (Tag 1)
+        ~title:"Start_of_level"
+        (obj1 (kind "start_of_level"))
+        (function Start_of_level -> Some () | _ -> None)
+        (fun () -> Start_of_level);
+      case
+        (Tag 2)
+        ~title:"End_of_level"
+        (obj1 (kind "end_of_level"))
+        (function End_of_level -> Some () | _ -> None)
+        (fun () -> End_of_level);
+    ]
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4027
+   We should change the payload of [External] from [bytes] to [string]. *)
 
 type t = Internal of internal_inbox_message | External of string
 
@@ -71,15 +112,11 @@ let encoding =
          case
            (Tag 0)
            ~title:"Internal"
-           (obj3
-              (req "payload" Script_repr.expr_encoding)
-              (req "sender" Contract_hash.encoding)
-              (req "source" Signature.Public_key_hash.encoding))
+           internal_inbox_message_encoding
            (function
-             | Internal {payload; sender; source} ->
-                 Some (payload, sender, source)
+             | Internal internal_message -> Some internal_message
              | External _ -> None)
-           (fun (payload, sender, source) -> Internal {payload; sender; source});
+           (fun internal_message -> Internal internal_message);
          case
            (Tag 1)
            ~title:"External"

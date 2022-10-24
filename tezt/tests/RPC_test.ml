@@ -1010,10 +1010,6 @@ let test_chain _test_mode_tag _protocol ?endpoint client =
     @@ RPC.get_chain_block_context_nonce block_level
   in
   let* _ =
-    (* Calls [/chains/main/blocks/head/context/sc_rollup] *)
-    RPC.Client.call ?endpoint client @@ RPC.get_chain_block_context_sc_rollup ()
-  in
-  let* _ =
     (* Calls [/chains/main/blocks/head/context/raw/bytes] *)
     RPC.Client.call ?endpoint client
     @@ RPC.get_chain_block_context_raw ~ctxt_type:Bytes ~value_path:[] ()

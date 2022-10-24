@@ -24,13 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [inbox context rollup] returns the current state of the inbox. *)
-val inbox :
-  Raw_context.t ->
-  Sc_rollup_repr.t ->
-  (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
+(** [get_inbox context] returns the current state of the inbox,
+    if it exists. *)
+val get_inbox :
+  Raw_context.t -> (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
-(** [add_external_messages context rollup msg] adds [msg] to [rollup]'s inbox.
+(** [add_external_messages context msg] adds [msg] to the smart rollups' inbox.
 
     This function returns the updated context as well as the size diff.
 
@@ -43,22 +42,37 @@ val inbox :
 *)
 val add_external_messages :
   Raw_context.t ->
-  Sc_rollup_repr.t ->
   string list ->
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
-(** [add_internal_message context rollup ~payload ~sender ~source] adds the
-  internal message of [payload], [sender], and [source] to [rollup]'s inbox.
+(** [add_deposit ~payload ~sender ~source ~destination ctxt] adds the
+    internal deposit message of [payload], [sender], and [source] to
+    the smart-contract rollups' inbox.
 
-  See [add_external_messages] for returned values and failures.
+    See [add_external_messages] for returned values and failures.
 *)
-val add_internal_message :
+val add_deposit :
   Raw_context.t ->
-  Sc_rollup_repr.t ->
   payload:Script_repr.expr ->
   sender:Contract_hash.t ->
   source:Signature.public_key_hash ->
+  destination:Sc_rollup_repr.Address.t ->
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+
+(** Initialize the inbox in the storage at protocol initialization. *)
+val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+(** Push a [Start_of_level] internal inbox message in the inbox using
+    {!add_internal_message}.
+*)
+val add_start_of_level :
+  Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+
+(** Push a [End_of_level] internal inbox message in the inbox using
+    {!add_internal_message}.
+*)
+val add_end_of_level :
+  Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (**/**)
 

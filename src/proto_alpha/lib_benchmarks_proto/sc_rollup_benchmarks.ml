@@ -241,14 +241,11 @@ module Sc_rollup_add_external_messages_benchmark = struct
       (rollup, ctxt)
     in
 
-    let add_message_and_increment_level ctxt rollup =
+    let add_message_and_increment_level ctxt =
       let open Lwt_result_syntax in
       let+ inbox, _, ctxt =
         Lwt.map Environment.wrap_tzresult
-        @@ Sc_rollup_inbox_storage.add_external_messages
-             ctxt
-             rollup
-             ["CAFEBABE"]
+        @@ Sc_rollup_inbox_storage.add_external_messages ctxt ["CAFEBABE"]
       in
       let ctxt = Raw_context.Internal_for_tests.add_level ctxt 1 in
       (inbox, ctxt)
@@ -256,26 +253,24 @@ module Sc_rollup_add_external_messages_benchmark = struct
 
     let prepare_benchmark_scenario () =
       let open Lwt_result_syntax in
-      let rec add_messages_for_level ctxt inbox rollup =
+      let rec add_messages_for_level ctxt inbox =
         if Raw_level_repr.((Raw_context.current_level ctxt).level > last_level)
         then return (inbox, ctxt)
         else
-          let* inbox, ctxt = add_message_and_increment_level ctxt rollup in
-          add_messages_for_level ctxt inbox rollup
+          let* inbox, ctxt = add_message_and_increment_level ctxt in
+          add_messages_for_level ctxt inbox
       in
-      let* rollup, ctxt = ctxt_with_rollup in
+      let* _rollup, ctxt = ctxt_with_rollup in
       let*! inbox =
         Sc_rollup_inbox_repr.empty
           (Raw_context.recover ctxt)
-          rollup
           (Raw_context.current_level ctxt).level
       in
-      let* inbox, ctxt = add_messages_for_level ctxt inbox rollup in
-      let+ messages, _ctxt =
-        Lwt.return @@ Environment.wrap_tzresult
-        @@ Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt rollup
+      let* inbox, ctxt = add_messages_for_level ctxt inbox in
+      let messages =
+        Raw_context.Sc_rollup_in_memory_inbox.current_messages ctxt
       in
-      (inbox, ctxt, messages)
+      return (inbox, ctxt, messages)
     in
 
     let inbox, ctxt, current_messages =

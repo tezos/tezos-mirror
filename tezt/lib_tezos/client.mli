@@ -1411,14 +1411,13 @@ module Sc_rollup : sig
     t ->
     Process.t
 
-  (** Run [octez-client send rollup message <msg> from <src> to <dst>]. *)
+  (** Run [octez-client send rollup message <msg> from <src>]. *)
   val send_message :
     ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
     msg:string ->
     src:string ->
-    dst:string ->
     t ->
     unit Lwt.t
 
@@ -1429,7 +1428,6 @@ module Sc_rollup : sig
     ?burn_cap:Tez.t ->
     msg:string ->
     src:string ->
-    dst:string ->
     t ->
     Process.t
 

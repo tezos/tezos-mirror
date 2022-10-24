@@ -388,12 +388,11 @@ module Tx_rollup = struct
 end
 
 module Sc_rollup = struct
-  let inbox ctxt sc_rollup =
-    Environment.RPC_context.make_call1
+  let inbox ctxt =
+    Environment.RPC_context.make_call0
       Plugin.RPC.Sc_rollup.S.inbox
       rpc_ctxt
       ctxt
-      sc_rollup
       ()
       ()
 

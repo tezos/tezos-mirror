@@ -109,12 +109,17 @@ let is_valid_parameters_ty_cost ~ty_size =
   S.add fixed_cost (S.mul coeff ty_size)
 
 let cost_serialize_internal_inbox_message
-    Sc_rollup_inbox_message_repr.{payload; sender = _; source = _} =
-  let lexpr = Script_repr.lazy_expr payload in
-  let expr_cost = Script_repr.force_bytes_cost lexpr in
-  S_syntax.(
-    expr_cost + Constants.cost_decoding_contract_optimized
-    + Constants.cost_decoding_key_hash_optimized)
+    (internal_inbox_message :
+      Sc_rollup_inbox_message_repr.internal_inbox_message) =
+  match internal_inbox_message with
+  | Transfer {payload; sender = _; source = _; destination = _} ->
+      let lexpr = Script_repr.lazy_expr payload in
+      let expr_cost = Script_repr.force_bytes_cost lexpr in
+      S_syntax.(
+        expr_cost + Constants.cost_decoding_contract_optimized
+        + Constants.cost_decoding_key_hash_optimized)
+  | Start_of_level -> Saturation_repr.zero
+  | End_of_level -> Saturation_repr.zero
 
 (** TODO: #3212
     Confirm gas cost model.

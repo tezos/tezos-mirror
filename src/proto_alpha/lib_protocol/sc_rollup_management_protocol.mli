@@ -60,15 +60,16 @@ type atomic_transaction_batch = private {transactions : transaction list}
 type outbox_message = private
   | Atomic_transaction_batch of atomic_transaction_batch
 
-(** [make_internal_inbox_message ctxt ty ~payload ~sender ~source] constructs a
-    smart-contract rollup's [inbox message] (an L1 to L2 message) with the given
-    [payload], [sender], and [source]. *)
-val make_internal_inbox_message :
+(** [make_internal_deposit ctxt ty ~payload ~sender ~source ~destination]
+    constructs a smart rollup's [inbox message] (an L1 to L2 message)
+    with the given [payload], [sender], and [source] targeting [destination]. *)
+val make_internal_deposit :
   context ->
   ('a, _) Script_typed_ir.ty ->
   payload:'a ->
   sender:Contract_hash.t ->
   source:public_key_hash ->
+  destination:Sc_rollup.Address.t ->
   (Sc_rollup.Inbox_message.t * context) tzresult Lwt.t
 
 (** [outbox_message_of_outbox_message_repr ctxt msg] returns a typed version of

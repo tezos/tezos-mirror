@@ -1689,21 +1689,44 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_commitment_repr.genesis_info_encoding
       end)
 
-  module Inbox_versioned =
-    Indexed_context.Make_carbonated_map
-      (Registered)
-      (struct
-        let name = ["inbox"]
-      end)
-      (struct
-        type t = Sc_rollup_inbox_repr.versioned
-
-        let encoding = Sc_rollup_inbox_repr.versioned_encoding
-      end)
-
   module Inbox = struct
-    include Inbox_versioned
-    include Make_versioned (Sc_rollup_inbox_repr) (Inbox_versioned)
+    include
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["sc_rollup_inbox"]
+        end)
+        (struct
+          type t = Sc_rollup_inbox_repr.versioned
+
+          let encoding = Sc_rollup_inbox_repr.versioned_encoding
+        end)
+
+    type value = Sc_rollup_inbox_repr.t
+
+    let of_versioned = Sc_rollup_inbox_repr.of_versioned
+
+    let to_versioned = Sc_rollup_inbox_repr.to_versioned
+
+    let get ctxt =
+      let open Lwt_tzresult_syntax in
+      let* versioned = get ctxt in
+      return (of_versioned versioned)
+
+    let find ctxt =
+      let open Lwt_tzresult_syntax in
+      let* versioned = find ctxt in
+      return (Option.map of_versioned versioned)
+
+    let init ctxt value = init ctxt (to_versioned value)
+
+    let update ctxt value = update ctxt (to_versioned value)
+
+    let add ctxt value =
+      let versioned = to_versioned value in
+      add ctxt versioned
+
+    let add_or_remove ctxt value =
+      add_or_remove ctxt (Option.map to_versioned value)
   end
 
   module Last_cemented_commitment =

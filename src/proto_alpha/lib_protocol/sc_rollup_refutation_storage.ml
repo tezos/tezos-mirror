@@ -251,17 +251,16 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let* parent_info, ctxt =
     Commitment_storage.get_commitment_unsafe ctxt rollup child_info.predecessor
   in
-  let* ctxt, inbox = Store.Inbox.get ctxt rollup in
+  let* inbox, ctxt = Sc_rollup_inbox_storage.get_inbox ctxt in
   let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
   let default_number_of_sections =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
-
   let current_level = (Raw_context.current_level ctxt).level in
   let game =
     Sc_rollup_game_repr.initial
       ~start_level:current_level
-      (Sc_rollup_inbox_repr.take_snapshot ~current_level inbox)
+      (Sc_rollup_inbox_repr.take_snapshot inbox)
       ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info
       ~child:child_info

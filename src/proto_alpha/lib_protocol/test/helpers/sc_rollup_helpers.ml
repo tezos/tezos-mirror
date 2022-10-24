@@ -177,30 +177,249 @@ let genesis_commitment_raw ~boot_sector ~origination_level kind =
   in
   return res
 
-let make_external_inbox_message_repr str =
+(** {2. Inbox message helpers.} *)
+
+(** {1. Above [Alpha_context].} *)
+
+let message_serialize msg =
   WithExceptions.Result.get_ok
     ~loc:__LOC__
-    Sc_rollup_inbox_message_repr.(External str |> serialize)
+    Sc_rollup.Inbox_message.(serialize msg)
 
-let make_input_repr ?(inbox_level = Raw_level_repr.root)
-    ?(message_counter = Z.zero) message =
-  Sc_rollup_PVM_sig.Inbox_message
-    {
-      inbox_level;
-      message_counter;
-      payload = make_external_inbox_message_repr message;
-    }
+let make_external_inbox_message str = message_serialize (External str)
 
-let make_external_inbox_message str =
-  WithExceptions.Result.get_ok
-    ~loc:__LOC__
-    Sc_rollup.Inbox_message.(External str |> serialize)
+let make_internal_inbox_message internal_msg =
+  message_serialize (Internal internal_msg)
 
 let make_input ?(inbox_level = Raw_level.root) ?(message_counter = Z.zero)
-    message =
-  Sc_rollup.Inbox_message
+    payload =
+  Sc_rollup.Inbox_message {inbox_level; message_counter; payload}
+
+let make_external_input ?inbox_level ?message_counter str =
+  let payload = make_external_inbox_message str in
+  make_input ?inbox_level ?message_counter payload
+
+let make_sol ~inbox_level =
+  let payload = make_internal_inbox_message Start_of_level in
+  make_input ~inbox_level ~message_counter:Z.zero payload
+
+let make_eol ~inbox_level ~message_counter =
+  let payload = make_internal_inbox_message End_of_level in
+  make_input ~inbox_level ~message_counter payload
+
+(** Message is the combination of a [message] and its associated [input].
+
+    [message] is used to:
+    - Construct the protocol inbox, when [message] is [`Message]. The protocol
+      adds [`SOL] and [`EOL] itself.
+    - Construct the players' inboxes.
+
+    [input] is used to evaluate the players' inboxes.
+
+*)
+type message = {
+  input : Sc_rollup.input;
+  message : [`SOL | `Message of string | `EOL];
+}
+
+let pp_input fmt (input : Sc_rollup.input) =
+  match input with
+  | Reveal _ -> assert false
+  | Inbox_message {inbox_level; message_counter; _} ->
+      Format.fprintf
+        fmt
+        "(%a, %s)"
+        Raw_level.pp
+        inbox_level
+        (Z.to_string message_counter)
+
+let pp_message fmt {input; message} =
+  Format.fprintf
+    fmt
+    "{ input = %a; message = %S }"
+    pp_input
+    input
+    (match message with `SOL -> "SOL" | `Message msg -> msg | `EOL -> "EOL")
+
+(** An empty inbox level is a SOL and EOL. *)
+let make_empty_level inbox_level =
+  let sol = {input = make_sol ~inbox_level; message = `SOL} in
+  let eol =
+    {input = make_eol ~inbox_level ~message_counter:Z.one; message = `EOL}
+  in
+  (inbox_level, [sol; eol])
+
+(** Creates inputs based on string messages. *)
+let strs_to_inputs inbox_level messages =
+  List.fold_left
+    (fun (acc, message_counter) message ->
+      let input = make_external_input ~inbox_level ~message_counter message in
+      ({input; message = `Message message} :: acc, Z.succ message_counter))
+    ([], Z.one)
+    messages
+
+(** Transform messages into inputs and wrap them between SOL and EOL. *)
+let wrap_messages inbox_level strs =
+  let sol = {input = make_sol ~inbox_level; message = `SOL} in
+  let rev_inputs, message_counter = strs_to_inputs inbox_level strs in
+  let inputs = List.rev rev_inputs in
+  let eol = {input = make_eol ~inbox_level ~message_counter; message = `EOL} in
+  (sol :: inputs) @ [eol]
+
+let gen_messages_for_levels ~start_level ~max_level gen_message =
+  let open QCheck2.Gen in
+  let rec aux acc n =
+    match n with
+    | n when n < 0 ->
+        (* Prevent [Stack_overflow]. *)
+        assert false
+    | 0 -> return acc
+    | n ->
+        let inbox_level =
+          Raw_level.of_int32_exn (Int32.of_int (start_level + n - 1))
+        in
+        let* empty_level = bool in
+        let* level_messages =
+          if empty_level then return (make_empty_level inbox_level)
+          else
+            let* messages =
+              let* input = gen_message in
+              let* inputs = small_list gen_message in
+              return (input :: inputs)
+            in
+            return (inbox_level, wrap_messages inbox_level messages)
+        in
+        aux (level_messages :: acc) (n - 1)
+  in
+  aux [] (max_level - start_level)
+
+(** {1. Below [Alpha_context].} *)
+
+let message_serialize_repr msg =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Sc_rollup_inbox_message_repr.(serialize msg)
+
+let make_external_inbox_message_repr str = message_serialize_repr (External str)
+
+let make_internal_inbox_message_repr internal_msg =
+  message_serialize_repr (Internal internal_msg)
+
+let make_input_repr ?(inbox_level = Raw_level_repr.root)
+    ?(message_counter = Z.zero) payload =
+  Sc_rollup_PVM_sig.Inbox_message {inbox_level; message_counter; payload}
+
+let make_external_input_repr ?inbox_level ?message_counter str =
+  let payload = make_external_inbox_message_repr str in
+  make_input_repr ?inbox_level ?message_counter payload
+
+let make_sol_repr ~inbox_level =
+  let payload = make_internal_inbox_message_repr Start_of_level in
+  make_input_repr ~inbox_level ~message_counter:Z.zero payload
+
+let make_eol_repr ~inbox_level ~message_counter =
+  let payload = make_internal_inbox_message_repr End_of_level in
+  make_input_repr ~inbox_level ~message_counter payload
+
+(** Message is the combination of a [message] and its associated [input].
+
+    [message] is used to:
+    - Construct the protocol inbox, when [message] is [`Message]. The protocol
+      adds [`SOL] and [`EOL] itself.
+    - Construct the players' inboxes.
+
+    [input] is used to evaluate the players' inboxes.
+
+*)
+type message_repr = {
+  input_repr : Sc_rollup_PVM_sig.input;
+  message_repr : [`SOL | `Message of string | `EOL];
+}
+
+let pp_input_repr fmt (input_repr : Sc_rollup_PVM_sig.input) =
+  match input_repr with
+  | Reveal _ -> assert false
+  | Inbox_message {inbox_level; message_counter; _} ->
+      Format.fprintf
+        fmt
+        "(%a, %s)"
+        Raw_level_repr.pp
+        inbox_level
+        (Z.to_string message_counter)
+
+let pp_message_repr fmt {input_repr; message_repr} =
+  Format.fprintf
+    fmt
+    "{ input_repr = %a; message_repr = %S }"
+    pp_input_repr
+    input_repr
+    (match message_repr with
+    | `SOL -> "SOL"
+    | `Message msg -> msg
+    | `EOL -> "EOL")
+
+(** An empty inbox level is a SOL and EOL. *)
+let make_empty_level_repr inbox_level =
+  let sol = {input_repr = make_sol_repr ~inbox_level; message_repr = `SOL} in
+  let eol =
     {
-      inbox_level;
-      message_counter;
-      payload = make_external_inbox_message message;
+      input_repr = make_eol_repr ~inbox_level ~message_counter:Z.one;
+      message_repr = `EOL;
     }
+  in
+  (inbox_level, [sol; eol])
+
+(** Creates input_reprs based on string message_reprs. *)
+let strs_to_input_reprs_repr inbox_level message_reprs =
+  List.fold_left
+    (fun (acc, message_counter) message_repr ->
+      let input_repr =
+        make_external_input_repr ~inbox_level ~message_counter message_repr
+      in
+      ( {input_repr; message_repr = `Message message_repr} :: acc,
+        Z.succ message_counter ))
+    ([], Z.one)
+    message_reprs
+
+(** Transform message_reprs into input_reprs and wrap them between SOL and EOL. *)
+let wrap_message_reprs_repr inbox_level strs =
+  let sol = {input_repr = make_sol_repr ~inbox_level; message_repr = `SOL} in
+  let rev_input_reprs, message_counter =
+    strs_to_input_reprs_repr inbox_level strs
+  in
+  let input_reprs = List.rev rev_input_reprs in
+  let eol =
+    {
+      input_repr = make_eol_repr ~inbox_level ~message_counter;
+      message_repr = `EOL;
+    }
+  in
+  (sol :: input_reprs) @ [eol]
+
+let gen_message_reprs_for_levels_repr ~start_level ~max_level gen_message_repr =
+  let open QCheck2.Gen in
+  let rec aux acc n =
+    match n with
+    | 0 -> return acc
+    | n when n > 0 ->
+        let inbox_level =
+          Raw_level_repr.of_int32_exn (Int32.of_int (start_level + n - 1))
+        in
+        let* empty_level = bool in
+        let* level_message_reprs =
+          if empty_level then return (make_empty_level_repr inbox_level)
+          else
+            let* message_reprs =
+              let* input_repr = gen_message_repr in
+              let* input_reprs = small_list gen_message_repr in
+              return (input_repr :: input_reprs)
+            in
+            return
+              (inbox_level, wrap_message_reprs_repr inbox_level message_reprs)
+        in
+        aux (level_message_reprs :: acc) (n - 1)
+    | _ ->
+        (* Prevent [Stack_overflow]. *)
+        assert false
+  in
+  aux [] (max_level - start_level)

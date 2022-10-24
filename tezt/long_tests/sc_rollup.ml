@@ -103,12 +103,11 @@ let setup ?commitment_period ?challenge_window ?timeout f ~protocol =
   let operator = Constant.bootstrap1.alias in
   f node client operator
 
-let send_message client sc_rollup msg =
+let send_message client msg =
   let* () =
     Client.Sc_rollup.send_message
       ~hooks
       ~src:Constant.bootstrap2.alias
-      ~dst:sc_rollup
       ~msg
       client
   in
@@ -202,7 +201,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
         match forwarder with
         | None ->
             (* External message *)
-            send_message client sc_rollup (sf "[%S]" message)
+            send_message client (sf "[%S]" message)
         | Some forwarder ->
             (* Internal message through forwarder *)
             let* () =

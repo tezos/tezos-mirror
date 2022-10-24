@@ -46,15 +46,21 @@
 (** [internal_inbox_message] represent an internal message in a inbox (L1 ->
     L2). This is not inline so it can easily be used by
     {!Sc_rollup_costs.cost_serialize_internal_inbox_message}. *)
-type internal_inbox_message = {
-  payload : Script_repr.expr;
-      (** A Micheline value containing the parameters passed to the rollup. *)
-  sender : Contract_hash.t;
-      (** The contract hash of an Layer 1 originated contract sending a message
+type internal_inbox_message =
+  | Transfer of {
+      payload : Script_repr.expr;
+          (** A Micheline value containing the parameters passed to the rollup. *)
+      sender : Contract_hash.t;
+          (** The contract hash of an Layer 1 originated contract sending a message
           to the rollup. *)
-  source : Signature.public_key_hash;
-      (** The implicit account that originated the transaction. *)
-}
+      source : Signature.public_key_hash;
+          (** The implicit account that originated the transaction. *)
+      destination : Sc_rollup_repr.Address.t;
+          (** The destination, as a rollup address, for the message. *)
+    }
+  | Start_of_level
+      (** Internal message put at the beginning of each inbox's level. *)
+  | End_of_level  (** Internal message put at the end of each inbox's level. *)
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

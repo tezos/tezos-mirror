@@ -85,7 +85,7 @@ let gen_versioned_commitment =
 
 let gen_player = Gen.oneofl Sc_rollup_game_repr.[Alice; Bob]
 
-let gen_inbox rollup level =
+let gen_inbox level =
   let open Gen in
   let gen_msg = small_string ~gen:printable in
   let* hd = gen_msg in
@@ -95,7 +95,7 @@ let gen_inbox rollup level =
     let open Lwt_result_syntax in
     let* ctxt = Context.default_raw_context () in
     let inbox_ctxt = Raw_context.recover ctxt in
-    let*! empty_inbox = Sc_rollup_inbox_repr.empty inbox_ctxt rollup level in
+    let*! empty_inbox = Sc_rollup_inbox_repr.empty inbox_ctxt level in
     lift
     @@ let*? input_messages =
          List.map_e
@@ -115,10 +115,10 @@ let gen_inbox rollup level =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
-let gen_inbox_history_proof rollup inbox_level =
+let gen_inbox_history_proof inbox_level =
   let open Gen in
-  let* inbox = gen_inbox rollup inbox_level in
-  return (Sc_rollup_inbox_repr.take_snapshot ~current_level:inbox_level inbox)
+  let* inbox = gen_inbox inbox_level in
+  return (Sc_rollup_inbox_repr.take_snapshot inbox)
 
 let gen_pvm_name = Gen.string_printable
 
@@ -138,11 +138,6 @@ let gen_dissection_chunk =
 let gen_dissection =
   let open Gen in
   small_list gen_dissection_chunk
-
-let gen_rollup =
-  let open Gen in
-  let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
-  return (Sc_rollup_repr.Address.hash_bytes [bytes])
 
 let gen_game_state =
   let open Sc_rollup_game_repr in
@@ -164,8 +159,7 @@ let gen_game =
   let* turn = gen_player in
   let* inbox_level = gen_inbox_level in
   let* start_level = gen_start_level in
-  let* rollup = gen_rollup in
-  let* inbox_snapshot = gen_inbox_history_proof rollup inbox_level in
+  let* inbox_snapshot = gen_inbox_history_proof inbox_level in
   let* pvm_name = gen_pvm_name in
   let* game_state = gen_game_state in
   return
@@ -181,6 +175,31 @@ let gen_conflict =
   return
     Sc_rollup_refutation_storage.
       {other; their_commitment; our_commitment; parent_commitment}
+
+let gen_rollup =
+  let open QCheck2.Gen in
+  let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
+  return (Sc_rollup_repr.Address.hash_bytes [bytes])
+
+let gen_inbox_message =
+  let open Gen in
+  let open Sc_rollup_inbox_message_repr in
+  let gen_external =
+    let+ s = small_string ~gen:printable in
+    External s
+  in
+  let gen_sol = return (Internal Start_of_level) in
+  let gen_eol = return (Internal End_of_level) in
+  let gen_deposit =
+    (* We won't test the encoding of these values. It's out of scope. *)
+    let payload = Script_repr.unit in
+    let sender = Contract_hash.zero in
+    let source = Signature.Public_key_hash.zero in
+    (* But the encoding of the rollup's address is our problem. *)
+    let+ destination = gen_rollup in
+    Internal (Transfer {payload; sender; source; destination})
+  in
+  oneof [gen_external; gen_sol; gen_eol; gen_deposit]
 
 (** {2 Tests} *)
 
@@ -216,7 +235,21 @@ let test_conflict =
     ~eq:( = )
     Sc_rollup_refutation_storage.conflict_encoding
 
+let test_inbox_message =
+  test_roundtrip
+    ~count:1_000
+    ~title:"Sc_rollup_inbox_message_repr.t"
+    ~gen:gen_inbox_message
+    ~eq:( = )
+    Sc_rollup_inbox_message_repr.encoding
+
 let tests =
-  [test_commitment; test_versioned_commitment; test_game; test_conflict]
+  [
+    test_commitment;
+    test_versioned_commitment;
+    test_game;
+    test_conflict;
+    test_inbox_message;
+  ]
 
 let () = Alcotest.run "SC rollup encoding" [("roundtrip", qcheck_wrap tests)]

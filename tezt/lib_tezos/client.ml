@@ -1834,19 +1834,16 @@ module Sc_rollup = struct
     let* output = Process.check_and_read_stdout process in
     parse_rollup_address_in_receipt output
 
-  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src ~dst client
-      =
+  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src client =
     spawn_command
       ?hooks
       client
       (["--wait"; wait]
-      @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src; "to"; dst]
+      @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src]
       @ optional_arg "burn-cap" Tez.to_string burn_cap)
 
-  let send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client =
-    let process =
-      spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client
-    in
+  let send_message ?hooks ?wait ?burn_cap ~msg ~src client =
+    let process = spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src client in
     Process.check process
 
   let publish_commitment ?hooks ?(wait = "none") ?burn_cap ~src ~sc_rollup
