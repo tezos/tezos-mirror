@@ -440,8 +440,8 @@ module History = struct
         case where the slot's header is published, but the endorsers didn't
         confirm the availability of its data.
 
-        To produce a proof for a page (see function {!produce_proof} below), we
-        assume given:
+        To produce a proof representation for a page (see function {!produce_proof_repr}
+        below), we assume given:
 
         - [page_id], identifies the page;
 
@@ -695,7 +695,7 @@ module History = struct
                dal_params.page_size
                (Bytes.length page.content)
 
-    let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
+    let produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache =
       let open Lwt_tzresult_syntax in
       let Page.{slot_id; page_index = _} = page_id in
       let deref ptr = History_cache.find ptr hist_cache in
@@ -732,12 +732,10 @@ module History = struct
               (List.is_empty inc_proof)
               (dal_proof_error "The inclusion proof cannot be empty")
           in
-          (* All checks succeeded. We return a serialized `Page_confirmed` proof. *)
-          let*? page_confirmed =
-            serialize_proof
-            @@ Page_confirmed {inc_proof; target_cell; page_data; page_proof}
-          in
-          return (page_confirmed, Some page_data)
+          (* All checks succeeded. We return a `Page_confirmed` proof. *)
+          return
+            ( Page_confirmed {inc_proof; target_cell; page_data; page_proof},
+              Some page_data )
       | None, Nearest {lower = prev_cell; upper = next_cell_opt} ->
           (* There is no previously confirmed slot in the skip list whose ID
              corresponds to the {published_level; slot_index} information
@@ -762,11 +760,8 @@ module History = struct
                 in
                 return @@ List.rev rev_next_inc_proof
           in
-          let*? page_unconfirmed =
-            serialize_proof
-            @@ Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof}
-          in
-          return (page_unconfirmed, None)
+          return
+            (Page_unconfirmed {prev_cell; next_cell_opt; next_inc_proof}, None)
       | None, Found _ ->
           proof_error
             "The page ID's slot is confirmed, but no page content and proof \
@@ -775,6 +770,14 @@ module History = struct
           proof_error
             "The page ID's slot is not confirmed, but page content and proof \
              are provided."
+
+    let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
+      let open Lwt_tzresult_syntax in
+      let* proof_repr, page_data =
+        produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache
+      in
+      let*? serialized_proof = serialize_proof proof_repr in
+      return (serialized_proof, page_data)
 
     (* Given a starting cell [snapshot] and a (final) [target], this function
        checks that the provided [inc_proof] encodes a minimal path from
@@ -796,11 +799,10 @@ module History = struct
            ~cell_ptr:snapshot_ptr
            ~target_ptr
            path)
-        (dal_proof_error "verify_proof: invalid inclusion Dal proof.")
+        (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
-    let verify_proof dal_params page_id snapshot serialized_proof =
+    let verify_proof_repr dal_params page_id snapshot proof =
       let open Lwt_tzresult_syntax in
-      let*? proof = deserialize_proof serialized_proof in
       let Page.{slot_id; page_index = _} = page_id in
       match proof with
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
@@ -811,8 +813,8 @@ module History = struct
             fail_when
               Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
-                 "verify_proof: cannot construct a confirmation page proof \
-                  with 'zero' as target slot.")
+                 "verify_proof_repr: cannot construct a confirmation page \
+                  proof with 'zero' as target slot.")
           in
           let* () =
             verify_inclusion_proof inc_proof ~src:snapshot ~dest:target_cell
@@ -837,7 +839,8 @@ module History = struct
                 let* () =
                   fail_unless
                     (List.is_empty next_inc_proof)
-                    (dal_proof_error "verify_proof: invalid next_inc_proof")
+                    (dal_proof_error
+                       "verify_proof_repr: invalid next_inc_proof")
                 in
                 (* In case the inclusion proof has no elements, we check that:
                    - the prev_cell slot's id is smaller than the unconfirmed slot's ID
@@ -850,7 +853,7 @@ module History = struct
                 fail_unless
                   ((Skip_list.content prev_cell).id < slot_id
                   && equal_history snapshot prev_cell)
-                  (dal_proof_error "verify_proof: invalid next_inc_proof")
+                  (dal_proof_error "verify_proof_repr: invalid next_inc_proof")
             | Some next_cell ->
                 (* In case the inclusion proof has at least one element,
                    we check that:
@@ -878,7 +881,8 @@ module History = struct
                         Pointer_hash.equal
                           prev_ptr
                           (hash_skip_list_cell prev_cell))
-                    (dal_proof_error "verify_proof: invalid next_inc_proof")
+                    (dal_proof_error
+                       "verify_proof_repr: invalid next_inc_proof")
                 in
                 verify_inclusion_proof
                   next_inc_proof
@@ -886,6 +890,11 @@ module History = struct
                   ~dest:next_cell
           in
           return_none
+
+    let verify_proof dal_params page_id snapshot serialized_proof =
+      let open Lwt_tzresult_syntax in
+      let*? proof_repr = deserialize_proof serialized_proof in
+      verify_proof_repr dal_params page_id snapshot proof_repr
 
     module Internal_for_tests = struct
       let content = Skip_list.content
