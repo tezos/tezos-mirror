@@ -100,6 +100,10 @@ Node
 
 - Added the built-in network alias for Limanet (``--network limanet``).
 
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number
+  additional cycles.
+
 Client
 ------
 
