@@ -31,7 +31,7 @@ log "Done setting up credentials."
   "$opam_dir"
 
 # Matches the corresponding variable in /scripts/opam-release.sh.
-branch_name="octez-$opam_release_tag"
+branch_name="octez-$(echo "$opam_release_tag" | tr '~' -)"
 
 log "While we're here, update master on the fork..."
 cd "$opam_dir"
