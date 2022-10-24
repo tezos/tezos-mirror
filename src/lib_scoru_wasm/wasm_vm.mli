@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val durable_buffers_encoding :
-  Tezos_webassembly_interpreter.Eval.buffers Tezos_tree_encoding.t
+open Wasm_pvm_state.Internal_state
 
-module Make (T : Tezos_tree_encoding.TREE) :
-  Wasm_pvm_sig.S with type tree = T.tree
+include Wasm_vm_sig.S
+
+val compute_step_many_until :
+  ?max_steps:int64 ->
+  (pvm_state -> bool Lwt.t) ->
+  pvm_state ->
+  (pvm_state * int64) Lwt.t
+
+val eval_has_finished : tick_state -> bool
