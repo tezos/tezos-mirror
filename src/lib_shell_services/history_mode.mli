@@ -72,7 +72,13 @@ val default : t
 
 val encoding : t Data_encoding.t
 
+(** Returns true if the modes and the number of additional cycles are
+   equal. *)
 val equal : t -> t -> bool
+
+(** Returns true if the modes are equal. The number of additional
+   cycles are not checked.*)
+val mode_equality : t -> t -> bool
 
 val pp : Format.formatter -> t -> unit
 
