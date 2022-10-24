@@ -95,8 +95,12 @@ val spawn_with_stdin :
   string list ->
   t * Lwt_io.output_channel
 
-(** Send SIGTERM to a process. *)
-val terminate : t -> unit
+(** Send SIGTERM to a process.
+
+    If [timeout] is specified, this registers a background promise that
+    causes SIGKILL to be sent if the process does not terminate
+    after [timeout] seconds. *)
+val terminate : ?timeout:float -> t -> unit
 
 (** Send SIGKILL to a process. *)
 val kill : t -> unit
