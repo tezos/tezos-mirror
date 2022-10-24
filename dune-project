@@ -185,6 +185,7 @@
 (package (name tezos-sapling))
 (package (name tezos-sc-rollup-alpha))
 (package (name tezos-scoru-wasm))
+(package (name tezos-scoru-wasm-benchmark)(allow_empty))
 (package (name tezos-scoru-wasm-test)(allow_empty))
 (package (name tezos-scoru-wasm-test-helpers)(allow_empty))
 (package (name tezos-shell))

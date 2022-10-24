@@ -31,6 +31,8 @@
 
 # Ignoring package tezos-protocol-plugin-alpha-tests, it only contains tests or private targets
 
+# Ignoring package tezos-scoru-wasm-benchmark, it only contains tests or private targets
+
 # Ignoring package tezos-scoru-wasm-test, it only contains tests or private targets
 
 # Ignoring package tezos-scoru-wasm-test-helpers, it only contains tests or private targets

@@ -3165,6 +3165,24 @@ let octez_scoru_wasm_tests_helpers =
       ]
     ~preprocess:[staged_pps [ppx_import; ppx_deriving_show]]
 
+let _octez_scoru_wasm_benchmark =
+  private_exe
+    "benchmark_scoru_wasm"
+    ~path:"src/lib_scoru_wasm/bench"
+    ~synopsis:"SCORU WASM benchmark executable"
+    ~opam:"tezos-scoru-wasm-benchmark"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib;
+        octez_webassembly_interpreter;
+        octez_context_memory;
+        octez_scoru_wasm;
+        octez_scoru_wasm_tests_helpers;
+        lwt_unix;
+      ]
+    ~preprocess:[pps ppx_deriving_show]
+
 let _octez_scoru_wasm_tests =
   test
     "test_scoru_wasm"
