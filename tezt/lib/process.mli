@@ -164,8 +164,10 @@ val run :
   string list ->
   unit Lwt.t
 
-(** Terminate all live processes created using {!spawn} and wait for them to terminate. *)
-val clean_up : unit -> unit Lwt.t
+(** Terminate all live processes created using {!spawn} and wait for them to terminate.
+
+    [timeout] is passed to [terminate], with a default value of [60.] (one minute). *)
+val clean_up : ?timeout:float -> unit -> unit Lwt.t
 
 (** Channel from which you can read the standard output of a process. *)
 val stdout : t -> Lwt_io.input_channel

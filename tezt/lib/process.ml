@@ -481,9 +481,9 @@ let run ?log_status_on_exit ?name ?color ?env ?hooks ?expect_failure command
   spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
   |> check ?expect_failure
 
-let clean_up () =
+let clean_up ?(timeout = 60.) () =
   let list = ID_map.bindings !live_processes |> List.map snd in
-  List.iter terminate list ;
+  List.iter (terminate ~timeout) list ;
   Lwt_list.iter_p
     (fun process ->
       let* _ = wait process in
