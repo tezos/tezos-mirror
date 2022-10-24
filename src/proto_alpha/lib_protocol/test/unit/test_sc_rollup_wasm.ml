@@ -119,6 +119,22 @@ let test_metadata_size () =
     = Tezos_scoru_wasm.Host_funcs.Internal_for_tests.metadata_size) ;
   Lwt_result_syntax.return_unit
 
+let test_l1_input_kind () =
+  let open Lwt_result_syntax in
+  let open Sc_rollup_inbox_message_repr in
+  let open Tezos_scoru_wasm in
+  let check_msg msg expected =
+    let*? msg = Environment.wrap_tzresult @@ serialize msg in
+    let msg = unsafe_to_string msg |> Pvm_input_kind.from_raw_input in
+    assert (msg = expected) ;
+    return_unit
+  in
+  let* () = check_msg (Internal Start_of_level) (Internal Start_of_level) in
+  let* () = check_msg (Internal End_of_level) (Internal End_of_level) in
+  let* () = check_msg (External "payload") External in
+
+  return_unit
+
 let make_transaction value text contract =
   let entrypoint = Entrypoint_repr.default in
   let destination : Contract_hash.t =
@@ -239,5 +255,6 @@ let tests =
       `Quick
       test_initial_state_hash_wasm_pvm;
     Tztest.tztest "size of a rollup metadata" `Quick test_metadata_size;
+    Tztest.tztest "l1 input kind" `Quick test_l1_input_kind;
     Tztest.tztest "test output proofs" `Quick test_output;
   ]
