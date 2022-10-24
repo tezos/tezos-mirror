@@ -51,5 +51,6 @@ let () =
       Unit_test.spec
         "Slot_framing_protocol.ml"
         Test_dal_slot_frame_encoding.tests;
+      Unit_test.spec "Dac_pages_encoding.ml" Test_dac_pages_encoding.tests;
     ]
   |> Lwt_main.run
