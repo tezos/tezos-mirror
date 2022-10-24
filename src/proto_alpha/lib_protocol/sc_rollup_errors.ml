@@ -71,6 +71,7 @@ type error +=
     }
   | (* `Temporary *) Sc_rollup_bad_commitment_serialization
   | (* `Permanent *) Sc_rollup_address_generation
+  | (* `Permanent *) Sc_rollup_zero_tick_commitment
 
 let () =
   register_error_kind
@@ -468,4 +469,14 @@ let () =
     ~description
     Data_encoding.empty
     (function Sc_rollup_address_generation -> Some () | _ -> None)
-    (fun () -> Sc_rollup_address_generation)
+    (fun () -> Sc_rollup_address_generation) ;
+  let description = "Tried to publish a 0 tick commitment" in
+  register_error_kind
+    `Permanent
+    ~id:"Sc_rollup_zero_tick_commitment"
+    ~title:description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    ~description
+    Data_encoding.empty
+    (function Sc_rollup_zero_tick_commitment -> Some () | _ -> None)
+    (fun () -> Sc_rollup_zero_tick_commitment)

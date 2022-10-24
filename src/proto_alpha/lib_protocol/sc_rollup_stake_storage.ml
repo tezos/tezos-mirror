@@ -338,6 +338,12 @@ let refine_stake ctxt rollup staker staked_on commitment =
 
 let publish_commitment ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
+  let* () =
+    fail_when
+      Sc_rollup_repr.Number_of_ticks.(
+        commitment.Commitment.number_of_ticks = zero)
+      Sc_rollup_zero_tick_commitment
+  in
   let* ctxt, staked_on_opt = Store.Stakers.find (ctxt, rollup) staker in
   let* ctxt, balance_updates, staked_on =
     match staked_on_opt with

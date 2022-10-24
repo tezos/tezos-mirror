@@ -695,23 +695,15 @@ let initial inbox dal_snapshot ~start_level ~pvm_name
   let alice_to_play = Staker.equal alice refuter in
   let open Sc_rollup_tick_repr in
   let tick = of_number_of_ticks child.number_of_ticks in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3974
-     0 tick commitments are impossible with SOL/EOL. *)
   let game_state =
     Dissecting
       {
         dissection =
-          (if equal tick initial then
-           [
-             make_chunk (Some child.compressed_state) initial;
-             make_chunk None (next initial);
-           ]
-          else
-            [
-              make_chunk (Some parent.compressed_state) initial;
-              make_chunk (Some child.compressed_state) tick;
-              make_chunk None (next tick);
-            ]);
+          [
+            make_chunk (Some parent.compressed_state) initial;
+            make_chunk (Some child.compressed_state) tick;
+            make_chunk None (next tick);
+          ];
         default_number_of_sections;
       }
   in
