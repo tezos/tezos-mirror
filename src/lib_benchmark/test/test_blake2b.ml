@@ -98,7 +98,7 @@ let () =
            "blake2b_model"
        with
       | None -> assert false
-      | Some code -> Format.printf "%a@." Codegen.pp_structure_item code) ;
+      | Some code -> Format.printf "%a@." Codegen.pp_model code) ;
       let module FPT = Fixed_point_transform.Apply (struct
         let options = {Fixed_point_transform.default_options with precision = 5}
       end) in
@@ -110,4 +110,4 @@ let () =
           "blake2b_model_fixed_point"
       with
       | None -> assert false
-      | Some code -> Format.printf "%a@." Codegen.pp_structure_item code)
+      | Some code -> Format.printf "%a@." Codegen.pp_model code)
