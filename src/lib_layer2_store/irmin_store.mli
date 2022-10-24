@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,43 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-(** The rollup node stores and publishes commitments for the PVM
-    every 20 levels.
-
-    Every time a finalized block is processed  by the rollup node,
-    the latter determines whether the last commitment that the node
-    has produced referred to 20 blocks earlier. In this case, it
-    computes and stores a new commitment in a level-indexed map.
-
-    Stored commitments are signed by the rollup node operator
-    and published on the layer1 chain. To ensure that commitments
-    produced by the rollup node are eventually published,
-    storing and publishing commitments are decoupled. Every time
-    a new head is processed, the node tries to publish the oldest
-    commitment that was not published already.
-*)
-
-open Protocol.Alpha_context
-
-module type Mutable_level_store =
-  Store_sigs.Mutable_value
-    with type value = Raw_level.t
-     and type store = Store.t
-
-(** [last_commitment_with_hash (module Last_level_module: Mutable_level_store) store]
-      returns the last commitment and relative hash
-      stored according to the value of level indicated by
-      [module Last_level_module]. If no commitment has been stored for the
-      level indicated by [module Last_level_module], then None is returned.
-      Two possible implementations for [module Last_level_module] are
-      [Store.Last_published_commitment_level] and
-      [Store.Last_stored_commitment_level].
-  *)
-
-val last_commitment_with_hash :
-  (module Mutable_level_store) ->
-  Store.t ->
-  (Sc_rollup.Commitment.t * Sc_rollup.Commitment.Hash.t) option Lwt.t
-
-module Make (PVM : Pvm.S) : Commitment_sig.S with module PVM = PVM
+module Make (N : sig
+  val name : string
+end) : Store_sigs.BACKEND

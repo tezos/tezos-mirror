@@ -30,49 +30,75 @@
 let reorganization_window_length = 10
 
 module Store = struct
-  module ProcessedHashes = Store_utils.Make_append_only_map (struct
-    let path = ["tezos"; "processed_blocks"]
+  module ProcessedHashes =
+    Store.Make_append_only_map
+      (struct
+        let path = ["tezos"; "processed_blocks"]
 
-    let keep_last_n_entries_in_memory = reorganization_window_length
+        let keep_last_n_entries_in_memory = Some reorganization_window_length
+      end)
+      (struct
+        type key = Block_hash.t
 
-    type key = Block_hash.t
+        let to_path_representation = Block_hash.to_b58check
+      end)
+      (struct
+        type value = int32
 
-    let string_of_key = Block_hash.to_b58check
+        let name = "level"
 
-    type value = int32
+        let encoding = Data_encoding.int32
+      end)
 
-    let value_encoding = Data_encoding.int32
-  end)
+  module LastProcessedHead =
+    Store.Make_mutable_value
+      (struct
+        let path = ["tezos"; "processed_head"]
 
-  module LastProcessedHead = Store_utils.Make_mutable_value (struct
-    let path = ["tezos"; "processed_head"]
+        let keep_last_n_entries_in_memory = None
+      end)
+      (struct
+        type value = Layer1.head
 
-    type value = Layer1.head
+        let name = "head"
 
-    let value_encoding = Layer1.head_encoding
-  end)
+        let encoding = Layer1.head_encoding
+      end)
 
-  module LastFinalizedHead = Store_utils.Make_mutable_value (struct
-    let path = ["tezos"; "finalized_head"]
+  module LastFinalizedHead =
+    Store.Make_mutable_value
+      (struct
+        let path = ["tezos"; "finalized_head"]
 
-    type value = Layer1.head
+        let keep_last_n_entries_in_memory = None
+      end)
+      (struct
+        type value = Layer1.head
 
-    let value_encoding = Layer1.head_encoding
-  end)
+        let name = "head"
 
-  module Levels = Store_utils.Make_updatable_map (struct
-    let path = ["tezos"; "levels"]
+        let encoding = Layer1.head_encoding
+      end)
 
-    let keep_last_n_entries_in_memory = reorganization_window_length
+  module Levels =
+    Store.Make_updatable_map
+      (struct
+        let path = ["tezos"; "levels"]
 
-    type key = int32
+        let keep_last_n_entries_in_memory = Some reorganization_window_length
+      end)
+      (struct
+        type key = int32
 
-    let string_of_key = Int32.to_string
+        let to_path_representation = Int32.to_string
+      end)
+      (struct
+        type value = Block_hash.t
 
-    type value = Block_hash.t
+        let name = "block_hash"
 
-    let value_encoding = Block_hash.encoding
-  end)
+        let encoding = Block_hash.encoding
+      end)
 end
 
 let hash_of_level store level = Store.Levels.get store level
