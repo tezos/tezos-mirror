@@ -19,7 +19,8 @@ Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 
 Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
-:gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`, :gl:`!6545`, :gl:`!6543`)
+:gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`, :gl:`!6545`, :gl:`!6543`,
+:gl:`!6590`, :gl:`!6623`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
@@ -50,6 +51,8 @@ Minor Changes
 Internal
 --------
 
+- Update migration for Lima. (MR :gl:`!6504`)
+
 - Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
 
 - Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
@@ -59,3 +62,18 @@ Internal
 - Clean up validation code. (MR :gl:`!6526`)
 
 - Remove ``Script_typed_ir.comparable_option_t``. (MR :gl:`!6513`)
+
+- Restrict functions to originated contracts. (MR :gl:`!6198`)
+
+- Minor fixes for Consensus key. (MR :gl:`!6567`)
+
+- Enrich execution traces with "just consumed gas". (MR :gl:`!6565`)
+
+- Fix ignored values. (MRs :gl:`!6577`, :gl:`!6579`, :gl:`!6583`)
+
+- Separate ``Generated_cost`` module. (MR :gl:`!6253`)
+
+- Remove unused parameter in gas model for ``SPLIT_TICKET``. (MR :gl:`!6489`)
+
+- Remove function for computing baking rights without cache update.
+  (MR :gl:`!6605`)
