@@ -147,16 +147,27 @@ module Encoding = struct
 
   type 'a lazy_t = {mutable state : 'a lazy_state; encoding : 'a t}
 
-  let force_decode le =
+  let force_decode_internal le =
     match le.state with
-    | Value value -> Some value
-    | Both (_, value) -> Some value
+    | Value value -> value
+    | Both (_, value) -> value
     | Bytes bytes -> (
         match Binary_reader.of_bytes_opt le.encoding bytes with
         | Some expr ->
             le.state <- Both (bytes, expr) ;
-            Some expr
-        | None -> None)
+            expr
+        | None ->
+            raise
+              (Json_encoding
+               .Decoding_exception_whilst_conversion_of_lazy_encoding
+                 bytes))
+
+  let force_decode le =
+    match force_decode_internal le with
+    | exception
+        Json_encoding.Decoding_exception_whilst_conversion_of_lazy_encoding _ ->
+        None
+    | v -> Some v
 
   let force_bytes le =
     match le.state with
@@ -175,18 +186,24 @@ module Encoding = struct
         Encoding.bytes
     in
     let json =
-      Encoding.conv
-        (fun le ->
-          match force_decode le with
-          | Some r -> r
-          | None ->
-              raise
-                (Json_encoding.Cannot_destruct
-                   ( [],
-                     Invalid_argument "error when decoding lazily encoded value"
-                   )))
-        (fun value -> {state = Value value; encoding})
-        encoding
+      Encoding.union
+        [
+          case
+            ~title:"invalid_lazy_bytes"
+            Json_only
+            (raw_splitted ~json:Json_encoding.invalid_lazy_bytes ~binary:bytes)
+            (fun _ -> None)
+            (fun bytes -> {state = Bytes bytes; encoding});
+          case
+            ~title:"valid_lazy_bytes"
+            Json_only
+            (Encoding.conv
+               force_decode_internal
+               (fun value -> {state = Value value; encoding})
+               encoding)
+            (fun x -> Some x)
+            (fun x -> x);
+        ]
     in
     splitted ~json ~binary
 

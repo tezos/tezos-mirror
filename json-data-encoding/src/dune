@@ -16,7 +16,7 @@
   (:standard -w -9 -open Json_data_encoding_stdlib))
  (modules json_encoding json_query json_repr json_schema)
  (synopsis "Type-safe encoding to and decoding from JSON")
- (libraries uri json_data_encoding_stdlib)
+ (libraries uri hex json_data_encoding_stdlib)
  (js_of_ocaml)
  (wrapped false))
 

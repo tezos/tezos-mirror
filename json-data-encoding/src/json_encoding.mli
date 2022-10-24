@@ -682,3 +682,14 @@ val any_value : Json_repr.any encoding
 
 (** Returns [true] is the encoding might construct [null]. *)
 val is_nullable : 't encoding -> bool
+
+(**/**)
+
+(* This exception is meant to be used by [data-encoding] for internal signaling.
+   Essentially it is used as a cross-library control-flow mechanism and should
+   not be used by users of either library ever. *)
+exception Decoding_exception_whilst_conversion_of_lazy_encoding of bytes
+
+(* This is meant to be used to define high-level binary-to-json function for
+   lazy-bytes. *)
+val invalid_lazy_bytes : bytes encoding

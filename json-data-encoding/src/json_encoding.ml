@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Decoding_exception_whilst_conversion_of_lazy_encoding of bytes
+
 exception Unexpected of string * string
 
 exception No_case_matched of exn list
@@ -178,6 +180,45 @@ let inc_field include_default_fields construct_default =
   | `Never -> false
   | `Always -> true
 
+let invalid_lazy_bytes : bytes encoding =
+  let read : type tf. (module Json_repr.Repr with type value = tf) -> tf -> 't =
+   fun (module Repr_f) repr ->
+    match Repr_f.view repr with
+    | `O [("invalid_lazy_bytes", hex_encoded_bytes)] -> (
+        match Repr_f.view hex_encoded_bytes with
+        | `String hex_encoded_bytes ->
+            let b = Hex.to_bytes (`Hex hex_encoded_bytes) in
+            b
+        | u -> raise (unexpected u "string"))
+    | `O _ as u -> raise (unexpected u "\"invalid_lazy_bytes\" field")
+    | _ as u -> raise (unexpected u "object")
+  in
+  let write : type tf. (module Json_repr.Repr with type value = tf) -> 't -> tf
+      =
+   fun (module Repr_f) bytes ->
+    Repr_f.repr
+      (`O
+        [
+          ( "invalid_lazy_bytes",
+            Repr_f.repr
+              (`String
+                (let (`Hex bytes) = Hex.of_bytes bytes in
+                 bytes)) );
+        ])
+  in
+  let schema =
+    let open Json_schema in
+    let properties =
+      [("invalid_lazy_bytes", element (String string_specs), true, None)]
+    in
+    let additional_properties = None in
+    let element =
+      element (Object {object_specs with properties; additional_properties})
+    in
+    create element
+  in
+  Custom ({read; write; is_object = true}, schema)
+
 module Make (Repr : Json_repr.Repr) : S with type repr_value = Repr.value =
 struct
   type repr_value = Repr.value
@@ -208,7 +249,11 @@ struct
       | Float None -> fun float -> Repr.repr (`Float float)
       | Describe {encoding = t} -> construct t
       | Custom ({write}, _) -> fun (j : t) -> write (module Repr) j
-      | Conv (ffrom, _, t, _) -> fun v -> construct t (ffrom v)
+      | Conv (ffrom, _, t, _) -> (
+          fun v ->
+            try construct t (ffrom v)
+            with Decoding_exception_whilst_conversion_of_lazy_encoding b ->
+              construct invalid_lazy_bytes b)
       | Mu {self} as enc -> construct (self enc)
       | Array t ->
           let w v = construct t v in
