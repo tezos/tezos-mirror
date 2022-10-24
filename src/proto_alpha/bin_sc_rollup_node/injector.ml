@@ -127,24 +127,39 @@ module Parameters :
         *)
         return Retry
     | Failed error -> (
-        match op with
-        | Sc_rollup_timeout _ | Sc_rollup_refute _ ->
-            (* Failing timeout and refutation operations can be ignored. *)
-            return Forget
-        | Sc_rollup_cement _ | Sc_rollup_add_messages _ | Sc_rollup_publish _ ->
-            return (Abort error)
-        | Reveal _ | Transaction _ | Origination _ | Delegation _
-        | Update_consensus_key _ | Register_global_constant _
-        | Set_deposits_limit _ | Increase_paid_storage _ | Tx_rollup_origination
-        | Tx_rollup_submit_batch _ | Tx_rollup_commit _
-        | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-        | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _
-        | Tx_rollup_dispatch_tickets _ | Transfer_ticket _
-        | Dal_publish_slot_header _ | Sc_rollup_originate _
-        | Sc_rollup_execute_outbox_message _ | Sc_rollup_recover_bond _
-        | Zk_rollup_origination _ | Zk_rollup_publish _ ->
-            (* These operations should never be handled by this injector *)
-            assert false)
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/4071
+           Think about which operations should be retried and when. *)
+        let is_gas_error =
+          TzTrace.fold
+            (fun found -> function
+              | Environment.Ecoproto_error Gas.Operation_quota_exceeded -> true
+              | _ -> found)
+            false
+            error
+        in
+        if is_gas_error then
+          (* Always retry operations which have gas errors *)
+          return Retry
+        else
+          match op with
+          | Sc_rollup_timeout _ | Sc_rollup_refute _ | Sc_rollup_cement _
+          | Sc_rollup_add_messages _ ->
+              (* Failing timeout and refutation operations can be ignored. *)
+              return Forget
+          | Sc_rollup_publish _ -> return (Abort error)
+          | Reveal _ | Transaction _ | Origination _ | Delegation _
+          | Update_consensus_key _ | Register_global_constant _
+          | Set_deposits_limit _ | Increase_paid_storage _
+          | Tx_rollup_origination | Tx_rollup_submit_batch _
+          | Tx_rollup_commit _ | Tx_rollup_return_bond _
+          | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
+          | Tx_rollup_rejection _ | Tx_rollup_dispatch_tickets _
+          | Transfer_ticket _ | Dal_publish_slot_header _
+          | Sc_rollup_originate _ | Sc_rollup_execute_outbox_message _
+          | Sc_rollup_recover_bond _ | Zk_rollup_origination _
+          | Zk_rollup_publish _ ->
+              (* These operations should never be handled by this injector *)
+              assert false)
 
   let operation_tag (type kind) (operation : kind manager_operation) :
       Tag.t option =
