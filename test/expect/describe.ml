@@ -1836,4 +1836,47 @@ let%expect_test _ =
                    { "layout": { "size": "Uint8", "kind": "Int" },
                      "kind": "Seq" }, "kind": "anon",
                  "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
+  let lazy_bounded_string =
+    Data_encoding.Encoding.(
+      lazy_encoding (Bounded.string' ~length_kind:`N Hex 900))
+  in
+  dump lazy_bounded_string ;
+  [%expect
+    {|
+    +-----------------------+----------+-------------------------+
+    | Name                  | Size     | Contents                |
+    +=======================+==========+=========================+
+    | # bytes in next field | 4 bytes  | unsigned 30-bit integer |
+    +-----------------------+----------+-------------------------+
+    | Unnamed field 0       | Variable | bytes                   |
+    +-----------------------+----------+-------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
+               { "layout": { "kind": "Bytes" }, "kind": "anon",
+                 "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
+  let lazy_tup4 =
+    Data_encoding.Encoding.(lazy_encoding (tup4 unit uint8 unit uint16))
+  in
+  dump lazy_tup4 ;
+  [%expect
+    {|
+    +-----------------------+----------+-------------------------+
+    | Name                  | Size     | Contents                |
+    +=======================+==========+=========================+
+    | # bytes in next field | 4 bytes  | unsigned 30-bit integer |
+    +-----------------------+----------+-------------------------+
+    | Unnamed field 0       | Variable | bytes                   |
+    +-----------------------+----------+-------------------------+
+
+
+
+    { "toplevel":
+         { "fields":
+             [ { "kind": "dyn", "num_fields": 1, "size": "Uint30" },
+               { "layout": { "kind": "Bytes" }, "kind": "anon",
+                 "data_kind": { "kind": "Variable" } } ] }, "fields": [] } |}] ;
   ()
