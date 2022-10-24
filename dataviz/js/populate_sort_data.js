@@ -297,7 +297,7 @@ function classify_operations(dict_data, delegate = "", msec = false) {
                 let round = 0;
                 if ("round" in element) round = element["round"];
                 if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
-                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestre": [], "invalid": [], "inconnu": [] } }
+                if (!(round in operations_logs)) operations_logs[round] = { "endorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "inconnu": [] }, "preendorsements": { "valid": [], "missed": [], "lost": [], "sequestered": [], "invalid": [], "inconnu": [] } }
             })
             if ("endorsements" in v) {
                 Object.entries(v["endorsements"]).forEach(([_, baker_ops]) => {
