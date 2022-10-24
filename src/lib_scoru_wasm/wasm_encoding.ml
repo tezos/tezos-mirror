@@ -1234,15 +1234,13 @@ let output_buffer_encoding =
 
 let config_encoding ~host_funcs =
   conv
-    (fun (step_kont, stack_size_limit, module_reg) ->
-      Eval.{step_kont; host_funcs; stack_size_limit; module_reg})
-    (fun Eval.{step_kont; stack_size_limit; module_reg; _} ->
-      (step_kont, stack_size_limit, module_reg))
-    (tup3
+    (fun (step_kont, stack_size_limit) ->
+      Eval.{step_kont; host_funcs; stack_size_limit})
+    (fun Eval.{step_kont; stack_size_limit; _} -> (step_kont, stack_size_limit))
+    (tup2
        ~flatten:true
        (scope ["step_kont"] step_kont_encoding)
-       (value ["stack_size_limit"] Data_encoding.int31)
-       (scope ["modules"] module_instances_encoding))
+       (value ["stack_size_limit"] Data_encoding.int31))
 
 let buffers_encoding =
   conv

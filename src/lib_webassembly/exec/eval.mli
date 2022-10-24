@@ -154,7 +154,6 @@ type config = {
   step_kont : step_kont;
   host_funcs : Host_funcs.registry;
   stack_size_limit : int;
-  module_reg : module_reg;
 }
 
 type ('a, 'b, 'acc) fold_right2_kont = {
@@ -269,6 +268,7 @@ val invoke :
 val step :
   ?init:bool ->
   ?durable:Durable_storage.t ->
+  module_reg ->
   config ->
   buffers ->
   (Durable_storage.t * config) Lwt.t
@@ -301,7 +301,6 @@ val config :
   Host_funcs.registry ->
   ?frame_arity:int32 (* The number of values returned by the computation *) ->
   module_key ->
-  module_reg ->
   value Vector.t ->
   admin_instr Vector.t ->
   config

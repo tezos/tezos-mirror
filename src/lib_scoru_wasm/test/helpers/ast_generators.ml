@@ -876,4 +876,4 @@ let buffers_gen =
 let config_gen ~host_funcs ~module_reg =
   let* stack_size_limit = small_int in
   let+ step_kont = step_kont_gen ~module_reg in
-  Eval.{step_kont; host_funcs; stack_size_limit; module_reg}
+  Eval.{step_kont; host_funcs; stack_size_limit}

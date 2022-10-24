@@ -30,7 +30,7 @@ let link_finished (ast : Wasm.Ast.module_) offset =
   offset >= Wasm.Ast.Vector.num_elements ast.it.imports
 
 let eval_has_finished = function
-  | Eval {step_kont = Wasm.Eval.(SK_Result _); _} -> true
+  | Eval {config = {step_kont = Wasm.Eval.(SK_Result _); _}; _} -> true
   | _ -> false
 
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
@@ -143,16 +143,15 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
           let admin_instr' = Wasm.Eval.Invoke main_func in
           let admin_instr = Wasm.Source.{it = admin_instr'; at = no_region} in
           (* Clear the values and the locals in the frame. *)
-          let eval_config =
+          let config =
             Wasm.Eval.config
               Host_funcs.all
               self
-              module_reg
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.empty ())
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.singleton
                  admin_instr)
           in
-          return ~status:Starting (Eval eval_config)
+          return ~status:Starting (Eval {config; module_reg})
       | _ ->
           (* We require a function with the name [main] to be exported
              rather than any other structure. *)
@@ -177,7 +176,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
   | _ when eval_has_finished tick_state ->
       (* We have an empty set of admin instructions, but need to wait until we can restart *)
       return tick_state
-  | Eval {step_kont = Wasm.Eval.(SK_Trapped msg); _} ->
+  | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped msg); _}; _} ->
       return
         ~status:Failing
         (Stuck
@@ -187,14 +186,14 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
                   Wasm_pvm_errors.truncate_message "trapped execution";
                 explanation = Some (Wasm_pvm_errors.truncate_message msg.it);
               }))
-  | Eval eval_config ->
+  | Eval {config; module_reg} ->
       (* Continue execution. *)
       let store = Durable.to_storage durable in
-      let* store', eval_config =
-        Wasm.Eval.step ~durable:store eval_config buffers
+      let* store', config =
+        Wasm.Eval.step ~durable:store module_reg config buffers
       in
       let durable' = Durable.of_storage ~default:durable store' in
-      return ~durable:durable' (Eval eval_config)
+      return ~durable:durable' (Eval {config; module_reg})
 
 let next_tick_state pvm_state =
   let to_stuck exn =
@@ -254,7 +253,7 @@ let input_request pvm_state =
       let+ has_reboot_flag = has_reboot_flag pvm_state.durable in
       if has_reboot_flag then Wasm_pvm_state.No_input_required
       else Wasm_pvm_state.Input_required
-  | Eval config -> (
+  | Eval {config; _} -> (
       match Tezos_webassembly_interpreter.Eval.is_reveal_tick config with
       | Some reveal -> return (Wasm_pvm_state.Reveal_required reveal)
       | None -> return Wasm_pvm_state.No_input_required)
@@ -362,9 +361,9 @@ let reveal_step payload pvm_state =
       {pvm_state with current_tick = Z.succ pvm_state.current_tick; tick_state}
   in
   match pvm_state.tick_state with
-  | Eval config ->
-      let* config = Eval.reveal_step config.module_reg payload config in
-      return (Eval config)
+  | Eval {config; module_reg} ->
+      let* config = Eval.reveal_step module_reg payload config in
+      return (Eval {config; module_reg})
   | Decode _ ->
       return
         (Stuck
