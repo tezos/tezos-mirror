@@ -39,6 +39,10 @@ Node
   can still be used to override the data directory location from the
   configuration file, whether it is specified from the command-line or not.
 
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number
+  additional cycles.
+
 Client
 ------
 

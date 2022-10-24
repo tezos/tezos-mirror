@@ -171,7 +171,7 @@ let equal hm1 hm2 =
 let mode_equality hm1 hm2 =
   match (hm1, hm2) with
   | Archive, Archive | Full _, Full _ | Rolling _, Rolling _ -> true
-  | _ -> false
+  | Archive, _ | Full _, _ | Rolling _, _ -> false
 
 let pp ppf = function
   | Archive -> Format.fprintf ppf "Archive mode"
