@@ -230,11 +230,11 @@ val show_history_mode : history_mode -> string
 (** Run [octez-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
 
-(** Run [octez-node config reset].
+(** Run [tezos-node config update]. *)
+val config_update : t -> argument list -> unit Lwt.t
 
-    Contrary to [config_init], this does not automatically adds
-    arguments that were passed to [create], only the [--data-dir]. *)
-val config_reset : t -> string list -> unit Lwt.t
+(** Run [tezos-node config reset]. *)
+val config_reset : t -> argument list -> unit Lwt.t
 
 (** Run [octez-node config show]. Returns the node configuration. *)
 val config_show : t -> JSON.t Lwt.t
@@ -285,6 +285,12 @@ end
 
 (** Same as [config_init], but do not wait for the process to exit. *)
 val spawn_config_init : t -> argument list -> Process.t
+
+(** Same as [config_update], but do not wait for the process to exit. *)
+val spawn_config_update : t -> argument list -> Process.t
+
+(** Same as [config_reset], but do not wait for the process to exit. *)
+val spawn_config_reset : t -> argument list -> Process.t
 
 (** A snapshot history mode for exports *)
 type snapshot_history_mode = Rolling_history | Full_history

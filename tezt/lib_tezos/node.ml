@@ -78,6 +78,43 @@ let make_argument = function
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
+(** [true] if the two given arguments are the same type
+    and cannot be repeated. [false] otherwise.
+ *)
+let is_redundant = function
+  | Network _, Network _
+  | History_mode _, History_mode _
+  | Expected_pow _, Expected_pow _
+  | Singleprocess, Singleprocess
+  | Bootstrap_threshold _, Bootstrap_threshold _
+  | Synchronisation_threshold _, Synchronisation_threshold _
+  | Sync_latency _, Sync_latency _
+  | Connections _, Connections _
+  | Private_mode, Private_mode
+  | No_bootstrap_peers, No_bootstrap_peers
+  | Disable_operations_precheck, Disable_operations_precheck
+  | Media_type _, Media_type _
+  | Metadata_size_limit _, Metadata_size_limit _ ->
+      true
+  | Metrics_addr addr1, Metrics_addr addr2 -> addr1 = addr2
+  | Peer peer1, Peer peer2 -> peer1 = peer2
+  | Network _, _
+  | History_mode _, _
+  | Expected_pow _, _
+  | Singleprocess, _
+  | Bootstrap_threshold _, _
+  | Synchronisation_threshold _, _
+  | Sync_latency _, _
+  | Connections _, _
+  | Private_mode, _
+  | No_bootstrap_peers, _
+  | Disable_operations_precheck, _
+  | Media_type _, _
+  | Metadata_size_limit _, _
+  | Peer _, _
+  | Metrics_addr _, _ ->
+      false
+
 type 'a known = Unknown | Known of 'a
 
 module Parameters = struct
@@ -88,6 +125,7 @@ module Parameters = struct
     rpc_host : string;
     rpc_port : int;
     default_expected_pow : int;
+    mutable default_arguments : argument list;
     mutable arguments : argument list;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
@@ -168,30 +206,49 @@ let show_history_mode = function
   | Rolling None -> "rolling"
   | Rolling (Some i) -> "rolling_" ^ string_of_int i
 
-let spawn_config_init node arguments =
-  let arguments = node.persistent_state.arguments @ arguments in
-  (* Since arguments will be in the configuration file, we will not need them after this. *)
-  node.persistent_state.arguments <- [] ;
+let add_missing_argument arguments argument =
+  if List.exists (fun arg -> is_redundant (arg, argument)) arguments then
+    arguments
+  else argument :: arguments
+
+let add_default_arguments arguments =
   let arguments =
     (* Give a default value of "sandbox" to --network. *)
-    if List.exists (function Network _ -> true | _ -> false) arguments then
-      arguments
-    else Network "sandbox" :: arguments
+    add_missing_argument arguments (Network "sandbox")
   in
+  (* Give a default value of 0 to --expected-pow. *)
+  add_missing_argument arguments (Expected_pow 0)
+
+let spawn_config_command command node arguments =
+  let arguments =
+    List.fold_left
+      add_missing_argument
+      arguments
+      node.persistent_state.arguments
+  in
+  (* Since arguments will be in the configuration file, we will not need them after this. *)
+  node.persistent_state.arguments <- [] ;
   spawn_command
     node
-    ("config" :: "init" :: "--data-dir" :: node.persistent_state.data_dir
+    ("config" :: command :: "--data-dir" :: node.persistent_state.data_dir
    :: make_arguments arguments)
+
+let spawn_config_init = spawn_config_command "init"
+
+let spawn_config_update = spawn_config_command "update"
+
+let spawn_config_reset node arguments =
+  node.persistent_state.arguments <- node.persistent_state.default_arguments ;
+  spawn_config_command "reset" node arguments
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
 
+let config_update node arguments =
+  spawn_config_update node arguments |> Process.check
+
 let config_reset node arguments =
-  spawn_command
-    node
-    ("config" :: "reset" :: "--data-dir" :: node.persistent_state.data_dir
-   :: arguments)
-  |> Process.check
+  spawn_config_reset node arguments |> Process.check
 
 let config_show node =
   let* output =
@@ -532,12 +589,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let arguments =
-    (* Give a default value of 0 to --expected-pow. *)
-    if List.exists (function Expected_pow _ -> true | _ -> false) arguments
-    then arguments
-    else Expected_pow 0 :: arguments
-  in
+  let arguments = add_default_arguments arguments in
   let default_expected_pow =
     list_find_map (function Expected_pow x -> Some x | _ -> None) arguments
     |> Option.value ~default:0
@@ -555,6 +607,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         advertised_net_port;
         rpc_host;
         rpc_port;
+        default_arguments = arguments;
         arguments;
         default_expected_pow;
         runner;
@@ -616,7 +669,6 @@ let runlike_command_arguments node command arguments =
         ("0.0.0.0:", "0.0.0.0:")
   in
   let arguments = node.persistent_state.arguments @ arguments in
-
   let command_args = make_arguments arguments in
   let command_args =
     match node.persistent_state.advertised_net_port with
