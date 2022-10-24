@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tests that test Tezt itself. *)
+(* Testing
+   -------
+   Component: Tezt.Process
+   Invocation:
+     dune build tezt/self_tests
+     dune exec tezt/self_tests/main.exe -- -f test_process.ml
+*)
 
-let () =
-  Test_check.register () ;
-  Test_daemon.register () ;
-  Test_retry.register () ;
-  Test_diff.register () ;
-  Test_process.register () ;
-  Test.run ()
+let register () =
+  Test.register
+    ~__FILE__
+    ~title:"Process.terminate with timeout"
+    ~tags:["process"; "kill"]
+  @@ fun () ->
+  let start = Unix.gettimeofday () in
+  let process =
+    Process.spawn
+      ~name:"process"
+      "_build/default/tezt/self_tests/bin_catch_sigterm/main.exe"
+      []
+  in
+  let* () = Lwt_unix.sleep 1. in
+  Log.info "Will now terminate process." ;
+  Process.terminate ~timeout:1. process ;
+  let* _ = Process.wait process in
+  let time = Unix.gettimeofday () -. start in
+  Log.info "Process.wait returned after %g seconds from start." time ;
+  if time > 2.5 then
+    Test.fail "expected Process.wait to return after about 2 seconds" ;
+  unit
