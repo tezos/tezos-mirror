@@ -1709,6 +1709,20 @@ module Contract = struct
         ~input:Ticket_token.unparsed_token_encoding
         ~output:n
         RPC_path.(path /: Contract.rpc_arg / "ticket_balance")
+
+    let all_ticket_balances =
+      let open Data_encoding in
+      let ticket_balance_encoding =
+        let open Data_encoding in
+        merge_objs Ticket_token.unparsed_token_encoding (obj1 (req "amount" n))
+      in
+      RPC_service.get_service
+        ~description:
+          "Access the complete list of tickets owned by the given contract by \
+           scanning the contract's storage."
+        ~query:RPC_query.empty
+        ~output:(list ticket_balance_encoding)
+        RPC_path.(path /: Contract.rpc_arg / "all_ticket_balances")
   end
 
   let get_contract contract f =
@@ -1782,7 +1796,46 @@ module Contract = struct
             ~contents:(Micheline.root contents)
         in
         let* amount, _ctxt = Ticket_balance.get_balance ctxt ticket_hash in
-        return @@ Option.value amount ~default:Z.zero)
+        return @@ Option.value amount ~default:Z.zero) ;
+    Registration.opt_register1
+      ~chunked:false
+      S.all_ticket_balances
+      (fun ctxt contract () () ->
+        get_contract contract @@ fun contract ->
+        let open Lwt_result_syntax in
+        let* ctxt, script = Contract.get_script ctxt contract in
+        match script with
+        | None -> return_none
+        | Some script ->
+            let* Ex_script (Script {storage; storage_type; _}), ctxt =
+              Script_ir_translator.parse_script
+                ctxt
+                ~elab_conf:(elab_conf ~legacy:true ())
+                ~allow_forged_in_storage:true
+                script
+            in
+            let*? has_tickets, ctxt =
+              Ticket_scanner.type_has_tickets ctxt storage_type
+            in
+            let* ticket_token_map, ctxt =
+              Ticket_accounting.ticket_balances_of_value
+                ctxt
+                ~include_lazy:true
+                has_tickets
+                storage
+            in
+            let* ticket_balances, _ctxt =
+              Ticket_token_map.fold_es
+                ctxt
+                (fun ctxt acc ex_token amount ->
+                  let* unparsed_token, ctxt =
+                    Ticket_token_unparser.unparse ctxt ex_token
+                  in
+                  return ((unparsed_token, amount) :: acc, ctxt))
+                []
+                ticket_token_map
+            in
+            return_some ticket_balances)
 
   let get_storage_normalized ctxt block ~contract ~unparsing_mode =
     RPC_context.make_call1
