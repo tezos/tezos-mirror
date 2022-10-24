@@ -196,6 +196,20 @@ module Client : sig
     'result t ->
     JSON.t Lwt.t
 
+  (** Get the schema of an RPC as JSON. *)
+  val schema :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
+    ?better_errors:bool ->
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?protocol_hash:string ->
+    Client.t ->
+    'result t ->
+    JSON.t Lwt.t
+
   (** Same as [call_raw], but do not wait for the process to exit.
 
       Because this function is mostly used to test error cases, the response body

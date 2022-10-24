@@ -51,6 +51,16 @@ let int64 = C {pp = pp_print_int64; compare = Int64.compare}
 
 let float = C {pp = Format.pp_print_float; compare = Float.compare}
 
+let json_u =
+  let pp fmt json = Format.pp_print_string fmt (JSON.encode_u json) in
+  let equal = JSON.equal_u in
+  E {pp; equal}
+
+let json =
+  let pp fmt json = Format.pp_print_string fmt (JSON.encode json) in
+  let equal = JSON.equal in
+  E {pp; equal}
+
 let compare_floats_epsilon epsilon a b =
   if abs_float (a -. b) <= epsilon then 0 else Float.compare a b
 

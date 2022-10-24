@@ -299,3 +299,44 @@ let put (key, value) json =
 let update key f json =
   let v = json |-> key in
   put (key, f v) json
+
+let merge_objects obj1 obj2 =
+  List.fold_left
+    (fun obj1' (key, value) -> put (key, value) obj1')
+    obj1
+    (as_object obj2)
+
+let filter_map_object json f =
+  let new_fields =
+    List.filter_map
+      (fun (key, value) ->
+        match f key value with
+        | Some {node; _} -> Some (key, node)
+        | None -> None)
+      (as_object json)
+  in
+  {json with node = `O new_fields}
+
+let filter_object json f =
+  filter_map_object json (fun key value ->
+      if f key value then Some value else None)
+
+let rec equal_u (a : u) (b : u) =
+  match (a, b) with
+  | `O object_a, `O object_b ->
+      let sort_object =
+        List.sort (fun (key_a, _) (key_b, _) -> compare key_a key_b)
+      in
+      List.equal
+        (fun (k, v) (k', v') -> String.equal k k' && equal_u v v')
+        (sort_object object_a)
+        (sort_object object_b)
+  | `Bool b, `Bool b' -> Bool.equal b b'
+  | `Float f, `Float f' -> Float.equal f f'
+  | `A ls, `A ls' -> List.equal equal_u ls ls'
+  | `Null, `Null -> true
+  | `String s, `String s' -> String.equal s s'
+  | `O _, _ | `Bool _, _ | `Float _, _ | `A _, _ | `Null, _ | `String _, _ ->
+      false
+
+let equal j j' = equal_u (unannotate j) (unannotate j')

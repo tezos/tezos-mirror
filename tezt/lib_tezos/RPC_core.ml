@@ -189,6 +189,21 @@ module Client = struct
     in
     return (rpc.decode json)
 
+  let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
+      ?endpoint ?hooks ?env ?protocol_hash client {verb; path; _} =
+    Client.rpc_schema
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?protocol_hash
+      verb
+      path
+      client
+
   let spawn ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client
       {verb; path; query_string; data; decode = _; _} =

@@ -534,6 +534,14 @@ val get_chain_block_context_constants :
 val get_chain_block_context_constants_errors :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/constants/parametric]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_constants_parametric :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/contracts/<contract>/storage/used_space]
 
     [chain] defaults to ["main"].

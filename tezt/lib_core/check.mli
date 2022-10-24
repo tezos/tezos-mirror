@@ -100,6 +100,16 @@ val float_epsilon : float -> float typ
     compared using the same comparison function as [char]. *)
 val string : string typ
 
+(** The [JSON.u] type.
+
+    Objects are compared using [JSON.equal_u]. *)
+val json_u : JSON.u typ
+
+(** The [JSON.t] type.
+
+    Objects are compared using [JSON.equal]. *)
+val json : JSON.t typ
+
 (** Make an option type.
 
     If the item type is comparable, the result is comparable.

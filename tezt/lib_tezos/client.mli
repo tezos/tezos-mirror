@@ -237,6 +237,36 @@ val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
 (** Same as [rpc_list], but do not wait for the process to exit. *)
 val spawn_rpc_list : ?endpoint:endpoint -> t -> Process.t
 
+(** Run [octez-client rpc schema]. *)
+val rpc_schema :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?better_errors:bool ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
+  ?protocol_hash:string ->
+  meth ->
+  path ->
+  t ->
+  JSON.t Lwt.t
+
+(** Same as [rpc_schema], but do not wait for the process to exit. *)
+val spawn_rpc_schema :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
+  ?better_errors:bool ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?env:string String_map.t ->
+  ?protocol_hash:string ->
+  meth ->
+  path ->
+  t ->
+  Process.t
+
 (** Run [octez-client rpc /chains/<chain>/blocks/<block>/header/shell]. *)
 val shell_header :
   ?endpoint:endpoint -> ?chain:string -> ?block:string -> t -> string Lwt.t
@@ -1664,7 +1694,7 @@ val convert_script :
 val bootstrapped : t -> unit Lwt.t
 
 (** Run [tezos-client config show]. *)
-val config_show : ?protocol:Protocol.t -> t -> unit Lwt.t
+val config_show : ?protocol:Protocol.t -> t -> string Lwt.t
 
 (** Same as [config_show], but do not wait for the process to exit. *)
 val spawn_config_show : ?protocol:Protocol.t -> t -> Process.t

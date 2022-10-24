@@ -132,6 +132,31 @@ val put : string * t -> t -> t
     @raise Error if [obj] is not an object. *)
 val update : string -> (t -> t) -> t -> t
 
+(** [filter_map_object obj f] maps [f] over each field in [obj].
+
+    If [f key value] is [None] then the [key] is removed from [obj].
+    If [f key value] is [Some value'] then the [key] is overwritten with [value'].
+
+    @raise Error if [obj] is not an object. *)
+val filter_map_object : t -> (string -> t -> t option) -> t
+
+(** [filter_object obj f] filters the bindings in [obj].
+
+    [filter_object obj f] removes each binding [key, value] in [obj]
+    for which [f key value] is [false].
+
+    @raise Error if [obj] is not an object. *)
+val filter_object : t -> (string -> t -> bool) -> t
+
+(** Non-recursively merges two objects.
+
+   [merge_objects o1 o2] returns an object containing all fields of [o1]
+   and [o2]. If a key exists in both [o1] and [o2], then it will be
+   bound to its value in [o2].
+
+   @raise Error if [o1] or [o2] is not an object. *)
+val merge_objects : t -> t -> t
+
 (** Test whether a JSON value is [`Null]. *)
 val is_null : t -> bool
 
@@ -240,3 +265,20 @@ val as_object_opt : t -> (string * t) list option
 
 (** Test whether [as_object] would succeed. *)
 val is_object : t -> bool
+
+(** Equality for JSON unannotated ASTs.
+
+    Objects are equal only when they have the exact same number of
+    fields with the same contents (their order does not
+    matter). Consequently, e.g. [{"a": 1}] is not equal to [{"a": 1,
+    "a": 1}].
+
+    Arrays are equal when they contain the same number of pair-wise
+    equal elements. *)
+val equal_u : u -> u -> bool
+
+(** Equality for JSON annotated ASTs.
+
+    Annotations are stripped, then the unannotated AST is compared
+    with {!equal_u}. *)
+val equal : t -> t -> bool
