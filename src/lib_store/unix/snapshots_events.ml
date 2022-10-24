@@ -54,6 +54,15 @@ module Event = struct
       ~pp1:Format.pp_print_string
       ("filename", Data_encoding.string)
 
+  let cleaning_tmp_export_directory =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"cleaning_tmp_export_directory"
+      ~msg:"cleaning leftover export directory '{filename}'"
+      ~pp1:Format.pp_print_string
+      ("filename", Data_encoding.string)
+
   let import_info =
     let option_pp ~default pp fmt = function
       | None -> Format.fprintf fmt "%s" default

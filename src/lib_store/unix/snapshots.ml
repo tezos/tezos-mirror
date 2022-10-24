@@ -77,7 +77,7 @@ type error +=
   | Target_block_validation_failed of Block_hash.t * string
   | Directory_already_exists of string
   | Empty_floating_store
-  | Cannot_create_tmp_export_directory of string
+  | Cannot_remove_tmp_export_directory of string
   | Inconsistent_version_import of {expected : int list; got : int}
   | Inconsistent_chain_import of {
       expected : Distributed_db_version.Name.t;
@@ -440,18 +440,19 @@ let () =
     (fun () -> Empty_floating_store) ;
   register_error_kind
     `Permanent
-    ~id:"snapshots.cannot_create_tmp_export_directory"
-    ~title:"Cannot create temporary export directory"
+    ~id:"snapshots.cannot_remove_tmp_export_directory"
+    ~title:"Cannot remove temporary export directory"
     ~description:"Cannot create temporary directory for exporting snapshot."
     ~pp:(fun ppf msg ->
       Format.fprintf
         ppf
         "Cannot export snapshot: the temporary snapshot directory already \
-         exists. Please remove %s and restart the snapshot export."
+         exists and cannot be removed. Please remove %s and restart the \
+         snapshot export."
         msg)
     (obj1 (req "message" string))
-    (function Cannot_create_tmp_export_directory str -> Some str | _ -> None)
-    (fun str -> Cannot_create_tmp_export_directory str) ;
+    (function Cannot_remove_tmp_export_directory str -> Some str | _ -> None)
+    (fun str -> Cannot_remove_tmp_export_directory str) ;
   register_error_kind
     `Permanent
     ~id:"snapshots.inconsistent_version_import"
@@ -769,9 +770,22 @@ let default_snapshot_filename metadata =
   else default_name
 
 let ensure_valid_tmp_snapshot_path snapshot_tmp_dir =
-  fail_when
-    (Sys.file_exists (Naming.dir_path snapshot_tmp_dir))
-    (Cannot_create_tmp_export_directory (Naming.dir_path snapshot_tmp_dir))
+  let open Lwt_result_syntax in
+  let path = Naming.dir_path snapshot_tmp_dir in
+  let exists = Sys.file_exists path in
+  if exists then
+    Lwt.catch
+      (fun () ->
+        let*! () = Event.(emit cleaning_tmp_export_directory) path in
+        let*! () = Lwt_utils_unix.remove_dir path in
+        return_unit)
+      (function
+        | _ ->
+            fail_when
+              exists
+              (Cannot_remove_tmp_export_directory
+                 (Naming.dir_path snapshot_tmp_dir)))
+  else return_unit
 
 let ensure_valid_export_path =
   let open Lwt_result_syntax in
