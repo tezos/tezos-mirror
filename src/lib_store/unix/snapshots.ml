@@ -1797,6 +1797,8 @@ module Tar_exporter : EXPORTER = struct
     return_unit
 
   let cleaner ?to_clean t =
+    let open Lwt_syntax in
+    let* () = Event.(emit cleaning_after_failure ()) in
     let paths =
       match to_clean with
       | Some paths -> paths
@@ -2491,11 +2493,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           Lwt.return_unit)
     in
     let* metadata =
-      protect
-        ~on_error:(fun errors ->
-          let*! () = Exporter.cleaner snapshot_exporter in
-          Lwt.return (Error errors))
-        (fun () ->
+      protect (fun () ->
           let* ( export_mode,
                  export_block,
                  pred_block,
