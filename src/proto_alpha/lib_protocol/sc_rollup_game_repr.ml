@@ -997,16 +997,19 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
   check_proof_stop_state ~stop_state input input_request proof false
 
 (** Returns the validity of the first final move on top of a dissection. *)
-let validity_final_move ~first_move ~metadata ~proof ~game ~start_chunk
-    ~stop_chunk =
+let validity_final_move dal_parameters ~dal_endorsement_lag ~first_move
+    ~metadata ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
   let*! res =
-    let {inbox_snapshot; inbox_level; pvm_name; _} = game in
+    let {inbox_snapshot; inbox_level; pvm_name; dal_snapshot; _} = game in
     let*! valid =
       Sc_rollup_proof_repr.valid
         ~metadata
         inbox_snapshot
         inbox_level
+        dal_snapshot
+        dal_parameters
+        ~dal_endorsement_lag
         ~pvm_name
         proof
     in
@@ -1049,8 +1052,11 @@ let validity_final_move ~first_move ~metadata ~proof ~game ~start_chunk
     - The proof stop on the state different than the refuted one.
     - The proof is correctly verified.
 *)
-let validity_first_final_move ~metadata ~proof ~game ~start_chunk ~stop_chunk =
+let validity_first_final_move dal_parameters ~dal_endorsement_lag ~metadata
+    ~proof ~game ~start_chunk ~stop_chunk =
   validity_final_move
+    dal_parameters
+    ~dal_endorsement_lag
     ~first_move:true
     ~metadata
     ~proof
@@ -1065,9 +1071,11 @@ let validity_first_final_move ~metadata ~proof ~game ~start_chunk ~stop_chunk =
     - The proof stop on the state validates the refuted one.
     - The proof is correctly verified.
 *)
-let validity_second_final_move ~metadata ~agreed_start_chunk ~refuted_stop_chunk
-    ~game ~proof =
+let validity_second_final_move dal_parameters ~dal_endorsement_lag ~metadata
+    ~agreed_start_chunk ~refuted_stop_chunk ~game ~proof =
   validity_final_move
+    dal_parameters
+    ~dal_endorsement_lag
     ~first_move:false
     ~metadata
     ~proof
@@ -1082,7 +1090,7 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-let play ~stakers metadata game refutation =
+let play dal_parameters ~dal_endorsement_lag ~stakers metadata game refutation =
   let open Lwt_tzresult_syntax in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
@@ -1121,6 +1129,8 @@ let play ~stakers metadata game refutation =
       in
       let*! player_result =
         validity_first_final_move
+          dal_parameters
+          ~dal_endorsement_lag
           ~proof
           ~metadata
           ~game
@@ -1148,6 +1158,8 @@ let play ~stakers metadata game refutation =
   | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
       let*! player_result =
         validity_second_final_move
+          dal_parameters
+          ~dal_endorsement_lag
           ~metadata
           ~agreed_start_chunk
           ~refuted_stop_chunk

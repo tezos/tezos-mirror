@@ -85,10 +85,18 @@ module Make (Interpreter : Interpreter.S) :
 
   let generate_proof node_ctxt game start_state =
     let open Lwt_result_syntax in
+    (* NOTE: [snapshot_level] and [snapshot_hash] below refer to the level
+       before the refutation game starts. In fact, snapshotting of inbox and Dal
+       slots histories at [game.start_level] takes the state of the skip list
+       at [pred game.start_level]. *)
+    let snapshot_level_int32 =
+      Int32.pred Raw_level.(to_int32 game.start_level)
+    in
     let*! snapshot_hash =
-      State.hash_of_level
-        node_ctxt.Node_context.store
-        (Int32.pred Raw_level.(to_int32 game.start_level))
+      State.hash_of_level node_ctxt.Node_context.store snapshot_level_int32
+    in
+    let snaphsot_head =
+      Layer1.{hash = snapshot_hash; level = snapshot_level_int32}
     in
     let* snapshot_inbox = Inbox.inbox_of_hash node_ctxt snapshot_hash in
     let* snapshot_history = Inbox.history_of_hash node_ctxt snapshot_hash in
@@ -105,6 +113,25 @@ module Make (Interpreter : Interpreter.S) :
         snapshot_messages_tree
       >|= Environment.wrap_tzresult
     in
+    let* dal_slots_history =
+      Dal_slots_tracker.slots_history_of_hash node_ctxt snaphsot_head
+    in
+    let* dal_slots_history_cache =
+      Dal_slots_tracker.slots_history_cache_of_hash node_ctxt snaphsot_head
+    in
+    (* We fetch the value of protocol constants at block snapshot_hash
+       where the game started. *)
+    let* parametric_constants =
+      let cctxt = node_ctxt.cctxt in
+      Protocol.Constants_services.parametric
+        cctxt
+        (cctxt#chain, `Hash (snapshot_hash, 0))
+    in
+    let dal_l1_parameters = parametric_constants.dal in
+    let dal_parameters = dal_l1_parameters.cryptobox_parameters in
+    let dal_endorsement_lag = dal_l1_parameters.endorsement_lag in
+
+    let* page_info = return_none in
     let module P = struct
       include PVM
 
@@ -122,6 +149,18 @@ module Make (Interpreter : Interpreter.S) :
 
         let inbox = snapshot
       end
+
+      module Dal_with_history = struct
+        let confirmed_slots_history = dal_slots_history
+
+        let history_cache = dal_slots_history_cache
+
+        let dal_endorsement_lag = dal_endorsement_lag
+
+        let dal_parameters = dal_parameters
+
+        let page_info = page_info
+      end
     end in
     let metadata = Interpreter.metadata node_ctxt in
     let* proof =
@@ -136,6 +175,9 @@ module Make (Interpreter : Interpreter.S) :
         ~metadata
         snapshot
         game.inbox_level
+        dal_slots_history
+        dal_parameters
+        ~dal_endorsement_lag
         ~pvm_name:game.pvm_name
         proof
       >|= Environment.wrap_tzresult

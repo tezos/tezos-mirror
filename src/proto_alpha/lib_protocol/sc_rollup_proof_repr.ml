@@ -176,8 +176,10 @@ let check_inbox_proof snapshot serialized_inbox_proof (level, counter) =
   | Some inbox_proof ->
       Sc_rollup_inbox_repr.verify_proof (level, counter) snapshot inbox_proof
 
-let valid ~metadata snapshot commit_level ~pvm_name proof =
+let valid ~metadata snapshot commit_level dal_snapshot dal_parameters
+    ~dal_endorsement_lag ~pvm_name proof =
   let open Lwt_tzresult_syntax in
+  ignore (dal_snapshot, dal_parameters, dal_endorsement_lag) ;
   let (module P) = Sc_rollups.wrapped_proof_module proof.pvm_step in
   let* () = check (String.equal P.name pvm_name) "Incorrect PVM kind" in
   let origination_level = metadata.Sc_rollup_metadata_repr.origination_level in
@@ -251,6 +253,19 @@ module type PVM_with_context_and_state = sig
     val inbox : Sc_rollup_inbox_repr.history_proof
 
     val history : Sc_rollup_inbox_repr.History.t
+  end
+
+  module Dal_with_history : sig
+    val confirmed_slots_history : Dal_slot_repr.History.t
+
+    val history_cache : Dal_slot_repr.History.History_cache.t
+
+    val page_info :
+      (Dal_slot_repr.Page.content * Dal_slot_repr.Page.proof) option
+
+    val dal_parameters : Dal_slot_repr.parameters
+
+    val dal_endorsement_lag : int
   end
 end
 

@@ -4714,6 +4714,7 @@ module Protocol = Protocol
             ringo_lwt;
             injector |> if_some |> open_;
             octez_scoru_wasm;
+            octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in
     let tx_rollup =

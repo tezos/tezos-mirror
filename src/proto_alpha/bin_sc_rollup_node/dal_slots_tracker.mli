@@ -44,3 +44,17 @@ type error += Cannot_read_block_metadata of Block_hash.t
       [Store.Dal_confirmed_slots].}
     }  *)
 val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+
+(** [slots_history_of_hash node_ctxt block_hash] returns the DAL confirmed slots
+   history at the end of the given [block_hash] validation. *)
+val slots_history_of_hash :
+  Node_context.t ->
+  Layer1.head ->
+  Protocol.Alpha_context.Dal.Slots_history.t tzresult Lwt.t
+
+(** [slots_history_cache_of_hash node_ctxt block_hash] returns the DAL confirmed
+   slots history cache at the end of the given [block_hash] validation. *)
+val slots_history_cache_of_hash :
+  Node_context.t ->
+  Layer1.head ->
+  Protocol.Alpha_context.Dal.Slots_history.History_cache.t tzresult Lwt.t

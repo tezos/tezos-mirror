@@ -292,8 +292,15 @@ let game_move ctxt rollup ~player ~opponent refutation =
       Sc_rollup_wrong_turn
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
+  let dal = (Constants_storage.parametric ctxt).dal in
   let* move_result =
-    Sc_rollup_game_repr.play ~stakers metadata game refutation
+    Sc_rollup_game_repr.play
+      dal.cryptobox_parameters
+      ~dal_endorsement_lag:dal.endorsement_lag
+      ~stakers
+      metadata
+      game
+      refutation
   in
   match move_result with
   | Either.Left game_result -> return (Some game_result, ctxt)
