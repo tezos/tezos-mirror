@@ -169,18 +169,6 @@ let assert_commitment_period ctxt rollup commitment =
   in
   return ctxt
 
-let assert_same_hash_as_predecessor ctxt rollup (commitment : Commitment.t) =
-  let open Lwt_tzresult_syntax in
-  let* pred, ctxt =
-    Commitment_storage.get_commitment_unsafe ctxt rollup commitment.predecessor
-  in
-  if
-    Sc_rollup_repr.State_hash.equal
-      pred.compressed_state
-      commitment.compressed_state
-  then return ctxt
-  else fail Sc_rollup_state_change_on_zero_tick_commitment
-
 (** Check invariants on [inbox_level], enforcing overallocation of storage and
     regularity of block production.
 
@@ -192,12 +180,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
   let* ctxt = assert_commitment_not_too_far_ahead ctxt rollup lcc commitment in
   let* ctxt = assert_commitment_period ctxt rollup commitment in
-  if
-    Sc_rollup_repr.Number_of_ticks.equal
-      Commitment.(commitment.number_of_ticks)
-      Sc_rollup_repr.Number_of_ticks.zero
-  then assert_same_hash_as_predecessor ctxt rollup commitment
-  else return ctxt
+  return ctxt
 
 let get_commitment_stake_count ctxt rollup node =
   let open Lwt_tzresult_syntax in
