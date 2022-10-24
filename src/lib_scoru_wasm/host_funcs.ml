@@ -109,13 +109,13 @@ let extract_error durable = function
 module Aux = struct
   let input_output_max_size = 4096
 
-  let read_input ~input_buffer ~output_buffer ~memory ~rtype_offset
-      ~level_offset ~id_offset ~dst ~max_bytes =
+  let read_input ~input_buffer ~output_buffer ~memory ~level_offset ~id_offset
+      ~dst ~max_bytes =
     let open Lwt_result_syntax in
     let*! res =
       Lwt.catch
         (fun () ->
-          let*! {rtype; raw_level; message_counter; payload} =
+          let*! {raw_level; message_counter; payload} =
             Input_buffer.dequeue input_buffer
           in
           let input_size = Bytes.length payload in
@@ -130,7 +130,6 @@ module Aux = struct
           let* () =
             Safe_access.store_bytes memory dst (Bytes.to_string payload)
           in
-          let* () = Safe_access.store_num memory rtype_offset 0l (I32 rtype) in
           let* () =
             Safe_access.store_num memory level_offset 0l (I32 raw_level)
           in
@@ -334,14 +333,7 @@ let value i = Values.(Num (I32 i))
 
 let read_input_type =
   let input_types =
-    Types.
-      [
-        NumType I32Type;
-        NumType I32Type;
-        NumType I32Type;
-        NumType I32Type;
-        NumType I32Type;
-      ]
+    Types.[NumType I32Type; NumType I32Type; NumType I32Type; NumType I32Type]
     |> Vector.of_list
   in
   let output_types = Types.[NumType I32Type] |> Vector.of_list in
@@ -355,7 +347,6 @@ let read_input =
       let open Lwt.Syntax in
       match inputs with
       | [
-       Values.(Num (I32 rtype_offset));
        Values.(Num (I32 level_offset));
        Values.(Num (I32 id_offset));
        Values.(Num (I32 dst));
@@ -367,7 +358,6 @@ let read_input =
               ~input_buffer
               ~output_buffer
               ~memory
-              ~rtype_offset
               ~level_offset
               ~id_offset
               ~dst

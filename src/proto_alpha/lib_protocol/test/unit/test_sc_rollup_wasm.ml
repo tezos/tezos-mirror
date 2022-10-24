@@ -148,7 +148,6 @@ let make_transactions () =
    [write_output] host function and so it is used to test this function. *)
 let test_output () =
   let open Lwt_result_syntax in
-  let rtype_offset = 0 in
   let level_offset = 20 in
   let id_offset = 40 in
   let dst = 60 in
@@ -159,12 +158,12 @@ let test_output () =
         (module
           (type (;0;) (func (param i32 i32 i32 i32 i32) (result i32)))
           (type $t0 (func (param i32 i32) (result i32)))
-          (type $t3 (func (param i32 i32 i32 i32 i32) (result i32)))
+          (type $t3 (func (param i32 i32 i32 i32) (result i32)))
           (import "rollup_safe_core" "read_input" (func $read_input (type $t3)))
           (import "rollup_safe_core" "write_output" (func $write_output (type $t0)))
           (func (export "kernel_next")
             (local $size i32)
-           (local.set $size (call $read_input (i32.const %d)
+           (local.set $size (call $read_input
                               (i32.const %d)
                               (i32.const %d)
                               (i32.const %d)
@@ -177,7 +176,6 @@ let test_output () =
           )
 
     |}
-      rtype_offset
       level_offset
       id_offset
       dst

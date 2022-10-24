@@ -1,12 +1,7 @@
 (** This module implements a FIFO queue to model the input. The messages are
     queued in an input_buffer in their order of appearance in the inbox. *)
 
-type message = {
-  rtype : int32;
-  raw_level : int32;
-  message_counter : Z.t;
-  payload : bytes;
-}
+type message = {raw_level : int32; message_counter : Z.t; payload : bytes}
 [@@deriving show]
 
 (** An element of type t will have a content which is a lazy_vector of messages

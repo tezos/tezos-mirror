@@ -464,14 +464,7 @@ let set_input_step input_info message pvm_state =
           Wasm.Input_buffer.(
             enqueue
               pvm_state.buffers.input
-              {
-                (* This is to distinguish (0) Inbox inputs from (1)
-                   DAL/Slot_header inputs. *)
-                rtype = 0l;
-                raw_level;
-                message_counter;
-                payload = String.to_bytes message;
-              })
+              {raw_level; message_counter; payload = String.to_bytes message})
         in
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
            The goal is to read a complete inbox. *)

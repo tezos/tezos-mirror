@@ -87,19 +87,18 @@ module Aux : sig
     num_bytes:int32 ->
     int32 Lwt.t
 
-  (** [aux_write_memory ~input_buffer ~module_inst ~rtype_offset
-       ~level_offset ~id_offset ~dst ~max_bytes] reads `input_buffer`
-       and writes its components to the memory of `module_inst` based
-       on the memory addreses offsets described. It also checks that
-       the input payload is no larger than `max_input` and crashes
-       with `input too large` otherwise. It returns the size of the
-       payload. Note also that, if the level increases this function also
-      updates the level of the output buffer and resets its id to zero.*)
+  (** [aux_write_memory ~input_buffer ~module_inst ~level_offset
+       ~id_offset ~dst ~max_bytes] reads `input_buffer` and writes its
+       components to the memory of `module_inst` based on the memory
+       addreses offsets described. It also checks that the input
+       payload is no larger than `max_input` and crashes with `input
+       too large` otherwise. It returns the size of the payload. Note
+       also that, if the level increases this function also updates
+       the level of the output buffer and resets its id to zero. *)
   val read_input :
     input_buffer:Tezos_webassembly_interpreter.Input_buffer.t ->
     output_buffer:Tezos_webassembly_interpreter.Output_buffer.t ->
     memory:Tezos_webassembly_interpreter.Instance.memory_inst ->
-    rtype_offset:int32 ->
     level_offset:int32 ->
     id_offset:int32 ->
     dst:int32 ->

@@ -870,16 +870,15 @@ let admin_instr_encoding =
 
 let input_buffer_message_encoding =
   conv_lwt
-    (fun (rtype, raw_level, message_counter, payload) ->
+    (fun (raw_level, message_counter, payload) ->
       let open Lwt.Syntax in
       let+ payload = C.to_bytes payload in
-      Input_buffer.{rtype; raw_level; message_counter; payload})
-    (fun Input_buffer.{rtype; raw_level; message_counter; payload} ->
+      Input_buffer.{raw_level; message_counter; payload})
+    (fun Input_buffer.{raw_level; message_counter; payload} ->
       let payload = C.of_bytes payload in
-      Lwt.return (rtype, raw_level, message_counter, payload))
-    (tup4
+      Lwt.return (raw_level, message_counter, payload))
+    (tup3
        ~flatten:true
-       (value ["rtype"] Data_encoding.int32)
        (value ["raw-level"] Data_encoding.int32)
        (value ["message-counter"] Data_encoding.z)
        chunked_byte_vector)
