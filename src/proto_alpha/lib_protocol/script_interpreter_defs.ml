@@ -811,7 +811,7 @@ type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
-  'j list ->
+  'j Script_list.t ->
   ('j Script_list.t, 'e) ty option ->
   int ->
   ('j Script_list.t, 'a * 'b, 'c, 'd) continuation ->
@@ -825,7 +825,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
-  'b list ->
+  'b Script_list.t ->
   ('b Script_list.t, 'f) ty option ->
   int ->
   ('b Script_list.t, 'a * 'c, 'd, 'e) continuation ->

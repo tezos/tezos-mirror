@@ -3181,7 +3181,8 @@ module Registration_section = struct
           let kbody = halt in
           fun () ->
             let cont =
-              KList_enter_body (kbody, [()], [], Some (list unit), 1, KNil)
+              KList_enter_body
+                (kbody, [()], Script_list.empty, Some (list unit), 1, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3203,8 +3204,7 @@ module Registration_section = struct
           fun () ->
             let ys = Samplers.Random_value.value (list unit) rng_state in
             let cont =
-              KList_enter_body
-                (kbody, [], ys.elements, Some (list unit), ys.length, KNil)
+              KList_enter_body (kbody, [], ys, Some (list unit), ys.length, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3225,7 +3225,8 @@ module Registration_section = struct
           let kbody = halt in
           fun () ->
             let cont =
-              KList_enter_body (kbody, [], [], Some (list unit), 1, KNil)
+              KList_enter_body
+                (kbody, [], Script_list.empty, Some (list unit), 1, KNil)
             in
             Ex_stack_and_cont
               {stack = ((), eos); stack_type = unit @$ bot; cont})
@@ -3246,7 +3247,8 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let kbody = halt in
           let cont =
-            KList_exit_body (kbody, [], [], Some (list unit), 1, KNil)
+            KList_exit_body
+              (kbody, [], Script_list.empty, Some (list unit), 1, KNil)
           in
           fun () ->
             Ex_stack_and_cont

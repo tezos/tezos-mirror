@@ -1176,7 +1176,7 @@ and (_, _, _, _) continuation =
   | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
-      * 'b list
+      * 'b Script_list.t
       * ('b Script_list.t, _) ty option
       * int
       * ('b Script_list.t, 'c * 's, 'r, 'f) continuation
@@ -1184,7 +1184,7 @@ and (_, _, _, _) continuation =
   | KList_exit_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
-      * 'b list
+      * 'b Script_list.t
       * ('b Script_list.t, _) ty option
       * int
       * ('b Script_list.t, 'c * 's, 'r, 'f) continuation
