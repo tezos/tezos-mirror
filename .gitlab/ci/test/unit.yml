@@ -147,6 +147,7 @@ unit:alpha:
         @src/proto_alpha/lib_client/runtest
         @src/proto_alpha/lib_plugin/runtest
         @src/proto_alpha/lib_delegate/runtest
+        @src/proto_alpha/lib_dal/runtest
   parallel:
     matrix:
       - TEST_TARGETS:
