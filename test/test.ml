@@ -49,4 +49,5 @@ let () =
       ("uint-like-n", Uint_like_n.tests);
       ("int-like-z", Int_like_z.tests);
       ("safer-encoding", Test_safer_encoding.tests);
+      ("lazy-bytes", Lazy_bytes.tests);
     ]
