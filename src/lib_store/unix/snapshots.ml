@@ -3646,7 +3646,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Some stored ->
           let requested = snapshot_metadata.history_mode in
           fail_unless
-            (History_mode.equal requested stored)
+            (History_mode.mode_equality requested stored)
             (Inconsistent_history_mode_import {requested; stored})
       | None -> return_unit
     in
