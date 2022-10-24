@@ -20,17 +20,18 @@
     <h1> Adress Endorsement reception delays </h1>
     <form>
         <div>
-            <label for="selectedLevel_begin">First block:</label>
-            <input name="level_" id="selectedLevel_begin" type="number" value="179000" />
+            <label for="selectedLevel_begin">First bloc:</label>
+            <input name="level_" id="selectedLevel_begin" type="number" />
             <span id='tick_begin'></span>
             <br>
-            <label for="selectedLevel_end">Last block:</label>
-            <input name="level_" id="selectedLevel_end" type="number" value="179020" />
+            <label for="selectedLevel_end">Last bloc:</label>
+            <input name="level_" id="selectedLevel_end" type="number" />
             <span id='tick_end'></span>
             <br>
             <label for="adress_">delegate adress:</label>
-            <input name="adress_" id="adress_" type="string" value="tz3WXYtyDUNL91qfiCJtVUX746QpNv5i5ve5" />
+            <input name="adress_" id="adress_" type="string" value="tz1Ro4GjLWajnL7FWE1RxFTweLwsGdPqKbdZ" />
             <input type="button" id="submit_" value="Search ">
+            
 
         </div>
     </form>
@@ -121,10 +122,9 @@
                         window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value+"&first_block="+document.getElementById('selectedLevel_begin').value +"&last_block="+document.getElementById('selectedLevel_end').value;
                     }else if(""!=(document.getElementById('adress_').value)){
                         window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value;
+
                     }
-
                 });
-
 
             } catch (e) {
                 console.log(e)
