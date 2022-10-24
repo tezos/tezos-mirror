@@ -120,27 +120,9 @@ let to_ticket_receipt ctxt ~owner ticket_token_map =
     (fun ctxt acc _ticket_hash (ex_ticket, amount) ->
       if Z.(equal amount zero) then return (acc, ctxt)
       else
-        let (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
-          ex_ticket
+        let* ticket_token, ctxt =
+          Ticket_token_unparser.unparse ctxt ex_ticket
         in
-        let loc = Micheline.dummy_location in
-        let* contents, ctxt =
-          Script_ir_unparser.unparse_comparable_data
-            ctxt
-            Script_ir_unparser.Optimized_legacy
-            contents_type
-            contents
-        in
-        let*? ty_unstripped, ctxt =
-          Script_ir_unparser.unparse_ty ~loc ctxt contents_type
-        in
-        let*? ctxt =
-          Gas.consume ctxt (Script.strip_annotations_cost ty_unstripped)
-        in
-        let ty = Script.strip_annotations ty_unstripped in
-        let*? ctxt = Gas.consume ctxt (Script.strip_locations_cost ty) in
-        let contents_type = Micheline.strip_locations ty in
-        let ticket_token = Ticket_token.{ticketer; contents_type; contents} in
         let update =
           Ticket_receipt.{ticket_token; updates = [{account = owner; amount}]}
         in
