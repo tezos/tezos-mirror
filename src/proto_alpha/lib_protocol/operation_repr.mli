@@ -48,7 +48,14 @@
       - tx rollup commit
       - tx rollup withdraw
       - tx rollup reveal withdrawals
-      - smart contract rollup origination
+      - smart rollup origination
+      - smart rollup add messages
+      - smart rollup publish
+      - smart rollup cement
+      - smart rollup refute
+      - smart rollup timeout
+      - smart rollup execute outbox message
+      - smart rollup recover bond
       - zk rollup origination
       - zk rollup publish
       - zk rollup update
