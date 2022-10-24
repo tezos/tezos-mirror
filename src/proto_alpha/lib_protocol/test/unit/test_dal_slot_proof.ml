@@ -389,31 +389,4 @@ let tests =
 
     let dal_parameters = constants_test.dal
   end) in
-  let module Sandbox = Make (struct
-    let name = "sandbox"
-
-    let dal_parameters = constants_sandbox.dal
-  end) in
-  let module Mainnet = Make (struct
-    let name = "mainnet"
-
-    let dal_parameters = constants_mainnet.dal
-  end) in
-  let module Custom = Make (struct
-    let name = "custom"
-
-    let dal_parameters =
-      let dal_mainnet = constants_mainnet.dal in
-      {
-        dal_mainnet with
-        cryptobox_parameters =
-          Dal_helpers.derive_dal_parameters
-            dal_mainnet.cryptobox_parameters
-            ~redundancy_factor:4
-            ~constants_divider:64;
-      }
-  end) in
-  (* TODO/DAL: Enable these tests to cover more protocol parameters if we manage
-     to run DAL crypto part faster. *)
-  ignore @@ Sandbox.tests @ Test.tests @ Mainnet.tests ;
-  Custom.tests
+  Test.tests
