@@ -115,6 +115,40 @@ let gen_inbox level =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
+let gen_dal_slots_history () =
+  let open Gen in
+  let open Dal_slot_repr in
+  (* Generate a list of (level * confirmed slot ID). *)
+  let* list = small_list (pair small_nat small_nat) in
+  let list =
+    List.rev_map
+      (fun (level, slot_index) ->
+        let published_level =
+          Raw_level_repr.(
+            (* use succ to avoid having a published_level = 0, as it's the
+               genesis cell's level in the skip list. *)
+            succ @@ try of_int32_exn (Int32.of_int level) with _ -> root)
+        in
+        let index = Index.(of_int slot_index |> Option.value ~default:zero) in
+        Header.{id = {published_level; index}; commitment = Commitment.zero})
+      list
+  in
+  let list =
+    (* Sort the list in the right ordering before adding slots to slots_history. *)
+    List.sort_uniq
+      (fun {Header.id = a; _} {id = b; _} ->
+        let c = Raw_level_repr.compare a.published_level b.published_level in
+        if c <> 0 then c else Index.compare a.index b.index)
+      list
+  in
+  History.(add_confirmed_slot_headers_no_cache genesis list) |> function
+  | Ok v -> return v
+  | Error e ->
+      return
+      @@ Stdlib.failwith
+           (Format.asprintf "%a" Error_monad.pp_print_trace
+           @@ Environment.wrap_tztrace e)
+
 let gen_inbox_history_proof inbox_level =
   let open Gen in
   let* inbox = gen_inbox inbox_level in
@@ -160,11 +194,20 @@ let gen_game =
   let* inbox_level = gen_inbox_level in
   let* start_level = gen_start_level in
   let* inbox_snapshot = gen_inbox_history_proof inbox_level in
+  let* dal_snapshot = gen_dal_slots_history () in
   let* pvm_name = gen_pvm_name in
   let* game_state = gen_game_state in
   return
     Sc_rollup_game_repr.
-      {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state}
+      {
+        turn;
+        dal_snapshot;
+        inbox_snapshot;
+        start_level;
+        inbox_level;
+        pvm_name;
+        game_state;
+      }
 
 let gen_conflict =
   let open Gen in

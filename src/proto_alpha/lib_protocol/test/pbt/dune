@@ -34,7 +34,8 @@
   tezos-benchmark-type-inference-alpha
   tezos-sc-rollup-alpha
   tezos-crypto-dal
-  tezos-base-test-helpers)
+  tezos-base-test-helpers
+  tezos-protocol-alpha.parameters)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -46,7 +47,8 @@
   -open Tezos_benchmark_type_inference_alpha
   -open Tezos_sc_rollup_alpha
   -open Tezos_crypto_dal
-  -open Tezos_base_test_helpers))
+  -open Tezos_base_test_helpers
+  -open Tezos_protocol_alpha_parameters))
 
 (rule
  (alias runtest)

@@ -386,6 +386,7 @@ module V1 = struct
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
+    dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
     pvm_name : string;
@@ -454,27 +455,21 @@ module V1 = struct
 
   let equal
       {
-        turn = turn1;
-        inbox_snapshot = inbox_snapshot1;
-        start_level = start_level1;
-        inbox_level = inbox_level1;
-        pvm_name = pvm_name1;
-        game_state = game_state1;
-      }
-      {
-        turn = turn2;
-        inbox_snapshot = inbox_snapshot2;
-        start_level = start_level2;
-        inbox_level = inbox_level2;
-        pvm_name = pvm_name2;
-        game_state = game_state2;
-      } =
-    player_equal turn1 turn2
-    && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
-    && Raw_level_repr.equal start_level1 start_level2
-    && Raw_level_repr.equal inbox_level1 inbox_level2
-    && String.equal pvm_name1 pvm_name2
-    && game_state_equal game_state1 game_state2
+        turn;
+        inbox_snapshot;
+        dal_snapshot;
+        start_level;
+        inbox_level;
+        pvm_name;
+        game_state;
+      } g2 =
+    player_equal turn g2.turn
+    && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot g2.inbox_snapshot
+    && Dal_slot_repr.History.equal dal_snapshot g2.dal_snapshot
+    && Raw_level_repr.equal start_level g2.start_level
+    && Raw_level_repr.equal inbox_level g2.inbox_level
+    && String.equal pvm_name g2.pvm_name
+    && game_state_equal game_state g2.game_state
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
@@ -535,18 +530,39 @@ module V1 = struct
       (fun {
              turn;
              inbox_snapshot;
+             dal_snapshot;
              start_level;
              inbox_level;
              pvm_name;
              game_state;
            } ->
-        (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state))
-      (fun (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state)
-           ->
-        {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state})
-      (obj6
+        ( turn,
+          inbox_snapshot,
+          dal_snapshot,
+          start_level,
+          inbox_level,
+          pvm_name,
+          game_state ))
+      (fun ( turn,
+             inbox_snapshot,
+             dal_snapshot,
+             start_level,
+             inbox_level,
+             pvm_name,
+             game_state ) ->
+        {
+          turn;
+          inbox_snapshot;
+          dal_snapshot;
+          start_level;
+          inbox_level;
+          pvm_name;
+          game_state;
+        })
+      (obj7
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
+         (req "dal_snapshot" Dal_slot_repr.History.encoding)
          (req "start_level" Raw_level_repr.encoding)
          (req "inbox_level" Raw_level_repr.encoding)
          (req "pvm_name" string)
@@ -671,7 +687,8 @@ end
 
 let make_chunk state_hash tick = {state_hash; tick}
 
-let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
+let initial inbox dal_snapshot ~start_level ~pvm_name
+    ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
     ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
@@ -702,6 +719,7 @@ let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
+    dal_snapshot;
     start_level;
     inbox_level = child.inbox_level;
     pvm_name;
@@ -1090,6 +1108,7 @@ let play ~stakers metadata game refutation =
            {
              turn = opponent game.turn;
              inbox_snapshot = game.inbox_snapshot;
+             dal_snapshot = game.dal_snapshot;
              start_level = game.start_level;
              inbox_level = game.inbox_level;
              pvm_name = game.pvm_name;
@@ -1120,6 +1139,7 @@ let play ~stakers metadata game refutation =
              {
                turn = opponent game.turn;
                inbox_snapshot = game.inbox_snapshot;
+               dal_snapshot = game.dal_snapshot;
                start_level = game.start_level;
                inbox_level = game.inbox_level;
                pvm_name = game.pvm_name;

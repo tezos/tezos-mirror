@@ -240,6 +240,12 @@ module V1 : sig
       otherwise they would have a 'moving target' because the actual
       inbox may be updated continuously.
 
+    - [dal_snapshot], a snapshot of the DAL's confirmed slots history at the
+      moment the game is created. In fact, since the confirmed slots history at
+      initialization would likely evolve during the game, we need a (fixed)
+      reference w.r.t. which Dal input proofs would be produced and verified if
+      needed.
+
     - [level], the inbox level of the commitment the game is refuting.
       This is only used when checking [Blocked_step] proofs---the proof
       will show that the next message available in [inbox_snapshot] is
@@ -259,11 +265,12 @@ module V1 : sig
     that size. The initial game dissection will be 3 values except in
     the case of a zero-tick commit when it will have 2 values.)
     - the first state hash value in [dissection] must not be [None]
-    - [inbox_snapshot] never changes once the game is created
+    - [inbox_snapshot] and [dal_snapshot] never change once the game is created
   *)
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
+    dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
     pvm_name : string;
@@ -323,9 +330,10 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox ~start_level ~pvm_name ~parent ~child ~refuter ~defender
-    ~default_number_of_sections] will construct an initial game where [refuter]
-    is next to play. The game has [dissection] with three states:
+    [initial inbox dal_slots_history ~start_level ~pvm_name
+    ~parent ~child ~refuter ~defender ~default_number_of_sections] will construct
+    an initial game where [refuter] is next to play. The game has [dissection]
+    with three states:
 
       - firstly, the state (with tick zero) of [parent], the commitment
       that both stakers agree on.
@@ -344,6 +352,7 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.history_proof ->
+  Dal_slot_repr.History.t ->
   start_level:Raw_level_repr.t ->
   pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->

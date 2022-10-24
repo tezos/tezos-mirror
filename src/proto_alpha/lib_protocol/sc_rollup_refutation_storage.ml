@@ -256,11 +256,15 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let default_number_of_sections =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
+  let* slots_history_snapshot =
+    Dal_slot_storage.get_slot_headers_history ctxt
+  in
   let current_level = (Raw_context.current_level ctxt).level in
   let game =
     Sc_rollup_game_repr.initial
       ~start_level:current_level
       (Sc_rollup_inbox_repr.take_snapshot inbox)
+      slots_history_snapshot
       ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info
       ~child:child_info
