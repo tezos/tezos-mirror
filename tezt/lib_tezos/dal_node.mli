@@ -64,9 +64,13 @@ val data_dir : t -> string
     [true] by default *)
 val run : ?wait_ready:bool -> ?env:string String_map.t -> t -> unit Lwt.t
 
-(** Send SIGTERM to a sc node and wait for it to terminate. With [kill] set, a
-    SIGKILL is sent instead of a SIGTERM. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** Shows in stdout every events sent by the node *)
 val log_events : t -> unit

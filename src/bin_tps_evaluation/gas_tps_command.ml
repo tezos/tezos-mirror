@@ -69,8 +69,8 @@ let estimate_gas_tps ~average_block_path () =
     Gas.deduce_tps ~protocol ~protocol_constants ~average_transaction_cost ()
   in
   Log.info "Gas TPS: %d" gas_tps ;
-  let* _ = Node.terminate ~kill:true node in
-  let* _ = Baker.terminate ~kill:true baker in
+  let* _ = Node.kill node in
+  let* _ = Baker.kill baker in
   Lwt.return
   @@ {average_block; transaction_costs; average_transaction_cost; gas_tps}
 
