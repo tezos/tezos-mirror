@@ -31,6 +31,18 @@ Node
   can still be used to override the data directory location from the
   configuration file, whether it is specified from the command-line or not.
 
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number
+  additional cycles.
+
+- Fixed an issue that could left a temporary directory if a snapshot
+  export was cancelled. Additionally, a cleanup now ensures the
+  absence of leftovers temporary directories when exporting a
+  snapshot.
+
+- Fixed an issue that could left a lock file if a snapshot import was
+  cancelled.
+
 Client
 ------
 
