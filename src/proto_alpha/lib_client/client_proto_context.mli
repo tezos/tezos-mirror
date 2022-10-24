@@ -609,6 +609,15 @@ val transfer_ticket :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup origination operation using
+    {!Injection.inject_operation}.
+
+    Originates a smart rollup of [kind] with the [boot_sector] using
+    [paramaters_ty]. Generates a unique smart rollup address returned
+    in the operation's receipt.
+
+    This is the only entry-point to create a smart rollup.
+*)
 val sc_rollup_originate :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -629,13 +638,18 @@ val sc_rollup_originate :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  ( Tezos_crypto.Operation_hash.t
-    * Kind.sc_rollup_originate Kind.manager contents
-    * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result,
-    tztrace )
-  result
+  (Tezos_crypto.Operation_hash.t
+  * Kind.sc_rollup_originate Kind.manager contents
+  * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result)
+  tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup add messages operation using
+    {!Injection.inject_operation}.
+
+    Adds external messages to the smart rollup inbox shared with all
+    smart rollups.
+*)
 val sc_rollup_add_messages :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -660,6 +674,13 @@ val sc_rollup_add_messages :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup cement commitment operation using
+    {!Injection.inject_operation}.
+
+    Cements a [commitment] for the smart rollup [rollup]. The commitment
+    now becomes unrefutable and we can execute outbox messages for the
+    committed PVM state (see {!sc_rollup_execute_outbox_message}).
+*)
 val sc_rollup_cement :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -685,6 +706,14 @@ val sc_rollup_cement :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup publish commitment operation using
+    {!Injection.inject_operation}.
+
+    Publishes a [commitment] to announces the PVM state at the end of
+    a commitment period and the number of ticks executed.
+    If it is the first time [src_pk] publishes a commitment, a bond
+    is frozen.
+*)
 val sc_rollup_publish :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -710,6 +739,12 @@ val sc_rollup_publish :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup execute outbox message operation using
+    {!Injection.inject_operation}.
+
+    Executes [output_proof] on the PVM commited state from the
+    [cemented_commitment]. Allows to perform L2->L1 communication.
+*)
 val sc_rollup_execute_outbox_message :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -730,14 +765,19 @@ val sc_rollup_execute_outbox_message :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
-  ( Tezos_crypto.Operation_hash.t
-    * Kind.sc_rollup_execute_outbox_message Kind.manager contents
-    * Kind.sc_rollup_execute_outbox_message Kind.manager
-      Apply_results.contents_result,
-    tztrace )
-  result
+  (Tezos_crypto.Operation_hash.t
+  * Kind.sc_rollup_execute_outbox_message Kind.manager contents
+  * Kind.sc_rollup_execute_outbox_message Kind.manager
+    Apply_results.contents_result)
+  tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup recover bond operation using
+    {!Injection.inject_operation}.
+
+    Allows to recover the bond frozen by the operation {!sc_rollup_publish}
+    of [src_pk], if the commitment is no longer subject to refutations.
+*)
 val sc_rollup_recover_bond :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
@@ -763,6 +803,12 @@ val sc_rollup_recover_bond :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup refutation operation using
+    {!Injection.inject_operation}.
+
+    Either start a refutation game between [src_pk] and [oppononent] or
+    plays a move in an existing refutation game.
+*)
 val sc_rollup_refute :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
@@ -789,6 +835,12 @@ val sc_rollup_refute :
   tzresult
   Lwt.t
 
+(** Injects a smart-contract rollup timeout operation using
+    {!Injection.inject_operation}.
+
+    Timeouts the absent player from the refutation game between [alice]
+    and [bob].
+*)
 val sc_rollup_timeout :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
