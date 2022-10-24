@@ -57,15 +57,15 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1000.596
       Resulting inbox state: { level = 3
-                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
-                               nb_messages_in_commitment_period = 6
+                               current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 3 nb_messages_in_commitment_period = 6
                                message_counter = 2
-                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
-                                                     
-       content = [SC_ROLLUP_INBOX_HASH]
+                               old_levels_messages = 
+       content = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 2
        index = 2
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
     
                                }
 
@@ -94,15 +94,15 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1000.596
       Resulting inbox state: { level = 4
-                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
-                               nb_messages_in_commitment_period = 9
+                               current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 4 nb_messages_in_commitment_period = 9
                                message_counter = 2
-                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
-                                                     
-       content = [SC_ROLLUP_INBOX_HASH]
+                               old_levels_messages = 
+       content = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 3
        index = 3
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
     
                                }
 
@@ -131,15 +131,15 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1000.596
       Resulting inbox state: { level = 4
-                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
-                               nb_messages_in_commitment_period = 9
+                               current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 4 nb_messages_in_commitment_period = 9
                                message_counter = 2
-                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
-                                                     
-       content = [SC_ROLLUP_INBOX_HASH]
+                               old_levels_messages = 
+       content = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 3
        index = 3
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
     
                                }
 
@@ -168,16 +168,16 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1000.596
       Resulting inbox state: { level = 5
-                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
-                               nb_messages_in_commitment_period = 12
+                               current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 5 nb_messages_in_commitment_period = 12
                                message_counter = 2
-                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
-                                                     
-       content = [SC_ROLLUP_INBOX_HASH]
+                               old_levels_messages = 
+       content = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 4
        index = 4
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
     
                                }
 
