@@ -1644,7 +1644,8 @@ module Stack_utils = struct
 
   (* [kinstr_final_stack_type sty instr] computes the stack type after
      [instr] has been executed, assuming [sty] is the type of the stack
-     prior to execution. *)
+     prior to execution. For the rare instructions which can return stacks
+     of any type ([FAILWITH] and [NEVER]), this function returns [None]. *)
   let rec kinstr_final_stack_type :
       type a s r f.
       (a, s) stack_ty -> (a, s, r, f) kinstr -> (r, f) stack_ty option tzresult
@@ -1798,36 +1799,32 @@ module Logger (Base : Logger_base) = struct
   open Script_interpreter_defs
   open Script_interpreter.Internals.Raw
 
-  (** [log_entry ctxt gas instr sty accu stack] simply calls
+  (** [log_entry ctxt gas instr sty accu stack] simply calls the
       [Base.log_entry] function with the appropriate arguments. *)
   let log_entry ctxt gas k sty accu stack =
     let ctxt = Local_gas_counter.update_context gas ctxt in
     Base.log_entry k ctxt (kinstr_location k) sty (accu, stack)
 
-  (** [log_exit ctxt gas loc instr sty accu stack] simply calls
+  (** [log_exit ctxt gas loc instr sty accu stack] simply calls the
       [Base.log_exit] function with the appropriate arguments. *)
   let log_exit ctxt gas loc_prev k sty accu stack =
     let ctxt = Local_gas_counter.update_context gas ctxt in
     Base.log_exit k ctxt loc_prev sty (accu, stack)
 
-  (** [log_control continuation] simply calls [Base.log_control]
+  (** [log_control continuation] simply calls the [Base.log_control]
       function with the appropriate arguments. *)
   let log_control ks = Base.log_control ks
 
   (** [log_kinstr logger sty instr] returns [instr] prefixed by an
-      [ILog] instruction to log the first instruction in [instr]. Note
-      that [logger] value is only available when logging is enables, so
-      the type system protects us from calling this by mistake. *)
+      [ILog] instruction to log the first instruction in [instr]. *)
   let log_kinstr logger sty i =
     ILog (kinstr_location i, sty, LogEntry, logger, i)
 
   (* [log_next_kinstr logger i] instruments the next instruction of [i]
-     with the [logger] with [ILog] instructions to make sure it will be logged.
+     with [ILog] instructions to make sure it will be logged.
      This instrumentation has a performance cost, but importantly, it is
      only ever paid when logging is enabled. Otherwise, the possibility
-     to instrument the script is costless. Note also that [logger] value
-     is only available when logging is enables, so the type system protects
-     us from calling this by mistake.
+     to instrument the script is costless.
 
      Notice that the instrumentation breaks the sharing of continuations
      that is normally enforced between branches of conditionals. This
@@ -1855,9 +1852,7 @@ module Logger (Base : Logger_base) = struct
 
     This instrumentation has a performance cost, but importantly, it
     is only ever paid when logging is enabled. Otherwise, the
-    possibility to instrument the script is costless. Note also that
-    [logger] value is only available when logging is enabled, so the
-    type system protects us from calling this by mistake. *)
+    possibility to instrument the script is costless. *)
   let log_next_continuation :
       type a b c d.
       logger ->
@@ -1925,7 +1920,7 @@ module Logger (Base : Logger_base) = struct
      continuations: we pass a constructor as argument to their
      evaluation rules so that they can instrument these fresh
      continuations by themselves. Instructions that create continuations
-     without calling specialised functions have their branches from [step]
+     without calling specialized functions have their branches from [step]
      function duplicated and adjusted here.
   
      This on-the-fly instrumentation of the execution allows zero-cost
