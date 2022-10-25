@@ -23,6 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type parameters = Dal.parameters = {
+  redundancy_factor : int;
+  page_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
+
+let parameters_encoding = Dal.parameters_encoding
+
 module Commitment = struct
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3389
 
@@ -119,6 +128,8 @@ module Page = struct
   type content = Bytes.t
 
   type slot_index = Index.t
+
+  let pages_per_slot = Dal.pages_per_slot
 
   module Index = struct
     type t = int
@@ -585,15 +596,6 @@ module History = struct
             (List.length next_inc_proof)
             pp_inclusion_proof
             next_inc_proof
-
-    type dal_parameters = Dal.parameters = {
-      redundancy_factor : int;
-      page_size : int;
-      slot_size : int;
-      number_of_shards : int;
-    }
-
-    let dal_parameters_encoding = Dal.parameters_encoding
 
     type error += Dal_proof_error of string
 

@@ -2782,6 +2782,13 @@ end
 
 (** This module exposes definitions for the data-availability layer. *)
 module Dal : sig
+  type parameters = Dal.parameters = {
+    redundancy_factor : int;
+    page_size : int;
+    slot_size : int;
+    number_of_shards : int;
+  }
+
   (** This module re-exports definitions from {!Dal_slot_repr.Index}. *)
   module Slot_index : sig
     type t
@@ -2821,6 +2828,8 @@ module Dal : sig
 
   module Page : sig
     type content = bytes
+
+    val pages_per_slot : parameters -> int
 
     module Index : sig
       type t = int
@@ -2903,13 +2912,6 @@ module Dal : sig
       History_cache.t ->
       Slot.Header.t list ->
       (t * History_cache.t) tzresult
-
-    type dal_parameters = Dal.parameters = {
-      redundancy_factor : int;
-      page_size : int;
-      slot_size : int;
-      number_of_shards : int;
-    }
 
     type proof
   end
