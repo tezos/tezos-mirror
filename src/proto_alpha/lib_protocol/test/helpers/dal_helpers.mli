@@ -157,7 +157,7 @@ end) : sig
   (** Helper for the case where produce_proof is expected to fail. *)
   val failing_check_produce_result :
     __LOC__:string ->
-    dal_proof_error:string ->
+    expected_error:Environment.Error_monad.error ->
     'a tzresult ->
     'b ->
     unit tzresult Lwt.t

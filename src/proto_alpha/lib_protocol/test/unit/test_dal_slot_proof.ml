@@ -219,9 +219,11 @@ struct
       ~check_produce:
         (failing_check_produce_result
            ~__LOC__
-           ~dal_proof_error:
-             "Wrong page content for the given page index and slot commitment \
-              (page id=(published_level: 11, slot_index: 0, page_index: 2)).")
+           ~expected_error:
+             (Hist.Dal_proof_error
+                "Wrong page content for the given page index and slot \
+                 commitment (page id=(published_level: 11, slot_index: 0, \
+                 page_index: 2))."))
 
   (** Test where a slot is confirmed, requesting a proof for a confirmed page,
       where correct page proof is provided, but given page data is altered. *)
@@ -239,9 +241,11 @@ struct
       ~check_produce:
         (failing_check_produce_result
            ~__LOC__
-           ~dal_proof_error:
-             "Wrong page content for the given page index and slot commitment \
-              (page id=(published_level: 11, slot_index: 0, page_index: 0)).")
+           ~expected_error:
+             (Hist.Dal_proof_error
+                "Wrong page content for the given page index and slot \
+                 commitment (page id=(published_level: 11, slot_index: 0, \
+                 page_index: 0))."))
 
   (* Variants of the tests above: Construct/verify proofs that attempt to
      unconfirm pages on top of a (confirmed) slot added in genesis_history skip
