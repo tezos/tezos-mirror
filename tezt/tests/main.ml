@@ -114,6 +114,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Encoding.register ~protocols ;
   Events.register ~protocols ;
   Forge.register ~protocols ;
+  Gas_bound.register ~protocols ;
   Ghostnet_dictator_migration.register ~protocols ;
   Global_constants.register ~protocols ;
   Large_metadata.register ~protocols ;
