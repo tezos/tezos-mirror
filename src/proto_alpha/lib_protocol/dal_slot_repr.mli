@@ -267,8 +267,10 @@ module History : sig
   (** Encoding for {!proof}. *)
   val proof_encoding : proof Data_encoding.t
 
-  (** Pretty-printer for {!proof}. *)
-  val pp_proof : Format.formatter -> proof -> unit
+  (** Pretty-printer for {!proof}. If [serialized] is [false] it will print 
+      the abstracted proof representation, otherwise if it's [true] it will
+      print the serialized version of the proof (i.e. a sequence of bytes). *)
+  val pp_proof : serialized:bool -> Format.formatter -> proof -> unit
 
   (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
       produces a proof that either:
@@ -315,6 +317,10 @@ module History : sig
   module Internal_for_tests : sig
     val content : t -> Header.t
 
+    (** [proof_statement_is serialized_proof expected] will return [true] if
+        the deserialized proof and the [expected] proof shape match and [false]
+        otherwise.
+        Note that it will also return [false] if deserialization fails.  *)
     val proof_statement_is : proof -> [`Confirmed | `Unconfirmed] -> bool
   end
 end
