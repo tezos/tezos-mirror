@@ -89,10 +89,13 @@ type page_proof
 (** An encoding for the proof of a page. *)
 val page_proof_encoding : page_proof Data_encoding.t
 
-(** [verify_page t commitment page page_proof] returns [Ok
-     true] if the [proof] certifies that the [slot_page] is indeed
-     included in the slot committed with commitment
-     [commitment]. Returns [Ok false] otherwise.
+(** [pages_per_slot t] returns the number of expected pages per slot. *)
+val pages_per_slot : parameters -> int
+
+(** [verify_page t srs commitment page page_proof] returns [Ok true]
+     if the [proof] certifies that the [slot_page] is indeed included
+     in the slot committed with commitment [commitment]. Returns [Ok
+     false] otherwise.
 
       Fails if the index of the page is out of range. *)
 val verify_page :

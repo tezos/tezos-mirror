@@ -346,9 +346,13 @@ module Inner = struct
          (req "slot_size" int31)
          (req "number_of_shards" uint16))
 
+  let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make {redundancy_factor; slot_size; page_size; number_of_shards} =
+  let make
+      ({redundancy_factor; slot_size; page_size; number_of_shards} as
+      parameters) =
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
@@ -381,7 +385,7 @@ module Inner = struct
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
         shard_size;
-        pages_per_slot = slot_size / page_size;
+        pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
         evaluations_log;
@@ -812,8 +816,6 @@ module Inner = struct
         Polynomials.(division_xn p l Scalar.(negate (pow wi (Z.of_int l))))
       in
       Ok (commit t quotient)
-
-  let pages_per_slot t = t.pages_per_slot
 
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
