@@ -215,6 +215,9 @@ struct
         match (e, expected_error) with
         | Hist.Dal_proof_error s, Hist.Dal_proof_error expected ->
             String.equal s expected
+        | ( Hist.Unexpected_page_size {expected_size = e1; page_size = p1},
+            Hist.Unexpected_page_size {expected_size = e2; page_size = p2} ) ->
+            e1 = e2 && p1 = p2
         | _ -> false)
 
   let successful_check_verify_result ~__LOC__ proof_status res page_info =
