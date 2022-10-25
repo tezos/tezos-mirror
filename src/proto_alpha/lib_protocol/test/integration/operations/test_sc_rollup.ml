@@ -163,7 +163,7 @@ let test_disable_feature_flag () =
     let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
     Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
   in
-  let expect_apply_failure = function
+  let expect_failure = function
     | Environment.Ecoproto_error
         (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
       :: _ ->
@@ -171,7 +171,7 @@ let test_disable_feature_flag () =
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
   in
-  let*! _ = Incremental.add_operation ~expect_apply_failure i op in
+  let* (_ : Incremental.t) = Incremental.add_operation ~expect_failure i op in
   return_unit
 
 (** [test_sc_rollups_all_well_defined] checks that the [kind_of_string] is
