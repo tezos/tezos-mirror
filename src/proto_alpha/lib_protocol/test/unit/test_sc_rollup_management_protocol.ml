@@ -125,9 +125,9 @@ let test_encode_decode_internal_inbox_message_transfer () =
     ( Script_int.(abs @@ of_int 42),
       string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 )
   in
-  let* deposit, ctxt =
+  let* transfer, ctxt =
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_deposit
+    @@ Sc_rollup_management_protocol.make_internal_transfer
          ctxt
          pair_nat_ticket_string_ty
          ~payload
@@ -135,14 +135,14 @@ let test_encode_decode_internal_inbox_message_transfer () =
          ~source
          ~destination
   in
-  let* () = check_encode_decode_inbox_message deposit in
+  let* () = check_encode_decode_inbox_message transfer in
   (* Check that the size of messages that can be encoded is bounded. *)
   let msg = String.make 4050 'c' in
   let*? payload = Environment.wrap_tzresult (Script_string.of_string msg) in
-  let* deposit, _ctxt =
+  let* transfer, _ctxt =
     let open Script_typed_ir in
     wrap
-    @@ Sc_rollup_management_protocol.make_internal_deposit
+    @@ Sc_rollup_management_protocol.make_internal_transfer
          ctxt
          String_t
          ~payload
@@ -150,7 +150,7 @@ let test_encode_decode_internal_inbox_message_transfer () =
          ~source
          ~destination
   in
-  let*! res = check_encode_decode_inbox_message deposit in
+  let*! res = check_encode_decode_inbox_message transfer in
   assert_encoding_failure ~loc:__LOC__ res
 
 let test_encode_decode_internal_inbox_message_sol () =

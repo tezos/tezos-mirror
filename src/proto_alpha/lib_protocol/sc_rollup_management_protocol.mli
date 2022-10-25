@@ -60,10 +60,10 @@ type atomic_transaction_batch = private {transactions : transaction list}
 type outbox_message = private
   | Atomic_transaction_batch of atomic_transaction_batch
 
-(** [make_internal_deposit ctxt ty ~payload ~sender ~source ~destination]
+(** [make_internal_transfer ctxt ty ~payload ~sender ~source ~destination]
     constructs a smart rollup's [inbox message] (an L1 to L2 message)
     with the given [payload], [sender], and [source] targeting [destination]. *)
-val make_internal_deposit :
+val make_internal_transfer :
   context ->
   ('a, _) Script_typed_ir.ty ->
   payload:'a ->
