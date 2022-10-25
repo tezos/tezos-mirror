@@ -67,6 +67,9 @@ Protocol Compiler And Environment
 Codec
 -----
 
+- Added the ``dump encoding <id>`` command to dump the description of a single
+  registered encoding.
+
 Docker Images
 -------------
 
