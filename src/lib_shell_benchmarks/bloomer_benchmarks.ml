@@ -25,12 +25,12 @@
 
 let ns = Namespace.make Shell_namespace.ns "bloomer"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 (* We use the same Bloom filter configuration as used in P2p_acl *)
 
 let const_time_model name =
-  Model.make
-    ~conv:(fun () -> ())
-    ~model:(Model.unknown_const1 ~const:(Free_variable.of_string name))
+  Model.make ~conv:(fun () -> ()) ~model:(Model.unknown_const1 ~const:(fv name))
 
 let make_bench name info model generator make_bench :
     Tezos_benchmark.Benchmark.t =

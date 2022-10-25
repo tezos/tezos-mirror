@@ -26,7 +26,9 @@
 open Protocol
 module Size = Gas_input_size
 
-let ns = Namespace.make Registration_helpers.ns "translator"
+let ns = Translator_model.ns
+
+let fv = Translator_model.fv
 
 (** {2 [Script_ir_translator] benchmarks} *)
 
@@ -550,13 +552,9 @@ module Ty_eq : Benchmark.S = struct
 
   let tags = [Tags.translator]
 
-  let intercept_var =
-    Free_variable.of_string
-      (Format.asprintf "%s_const" (Namespace.basename name))
+  let intercept_var = fv (Format.asprintf "%s_const" (Namespace.basename name))
 
-  let coeff_var =
-    Free_variable.of_string
-      (Format.asprintf "%s_coeff" (Namespace.basename name))
+  let coeff_var = fv (Format.asprintf "%s_coeff" (Namespace.basename name))
 
   let size_model =
     Model.make
@@ -745,11 +743,8 @@ module Parse_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string
-                (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (Free_variable.of_string
-                (Format.asprintf "%s_coeff" (Namespace.basename name))))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 
@@ -796,11 +791,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string
-                (Format.asprintf "%s_const" (Namespace.basename name)))
-           ~coeff:
-             (Free_variable.of_string
-                (Format.asprintf "%s_coeff" (Namespace.basename name))))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:(fv (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 

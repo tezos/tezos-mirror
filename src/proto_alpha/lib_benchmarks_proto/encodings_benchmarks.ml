@@ -28,6 +28,8 @@ module Size = Gas_input_size
 
 let ns = Namespace.make Registration_helpers.ns "encoding"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 module Micheline_common = struct
   let make_printable node =
     Micheline_printer.printable
@@ -102,24 +104,15 @@ module Micheline_common = struct
         (traversal, (int_bytes, (string_bytes, ()))))
       ~model:
         (Model.trilinear
-           ~coeff1:
-             (Free_variable.of_string
-                (Format.asprintf "%s_micheline_traversal" name))
-           ~coeff2:
-             (Free_variable.of_string
-                (Format.asprintf "%s_micheline_int_bytes" name))
-           ~coeff3:
-             (Free_variable.of_string
-                (Format.asprintf "%s_micheline_string_bytes" name)))
+           ~coeff1:(fv (Format.asprintf "%s_micheline_traversal" name))
+           ~coeff2:(fv (Format.asprintf "%s_micheline_int_bytes" name))
+           ~coeff3:(fv (Format.asprintf "%s_micheline_string_bytes" name)))
 
   let model_bytes name =
     Model.make
       ~conv:(fun {bytes; _} -> (bytes, ()))
       ~model:
-        (Model.linear
-           ~coeff:
-             (Free_variable.of_string
-                (Format.asprintf "%s_micheline_bytes" name)))
+        (Model.linear ~coeff:(fv (Format.asprintf "%s_micheline_bytes" name)))
 
   let models name =
     [("micheline", model_size name); ("micheline_bytes", model_bytes name)]

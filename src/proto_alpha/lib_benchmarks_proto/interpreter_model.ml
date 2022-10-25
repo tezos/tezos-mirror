@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Registration_helpers.ns "interpreter"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 (* ------------------------------------------------------------------------- *)
 
 let trace_error expected given =
@@ -108,8 +112,6 @@ let model_4 instr model =
           else trace_error instr name
       | {args; _} -> arity_error instr 4 args)
     ~model
-
-let fv = Free_variable.of_string
 
 let sf = Format.asprintf
 

@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.make Registration_helpers.ns "interpreter"
+let ns = Interpreter_model.ns
+
+let fv = Interpreter_model.fv
 
 module Timelock_samplers = Tezos_crypto.Timelock
 open Protocol

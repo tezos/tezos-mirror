@@ -27,7 +27,9 @@
 
 let ns = Namespace.make Namespace.root "builtin"
 
-let timer_variable = Free_variable.of_string "Timer_latency"
+let fv s = Free_variable.of_namespace (ns s)
+
+let timer_variable = fv "Timer_latency"
 
 let timer_model =
   Model.make

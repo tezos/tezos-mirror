@@ -27,6 +27,8 @@ open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "sc_rollup"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 (** A benchmark for estimating the gas cost of
     {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
     value is used to consume the gas cost internally in
@@ -80,8 +82,7 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
       ~model:
         (Model.unknown_const2
            ~const1:Builtin_benchmarks.timer_variable
-           ~const2:
-             (Free_variable.of_string "cost_update_num_and_size_of_messages"))
+           ~const2:(fv "cost_update_num_and_size_of_messages"))
 
   let models = [("scoru", cost_update_num_and_size_ofmessages_model)]
 
@@ -180,9 +181,9 @@ module Sc_rollup_add_external_messages_benchmark = struct
       ~conv:(fun {message_length; level} -> (message_length, (level, ())))
       ~model:
         (Model.n_plus_logm
-           ~intercept:(Free_variable.of_string "cost_add_message_intercept")
-           ~linear_coeff:(Free_variable.of_string "cost_add_message_per_byte")
-           ~log_coeff:(Free_variable.of_string "cost_add_message_per_level"))
+           ~intercept:(fv "cost_add_message_intercept")
+           ~linear_coeff:(fv "cost_add_message_per_byte")
+           ~log_coeff:(fv "cost_add_message_per_level"))
 
   let models = [("scoru", add_message_model)]
 

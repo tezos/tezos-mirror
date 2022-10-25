@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Registration_helpers.ns "translator"
+
+let fv s = Free_variable.of_namespace (ns s)
+
 let gas_full t_kind code_or_data =
   let name =
     Format.asprintf
@@ -32,8 +36,8 @@ let gas_full t_kind code_or_data =
       Translator_workload.pp_code_or_data
       code_or_data
   in
-  let intercept = Free_variable.of_string (Format.asprintf "%s_const" name) in
-  let coeff = Free_variable.of_string (Format.asprintf "%s_coeff" name) in
+  let intercept = fv (Format.asprintf "%s_const" name) in
+  let coeff = fv (Format.asprintf "%s_coeff" name) in
   Model.affine ~intercept ~coeff
 
 let size_full t_kind code_or_data =
@@ -45,11 +49,9 @@ let size_full t_kind code_or_data =
       Translator_workload.pp_code_or_data
       code_or_data
   in
-  let coeff1 = Free_variable.of_string (Format.asprintf "%s_traversal" name) in
-  let coeff2 = Free_variable.of_string (Format.asprintf "%s_int_bytes" name) in
-  let coeff3 =
-    Free_variable.of_string (Format.asprintf "%s_string_bytes" name)
-  in
+  let coeff1 = fv (Format.asprintf "%s_traversal" name) in
+  let coeff2 = fv (Format.asprintf "%s_int_bytes" name) in
+  let coeff3 = fv (Format.asprintf "%s_string_bytes" name) in
   Model.trilinear ~coeff1 ~coeff2 ~coeff3
 
 let gas_based_model t_kind code_or_data =

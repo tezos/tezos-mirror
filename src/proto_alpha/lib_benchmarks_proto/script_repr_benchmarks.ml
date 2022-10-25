@@ -27,6 +27,8 @@ open Protocol
 
 let ns = Namespace.make Registration_helpers.ns "script_repr"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 (** {2 [Script_repr] benchmarks} *)
 
 module Script_repr_shared_config = struct
@@ -84,10 +86,9 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string
-                (Format.asprintf "%s_const" (Namespace.basename name)))
+             (fv (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
-             (Free_variable.of_string
+             (fv
                 (Format.asprintf
                    "%s_ns_per_node_coeff"
                    (Namespace.basename name))))
@@ -126,7 +127,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
     Model.(
       make
         ~conv:(fun {micheline_nodes} -> (micheline_nodes, ()))
-        ~model:(linear ~coeff:(Free_variable.of_string "nodes")))
+        ~model:(linear ~coeff:(fv "nodes")))
 
   let () =
     Registration_helpers.register_for_codegen

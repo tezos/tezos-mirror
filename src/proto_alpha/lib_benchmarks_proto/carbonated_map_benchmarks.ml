@@ -27,6 +27,8 @@ open Tezos_benchmark
 
 let ns = Namespace.make Registration_helpers.ns "carbonated_map"
 
+let fv s = Free_variable.of_namespace (ns s)
+
 let make_context ~rng_state =
   match Lwt_main.run @@ Execution_context.make ~rng_state with
   | Ok (ctxt, _) -> ctxt
@@ -89,8 +91,8 @@ module Fold_benchmark : Benchmark.S = struct
       ~conv:(fun {size} -> (size, ()))
       ~model:
         (Model.affine
-           ~intercept:(Free_variable.of_string "fold_const")
-           ~coeff:(Free_variable.of_string "fold_cost_per_item"))
+           ~intercept:(fv "fold_const")
+           ~coeff:(fv "fold_cost_per_item"))
 
   let models = [("carbonated_map", fold_model)]
 
@@ -145,8 +147,7 @@ end
   key-type for [Carbonated_map] instances.
 *)
 module Make (CS : COMPARABLE_SAMPLER) = struct
-  let compare_var type_name =
-    Free_variable.of_string @@ Printf.sprintf "compare_%s" type_name
+  let compare_var type_name = fv (Printf.sprintf "compare_%s" type_name)
 
   module Compare = struct
     type config = unit
@@ -241,9 +242,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
             ~conv:(fun {size} -> (size, ()))
             ~model:
               (find_model
-                 ~intercept:(Free_variable.of_string "intercept")
-                 ~traverse_overhead:
-                   (Free_variable.of_string "traversal_overhead")) );
+                 ~intercept:(fv "intercept")
+                 ~traverse_overhead:(fv "traversal_overhead")) );
       ]
 
     let benchmark rng_state (config : config) () =
@@ -314,7 +314,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
             ~model:
               (Model.unknown_const2
                  ~const1:Builtin_benchmarks.timer_variable
-                 ~const2:(Free_variable.of_string "intercept")) );
+                 ~const2:(fv "intercept")) );
       ]
 
     let benchmark rng_state (_config : config) () =
