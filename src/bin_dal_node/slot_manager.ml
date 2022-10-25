@@ -120,8 +120,8 @@ let save store slot_header shards =
     (fun i share ->
       let path = share_path slot_header i in
       let*? share = encode Cryptobox.share_encoding share in
-      let*! metadata = Store.set ~msg:"Share stored" store path share in
-      return metadata)
+      let*! () = Store.set ~msg:"Share stored" store path share in
+      return_unit)
     shards
 
 let split_and_store watcher cb_constants store slot =

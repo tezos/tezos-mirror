@@ -41,9 +41,9 @@ let handle_split_slot ctxt fill slot =
   let store = Node_context.get_store ctxt in
   let+ commitment =
     Slot_manager.split_and_store
-      store.slot_watcher
+      store.slots_watcher
       dal_constants
-      store.slot_store
+      store.slots_store
       slot
   in
   Cryptobox.Commitment.to_b58check commitment
@@ -55,7 +55,7 @@ let handle_slot ctxt (_, commitment) trim () =
     Slot_manager.get_slot
       dal_parameters
       dal_constants
-      (Node_context.get_store ctxt).slot_store
+      (Node_context.get_store ctxt).slots_store
       commitment
   in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
@@ -65,7 +65,7 @@ let handle_stored_slot_headers ctxt (_, block_hash) () () =
   let open Lwt_result_syntax in
   let*! shs =
     Slot_headers_store.list_secondary_keys_with_values
-      (Node_context.get_store ctxt).slot_header_store
+      (Node_context.get_store ctxt).slot_headers_store
       ~primary_key:block_hash
   in
   return @@ shs
@@ -76,17 +76,17 @@ let handle_slot_pages ctxt (_, commitment) () () =
   Slot_manager.get_slot_pages
     dal_parameters
     dal_constants
-    (Node_context.get_store ctxt).slot_store
+    (Node_context.get_store ctxt).slots_store
     commitment
 
 let handle_shard ctxt ((_, commitment), shard) () () =
   Slot_manager.get_shard
-    (Node_context.get_store ctxt).slot_store
+    (Node_context.get_store ctxt).slots_store
     commitment
     shard
 
 let handle_monitor_slot_headers ctxt () () () =
-  let stream, stopper = Store.slot_watcher (Node_context.get_store ctxt) in
+  let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
   let shutdown () = Lwt_watcher.shutdown stopper in
   let next () = Lwt_stream.get stream in
   RPC_answer.return_stream {next; shutdown}

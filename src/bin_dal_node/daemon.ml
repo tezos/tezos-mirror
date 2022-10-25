@@ -129,7 +129,7 @@ let run ~data_dir cctxt =
           List.iter_s
             (fun (slot_index, slot_header) ->
               Slot_headers_store.add
-                (Node_context.get_store ctxt).slot_header_store
+                (Node_context.get_store ctxt).slot_headers_store
                 ~primary_key:block_hash
                 ~secondary_key:slot_index
                 slot_header)
