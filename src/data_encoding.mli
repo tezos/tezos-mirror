@@ -1752,6 +1752,11 @@ let expr_encoding =
             {b Warning:} It is expected that [tag layout < 2^tag_len - 1]. *)
         val tag : layout -> tag
 
+        (** [title layout] computes the title to be used in documentation for
+            the given layout. The title is not always available (some elements
+            don't have one) and [None] is used in that case. *)
+        val title : layout -> string option
+
         (** [partial_encoding layout] returns the encoding to use for values
             classified as [layout].
 

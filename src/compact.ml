@@ -89,6 +89,8 @@ module type S = sig
 
   val tag : layout -> tag
 
+  val title : layout -> string option
+
   val partial_encoding : layout -> input Encoding.t
 
   val classify : input -> layout
@@ -145,11 +147,16 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
           @@ List.map
                (fun layout ->
                  let tag = tag layout in
+                 let title =
+                   match C.title layout with
+                   | None -> Format.sprintf "case%d" tag
+                   | Some s -> s
+                 in
                  (* Note: the projection function is never used. This is
                     because [matching] uses the list of cases for decoding
                     only, not encoding. *)
                  Encoding.case
-                   ~title:(Format.sprintf "case %d" tag)
+                   ~title
                    (Encoding.Tag tag)
                    (C.partial_encoding layout)
                    (fun x -> Some x)
@@ -186,6 +193,8 @@ let void : void t =
 
     let layouts = []
 
+    let title = refute
+
     let classify = refute
 
     let partial_encoding = refute
@@ -209,6 +218,7 @@ type ('a, 'b, 'layout) case_open = {
 
 type ('a, 'b, 'layout) case_layout_open = {
   tag : int; (* The tag which identifies this specific case out of the others *)
+  title : string;
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
   compact : (module S with type input = 'b and type layout = 'layout);
@@ -239,9 +249,9 @@ let case_to_layout_open :
     (a, b, layout) case_open ->
     ((a, b, layout) case_layout_open -> c) ->
     c list =
- fun tag {proj; inj; compact; _} f ->
+ fun tag {proj; inj; compact; title; _} f ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  List.map (fun layout -> f {tag; proj; inj; compact; layout}) C.layouts
+  List.map (fun layout -> f {tag; proj; inj; compact; layout; title}) C.layouts
 
 let case_to_layout : type a. tag -> a case -> a case_layout list =
  fun tag (Case case) -> case_to_layout_open tag case (fun x -> Case_layout x)
@@ -255,12 +265,12 @@ let classify_with_case_open :
     (a, b, layout) case_open ->
     a ->
     (a, b, layout) case_layout_open option =
- fun tag {compact; proj; inj; _} input ->
+ fun tag {compact; proj; inj; title; _} input ->
   let (module C : S with type input = b and type layout = layout) = compact in
   match proj input with
   | Some input' ->
       let layout = C.classify input' in
-      Some {proj; inj; tag; layout; compact}
+      Some {proj; inj; tag; layout; title; compact}
   | None -> None
 
 let classify_with_case : type a. tag -> a case -> a -> a case_layout option =
@@ -290,6 +300,13 @@ let tag_with_case_layout_open :
 let tag_with_case_layout : type a. int -> a case_layout -> tag =
  fun inner_tag_len (Case_layout case) ->
   tag_with_case_layout_open inner_tag_len case
+
+let title_with_case_layout_open :
+    type a b layout. (a, b, layout) case_layout_open -> string =
+ fun {title; _} -> title
+
+let title_with_case_layout : type a. a case_layout -> string =
+ fun (Case_layout case) -> title_with_case_layout_open case
 
 let tag_len_of_case_open : type a b layout. (a, b, layout) case_open -> int =
  fun {compact; _} ->
@@ -393,6 +410,8 @@ let union :
 
     let tag layout = tag_with_case_layout cases_tag_len layout
 
+    let title layout = Some (title_with_case_layout layout)
+
     let json_encoding : input Encoding.t =
       Encoding.union @@ List.map case_to_json_data_encoding_case cases
   end)
@@ -409,6 +428,8 @@ let payload : type a. a Encoding.t -> a t =
     let tag_len = 0
 
     let tag () = 0
+
+    let title () = None
 
     let classify (_ : input) = ()
 
@@ -433,6 +454,8 @@ let conv : type a b. ?json:a Encoding.t -> (a -> b) -> (b -> a) -> b t -> a t =
     let tag_len = B.tag_len
 
     let tag = B.tag
+
+    let title = B.title
 
     let classify b = B.classify (f b)
 
@@ -473,6 +496,8 @@ let tup1 : type a. a t -> a t =
 
     let tag a = A.tag a
 
+    let title = A.title
+
     let json_encoding = Encoding.tup1 A.json_encoding
   end)
 
@@ -502,6 +527,8 @@ let tup2 : type a b. a t -> b t -> (a * b) t =
       Encoding.tup2 (A.partial_encoding la) (B.partial_encoding lb)
 
     let tag (a, b) = join_tags [(A.tag a, A.tag_len); (B.tag b, B.tag_len)]
+
+    let title _ = None
 
     let json_encoding = Encoding.tup2 A.json_encoding B.json_encoding
   end)
@@ -539,6 +566,8 @@ let tup3 : type a b c. a t -> b t -> c t -> (a * b * c) t =
     let tag (a, b, c) =
       join_tags
         [(A.tag a, A.tag_len); (B.tag b, B.tag_len); (C.tag c, C.tag_len)]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup3 A.json_encoding B.json_encoding C.json_encoding
@@ -587,6 +616,8 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
           (C.tag c, C.tag_len);
           (D.tag d, D.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup4
@@ -644,6 +675,8 @@ let tup5 :
           (D.tag d, D.tag_len);
           (E.tag e, E.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup5
@@ -715,6 +748,8 @@ let tup6 :
           (E.tag e, E.tag_len);
           (F.tag f, F.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup6
@@ -801,6 +836,8 @@ let tup7 :
           (F.tag f, F.tag_len);
           (G.tag g, G.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup7
@@ -908,6 +945,8 @@ let tup8 :
           (G.tag g, G.tag_len);
           (H.tag h, H.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup8
@@ -1024,6 +1063,8 @@ let tup9 :
           (H.tag h, H.tag_len);
           (I.tag i, I.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup9
@@ -1149,6 +1190,8 @@ let tup10 :
           (I.tag i, I.tag_len);
           (J.tag j, J.tag_len);
         ]
+
+    let title _ = None
 
     let json_encoding =
       Encoding.tup10
@@ -1542,6 +1585,8 @@ module Compact_bool = struct
 
   let tag = function true -> 1 | false -> 0
 
+  let title _ = None
+
   let partial_encoding : layout -> bool Encoding.t =
    fun b ->
     conv_partial
@@ -1720,6 +1765,8 @@ let list : type a. bits:int -> a Encoding.t -> a list t =
     let tag_len = bits
 
     let tag = tag bits
+
+    let title _ = None
 
     let classify = classify bits
 
