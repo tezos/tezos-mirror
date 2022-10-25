@@ -11913,6 +11913,10 @@ val parameters_encoding : parameters Data_encoding.t
   defined in this module and store them in a value of type [t] *)
 val make : parameters -> (t, [> `Fail of string]) result
 
+(** [parameters t] returns the parameters given when [t] was
+     initialised with the function {!val:make} *)
+val parameters : t -> parameters
+
 (** Commitment to a polynomial. *)
 type commitment
 
