@@ -743,17 +743,21 @@ let get_chain_block_context_contract_all_ticket_balances ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollups ?(chain = "main") ?(block = "head") () =
-  make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollups"] Fun.id
-
-let get_chain_block_context_sc_rollups_inbox ?(chain = "main") ?(block = "head")
+let get_chain_block_context_sc_rollups_all ?(chain = "main") ?(block = "head")
     () =
   make
     GET
-    ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "inbox"]
+    ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"]
     Fun.id
 
-let get_chain_block_context_sc_rollup_genesis_info ?(chain = "main")
+let get_chain_block_context_sc_rollups_all_inbox ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "context"; "sc_rollups"; "all"; "inbox"]
+    Fun.id
+
+let get_chain_block_context_sc_rollups_sc_rollup_genesis_info ?(chain = "main")
     ?(block = "head") sc_rollup =
   make
     GET
@@ -763,13 +767,14 @@ let get_chain_block_context_sc_rollup_genesis_info ?(chain = "main")
       "blocks";
       block;
       "context";
+      "sc_rollups";
       "sc_rollup";
       sc_rollup;
       "genesis_info";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_boot_sector ?(chain = "main")
+let get_chain_block_context_sc_rollups_sc_rollup_boot_sector ?(chain = "main")
     ?(block = "head") sc_rollup =
   make
     GET
@@ -779,13 +784,14 @@ let get_chain_block_context_sc_rollup_boot_sector ?(chain = "main")
       "blocks";
       block;
       "context";
+      "sc_rollups";
       "sc_rollup";
       sc_rollup;
       "boot_sector";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+let get_chain_block_context_sc_rollups_sc_rollup_last_cemented_commitment_hash_with_level
     ?(chain = "main") ?(block = "head") sc_rollup =
   make
     GET
@@ -795,13 +801,14 @@ let get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
       "blocks";
       block;
       "context";
+      "sc_rollups";
       "sc_rollup";
       sc_rollup;
       "last_cemented_commitment_hash_with_level";
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_commitment ?(chain = "main")
+let get_chain_block_context_sc_rollups_sc_rollup_commitment ?(chain = "main")
     ?(block = "head") ~sc_rollup ~hash () =
   make
     GET
@@ -811,6 +818,7 @@ let get_chain_block_context_sc_rollup_commitment ?(chain = "main")
       "blocks";
       block;
       "context";
+      "sc_rollups";
       "sc_rollup";
       sc_rollup;
       "commitment";
@@ -818,7 +826,7 @@ let get_chain_block_context_sc_rollup_commitment ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_sc_rollup_staker_staked_on_commitment
+let get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment
     ?(chain = "main") ?(block = "head") ~sc_rollup staker =
   make
     GET
@@ -828,6 +836,7 @@ let get_chain_block_context_sc_rollup_staker_staked_on_commitment
       "blocks";
       block;
       "context";
+      "sc_rollups";
       "sc_rollup";
       sc_rollup;
       "staker";

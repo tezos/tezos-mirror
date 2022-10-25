@@ -754,28 +754,28 @@ val get_chain_block_context_contract_all_ticket_balances :
 
 (** {2 Smart contract rollup RPC module} *)
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups] *)
-val get_chain_block_context_sc_rollups :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/all] *)
+val get_chain_block_context_sc_rollups_all :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/inbox] *)
-val get_chain_block_context_sc_rollups_inbox :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/all/inbox] *)
+val get_chain_block_context_sc_rollups_all_inbox :
   ?chain:string -> ?block:string -> unit -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/genesis_info] *)
-val get_chain_block_context_sc_rollup_genesis_info :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/genesis_info] *)
+val get_chain_block_context_sc_rollups_sc_rollup_genesis_info :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/boot_sector] *)
-val get_chain_block_context_sc_rollup_boot_sector :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/boot_sector] *)
+val get_chain_block_context_sc_rollups_sc_rollup_boot_sector :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
-val get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/get_last_cemented_commitment_hash_with_level] *)
+val get_chain_block_context_sc_rollups_sc_rollup_last_cemented_commitment_hash_with_level :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
-(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollup/<sc_rollup_address>/commitment/<hash>] *)
-val get_chain_block_context_sc_rollup_commitment :
+(** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<sc_rollup_address>/commitment/<hash>] *)
+val get_chain_block_context_sc_rollups_sc_rollup_commitment :
   ?chain:string ->
   ?block:string ->
   sc_rollup:string ->
@@ -783,8 +783,8 @@ val get_chain_block_context_sc_rollup_commitment :
   unit ->
   JSON.t t
 
-(** Call RPC /chains/<chain>/blocks/<block>/context/sc_rollup/<rollup_hash>/staker/<staker>/staked_on_commitment *)
-val get_chain_block_context_sc_rollup_staker_staked_on_commitment :
+(** RPC: [GET: chains/<chain>/blocks/<block>/context/sc_rollups/sc_rollup/<rollup_hash>/staker/<staker>/staked_on_commitment] *)
+val get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment :
   ?chain:string -> ?block:string -> sc_rollup:string -> string -> JSON.t t
 
 (** {2 Delegates RPC module } *)

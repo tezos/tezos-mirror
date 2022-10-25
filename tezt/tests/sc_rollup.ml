@@ -284,7 +284,7 @@ let last_cemented_commitment_hash_with_level ~sc_rollup client =
   let* json =
     RPC.Client.call client
     @@ RPC
-       .get_chain_block_context_sc_rollup_last_cemented_commitment_hash_with_level
+       .get_chain_block_context_sc_rollups_sc_rollup_last_cemented_commitment_hash_with_level
          sc_rollup
   in
   let hash = JSON.(json |-> "hash" |> as_string) in
@@ -294,7 +294,8 @@ let last_cemented_commitment_hash_with_level ~sc_rollup client =
 let get_staked_on_commitment ~sc_rollup ~staker client =
   let* json =
     RPC.Client.call client
-    @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
+    @@ RPC
+       .get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment
          ~sc_rollup
          staker
   in
@@ -446,7 +447,7 @@ let test_rollup_get_genesis_info ~kind =
   in
   let* genesis_info =
     RPC.Client.call tezos_client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let genesis_hash = JSON.(genesis_info |-> "commitment_hash" |> as_string) in
   let genesis_level = JSON.(genesis_info |-> "level" |> as_int) in
@@ -508,7 +509,8 @@ let parse_inbox json =
 
 let get_inbox_from_tezos_node client =
   let* inbox =
-    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups_inbox ()
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_sc_rollups_all_inbox ()
   in
   parse_inbox inbox
 
@@ -712,7 +714,7 @@ let test_rollup_list ~kind =
   @@ fun protocol ->
   let* _node, client = setup_l1 protocol in
   let* rollups =
-    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
+    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups_all ()
   in
   let rollups = JSON.as_list rollups in
   let () =
@@ -724,7 +726,7 @@ let test_rollup_list ~kind =
   let* scoru_addresses = originate_sc_rollups ~kind 10 client in
   let* () = Client.bake_for_and_wait client in
   let* rollups =
-    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups ()
+    RPC.Client.call client @@ RPC.get_chain_block_context_sc_rollups_all ()
   in
   let rollups =
     JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
@@ -752,7 +754,7 @@ let test_rollup_node_boots_into_initial_state ~kind =
   @@ fun sc_rollup_node sc_rollup_client sc_rollup _node client ->
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
@@ -794,7 +796,7 @@ let test_rollup_node_advances_pvm_state ?regression ~title ?boot_sector
   @@ fun sc_rollup_node sc_rollup_client sc_rollup _tezos_node client ->
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* () = Sc_rollup_node.run sc_rollup_node [] in
@@ -977,23 +979,14 @@ let check_commitment_eq (commitment, name) (expected_commitment, exp_name) =
          (String.capitalize_ascii exp_name))
 
 let tezos_client_get_commitment client sc_rollup commitment_hash =
-  let* output =
-    Client.rpc
-      Client.GET
-      [
-        "chains";
-        "main";
-        "blocks";
-        "head";
-        "context";
-        "sc_rollup";
-        sc_rollup;
-        "commitment";
-        commitment_hash;
-      ]
-      client
+  let* json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_commitment
+         ~sc_rollup
+         ~hash:commitment_hash
+         ()
   in
-  Lwt.return @@ Sc_rollup_client.commitment_from_json output
+  return (Sc_rollup_client.commitment_from_json json)
 
 let check_published_commitment_in_l1 ?(allow_non_published = false)
     ?(force_new_level = true) sc_rollup client published_commitment =
@@ -1043,7 +1036,7 @@ let commitment_stored sc_rollup_node sc_rollup_client sc_rollup _node client =
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1186,7 +1179,7 @@ let commitment_not_stored_if_non_final sc_rollup_node sc_rollup_client sc_rollup
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1250,7 +1243,7 @@ let commitments_messages_reset sc_rollup_node sc_rollup_client sc_rollup _node
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1317,7 +1310,7 @@ let commitment_stored_robust_to_failures sc_rollup_node sc_rollup_client
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1406,7 +1399,7 @@ let commitments_reorgs ~kind sc_rollup_node sc_rollup_client sc_rollup node
   *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1600,7 +1593,7 @@ let commitment_before_lcc_not_published sc_rollup_node sc_rollup_client
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -1778,7 +1771,7 @@ let first_published_level_is_global sc_rollup_node sc_rollup_client sc_rollup
   (* Rollup node 1 processes messages, produces and publishes two commitments. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let* commitment_period = get_sc_rollup_commitment_period_in_blocks client in
@@ -1973,12 +1966,12 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   @@ fun rollup_node rollup_client sc_rollup _tezos_node tezos_client ->
   let* client_boot_sector =
     RPC.Client.call ~hooks tezos_client
-    @@ RPC.get_chain_block_context_sc_rollup_boot_sector sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_boot_sector sc_rollup
   in
   let client_boot_sector = JSON.as_string client_boot_sector in
   let* genesis_info =
     RPC.Client.call ~hooks tezos_client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
   let genesis_commitment_hash =
@@ -1986,7 +1979,7 @@ let test_rollup_origination_boot_sector ~boot_sector ~kind =
   in
   let* init_commitment =
     RPC.Client.call ~hooks tezos_client
-    @@ RPC.get_chain_block_context_sc_rollup_commitment
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_commitment
          ~sc_rollup
          ~hash:genesis_commitment_hash
          ()
@@ -2036,14 +2029,14 @@ let test_boot_sector_is_evaluated ~boot_sector1 ~boot_sector2 ~kind =
   let genesis_state_hash ~sc_rollup tezos_client =
     let* genesis_info =
       RPC.Client.call ~hooks tezos_client
-      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
     in
     let commitment_hash =
       JSON.(genesis_info |-> "commitment_hash" |> as_string)
     in
     let* commitment =
       RPC.Client.call ~hooks tezos_client
-      @@ RPC.get_chain_block_context_sc_rollup_commitment
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_commitment
            ~sc_rollup
            ~hash:commitment_hash
            ()
@@ -2086,7 +2079,7 @@ let test_rollup_arith_uses_reveals ~kind =
   in
   let* genesis_info =
     RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+    @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
@@ -2217,7 +2210,8 @@ let test_consecutive_commitments _rollup_node _rollup_client sc_rollup
   (* As we did no publish any commitment yet, this is supposed to fail. *)
   let*? process =
     RPC.Client.spawn tezos_client
-    @@ RPC.get_chain_block_context_sc_rollup_staker_staked_on_commitment
+    @@ RPC
+       .get_chain_block_context_sc_rollups_sc_rollup_staker_staked_on_commitment
          ~sc_rollup
          operator
   in

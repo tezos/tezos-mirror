@@ -157,7 +157,7 @@ let test_rollup_node_advances_pvm_state protocols ~test_name ~boot_sector
   let go ~internal client sc_rollup sc_rollup_node =
     let* genesis_info =
       RPC.Client.call ~hooks client
-      @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup
+      @@ RPC.get_chain_block_context_sc_rollups_sc_rollup_genesis_info sc_rollup
     in
     let init_level = JSON.(genesis_info |-> "level" |> as_int) in
 
