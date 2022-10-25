@@ -59,8 +59,6 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
 
   val make_repo : unit -> DB.repo Lwt.t
 
-  val shallow : DB.repo -> kinded_key -> DB.tree
-
   val kinded_key : DB.tree -> kinded_key option
 
   val is_shallow : DB.tree -> bool
