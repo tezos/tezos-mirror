@@ -727,6 +727,22 @@ let post_chain_block_context_contract_ticket_balance ?(chain = "main")
     ~data
     JSON.as_int
 
+let get_chain_block_context_contract_all_ticket_balances ?(chain = "main")
+    ?(block = "head") ~id () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "contracts";
+      id;
+      "all_ticket_balances";
+    ]
+    Fun.id
+
 let get_chain_block_context_sc_rollups ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "context"; "sc_rollups"] Fun.id
 
