@@ -41,7 +41,11 @@ type problem =
     }
   | Degenerate of {predicted : matrix; measured : matrix}
 
-type solution = {mapping : (Free_variable.t * float) list; weights : matrix}
+type solution = {
+  mapping : (Free_variable.t * float) list;
+  weights : matrix;
+  score : float;
+}
 
 type solver =
   | Ridge of {alpha : float}
@@ -289,8 +293,8 @@ let to_scipy m =
   let rows = Maths.row_dim m in
   Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
 
-let wrap_python_solver ~input ~output solver =
-  (* Scipy's solvers expect a column vector on output. *)
+let wrap_python_function ~input ~output solver =
+  (* Scipy's functions expect a column vector on output. *)
   let output =
     Matrix.of_col
     @@ map_rows
@@ -300,7 +304,10 @@ let wrap_python_solver ~input ~output solver =
   in
   let input = to_scipy input in
   let output = to_scipy output in
-  solver input output |> of_scipy
+  solver input output
+
+let wrap_python_solver ~input ~output solver =
+  wrap_python_function ~input ~output solver |> of_scipy
 
 let ridge ~alpha ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
@@ -314,10 +321,15 @@ let nnls ~input ~output =
   wrap_python_solver ~input ~output (fun input output ->
       Scikit.LinearModel.nnls ~input ~output)
 
+let r2_score ~input ~output ~weights =
+  let weights = to_scipy weights in
+  wrap_python_function ~input ~output (fun input output ->
+      Scikit.r2_score ~input ~output ~weights)
+
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
-  | Degenerate _ -> {mapping = []; weights = empty_matrix}
+  | Degenerate _ -> {mapping = []; weights = empty_matrix; score = 0.0}
   | Non_degenerate {input; output; nmap; _} ->
       let weights =
         match solver with
@@ -325,6 +337,7 @@ let solve_problem : problem -> solver -> solution =
         | Lasso {alpha; positive} -> lasso ~alpha ~positive ~input ~output
         | NNLS -> nnls ~input ~output
       in
+      let score = r2_score ~input ~output ~weights in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
         let cols = Maths.col_dim weights in
@@ -345,4 +358,4 @@ let solve_problem : problem -> solver -> solution =
             nmap
             []
         in
-        {mapping; weights}
+        {mapping; weights; score}

@@ -111,3 +111,34 @@ module LinearModel = struct
       let res = array.(0) in
       Scikit_matrix.of_numpy res
 end
+
+let r2_score ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t)
+    ~(weights : Scikit_matrix.t) =
+  let weights = Scikit_matrix.to_numpy weights in
+  let input = Scikit_matrix.to_numpy input in
+  let len = Scikit_matrix.dim1 output in
+  if len <= 1 then
+    (* The following warning will be raised from `r2_score` of Python. *)
+    (* `R^2 score is not well-defined with less than two samples.` *)
+
+    (* For this case, we use `1.0 (perfect predictions)` as the score. *)
+    (* see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.r2_score.html#sklearn.metrics.r2_score *)
+    1.0
+  else
+    let output = Scikit_matrix.to_numpy output in
+    let output =
+      Py.Module.get_function
+        (Pyinit.numpy ())
+        "reshape"
+        [|output; Py.Int.of_int len|]
+    in
+    let prediction =
+      Py.Module.get_function (Pyinit.numpy ()) "matmul" [|input; weights|]
+    in
+    let score =
+      Py.Module.get_function
+        (Pyinit.sklearn_metrics ())
+        "r2_score"
+        [|output; prediction|]
+    in
+    Py.Float.to_float score

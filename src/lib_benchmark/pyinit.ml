@@ -65,3 +65,8 @@ let scipy_optimize () =
   pyinit () ;
   handle_python_error "While initializing scipy.optimize" @@ fun () ->
   Py.Import.import_module "scipy.optimize"
+
+let sklearn_metrics () =
+  pyinit () ;
+  handle_python_error "While initializing sklearn.metrics" @@ fun () ->
+  Py.Import.import_module "sklearn.metrics"

@@ -268,7 +268,7 @@ and infer_cmd_full_auto model_name workload_data solver
             solution.mapping
         in
         perform_plot measure model_name problem solution infer_opts ;
-        perform_csv_export solution infer_opts ;
+        perform_csv_export Bench.name solution infer_opts ;
         (overrides_map, report))
       graph
       (overrides_map, report)
@@ -302,20 +302,26 @@ and solver_of_string (solver : string)
       exit 1
 
 and process_output measure model_name problem solution infer_opts =
-  perform_csv_export solution infer_opts ;
+  let (Measure.Measurement ((module Bench), _)) = measure in
+  perform_csv_export Bench.name solution infer_opts ;
   let map = Free_variable.Map.of_seq (List.to_seq solution.mapping) in
   perform_save_solution map infer_opts ;
   perform_plot measure model_name problem solution infer_opts
 
-and perform_csv_export solution (infer_opts : Cmdline.infer_parameters_options)
-    =
+and perform_csv_export bench_name solution
+    (infer_opts : Cmdline.infer_parameters_options) =
   match infer_opts.csv_export with
   | None -> ()
   | Some filename -> (
       let solution_csv_opt = Inference.solution_to_csv solution in
       match solution_csv_opt with
       | None -> ()
-      | Some solution_csv -> Csv.append_columns ~filename solution_csv)
+      | Some solution_csv ->
+          let Inference.{score; _} = solution in
+          Csv.append_columns
+            ~filename
+            [["score_" ^ bench_name]; [Float.to_string score]] ;
+          Csv.append_columns ~filename solution_csv)
 
 and perform_save_solution (solution : float Free_variable.Map.t)
     (infer_opts : Cmdline.infer_parameters_options) =
