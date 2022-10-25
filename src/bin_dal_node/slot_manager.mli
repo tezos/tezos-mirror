@@ -30,6 +30,10 @@
    - reading a slot means rebuild it from the shards
    *)
 
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4099
+    DAL/Node: make slot_header/commitment definition consistent with
+    alpha_context.mli *)
+
 type slot = bytes
 
 (** [split_and_store watcher dal_constants store slot] splits [slot] in
