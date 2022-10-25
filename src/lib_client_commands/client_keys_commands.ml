@@ -27,13 +27,13 @@ open Client_keys
 
 let group =
   {
-    Clic.name = "keys";
+    Tezos_clic.name = "keys";
     title = "Commands for managing the wallet of cryptographic keys";
   }
 
 let algo_param () =
   let open Lwt_result_syntax in
-  Clic.parameter
+  Tezos_clic.parameter
     ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"])
     (fun _ name ->
       match name with
@@ -47,7 +47,7 @@ let algo_param () =
             name)
 
 let sig_algo_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~doc:"use custom signature algorithm"
     ~long:"sig"
     ~short:'s'
@@ -253,7 +253,7 @@ let fail_if_already_registered cctxt force pk_uri name =
            name)
 
 let keys_count_param =
-  let open Clic in
+  let open Tezos_clic in
   param
     ~name:"keys_count"
     ~desc:"How many keys to generate"
@@ -313,9 +313,8 @@ end
     protocol-specific code because it should be available before a
     protocol is activated. *)
 let generate_test_keys =
-  let open Clic in
+  let open Tezos_clic in
   let alias_prefix_param =
-    let open Clic in
     arg
       ~long:"alias-prefix"
       ~placeholder:"PREFIX"
@@ -483,16 +482,16 @@ module Bls_commands = struct
     register_aggregate_key cctxt (pkh, pk_uri, sk_uri) ?public_key name
 end
 
-let commands network : Client_context.full Clic.command list =
+let commands network : Client_context.full Tezos_clic.command list =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   let encrypted_switch () =
     if
       List.exists
         (fun (scheme, _) -> scheme = Tezos_signer_backends.Unencrypted.scheme)
         (Client_keys.registered_signers ())
-    then Clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
-    else Clic.constant true
+    then Tezos_clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
+    else Tezos_clic.constant true
   in
   let show_private_switch =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
@@ -802,7 +801,7 @@ let commands network : Client_context.full Clic.command list =
         ~group
         ~desc:"Forget one address."
         (args1
-           (Clic.switch
+           (Tezos_clic.switch
               ~long:"force"
               ~short:'f'
               ~doc:"delete associated keys when present"
@@ -825,7 +824,7 @@ let commands network : Client_context.full Clic.command list =
         ~group
         ~desc:"Forget the entire wallet of keys."
         (args1
-           (Clic.switch
+           (Tezos_clic.switch
               ~long:"force"
               ~short:'f'
               ~doc:"you got to use the force for that"

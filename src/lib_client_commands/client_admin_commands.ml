@@ -25,22 +25,23 @@
 (*****************************************************************************)
 
 let block_param ~name ~desc t =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc
-    (Clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str -> Lwt.return (Block_hash.of_b58check str)))
     t
 
 let operation_param ~name ~desc t =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc
-    (Clic.parameter (fun _ str -> Lwt.return (Operation_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str ->
+         Lwt.return (Operation_hash.of_b58check str)))
     t
 
 let commands () =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   let group =
     {
       name = "admin";

@@ -23,13 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
 open Protocol.Alpha_context
 
 let possible_block_ids = ["head"; "finalized"; "cemented"; "<hash>"; "<level>"]
 
 let block_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"block"
     ~short:'B'
     ~placeholder:"block"
@@ -39,7 +38,7 @@ let block_arg =
          "The block identifier for which the command applies (possible values: \
           %s)."
          (String.concat ", " possible_block_ids))
-    (Clic.parameter
+    (Tezos_clic.parameter
        (fun _ s ->
          match Sc_rollup_services.Arg.destruct_block_id s with
          | Ok b -> return b
@@ -47,22 +46,22 @@ let block_arg =
        ~autocomplete:(fun _ -> return possible_block_ids))
 
 let get_sc_rollup_addresses_command () =
-  command
+  Tezos_clic.command
     ~desc:
       "Retrieve the smart-contract rollup address the node is interacting with."
-    no_options
-    (fixed ["get"; "sc"; "rollup"; "address"])
+    Tezos_clic.no_options
+    (Tezos_clic.fixed ["get"; "sc"; "rollup"; "address"])
     (fun () (cctxt : #Configuration.sc_client_context) ->
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
       cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
 
 let get_state_value_command () =
-  command
+  Tezos_clic.command
     ~desc:"Observe a key in the PVM state."
-    (args1 block_arg)
-    (prefixes ["get"; "state"; "value"; "for"]
-    @@ string ~name:"key" ~desc:"The key of the state value"
-    @@ stop)
+    (Tezos_clic.args1 block_arg)
+    (Tezos_clic.prefixes ["get"; "state"; "value"; "for"]
+    @@ Tezos_clic.string ~name:"key" ~desc:"The key of the state value"
+    @@ Tezos_clic.stop)
     (fun block key (cctxt : #Configuration.sc_client_context) ->
       RPC.get_state_value_command cctxt block key >>=? fun bytes ->
       cctxt#message "@[%S@]" (String.of_bytes bytes) >>= fun () -> return_unit)
@@ -142,20 +141,22 @@ let get_output_proof () =
            transactions."
   in
 
-  command
+  Tezos_clic.command
     ~desc:"Ask the rollup node for an output proof."
-    no_options
-    (prefixes ["get"; "proof"; "for"; "message"]
-    @@ string ~name:"index" ~desc:"The index of the message in the outbox"
-    @@ prefixes ["of"; "outbox"; "at"; "level"]
-    @@ string
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["get"; "proof"; "for"; "message"]
+    @@ Tezos_clic.string
+         ~name:"index"
+         ~desc:"The index of the message in the outbox"
+    @@ Tezos_clic.prefixes ["of"; "outbox"; "at"; "level"]
+    @@ Tezos_clic.string
          ~name:"level"
          ~desc:"The level of the rollup outbox where the message is available"
-    @@ prefixes ["transferring"]
-    @@ string
+    @@ Tezos_clic.prefixes ["transferring"]
+    @@ Tezos_clic.string
          ~name:"transactions"
          ~desc:"A JSON description of the transactions"
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun () index level transactions (cctxt : #Configuration.sc_client_context) ->
       let open Lwt_result_syntax in
       let* message = parse_transactions transactions in
@@ -186,21 +187,23 @@ let call_get (cctxt : #Configuration.sc_client_context) raw_url =
   return_unit
 
 let rpc_get_command =
-  command
+  Tezos_clic.command
     ~desc:"Call an RPC with the GET method."
-    no_options
-    (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["rpc"; "get"]
+    @@ Tezos_clic.string ~name:"url" ~desc:"the RPC URL"
+    @@ Tezos_clic.stop)
     (fun () url cctxt -> call_get cctxt url)
 
 module Keys = struct
   open Tezos_client_base.Client_keys
 
   let generate_keys () =
-    command
+    Tezos_clic.command
       ~desc:"Generate a pair of keys."
-      (args1 (Secret_key.force_switch ()))
-      (prefixes ["gen"; "unencrypted"; "keys"]
-      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
+      (Tezos_clic.args1 (Secret_key.force_switch ()))
+      (Tezos_clic.prefixes ["gen"; "unencrypted"; "keys"]
+      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ Tezos_clic.stop)
       (fun force name (cctxt : #Configuration.sc_client_context) ->
         Client_keys_commands.Bls_commands.generate_keys
           ~force
@@ -209,19 +212,19 @@ module Keys = struct
           cctxt)
 
   let list_keys () =
-    command
+    Tezos_clic.command
       ~desc:"List keys."
-      no_options
-      (prefixes ["list"; "keys"] @@ stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["list"; "keys"] @@ Tezos_clic.stop)
       (fun () (cctxt : #Configuration.sc_client_context) ->
         Client_keys_commands.Bls_commands.list_keys cctxt)
 
   let show_address () =
-    command
+    Tezos_clic.command
       ~desc:"Show the keys associated with an account."
-      no_options
-      (prefixes ["show"; "address"]
-      @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["show"; "address"]
+      @@ Aggregate_alias.Public_key_hash.alias_param @@ Tezos_clic.stop)
       (fun () (name, _pkh) (cctxt : #Configuration.sc_client_context) ->
         Client_keys_commands.Bls_commands.show_address
           ~show_private:true
@@ -229,12 +232,12 @@ module Keys = struct
           cctxt)
 
   let import_secret_key () =
-    command
+    Tezos_clic.command
       ~desc:"Add a secret key to the wallet."
-      (args1 (Aggregate_alias.Secret_key.force_switch ()))
-      (prefixes ["import"; "secret"; "key"]
+      (Tezos_clic.args1 (Aggregate_alias.Secret_key.force_switch ()))
+      (Tezos_clic.prefixes ["import"; "secret"; "key"]
       @@ Aggregate_alias.Secret_key.fresh_alias_param @@ aggregate_sk_uri_param
-      @@ stop)
+      @@ Tezos_clic.stop)
       (fun force name sk_uri (cctxt : #Configuration.sc_client_context) ->
         Client_keys_commands.Bls_commands.import_secret_key
           ~force

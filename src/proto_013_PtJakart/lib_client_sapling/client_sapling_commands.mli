@@ -20,4 +20,4 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. *)
 
-val commands : unit -> Protocol_client_context.full Clic.command list
+val commands : unit -> Protocol_client_context.full Tezos_clic.command list

@@ -28,12 +28,12 @@ open Alpha_context
 
 let group =
   {
-    Clic.name = "multisig";
+    Tezos_clic.name = "multisig";
     title = "Commands for managing a multisig smart contract";
   }
 
 let threshold_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"threshold"
     ~desc:"Number of required signatures"
     Client_proto_args.int_parameter
@@ -51,22 +51,22 @@ let secret_key_param () =
        multisig contract"
 
 let signature_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"signature"
     ~desc:"Each signer of the multisig contract"
     Client_proto_args.signature_parameter
 
 let bytes_only_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"bytes-only"
     ~doc:"return only the byte sequence to be signed"
     ()
 
 let bytes_param ~name ~desc =
-  Clic.param ~name ~desc Client_proto_args.bytes_parameter
+  Tezos_clic.param ~name ~desc Client_proto_args.bytes_parameter
 
 let transfer_options =
-  Clic.args13
+  Tezos_clic.args13
     Client_proto_args.fee_arg
     Client_proto_context_commands.dry_run_switch
     Client_proto_context_commands.verbose_signing_switch
@@ -114,8 +114,8 @@ let prepare_command_display prepared_command bytes_only =
              Signature.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
-let commands () : #Protocol_client_context.full Clic.command list =
-  Clic.
+let commands () : #Protocol_client_context.full Tezos_clic.command list =
+  Tezos_clic.
     [
       command
         ~group
@@ -795,7 +795,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
               >>= function
               | None -> return_unit
               | Some (_res, _contracts) -> return_unit));
-      (* This command is no longer necessary as Clic now supports non terminal
+      (* This command is no longer necessary as Tezos_clic now supports non terminal
          lists of parameters, however, it is kept for compatibility. *)
       command
         ~group

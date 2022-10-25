@@ -84,7 +84,7 @@ module ContractAlias = struct
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later."
     in
-    Clic.(
+    Tezos_clic.(
       param
         ~name
         ~desc
@@ -106,7 +106,7 @@ module ContractAlias = struct
             | Error c_errs -> Lwt.return_error (k_errs @ c_errs)))
 
   let destination_parameter () =
-    Clic.parameter
+    Tezos_clic.parameter
       ~autocomplete:(fun cctxt ->
         autocomplete cctxt >>=? fun list1 ->
         Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
@@ -123,7 +123,7 @@ module ContractAlias = struct
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
-    Clic.param ~name ~desc (destination_parameter ()) next
+    Tezos_clic.param ~name ~desc (destination_parameter ()) next
 
   let destination_arg ?(name = "dst") ?(doc = "destination contract") () =
     let doc =
@@ -135,7 +135,7 @@ module ContractAlias = struct
            Use 'text:literal', 'alias:name', 'key:name' to force.";
         ]
     in
-    Clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
+    Tezos_clic.arg ~long:name ~doc ~placeholder:name (destination_parameter ())
 
   let name cctxt contract =
     rev_find cctxt contract >>=? function

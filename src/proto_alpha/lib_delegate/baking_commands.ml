@@ -23,16 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
 open Client_proto_args
 
 let pidfile_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"write process id in file"
     ~short:'P'
     ~long:"pidfile"
     ~placeholder:"filename"
-    (Clic.parameter (fun _ s -> return s))
+    (Tezos_clic.parameter (fun _ s -> return s))
 
 let may_lock_pidfile pidfile_opt f =
   match pidfile_opt with
@@ -80,7 +79,7 @@ let http_headers =
            lines)
 
 let operations_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"operations-pool"
     ~placeholder:"file|uri"
     ~doc:
@@ -94,7 +93,7 @@ let operations_arg =
           unreadable, or the web service returns a 404 error, the resource is \
           simply ignored."
          http_headers_env_variable)
-    (Clic.map_parameter
+    (Tezos_clic.map_parameter
        ~f:(fun uri ->
          let open Baking_configuration in
          match Uri.scheme uri with
@@ -106,7 +105,7 @@ let operations_arg =
        uri_parameter)
 
 let context_path_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"context"
     ~placeholder:"path"
     ~doc:
@@ -116,7 +115,7 @@ let context_path_arg =
     string_parameter
 
 let endorsement_force_switch_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"force"
     ~short:'f'
     ~doc:
@@ -125,7 +124,7 @@ let endorsement_force_switch_arg =
     ()
 
 let do_not_monitor_node_mempool_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"ignore-node-mempool"
     ~doc:
       "Ignore mempool operations from the node and do not subsequently monitor \
@@ -134,7 +133,7 @@ let do_not_monitor_node_mempool_arg =
     ()
 
 let keep_alive_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~doc:
       "Keep the daemon process alive: when the connection with the node is \
        lost, the daemon periodically tries to reach it."
@@ -143,7 +142,7 @@ let keep_alive_arg =
     ()
 
 let liquidity_baking_toggle_vote_parameter =
-  Clic.parameter
+  Tezos_clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Liquidity_baking in
     fun _ctxt -> function
@@ -156,7 +155,7 @@ let liquidity_baking_toggle_vote_parameter =
             s)
 
 let liquidity_baking_toggle_vote_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:
       "Vote to continue or end the liquidity baking subsidy. The possible \
        values for this option are: \"off\" to request ending the subsidy, \
@@ -202,15 +201,16 @@ let get_delegates (cctxt : Protocol_client_context.full)
   >>= fun () -> return delegates_no_duplicates
 
 let sources_param =
-  Clic.seq_of_param
+  Tezos_clic.seq_of_param
     (Client_keys.Public_key_hash.source_param
        ~name:"baker"
        ~desc:
          "name of the delegate owning the endorsement/baking right or name of \
           the consensus key signing on the delegate's behalf")
 
-let delegate_commands () : Protocol_client_context.full Clic.command list =
-  let open Clic in
+let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
+    =
+  let open Tezos_clic in
   let group =
     {name = "delegate.client"; title = "Tenderbake client commands"}
   in
@@ -301,24 +301,24 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
   ]
 
 let directory_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p && Sys.is_directory p) then
         failwith "Directory doesn't exist: '%s'" p
       else return p)
 
 let per_block_vote_file_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"read per block votes as json file"
     ~short:'V'
     ~long:"votefile"
     ~placeholder:"filename"
-    (Clic.parameter (fun _ s -> return s))
+    (Tezos_clic.parameter (fun _ s -> return s))
 
-let baker_commands () : Protocol_client_context.full Clic.command list =
-  let open Clic in
+let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
+  let open Tezos_clic in
   let group =
     {
-      Clic.name = "delegate.baker";
+      Tezos_clic.name = "delegate.baker";
       title = "Commands related to the baker daemon.";
     }
   in
@@ -393,10 +393,10 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
   ]
 
 let accuser_commands () =
-  let open Clic in
+  let open Tezos_clic in
   let group =
     {
-      Clic.name = "delegate.accuser";
+      Tezos_clic.name = "delegate.accuser";
       title = "Commands related to the accuser daemon.";
     }
   in

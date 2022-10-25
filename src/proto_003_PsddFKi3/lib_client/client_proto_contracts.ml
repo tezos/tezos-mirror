@@ -84,7 +84,7 @@ module ContractAlias = struct
       ^ "Can be a contract alias or a key alias (autodetected in order).\n\
          Use 'key:name' to force the later."
     in
-    Clic.(
+    Tezos_clic.(
       param
         ~name
         ~desc
@@ -97,7 +97,7 @@ module ContractAlias = struct
       ^ "Can be an alias, a key, or a literal (autodetected in order).\n\
          Use 'text:literal', 'alias:name', 'key:name' to force."
     in
-    Clic.(
+    Tezos_clic.(
       param
         ~name
         ~desc

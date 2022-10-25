@@ -23,11 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
 open Client_keys
 open Tezos_sapling.Core.Client
 
-let json_switch = switch ~long:"json" ~doc:"Use JSON format" ()
+let json_switch = Tezos_clic.switch ~long:"json" ~doc:"Use JSON format" ()
 
 let save_json_to_file json file =
   let output_channel = open_out_bin file in
@@ -38,7 +37,7 @@ let save_json_to_file json file =
 
 let group =
   {
-    Clic.name = "sapling";
+    Tezos_clic.name = "sapling";
     title = "Commands for working with Sapling transactions";
   }
 
@@ -113,7 +112,7 @@ let do_sapling_transfer cctxt ?message contract src_name amount dst =
     anti_replay
 
 let message_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"message"
     ~placeholder:""
@@ -121,7 +120,7 @@ let message_arg =
     (parameter (fun _ x -> return @@ Bytes.of_string x))
 
 let memo_size_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"memo-size"
     ~placeholder:"memo-size"
@@ -141,10 +140,10 @@ let shield_cmd =
   let open Client_proto_context_commands in
   let open Protocol.Alpha_context in
   let open Client_proto_contracts in
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Shield tokens from an implicit account to a Sapling address."
-    (args14
+    (Tezos_clic.args14
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -159,21 +158,21 @@ let shield_cmd =
        fee_cap_arg
        burn_cap_arg
        message_arg)
-    (prefixes ["sapling"; "shield"]
+    (Tezos_clic.prefixes ["sapling"; "shield"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from transparent wallet of source."
-    @@ prefix "from"
+    @@ Tezos_clic.prefix "from"
     @@ ContractAlias.destination_param
          ~name:"src-tz"
          ~desc:"Transparent source account."
-    @@ prefix "to"
-    @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
-    @@ prefix "using"
+    @@ Tezos_clic.prefix "to"
+    @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
+    @@ Tezos_clic.prefix "using"
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -250,10 +249,10 @@ let unshield_cmd =
   let open Client_proto_context_commands in
   let open Protocol.Alpha_context in
   let open Client_proto_contracts in
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Unshield tokens from a Sapling address to an implicit account."
-    (args13
+    (Tezos_clic.args13
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -267,23 +266,23 @@ let unshield_cmd =
        force_low_fee_arg
        fee_cap_arg
        burn_cap_arg)
-    (prefixes ["sapling"; "unshield"]
+    (Tezos_clic.prefixes ["sapling"; "unshield"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from shielded wallet of source."
-    @@ prefix "from"
+    @@ Tezos_clic.prefix "from"
     @@ Sapling_key.alias_param
          ~name:"src-sap"
          ~desc:"Sapling account of source."
-    @@ prefix "to"
+    @@ Tezos_clic.prefix "to"
     @@ ContractAlias.destination_param
          ~name:"dst-tz"
          ~desc:"Transparent destination account."
-    @@ prefix "using"
+    @@ Tezos_clic.prefix "using"
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -358,7 +357,7 @@ let unshield_cmd =
 let sapling_transaction_file = "sapling_transaction"
 
 let file_arg default_filename =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"file"
     ~placeholder:default_filename
@@ -371,10 +370,10 @@ let forge_shielded_cmd =
   let open Client_proto_args in
   let open Client_proto_context_commands in
   let open Client_proto_contracts in
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Forge a sapling transaction and save it to a file."
-    (args16
+    (Tezos_clic.args16
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -391,21 +390,21 @@ let forge_shielded_cmd =
        message_arg
        (file_arg sapling_transaction_file)
        json_switch)
-    (prefixes ["sapling"; "forge"; "transaction"]
+    (Tezos_clic.prefixes ["sapling"; "forge"; "transaction"]
     @@ tez_param
          ~name:"qty"
          ~desc:"Amount taken from shielded wallet of source."
-    @@ prefix "from"
+    @@ Tezos_clic.prefix "from"
     @@ Sapling_key.alias_param
          ~name:"src-sap"
          ~desc:"Sapling account of source."
-    @@ prefix "to"
-    @@ Clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
-    @@ prefix "using"
+    @@ Tezos_clic.prefix "to"
+    @@ Tezos_clic.string ~name:"dst-sap" ~desc:"Sapling address of destination."
+    @@ Tezos_clic.prefix "using"
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun ( _fee,
            _dry_run,
            _verbose_signing,
@@ -453,10 +452,10 @@ let submit_shielded_cmd =
   let open Client_proto_context_commands in
   let open Client_proto_args in
   let open Client_proto_contracts in
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Submit a forged sapling transaction."
-    (args14
+    (Tezos_clic.args14
        fee_arg
        dry_run_switch
        verbose_signing_switch
@@ -471,19 +470,21 @@ let submit_shielded_cmd =
        fee_cap_arg
        burn_cap_arg
        json_switch)
-    (prefixes ["sapling"; "submit"]
-    (* TODO: Add a dedicated abstracted Clic element to parse filenames,
+    (Tezos_clic.prefixes ["sapling"; "submit"]
+    (* TODO: Add a dedicated abstracted Tezos_clic element to parse filenames,
        potentially using Sys.file_exists *)
-    @@ Clic.string ~name:"file" ~desc:"Filename of the forged transaction."
-    @@ prefix "from"
+    @@ Tezos_clic.string
+         ~name:"file"
+         ~desc:"Filename of the forged transaction."
+    @@ Tezos_clic.prefix "from"
     @@ ContractAlias.destination_param
          ~name:"alias-tz"
          ~desc:"Transparent account paying the fees."
-    @@ prefix "using"
+    @@ Tezos_clic.prefix "using"
     @@ ContractAlias.destination_param
          ~name:"sapling contract"
          ~desc:"Smart contract to submit this transaction to."
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun ( fee,
            dry_run,
            verbose_signing,
@@ -572,17 +573,18 @@ let for_contract_arg =
     ()
 
 let unencrypted_switch () =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"unencrypted"
     ~doc:"Do not encrypt the key on-disk (for testing and debugging)."
     ()
 
 let generate_key_cmd =
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Generate a new sapling key."
-    (args2 (Sapling_key.force_switch ()) (unencrypted_switch ()))
-    (prefixes ["sapling"; "gen"; "key"] @@ Sapling_key.fresh_alias_param @@ stop)
+    (Tezos_clic.args2 (Sapling_key.force_switch ()) (unencrypted_switch ()))
+    (Tezos_clic.prefixes ["sapling"; "gen"; "key"]
+    @@ Sapling_key.fresh_alias_param @@ Tezos_clic.stop)
     (fun (force, unencrypted) name (cctxt : Protocol_client_context.full) ->
       Sapling_key.of_fresh cctxt force name >>=? fun name ->
       let mnemonic = Wallet.Mnemonic.new_random in
@@ -599,19 +601,19 @@ let generate_key_cmd =
       return_unit)
 
 let use_key_for_contract_cmd =
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Use a sapling key for a contract."
-    (args1 memo_size_arg)
-    (prefixes ["sapling"; "use"; "key"]
+    (Tezos_clic.args1 memo_size_arg)
+    (Tezos_clic.prefixes ["sapling"; "use"; "key"]
     @@ Sapling_key.alias_param
          ~name:"sapling-key"
          ~desc:"Sapling key to use for the contract."
-    @@ prefixes ["for"; "contract"]
+    @@ Tezos_clic.prefixes ["for"; "contract"]
     @@ Client_proto_contracts.ContractAlias.destination_param
          ~name:"contract"
          ~desc:"Contract the key will be used on."
-    @@ stop)
+    @@ Tezos_clic.stop)
     (fun default_memo_size
          (name, _sapling_uri)
          (_contract_name, contract)
@@ -625,19 +627,19 @@ let use_key_for_contract_cmd =
         vk)
 
 let import_key_cmd =
-  command
+  Tezos_clic.command
     ~group
     ~desc:"Restore a sapling key from mnemonic."
-    (args3
+    (Tezos_clic.args3
        (Sapling_key.force_switch ())
        (unencrypted_switch ())
-       (Clic.arg
+       (Tezos_clic.arg
           ~long:"mnemonic"
           ~placeholder:"mnemonic"
           ~doc:"Mnemonic as an option, only used for testing and debugging."
           Client_proto_args.string_parameter))
-    (prefixes ["sapling"; "import"; "key"]
-    @@ Sapling_key.fresh_alias_param @@ stop)
+    (Tezos_clic.prefixes ["sapling"; "import"; "key"]
+    @@ Sapling_key.fresh_alias_param @@ Tezos_clic.stop)
     (fun (force, unencrypted, mnemonic_opt)
          fresh_name
          (cctxt : Protocol_client_context.full) ->
@@ -664,13 +666,13 @@ let import_key_cmd =
 
 let commands () =
   let child_index_param =
-    Clic.param
+    Tezos_clic.param
       ~name:"child-index"
       ~desc:"Index of the child to derive."
       Client_proto_args.int_parameter
   in
   let index_arg =
-    Clic.arg
+    Tezos_clic.arg
       ~doc:"index of the address to generate"
       ~long:"address-index"
       ~placeholder:"idx"
@@ -680,19 +682,19 @@ let commands () =
     generate_key_cmd;
     use_key_for_contract_cmd;
     import_key_cmd;
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Derive a key from an existing one using zip32."
-      (args4
+      (Tezos_clic.args4
          (Sapling_key.force_switch ())
          for_contract_arg
          (unencrypted_switch ())
          memo_size_arg)
-      (prefixes ["sapling"; "derive"; "key"]
-      @@ Sapling_key.fresh_alias_param @@ prefix "from"
+      (Tezos_clic.prefixes ["sapling"; "derive"; "key"]
+      @@ Sapling_key.fresh_alias_param @@ Tezos_clic.prefix "from"
       @@ Sapling_key.alias_param
-      @@ prefixes ["at"; "index"]
-      @@ child_index_param @@ stop)
+      @@ Tezos_clic.prefixes ["at"; "index"]
+      @@ child_index_param @@ Tezos_clic.stop)
       (fun (force, contract_opt, unencrypted, default_memo_size)
            fresh_name
            (existing_name, _existing_uri)
@@ -721,11 +723,12 @@ let commands () =
           ~force
           contract
           vk);
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Generate an address for a key referenced by alias."
-      (args1 index_arg)
-      (prefixes ["sapling"; "gen"; "address"] @@ Sapling_key.alias_param @@ stop)
+      (Tezos_clic.args1 index_arg)
+      (Tezos_clic.prefixes ["sapling"; "gen"; "address"]
+      @@ Sapling_key.alias_param @@ Tezos_clic.stop)
       (fun index_opt (name, _sapling_uri) (cctxt : Protocol_client_context.full) ->
         Wallet.new_address cctxt name index_opt
         >>=? fun (_, corrected_index, address) ->
@@ -737,38 +740,38 @@ let commands () =
           address_b58
           (Viewing_key.index_to_int64 corrected_index)
         >>= fun () -> return_unit);
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Save a sapling viewing key in a JSON file."
-      no_options
-      (prefixes ["sapling"; "export"; "key"]
-      @@ Sapling_key.alias_param @@ prefix "in"
-      @@ Clic.param
+      Tezos_clic.no_options
+      (Tezos_clic.prefixes ["sapling"; "export"; "key"]
+      @@ Sapling_key.alias_param @@ Tezos_clic.prefix "in"
+      @@ Tezos_clic.param
            ~name:"file"
            ~desc:"Filename."
            Client_proto_args.string_parameter
-      @@ stop)
+      @@ Tezos_clic.stop)
       (fun () (name, _sapling_uri) file (cctxt : Protocol_client_context.full) ->
         Wallet.export_vk cctxt name >>=? fun vk_json ->
         return (save_json_to_file vk_json file));
-    command
+    Tezos_clic.command
       ~group
       ~desc:"Get balance associated with given sapling key and contract"
-      (args1
-         (Clic.switch
+      (Tezos_clic.args1
+         (Tezos_clic.switch
             ~doc:"Print the collection of non-spent inputs."
             ~short:'v'
             ~long:"verbose"
             ()))
-      (prefixes ["sapling"; "get"; "balance"; "for"]
+      (Tezos_clic.prefixes ["sapling"; "get"; "balance"; "for"]
       @@ Sapling_key.alias_param
            ~name:"sapling-key"
            ~desc:"Sapling key we get balance for."
-      @@ prefixes ["in"; "contract"]
+      @@ Tezos_clic.prefixes ["in"; "contract"]
       @@ Client_proto_contracts.ContractAlias.destination_param
            ~name:"contract"
            ~desc:"Contract we get balance from."
-      @@ stop)
+      @@ Tezos_clic.stop)
       (fun verbose
            (name, _sapling_uri)
            (_contract_name, contract)
@@ -795,11 +798,11 @@ let commands () =
                   (Context.Account.balance account)
                   Client_proto_args.tez_sym
                 >>= fun () -> return_unit));
-    command
+    Tezos_clic.command
       ~group
       ~desc:"List sapling keys."
-      no_options
-      (fixed ["sapling"; "list"; "keys"])
+      Tezos_clic.no_options
+      (Tezos_clic.fixed ["sapling"; "list"; "keys"])
       (fun () (cctxt : Protocol_client_context.full) ->
         Sapling_key.load cctxt >>=? fun l ->
         List.iter_s

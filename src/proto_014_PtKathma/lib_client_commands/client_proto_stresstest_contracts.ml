@@ -161,7 +161,7 @@ let select (smart_contracts : t) (q : float) : invocation_parameters option =
   go smart_contracts q
 
 let originate_command =
-  let open Clic in
+  let open Tezos_clic in
   let open Client_proto_context in
   let open Client_proto_contracts in
   let open Client_proto_context_commands in

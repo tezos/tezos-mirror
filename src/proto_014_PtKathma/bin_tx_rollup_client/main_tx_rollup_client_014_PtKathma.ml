@@ -108,23 +108,23 @@ let main () =
   Configuration.parse (argv ()) >>=? fun (configuration, argv) ->
   register_signers () ;
   let cctxt = Configuration.make_unix_client_context configuration in
-  Clic.dispatch (Commands.all ()) cctxt argv
+  Tezos_clic.dispatch (Commands.all ()) cctxt argv
 
 let handle_error = function
   | Ok () -> Stdlib.exit 0
-  | Error [Clic.Version] ->
+  | Error [Tezos_clic.Version] ->
       let version = Tezos_version.Bin_version.version_string in
       Format.printf "%s@." version ;
       Stdlib.exit 0
-  | Error [Clic.Help command] ->
-      Clic.usage
+  | Error [Tezos_clic.Help command] ->
+      Tezos_clic.usage
         Format.std_formatter
         ~executable_name
         ~global_options:(Configuration.global_options ())
         (Stdlib.Option.to_list command) ;
       Stdlib.exit 0
   | Error errs ->
-      Clic.pp_cli_errors
+      Tezos_clic.pp_cli_errors
         Format.err_formatter
         ~executable_name
         ~global_options:(Configuration.global_options ())

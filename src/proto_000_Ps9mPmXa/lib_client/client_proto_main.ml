@@ -50,11 +50,11 @@ let bake cctxt ?timestamp block command sk =
   >>=? fun signed_blk -> Shell_services.Injection.block cctxt signed_blk []
 
 let int64_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       try return (Int64.of_string p) with _ -> failwith "Cannot read int64")
 
 let file_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       if not (Sys.file_exists p) then failwith "File doesn't exist: '%s'" p
       else return p)
 
@@ -70,36 +70,37 @@ let fitness_from_int64 fitness =
   [Bytes.of_string version_number; int64_to_bytes fitness]
 
 let timestamp_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"timestamp"
     ~placeholder:"date"
     ~doc:"Set the timestamp of the block (and initial time of the chain)"
-    (Clic.parameter (fun _ t ->
+    (Tezos_clic.parameter (fun _ t ->
          match Time.Protocol.of_notation t with
          | None ->
              failwith "Could not parse value provided to -timestamp option"
          | Some t -> return t))
 
 let test_delay_arg =
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"delay"
     ~placeholder:"time"
     ~doc:"Set the life span of the test chain (in seconds)"
     ~default:(Int64.to_string (Int64.mul 24L 3600L))
-    (Clic.parameter (fun _ t ->
+    (Tezos_clic.parameter (fun _ t ->
          match Int64.of_string_opt t with
          | None -> failwith "Could not parse value provided to -delay option"
          | Some t -> return t))
 
 let proto_param ~name ~desc t =
-  Clic.param
+  Tezos_clic.param
     ~name
     ~desc
-    (Clic.parameter (fun _ str -> Lwt.return (Protocol_hash.of_b58check str)))
+    (Tezos_clic.parameter (fun _ str ->
+         Lwt.return (Protocol_hash.of_b58check str)))
     t
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let args = args1 timestamp_arg in
   [
     command

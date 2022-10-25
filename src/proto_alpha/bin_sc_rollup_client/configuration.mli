@@ -40,7 +40,8 @@ val parse : string list -> (t * string list) tzresult Lwt.t
 
 (** [global_options ()] returns the list of options that have an
    influence on the configuration. *)
-val global_options : unit -> (string option * Uri.t option, 'a) Clic.options
+val global_options :
+  unit -> (string option * Uri.t option, 'a) Tezos_clic.options
 
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
     RPCs. Can be used for keys and RPCs related commands. *)

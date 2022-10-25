@@ -23,4 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commands : unit -> #Client_context.full Clic.command list
+val commands : unit -> #Client_context.full Tezos_clic.command list

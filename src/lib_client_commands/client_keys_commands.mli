@@ -59,4 +59,4 @@ module Bls_commands : sig
 end
 
 val commands :
-  [`Mainnet | `Testnet] option -> Client_context.full Clic.command list
+  [`Mainnet | `Testnet] option -> Client_context.full Tezos_clic.command list

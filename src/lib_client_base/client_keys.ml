@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 type error += Unregistered_key_scheme of string
 
 type error += Wrong_key_scheme of (string * string)
@@ -175,7 +173,7 @@ let make_aggregate_sk_uri (x : Uri.t) : aggregate_sk_uri tzresult =
   | Some _ -> return x
 
 let pk_uri_parameter () =
-  Clic.parameter (fun _ s -> Lwt.return @@ make_pk_uri (Uri.of_string s))
+  Tezos_clic.parameter (fun _ s -> Lwt.return @@ make_pk_uri (Uri.of_string s))
 
 let pk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -187,10 +185,10 @@ let pk_uri_param ?name ?desc params =
          Use command `list signing schemes` for more information."
       desc
   in
-  Clic.param ~name ~desc (pk_uri_parameter ()) params
+  Tezos_clic.param ~name ~desc (pk_uri_parameter ()) params
 
 let sk_uri_parameter () =
-  Clic.parameter (fun _ s -> Lwt.return (make_sk_uri @@ Uri.of_string s))
+  Tezos_clic.parameter (fun _ s -> Lwt.return (make_sk_uri @@ Uri.of_string s))
 
 let sk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -202,10 +200,10 @@ let sk_uri_param ?name ?desc params =
          Use command `list signing schemes` for more information."
       desc
   in
-  Clic.param ~name ~desc (sk_uri_parameter ()) params
+  Tezos_clic.param ~name ~desc (sk_uri_parameter ()) params
 
 let aggregate_sk_uri_parameter () =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       make_aggregate_sk_uri @@ Uri.of_string s |> Lwt.return)
 
 let aggregate_sk_uri_param ?name ?desc params =
@@ -218,7 +216,7 @@ let aggregate_sk_uri_param ?name ?desc params =
          Use command `list signing schemes` for more information."
       desc
   in
-  Clic.param ~name ~desc (aggregate_sk_uri_parameter ()) params
+  Tezos_clic.param ~name ~desc (aggregate_sk_uri_parameter ()) params
 
 module Secret_key = Client_aliases.Alias (struct
   let name = "secret_key"
@@ -828,7 +826,7 @@ let alias_keys cctxt name =
   | Error _ -> return_none
 
 let force_switch () =
-  Clic.switch ~long:"force" ~short:'f' ~doc:"overwrite existing keys" ()
+  Tezos_clic.switch ~long:"force" ~short:'f' ~doc:"overwrite existing keys" ()
 
 let register_aggregate_key cctxt ?(force = false)
     (public_key_hash, pk_uri, sk_uri) ?public_key name =

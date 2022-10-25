@@ -25,10 +25,10 @@
 
 open Client_proto_utils
 
-let group = {Clic.name = "utilities"; title = "Utility Commands"}
+let group = {Tezos_clic.name = "utilities"; title = "Utility Commands"}
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let string_param ~name ~desc =
     param ~name ~desc Client_proto_args.string_parameter
   in

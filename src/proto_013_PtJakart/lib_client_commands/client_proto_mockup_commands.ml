@@ -23,25 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 let protocol_constants_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"a JSON file that contains protocol constants to set."
     ~long:"protocol-constants"
     ~placeholder:"path"
-    (Clic.parameter (fun _ x -> return x))
+    (Tezos_clic.parameter (fun _ x -> return x))
 
 let bootstrap_accounts_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:
       "a JSON file that contains definitions of bootstrap accounts to create."
     ~long:"bootstrap-accounts"
     ~placeholder:"path"
-    (Clic.parameter (fun _ x -> return x))
+    (Tezos_clic.parameter (fun _ x -> return x))
 
 let asynchronous_flag =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"asynchronous"
     ~doc:"put operations in mempool and require baking to include in the chain"
     ()
@@ -69,8 +67,8 @@ let create_mockup_command_handler
   >>=? fun () ->
   Tezos_mockup_commands.Mockup_wallet.populate cctxt bootstrap_accounts_file
 
-let create_mockup_command : Protocol_client_context.full Clic.command =
-  let open Clic in
+let create_mockup_command : Protocol_client_context.full Tezos_clic.command =
+  let open Tezos_clic in
   command
     ~group:Tezos_mockup_commands.Mockup_commands.group
     ~desc:"Create a mockup environment."

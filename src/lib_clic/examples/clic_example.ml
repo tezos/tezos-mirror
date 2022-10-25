@@ -1,4 +1,3 @@
-open Tezos_clic
 open Tezos_error_monad.Error_monad
 
 (* [context type] *)
@@ -16,13 +15,13 @@ end
 
 (* [command groups] *)
 let wallet_group =
-  {Clic.name = "wallet_group"; title = "Wallet-related commands"}
+  {Tezos_clic.name = "wallet_group"; title = "Wallet-related commands"}
 
 (* [list known contracts] *)
 module List_known_contracts = struct
-  let options = Clic.no_options
+  let options = Tezos_clic.no_options
 
-  let params = Clic.(prefixes ["list"; "known"; "contracts"] stop)
+  let params = Tezos_clic.(prefixes ["list"; "known"; "contracts"] stop)
 
   let list_known_contracts_handler :
       unit -> context -> unit Tezos_error_monad.Error_monad.tzresult Lwt.t =
@@ -32,7 +31,7 @@ module List_known_contracts = struct
     Lwt_result_syntax.return_unit
 
   let command =
-    Clic.command
+    Tezos_clic.command
       ~group:wallet_group
       ~desc:"Prints the list of known contracts"
       options
@@ -46,7 +45,7 @@ let commands = [List_known_contracts.command]
 let () =
   (* 1. Setup formatter with color *)
   ignore
-    Clic.(
+    Tezos_clic.(
       setup_formatter
         Format.std_formatter
         (if Unix.isatty Unix.stdout then Ansi else Plain)
@@ -55,12 +54,12 @@ let () =
   let ctxt = (module Dummy_context : CONTEXT) in
   let result =
     Lwt_main.run
-      (Clic.dispatch commands ctxt (Array.to_list Sys.argv |> List.tl))
+      (Tezos_clic.dispatch commands ctxt (Array.to_list Sys.argv |> List.tl))
   in
   (* 3. Handle results *)
   match result with
   | Ok () -> ()
-  | Error [Clic.Help _command] ->
+  | Error [Tezos_clic.Help _command] ->
       Format.printf "<display help>\n" ;
       exit 0
   | Error _ ->

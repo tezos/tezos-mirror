@@ -25,10 +25,10 @@
 
 open Client_proto_utils
 
-let group = {Clic.name = "utilities"; title = "Utility Commands"}
+let group = {Tezos_clic.name = "utilities"; title = "Utility Commands"}
 
 let unsigned_block_header_param =
-  let open Clic in
+  let open Tezos_clic in
   param
     ~name:"unsigned block header"
     ~desc:"A hex or JSON encoded unsigned block header"
@@ -52,7 +52,7 @@ let unsigned_block_header_param =
                  try destruct enc json |> return with _ -> fail error)))
 
 let commands () =
-  let open Clic in
+  let open Tezos_clic in
   let string_param ~name ~desc =
     param ~name ~desc Client_proto_args.string_parameter
   in

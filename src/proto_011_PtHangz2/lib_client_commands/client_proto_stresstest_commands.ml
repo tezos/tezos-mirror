@@ -780,7 +780,8 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   Lwt.pick [loop (); heads_iteration]
 
 let group =
-  Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}
+  Tezos_clic.
+    {name = "stresstest"; title = "Commands for stress-testing the network"}
 
 type pool_source =
   | From_string of {json : Ezjsonm.value}
@@ -790,7 +791,7 @@ let json_of_pool_source = function
   | From_string {json} | From_file {json; _} -> json
 
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
@@ -806,7 +807,7 @@ let json_file_or_text_parameter =
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let seed_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"seed"
     ~placeholder:"int"
@@ -819,7 +820,7 @@ let seed_arg =
          | i -> return i))
 
 let tps_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"tps"
     ~placeholder:"float"
@@ -834,7 +835,7 @@ let tps_arg =
          | f -> return f))
 
 let fresh_probability_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"fresh-probability"
     ~placeholder:"float in [0;1]"
@@ -858,7 +859,7 @@ let fresh_probability_arg =
          | f -> return f))
 
 let strategy_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"strategy"
     ~placeholder:"fixed:mutez | evaporation:[0;1]"
@@ -869,7 +870,7 @@ let strategy_arg =
          | Ok strategy -> return strategy))
 
 let gas_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let gas_limit_kind =
     parameter (fun _ s ->
         try
@@ -890,7 +891,7 @@ let gas_limit_arg =
     gas_limit_kind
 
 let storage_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   let storage_limit_kind =
     parameter (fun _ s ->
         try
@@ -913,7 +914,7 @@ let storage_limit_arg =
     storage_limit_kind
 
 let transfers_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"transfers"
     ~placeholder:"integer"
@@ -927,7 +928,7 @@ let transfers_arg =
          | i -> return i))
 
 let single_op_per_pkh_per_block_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"single-op-per-pkh-per-block"
     ~doc:
       "ensure that the operations are not rejected by limiting the injection \
@@ -935,7 +936,7 @@ let single_op_per_pkh_per_block_arg =
     ()
 
 let level_limit_arg =
-  let open Clic in
+  let open Tezos_clic in
   arg
     ~long:"level-limit"
     ~placeholder:"integer | +integer"
@@ -951,12 +952,12 @@ let level_limit_arg =
          | i -> if String.get s 0 = '+' then return (Rel i) else return (Abs i)))
 
 let verbose_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose"
     ~doc:"Display detailed logs of the injected operations"
     ()
 
-let debug_arg = Clic.switch ~long:"debug" ~doc:"Display debug logs" ()
+let debug_arg = Tezos_clic.switch ~long:"debug" ~doc:"Display debug logs" ()
 
 let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
@@ -989,7 +990,7 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
       Lwt_utils_unix.Json.write_file path json >>= catch_write_error
 
 let generate_random_transactions =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Generate random transactions"

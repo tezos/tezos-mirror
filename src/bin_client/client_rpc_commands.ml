@@ -25,7 +25,7 @@
 
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
-open Clic
+open Tezos_clic
 open Json_schema
 
 (*-- Assisted, schema directed input fill in --------------------------------*)
@@ -540,7 +540,8 @@ let meth_params ?(name = "HTTP method") ?(desc = "") params =
          | Some meth -> return meth))
     params
 
-let group = {Clic.name = "rpc"; title = "Commands for the low level RPC layer"}
+let group =
+  {Tezos_clic.name = "rpc"; title = "Commands for the low level RPC layer"}
 
 let commands =
   [

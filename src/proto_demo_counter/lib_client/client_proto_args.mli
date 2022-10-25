@@ -23,16 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_clic
-
 val amount_param :
   name:string ->
   desc:string ->
-  ('a, Protocol_client_context.full) Clic.params ->
-  (Int32.t -> 'a, Protocol_client_context.full) Clic.params
+  ('a, Protocol_client_context.full) Tezos_clic.params ->
+  (Int32.t -> 'a, Protocol_client_context.full) Tezos_clic.params
 
 val msg_param :
   name:string ->
   desc:string ->
-  ('a, Protocol_client_context.full) Clic.params ->
-  (string -> 'a, Protocol_client_context.full) Clic.params
+  ('a, Protocol_client_context.full) Tezos_clic.params ->
+  (string -> 'a, Protocol_client_context.full) Tezos_clic.params

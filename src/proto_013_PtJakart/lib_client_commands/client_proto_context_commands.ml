@@ -41,10 +41,10 @@ let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
   return_unit
 
 let encrypted_switch =
-  Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
+  Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let normalize_types_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"normalize-types"
     ~doc:
       "Whether types should be normalized (annotations removed, combs \
@@ -77,7 +77,7 @@ let parse_file parse path =
 
 let file_or_text_parameter ~from_text
     ?(from_path = parse_file (from_text ~heuristic:false)) () =
-  Clic.parameter @@ fun _ p ->
+  Tezos_clic.parameter @@ fun _ p ->
   match String.split ~limit:1 ':' p with
   | ["text"; text] -> from_text ~heuristic:false text
   | ["file"; path] -> from_path path
@@ -93,18 +93,18 @@ let json_file_or_text_parameter =
   file_or_text_parameter ~from_text ~from_path ()
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let block_hash_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let rollup_kind_param =
-  Clic.parameter (fun _ name ->
+  Tezos_clic.parameter (fun _ name ->
       match Sc_rollups.from ~name with
       | None ->
           failwith
@@ -131,7 +131,7 @@ let messages_param =
     with Ezjsonm.Parse_error _ ->
       failwith "Given text is not valid JSON: '%s'" text
   in
-  Clic.parameter @@ fun _ p ->
+  Tezos_clic.parameter @@ fun _ p ->
   match String.split ~limit:1 ':' p with
   | ["bin"; path] ->
       Lwt_utils_unix.read_file path >>= fun bin -> return (`Bin bin)
@@ -140,7 +140,7 @@ let messages_param =
   | _ -> if Sys.file_exists p then from_path p else from_text p
 
 let rollup_address_param =
-  Clic.parameter (fun _ name ->
+  Tezos_clic.parameter (fun _ name ->
       match Sc_rollup.Address.of_b58check_opt name with
       | None ->
           failwith
@@ -150,14 +150,14 @@ let rollup_address_param =
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let tez_of_string_exn index field s =
   match Tez.of_string s with
@@ -175,7 +175,7 @@ let tez_of_opt_string_exn index field s =
   | Some s -> tez_of_string_exn index field s >>=? fun s -> return (Some s)
 
 let commands_ro () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -292,9 +292,9 @@ let commands_ro () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -315,13 +315,13 @@ let commands_ro () =
       ~desc:"Get a value in a big map."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -383,7 +383,7 @@ let commands_ro () =
       ~desc:"Get the type of an entrypoint of a contract."
       (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
            ~desc:"the entrypoint to describe"
            entrypoint_parameter
@@ -667,27 +667,27 @@ let commands_ro () =
 (* ----------------------------------------------------------------------------*)
 
 let dry_run_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"dry-run"
     ~short:'D'
     ~doc:"don't inject the operation, just display it"
     ()
 
 let verbose_signing_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose-signing"
     ~doc:"display extra information before signing the operation"
     ()
 
 let simulate_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"simulation"
     ~doc:
       "Simulate the execution of the command, without needing any signatures."
     ()
 
 let force_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"force"
     ~doc:
       "Inject the operation even if the simulation results in a failure. This \
@@ -844,7 +844,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 
 let commands_network network () =
-  let open Clic in
+  let open Tezos_clic in
   match network with
   | Some `Testnet | None ->
       [
@@ -898,7 +898,7 @@ let commands_network network () =
           @@ Public_key_hash.alias_param @@ prefixes ["with"]
           @@ param
                ~name:"code"
-               (Clic.parameter (fun _ctx code ->
+               (Tezos_clic.parameter (fun _ctx code ->
                     match
                       Blinded_public_key_hash.activation_code_of_hex code
                     with
@@ -921,7 +921,7 @@ let commands_network network () =
 let commands_rw () =
   let open Client_proto_programs in
   let open Tezos_micheline in
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -2263,7 +2263,7 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["submit"; "tx"; "rollup"; "batch"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"batch"
            ~desc:
              "Bytes representation (hexadecimal string) of the batch. Must be \
@@ -2666,7 +2666,7 @@ let commands_rw () =
       @@ Tx_rollup.message_result_path_param
            ~usage:"Disputed message result path."
       @@ prefixes ["for"; "message"; "at"; "position"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"message position"
            ~desc:
              "Position of the message in the inbox with the result being \
@@ -2812,7 +2812,7 @@ let commands_rw () =
              "Level of the finalized commitment that includes the message \
               result whose withdrawals will be dispatched."
       @@ prefixes ["for"; "the"; "message"; "at"; "index"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"message index"
            ~desc:"Index of the message whose withdrawals will be dispatched."
            non_negative_param
@@ -2916,17 +2916,17 @@ let commands_rw () =
            ~name:"recipient contract"
            ~desc:"Contract receiving the tickets."
       @@ prefixes ["with"; "entrypoint"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"entrypoint"
            ~desc:"Entrypoint to use on the receiving contract."
            entrypoint_parameter
       @@ prefixes ["and"; "contents"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets content"
            ~desc:"Content of the tickets."
            Client_proto_args.string_parameter
       @@ prefixes ["and"; "type"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"tickets type"
            ~desc:"Type of the tickets."
            Client_proto_args.string_parameter

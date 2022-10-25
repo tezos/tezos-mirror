@@ -577,7 +577,7 @@ val restore_formatter : Format.formatter -> formatter_state -> unit
 
 (** {2 Parsing and error reporting} *)
 
-(* FIXME: #2935 Add documentation about failures in [Clic]
+(* FIXME: #2935 Add documentation about failures in [Tezos_clic]
    The documentation should mention what happens if the functions fail.
 *)
 

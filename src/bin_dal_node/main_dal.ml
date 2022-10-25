@@ -23,11 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let group = {Clic.name = "dal-node"; title = "Commands related to the DAL node"}
+let group =
+  {Tezos_clic.name = "dal-node"; title = "Commands related to the DAL node"}
 
 let data_dir_arg =
   let default = Configuration.default_data_dir in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"data-dir"
     ~placeholder:"data-dir"
     ~doc:
@@ -39,7 +40,7 @@ let data_dir_arg =
 
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-addr"
     ~placeholder:"rpc-address|ip"
     ~doc:
@@ -50,13 +51,13 @@ let rpc_addr_arg =
     (Client_config.string_parameter ())
 
 let int_parameter =
-  let open Clic in
+  let open Tezos_clic in
   parameter (fun _ p ->
       try Lwt.return_ok (int_of_string p) with _ -> failwith "Cannot read int")
 
 let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
-  Clic.default_arg
+  Tezos_clic.default_arg
     ~long:"rpc-port"
     ~placeholder:"rpc-port"
     ~doc:
@@ -67,7 +68,7 @@ let rpc_port_arg =
     int_parameter
 
 let use_unsafe_srs_for_tests_arg =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"use-unsafe-srs-for-tests"
     ~doc:
       (Format.sprintf
@@ -76,7 +77,7 @@ let use_unsafe_srs_for_tests_arg =
 
 let config_init_command =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Configure DAL node."
@@ -92,7 +93,7 @@ let config_init_command =
       return ())
 
 let run_command =
-  let open Clic in
+  let open Tezos_clic in
   command
     ~group
     ~desc:"Run the DAL node."

@@ -24,14 +24,14 @@
 (*****************************************************************************)
 
 let group =
-  Clic.
+  Tezos_clic.
     {
       name = "event-logging-framework";
       title = "Commands to inspect the event-logging framework";
     }
 
 let date_parameter option_name build =
-  let open Clic in
+  let open Tezos_clic in
   let open Lwt_result_syntax in
   parameter (fun _ s ->
       let problem fmt = Printf.ksprintf invalid_arg fmt in
@@ -80,7 +80,7 @@ let flat_pp pp o =
 
 let commands () =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   let command ~desc = command ~group ~desc in
   [
     command

@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Clic
 open Lwt_result_syntax
 module Base = Tezos_client_base
 
@@ -50,7 +49,7 @@ let valid_endpoint _configuration s =
   | _ -> failwith "Endpoint should be of the form http[s]://address:port"
 
 let endpoint_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"endpoint"
     ~short:'E'
     ~placeholder:"uri"
@@ -58,7 +57,7 @@ let endpoint_arg () =
       (Printf.sprintf
          "endpoint of the tx rollup node; e.g. '%s'"
          default_endpoint)
-  @@ parameter valid_endpoint
+  @@ Tezos_clic.parameter valid_endpoint
 
 let valid_dir _configuration base_dir =
   match Sys.is_directory base_dir with
@@ -67,7 +66,7 @@ let valid_dir _configuration base_dir =
       failwith "%s does not seem to be an existing directory" base_dir
 
 let base_dir_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -78,10 +77,10 @@ let base_dir_arg () =
           data.@,\
           If absent, its value defaults to %s@]@]@."
          default_base_dir)
-    (parameter valid_dir)
+    (Tezos_clic.parameter valid_dir)
 
 let wallet_dir_arg () =
-  arg
+  Tezos_clic.arg
     ~long:"wallet-dir"
     ~short:'w'
     ~placeholder:"path"
@@ -91,10 +90,10 @@ let wallet_dir_arg () =
           The directory where to look for known keys.@,\
           If absent, its value defaults to %s@]@]@."
          default_tezos_base_dir)
-    (parameter valid_dir)
+    (Tezos_clic.parameter valid_dir)
 
 let global_options () =
-  Clic.args3 (base_dir_arg ()) (wallet_dir_arg ()) (endpoint_arg ())
+  Tezos_clic.args3 (base_dir_arg ()) (wallet_dir_arg ()) (endpoint_arg ())
 
 let make (base_dir, wallet_dir, endpoint) =
   {
@@ -105,7 +104,7 @@ let make (base_dir, wallet_dir, endpoint) =
 
 let parse argv =
   let* opts, argv =
-    Clic.parse_global_options (global_options ()) default argv
+    Tezos_clic.parse_global_options (global_options ()) default argv
   in
   return (make opts, argv)
 

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let unique_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"unique"
     ~short:'u'
     ~doc:"Fail when there is more than one possible completion."
@@ -32,7 +32,7 @@ let unique_switch =
 
 let commands () =
   let open Lwt_result_syntax in
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~desc:

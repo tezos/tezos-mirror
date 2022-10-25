@@ -26,4 +26,4 @@
 val commands :
   [`Mainnet | `Testnet] option ->
   unit ->
-  Protocol_client_context.full Clic.command list
+  Protocol_client_context.full Tezos_clic.command list

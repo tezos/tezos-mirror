@@ -34,23 +34,23 @@ open Client_keys
 open Client_proto_args
 
 let encrypted_switch =
-  Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
+  Tezos_clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let dry_run_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"dry-run"
     ~short:'D'
     ~doc:"don't inject the operation, just display it"
     ()
 
 let verbose_signing_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"verbose-signing"
     ~doc:"display extra information before signing the operation"
     ()
 
 let simulate_switch =
-  Clic.switch
+  Tezos_clic.switch
     ~long:"simulation"
     ~doc:
       "Simulate the execution of the command, without needing any signatures."
@@ -71,7 +71,7 @@ let report_michelson_errors ?(no_print_source = false) ~msg
   | Ok data -> Lwt.return_some data
 
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
+  Tezos_clic.parameter (fun _ p ->
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (Ezjsonm.from_string text)
       | ["file"; path] -> Lwt_utils_unix.Json.read_file path
@@ -83,32 +83,32 @@ let json_file_or_text_parameter =
               failwith "Neither an existing file nor valid JSON: '%s'" p))
 
 let data_parameter =
-  Clic.parameter (fun _ data ->
+  Tezos_clic.parameter (fun _ data ->
       Lwt.return
         (Micheline_parser.no_parsing_error
         @@ Michelson_v1_parser.parse_expression data))
 
 let non_negative_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
       | Some i when i >= 0 -> return i
       | _ -> failwith "Parameter should be a non-negative integer literal")
 
 let block_hash_param =
-  Clic.parameter (fun _ s ->
+  Tezos_clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
 let group =
   {
-    Clic.name = "context";
+    Tezos_clic.name = "context";
     title = "Block contextual commands (see option -block)";
   }
 
-let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
+let alphanet = {Tezos_clic.name = "alphanet"; title = "Alphanet only commands"}
 
 let binary_description =
-  {Clic.name = "description"; title = "Binary Description"}
+  {Tezos_clic.name = "description"; title = "Binary Description"}
 
 let transfer_command amount source destination cctxt
     ( fee,
@@ -250,7 +250,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   >>=? fun operation -> return (Injection.Annotated_manager_operation operation)
 
 let commands network () =
-  let open Clic in
+  let open Tezos_clic in
   [
     command
       ~group
@@ -317,9 +317,9 @@ let commands network () =
          contract (deprecated)."
       no_options
       (prefixes ["get"; "big"; "map"; "value"; "for"]
-      @@ Clic.param ~name:"key" ~desc:"the key to look for" data_parameter
+      @@ Tezos_clic.param ~name:"key" ~desc:"the key to look for" data_parameter
       @@ prefixes ["of"; "type"]
-      @@ Clic.param ~name:"type" ~desc:"type of the key" data_parameter
+      @@ Tezos_clic.param ~name:"type" ~desc:"type of the key" data_parameter
       @@ prefix "in"
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -340,13 +340,13 @@ let commands network () =
       ~desc:"Get a value in a big map."
       (args1 (unparsing_mode_arg ~default:"Readable"))
       (prefixes ["get"; "element"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"key"
            ~desc:"the key to look for"
-           (Clic.parameter (fun _ s ->
+           (Tezos_clic.parameter (fun _ s ->
                 return (Script_expr_hash.of_b58check_exn s)))
       @@ prefixes ["of"; "big"; "map"]
-      @@ Clic.param
+      @@ Tezos_clic.param
            ~name:"big_map"
            ~desc:"identifier of the big_map"
            int_parameter
@@ -422,7 +422,7 @@ let commands network () =
       ~desc:"Get the type of an entrypoint of a contract."
       no_options
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ Tezos_clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
       @@ prefixes ["for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
@@ -1227,7 +1227,7 @@ let commands network () =
             @@ Public_key_hash.alias_param @@ prefixes ["with"]
             @@ param
                  ~name:"code"
-                 (Clic.parameter (fun _ctx code ->
+                 (Tezos_clic.parameter (fun _ctx code ->
                       protect (fun () ->
                           return
                             (Blinded_public_key_hash.activation_code_of_hex

@@ -29,7 +29,7 @@ open Client_proto_args
 
 let group =
   {
-    Clic.name = "tokens";
+    Tezos_clic.name = "tokens";
     title = "Commands for managing FA1.2-compatible smart contracts";
   }
 
@@ -46,10 +46,10 @@ let from_param () =
 let to_param () = alias_param ~name:"to" ~desc:"name or address of the receiver"
 
 let amount_param () =
-  Clic.param
+  Tezos_clic.param
     ~name:"amount"
     ~desc:"number of tokens"
-    (Clic.parameter (fun _ s ->
+    (Tezos_clic.parameter (fun _ s ->
          try
            let v = Z.of_string s in
            assert (Compare.Z.(v >= Z.zero)) ;
@@ -66,12 +66,12 @@ let as_arg =
     ()
 
 let custom_gas_flag =
-  Clic.arg
+  Tezos_clic.arg
     ~long:"gas"
     ~short:'G'
     ~doc:"Initial quantity of gas for typechecking and execution"
     ~placeholder:"gas"
-    (Clic.parameter (fun _ctx str ->
+    (Tezos_clic.parameter (fun _ctx str ->
          try
            let v = Z.of_string str in
            assert (Compare.Z.(v >= Z.zero)) ;
@@ -85,14 +85,14 @@ let payer_arg =
     ()
 
 let callback_entrypoint_arg =
-  Clic.arg
+  Tezos_clic.arg
     ~doc:"Entrypoint the view should use to callback to"
     ~long:"callback-entrypoint"
     ~placeholder:"name"
     string_parameter
 
 let contract_call_options =
-  Clic.args14
+  Tezos_clic.args14
     tez_amount_arg
     fee_arg
     Client_proto_context_commands.dry_run_switch
@@ -109,7 +109,7 @@ let contract_call_options =
     burn_cap_arg
 
 let contract_view_options =
-  Clic.args15
+  Tezos_clic.args15
     callback_entrypoint_arg
     tez_amount_arg
     fee_arg
@@ -127,7 +127,7 @@ let contract_view_options =
     burn_cap_arg
 
 let originate_options =
-  Clic.args16
+  Tezos_clic.args16
     tez_amount_arg
     fee_arg
     Client_proto_context_commands.dry_run_switch
@@ -146,7 +146,10 @@ let originate_options =
     burn_cap_arg
 
 let view_options =
-  Clic.args3 custom_gas_flag payer_arg (unparsing_mode_arg ~default:"Readable")
+  Tezos_clic.args3
+    custom_gas_flag
+    payer_arg
+    (unparsing_mode_arg ~default:"Readable")
 
 let dummy_callback = Contract.implicit_contract Signature.Public_key_hash.zero
 
@@ -158,9 +161,9 @@ let get_contract_caller_keys cctxt caller =
       Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
       return (source, caller_pk, caller_sk)
 
-let commands () : #Protocol_client_context.full Clic.command list =
+let commands () : #Protocol_client_context.full Tezos_clic.command list =
   let open Client_proto_args in
-  Clic.
+  Tezos_clic.
     [
       command
         ~group
@@ -186,7 +189,7 @@ let commands () : #Protocol_client_context.full Clic.command list =
       command
         ~group
         ~desc:"Transfer tokens between two given accounts"
-        (Clic.args15
+        (Tezos_clic.args15
            as_arg
            tez_amount_arg
            fee_arg

@@ -72,7 +72,7 @@ type invocation_parameters = {
 val select : t -> float -> invocation_parameters option
 
 (** A ready-to-use command that originates all supported smart contracts. *)
-val originate_command : Protocol_client_context.full Clic.command
+val originate_command : Protocol_client_context.full Tezos_clic.command
 
 (** Call the callback function once per supported smart contract by passing
     it [t] that only selects that smart contract. Collect the
