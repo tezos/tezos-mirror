@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local = Local_context
+module Local = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 
 (** The kind of RPC request: is it a GET (i.e. is it loading data?) or
@@ -104,7 +104,9 @@ let rec raw_context_to_tree (raw : Proof.raw_context) : Local.tree option Lwt.t
       in
       let* dir =
         String.Map.bindings map
-        |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
+        |> List.fold_left_s
+             add_to_tree
+             (Tezos_context_memory.make_empty_tree ())
       in
       if Local.Tree.is_empty dir then return_none else return_some dir
 
@@ -168,7 +170,7 @@ struct
 
   type key = Local.key
 
-  let empty = Local.Tree.empty Local.empty
+  let empty = Local.Tree.empty (Tezos_context_memory.make_empty_context ())
 
   let get = Local.Tree.find_tree
 

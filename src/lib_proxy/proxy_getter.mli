@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Local := Local_context
+module Local := Tezos_context_memory.Context
 module Proof := Tezos_context_sigs.Context.Proof_types
 
 (** The size of a tree, for logging *)

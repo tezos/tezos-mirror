@@ -34,7 +34,7 @@
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
 module StringMap = String.Map
-module Local = Tezos_proxy.Local_context
+module Local = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 
 (** Alias to make "empty list" intention more explicit *)

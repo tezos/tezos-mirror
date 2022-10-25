@@ -34,145 +34,11 @@
                   width and depth of structures is fine-tuned.
 *)
 
-module Store = Tezos_proxy.Local_context
+module Store = Tezos_context_memory.Context
 module Proof = Tezos_context_sigs.Context.Proof_types
 open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
-
-(** [list1_gen gen] generates non-empty lists using [gen]. *)
-let list1_gen gen =
-  QCheck2.Gen.(
-    list_size (1 -- 20) gen |> add_shrink_invariant (fun l -> l <> []))
-
-let irmin_tree_gen =
-  let module StringList = struct
-    type t = string list
-
-    let compare = Stdlib.compare
-  end in
-  let module StringListMap = Stdlib.Map.Make (StringList) in
-  let open MakeMapGen (StringListMap) in
-  let open QCheck2.Gen in
-  let+ entries = small_list (pair (small_list string) bytes_gen) in
-  List.fold_left_s
-    (fun built_tree (path, bytes) -> Store.Tree.add built_tree path bytes)
-    (Store.Tree.empty Store.empty)
-    entries
-  |> Lwt_main.run
-
-let print_tree = Format.asprintf "%a" Store.Tree.pp
-
-module HashStability = struct
-  let make_tree_shallow repo tree =
-    let hash = Store.Tree.hash tree in
-    let data =
-      match Store.Tree.kind tree with
-      | `Value -> `Value hash
-      | `Tree -> `Node hash
-    in
-    Store.Tree.shallow repo data
-
-  (** Sub-par pseudo-random shallower, based on the tree and sub-trees hashes.
-      The resulting tree may or may not be shallowed (i.e. exactly the same as
-      the input one). *)
-  let rec make_partial_shallow_tree repo tree =
-    let open Lwt_syntax in
-    if (Store.Tree.hash tree |> Context_hash.hash) mod 2 = 0 then
-      (* Full shallow *)
-      Lwt.return @@ make_tree_shallow repo tree
-    else
-      (* Maybe shallow some sub-trees *)
-      let* dir = Store.Tree.list tree [] in
-      Lwt_list.fold_left_s
-        (fun wip_tree (key, sub_tree) ->
-          let* partial_shallowed_sub_tree =
-            make_partial_shallow_tree repo sub_tree
-          in
-          Store.Tree.add_tree wip_tree [key] partial_shallowed_sub_tree)
-        tree
-        dir
-
-  (** Provides a tree and a potentially shallowed (partially, totally or not at all) equivalent tree.
-      Randomization of shallowing is sub-par (based on tree hash) because
-      otherwise it would be very difficult to provide shrinking. Note that
-      this will no be a problem once QCheck provides integrated shrinking. *)
-  let tree_and_shallow_gen =
-    let open QCheck2.Gen in
-    let repo = Lwt_main.run (Store.Tree.make_repo ()) in
-    let+ tree = irmin_tree_gen in
-    (tree, Lwt_main.run (make_partial_shallow_tree repo tree))
-
-  let print_tree_and_shallow = QCheck2.Print.pair print_tree print_tree
-
-  (** Test that replacing Irmin subtrees by their [Store.Tree.shallow]
-      value leaves the top-level [Store.Tree.hash] unchanged.
-
-      This test was also proposed to Irmin in
-      https://github.com/mirage/irmin/pull/1291 *)
-  let test_hash_stability =
-    let open QCheck2 in
-    Test.make
-      ~name:"Shallowing trees does not change their top-level hash"
-      ~print:print_tree_and_shallow
-      tree_and_shallow_gen
-    @@ fun (tree, shallow_tree) ->
-    let hash = Store.Tree.hash tree in
-    let shallow_hash = Store.Tree.hash shallow_tree in
-    if Context_hash.equal hash shallow_hash then true
-    else
-      Test.fail_reportf
-        "@[<v 2>Equality check failed!@,\
-         expected:@,\
-         %a@,\
-         actual:@,\
-         %a@,\
-         expected hash:@,\
-         %a@,\
-         actual hash:@,\
-         %a@]"
-        Store.Tree.pp
-        tree
-        Store.Tree.pp
-        shallow_tree
-        Context_hash.pp
-        hash
-        Context_hash.pp
-        shallow_hash
-end
-
-let check_tree_eq = qcheck_eq ~pp:Store.Tree.pp ~eq:Store.Tree.equal
-
-module AddTree = struct
-  (** Test that getting a tree that was just set returns this tree.
-
-      This test was also proposed to Irmin in
-      https://github.com/mirage/irmin/pull/1291 *)
-  let test_add_tree =
-    let open QCheck2 in
-    Test.make
-      ~name:
-        "let tree' = Store.Tree.add_tree tree key at_key in \
-         Store.Tree.find_tree tree' key = at_key"
-      ~print:
-        Print.(
-          triple HashStability.print_tree_and_shallow (list string) print_tree)
-      Gen.(
-        triple
-          HashStability.tree_and_shallow_gen
-          (list1_gen string)
-          irmin_tree_gen)
-      (fun ( ((_, tree) : _ * Store.tree),
-             (key : Store.key),
-             (added : Store.tree) ) ->
-        let tree' = Store.Tree.add_tree tree key added |> Lwt_main.run in
-        let tree_opt_set_at_key =
-          Store.Tree.find_tree tree' key |> Lwt_main.run
-        in
-        match tree_opt_set_at_key with
-        | None -> check_tree_eq (Store.Tree.empty Store.empty) added
-        | Some tree_set_at_key -> check_tree_eq added tree_set_at_key)
-end
 
 module Consensus = struct
   let chain, block = (`Main, `Head 0)
@@ -352,9 +218,6 @@ let () =
   Alcotest.run
     "Mode Light"
     [
-      ( "Hash stability",
-        qcheck_wrap [HashStability.test_hash_stability; AddTree.test_add_tree]
-      );
       ( "Consensus consistency examples",
         (* These tests are kinda superseded by the fuzzing tests
            ([test_consensus_spec]) below. However, I want to keep them for
