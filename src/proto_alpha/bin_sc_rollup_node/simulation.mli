@@ -31,24 +31,28 @@ module type S = sig
   module PVM = Interpreter.PVM
   module Fueled_pvm = Interpreter.Free_pvm
 
+  type level_position = Start | Middle | End
+
   (** Type of the state for a simulation. *)
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
-    nb_messages : int64;
     state : PVM.state;
     reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
+    nb_messages_period : int64;
+    nb_messages_inbox : int;
+    level_position : level_position;
   }
 
-  (** [start_simulation node_ctxt block] starts a new simulation {e on top} of
-      [block], i.e. for an hypothetical new inbox (level).  *)
+  (** [start_simulation node_ctxt reveal_source block] starts a new simulation
+      {e on top} of [block], i.e. for an hypothetical new inbox (level).  *)
   val start_simulation :
     Node_context.ro ->
     reveal_map:string Sc_rollup.Reveal_hash.Map.t option ->
     Layer1.head ->
     t tzresult Lwt.t
 
-  (**  [simulate_messages node_ctxt ?fuel sim messages] runs a simulation of new
+  (**  [simulate_messages node_ctxt sim messages] runs a simulation of new
        [messages] in the given simulation (state) [sim] and returns a new
        simulation state, the remaining fuel (when [?fuel] is provided) and the
        number of ticks that happened. *)
@@ -57,6 +61,10 @@ module type S = sig
     t ->
     Sc_rollup.Inbox_message.t list ->
     (t * Z.t) tzresult Lwt.t
+
+  (** [end_simulation node_ctxt sim] adds and [End_of_level] message and marks
+      the simulation as ended. *)
+  val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
 end
 
 (** Functor to construct a simulator for a given PVM with interpreter. *)

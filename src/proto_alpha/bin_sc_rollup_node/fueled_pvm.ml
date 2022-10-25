@@ -48,17 +48,19 @@ module type S = sig
     (PVM.state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
     Lwt.t
 
-  (** [eval_messages ?reveal_map ~fuel node_ctxt state
+  (** [eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
       inbox_level messages] evaluates the [messages] for inbox level
       [inbox_level] in the given [state] of the PVM and returns the evaluation
       results containing the new state, the remaining fuel, and the number of
-      ticks for the evaluation of these messages. When
+      ticks for the evaluation of these messages. [message_counter_offset] is
+      used when we evaluate partial inboxes, such as during simulation. When
       [reveal_map] is provided, it is used as an additional source of data for
       revelation ticks. *)
   val eval_messages :
     ?reveal_map:string Sc_rollup.Reveal_hash.Map.t ->
     fuel:fuel ->
     _ Node_context.t ->
+    message_counter_offset:int ->
     PVM.state ->
     Raw_level.t ->
     Sc_rollup.Inbox_message.t list ->
@@ -272,7 +274,8 @@ module Make (PVM : Pvm.S) = struct
       in
       return (state, tick)
 
-    let eval_messages ~reveal_map ~fuel node_ctxt state inbox_level messages =
+    let eval_messages ~reveal_map ~fuel node_ctxt ~message_counter_offset state
+        inbox_level messages =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
       let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
@@ -283,22 +286,21 @@ module Make (PVM : Pvm.S) = struct
             Sc_rollup.Inbox_message.(
               message |> serialize |> Environment.wrap_tzresult)
           in
-          let input =
-            Sc_rollup.
-              {inbox_level; message_counter = Z.of_int message_counter; payload}
-          in
+          let message_index = message_counter_offset + message_counter in
+          let message_counter = Z.of_int message_index in
+          let input = Sc_rollup.{inbox_level; message_counter; payload} in
           let failing_ticks =
             Loser_mode.is_failure
               node_ctxt.Node_context.loser_mode
               ~level
-              ~message_index:message_counter
+              ~message_index
           in
           let>* state, executed_ticks =
             feed_input
               node_ctxt
               reveal_map
               level
-              message_counter
+              message_index
               ~fuel
               ~failing_ticks
               state
@@ -335,18 +337,27 @@ module Make (PVM : Pvm.S) = struct
               ~reveal_map:None
               ~fuel
               node_ctxt
+              ~message_counter_offset:0
               state
               inbox_level
               messages
           in
           return (state, num_messages, inbox_level, fuel)
 
-    let eval_messages ?reveal_map ~fuel node_ctxt state inbox_level messages =
+    let eval_messages ?reveal_map ~fuel node_ctxt ~message_counter_offset state
+        inbox_level messages =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
       let*! initial_tick = PVM.get_tick state in
-      let*> state, remaining_fuel =
-        eval_messages ~reveal_map ~fuel node_ctxt state inbox_level messages
+      let>* state, remaining_fuel =
+        eval_messages
+          ~reveal_map
+          ~fuel
+          node_ctxt
+          ~message_counter_offset
+          state
+          inbox_level
+          messages
       in
       let*! final_tick = PVM.get_tick state in
       let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in

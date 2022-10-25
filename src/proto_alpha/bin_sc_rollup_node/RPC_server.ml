@@ -269,9 +269,13 @@ module Make (Interpreter : Interpreter.S) = struct
     let messages =
       List.map (fun m -> Sc_rollup.Inbox_message.External m) messages
     in
-    let* {state; inbox_level; _}, num_ticks =
+    let* sim, num_ticks_0 =
       Simulation.simulate_messages node_ctxt sim messages
     in
+    let* {state; inbox_level; _}, num_ticks_end =
+      Simulation.end_simulation node_ctxt sim
+    in
+    let num_ticks = Z.(num_ticks_0 + num_ticks_end) in
     let*! outbox = PVM.get_outbox state in
     let output =
       List.filter

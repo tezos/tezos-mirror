@@ -32,12 +32,16 @@ module type S = sig
   module PVM = Interpreter.PVM
   module Fueled_pvm = Interpreter.Free_pvm
 
+  type level_position = Start | Middle | End
+
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
-    nb_messages : int64;
     state : PVM.state;
     reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
+    nb_messages_period : int64;
+    nb_messages_inbox : int;
+    level_position : level_position;
   }
 
   val start_simulation :
@@ -51,6 +55,8 @@ module type S = sig
     t ->
     Sc_rollup.Inbox_message.t list ->
     (t * Z.t) tzresult Lwt.t
+
+  val end_simulation : Node_context.ro -> t -> (t * Z.t) tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :
@@ -59,19 +65,29 @@ module Make (Interpreter : Interpreter.S) :
   module PVM = Interpreter.PVM
   module Fueled_pvm = Interpreter.Free_pvm
 
+  type level_position = Start | Middle | End
+
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
-    nb_messages : int64;
     state : PVM.state;
     reveal_map : string Sc_rollup.Reveal_hash.Map.t option;
+    nb_messages_period : int64;
+    nb_messages_inbox : int;
+    level_position : level_position;
   }
 
   let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
     let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 level in
+    let*? () =
+      error_unless
+        Raw_level.(level >= node_ctxt.Node_context.genesis_info.level)
+        (Exn (Failure "Cannot simulate before origination level"))
+    in
+    let first_inbox_level = Raw_level.succ node_ctxt.genesis_info.level in
     let* ctxt =
-      if Raw_level.(level <= node_ctxt.Node_context.genesis_info.level) then
+      if Raw_level.(level < first_inbox_level) then
         (* This is before we have interpreted the boot sector, so we start
            with an empty context in genesis *)
         return (Context.empty node_ctxt.context)
@@ -79,45 +95,102 @@ module Make (Interpreter : Interpreter.S) :
     in
     let* inbox = Inbox.inbox_of_head node_ctxt head in
     let+ ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
-    let nb_messages =
+    let nb_messages_period =
       Sc_rollup.Inbox.number_of_messages_during_commitment_period inbox
     in
     let inbox_level = Raw_level.succ level in
-    {ctxt; nb_messages; state; inbox_level; reveal_map}
+    {
+      ctxt;
+      state;
+      inbox_level;
+      reveal_map;
+      nb_messages_period;
+      nb_messages_inbox = 0;
+      level_position = Start;
+    }
 
-  let simulate_messages (node_ctxt : Node_context.ro)
-      {ctxt; nb_messages; state; inbox_level; reveal_map} messages =
+  let simulate_messages_no_checks (node_ctxt : Node_context.ro)
+      ({
+         ctxt;
+         state;
+         inbox_level;
+         reveal_map;
+         nb_messages_period;
+         nb_messages_inbox;
+         level_position = _;
+       } as sim) messages =
+    let open Lwt_result_syntax in
+    (* Build new state *)
+    let* eval_result =
+      Fueled_pvm.eval_messages
+        ?reveal_map
+        ~fuel:(Fuel.Free.of_ticks 0L)
+        node_ctxt
+        ~message_counter_offset:nb_messages_inbox
+        state
+        inbox_level
+        messages
+    in
+    let Fueled_pvm.{state; num_ticks; _} =
+      Delayed_write_monad.ignore eval_result
+    in
+    let*! ctxt = PVM.State.set ctxt state in
+    let nb_messages = List.length messages in
+    let nb_messages_inbox = nb_messages_inbox + nb_messages in
+    let nb_messages_period =
+      Int64.add nb_messages_period (Int64.of_int nb_messages)
+    in
+    return
+      ({sim with ctxt; state; nb_messages_period; nb_messages_inbox}, num_ticks)
+
+  let simulate_messages (node_ctxt : Node_context.ro) sim messages =
     let open Lwt_result_syntax in
     (* Build new inbox *)
+    let*? () =
+      error_when
+        (sim.level_position = End)
+        (Exn (Failure "Level for simulation is ended"))
+    in
     let*? () =
       error_when
         (messages = [])
         (Environment.wrap_tzerror Sc_rollup_errors.Sc_rollup_add_zero_messages)
     in
+    let messages =
+      if sim.level_position = Start then
+        Sc_rollup.Inbox_message.Internal Start_of_level :: messages
+      else messages
+    in
     let max_messages =
       node_ctxt.protocol_constants.parametric.sc_rollup
         .max_number_of_messages_per_commitment_period |> Int64.of_int
+      |> Int64.pred (* To account for End_of_level message *)
     in
-    let nb_messages =
-      Int64.add nb_messages (Int64.of_int (List.length messages))
+    let nb_messages_period =
+      Int64.add sim.nb_messages_period (Int64.of_int (List.length messages))
     in
     let*? () =
       error_when
-        Compare.Int64.(nb_messages > max_messages)
+        Compare.Int64.(nb_messages_period > max_messages)
         (Environment.wrap_tzerror
            Sc_rollup_errors
            .Sc_rollup_max_number_of_messages_reached_for_commitment_period)
     in
-    (* Build new state *)
-    let* Fueled_pvm.{state; num_ticks; _} =
-      Fueled_pvm.eval_messages
-        ?reveal_map
-        ~fuel:(Fuel.Free.of_ticks 0L)
-        node_ctxt
-        state
-        inbox_level
-        messages
+    let+ sim, num_ticks = simulate_messages_no_checks node_ctxt sim messages in
+    ({sim with level_position = Middle}, num_ticks)
+
+  let end_simulation node_ctxt sim =
+    let open Lwt_result_syntax in
+    let*? () =
+      error_when
+        (sim.level_position = End)
+        (Exn (Failure "Level for simulation is ended"))
     in
-    let*! ctxt = PVM.State.set ctxt state in
-    return ({ctxt; nb_messages; state; inbox_level; reveals_map}, num_ticks)
+    let+ sim, num_ticks =
+      simulate_messages_no_checks
+        node_ctxt
+        sim
+        [Sc_rollup.Inbox_message.Internal End_of_level]
+    in
+    ({sim with level_position = End}, num_ticks)
 end
