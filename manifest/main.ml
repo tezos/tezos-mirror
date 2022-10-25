@@ -3681,6 +3681,7 @@ end = struct
               sc_rollup |> if_some |> if_ N.(number >= 016) |> open_;
               octez_crypto_dal |> if_ N.(number >= 016) |> open_;
               octez_base_test_helpers |> if_ N.(number >= 016) |> open_;
+              parameters |> if_some |> if_ N.(number >= 016) |> open_;
             ]
           ~dune
       in
@@ -3698,7 +3699,7 @@ end = struct
               octez_micheline |> open_;
               client |> if_some |> open_;
               octez_client_base;
-              parameters |> if_some;
+              parameters |> if_some |> open_if N.(number >= 016);
               octez_protocol_environment;
               octez_stdlib_unix;
               main |> open_;
@@ -4713,6 +4714,7 @@ module Protocol = Protocol
             ringo_lwt;
             injector |> if_some |> open_;
             octez_scoru_wasm;
+            octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in
     let tx_rollup =

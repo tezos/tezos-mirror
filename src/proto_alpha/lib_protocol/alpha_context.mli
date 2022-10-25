@@ -2804,6 +2804,8 @@ module Dal : sig
     val to_int : t -> int
 
     val compare : t -> t -> int
+
+    val equal : t -> t -> bool
   end
 
   (** This module re-exports definitions from {!Dal_endorsement_repr} and
@@ -2826,6 +2828,8 @@ module Dal : sig
     val record_available_shards : context -> t -> int list -> context
   end
 
+  type slot_id = {published_level : Raw_level.t; index : Slot_index.t}
+
   module Page : sig
     type content = bytes
 
@@ -2843,7 +2847,7 @@ module Dal : sig
       val equal : int -> int -> bool
     end
 
-    type t
+    type t = {slot_id : slot_id; page_index : Index.t}
 
     val content_encoding : content Data_encoding.t
 
@@ -2869,11 +2873,15 @@ module Dal : sig
     end
 
     module Header : sig
-      type id = {published_level : Raw_level.t; index : Slot_index.t}
+      type id = slot_id = {published_level : Raw_level.t; index : Slot_index.t}
 
       type t = {id : id; commitment : Commitment.t}
 
+      val id_encoding : id Data_encoding.t
+
       val encoding : t Data_encoding.t
+
+      val pp_id : Format.formatter -> id -> unit
 
       val pp : Format.formatter -> t -> unit
 
@@ -3037,7 +3045,10 @@ module Sc_rollup : sig
     payload : Inbox_message.serialized;
   }
 
-  type reveal_data = Raw_data of string | Metadata of Metadata.t
+  type reveal_data =
+    | Raw_data of string
+    | Metadata of Metadata.t
+    | Dal_page of Dal.Page.content option
 
   type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -3055,7 +3066,10 @@ module Sc_rollup : sig
 
   module Reveal_hash : S.HASH
 
-  type reveal = Reveal_raw_data of Reveal_hash.t | Reveal_metadata
+  type reveal =
+    | Reveal_raw_data of Reveal_hash.t
+    | Reveal_metadata
+    | Request_dal_page of Dal.Page.t
 
   type input_request =
     | No_input_required
@@ -3557,7 +3571,13 @@ module Sc_rollup : sig
   val wrapped_proof_module : wrapped_proof -> (module PVM_with_proof)
 
   module Proof : sig
-    type reveal_proof = Raw_data_proof of string | Metadata_proof
+    type reveal_proof =
+      | Raw_data_proof of string
+      | Metadata_proof
+      | Dal_page_proof of {
+          page_id : Dal.Page.t;
+          proof : Dal.Slots_history.proof;
+        }
 
     type input_proof =
       | Inbox_proof of {
@@ -3588,6 +3608,18 @@ module Sc_rollup : sig
 
         val history : Inbox.History.t
       end
+
+      module Dal_with_history : sig
+        val confirmed_slots_history : Dal.Slots_history.t
+
+        val history_cache : Dal.Slots_history.History_cache.t
+
+        val page_info : (Dal.Page.content * Dal.Page.proof) option
+
+        val dal_parameters : Dal.parameters
+
+        val dal_endorsement_lag : int
+      end
     end
 
     type error += Sc_rollup_proof_check of string
@@ -3596,6 +3628,9 @@ module Sc_rollup : sig
       metadata:Metadata.t ->
       Inbox.history_proof ->
       Raw_level.t ->
+      Dal.Slots_history.t ->
+      Dal.parameters ->
+      dal_endorsement_lag:int ->
       pvm_name:string ->
       t ->
       (input option * input_request) tzresult Lwt.t
@@ -3637,6 +3672,7 @@ module Sc_rollup : sig
     type t = {
       turn : player;
       inbox_snapshot : Inbox.history_proof;
+      dal_snapshot : Dal.Slots_history.t;
       start_level : Raw_level.t;
       inbox_level : Raw_level.t;
       pvm_name : string;
@@ -3689,6 +3725,7 @@ module Sc_rollup : sig
 
     val initial :
       Inbox.history_proof ->
+      Dal.Slots_history.t ->
       start_level:Raw_level.t ->
       pvm_name:string ->
       parent:Commitment.t ->
@@ -3699,6 +3736,8 @@ module Sc_rollup : sig
       t
 
     val play :
+      Dal.parameters ->
+      dal_endorsement_lag:int ->
       stakers:Index.t ->
       Metadata.t ->
       t ->

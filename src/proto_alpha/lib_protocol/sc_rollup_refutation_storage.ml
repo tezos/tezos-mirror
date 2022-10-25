@@ -256,11 +256,15 @@ let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let default_number_of_sections =
     Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
   in
+  let* slots_history_snapshot =
+    Dal_slot_storage.get_slot_headers_history ctxt
+  in
   let current_level = (Raw_context.current_level ctxt).level in
   let game =
     Sc_rollup_game_repr.initial
       ~start_level:current_level
       (Sc_rollup_inbox_repr.take_snapshot inbox)
+      slots_history_snapshot
       ~pvm_name:(Sc_rollups.Kind.name_of kind)
       ~parent:parent_info
       ~child:child_info
@@ -288,8 +292,15 @@ let game_move ctxt rollup ~player ~opponent refutation =
       Sc_rollup_wrong_turn
   in
   let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
+  let dal = (Constants_storage.parametric ctxt).dal in
   let* move_result =
-    Sc_rollup_game_repr.play ~stakers metadata game refutation
+    Sc_rollup_game_repr.play
+      dal.cryptobox_parameters
+      ~dal_endorsement_lag:dal.endorsement_lag
+      ~stakers
+      metadata
+      game
+      refutation
   in
   match move_result with
   | Either.Left game_result -> return (Some game_result, ctxt)

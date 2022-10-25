@@ -602,18 +602,18 @@ module Make (Context : P) :
     end)
 
     module Required_reveal = Make_var (struct
-      type t = PS.Reveal_hash.t option
+      type t = PS.reveal option
 
       let initial = None
 
-      let encoding = Data_encoding.option PS.Reveal_hash.encoding
+      let encoding = Data_encoding.option PS.reveal_encoding
 
-      let name = "required_pre_image_hash"
+      let name = "required_reveal"
 
       let pp fmt v =
         match v with
         | None -> Format.fprintf fmt "<none>"
-        | Some h -> PS.Reveal_hash.pp fmt h
+        | Some h -> PS.pp_reveal fmt h
     end)
 
     module Metadata = Make_var (struct
@@ -883,10 +883,10 @@ module Make (Context : P) :
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
     | Waiting_for_reveal -> (
-        let* h = Required_reveal.get in
-        match h with
+        let* r = Required_reveal.get in
+        match r with
         | None -> internal_error "Internal error: Reveal invariant broken"
-        | Some h -> return (PS.Needs_reveal (Reveal_raw_data h)))
+        | Some reveal -> return (PS.Needs_reveal reveal))
     | Waiting_for_metadata -> return PS.(Needs_reveal Reveal_metadata)
     | Halted | Parsing | Evaluating -> return PS.No_input_required
 
@@ -975,6 +975,18 @@ module Make (Context : P) :
     | PS.Metadata metadata ->
         let* () = Metadata.set (Some metadata) in
         let* () = Status.set Waiting_for_input_message in
+        return ()
+    | PS.Dal_page None ->
+        (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
+           Below, we set the status to [Waiting_for_input_message] because the
+           inbox is the only source of automatically fetched data.
+           Once the issue above is handled (auto-fetch of Dal pages with EOL/SOL),
+           the implementation should be adapted. *)
+        let* () = Status.set Waiting_for_input_message in
+        return ()
+    | PS.Dal_page (Some data) ->
+        let* () = Next_message.set (Some (Bytes.to_string data)) in
+        let* () = start_parsing in
         return ()
 
   let ticked m =
@@ -1168,6 +1180,85 @@ module Make (Context : P) :
             return (destination, entrypoint))
     | [] -> fail
 
+  let evaluate_preimage_request hash =
+    let open Monad.Syntax in
+    match PS.Reveal_hash.of_b58check_opt hash with
+    | None -> stop_evaluating false
+    | Some hash ->
+        let* () = Required_reveal.set (Some (Reveal_raw_data hash)) in
+        let* () = Status.set Waiting_for_reveal in
+        return ()
+
+  let evaluate_dal_page_request =
+    (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+       - We should rather provide DAL parameters to PVM via metadata (and handle
+         the case where parameters are updated on L1).
+       - It's better to use EOL/SOL to request DAL pages once unique inbox MR
+         is merged. *)
+    (* The parameters below are those of mainnet in protocol constants, divided
+       by 16. *)
+    let endorsement_lag = 1l in
+    let page_size = 4096 / 64 in
+    let slot_size = (1 lsl 20) / 64 in
+    let number_of_slots = 256 / 64 in
+    let number_of_pages = slot_size / page_size in
+    let mk_slot_index slot_str =
+      let open Option_syntax in
+      let* index = Option.map Int32.to_int @@ Int32.of_string_opt slot_str in
+      if Compare.Int.(index < 0 || index >= number_of_slots) then None
+      else Dal_slot_repr.Index.of_int index
+    in
+    let mk_page_index page_str =
+      let open Option_syntax in
+      let* index = Option.map Int32.to_int @@ Int32.of_string_opt page_str in
+      if Compare.Int.(index < 0 || index >= number_of_pages) then None
+      else Some index
+    in
+    fun raw_page_id ->
+      let mk_page_id current_lvl =
+        (* Dal pages import directive is [dal:<LVL>:<SID>:<PID>]. See mli file.*)
+        let open Option_syntax in
+        match String.split_on_char ':' raw_page_id with
+        | [lvl; slot; page] ->
+            let* lvl = Int32.of_string_opt lvl in
+            let* lvl = Bounded.Non_negative_int32.of_value lvl in
+            let published_level = Raw_level_repr.of_int32_non_negative lvl in
+            let delta = Raw_level_repr.diff current_lvl published_level in
+            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3995
+               Putting delta > 0l doesn't work here because of the way the node
+               currently fetches blocks' data and calls the PVM.
+               This will be changed, in particular once EOL is used to fetch DAL
+               data.
+
+               More generally, the whole condition below will be reworked. *)
+            if
+              Compare.Int32.(
+                delta > 1l && delta <= Int32.mul 2l endorsement_lag)
+            then
+              let* index = mk_slot_index slot in
+              let* page_index = mk_page_index page in
+              let slot_id = Dal_slot_repr.Header.{published_level; index} in
+              Some Dal_slot_repr.Page.{slot_id; page_index}
+            else None
+        | _ -> None
+      in
+      let open Monad.Syntax in
+      let* current_lvl = Current_level.get in
+      match mk_page_id current_lvl with
+      | Some page_id ->
+          let* () = Required_reveal.set (Some (Request_dal_page page_id)) in
+          let* () = Status.set Waiting_for_reveal in
+          return ()
+      | None -> stop_evaluating false
+
+  let remove_prefix prefix input input_len =
+    let prefix_len = String.length prefix in
+    if
+      Compare.Int.(input_len > prefix_len)
+      && String.(equal (sub input 0 prefix_len) prefix)
+    then Some (String.sub input prefix_len (input_len - prefix_len))
+    else None
+
   let evaluate =
     let open Monad.Syntax in
     let* i = Code.pop in
@@ -1175,24 +1266,28 @@ module Make (Context : P) :
     | None -> stop_evaluating true
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
+        (* When evaluating an instruction [IStore x], we start by checking if [x]
+           is a reserved directive:
+           - "hash:<HASH>", to import a DAC data;
+           - "dal:<LVL>:<SID>:<PID>", to request a Dal page;
+           - "out" or "<DESTINATION>%<ENTRYPOINT>", to add a message in the outbox.
+           Otherwise, the instruction is interpreted as a directive to store the
+           top of the PVM's stack into the variable [x].
+        *)
         let len = String.length x in
-        if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
-        then
-          let hash = String.sub x 5 (len - 5) in
-          match PS.Reveal_hash.of_b58check_opt hash with
-          | None -> stop_evaluating false
-          | Some hash ->
-              let* () = Required_reveal.set (Some hash) in
-              let* () = Status.set Waiting_for_reveal in
-              return ()
-        else
-          let* v = Stack.top in
-          match v with
-          | None -> stop_evaluating false
-          | Some v -> (
-              match identifies_target_contract x with
-              | Some contract_entrypoint -> output contract_entrypoint v
-              | None -> Vars.set x v))
+        match remove_prefix "hash:" x len with
+        | Some hash -> evaluate_preimage_request hash
+        | None -> (
+            match remove_prefix "dal:" x len with
+            | Some pid -> evaluate_dal_page_request pid
+            | None -> (
+                let* v = Stack.top in
+                match v with
+                | None -> stop_evaluating false
+                | Some v -> (
+                    match identifies_target_contract x with
+                    | Some contract_entrypoint -> output contract_entrypoint v
+                    | None -> Vars.set x v))))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -1233,38 +1328,35 @@ module Make (Context : P) :
   let step_transition input_given state =
     let open Lwt_syntax in
     let* request = is_input_state state in
+    let error msg = state_of (internal_error msg) state in
     let* state =
-      match request with
-      | PS.No_input_required -> eval state
-      | PS.Initial | PS.First_after _ -> (
-          match input_given with
-          | Some (PS.Inbox_message _ as input_given) ->
-              set_input input_given state
-          | None | Some (PS.Reveal _) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting inbox message, got a reveal.")
-                state)
-      | PS.Needs_reveal (Reveal_raw_data _hash) -> (
-          match input_given with
-          | Some (PS.Reveal (Raw_data _) as input_given) ->
-              set_input input_given state
-          | None | Some (PS.Inbox_message _) | Some (PS.Reveal (Metadata _)) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting a raw data reveal, got an \
-                    inbox message or a reveal metadata.")
-                state)
-      | PS.Needs_reveal Reveal_metadata -> (
-          match input_given with
-          | Some (PS.Reveal (Metadata _) as metadata) ->
-              set_input metadata state
-          | None | Some (PS.Reveal (Raw_data _)) | Some (PS.Inbox_message _) ->
-              state_of
-                (internal_error
-                   "Invalid set_input: expecting a metadata reveal, got an \
-                    inbox message or a raw data reveal.")
-                state)
+      match (request, input_given) with
+      | PS.No_input_required, None -> eval state
+      | PS.No_input_required, Some _ ->
+          error "Invalid set_input: expecting no input message but got one."
+      | (PS.Initial | PS.First_after _), Some (PS.Inbox_message _ as input)
+      | ( PS.Needs_reveal (Reveal_raw_data _),
+          Some (PS.Reveal (Raw_data _) as input) )
+      | PS.Needs_reveal Reveal_metadata, Some (PS.Reveal (Metadata _) as input)
+      | ( PS.Needs_reveal (PS.Request_dal_page _),
+          Some (PS.Reveal (Dal_page _) as input) ) ->
+          (* For all the cases above, the input request matches the given input, so
+             we proceed by setting the input. *)
+          set_input input state
+      | (PS.Initial | PS.First_after _), _ ->
+          error "Invalid set_input: expecting inbox message, got a reveal."
+      | PS.Needs_reveal (Reveal_raw_data _hash), _ ->
+          error
+            "Invalid set_input: expecting a raw data reveal, got an inbox \
+             message or a reveal metadata."
+      | PS.Needs_reveal Reveal_metadata, _ ->
+          error
+            "Invalid set_input: expecting a metadata reveal, got an inbox \
+             message or a raw data reveal."
+      | PS.Needs_reveal (PS.Request_dal_page _), _ ->
+          error
+            "Invalid set_input: expecting a dal page reveal, got an inbox \
+             message or a raw data reveal."
     in
     return (state, request)
 

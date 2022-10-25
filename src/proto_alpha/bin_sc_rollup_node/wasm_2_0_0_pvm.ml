@@ -75,6 +75,8 @@ module Impl : Pvm.S = struct
           Sc_rollup.Reveal_hash.pp
           hash
     | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
+    | Waiting_for_reveal (Sc_rollup.Request_dal_page page_id) ->
+        Format.asprintf "Waiting for page data %a" Dal.Page.pp page_id
     | Computing -> "Computing"
 
   module Backend = Make_backend (Wasm_2_0_0_proof_format.Tree)

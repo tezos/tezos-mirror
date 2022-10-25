@@ -16,6 +16,9 @@
         "Tx_rollup_prefixes",
         "Merkle_list",
         "Bitset",
+        "Bounded_history_repr",
+        "Skip_list_repr",
+
 
         "Michelson_v1_primitives",
         "Slot_repr",
@@ -44,7 +47,10 @@
         "Contract_repr",
         "Indexable",
         "Entrypoint_repr",
-        "Bounded_history_repr",
+
+        "Dal_slot_repr",
+        "Dal_endorsement_repr",
+
         "Sc_rollup_repr",
         "Sc_rollup_metadata_repr",
         "Sc_rollup_tick_repr",
@@ -54,7 +60,6 @@
         "Sc_rollup_arith",
         "Sc_rollup_wasm",
         "Sc_rollups",
-        "Skip_list_repr",
         "Sc_rollup_data_version_sig",
         "Sc_rollup_inbox_repr",
         "Sc_rollup_commitment_repr",
@@ -78,8 +83,6 @@
         "Tx_rollup_errors_repr",
         "Tx_rollup_state_repr",
 
-        "Dal_slot_repr",
-        "Dal_endorsement_repr",
         "Dal_errors_repr",
 
         "Zk_rollup_scalar",
@@ -172,10 +175,10 @@
         "Sc_rollup_outbox_storage",
         "Sc_rollup_stake_storage",
         "Sc_rollup_storage",
+        "Dal_slot_storage",
         "Sc_rollup_refutation_storage",
         "Zk_rollup_errors",
 
-        "Dal_slot_storage",
 
         "Alpha_context",
         "Script_string",

@@ -312,6 +312,10 @@ module V2_0_0 = struct
           let* s = get in
           let* s = lift (WASM_machine.reveal_step metadata_bytes s) in
           set s
+      | PS.Reveal (PS.Dal_page _content_opt) ->
+          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3927.
+             Handle DAL pages in wasm PVM. *)
+          assert false
 
     let set_input input = state_of @@ set_input_state input
 

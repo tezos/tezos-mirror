@@ -23,38 +23,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node keeps the list of dal slots to which the rollup is
-    subscribed to for each block it needs to process. This is to determine
-    whether the inbox for a given block will need to be retrieved from the
-    block operations, or from the data availability layer after lag levels
-    have passed and the slot for the block has been declared available.
+open Protocol
+open Alpha_context
 
-    The state of subscribed slots per block is persistent.
+(** Access DAL slots and pages content.
+
+    This module is a wrapper on top of {!Store.Dal_slot_pages} module to
+    access DAL slots and pages' data that have been previously fetched by
+    the rollup node.
 *)
 
-type error += Cannot_read_block_metadata of Block_hash.t
+(** This error is returned when a slot, identified by its ID, is not found in
+    the store. *)
+type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
 
-(** [process_head node_ctxt head] performs the following operations:
-    {ul
-      {li it fetches the slot indices to which the rollup is subscribed to,
-       and stores them in [Store.Dal_slot_subbscriptions] }
-      {li it reads the endorsements for headers published endorsement_lag
-      levels preceding [head] from the block metadata, determines which
-      ones the rollup node will download, and stores the results in
-      [Store.Dal_confirmed_slots].}
-    }  *)
-val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
+(** Retrieve the pages' content of the given slot ID's from the store.
 
-(** [slots_history_of_hash node_ctxt block_hash] returns the DAL confirmed slots
-   history at the end of the given [block_hash] validation. *)
-val slots_history_of_hash :
-  Node_context.t ->
-  Layer1.head ->
-  Protocol.Alpha_context.Dal.Slots_history.t tzresult Lwt.t
+    The function returns [Dal_slot_not_found_in_store] if no entry is found in
+    the store for the given ID (i.e. no page is registered with or without content).
 
-(** [slots_history_cache_of_hash node_ctxt block_hash] returns the DAL confirmed
-   slots history cache at the end of the given [block_hash] validation. *)
-val slots_history_cache_of_hash :
-  Node_context.t ->
-  Layer1.head ->
-  Protocol.Alpha_context.Dal.Slots_history.History_cache.t tzresult Lwt.t
+    If the returned list is not empty, the slot whose ID is given is supposed to
+    be confirmed.
+
+    The function relies on {!Store.Dal_slot_pages}'s invariants to guarantee that:
+    - the pages are returned in increasing order w.r.t. their indexes in the slot;
+    - the size of the list, in case it is not empty, is equal to the expected
+      number of pages in a slot.
+
+    [dal_endorsement_lag] is used to retrieve the correct entry in [store].
+*)
+val slot_pages :
+  dal_endorsement_lag:int ->
+  Store.t ->
+  Dal.slot_id ->
+  Dal.Page.content list tzresult Lwt.t
+
+(** Retrieve the content of the page identified by the given ID from the store.
+
+    The function returns [Dal_slot_not_found_in_store] if no entry is found in
+    the store for the given ID. It
+    returns [None] in case the entry is found, but the slot is not confirmed. Said
+    otherwise, some content is only returned for confirmed pages (slots) for
+    which the content has already been downloaded and saved to the store.
+
+    [dal_endorsement_lag] is used to retrieve the correct entry in [store].
+*)
+val page_content :
+  dal_endorsement_lag:int ->
+  Store.t ->
+  Dal.Page.t ->
+  Dal.Page.content option tzresult Lwt.t

@@ -63,7 +63,10 @@ type inbox_message = {
   payload : Sc_rollup_inbox_message_repr.serialized;
 }
 
-type reveal_data = Raw_data of string | Metadata of Sc_rollup_metadata_repr.t
+type reveal_data =
+  | Raw_data of string
+  | Metadata of Sc_rollup_metadata_repr.t
+  | Dal_page of Dal_slot_repr.Page.content option
 
 type input = Inbox_message of inbox_message | Reveal of reveal_data
 
@@ -79,6 +82,12 @@ let pp_inbox_message fmt {inbox_level; message_counter; _} =
 let pp_reveal_data fmt = function
   | Raw_data _ -> Format.pp_print_string fmt "raw data"
   | Metadata metadata -> Sc_rollup_metadata_repr.pp fmt metadata
+  | Dal_page content_opt ->
+      Format.pp_print_option
+        ~none:(fun fmt () -> Format.pp_print_string fmt "<No_dal_data>")
+        (fun fmt _a -> Format.fprintf fmt "<Some_dal_data>")
+        fmt
+        content_opt
 
 let pp_input fmt = function
   | Inbox_message msg ->
@@ -123,7 +132,17 @@ let reveal_data_encoding =
       (function Metadata md -> Some ((), md) | _ -> None)
       (fun ((), md) -> Metadata md)
   in
-  union [case_raw_data; case_metadata]
+  let case_dal_page =
+    case
+      ~title:"dal page"
+      (Tag 2)
+      (obj2
+         (req "reveal_data_kind" (constant "dal_page"))
+         (req "dal_page_content" (option bytes)))
+      (function Dal_page p -> Some ((), p) | _ -> None)
+      (fun ((), p) -> Dal_page p)
+  in
+  union [case_raw_data; case_metadata; case_dal_page]
 
 let input_encoding =
   let open Data_encoding in
@@ -162,6 +181,8 @@ let reveal_data_equal a b =
   | Raw_data _, _ -> false
   | Metadata a, Metadata b -> Sc_rollup_metadata_repr.equal a b
   | Metadata _, _ -> false
+  | Dal_page a, Dal_page b -> Option.equal Bytes.equal a b
+  | Dal_page _, _ -> false
 
 let input_equal a b =
   match (a, b) with
@@ -198,7 +219,10 @@ module Reveal_hash =
       let size = Some 32
     end)
 
-type reveal = Reveal_raw_data of Reveal_hash.t | Reveal_metadata
+type reveal =
+  | Reveal_raw_data of Reveal_hash.t
+  | Reveal_metadata
+  | Request_dal_page of Dal_slot_repr.Page.t
 
 let reveal_encoding =
   let open Data_encoding in
@@ -219,7 +243,17 @@ let reveal_encoding =
       (function Reveal_metadata -> Some () | _ -> None)
       (fun () -> Reveal_metadata)
   in
-  union [case_raw_data; case_metadata]
+  let case_dal_page =
+    case
+      ~title:"Request_dal_page"
+      (Tag 2)
+      (obj2
+         (req "reveal_kind" (constant "request_dal_page"))
+         (req "page_id" Dal_slot_repr.Page.encoding))
+      (function Request_dal_page s -> Some ((), s) | _ -> None)
+      (fun ((), s) -> Request_dal_page s)
+  in
+  union [case_raw_data; case_metadata; case_dal_page]
 
 (** The PVM's current input expectations:
     - [No_input_required] if the machine is busy and has no need for new input.
@@ -281,6 +315,7 @@ let input_request_encoding =
 let pp_reveal fmt = function
   | Reveal_raw_data hash -> Reveal_hash.pp fmt hash
   | Reveal_metadata -> Format.pp_print_string fmt "Reveal metadata"
+  | Request_dal_page id -> Dal_slot_repr.Page.pp fmt id
 
 (** [pp_input_request fmt i] pretty prints the given input [i] to the formatter
     [fmt]. *)
@@ -302,9 +337,9 @@ let pp_input_request fmt request =
 let reveal_equal p1 p2 =
   match (p1, p2) with
   | Reveal_raw_data h1, Reveal_raw_data h2 -> Reveal_hash.equal h1 h2
-  | Reveal_raw_data _, _ -> false
   | Reveal_metadata, Reveal_metadata -> true
-  | Reveal_metadata, _ -> false
+  | Request_dal_page a, Request_dal_page b -> Dal_slot_repr.Page.equal a b
+  | (Reveal_raw_data _ | Reveal_metadata | Request_dal_page _), _ -> false
 
 (** [input_request_equal i1 i2] return whether [i1] and [i2] are equal. *)
 let input_request_equal a b =

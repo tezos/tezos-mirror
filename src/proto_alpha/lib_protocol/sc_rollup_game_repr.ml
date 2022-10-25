@@ -386,6 +386,7 @@ module V1 = struct
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
+    dal_snapshot : Dal_slot_repr.History.t;
     start_level : Raw_level_repr.t;
     inbox_level : Raw_level_repr.t;
     pvm_name : string;
@@ -454,27 +455,21 @@ module V1 = struct
 
   let equal
       {
-        turn = turn1;
-        inbox_snapshot = inbox_snapshot1;
-        start_level = start_level1;
-        inbox_level = inbox_level1;
-        pvm_name = pvm_name1;
-        game_state = game_state1;
-      }
-      {
-        turn = turn2;
-        inbox_snapshot = inbox_snapshot2;
-        start_level = start_level2;
-        inbox_level = inbox_level2;
-        pvm_name = pvm_name2;
-        game_state = game_state2;
-      } =
-    player_equal turn1 turn2
-    && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot1 inbox_snapshot2
-    && Raw_level_repr.equal start_level1 start_level2
-    && Raw_level_repr.equal inbox_level1 inbox_level2
-    && String.equal pvm_name1 pvm_name2
-    && game_state_equal game_state1 game_state2
+        turn;
+        inbox_snapshot;
+        dal_snapshot;
+        start_level;
+        inbox_level;
+        pvm_name;
+        game_state;
+      } g2 =
+    player_equal turn g2.turn
+    && Sc_rollup_inbox_repr.equal_history_proof inbox_snapshot g2.inbox_snapshot
+    && Dal_slot_repr.History.equal dal_snapshot g2.dal_snapshot
+    && Raw_level_repr.equal start_level g2.start_level
+    && Raw_level_repr.equal inbox_level g2.inbox_level
+    && String.equal pvm_name g2.pvm_name
+    && game_state_equal game_state g2.game_state
 
   let string_of_player = function Alice -> "alice" | Bob -> "bob"
 
@@ -535,18 +530,39 @@ module V1 = struct
       (fun {
              turn;
              inbox_snapshot;
+             dal_snapshot;
              start_level;
              inbox_level;
              pvm_name;
              game_state;
            } ->
-        (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state))
-      (fun (turn, inbox_snapshot, start_level, inbox_level, pvm_name, game_state)
-           ->
-        {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state})
-      (obj6
+        ( turn,
+          inbox_snapshot,
+          dal_snapshot,
+          start_level,
+          inbox_level,
+          pvm_name,
+          game_state ))
+      (fun ( turn,
+             inbox_snapshot,
+             dal_snapshot,
+             start_level,
+             inbox_level,
+             pvm_name,
+             game_state ) ->
+        {
+          turn;
+          inbox_snapshot;
+          dal_snapshot;
+          start_level;
+          inbox_level;
+          pvm_name;
+          game_state;
+        })
+      (obj7
          (req "turn" player_encoding)
          (req "inbox_snapshot" Sc_rollup_inbox_repr.history_proof_encoding)
+         (req "dal_snapshot" Dal_slot_repr.History.encoding)
          (req "start_level" Raw_level_repr.encoding)
          (req "inbox_level" Raw_level_repr.encoding)
          (req "pvm_name" string)
@@ -671,7 +687,8 @@ end
 
 let make_chunk state_hash tick = {state_hash; tick}
 
-let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
+let initial inbox dal_snapshot ~start_level ~pvm_name
+    ~(parent : Sc_rollup_commitment_repr.t)
     ~(child : Sc_rollup_commitment_repr.t) ~refuter ~defender
     ~default_number_of_sections =
   let ({alice; _} : Index.t) = Index.make refuter defender in
@@ -702,6 +719,7 @@ let initial inbox ~start_level ~pvm_name ~(parent : Sc_rollup_commitment_repr.t)
   {
     turn = (if alice_to_play then Alice else Bob);
     inbox_snapshot = inbox;
+    dal_snapshot;
     start_level;
     inbox_level = child.inbox_level;
     pvm_name;
@@ -979,16 +997,22 @@ let check_proof_refute_stop_state ~stop_state input input_request proof =
   check_proof_stop_state ~stop_state input input_request proof false
 
 (** Returns the validity of the first final move on top of a dissection. *)
-let validity_final_move ~first_move ~metadata ~proof ~game ~start_chunk
-    ~stop_chunk =
+let validity_final_move dal_parameters ~dal_endorsement_lag ~first_move
+    ~metadata ~proof ~game ~start_chunk ~stop_chunk =
   let open Lwt_result_syntax in
   let*! res =
-    let {inbox_snapshot; inbox_level; pvm_name; _} = game in
+    let {inbox_snapshot; inbox_level; pvm_name; dal_snapshot; _} = game in
     let*! valid =
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+         This function is not resilient to dal parameters changes
+         (cryptobox parameters or dal_endorsement_lag for instance). *)
       Sc_rollup_proof_repr.valid
         ~metadata
         inbox_snapshot
         inbox_level
+        dal_snapshot
+        dal_parameters
+        ~dal_endorsement_lag
         ~pvm_name
         proof
     in
@@ -1031,8 +1055,11 @@ let validity_final_move ~first_move ~metadata ~proof ~game ~start_chunk
     - The proof stop on the state different than the refuted one.
     - The proof is correctly verified.
 *)
-let validity_first_final_move ~metadata ~proof ~game ~start_chunk ~stop_chunk =
+let validity_first_final_move dal_parameters ~dal_endorsement_lag ~metadata
+    ~proof ~game ~start_chunk ~stop_chunk =
   validity_final_move
+    dal_parameters
+    ~dal_endorsement_lag
     ~first_move:true
     ~metadata
     ~proof
@@ -1047,9 +1074,11 @@ let validity_first_final_move ~metadata ~proof ~game ~start_chunk ~stop_chunk =
     - The proof stop on the state validates the refuted one.
     - The proof is correctly verified.
 *)
-let validity_second_final_move ~metadata ~agreed_start_chunk ~refuted_stop_chunk
-    ~game ~proof =
+let validity_second_final_move dal_parameters ~dal_endorsement_lag ~metadata
+    ~agreed_start_chunk ~refuted_stop_chunk ~game ~proof =
   validity_final_move
+    dal_parameters
+    ~dal_endorsement_lag
     ~first_move:false
     ~metadata
     ~proof
@@ -1064,7 +1093,7 @@ let loser_of_results ~alice_result ~bob_result =
   | false, true -> Some Alice
   | true, false -> Some Bob
 
-let play ~stakers metadata game refutation =
+let play dal_parameters ~dal_endorsement_lag ~stakers metadata game refutation =
   let open Lwt_tzresult_syntax in
   let mk_loser loser =
     let loser = Index.staker stakers loser in
@@ -1090,6 +1119,7 @@ let play ~stakers metadata game refutation =
            {
              turn = opponent game.turn;
              inbox_snapshot = game.inbox_snapshot;
+             dal_snapshot = game.dal_snapshot;
              start_level = game.start_level;
              inbox_level = game.inbox_level;
              pvm_name = game.pvm_name;
@@ -1102,6 +1132,8 @@ let play ~stakers metadata game refutation =
       in
       let*! player_result =
         validity_first_final_move
+          dal_parameters
+          ~dal_endorsement_lag
           ~proof
           ~metadata
           ~game
@@ -1120,6 +1152,7 @@ let play ~stakers metadata game refutation =
              {
                turn = opponent game.turn;
                inbox_snapshot = game.inbox_snapshot;
+               dal_snapshot = game.dal_snapshot;
                start_level = game.start_level;
                inbox_level = game.inbox_level;
                pvm_name = game.pvm_name;
@@ -1128,6 +1161,8 @@ let play ~stakers metadata game refutation =
   | Proof proof, Final_move {agreed_start_chunk; refuted_stop_chunk} ->
       let*! player_result =
         validity_second_final_move
+          dal_parameters
+          ~dal_endorsement_lag
           ~metadata
           ~agreed_start_chunk
           ~refuted_stop_chunk

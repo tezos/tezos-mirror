@@ -98,18 +98,27 @@ module Index : sig
 end
 
 module Header : sig
-  (** For Layer-1, a slot is described by the level at which it is published,
-    the slot's index (in the list of slots), and the slot's header
-    (KATE commitment hash). *)
+  (** For Layer-1, a slot is identified by the level at which it is published
+      and the slot's index. *)
   type id = {published_level : Raw_level_repr.t; index : Index.t}
 
+  (** For Layer-1, a slot is described by its slot {!id} and the slot's KATE
+      commitment hash. *)
   type t = {id : id; commitment : Commitment.t}
 
-  (** The encoding ensures the slot is always a non-negative number. *)
+  (** encoding for values of type {!id}. *)
+  val id_encoding : id Data_encoding.t
+
+  (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
+  (** pretty-printer for values of type {!id}. *)
+  val pp_id : Format.formatter -> id -> unit
+
+  (** pretty-printer for values of type {!t}. *)
   val pp : Format.formatter -> t -> unit
 
+  (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
 end
 
@@ -141,18 +150,22 @@ module Page : sig
   (** Encoding for page contents. *)
   val content_encoding : content Data_encoding.t
 
-  (** A page is identified by its slot id and by its own index in the list
+  (** A page is identified by its slot ID and by its own index in the list
      of pages of the slot. *)
   type t = {slot_id : Header.id; page_index : Index.t}
 
   type proof = Dal.page_proof
 
+  (** equal function for values of type {!t}. *)
   val equal : t -> t -> bool
 
+  (** encoding for values of type {!t}. *)
   val encoding : t Data_encoding.t
 
+  (** encoding for values of type {!proof}. *)
   val proof_encoding : proof Data_encoding.t
 
+  (** pretty-printer for values of type {!t}. *)
   val pp : Format.formatter -> t -> unit
 end
 

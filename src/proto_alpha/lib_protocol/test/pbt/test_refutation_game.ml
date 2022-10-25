@@ -1354,6 +1354,22 @@ let build_proof ~player_client start_tick (game : Game.t) =
 
       let inbox = history_proof
     end
+
+    (* FIXME/DAL-REFUTATION: https://gitlab.com/tezos/tezos/-/issues/3992
+       Extend refutation game to handle Dal refutation case. *)
+    module Dal_with_history = struct
+      let confirmed_slots_history = Dal.Slots_history.genesis
+
+      let history_cache = Dal.Slots_history.History_cache.empty ~capacity:0L
+
+      let page_info = None
+
+      let dal_parameters =
+        Default_parameters.constants_test.dal.cryptobox_parameters
+
+      let dal_endorsement_lag =
+        Default_parameters.constants_test.dal.endorsement_lag
+    end
   end in
   let*! proof = Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level in
   return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)

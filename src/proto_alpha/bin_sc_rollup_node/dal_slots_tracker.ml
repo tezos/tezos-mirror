@@ -444,3 +444,8 @@ let process_head node_ctxt (Layer1.{hash = head_hash; _} as head) =
           confirmation_info
       in
       Confirmed_slots_history.update node_ctxt head confirmation_info
+
+let slots_history_of_hash = Confirmed_slots_history.slots_history_of_hash
+
+let slots_history_cache_of_hash =
+  Confirmed_slots_history.slots_history_cache_of_hash
