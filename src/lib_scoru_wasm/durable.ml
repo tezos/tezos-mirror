@@ -131,8 +131,9 @@ let subtree_name_at tree key index =
 
 let move_tree_exn tree from_key to_key =
   let open Lwt.Syntax in
-  let* tree = copy_tree_exn tree from_key to_key in
-  delete tree from_key
+  let* move_tree = find_tree_exn tree from_key in
+  let* tree = delete tree from_key in
+  T.add_tree tree to_key move_tree
 
 let hash_exn tree key =
   let open Lwt.Syntax in
