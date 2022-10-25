@@ -125,7 +125,7 @@ val unsafe_transaction :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?parameters:
     Michelson_v1_primitives.prim Micheline.canonical Data_encoding.lazy_t ->
   ?entrypoint:Entrypoint_repr.t ->
@@ -184,13 +184,13 @@ val increase_paid_storage :
     {li [?forge_pkh]: use a provided [pkh] as source, instead of
     hashing [pkh]. Useful for forging non-honest reveal operations}
 
-    {li [?storage_limit:counter]: forces a storage limit, otherwise
+    {li [?storage_limit:Z.t]: forces a storage limit, otherwise
     set to [Z.zero]}
 *)
 val revelation :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   ?forge_pkh:public_key_hash option ->
   Context.t ->
@@ -489,7 +489,7 @@ val tx_rollup_dispatch_tickets :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   source:Contract.t ->
   message_index:int ->
@@ -529,7 +529,7 @@ val transfer_ticket :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   source:Contract.t ->
   contents:Script.lazy_expr ->
@@ -608,7 +608,7 @@ val sc_rollup_origination :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?origination_proof:string ->
   Context.t ->
   Contract.t ->
@@ -662,7 +662,7 @@ val sc_rollup_execute_outbox_message :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?force_reveal:bool ->
   Context.t ->
   Contract.t ->
@@ -724,7 +724,7 @@ val dal_publish_slot_header :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   Dal.Slot.Header.t ->
@@ -737,7 +737,7 @@ val zk_rollup_origination :
   ?counter:Z.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   public_parameters:
@@ -753,7 +753,7 @@ val update_consensus_key :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   public_key ->
@@ -773,7 +773,7 @@ val zk_rollup_publish :
   ?counter:Z.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
   zk_rollup:Zk_rollup.t ->

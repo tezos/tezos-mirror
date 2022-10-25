@@ -329,6 +329,11 @@ let gen_counters =
   let+ i = nat in
   Z.of_int i
 
+let gen_ticket_amounts =
+  let open QCheck2.Gen in
+  let+ i = nat in
+  Option.value (Ticket_amount.of_zint (Z.of_int i)) ~default:Ticket_amount.one
+
 let gen_gas_limit =
   let open QCheck2.Gen in
   let+ i = nat in
@@ -630,10 +635,7 @@ let generate_transfer_ticket =
   let open QCheck2.Gen in
   let* ticketer = random_contract in
   let* destination = random_contract in
-  let+ amount = gen_counters in
-  let amount =
-    Option.value (Ticket_amount.of_zint amount) ~default:Ticket_amount.one
-  in
+  let+ amount = gen_ticket_amounts in
   let contents = Script.lazy_expr (Expr.from_string "1") in
   let ty = Script.lazy_expr (Expr.from_string "nat") in
   let entrypoint = Entrypoint.default in

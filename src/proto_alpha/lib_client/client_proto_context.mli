@@ -812,7 +812,7 @@ val sc_rollup_originate :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
@@ -839,7 +839,7 @@ val sc_rollup_add_messages :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   messages:string list ->
@@ -863,7 +863,7 @@ val sc_rollup_cement :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
@@ -888,7 +888,7 @@ val sc_rollup_publish :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
@@ -913,7 +913,7 @@ val sc_rollup_execute_outbox_message :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Sc_rollup.t ->
@@ -965,7 +965,7 @@ val sc_rollup_refute :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
@@ -991,7 +991,7 @@ val sc_rollup_timeout :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->
@@ -1017,7 +1017,7 @@ val sc_rollup_dal_slot_subscribe :
   ?simulation:bool ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
+  ?storage_limit:Z.t ->
   ?counter:counter ->
   source:public_key_hash ->
   rollup:Alpha_context.Sc_rollup.t ->

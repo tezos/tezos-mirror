@@ -101,4 +101,4 @@ val transfer_ticket :
   dst:Destination.t ->
   Ticket_token.ex_token ->
   Script_typed_ir.ticket_amount ->
-  (context * counter, error trace) result Lwt.t
+  (context * Z.t, error trace) result Lwt.t

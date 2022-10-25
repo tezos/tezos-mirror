@@ -30,9 +30,17 @@ type error +=
   | (* `Temporary *)
       Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_past of {
+      contract : Contract_repr.t;
+      expected : Z.t;
+      found : Z.t;
+    }
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
+      Counter_in_the_future of {
+      contract : Contract_repr.t;
+      expected : Z.t;
+      found : Z.t;
+    }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
   | (* `Permanent *)
