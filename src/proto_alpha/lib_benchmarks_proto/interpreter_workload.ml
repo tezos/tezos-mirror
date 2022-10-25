@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -103,6 +104,10 @@ type instruction_name =
   | N_INot_bytes
   | N_ILsl_bytes
   | N_ILsr_bytes
+  | N_IBytes_nat
+  | N_INat_bytes
+  | N_IBytes_int
+  | N_IInt_bytes
   (* timestamp operations *)
   | N_IAdd_seconds_to_timestamp
   | N_IAdd_timestamp_to_seconds
@@ -310,6 +315,10 @@ let string_of_instruction_name : instruction_name -> string =
   | N_INot_bytes -> "N_INot_bytes"
   | N_ILsl_bytes -> "N_ILsl_bytes"
   | N_ILsr_bytes -> "N_ILsr_bytes"
+  | N_IBytes_nat -> "N_IBytes_nat"
+  | N_INat_bytes -> "N_INat_bytes"
+  | N_IBytes_int -> "N_IBytes_int"
+  | N_IInt_bytes -> "N_IInt_bytes"
   | N_IAdd_seconds_to_timestamp -> "N_IAdd_seconds_to_timestamp"
   | N_IAdd_timestamp_to_seconds -> "N_IAdd_timestamp_to_seconds"
   | N_ISub_timestamp_seconds -> "N_ISub_timestamp_seconds"
@@ -532,6 +541,10 @@ let all_instructions =
     N_IConcat_bytes_pair;
     N_ISlice_bytes;
     N_IBytes_size;
+    N_IBytes_nat;
+    N_INat_bytes;
+    N_IBytes_int;
+    N_IInt_bytes;
     N_IAdd_seconds_to_timestamp;
     N_IAdd_timestamp_to_seconds;
     N_ISub_timestamp_seconds;
@@ -854,6 +867,14 @@ module Instructions = struct
     ir_sized_step N_IXor_bytes (binary "bytes1" bytes1 "bytes2" bytes2)
 
   let not_bytes bytes = ir_sized_step N_INot_bytes (unary "bytes" bytes)
+
+  let bytes_nat nat = ir_sized_step N_IBytes_nat (unary "nat" nat)
+
+  let nat_bytes bytes = ir_sized_step N_INat_bytes (unary "bytes" bytes)
+
+  let bytes_int int = ir_sized_step N_IBytes_int (unary "int" int)
+
+  let int_bytes bytes = ir_sized_step N_IInt_bytes (unary "bytes" bytes)
 
   let add_seconds_to_timestamp seconds tstamp =
     ir_sized_step
@@ -1294,6 +1315,10 @@ let extract_ir_sized_step :
   | ISlice_bytes (_, _), (_off, (_len, (s, _))) ->
       Instructions.slice_bytes (Size.bytes s)
   | IBytes_size (_, _), _ -> Instructions.bytes_size
+  | IBytes_nat (_, _), (n, _) -> Instructions.bytes_nat (Size.integer n)
+  | INat_bytes (_, _), (b, _) -> Instructions.nat_bytes (Size.bytes b)
+  | IBytes_int (_, _), (n, _) -> Instructions.bytes_int (Size.integer n)
+  | IInt_bytes (_, _), (b, _) -> Instructions.int_bytes (Size.bytes b)
   | IAdd_seconds_to_timestamp (_, _), (s, (t, _)) ->
       Instructions.add_seconds_to_timestamp (Size.timestamp t) (Size.integer s)
   | IAdd_timestamp_to_seconds (_, _), (t, (s, _)) ->

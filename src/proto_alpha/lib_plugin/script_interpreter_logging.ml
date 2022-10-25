@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -641,6 +642,42 @@ module Stack_utils = struct
                cont_init_stack = s;
                continuation = k;
                reconstruct = (fun k -> INot_bytes (loc, k));
+             }
+    | IBytes_nat (loc, k), Item_t (_, s) ->
+        let s = Item_t (bytes_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IBytes_nat (loc, k));
+             }
+    | INat_bytes (loc, k), Item_t (_, s) ->
+        let s = Item_t (nat_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> INat_bytes (loc, k));
+             }
+    | IBytes_int (loc, k), Item_t (_, s) ->
+        let s = Item_t (bytes_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IBytes_int (loc, k));
+             }
+    | IInt_bytes (loc, k), Item_t (_, s) ->
+        let s = Item_t (int_t, s) in
+        ok
+        @@ Ex_split_kinstr
+             {
+               cont_init_stack = s;
+               continuation = k;
+               reconstruct = (fun k -> IInt_bytes (loc, k));
              }
     | IAdd_seconds_to_timestamp (loc, k), Item_t (_, s) ->
         ok

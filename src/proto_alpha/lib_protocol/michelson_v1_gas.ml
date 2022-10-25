@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -35,7 +36,7 @@ module Cost_of = struct
     let bits = Z.numbits z in
     (7 + bits) / 8
 
-  let int_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
+  let int_size_in_bytes (z : 'a Script_int.num) = z_bytes (Script_int.to_zint z)
 
   let manager_operation_int = 1_000
 
@@ -123,7 +124,7 @@ module Cost_of = struct
     let add_seconds_timestamp :
         'a Script_int.num -> Script_timestamp.t -> Gas.cost =
      fun seconds timestamp ->
-      let seconds_bytes = int_bytes seconds in
+      let seconds_bytes = int_size_in_bytes seconds in
       let timestamp_bytes = z_bytes (Script_timestamp.to_zint timestamp) in
       atomic_step_cost
         (cost_N_IAdd_seconds_to_timestamp seconds_bytes timestamp_bytes)
@@ -131,7 +132,7 @@ module Cost_of = struct
     let add_timestamp_seconds :
         Script_timestamp.t -> 'a Script_int.num -> Gas.cost =
      fun timestamp seconds ->
-      let seconds_bytes = int_bytes seconds in
+      let seconds_bytes = int_size_in_bytes seconds in
       let timestamp_bytes = z_bytes (Script_timestamp.to_zint timestamp) in
       atomic_step_cost
         (cost_N_IAdd_timestamp_to_seconds timestamp_bytes seconds_bytes)
@@ -139,7 +140,7 @@ module Cost_of = struct
     let sub_timestamp_seconds :
         Script_timestamp.t -> 'a Script_int.num -> Gas.cost =
      fun timestamp seconds ->
-      let seconds_bytes = int_bytes seconds in
+      let seconds_bytes = int_size_in_bytes seconds in
       let timestamp_bytes = z_bytes (Script_timestamp.to_zint timestamp) in
       atomic_step_cost
         (cost_N_ISub_timestamp_seconds timestamp_bytes seconds_bytes)
@@ -192,6 +193,14 @@ module Cost_of = struct
 
     let not_bytes b = atomic_step_cost (cost_N_INot_bytes (Bytes.length b))
 
+    let bytes_nat n = atomic_step_cost (cost_N_IBytes_nat (int_size_in_bytes n))
+
+    let nat_bytes b = atomic_step_cost (cost_N_INat_bytes (Bytes.length b))
+
+    let bytes_int n = atomic_step_cost (cost_N_IBytes_int (int_size_in_bytes n))
+
+    let int_bytes b = atomic_step_cost (cost_N_IInt_bytes (Bytes.length b))
+
     let add_tez = atomic_step_cost cost_N_IAdd_tez
 
     let sub_tez = atomic_step_cost cost_N_ISub_tez
@@ -212,56 +221,69 @@ module Cost_of = struct
 
     let is_nat = atomic_step_cost cost_N_IIs_nat
 
-    let abs_int i = atomic_step_cost (cost_N_IAbs_int (int_bytes i))
+    let abs_int i = atomic_step_cost (cost_N_IAbs_int (int_size_in_bytes i))
 
     let int_nat = atomic_step_cost cost_N_IInt_nat
 
-    let neg i = atomic_step_cost (cost_N_INeg (int_bytes i))
+    let neg i = atomic_step_cost (cost_N_INeg (int_size_in_bytes i))
 
     let add_int i1 i2 =
-      atomic_step_cost (cost_N_IAdd_int (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IAdd_int (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let add_nat i1 i2 =
-      atomic_step_cost (cost_N_IAdd_nat (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IAdd_nat (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let sub_int i1 i2 =
-      atomic_step_cost (cost_N_ISub_int (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_ISub_int (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let mul_int i1 i2 =
-      atomic_step_cost (cost_N_IMul_int (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IMul_int (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let mul_nat i1 i2 =
-      atomic_step_cost (cost_N_IMul_nat (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IMul_nat (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let ediv_teznat _tez _n = atomic_step_cost cost_N_IEdiv_teznat
 
     let ediv_tez = atomic_step_cost cost_N_IEdiv_tez
 
     let ediv_int i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_int (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IEdiv_int (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let ediv_nat i1 i2 =
-      atomic_step_cost (cost_N_IEdiv_nat (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_IEdiv_nat (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let eq = atomic_step_cost cost_N_IEq
 
-    let lsl_nat shifted = atomic_step_cost (cost_N_ILsl_nat (int_bytes shifted))
+    let lsl_nat shifted =
+      atomic_step_cost (cost_N_ILsl_nat (int_size_in_bytes shifted))
 
-    let lsr_nat shifted = atomic_step_cost (cost_N_ILsr_nat (int_bytes shifted))
+    let lsr_nat shifted =
+      atomic_step_cost (cost_N_ILsr_nat (int_size_in_bytes shifted))
 
     let or_nat n1 n2 =
-      atomic_step_cost (cost_N_IOr_nat (int_bytes n1) (int_bytes n2))
+      atomic_step_cost
+        (cost_N_IOr_nat (int_size_in_bytes n1) (int_size_in_bytes n2))
 
     let and_nat n1 n2 =
-      atomic_step_cost (cost_N_IAnd_nat (int_bytes n1) (int_bytes n2))
+      atomic_step_cost
+        (cost_N_IAnd_nat (int_size_in_bytes n1) (int_size_in_bytes n2))
 
     let and_int_nat n1 n2 =
-      atomic_step_cost (cost_N_IAnd_int_nat (int_bytes n1) (int_bytes n2))
+      atomic_step_cost
+        (cost_N_IAnd_int_nat (int_size_in_bytes n1) (int_size_in_bytes n2))
 
     let xor_nat n1 n2 =
-      atomic_step_cost (cost_N_IXor_nat (int_bytes n1) (int_bytes n2))
+      atomic_step_cost
+        (cost_N_IXor_nat (int_size_in_bytes n1) (int_size_in_bytes n2))
 
-    let not_int i = atomic_step_cost (cost_N_INot_int (int_bytes i))
+    let not_int i = atomic_step_cost (cost_N_INot_int (int_size_in_bytes i))
 
     let if_ = atomic_step_cost cost_N_IIf
 
@@ -318,10 +340,10 @@ module Cost_of = struct
     let mul_bls12_381_fr = atomic_step_cost cost_N_IMul_bls12_381_fr
 
     let mul_bls12_381_fr_z z =
-      atomic_step_cost (cost_N_IMul_bls12_381_fr_z (int_bytes z))
+      atomic_step_cost (cost_N_IMul_bls12_381_fr_z (int_size_in_bytes z))
 
     let mul_bls12_381_z_fr z =
-      atomic_step_cost (cost_N_IMul_bls12_381_z_fr (int_bytes z))
+      atomic_step_cost (cost_N_IMul_bls12_381_z_fr (int_size_in_bytes z))
 
     let int_bls12_381_fr = atomic_step_cost cost_N_IInt_bls12_381_z_fr
 
@@ -414,7 +436,9 @@ module Cost_of = struct
 
     let split_ticket amount_a amount_b =
       atomic_step_cost
-        (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
+        (cost_N_ISplit_ticket
+           (int_size_in_bytes amount_a)
+           (int_size_in_bytes amount_b))
 
     let open_chest ~chest ~time =
       let plaintext =
@@ -448,10 +472,12 @@ module Cost_of = struct
     let compare_mutez = atomic_step_cost (cost_N_ICompare 8 8)
 
     let compare_int i1 i2 =
-      atomic_step_cost (cost_N_ICompare (int_bytes i1) (int_bytes i2))
+      atomic_step_cost
+        (cost_N_ICompare (int_size_in_bytes i1) (int_size_in_bytes i2))
 
     let compare_nat n1 n2 =
-      atomic_step_cost (cost_N_ICompare (int_bytes n1) (int_bytes n2))
+      atomic_step_cost
+        (cost_N_ICompare (int_size_in_bytes n1) (int_size_in_bytes n2))
 
     let compare_key_hash =
       let sz = Signature.Public_key_hash.size in

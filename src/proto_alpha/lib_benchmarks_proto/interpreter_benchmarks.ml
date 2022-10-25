@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1690,6 +1691,90 @@ module Registration_section = struct
                      (Random.State.int rng_state ((Bytes.length bytes * 8) + 1))))
             in
             (bytes, (shift, eos)))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IBytes_nat
+        ~stack_type:(nat @$ bot)
+        ~kinstr:(IBytes_nat (dummy_loc, halt))
+        ~intercept_stack:(Script_int.one_n, eos)
+          (* Avoid the optimized case of 0 *)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {cfg.sampler.base_parameters with int_size = {min = 0; max = 4096}}
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let nat =
+              Samplers.Random_value.value Script_typed_ir.nat_t rng_state
+            in
+            (nat, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_INat_bytes
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(INat_bytes (dummy_loc, halt))
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {
+              cfg.sampler.base_parameters with
+              bytes_size = {min = 0; max = 4096};
+            }
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (bytes, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IBytes_int
+        ~stack_type:(int @$ bot)
+        ~kinstr:(IBytes_int (dummy_loc, halt))
+        ~intercept_stack:(Script_int.one, eos)
+          (* Avoid the optimized case of 0 *)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {cfg.sampler.base_parameters with int_size = {min = 0; max = 4096}}
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let int =
+              Samplers.Random_value.value Script_typed_ir.int_t rng_state
+            in
+            (int, eos))
+        ()
+
+    let () =
+      simple_benchmark_with_stack_sampler
+        ~name:Interpreter_workload.N_IInt_bytes
+        ~stack_type:(bytes @$ bot)
+        ~kinstr:(IInt_bytes (dummy_loc, halt))
+        ~intercept_stack:(Bytes.empty, eos)
+        ~stack_sampler:(fun cfg rng_state ->
+          let base_parameters =
+            {
+              cfg.sampler.base_parameters with
+              bytes_size = {min = 0; max = 4096};
+            }
+          in
+          let sampler = {cfg.sampler with base_parameters} in
+          let _, (module Samplers) = make_default_samplers sampler in
+          fun () ->
+            let bytes =
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
+            in
+            (bytes, eos))
         ()
   end
 

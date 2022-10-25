@@ -5,6 +5,7 @@
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
+(* Copyright (c) 2022 DaiLambda, Inc. <contact@dailambda,jp>                 *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -3558,6 +3559,26 @@ and parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun k -> IBytes_size (loc, k))} in
       let stack = Item_t (nat_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_BYTES, [], annot), Item_t (Nat_t, rest) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IBytes_nat (loc, k))} in
+      let stack = Item_t (bytes_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_NAT, [], annot), Item_t (Bytes_t, rest) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> INat_bytes (loc, k))} in
+      let stack = Item_t (nat_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_BYTES, [], annot), Item_t (Int_t, rest) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IBytes_int (loc, k))} in
+      let stack = Item_t (bytes_t, rest) in
+      typed ctxt loc instr stack
+  | Prim (loc, I_INT, [], annot), Item_t (Bytes_t, rest) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun k -> IInt_bytes (loc, k))} in
+      let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
   (* currency operations *)
   | ( Prim (loc, I_ADD, [], annot),
