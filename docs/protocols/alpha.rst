@@ -86,3 +86,5 @@ Internal
 
 - Make ``counter`` an abstract type instead of an alias of ``Z.t``.
   (MRs :gl:`!6647`, :gl:`!6648`)
+
+- Move interpreter logging to the plugin. (MR :gl:`!5778`)
