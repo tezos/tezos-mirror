@@ -60,7 +60,7 @@ let sc_rollup_timeout_period_in_blocks = 20_160
    Think harder about those values. *)
 let default_cryptobox_parameters =
   {
-    Dal.Slots_history.page_size = 4096;
+    Dal.page_size = 4096;
     slot_size = 1 lsl 20;
     redundancy_factor = 16;
     number_of_shards = 2048;
@@ -276,7 +276,7 @@ let constants_mainnet =
 let derive_cryptobox_parameters ~redundancy_factor ~mainnet_constants_divider =
   let m = default_cryptobox_parameters in
   {
-    Dal.Slots_history.redundancy_factor;
+    Dal.redundancy_factor;
     page_size = m.page_size / mainnet_constants_divider;
     slot_size = m.slot_size / mainnet_constants_divider;
     number_of_shards = m.number_of_shards / mainnet_constants_divider;

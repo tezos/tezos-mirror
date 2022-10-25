@@ -1398,5 +1398,14 @@ struct
 
   module Equality_witness = Environment_context.Equality_witness
   module Plonk = Tezos_protocol_environment_structs.V7.Plonk
-  module Dal = Tezos_crypto_dal.Cryptobox.Verifier
+
+  module Dal = struct
+    include Tezos_crypto_dal.Cryptobox.Verifier
+
+    let verify_page t sh page proof =
+      match verify_page t sh page proof with
+      | Error `Page_length_mismatch -> Ok false
+      | Error `Segment_index_out_of_range -> Error `Segment_index_out_of_range
+      | Ok r -> Ok r
+  end
 end

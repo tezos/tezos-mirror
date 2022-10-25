@@ -23,6 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** To verify the proof of a page membership in its associated slot, the
+     Cryptobox module needs the following Dal parameters. These are part of the
+     protocol's parameters. See {!Default_parameters.default_dal}. *)
+type parameters = Dal.parameters = {
+  redundancy_factor : int;
+  page_size : int;
+  slot_size : int;
+  number_of_shards : int;
+}
+
+(** An encoding for values of type {!parameters}. *)
+val parameters_encoding : parameters Data_encoding.t
+
 (** Slot header representation for the data-availability layer.
 
     {1 Overview}
@@ -108,6 +121,8 @@ module Page : sig
   type content = Bytes.t
 
   type slot_index = Index.t
+
+  val pages_per_slot : Dal.parameters -> int
 
   module Index : sig
     type t = int
@@ -242,19 +257,6 @@ module History : sig
   (** Pretty-printer for {!proof}. *)
   val pp_proof : Format.formatter -> proof -> unit
 
-  (** To verify the proof of a page membership in its associated slot, the
-     Cryptobox module needs the following Dal parameters. These are part of the
-     protocol's parameters. See {!Default_parameters.default_dal}. *)
-  type dal_parameters = Dal.parameters = {
-    redundancy_factor : int;
-    page_size : int;
-    slot_size : int;
-    number_of_shards : int;
-  }
-
-  (** An encoding for values of type {!dal_parameters}. *)
-  val dal_parameters_encoding : dal_parameters Data_encoding.t
-
   (** [produce_proof dal_parameters page_id page_info slots_hist hist_cache]
       produces a proof that either:
       - there exists a confirmed slot in the skip list that contains
@@ -273,7 +275,7 @@ module History : sig
       the candidate slot (if any).
   *)
   val produce_proof :
-    dal_parameters ->
+    parameters ->
     Page.t ->
     page_info:(Page.content * Page.proof) option ->
     t ->
@@ -291,7 +293,7 @@ module History : sig
       the candidate slot (if any).
   *)
   val verify_proof :
-    dal_parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
+    parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 

@@ -49,7 +49,7 @@ let mk_cryptobox dal_params =
   let open Result_syntax in
   let parameters =
     Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
-      ~slot_size:dal_params.Hist.slot_size
+      ~slot_size:dal_params.S.slot_size
   in
   let () = Cryptobox.Internal_for_tests.load_parameters parameters in
   match Cryptobox.make dal_params with
@@ -59,7 +59,7 @@ let mk_cryptobox dal_params =
 let derive_dal_parameters (reference : Cryptobox.parameters) ~redundancy_factor
     ~constants_divider =
   {
-    Hist.redundancy_factor;
+    S.redundancy_factor;
     page_size = reference.page_size / constants_divider;
     slot_size = reference.slot_size / constants_divider;
     number_of_shards = reference.number_of_shards / constants_divider;

@@ -281,7 +281,7 @@ module Inner = struct
     (* Domain for the FFT on erasure encoded slots (as polynomials). *)
     shard_size : int;
     (* Length of a shard in terms of scalar elements. *)
-    nb_pages : int;
+    pages_per_slot : int;
     (* Number of slot pages. *)
     page_length : int;
     remaining_bytes : int;
@@ -346,9 +346,13 @@ module Inner = struct
          (req "slot_size" int31)
          (req "number_of_shards" uint16))
 
+  let pages_per_slot {slot_size; page_size; _} = slot_size / page_size
+
   (* Error cases of this functions are not encapsulated into
      `tzresult` for modularity reasons. *)
-  let make {redundancy_factor; slot_size; page_size; number_of_shards} =
+  let make
+      ({redundancy_factor; slot_size; page_size; number_of_shards} as
+      parameters) =
     let open Result_syntax in
     let k = slot_as_polynomial_length ~slot_size in
     let n = redundancy_factor * k in
@@ -381,7 +385,7 @@ module Inner = struct
         domain_2k = make_domain (2 * k);
         domain_n = make_domain n;
         shard_size;
-        nb_pages = slot_size / page_size;
+        pages_per_slot = pages_per_slot parameters;
         page_length;
         remaining_bytes = page_size mod scalar_bytes_amount;
         evaluations_log;
@@ -391,6 +395,10 @@ module Inner = struct
       }
     in
     ensure_validity t
+
+  let parameters
+      ({redundancy_factor; slot_size; page_size; number_of_shards; _} : t) =
+    {redundancy_factor; slot_size; page_size; number_of_shards}
 
   let polynomial_degree = Polynomials.degree
 
@@ -412,19 +420,19 @@ module Inner = struct
     else
       let offset = ref 0 in
       let res = Array.init t.k (fun _ -> Scalar.(copy zero)) in
-      for page = 0 to t.nb_pages - 1 do
+      for page = 0 to t.pages_per_slot - 1 do
         for elt = 0 to t.page_length - 1 do
           if !offset > t.slot_size then ()
           else if elt = t.page_length - 1 then (
             let dst = Bytes.create t.remaining_bytes in
             Bytes.blit slot !offset dst 0 t.remaining_bytes ;
             offset := !offset + t.remaining_bytes ;
-            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst)
+            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst)
           else
             let dst = Bytes.create scalar_bytes_amount in
             Bytes.blit slot !offset dst 0 scalar_bytes_amount ;
             offset := !offset + scalar_bytes_amount ;
-            res.((elt * t.nb_pages) + page) <- Scalar.of_bytes_exn dst
+            res.((elt * t.pages_per_slot) + page) <- Scalar.of_bytes_exn dst
         done
       done ;
       Ok res
@@ -436,7 +444,7 @@ module Inner = struct
 
   let eval_coset t eval slot offset page =
     for elt = 0 to t.page_length - 1 do
-      let idx = (elt * t.nb_pages) + page in
+      let idx = (elt * t.pages_per_slot) + page in
       let coeff = Scalar.to_bytes (Array.get eval idx) in
       if elt = t.page_length - 1 then (
         Bytes.blit coeff 0 slot !offset t.remaining_bytes ;
@@ -452,7 +460,7 @@ module Inner = struct
     let eval = Evaluations.(evaluation_fft t.domain_k p |> to_array) in
     let slot = Bytes.init t.slot_size (fun _ -> '0') in
     let offset = ref 0 in
-    for page = 0 to t.nb_pages - 1 do
+    for page = 0 to t.pages_per_slot - 1 do
       eval_coset t eval slot offset page
     done ;
     slot
@@ -803,7 +811,7 @@ module Inner = struct
         ])
 
   let prove_page t p page_index =
-    if page_index < 0 || page_index >= t.nb_pages then
+    if page_index < 0 || page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
       let l = 1 lsl Z.(log2up (of_int t.page_length)) in
@@ -816,42 +824,47 @@ module Inner = struct
   (* Parses the [slot_page] to get the evaluations that it contains. The
      evaluation points are given by the [slot_page_index]. *)
   let verify_page t cm {index = slot_page_index; content = slot_page} proof =
-    if slot_page_index < 0 || slot_page_index >= t.nb_pages then
+    if slot_page_index < 0 || slot_page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
-      let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
-      let slot_page_evaluations =
-        Array.init
-          (1 lsl Z.(log2up (of_int t.page_length)))
-          (function
-            | i when i < t.page_length - 1 ->
-                let dst = Bytes.create scalar_bytes_amount in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  scalar_bytes_amount ;
-                Scalar.of_bytes_exn dst
-            | i when i = t.page_length - 1 ->
-                let dst = Bytes.create t.remaining_bytes in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  t.remaining_bytes ;
-                Scalar.of_bytes_exn dst
-            | _ -> Scalar.(copy zero))
-      in
-      Ok
-        (verify
-           t
-           cm
-           t.srs.kate_amortized_srs_g2_pages
-           domain
-           (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
-           proof)
+      let expected_page_length = t.page_size in
+      let got_page_length = Bytes.length slot_page in
+      if expected_page_length <> got_page_length then
+        Error `Page_length_mismatch
+      else
+        let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
+        let slot_page_evaluations =
+          Array.init
+            (1 lsl Z.(log2up (of_int t.page_length)))
+            (function
+              | i when i < t.page_length - 1 ->
+                  let dst = Bytes.create scalar_bytes_amount in
+                  Bytes.blit
+                    slot_page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    scalar_bytes_amount ;
+                  Scalar.of_bytes_exn dst
+              | i when i = t.page_length - 1 ->
+                  let dst = Bytes.create t.remaining_bytes in
+                  Bytes.blit
+                    slot_page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    t.remaining_bytes ;
+                  Scalar.of_bytes_exn dst
+              | _ -> Scalar.(copy zero))
+        in
+        Ok
+          (verify
+             t
+             cm
+             t.srs.kate_amortized_srs_g2_pages
+             domain
+             (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
+             proof)
 end
 
 include Inner
@@ -869,12 +882,4 @@ module Internal_for_tests = struct
     {srs_g1; srs_g2}
 
   let load_parameters parameters = initialisation_parameters := Some parameters
-
-  let parameters (t : t) =
-    {
-      redundancy_factor = t.redundancy_factor;
-      slot_size = t.slot_size;
-      page_size = t.page_size;
-      number_of_shards = t.number_of_shards;
-    }
 end
