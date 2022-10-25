@@ -205,19 +205,42 @@ module Input_hash =
       let size = Some 20
     end)
 
-module Reveal_hash =
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Sc_rollup_reveal_data_hash"
+module Reveal_hash = struct
+  (* Reserve the first byte in the encoding to support multi-versioning
+     in the future. *)
+  module V0 = struct
+    include
+      Blake2B.Make
+        (Base58)
+        (struct
+          let name = "Sc_rollup_reveal_data_hash"
 
-      let title = "A smart contract rollup reveal hash"
+          let title = "A smart contract rollup reveal hash"
 
-      let b58check_prefix =
-        "\003\250\187\088\008" (* "scrh1(55)" decoded from Base58. *)
+          let b58check_prefix =
+            "\017\144\121\209\203" (* "scrrh1(54)" decoded from Base58. *)
 
-      let size = Some 32
-    end)
+          let size = Some 31
+        end)
+
+    let () = Base58.check_encoded_prefix b58check_encoding "scrrh1" 54
+  end
+
+  include V0
+
+  let encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"Reveal_data_hash_v0"
+          (Tag 0)
+          V0.encoding
+          (fun s -> Some s)
+          (fun s -> s);
+      ]
+end
 
 type reveal =
   | Reveal_raw_data of Reveal_hash.t
