@@ -134,6 +134,7 @@ let test_ticket_receipt_and_rpc =
   in
   let tz_a = Constant.bootstrap2 in
   let* () =
+    (* Check regressions for ticket updates in the transaction receipt. *)
     Client.transfer
       ~burn_cap:(Tez.of_int 2)
       ~amount:Tez.zero
