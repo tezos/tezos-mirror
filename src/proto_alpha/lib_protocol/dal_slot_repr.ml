@@ -650,7 +650,9 @@ module History = struct
                   pp_inclusion_proof
                   next_inc_proof)
 
-    type error += Dal_proof_error of string
+    type error +=
+      | Dal_proof_error of string
+      | Unexpected_page_size of {expected_size : int; page_size : int}
 
     let () =
       let open Data_encoding in
@@ -663,6 +665,29 @@ module History = struct
         (obj1 (req "error" string))
         (function Dal_proof_error e -> Some e | _ -> None)
         (fun e -> Dal_proof_error e)
+
+    let () =
+      let open Data_encoding in
+      register_error_kind
+        `Permanent
+        ~id:"dal_slot_repr.slots_history.unexpected_page_size"
+        ~title:"Unexpected page size"
+        ~description:
+          "The size of the given page content doesn't match the expected one."
+        ~pp:(fun ppf (expected, size) ->
+          Format.fprintf
+            ppf
+            "The size of a Dal page is expected to be %d bytes. The given one \
+             has %d"
+            expected
+            size)
+        (obj2 (req "expected_size" int16) (req "page_size" int16))
+        (function
+          | Unexpected_page_size {expected_size; page_size} ->
+              Some (expected_size, page_size)
+          | _ -> None)
+        (fun (expected_size, page_size) ->
+          Unexpected_page_size {expected_size; page_size})
 
     let dal_proof_error reason = Dal_proof_error reason
 
@@ -687,11 +712,12 @@ module History = struct
       | Error `Segment_index_out_of_range ->
           fail_with_error_msg "Segment_index_out_of_range"
       | Error `Page_length_mismatch ->
-          fail_with_error_msg
-          @@ Format.sprintf
-               "Page_length_mismatch: Expected:%d. Got: %d"
-               dal_params.page_size
-               (Bytes.length page.content)
+          fail
+          @@ Unexpected_page_size
+               {
+                 expected_size = dal_params.page_size;
+                 page_size = Bytes.length data;
+               }
 
     let produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache =
       let open Tzresult_syntax in
