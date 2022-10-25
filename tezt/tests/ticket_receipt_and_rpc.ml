@@ -132,45 +132,78 @@ let test_ticket_receipt_and_rpc =
       ~burn_cap:Tez.one
       client
   in
+  let tz_a = Constant.bootstrap2 in
   let* () =
     Client.transfer
       ~burn_cap:(Tez.of_int 2)
       ~amount:Tez.zero
-      ~giver:"bootstrap2"
+      ~giver:tz_a.alias
       ~receiver:kt_a
       ~arg:(Format.sprintf {|(Pair "%s" "%s")|} kt_b kt_c)
       ~hooks
       client
   in
-  (* Check that the ticket balance are expected via both RPC and CLI. *)
-  [
-    (kt_a, kt_a, "string", "red", 1);
-    (kt_a, kt_a, "string", "green", 2);
-    (kt_a, kt_a, "string", "blue", 0);
-    (kt_b, kt_a, "string", "blue", 1);
-    (kt_c, kt_a, "string", "blue", 1);
-  ]
-  |> Lwt_list.iter_s
-     @@ fun (contract, ticketer, content_type, content, expected) ->
-     let* () =
-       rpc_check_ticket_balance
-         client
-         ~contract
-         ~ticketer
-         ~content_type
-         ~content
-         ~expected
-     in
-     let* () =
-       cli_check_ticket_balance
-         client
-         ~hooks
-         ~contract
-         ~ticketer
-         ~content_type
-         ~content
-         ~expected
-     in
-     unit
+  let* () =
+    (* Check that the ticket balance are expected via [ticket_balance] RPC and CLI. *)
+    [
+      (kt_a, kt_a, "string", "red", 1);
+      (kt_a, kt_a, "string", "green", 2);
+      (kt_a, kt_a, "string", "blue", 0);
+      (kt_b, kt_a, "string", "blue", 1);
+      (kt_c, kt_a, "string", "blue", 1);
+    ]
+    |> Lwt_list.iter_s
+       @@ fun (contract, ticketer, content_type, content, expected) ->
+       let* () =
+         rpc_check_ticket_balance
+           client
+           ~contract
+           ~ticketer
+           ~content_type
+           ~content
+           ~expected
+       in
+       let* () =
+         cli_check_ticket_balance
+           client
+           ~hooks
+           ~contract
+           ~ticketer
+           ~content_type
+           ~content
+           ~expected
+       in
+       unit
+  in
+  let* () =
+    (* Check regressions for the [all_ticket_balances] RPC when called for
+       originated. *)
+    [kt_a; kt_b; kt_c]
+    |> Lwt_list.iter_s @@ fun contract ->
+       let* _ =
+         RPC.Client.call ~hooks client
+         @@ RPC.get_chain_block_context_contract_all_ticket_balances
+              ~id:contract
+              ()
+       in
+       unit
+  in
+  let* () =
+    (* Check regressions for the [all_ticket_balances] RPC when called for
+       implicit. *)
+    let*? process =
+      RPC.Client.spawn ~hooks client
+      @@ RPC.get_chain_block_context_contract_all_ticket_balances
+           ~id:tz_a.public_key_hash
+           ()
+    in
+    Process.check_error
+      ~msg:
+        (rex
+           "(No service found at this URL|Did not find service|Rpc request \
+            failed)")
+      process
+  in
+  unit
 
 let register ~protocols = test_ticket_receipt_and_rpc protocols
