@@ -70,12 +70,12 @@ module Cost_of : sig
     val if_cons : Gas.cost
 
     (* The argument of this function is ignored when calculating gas cost. *)
-    val list_map : 'a Script_typed_ir.boxed_list -> Gas.cost
+    val list_map : 'a Script_list.t -> Gas.cost
 
     val list_size : Gas.cost
 
     (* The argument of this function is ignored when calculating gas cost. *)
-    val list_iter : 'a Script_typed_ir.boxed_list -> Gas.cost
+    val list_iter : 'a Script_list.t -> Gas.cost
 
     val empty_set : Gas.cost
 
@@ -255,7 +255,7 @@ module Cost_of : sig
 
     val neq : Gas.cost
 
-    val pairing_check_bls12_381 : 'a Script_typed_ir.boxed_list -> Gas.cost
+    val pairing_check_bls12_381 : 'a Script_list.t -> Gas.cost
 
     val comb : int -> Gas.cost
 
@@ -269,7 +269,7 @@ module Cost_of : sig
 
     val compare : 'a Script_typed_ir.comparable_ty -> 'a -> 'a -> Gas.cost
 
-    val concat_string_precheck : 'a Script_typed_ir.boxed_list -> Gas.cost
+    val concat_string_precheck : 'a Script_list.t -> Gas.cost
 
     val concat_string :
       Saturation_repr.may_saturate Saturation_repr.t -> Gas.cost

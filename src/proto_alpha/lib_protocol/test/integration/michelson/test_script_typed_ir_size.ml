@@ -481,7 +481,7 @@ let check_value_size () =
         ======
     *)
     @ (let module P = struct
-         type 'a f = {apply : 'c. ('a boxed_list, 'c) ty -> ex list}
+         type 'a f = {apply : 'c. ('a Script_list.t, 'c) ty -> ex list}
        end in
       let on_list : type a. (a, _) ty -> a P.f -> ex list =
        fun ty f -> f.apply @@ is_ok @@ list_t dummy_loc ty
@@ -492,7 +492,9 @@ let check_value_size () =
           {
             apply =
               (fun ty ->
-                let show fmt l = Format.pp_print_list show_elt fmt l.elements in
+                let show fmt l =
+                  Format.pp_print_list show_elt fmt @@ Script_list.to_list l
+                in
                 exs nsample show ty ": list _");
           }
       in

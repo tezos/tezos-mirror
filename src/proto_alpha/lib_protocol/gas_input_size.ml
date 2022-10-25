@@ -25,8 +25,7 @@
 
 include Gas_comparable_input_size
 
-let list (list : 'a Script_typed_ir.boxed_list) : t =
-  list.Script_typed_ir.length
+let list (list : 'a Script_list.t) : t = list.Script_list.length
 
 let set (set : 'a Script_typed_ir.set) : t =
   let res = Script_int.to_int (Script_set.size set) in

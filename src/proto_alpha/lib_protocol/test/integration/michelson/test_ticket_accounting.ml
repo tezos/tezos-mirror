@@ -431,8 +431,7 @@ let ticket_string_list_type =
   Result.value_f ~default:(fun _ -> assert false)
   @@ Script_typed_ir.list_t (-1) ticket_string_type
 
-let boxed_list elements =
-  {Script_typed_ir.elements; length = List.length elements}
+let boxed_list = Script_list.of_list
 
 let big_map_type ~key_type ~value_type =
   Environment.wrap_tzresult

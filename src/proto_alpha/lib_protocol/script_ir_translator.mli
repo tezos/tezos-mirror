@@ -94,7 +94,7 @@ type ('arg, 'storage) code =
   | Code : {
       code :
         ( ('arg, 'storage) Script_typed_ir.pair,
-          ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+          ( Script_typed_ir.operation Script_list.t,
             'storage )
           Script_typed_ir.pair )
         Script_typed_ir.lambda;

@@ -206,6 +206,7 @@
   Gas_monad
   Script_ir_annot
   Dependent_bool
+  Script_list
   Script_typed_ir
   Script_comparable
   Gas_comparable_input_size
@@ -217,7 +218,6 @@
   Michelson_v1_gas_costs_generated
   Michelson_v1_gas_costs
   Michelson_v1_gas
-  Script_list
   Script_tc_context
   Ticket_token
   Ticket_receipt
@@ -475,6 +475,7 @@
   gas_monad.ml gas_monad.mli
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -486,7 +487,6 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
-  script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli
@@ -724,6 +724,7 @@
   gas_monad.ml gas_monad.mli
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -735,7 +736,6 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
-  script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli
@@ -978,6 +978,7 @@
   gas_monad.ml gas_monad.mli
   script_ir_annot.ml script_ir_annot.mli
   dependent_bool.ml dependent_bool.mli
+  script_list.ml script_list.mli
   script_typed_ir.ml script_typed_ir.mli
   script_comparable.ml script_comparable.mli
   gas_comparable_input_size.ml gas_comparable_input_size.mli
@@ -989,7 +990,6 @@
   michelson_v1_gas_costs_generated.ml
   michelson_v1_gas_costs.ml
   michelson_v1_gas.ml michelson_v1_gas.mli
-  script_list.ml script_list.mli
   script_tc_context.ml script_tc_context.mli
   ticket_token.ml ticket_token.mli
   ticket_receipt.ml ticket_receipt.mli

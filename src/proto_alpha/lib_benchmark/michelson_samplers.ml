@@ -684,16 +684,15 @@ end)
 
     and generate_list :
         type elt eltc.
-        (elt, eltc) Script_typed_ir.ty -> elt Script_typed_ir.boxed_list sampler
-        =
+        (elt, eltc) Script_typed_ir.ty -> elt Script_list.t sampler =
      fun elt_type ->
       let open M in
-      let* length, elements =
+      let* _, elements =
         Structure_samplers.list
           ~range:P.parameters.list_size
           ~sampler:(value elt_type)
       in
-      return Script_typed_ir.{elements; length}
+      return @@ Script_list.of_list elements
 
     (* Note that we might very well generate sets smaller than the specified range (consider the
        case of a set of type [unit]). *)

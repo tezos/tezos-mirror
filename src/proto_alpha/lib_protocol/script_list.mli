@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,8 +25,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type 'elt t = private {elements : 'elt list; length : int}
+
+(** Convert an OCaml list into Michelson list. *)
+val of_list : 'a list -> 'a t
+
+(** Convert a Michelson list to an OCaml list. *)
+val to_list : 'a t -> 'a list
+
+(** [length l] returns the number of elements in [l] as [int]. *)
+val length : 'a t -> int
+
 (** Empty list. *)
-val empty : 'a Script_typed_ir.boxed_list
+val empty : 'a t
 
 (** Prepend an element. *)
-val cons : 'a -> 'a Script_typed_ir.boxed_list -> 'a Script_typed_ir.boxed_list
+val cons : 'a -> 'a t -> 'a t
+
+(** [uncons l] returns [Some (hd, tl)] where [hd :: tl = l] if [l] is
+    not empty or [None] otherwise. *)
+val uncons : 'a t -> ('a * 'a t) option
+
+(** [rev l] returns a list containing all elements of [l] in reversed order. *)
+val rev : 'a t -> 'a t

@@ -1454,7 +1454,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KList_enter_body (_, xs, ys, _, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))
-        (Size.of_int (List.length ys))
+        (Size.of_int (Script_list.length ys))
   | KList_exit_body (_, _, _, _, _, _) -> Control.list_exit_body
   | KMap_enter_body (_, xs, _, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))

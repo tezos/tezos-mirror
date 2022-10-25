@@ -1117,7 +1117,7 @@ type toplevel = {
 type ('arg, 'storage) code =
   | Code : {
       code :
-        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
       arg_type : ('arg, _) ty;
       storage_type : ('storage, _) ty;
       views : view_map;
@@ -5076,7 +5076,7 @@ type 'ty has_lazy_storage =
       'a has_lazy_storage * 'b has_lazy_storage
       -> ('a, 'b) union has_lazy_storage
   | Option_f : 'a has_lazy_storage -> 'a option has_lazy_storage
-  | List_f : 'a has_lazy_storage -> 'a boxed_list has_lazy_storage
+  | List_f : 'a has_lazy_storage -> 'a Script_list.t has_lazy_storage
   | Map_f : 'v has_lazy_storage -> (_, 'v) map has_lazy_storage
 
 (**
@@ -5203,7 +5203,7 @@ let extract_lazy_storage_updates ctxt mode ~temporary ids_to_copy acc ty x =
           (ctxt, Script_list.empty, ids_to_copy, acc)
           l.elements
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
-        let reversed = {length = l.length; elements = List.rev l.elements} in
+        let reversed = Script_list.rev l in
         (ctxt, reversed, ids_to_copy, acc)
     | Map_f has_lazy_storage, Map_t (_, ty, _), map ->
         let (module M) = Script_map.get_module map in

@@ -274,7 +274,8 @@ and kmap_enter : type a b c d f i j k. (a, b, c, d, f, i, j, k) kmap_enter_type
 
 and klist_exit : type a b c d e i j. (a, b, c, d, e, i, j) klist_exit_type =
  fun instrument g gas body xs ys ty len ks accu stack ->
-  let ks = instrument @@ KList_enter_body (body, xs, accu :: ys, ty, len, ks) in
+  let ys = Script_list.cons accu ys in
+  let ks = instrument @@ KList_enter_body (body, xs, ys, ty, len, ks) in
   let accu, stack = stack in
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
@@ -283,7 +284,7 @@ and klist_enter : type a b c d e f j. (a, b, c, d, e, f, j) klist_enter_type =
  fun instrument g gas body xs ys ty len ks' accu stack ->
   match xs with
   | [] ->
-      let ys = {elements = List.rev ys; length = len} in
+      let ys = Script_list.rev ys in
       (next [@ocaml.tailcall]) g gas ks' ys (accu, stack)
   | x :: xs ->
       let ks = instrument @@ KList_exit_body (body, xs, ys, ty, len, ks') in
@@ -391,7 +392,7 @@ and ilist_map :
     type a b c d e f g h i. (a, b, c, d, e, f, g, h, i) ilist_map_type =
  fun instrument g gas body k ks ty accu stack ->
   let xs = accu.elements in
-  let ys = [] in
+  let ys = Script_list.empty in
   let len = accu.length in
   let ks =
     instrument @@ KList_enter_body (body, xs, ys, ty, len, KCons (k, ks))
@@ -694,8 +695,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let accu = Script_list.empty in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IIf_cons {branch_if_cons; branch_if_nil; k; _} -> (
-          match accu.elements with
-          | [] ->
+          match Script_list.uncons accu with
+          | None ->
               let accu, stack = stack in
               (step [@ocaml.tailcall])
                 g
@@ -704,8 +705,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 (KCons (k, ks))
                 accu
                 stack
-          | hd :: tl ->
-              let tl = {elements = tl; length = accu.length - 1} in
+          | Some (hd, tl) ->
               (step [@ocaml.tailcall])
                 g
                 gas
@@ -1682,12 +1682,11 @@ and log :
             Script_interpreter_logging.instrument_cont logger sty'
             @@ KCons (k, ks)
       in
-      match accu.elements with
-      | [] ->
+      match Script_list.uncons accu with
+      | None ->
           let accu, stack = stack in
           (step [@ocaml.tailcall]) g gas branch_if_nil k' accu stack
-      | hd :: tl ->
-          let tl = {elements = tl; length = accu.length - 1} in
+      | Some (hd, tl) ->
           (step [@ocaml.tailcall]) g gas branch_if_cons k' hd (tl, stack))
   | IList_map (_, body, ty, k) ->
       let (Item_t (_, sty')) = sty in

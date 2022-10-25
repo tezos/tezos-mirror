@@ -269,16 +269,16 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     let ty =
       match list_t (-1) ticket_ty with Error _ -> assert false | Ok t -> t
     in
-    let length, elements =
+    let _, elements =
       Structure_samplers.list
         ~range:{min = 0; max = config.max_size}
         ~sampler:ticket_sampler
         rng_state
     in
-    let boxed_ticket_list = {elements; length} in
+    let boxed_ticket_list = Script_list.of_list elements in
     Environment.wrap_tzresult
     @@ let* has_tickets, ctxt = Ticket_scanner.type_has_tickets ctxt ty in
-       let workload = {nodes = length} in
+       let workload = {nodes = Script_list.length boxed_ticket_list} in
        let closure () =
          ignore
            (Lwt_main.run

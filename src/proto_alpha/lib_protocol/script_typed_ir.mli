@@ -29,15 +29,34 @@ open Alpha_context
 open Script_int
 open Dependent_bool
 
+(*
+
+    The step function of the interpreter is parametrized by a bunch of values called the step constants.
+    These values are indeed constants during the call of a smart contract with the notable exception of
+    the IView instruction which modifies `source`, `self`, and `amount` and the KView_exit continuation
+    which restores them.
+    ======================
+
+*)
 type step_constants = {
   source : Contract.t;
+      (** The address calling this contract, as returned by SENDER. *)
   payer : Signature.public_key_hash;
+      (** The address of the implicit account that initiated the chain of contract calls, as returned by SOURCE. *)
   self : Contract_hash.t;
+      (** The address of the contract being executed, as returned by SELF and SELF_ADDRESS.
+     Also used:
+     - as ticketer in TICKET
+     - as caller in VIEW, TRANSFER_TOKENS, and CREATE_CONTRACT *)
   amount : Tez.t;
-  balance : Tez.t;
+      (** The amount of the current transaction, as returned by AMOUNT. *)
+  balance : Tez.t;  (** The balance of the contract as returned by BALANCE. *)
   chain_id : Chain_id.t;
+      (** The chain id of the chain, as returned by CHAIN_ID. *)
   now : Script_timestamp.t;
+      (** The earliest time at which the current block could have been timestamped, as returned by NOW. *)
   level : Script_int.n Script_int.num;
+      (** The level of the current block, as returned by LEVEL. *)
 }
 
 (* Preliminary definitions. *)
@@ -271,8 +290,6 @@ type ('key, 'value) big_map_overlay = {
   size : int;
 }
 
-type 'elt boxed_list = {elements : 'elt list; length : int}
-
 type view = {
   input_ty : Script.node;
   output_ty : Script.node;
@@ -492,33 +509,33 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      -----
   *)
   | ICons_list :
-      Script.location * ('a boxed_list, 's, 'r, 'f) kinstr
-      -> ('a, 'a boxed_list * 's, 'r, 'f) kinstr
+      Script.location * ('a Script_list.t, 's, 'r, 'f) kinstr
+      -> ('a, 'a Script_list.t * 's, 'r, 'f) kinstr
   | INil :
-      Script.location * ('b, _) ty * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
+      Script.location * ('b, _) ty * ('b Script_list.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       loc : Script.location;
-      branch_if_cons : ('a, 'a boxed_list * ('b * 's), 'c, 't) kinstr;
+      branch_if_cons : ('a, 'a Script_list.t * ('b * 's), 'c, 't) kinstr;
       branch_if_nil : ('b, 's, 'c, 't) kinstr;
       k : ('c, 't, 'r, 'f) kinstr;
     }
-      -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
+      -> ('a Script_list.t, 'b * 's, 'r, 'f) kinstr
   | IList_map :
       Script.location
       * ('a, 'c * 's, 'b, 'c * 's) kinstr
-      * ('b boxed_list, _) ty option
-      * ('b boxed_list, 'c * 's, 'r, 'f) kinstr
-      -> ('a boxed_list, 'c * 's, 'r, 'f) kinstr
+      * ('b Script_list.t, _) ty option
+      * ('b Script_list.t, 'c * 's, 'r, 'f) kinstr
+      -> ('a Script_list.t, 'c * 's, 'r, 'f) kinstr
   | IList_iter :
       Script.location
       * ('a, _) ty option
       * ('a, 'b * 's, 'b, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
-      -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
+      -> ('a Script_list.t, 'b * 's, 'r, 'f) kinstr
   | IList_size :
       Script.location * (n num, 's, 'r, 'f) kinstr
-      -> ('a boxed_list, 's, 'r, 'f) kinstr
+      -> ('a Script_list.t, 's, 'r, 'f) kinstr
   (*
     Sets
     ----
@@ -606,7 +623,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IConcat_string :
       Script.location * (Script_string.t, 's, 'r, 'f) kinstr
-      -> (Script_string.t boxed_list, 's, 'r, 'f) kinstr
+      -> (Script_string.t Script_list.t, 's, 'r, 'f) kinstr
   | IConcat_string_pair :
       Script.location * (Script_string.t, 's, 'r, 'f) kinstr
       -> (Script_string.t, Script_string.t * 's, 'r, 'f) kinstr
@@ -622,7 +639,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IConcat_bytes :
       Script.location * (bytes, 's, 'r, 'f) kinstr
-      -> (bytes boxed_list, 's, 'r, 'f) kinstr
+      -> (bytes Script_list.t, 's, 'r, 'f) kinstr
   | IConcat_bytes_pair :
       Script.location * (bytes, 's, 'r, 'f) kinstr
       -> (bytes, bytes * 's, 'r, 'f) kinstr
@@ -1030,7 +1047,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | IPairing_check_bls12_381 :
       Script.location * (bool, 's, 'r, 'f) kinstr
-      -> ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
+      -> ( (Script_bls.G1.t, Script_bls.G2.t) pair Script_list.t,
+           's,
+           'r,
+           'f )
+         kinstr
   | IComb :
       Script.location
       * int
@@ -1237,19 +1258,19 @@ and (_, _, _, _) continuation =
   | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
-      * 'b list
-      * ('b boxed_list, _) ty option
+      * 'b Script_list.t
+      * ('b Script_list.t, _) ty option
       * int
-      * ('b boxed_list, 'c * 's, 'r, 'f) continuation
+      * ('b Script_list.t, 'c * 's, 'r, 'f) continuation
       -> ('c, 's, 'r, 'f) continuation
   (* This continuation represents what is done after each step of a List.map. *)
   | KList_exit_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
       * 'a list
-      * 'b list
-      * ('b boxed_list, _) ty option
+      * 'b Script_list.t
+      * ('b Script_list.t, _) ty option
       * int
-      * ('b boxed_list, 'c * 's, 'r, 'f) continuation
+      * ('b Script_list.t, 'c * 's, 'r, 'f) continuation
       -> ('b, 'c * 's, 'r, 'f) continuation
   (* This continuation represents each step of a Map.map. *)
   | KMap_enter_body :
@@ -1357,7 +1378,9 @@ and ('ty, 'comparable) ty =
   | Option_t :
       ('v, 'c) ty * 'v option ty_metadata * 'c dbool
       -> ('v option, 'c) ty
-  | List_t : ('v, _) ty * 'v boxed_list ty_metadata -> ('v boxed_list, no) ty
+  | List_t :
+      ('v, _) ty * 'v Script_list.t ty_metadata
+      -> ('v Script_list.t, no) ty
   | Set_t : 'v comparable_ty * 'v set ty_metadata -> ('v set, no) ty
   | Map_t :
       'k comparable_ty * ('v, _) ty * ('k, 'v) map ty_metadata
@@ -1578,7 +1601,7 @@ and operation = {
 type ('arg, 'storage) script =
   | Script : {
       code :
-        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+        (('arg, 'storage) pair, (operation Script_list.t, 'storage) pair) lambda;
       arg_type : ('arg, _) ty;
       storage : 'storage;
       storage_type : ('storage, _) ty;
@@ -1684,9 +1707,9 @@ val option_pair_mutez_mutez_t : (Tez.t, Tez.t) pair option comparable_ty
 
 val option_pair_int_nat_t : (z num, n num) pair option comparable_ty
 
-val list_t : Script.location -> ('v, _) ty -> ('v boxed_list, no) ty tzresult
+val list_t : Script.location -> ('v, _) ty -> ('v Script_list.t, no) ty tzresult
 
-val list_operation_t : (operation boxed_list, no) ty
+val list_operation_t : (operation Script_list.t, no) ty
 
 val set_t : Script.location -> 'v comparable_ty -> ('v set, no) ty tzresult
 
