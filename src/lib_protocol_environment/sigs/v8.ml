@@ -11969,15 +11969,15 @@ val pages_per_slot : parameters -> int
      in the slot committed with commitment [commitment]. Returns [Ok
      false] otherwise.
 
-      Fails if the index of the page is out of range. *)
+      Fails if the index of the page is out of range or if the page is
+     not of the expected length [page_size] given for the
+     initialisation of [t]. *)
 val verify_page :
   t ->
   commitment ->
   page ->
   page_proof ->
-  ( bool,
-    [> `Degree_exceeds_srs_length of string | `Segment_index_out_of_range] )
-  Result.t
+  (bool, [> `Segment_index_out_of_range | `Page_length_mismatch]) Result.t
 end
 # 136 "v8.in.ml"
 

@@ -631,9 +631,12 @@ module History = struct
             "Wrong page content for the given page index and slot commitment"
       | Error `Segment_index_out_of_range ->
           fail_with_error_msg "Segment_index_out_of_range"
-      | Error (`Degree_exceeds_srs_length s) ->
+      | Error `Page_length_mismatch ->
           fail_with_error_msg
-          @@ Format.sprintf "Degree_exceeds_srs_length: %s" s
+          @@ Format.sprintf
+               "Page_length_mismatch: Expected:%d. Got: %d"
+               dal_params.page_size
+               (Bytes.length page.content)
 
     let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
       let open Lwt_tzresult_syntax in

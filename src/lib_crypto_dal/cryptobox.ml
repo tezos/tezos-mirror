@@ -823,39 +823,44 @@ module Inner = struct
     if slot_page_index < 0 || slot_page_index >= t.pages_per_slot then
       Error `Segment_index_out_of_range
     else
-      let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
-      let slot_page_evaluations =
-        Array.init
-          (1 lsl Z.(log2up (of_int t.page_length)))
-          (function
-            | i when i < t.page_length - 1 ->
-                let dst = Bytes.create scalar_bytes_amount in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  scalar_bytes_amount ;
-                Scalar.of_bytes_exn dst
-            | i when i = t.page_length - 1 ->
-                let dst = Bytes.create t.remaining_bytes in
-                Bytes.blit
-                  slot_page
-                  (i * scalar_bytes_amount)
-                  dst
-                  0
-                  t.remaining_bytes ;
-                Scalar.of_bytes_exn dst
-            | _ -> Scalar.(copy zero))
-      in
-      Ok
-        (verify
-           t
-           cm
-           t.srs.kate_amortized_srs_g2_pages
-           domain
-           (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
-           proof)
+      let expected_page_length = t.page_size in
+      let got_page_length = Bytes.length slot_page in
+      if expected_page_length <> got_page_length then
+        Error `Page_length_mismatch
+      else
+        let domain = Domains.build ~log:Z.(log2up (of_int t.page_length)) in
+        let slot_page_evaluations =
+          Array.init
+            (1 lsl Z.(log2up (of_int t.page_length)))
+            (function
+              | i when i < t.page_length - 1 ->
+                  let dst = Bytes.create scalar_bytes_amount in
+                  Bytes.blit
+                    slot_page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    scalar_bytes_amount ;
+                  Scalar.of_bytes_exn dst
+              | i when i = t.page_length - 1 ->
+                  let dst = Bytes.create t.remaining_bytes in
+                  Bytes.blit
+                    slot_page
+                    (i * scalar_bytes_amount)
+                    dst
+                    0
+                    t.remaining_bytes ;
+                  Scalar.of_bytes_exn dst
+              | _ -> Scalar.(copy zero))
+        in
+        Ok
+          (verify
+             t
+             cm
+             t.srs.kate_amortized_srs_g2_pages
+             domain
+             (Domains.get t.domain_k slot_page_index, slot_page_evaluations)
+             proof)
 end
 
 include Inner
