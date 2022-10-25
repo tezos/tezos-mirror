@@ -1944,29 +1944,36 @@ module Sc_rollup = struct
   open Data_encoding
 
   module S = struct
-    let path : RPC_context.t RPC_path.context =
-      RPC_path.(open_root / "context" / "sc_rollup")
+    let prefix : RPC_context.t RPC_path.context =
+      RPC_path.(open_root / "context" / "sc_rollups")
+
+    let path_sc_rollup :
+        (Updater.rpc_context, Updater.rpc_context * Sc_rollup.t) RPC_path.t =
+      RPC_path.(prefix / "sc_rollup" /: Sc_rollup.Address.rpc_arg)
+
+    let path_sc_rollups : RPC_context.t RPC_path.context =
+      RPC_path.(prefix / "all")
 
     let kind =
       RPC_service.get_service
         ~description:"Kind of smart-contract rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Kind.encoding
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "kind")
+        RPC_path.(path_sc_rollup / "kind")
 
     let initial_pvm_state_hash =
       RPC_service.get_service
         ~description:"Initial PVM state hash of smart-contract rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.State_hash.encoding
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "initial_pvm_state_hash")
+        RPC_path.(path_sc_rollup / "initial_pvm_state_hash")
 
     let boot_sector =
       RPC_service.get_service
         ~description:"Boot sector of smart-contract rollup"
         ~query:RPC_query.empty
         ~output:Data_encoding.string
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "boot_sector")
+        RPC_path.(path_sc_rollup / "boot_sector")
 
     let genesis_info =
       RPC_service.get_service
@@ -1975,7 +1982,7 @@ module Sc_rollup = struct
            smart-contract rollup"
         ~query:RPC_query.empty
         ~output:Sc_rollup.Commitment.genesis_info_encoding
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "genesis_info")
+        RPC_path.(path_sc_rollup / "genesis_info")
 
     let last_cemented_commitment_hash_with_level =
       RPC_service.get_service
@@ -1987,9 +1994,7 @@ module Sc_rollup = struct
           (obj2
              (req "hash" Sc_rollup.Commitment.Hash.encoding)
              (req "level" Raw_level.encoding))
-        RPC_path.(
-          path /: Sc_rollup.Address.rpc_arg
-          / "last_cemented_commitment_hash_with_level")
+        RPC_path.(path_sc_rollup / "last_cemented_commitment_hash_with_level")
 
     let staked_on_commitment =
       RPC_service.get_service
@@ -1999,8 +2004,8 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:(obj1 (req "hash" Sc_rollup.Commitment.Hash.encoding))
         RPC_path.(
-          path /: Sc_rollup.Address.rpc_arg / "staker"
-          /: Sc_rollup.Staker.rpc_arg / "staked_on_commitment")
+          path_sc_rollup / "staker" /: Sc_rollup.Staker.rpc_arg
+          / "staked_on_commitment")
 
     let commitment =
       RPC_service.get_service
@@ -2008,8 +2013,17 @@ module Sc_rollup = struct
         ~query:RPC_query.empty
         ~output:Sc_rollup.Commitment.encoding
         RPC_path.(
-          path /: Sc_rollup.Address.rpc_arg / "commitment"
-          /: Sc_rollup.Commitment.Hash.rpc_arg)
+          path_sc_rollup / "commitment" /: Sc_rollup.Commitment.Hash.rpc_arg)
+
+    let dal_slot_subscriptions =
+      RPC_service.get_service
+        ~description:
+          "List of slot indices to which a rollup is subscribed to at a given \
+           level"
+        ~query:RPC_query.empty
+        ~output:(Data_encoding.list Dal.Slot_index.encoding)
+        RPC_path.(
+          path_sc_rollup / "dal_slot_subscriptions" /: Raw_level.rpc_arg)
 
     let ongoing_refutation_game =
       let query =
@@ -2032,7 +2046,7 @@ module Sc_rollup = struct
         ~description:"Ongoing refufation game for a given staker"
         ~query
         ~output
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "game")
+        RPC_path.(path_sc_rollup / "game")
 
     let conflicts =
       let query =
@@ -2049,7 +2063,7 @@ module Sc_rollup = struct
         ~description:"List of stakers in conflict with the given staker"
         ~query
         ~output
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "conflicts")
+        RPC_path.(path_sc_rollup / "conflicts")
 
     let timeout =
       let query =
@@ -2067,7 +2081,7 @@ module Sc_rollup = struct
         ~description:"Returns the timeout of players."
         ~query
         ~output
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout")
+        RPC_path.(path_sc_rollup / "timeout")
 
     let timeout_reached =
       let query =
@@ -2086,7 +2100,7 @@ module Sc_rollup = struct
           "Returns whether the timeout creates a result for the game."
         ~query
         ~output
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "timeout_reached")
+        RPC_path.(path_sc_rollup / "timeout_reached")
 
     let can_be_cemented =
       let query =
@@ -2102,10 +2116,7 @@ module Sc_rollup = struct
           "Returns true if and only if the provided commitment can be cemented."
         ~query
         ~output
-        RPC_path.(path /: Sc_rollup.Address.rpc_arg / "can_be_cemented")
-
-    let path_sc_rollups : RPC_context.t RPC_path.context =
-      RPC_path.(open_root / "context" / "sc_rollups")
+        RPC_path.(path_sc_rollup / "can_be_cemented")
 
     let root =
       RPC_service.get_service
