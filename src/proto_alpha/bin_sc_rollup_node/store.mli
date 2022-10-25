@@ -148,14 +148,6 @@ module Commitments_published_at_level :
      and type value = Raw_level.t
      and type store = t
 
-(** Storage containing the a [Block_hash.t]-indexed map whose values are
-    the slots to which the rollup was subscribed w.r.t. a block hash. *)
-module Dal_slot_subscriptions :
-  Store_sigs.Map
-    with type key = Block_hash.t
-     and type value = Dal.Slot_index.t list
-     and type store = t
-
 (** Storage containing the hashes of contexts retrieved from the L1 node. *)
 module Contexts :
   Store_sigs.Map
@@ -206,7 +198,7 @@ module Dal_slot_pages :
     this storage module have type `[`Confirmed | `Unconfirmed]`, depending on
     whether the content of the slot has been confirmed or not. If an entry is
     not present for a [(block_hash, slot_index)], this either means that it's
-    not processed yet, or that the rollup node didn't subscribe to that slot.
+    not processed yet.
 *)
 module Dal_processed_slots :
   Store_sigs.Nested_map

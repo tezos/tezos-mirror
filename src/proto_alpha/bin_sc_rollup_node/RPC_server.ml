@@ -300,14 +300,6 @@ module Make (PVM : Pvm.S) = struct
     return (PVM.string_of_status status)
 
   let () =
-    Block_directory.register0
-      Sc_rollup_services.Global.Block.dal_slot_subscriptions
-    @@ fun (node_ctxt, block) () () ->
-    let open Lwt_result_syntax in
-    let*! subs = Store.Dal_slot_subscriptions.find node_ctxt.store block in
-    return subs
-
-  let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slots
     @@ fun (node_ctxt, block) () () ->
     let open Lwt_result_syntax in

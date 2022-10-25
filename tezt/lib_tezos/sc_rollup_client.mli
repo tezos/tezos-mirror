@@ -132,11 +132,6 @@ with its hash and level when the commitment was first published. *)
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> (string * commitment * int option) option Lwt.t
 
-(** [dal_slot_subscriptions ?block client] gets the slots to which the rollup
-    node is subscribed to, for the [block] (default ["head"]). *)
-val dal_slot_subscriptions :
-  ?hooks:Process.hooks -> ?block:string -> t -> int list Lwt.t
-
 (** [dal_slot_headers ?block client] returns the dal slot headers of the
     [block] (default ["head"]). *)
 val dal_slot_headers :
