@@ -105,7 +105,8 @@ module Pp_impl : S with type 'a repr = printed and type size = string = struct
     unprotect_in_context [Lam_body; Add; Sub; Mul; Div] (fun fmtr () ->
         Format.fprintf fmtr "sqrt @[<h>%a@]" x Arg_app)
 
-  let free ~name fmtr _c = Format.fprintf fmtr "free(%a)" Free_variable.pp name
+  let free ~name fmtr _c =
+    Format.fprintf fmtr "free(%a)" Free_variable.pp_short name
 
   let lt x y =
     unprotect_in_context [Lam_body; If_cond] (fun fmtr () ->
@@ -254,7 +255,7 @@ let overrides_table (overrides : float Free_variable.Map.t) =
     let data =
       Free_variable.Map.fold
         (fun var value acc ->
-          let var = Format.asprintf "%a" Free_variable.pp var in
+          let var = Format.asprintf "%a" Free_variable.pp_short var in
           Latex_syntax.Row [[maths var]; [maths (string_of_float value)]] :: acc)
         overrides
         []

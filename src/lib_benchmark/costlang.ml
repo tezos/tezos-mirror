@@ -126,10 +126,6 @@ module Free_variables :
   S with type 'a repr = Free_variable.Set.t and type size = unit = struct
   open Free_variable
 
-  exception Free_variable_captured_by_lambda of string
-
-  exception Free_variable_captured_by_let of string
-
   type 'a repr = Set.t
 
   type size = unit
@@ -171,19 +167,15 @@ module Free_variables :
   let eq = lift_binop
 
   let lam ~name f =
-    let result = f Set.empty in
-    let bound = Free_variable.of_string name in
-    if Set.mem bound result then raise (Free_variable_captured_by_lambda name)
-    else result
+    ignore name ;
+    f Set.empty
 
   let app f arg = Set.union f arg
 
   let let_ ~name m f =
+    ignore name ;
     let in_scope = f Set.empty in
-    let result = Set.union m in_scope in
-    let bound = Free_variable.of_string name in
-    if Set.mem bound in_scope then raise (Free_variable_captured_by_let name)
-    else result
+    Set.union m in_scope
 
   let if_ cond ift iff = Set.union cond (Set.union ift iff)
 end
