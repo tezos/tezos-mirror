@@ -973,6 +973,32 @@ let get_balance_for ?endpoint ~account client =
   in
   return @@ Tez.parse_floating output
 
+let spawn_ticket_balance ?hooks ~contract ~ticketer ~content_type ~content
+    client =
+  spawn_command
+    ?hooks
+    client
+    [
+      "get";
+      "ticket";
+      "balance";
+      "for";
+      contract;
+      "with";
+      "ticketer";
+      ticketer;
+      "and";
+      "type";
+      content_type;
+      "and";
+      "content";
+      content;
+    ]
+
+let ticket_balance ?hooks ~contract ~ticketer ~content_type ~content client =
+  spawn_ticket_balance ?hooks ~contract ~ticketer ~content_type ~content client
+  |> Process.check_and_read_stdout
+
 let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file
     ?bootstrap_accounts_file ~protocol client =
   let cmd =

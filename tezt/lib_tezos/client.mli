@@ -757,6 +757,26 @@ val get_balance_for : ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
 val spawn_get_balance_for :
   ?endpoint:endpoint -> account:string -> t -> Process.t
 
+(** Run [octez-client get ticket balance for contract with ticketer and type and content ]. *)
+val ticket_balance :
+  ?hooks:Process.hooks ->
+  contract:string ->
+  ticketer:string ->
+  content_type:string ->
+  content:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [ticket_balance], but do not wait for the process to exit. *)
+val spawn_ticket_balance :
+  ?hooks:Process.hooks ->
+  contract:string ->
+  ticketer:string ->
+  content_type:string ->
+  content:string ->
+  t ->
+  Process.t
+
 (** Run [octez-client create mockup]. *)
 val create_mockup :
   ?sync_mode:mockup_sync_mode ->
@@ -1207,8 +1227,8 @@ val spawn_run_tzip4_view :
   t ->
   Process.t
 
-(** Run [tezos-client run tzip4 view .. on contract .. with input .. ] 
-    
+(** Run [tezos-client run tzip4 view .. on contract .. with input .. ]
+
     Returns the value returned by a view as a string.
 
     Fails if the view or the contract does not exist. If [input] is [None],

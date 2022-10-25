@@ -516,6 +516,46 @@ let commands_ro () =
             in
             return_unit);
     command
+      ~group
+      ~desc:
+        "Get contract's balance of ticket with specified ticketer, content \
+         type, and content."
+      no_options
+      (prefixes ["get"; "ticket"; "balance"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"Source contract."
+      @@ prefixes ["with"; "ticketer"]
+      @@ ContractAlias.destination_param
+           ~name:"ticketer"
+           ~desc:"Ticketer contract of the ticket."
+      @@ prefixes ["and"; "type"]
+      @@ Tezos_clic.param
+           ~name:"ticket content type"
+           ~desc:"Type of the content of the ticket."
+           data_parameter
+      @@ prefixes ["and"; "content"]
+      @@ Tezos_clic.param
+           ~name:"ticket content"
+           ~desc:"Content of the ticket."
+           data_parameter
+      @@ stop)
+      (fun () contract ticketer content_type content cctxt ->
+        let open Lwt_result_syntax in
+        let* balance =
+          get_contract_ticket_balance
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+            Ticket_token.
+              {
+                ticketer;
+                contents_type = content_type.expanded;
+                contents = content.expanded;
+              }
+        in
+        let*! () = cctxt#answer "%a" Z.pp_print balance in
+        return_unit);
+    command
       ~desc:"Get receipt for past operation"
       (args1
          (default_arg
