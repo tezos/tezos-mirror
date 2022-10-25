@@ -782,7 +782,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
             })
             tbdy.appendChild(tr_invalid);
 
-            let captive = ["held captive", (v["endorsements"]["sequestered"]).length, v["endorsements"]["sequestered"]];
+            let captive = ["Held captive", (v["endorsements"]["sequestered"]).length, v["endorsements"]["sequestered"]];
             var tr_captive = document.createElement('tr');
             captive.forEach((element) => {
                 var td = document.createElement('td');

@@ -76,7 +76,7 @@
                         let t_op_valide_array = delays_distribution_of_operations(dict_data);
                         let endorsing_power= get_endorsing_power(dict_data)
                         let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
-                        let results = TimeForPercIntegration_w_endorsing_power(threshold, t_op_valide_dict[0], endorsing_power)
+                        let results = TimeForPercIntegration_w_endorsing_power(threshold, t_op_valide_dict[1], endorsing_power)
                         chart_time_required_endorsments(results); 
                     });
                 }
