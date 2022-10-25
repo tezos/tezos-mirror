@@ -27,6 +27,18 @@ open Wasm_pvm_state.Internal_state
 
 include Wasm_vm_sig.S
 
+(** [compute_step_many_until max_step should_continue pvm_state]
+      advance forwards the VM in the same manners as [compute_step_many]
+      as long as [should_continue] returns true.
+
+      Returns the new state and number of the executed ticks.
+
+      IS applied on [pvm_state] rather than a tree.
+
+      /!\ as it allows to redefine the stop condition, this function should
+      not be used in unit test: the test could hide regression if the
+      condition change in the code, but not in the test.
+  *)
 val compute_step_many_until :
   ?max_steps:int64 ->
   (pvm_state -> bool Lwt.t) ->

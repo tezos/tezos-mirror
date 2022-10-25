@@ -25,50 +25,6 @@
 (*****************************************************************************)
 open Wasm_pvm_state
 
-(** This module type expose internals necessary for benchmarking.
-
-    /!\ Not intended for unit tests: the functions could be used to redefine the
-    main execution loop, at the risk of departing from what is defined in the
-    PVM definition. [Internal_for_benchmark.compute_step_many_until] can use
-    custom stopping condition and therefore should not be used in unit test:
-    the test could hide regression if the condition change in the code, but not
-    in the test. *)
-module type Internal_for_benchmark = sig
-  open Internal_state
-
-  type tree
-
-  val decode : tree -> pvm_state Lwt.t
-
-  val encode : pvm_state -> tree -> tree Lwt.t
-
-  (** [compute_step_many_until_pvm_state max_step should_continue pvm_state]
-      advance forwards the VM in the same manners as [compute_step_many]
-      as long as [should_continue] returns true.
-
-      Returns the new state and number of the executed ticks.
-
-      IS applied on [pvm_state] rather than a tree.
-
-      /!\ as it allows to redefine the stop condition, this function should
-      not be used in unit test: the test could hide regression if the
-      condition change in the code, but not in the test.
-  *)
-  val compute_step_many_until_pvm_state :
-    ?max_steps:int64 ->
-    (pvm_state -> bool Lwt.t) ->
-    pvm_state ->
-    (pvm_state * int64) Lwt.t
-
-  (** [compute_step_many_pvm_state max_step pvm_state]
-      advance forwards the VM in the same manners as [compute_step_many]
-  *)
-  val compute_step_many_pvm_state :
-    max_steps:int64 -> pvm_state -> (pvm_state * int64) Lwt.t
-
-  val eval_has_finished : tick_state -> bool
-end
-
 module type Internal_for_tests = sig
   open Internal_state
 
@@ -110,8 +66,6 @@ module type S = sig
       [Sc_rollup_PVM_sem.output_encoding]. If the output is missing, this
       function may raise an exception. *)
   val get_output : output_info -> tree -> string option Lwt.t
-
-  module Internal_for_benchmark : Internal_for_benchmark with type tree := tree
 
   module Internal_for_tests : Internal_for_tests with type tree := tree
 end

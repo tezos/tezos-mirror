@@ -24,6 +24,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val pvm_state_encoding :
+  Wasm_pvm_state.Internal_state.pvm_state Tezos_tree_encoding.t
+
 val durable_buffers_encoding :
   Tezos_webassembly_interpreter.Eval.buffers Tezos_tree_encoding.t
 

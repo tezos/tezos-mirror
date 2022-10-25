@@ -31,6 +31,10 @@ module Wasm : Tezos_scoru_wasm.Wasm_pvm_sig.S with type tree = Context.tree
 open Tezos_scoru_wasm
 open Wasm_pvm_state
 
+val encode_pvm_state : Internal_state.pvm_state -> Wasm.tree -> Wasm.tree Lwt.t
+
+val decode_pvm_state : Wasm.tree -> Internal_state.pvm_state Lwt.t
+
 val get_tick_from_tree : Wasm.tree -> Z.t Lwt.t
 
 val get_tick_from_pvm_state : Internal_state.pvm_state -> Z.t Lwt.t

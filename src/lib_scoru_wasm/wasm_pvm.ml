@@ -251,18 +251,6 @@ module Make (T : Tezos_tree_encoding.TREE) :
       let* pvm_state = Wasm_vm.reveal_step payload pvm_state in
       encode pvm_state tree
 
-    module Internal_for_benchmark = struct
-      let decode = decode
-
-      let encode = encode
-
-      let compute_step_many_until_pvm_state = Wasm_vm.compute_step_many_until
-
-      let compute_step_many_pvm_state = Wasm_vm.compute_step_many
-
-      let eval_has_finished = Wasm_vm.eval_has_finished
-    end
-
     module Internal_for_tests = struct
       let get_tick_state tree =
         let open Lwt_syntax in

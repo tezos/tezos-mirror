@@ -133,17 +133,14 @@ let exec_phase run_state phase =
 let exec_loop tree_run_state =
   let open Lwt_syntax in
   let* pvm_run_state =
-    switch_state_type
-      Wasm.Internal_for_benchmark.decode
-      "Decode tree"
-      tree_run_state
+    switch_state_type decode_pvm_state "Decode tree" tree_run_state
   in
   let* pvm_run_state = Exec.run_loop exec_phase pvm_run_state in
   let* tree_run_state =
     switch_state_type
       (fun state ->
         (* the encode function takes the _previous_ tree encoding as argument *)
-        Wasm.Internal_for_benchmark.encode state tree_run_state.state)
+        encode_pvm_state state tree_run_state.state)
       "Encode tree"
       pvm_run_state
   in

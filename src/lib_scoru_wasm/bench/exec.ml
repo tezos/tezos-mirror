@@ -26,7 +26,6 @@
 open Test_scoru_wasm_test_helpers
 open Tezos_scoru_wasm
 open Wasm_pvm_state.Internal_state
-open Pvm_instance
 
 type phase = Decoding | Initialising | Linking | Evaluating | Padding
 [@@deriving show {with_path = false}]
@@ -44,8 +43,7 @@ let should_continue phase (pvm_state : pvm_state) =
     | Initialising, Init _ -> true
     | Linking, Link _ -> true
     | Decoding, Decode _ -> true
-    | Evaluating, Eval _
-      when Wasm.Internal_for_benchmark.eval_has_finished pvm_state.tick_state ->
+    | Evaluating, Eval _ when Wasm_vm.eval_has_finished pvm_state.tick_state ->
         false
     | Evaluating, Eval _ -> true
     | Padding, Eval _ -> true
@@ -54,12 +52,10 @@ let should_continue phase (pvm_state : pvm_state) =
   Lwt.return continue
 
 let finish_top_level_call_on_state pvm_state =
-  Wasm.Internal_for_benchmark.compute_step_many_pvm_state
-    ~max_steps:Int64.max_int
-    pvm_state
+  Wasm_vm.compute_step_many ~max_steps:Int64.max_int pvm_state
 
 let execute_on_state phase state =
-  Wasm.Internal_for_benchmark.compute_step_many_until_pvm_state
+  Wasm_vm.compute_step_many_until
     ~max_steps:Int64.max_int
     (should_continue phase)
     state
