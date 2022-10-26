@@ -1571,6 +1571,13 @@ opam:tezos-version:
   variables:
     package: tezos-version
 
+opam:tezos-wasmer:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_7
+  variables:
+    package: tezos-wasmer
+
 opam:tezos-webassembly-interpreter:
   extends:
     - .opam_template

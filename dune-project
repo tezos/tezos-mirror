@@ -210,6 +210,7 @@
 (package (name tezos-tx-rollup-alpha))
 (package (name tezos-validation))
 (package (name tezos-version))
+(package (name tezos-wasmer))
 (package (name tezos-webassembly-interpreter))
 (package (name tezos-webassembly-interpreter-extra))
 (package (name tezos-workers))
