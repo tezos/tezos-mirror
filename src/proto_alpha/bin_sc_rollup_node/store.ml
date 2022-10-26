@@ -387,11 +387,57 @@ module Dal_slot_pages =
       let name = "slot_index"
     end)
     (struct
-      type value = Dal.Page.content option
+      type value = Dal.Page.content
 
-      let encoding = Data_encoding.option Dal.Page.content_encoding
+      let encoding = Dal.Page.content_encoding
 
       let name = "slot_pages"
+    end)
+
+(** stores slots whose data have been considered and pages stored to disk (if
+    they are confirmed and the rollup node subscribed to them). *)
+module Dal_processed_slots =
+  Make_nested_map
+    (struct
+      let path = ["dal"; "processed_slots"]
+
+      let keep_last_n_entries_in_memory = None
+    end)
+    (struct
+      type key = Block_hash.t
+
+      let to_path_representation = Block_hash.to_b58check
+    end)
+    (struct
+      type key = Dal.Slot_index.t
+
+      let encoding = Dal.Slot_index.encoding
+
+      let compare = Dal.Slot_index.compare
+
+      let name = "slot_index"
+    end)
+    (struct
+      type value = [`Confirmed | `Unconfirmed]
+
+      let name = "slot_processing_status"
+
+      let encoding =
+        let open Data_encoding in
+        let mk_case constr ~tag ~title =
+          case
+            ~title
+            (Tag tag)
+            (obj1 (req "kind" (constant title)))
+            (fun x -> if x = constr then Some () else None)
+            (fun () -> constr)
+        in
+        union
+          ~tag_size:`Uint8
+          [
+            mk_case `Confirmed ~tag:0 ~title:"Confirmed";
+            mk_case `Unconfirmed ~tag:1 ~title:"Unconfirmed";
+          ]
     end)
 
 module Dal_slots_headers =

@@ -48,34 +48,8 @@ This sequence of operations was run:
     "commitment":
       "sh237VRQLZqf8Uno4hjiiJh8RJxuwhPF4xWnPq2VKuC2ZbwVp3w9nw36iGfLHzpQrbopWx8GFq" } ]
 
-./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/slot_pages
-[ { "index": 0,
-    "contents":
-      [ null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null,
-        null, null, null ] },
-  { "index": 1,
+./octez-sc-rollup-client-alpha rpc get /global/block/head/dal/confirmed_slot_pages
+[ { "index": 1,
     "contents":
       [ "2032303020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",

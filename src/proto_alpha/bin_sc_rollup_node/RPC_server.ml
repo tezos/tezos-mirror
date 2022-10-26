@@ -70,7 +70,7 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_slot_pages store block =
+let get_dal_confirmed_slot_pages store block =
   let open Lwt_result_syntax in
   let*! slot_pages =
     Store.Dal_slot_pages.list_secondary_keys_with_values
@@ -96,20 +96,25 @@ let get_dal_slot_pages store block =
 
 let get_dal_slot_page store block slot_index slot_page =
   let open Lwt_result_syntax in
-  let*! contents_opt_opt =
-    Store.Dal_slot_pages.find
+  let*! processed =
+    Store.Dal_processed_slots.find
       store
       ~primary_key:block
-      ~secondary_key:(slot_index, slot_page)
+      ~secondary_key:slot_index
   in
-  return
-  @@
-  match contents_opt_opt with
-  | None -> ("Slot page has not been downloaded", None)
-  | Some contents_opt -> (
+  match processed with
+  | None -> return ("Slot page has not been downloaded", None)
+  | Some `Unconfirmed -> return ("Slot was not confirmed", None)
+  | Some `Confirmed -> (
+      let*! contents_opt =
+        Store.Dal_slot_pages.find
+          store
+          ~primary_key:block
+          ~secondary_key:(slot_index, slot_page)
+      in
       match contents_opt with
-      | None -> ("Slot was not confirmed", None)
-      | Some contents -> ("Slot page is available", Some contents))
+      | None -> assert false
+      | Some _contents -> return ("Slot page is available", contents_opt))
 
 module type PARAM = sig
   include Sc_rollup_services.PREFIX
@@ -312,8 +317,10 @@ module Make (PVM : Pvm.S) = struct
     return slots
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_pages
-    @@ fun (node_ctxt, block) () () -> get_dal_slot_pages node_ctxt.store block
+    Block_directory.register0
+      Sc_rollup_services.Global.Block.dal_confirmed_slot_pages
+    @@ fun (node_ctxt, block) () () ->
+    get_dal_confirmed_slot_pages node_ctxt.store block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page

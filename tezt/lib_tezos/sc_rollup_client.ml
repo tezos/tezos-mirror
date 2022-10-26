@@ -244,21 +244,21 @@ let dal_slot_headers ?hooks ?(block = "head") sc_client =
              index = obj |> get "index" |> as_int;
            }))
 
-let dal_downloaded_slots ?hooks ?(block = "head") sc_client =
+let dal_downloaded_confirmed_slot_pages ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
   let+ json =
-    rpc_get ?hooks sc_client ["global"; "block"; block; "dal"; "slot_pages"]
+    rpc_get
+      ?hooks
+      sc_client
+      ["global"; "block"; block; "dal"; "confirmed_slot_pages"]
   in
   JSON.as_list json
   |> List.map (fun obj ->
          let index = obj |> JSON.get "index" |> JSON.as_int in
          let contents =
            obj |> JSON.get "contents" |> JSON.as_list
-           |> List.map (fun pages ->
-                  pages |> JSON.as_opt
-                  |> Option.map (fun page ->
-                         page |> JSON.as_string |> fun s ->
-                         Hex.to_string (`Hex s)))
+           |> List.map (fun page ->
+                  page |> JSON.as_string |> fun s -> Hex.to_string (`Hex s))
          in
          (index, contents))
 

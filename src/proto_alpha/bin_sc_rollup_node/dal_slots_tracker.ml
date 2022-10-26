@@ -191,46 +191,52 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
   *)
   List.filter_map Dal.Slot_index.of_int filtered
 
-let save_unconfirmed_slots store current_block_hash slot_index number_of_pages =
-  (* Adding multiple entries with the same primary key amounts to updating the
-     contents of an in-memory map, hence pages must be added sequentially. *)
-  List.iter_s
-    (fun page_number ->
-      Store.Dal_slot_pages.add
-        store
-        ~primary_key:current_block_hash
-        ~secondary_key:(slot_index, page_number)
-        None)
-    Misc.(0 --> (number_of_pages - 1))
+let save_unconfirmed_slot store current_block_hash slot_index =
+  (* No page is actually saved *)
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Unconfirmed
 
 let save_confirmed_slot store current_block_hash slot_index pages =
   (* Adding multiple entries with the same primary key amounts to updating the
      contents of an in-memory map, hence pages must be added sequentially. *)
-  List.iteri_s
-    (fun page_number page ->
-      Store.Dal_slot_pages.add
-        store
-        ~primary_key:current_block_hash
-        ~secondary_key:(slot_index, page_number)
-        (Some page))
-    pages
+  let open Lwt_syntax in
+  let* () =
+    List.iteri_s
+      (fun page_number page ->
+        Store.Dal_slot_pages.add
+          store
+          ~primary_key:current_block_hash
+          ~secondary_key:(slot_index, page_number)
+          page)
+      pages
+  in
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Confirmed
 
 let download_and_save_slots
     {Node_context.store; dal_cctxt; protocol_constants; _} ~current_block_hash
     {published_block_hash; subscribed_slots_indexes; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
-  let*? subscribed_not_confirmed =
+  let*? all_slots =
+    Misc.(0 --> (protocol_constants.parametric.dal.number_of_slots - 1))
+    |> Bitset.from_list |> Environment.wrap_tzresult
+  in
+  let*? not_confirmed =
     Environment.wrap_tzresult
     @@ to_slot_index_list protocol_constants.parametric
-    @@ Bitset.diff subscribed_slots_indexes confirmed_slots_indexes
+    @@ Bitset.diff all_slots confirmed_slots_indexes
   in
   let*? subscribed_and_confirmed =
     Environment.wrap_tzresult
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.inter subscribed_slots_indexes confirmed_slots_indexes
   in
-  let params = protocol_constants.parametric.dal.cryptobox_parameters in
-  let number_of_pages = Dal.Page.pages_per_slot params in
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
      As part of the clean rollup storage workflow, we should make sure that
      pages for old slots are removed from the storage when not needed anymore.
@@ -239,13 +245,9 @@ let download_and_save_slots
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)
   let*! () =
-    subscribed_not_confirmed
-    |> List.iter_p (fun s_slot ->
-           save_unconfirmed_slots
-             store
-             current_block_hash
-             s_slot
-             number_of_pages)
+    List.iter_p
+      (fun s_slot -> save_unconfirmed_slot store current_block_hash s_slot)
+      not_confirmed
   in
   let* () =
     subscribed_and_confirmed

@@ -138,31 +138,19 @@ module Make (Interpreter : Interpreter.S) :
              It's better to do the check when the slots are saved into disk. *)
           (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
              This check is not resilient to dal parameters change. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4033
-             This check would be useless if we guarantee atomicity (at least in
-             the interface) when retrieveing a slot's pages: all the pages, or
-             nothing. *)
-          if List.compare_length_with pages pages_per_slot <> 0 then
-            failwith
-              "Unexpected number of pages for slot %a. Got %d instead of %d"
-              Dal.Slot.Header.pp_id
-              slot_id
-              (List.length pages)
-              pages_per_slot
-          else
-            match List.nth_opt pages page_index with
-            | Some content ->
-                let* page_proof =
-                  page_membership_proof dal_params page_index
-                  @@ Bytes.concat Bytes.empty pages
-                in
-                return_some (content, page_proof)
-            | None ->
-                failwith
-                  "Page index %d too big or negative.\n\
-                   Number of pages in a slot is %d."
-                  page_index
-                  pages_per_slot)
+          match List.nth_opt pages page_index with
+          | Some content ->
+              let* page_proof =
+                page_membership_proof dal_params page_index
+                @@ Bytes.concat Bytes.empty pages
+              in
+              return_some (content, page_proof)
+          | None ->
+              failwith
+                "Page index %d too big or negative.\n\
+                 Number of pages in a slot is %d."
+                page_index
+                pages_per_slot)
     | _ -> return_none
 
   let generate_proof node_ctxt game start_state =

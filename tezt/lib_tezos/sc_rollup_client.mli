@@ -142,13 +142,10 @@ val dal_slot_subscriptions :
 val dal_slot_headers :
   ?hooks:Process.hooks -> ?block:string -> t -> slot_header list Lwt.t
 
-(** [dal_downloaded_slots ?block client] returns the slots downloaded after processing
-    the [block] (default ["head"]). *)
-val dal_downloaded_slots :
-  ?hooks:Process.hooks ->
-  ?block:string ->
-  t ->
-  (int * string option list) list Lwt.t
+(** [dal_downloaded_confirmed_slot_pages ?block client] returns the confirmed
+    slots downloaded after processing the [block] (default ["head"]). *)
+val dal_downloaded_confirmed_slot_pages :
+  ?hooks:Process.hooks -> ?block:string -> t -> (int * string list) list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

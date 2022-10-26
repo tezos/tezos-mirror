@@ -190,14 +190,27 @@ module Dal_confirmed_slots_histories :
 
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
     of dal slots fetched by the rollup node, as a list of pages. The values of
-    this storage module have type `string option list`. The value[None] for
-    elements of the list is used to denote pages of slots that have not been
-    confirmed. A value of the form [Some page_contents] refers to a page of
-    a slot that has been confirmed, and whose contents are [page_contents].
+    this storage module have type `string list`. A value of the form
+    [page_contents] refers to a page of a slot that has been confirmed, and
+    whose contents are [page_contents].
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map
     with type primary_key = Block_hash.t
      and type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
-     and type value = Dal.Page.content option
+     and type value = Dal.Page.content
+     and type store = t
+
+(** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing
+    status of dal slots content fetched by the rollup node. The values of
+    this storage module have type `[`Confirmed | `Unconfirmed]`, depending on
+    whether the content of the slot has been confirmed or not. If an entry is
+    not present for a [(block_hash, slot_index)], this either means that it's
+    not processed yet, or that the rollup node didn't subscribe to that slot.
+*)
+module Dal_processed_slots :
+  Store_sigs.Nested_map
+    with type primary_key = Block_hash.t
+     and type secondary_key = Dal.Slot_index.t
+     and type value = [`Confirmed | `Unconfirmed]
      and type store = t

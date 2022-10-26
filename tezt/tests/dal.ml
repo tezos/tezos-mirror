@@ -826,37 +826,26 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     Check.int
     ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
   (* 7. Wait for the rollup node to download the endorsed slots. *)
-  let* downloaded_slots =
-    Sc_rollup_client.dal_downloaded_slots ~hooks sc_rollup_client
+  let* downloaded_confirmed_slots =
+    Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
   in
   (* 8. Verify that rollup node has downloaded slot 1, slot 0 is
         unconfirmed, and slot 2 has not been downloaded *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
+  let expected_number_of_downloaded_or_unconfirmed_slots = 1 in
   Check.(
-    List.length downloaded_slots
+    List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
     Check.int
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
        unconfirmed (%L = %R)" ;
-  let slot_0_index, slot_0_pages = List.nth downloaded_slots 0 in
-  Check.(slot_0_index = 0)
-    Check.int
-    ~error_msg:"Slot is not as expected(%L = %R)" ;
-
-  List.iter
-    (fun page ->
-      Check.(page = None)
-        (Check.option @@ Check.string)
-        ~error_msg:"Contents of slot 0 are not as expected (%L = %R)")
-    slot_0_pages ;
   let confirmed_slot_index, confirmed_slot_contents =
-    List.nth downloaded_slots 1
+    List.nth downloaded_confirmed_slots 0
   in
   Check.(confirmed_slot_index = 1)
     Check.int
     ~error_msg:"Index of confirmed slot is not as expected (%L = %R)" ;
-  let relevant_slot = Option.get @@ List.nth confirmed_slot_contents 0 in
+  let relevant_slot = List.nth confirmed_slot_contents 0 in
   let message = String.sub relevant_slot 0 (String.length slot_contents_1) in
   Check.(message = slot_contents_1)
     Check.string
