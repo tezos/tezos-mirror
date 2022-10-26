@@ -190,10 +190,9 @@ module Dal_confirmed_slots_histories :
 
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
     of dal slots fetched by the rollup node, as a list of pages. The values of
-    this storage module have type `string option list`. The value[None] for
-    elements of the list is used to denote pages of slots that have not been
-    confirmed. A value of the form [Some page_contents] refers to a page of
-    a slot that has been confirmed, and whose contents are [page_contents].
+    this storage module have type `string list`. A value of the form
+    [Some page_contents] refers to a page of a slot that has been confirmed, and
+    whose contents are [page_contents].
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map

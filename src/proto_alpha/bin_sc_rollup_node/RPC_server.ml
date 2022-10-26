@@ -96,20 +96,28 @@ let get_dal_slot_pages store block =
 
 let get_dal_slot_page store block slot_index slot_page =
   let open Lwt_result_syntax in
-  let*! contents_opt_opt =
-    Store.Dal_slot_pages.find
+  let*! processed =
+    Store.Dal_processed_slots.find
       store
       ~primary_key:block
-      ~secondary_key:(slot_index, slot_page)
+      ~secondary_key:slot_index
   in
-  return
-  @@
-  match contents_opt_opt with
-  | None -> ("Slot page has not been downloaded", None)
-  | Some contents_opt -> (
-      match contents_opt with
-      | None -> ("Slot was not confirmed", None)
-      | Some contents -> ("Slot page is available", Some contents))
+  match processed with
+  | None -> return ("Slot page has not been downloaded", None)
+  | Some `Unconfirmed -> return ("Slot was not confirmed", None)
+  | Some `Confirmed -> (
+      let*! contents_opt_opt =
+        Store.Dal_slot_pages.find
+          store
+          ~primary_key:block
+          ~secondary_key:(slot_index, slot_page)
+      in
+      match contents_opt_opt with
+      | None -> assert false
+      | Some contents_opt -> (
+          match contents_opt with
+          | None -> assert false
+          | Some contents -> return ("Slot page is available", Some contents)))
 
 module type PARAM = sig
   include Sc_rollup_services.PREFIX

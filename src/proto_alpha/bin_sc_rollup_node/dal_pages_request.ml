@@ -57,35 +57,42 @@ let store_entry_from_published_level ~dal_endorsement_lag ~published_level store
 let slot_pages ~dal_endorsement_lag store
     (Dal.Slot.Header.{published_level; index} as slot_id) =
   let open Lwt_result_syntax in
-  let*! pages =
-    let*! confirmed_in_block_hash =
-      store_entry_from_published_level
-        ~dal_endorsement_lag
-        ~published_level
-        store
-    in
-    Store.Dal_slot_pages.list_secondary_keys_with_values
+  let*! confirmed_in_block_hash =
+    store_entry_from_published_level ~dal_endorsement_lag ~published_level store
+  in
+  let*! processed =
+    Store.Dal_processed_slots.find
       store
       ~primary_key:confirmed_in_block_hash
+      ~secondary_key:index
   in
-  let pages =
-    List.filter
-      (fun ((slot_idx, _page_idx), _v) -> Dal.Slot_index.equal index slot_idx)
-      pages
-  in
-  let* () =
-    fail_when (List.is_empty pages) (Dal_slot_not_found_in_store slot_id)
-  in
-  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4033
-     This could be simplified with a simpler interface to store data.
-     Otherwise, we should ideally check that we only have [Some <data>] or only
-     [None] in the list. (i.e., all the pages of the slot are confirmed, or none
-     is confirmed). *)
-  List.fold_left
-    (fun acc (_, v) -> match v with None -> acc | Some v -> v :: acc)
-    []
-    (List.rev pages)
-  |> return
+  match processed with
+  | None -> tzfail @@ Dal_slot_not_found_in_store slot_id
+  | Some `Unconfirmed -> return []
+  | Some `Confirmed ->
+      let*! pages =
+        Store.Dal_slot_pages.list_secondary_keys_with_values
+          store
+          ~primary_key:confirmed_in_block_hash
+      in
+      let pages =
+        List.filter
+          (fun ((slot_idx, _page_idx), _v) ->
+            Dal.Slot_index.equal index slot_idx)
+          pages
+      in
+      (* This should not happen. *)
+      assert (not (List.is_empty pages)) ;
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4033
+         This could be simplified with a simpler interface to store data.
+         Otherwise, we should ideally check that we only have [Some <data>] or only
+         [None] in the list. (i.e., all the pages of the slot are confirmed, or none
+         is confirmed). *)
+      List.fold_left
+        (fun acc (_, v) -> match v with None -> acc | Some v -> v :: acc)
+        []
+        (List.rev pages)
+      |> return
 
 let page_content ~dal_endorsement_lag store page_id =
   let open Lwt_result_syntax in
@@ -94,10 +101,20 @@ let page_content ~dal_endorsement_lag store page_id =
   let*! confirmed_in_block_hash =
     store_entry_from_published_level ~dal_endorsement_lag ~published_level store
   in
-  Store.Dal_slot_pages.find
-    store
-    ~primary_key:confirmed_in_block_hash
-    ~secondary_key:(index, page_index)
-  >|= Option.fold
-        ~some:(fun v -> Ok v)
-        ~none:(error (Dal_slot_not_found_in_store slot_id))
+  let*! processed =
+    Store.Dal_processed_slots.find
+      store
+      ~primary_key:confirmed_in_block_hash
+      ~secondary_key:index
+  in
+  match processed with
+  | None -> tzfail @@ Dal_slot_not_found_in_store slot_id
+  | Some `Unconfirmed -> return None
+  | Some `Confirmed ->
+      Store.Dal_slot_pages.find
+        store
+        ~primary_key:confirmed_in_block_hash
+        ~secondary_key:(index, page_index)
+      >|= Option.fold
+            ~some:(fun v -> Ok v)
+            ~none:(error (Dal_slot_not_found_in_store slot_id))

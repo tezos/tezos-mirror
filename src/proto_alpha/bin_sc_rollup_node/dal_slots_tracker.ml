@@ -191,29 +191,33 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
   *)
   List.filter_map Dal.Slot_index.of_int filtered
 
-let save_unconfirmed_slots store current_block_hash slot_index number_of_pages =
-  (* Adding multiple entries with the same primary key amounts to updating the
-     contents of an in-memory map, hence pages must be added sequentially. *)
-  List.iter_s
-    (fun page_number ->
-      Store.Dal_slot_pages.add
-        store
-        ~primary_key:current_block_hash
-        ~secondary_key:(slot_index, page_number)
-        None)
-    Misc.(0 --> (number_of_pages - 1))
+let save_unconfirmed_slot store current_block_hash slot_index =
+  (* No page is actually saved *)
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Unconfirmed
 
 let save_confirmed_slot store current_block_hash slot_index pages =
   (* Adding multiple entries with the same primary key amounts to updating the
      contents of an in-memory map, hence pages must be added sequentially. *)
-  List.iteri_s
-    (fun page_number page ->
-      Store.Dal_slot_pages.add
-        store
-        ~primary_key:current_block_hash
-        ~secondary_key:(slot_index, page_number)
-        (Some page))
-    pages
+  let open Lwt_syntax in
+  let* () =
+    List.iteri_s
+      (fun page_number page ->
+        Store.Dal_slot_pages.add
+          store
+          ~primary_key:current_block_hash
+          ~secondary_key:(slot_index, page_number)
+          (Some page))
+      pages
+  in
+  Store.Dal_processed_slots.add
+    store
+    ~primary_key:current_block_hash
+    ~secondary_key:slot_index
+    `Confirmed
 
 let download_and_save_slots
     {Node_context.store; dal_cctxt; protocol_constants; _} ~current_block_hash
@@ -229,8 +233,6 @@ let download_and_save_slots
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.inter subscribed_slots_indexes confirmed_slots_indexes
   in
-  let params = protocol_constants.parametric.dal.cryptobox_parameters in
-  let number_of_pages = Dal.Page.pages_per_slot params in
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
      As part of the clean rollup storage workflow, we should make sure that
      pages for old slots are removed from the storage when not needed anymore.
@@ -241,11 +243,7 @@ let download_and_save_slots
   let*! () =
     subscribed_not_confirmed
     |> List.iter_p (fun s_slot ->
-           save_unconfirmed_slots
-             store
-             current_block_hash
-             s_slot
-             number_of_pages)
+           save_unconfirmed_slot store current_block_hash s_slot)
   in
   let* () =
     subscribed_and_confirmed
