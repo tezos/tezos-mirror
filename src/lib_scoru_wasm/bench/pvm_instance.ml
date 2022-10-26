@@ -30,6 +30,15 @@ module Tree = Test_encodings_util.Tree
 module Tree_encoding_runner = Test_encodings_util.Tree_encoding_runner
 module Wasm = Wasm_utils.Wasm
 
+let encode_pvm_state state tree =
+  Tree_encoding_runner.encode
+    Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding
+    state
+    tree
+
+let decode_pvm_state tree =
+  Tree_encoding_runner.decode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding tree
+
 let get_tick_from_tree tree =
   let open Lwt_syntax in
   let* info = Wasm.get_info tree in
