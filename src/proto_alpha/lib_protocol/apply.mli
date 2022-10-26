@@ -112,6 +112,8 @@ val begin_partial_construction :
   migration_balance_updates:Receipt.balance_updates ->
   migration_operation_results:Migration.origination_result list ->
   predecessor_level:Raw_level.t ->
+  predecessor_timestamp:Timestamp.t ->
+  predecessor_hash:Block_hash.t ->
   predecessor_fitness:Fitness.raw ->
   application_state tzresult Lwt.t
 

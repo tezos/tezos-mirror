@@ -3454,6 +3454,9 @@ module Sc_rollup : sig
 
     val add_end_of_level : context -> (t * Z.t * context) tzresult Lwt.t
 
+    val add_info_per_level :
+      context -> Time.t -> Block_hash.t -> (t * Z.t * context) tzresult Lwt.t
+
     val get_inbox : context -> (t * context) tzresult Lwt.t
   end
 
@@ -5044,6 +5047,7 @@ val prepare_first_block :
     ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
+  predecessor:Block_hash.t ->
   context tzresult Lwt.t
 
 (** Create an [Alpha_context.t] from an untyped context. *)

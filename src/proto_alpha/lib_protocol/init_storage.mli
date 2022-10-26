@@ -42,6 +42,7 @@ val prepare_first_block :
     Lwt.t) ->
   level:int32 ->
   timestamp:Time.t ->
+  predecessor:Block_hash.t ->
   (Raw_context.t, Error_monad.error Error_monad.trace) Pervasives.result Lwt.t
 
 val prepare :

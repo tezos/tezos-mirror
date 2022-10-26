@@ -60,19 +60,26 @@ val add_deposit :
   (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** Initialize the inbox in the storage at protocol initialization. *)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val init :
+  timestamp:Time.t ->
+  predecessor:Block_hash.t ->
+  Raw_context.t ->
+  Raw_context.t tzresult Lwt.t
 
-(** Push a [Start_of_level] internal inbox message in the inbox using
-    {!add_internal_message}.
-*)
+(** Push a [Start_of_level] internal inbox message in the inbox. *)
 val add_start_of_level :
   Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
-(** Push a [End_of_level] internal inbox message in the inbox using
-    {!add_internal_message}.
-*)
+(** Push a [End_of_level] internal inbox message in the inbox. *)
 val add_end_of_level :
   Raw_context.t -> (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
+
+(** Push a [Info_per_level] internal inbox message in the inbox. *)
+val add_info_per_level :
+  Raw_context.t ->
+  Time.t ->
+  Block_hash.t ->
+  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (**/**)
 
