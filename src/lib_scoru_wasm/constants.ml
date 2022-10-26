@@ -31,11 +31,17 @@ let wasm_main_module_name = "main"
    kernel to expose a function named [kernel_next]. *)
 let wasm_entrypoint = "kernel_next"
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/3590
-   An appropriate number should be used,
-   currently 100 times the nb of ticks it takes tx_kernel to init, deposit, then withdraw
-   (so 100x 2 billion ticks) *)
-let wasm_max_tick = Z.of_int 200_000_000_000
+(* Number of ticks between snapshotable states,
+   should be chosen low enough to maintain refutability.
+
+   Depends on
+   - speed (tick/s) of node in slow mode (from benchmark, 6000000 tick/s)
+   - the number of ticks in a commitment (Int64.max_int,
+      as per Number_of_ticks.max_value)
+
+   see #3590 for more pointers
+*)
+let wasm_max_tick = Z.of_int 11_000_000_000
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
    Find an appropriate number of reboots per inputs.
