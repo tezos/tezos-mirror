@@ -302,10 +302,11 @@ module Global = struct
         ~output:(Data_encoding.list Dal.Slot.Header.encoding)
         (path / "dal" / "slot_headers")
 
-    let dal_slot_pages =
+    let dal_confirmed_slot_pages =
       RPC_service.get_service
         ~description:
-          "Data availability downloaded slot pages for a given block hash"
+          "Data availability confirmed & downloaded slot pages for a given \
+           block hash"
         ~query:RPC_query.empty
         ~output:
           (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
@@ -315,8 +316,8 @@ module Global = struct
             list
             @@ obj2
                  (req "index" Dal.Slot_index.encoding)
-                 (req "contents" (list @@ option Dal.Page.content_encoding)))
-        (path / "dal" / "slot_pages")
+                 (req "contents" (list Dal.Page.content_encoding)))
+        (path / "dal" / "confirmed_slot_pages")
 
     type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
 

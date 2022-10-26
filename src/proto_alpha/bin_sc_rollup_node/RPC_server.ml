@@ -70,7 +70,7 @@ module Slot_pages_map = struct
   include Map.Make (Dal.Slot_index)
 end
 
-let get_dal_slot_pages store block =
+let get_dal_confirmed_slot_pages store block =
   let open Lwt_result_syntax in
   let*! slot_pages =
     Store.Dal_slot_pages.list_secondary_keys_with_values
@@ -84,8 +84,7 @@ let get_dal_slot_pages store block =
       (fun map ((index, _page), page) ->
         Slot_pages_map.update
           index
-          (function
-            | None -> Some [Some page] | Some pages -> Some (Some page :: pages))
+          (function None -> Some [page] | Some pages -> Some (page :: pages))
           map)
       Slot_pages_map.empty
       slot_pages
@@ -318,8 +317,10 @@ module Make (PVM : Pvm.S) = struct
     return slots
 
   let () =
-    Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_pages
-    @@ fun (node_ctxt, block) () () -> get_dal_slot_pages node_ctxt.store block
+    Block_directory.register0
+      Sc_rollup_services.Global.Block.dal_confirmed_slot_pages
+    @@ fun (node_ctxt, block) () () ->
+    get_dal_confirmed_slot_pages node_ctxt.store block
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.dal_slot_page
