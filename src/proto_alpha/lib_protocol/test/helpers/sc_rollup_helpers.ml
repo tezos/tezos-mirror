@@ -207,6 +207,12 @@ let make_eol ~inbox_level ~message_counter =
   let payload = make_internal_inbox_message End_of_level in
   make_input ~inbox_level ~message_counter payload
 
+let make_info_per_level ~inbox_level ~timestamp ~predecessor =
+  let payload =
+    make_internal_inbox_message (Info_per_level {timestamp; predecessor})
+  in
+  make_input ~inbox_level ~message_counter:Z.one payload
+
 (** Message is the combination of a [message] and its associated [input].
 
     [message] is used to:
@@ -219,7 +225,11 @@ let make_eol ~inbox_level ~message_counter =
 *)
 type message = {
   input : Sc_rollup.input;
-  message : [`SOL | `Message of string | `EOL];
+  message :
+    [ `SOL
+    | `Info_per_level of Timestamp.t * Tezos_crypto.Block_hash.t
+    | `Message of string
+    | `EOL ];
 }
 
 let pp_input fmt (input : Sc_rollup.input) =
@@ -239,15 +249,34 @@ let pp_message fmt {input; message} =
     "{ input = %a; message = %S }"
     pp_input
     input
-    (match message with `SOL -> "SOL" | `Message msg -> msg | `EOL -> "EOL")
+    (match message with
+    | `SOL -> "SOL"
+    | `Info_per_level (timestamp, block_hash) ->
+        Format.asprintf
+          "Info_per_level (%s, %a)"
+          (Timestamp.to_notation timestamp)
+          Tezos_crypto.Block_hash.pp
+          block_hash
+    | `Message msg -> msg
+    | `EOL -> "EOL")
 
 (** An empty inbox level is a SOL and EOL. *)
-let make_empty_level inbox_level =
+let make_empty_level (timestamp, predecessor) inbox_level =
   let sol = {input = make_sol ~inbox_level; message = `SOL} in
-  let eol =
-    {input = make_eol ~inbox_level ~message_counter:Z.one; message = `EOL}
+  let info_per_level =
+    {
+      input = make_info_per_level ~inbox_level ~predecessor ~timestamp;
+      message = `Info_per_level (timestamp, predecessor);
+    }
   in
-  (inbox_level, [sol; eol])
+
+  let eol =
+    {
+      input = make_eol ~inbox_level ~message_counter:(Z.of_int 2);
+      message = `EOL;
+    }
+  in
+  (inbox_level, [sol; info_per_level; eol])
 
 (** Creates inputs based on string messages. *)
 let strs_to_inputs inbox_level messages =
@@ -255,19 +284,26 @@ let strs_to_inputs inbox_level messages =
     (fun (acc, message_counter) message ->
       let input = make_external_input ~inbox_level ~message_counter message in
       ({input; message = `Message message} :: acc, Z.succ message_counter))
-    ([], Z.one)
+    ([], Z.of_int 2)
     messages
 
 (** Transform messages into inputs and wrap them between SOL and EOL. *)
-let wrap_messages inbox_level strs =
+let wrap_messages (timestamp, predecessor) inbox_level strs =
   let sol = {input = make_sol ~inbox_level; message = `SOL} in
   let rev_inputs, message_counter = strs_to_inputs inbox_level strs in
   let inputs = List.rev rev_inputs in
+  let info_per_level =
+    {
+      input = make_info_per_level ~inbox_level ~predecessor ~timestamp;
+      message = `Info_per_level (timestamp, predecessor);
+    }
+  in
   let eol = {input = make_eol ~inbox_level ~message_counter; message = `EOL} in
-  (sol :: inputs) @ [eol]
+  (sol :: info_per_level :: inputs) @ [eol]
 
 let gen_messages_for_levels ~start_level ~max_level gen_message =
   let open QCheck2.Gen in
+  let dumb_info = (Timestamp.of_seconds 0L, Tezos_crypto.Block_hash.zero) in
   let rec aux acc n =
     match n with
     | n when n < 0 ->
@@ -280,14 +316,14 @@ let gen_messages_for_levels ~start_level ~max_level gen_message =
         in
         let* empty_level = bool in
         let* level_messages =
-          if empty_level then return (make_empty_level inbox_level)
+          if empty_level then return (make_empty_level dumb_info inbox_level)
           else
             let* messages =
               let* input = gen_message in
               let* inputs = small_list gen_message in
               return (input :: inputs)
             in
-            return (inbox_level, wrap_messages inbox_level messages)
+            return (inbox_level, wrap_messages dumb_info inbox_level messages)
         in
         aux (level_messages :: acc) (n - 1)
   in
@@ -495,24 +531,23 @@ end
    test/unit/test_sc_rollup_inbox. The main difference is: we use
    [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
    former. *)
-let construct_inbox ~inbox ?origination_level ctxt levels_and_messages =
+let construct_inbox ~inbox ?origination_level ctxt levels_and_inputs =
   let open Lwt_syntax in
   let open Store_inbox in
   let history = Sc_rollup.Inbox.History.empty ~capacity:10000L in
   let rec aux history inbox level_tree = function
     | [] -> return (ctxt, level_tree, history, inbox)
-    | ((level, messages) : Raw_level.t * message list) :: rst ->
+    | ((level, inputs) : Raw_level.t * Sc_rollup.input list) :: rst ->
         assert (
           match origination_level with
           | Some origination_level -> Raw_level.(origination_level < level)
           | None -> true) ;
         let payloads =
           List.map
-            (fun {input; _} ->
-              match input with
-              | Inbox_message {payload; _} -> payload
+            (function
+              | Sc_rollup.Inbox_message {payload; _} -> payload
               | Reveal _ -> (* We don't produce any reveals. *) assert false)
-            messages
+            inputs
         in
         let* res =
           add_messages ctxt history inbox level payloads level_tree
@@ -523,4 +558,4 @@ let construct_inbox ~inbox ?origination_level ctxt levels_and_messages =
         in
         aux history inbox (Some level_tree) rst
   in
-  aux history inbox None levels_and_messages
+  aux history inbox None levels_and_inputs

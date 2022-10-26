@@ -76,8 +76,8 @@ This sequence of operations was run:
       Consumed gas: 1001.226
       Resulting inbox state: { level = 5
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 5 nb_messages_in_commitment_period = 11
-                               message_counter = 3
+                               level: 5 nb_messages_in_commitment_period = 16
+                               message_counter = 4
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 4
@@ -118,8 +118,8 @@ This sequence of operations was run:
       Consumed gas: 1010.725
       Resulting inbox state: { level = 6
                                current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
-                               level: 6 nb_messages_in_commitment_period = 28
-                               message_counter = 16
+                               level: 6 nb_messages_in_commitment_period = 34
+                               message_counter = 17
                                old_levels_messages = 
        content = hash: [SC_ROLLUP_INBOX_HASH]
                                level: 5

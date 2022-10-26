@@ -241,13 +241,13 @@ This sequence of operations was run:
 16
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/num_messages
-"7"
+"8"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/status
 "Waiting for input message"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/ticks
-"88000000000"
+"99000000000"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"

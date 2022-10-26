@@ -2053,18 +2053,27 @@ let node_proof_to_protocol_proof p =
 let full_history_inbox all_inbox_messages =
   let open Lwt_syntax in
   let open Sc_rollup_helpers in
-  (* Add the SOL/EOL to the list of inbox messages. *)
+  (* Add the SOL/Info_per_level/EOL to the list of inbox messages. *)
   let all_inbox_messages =
     List.map
-      (fun (inbox_level, inbox_messages) ->
-        (inbox_level, wrap_messages inbox_level inbox_messages))
+      (fun (inbox_level, info, inbox_messages) ->
+        (inbox_level, wrap_messages info inbox_level inbox_messages))
       all_inbox_messages
   in
   (* Create a inbox adding the messages from [all_inbox_messages]. *)
   let* index = Tezos_context_memory.Context.init "inbox" in
   let ctxt = Tezos_context_memory.Context.empty index in
   let* inbox = Store_inbox.empty ctxt Raw_level.root in
-  Sc_rollup_helpers.construct_inbox ~inbox ctxt all_inbox_messages
+  let all_inbox_inputs =
+    List.map
+      (fun (level, messages) ->
+        ( level,
+          List.map
+            (fun Sc_rollup_helpers.{input; message = _} -> input)
+            messages ))
+      all_inbox_messages
+  in
+  Sc_rollup_helpers.construct_inbox ~inbox ctxt all_inbox_inputs
 
 let input_included ~snapshot ~full_history_inbox (l, n) =
   let open Sc_rollup_helpers in
@@ -2087,9 +2096,9 @@ let input_included ~snapshot ~full_history_inbox (l, n) =
     (fun inbox_message -> Sc_rollup.Inbox_message inbox_message)
     inbox_message_verified
 
-(** Test that the protocol adds a [SOL] and [EOL] for each Tezos level,
-    even if no messages are added to the inbox. *)
-let test_sol_and_eol () =
+(** Test that the protocol adds a [SOL], [Info_per_level] and [EOL] for each
+    Tezos level, even if no messages are added to the inbox. *)
+let test_automatically_added_internal_messages () =
   let assert_input_included ~snapshot ~full_history_inbox (l, n) input =
     let* input_verified = input_included ~snapshot ~full_history_inbox (l, n) in
     Assert.equal
@@ -2104,15 +2113,23 @@ let test_sol_and_eol () =
       input
   in
 
+  let info_per_block (block : Block.t) =
+    let header = block.header.shell in
+    (header.timestamp, header.predecessor)
+  in
+
   (* Create the first block. *)
   let* block, account = context_init Context.T1 in
+  let level_zero_info = info_per_block block in
 
   (* Bake a second block. *)
   let* block = Block.bake block in
+  let level_one_info = info_per_block block in
 
   (* Bake a third block where a message is added. *)
   let* operation = Op.sc_rollup_add_messages (B block) account ["foo"] in
   let* block = Block.bake ~operation block in
+  let level_two_info = info_per_block block in
 
   (* Bake an extra block to archive all inbox messages for the snapshot. *)
   let* block = Block.bake block in
@@ -2123,7 +2140,12 @@ let test_sol_and_eol () =
   let level_one = Raw_level.of_int32_exn 1l in
   let level_two = Raw_level.of_int32_exn 2l in
   let*! ((ctxt, level_tree, history, inbox) as full_history_inbox) =
-    full_history_inbox [(level_zero, []); (level_one, []); (level_two, ["foo"])]
+    full_history_inbox
+      [
+        (level_zero, level_zero_info, []);
+        (level_one, level_one_info, []);
+        (level_two, level_two_info, ["foo"]);
+      ]
   in
 
   (* Assert SOL is at position 0. *)
@@ -2135,17 +2157,34 @@ let test_sol_and_eol () =
       (level_two, Z.zero)
       (Some sol)
   in
-  (* Assert EOL is at the end of inbox level. *)
-  let eol =
-    Sc_rollup_helpers.make_eol
+
+  (* Assert Info_per_level is at position 1. *)
+  let timestamp, predecessor = level_two_info in
+  let info_per_level =
+    Sc_rollup_helpers.make_info_per_level
       ~inbox_level:level_two
-      ~message_counter:(Z.of_int 2)
+      ~timestamp
+      ~predecessor
   in
   let* () =
     assert_input_included
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.of_int 2)
+      (level_two, Z.one)
+      (Some info_per_level)
+  in
+
+  (* Assert EOL is at the end of inbox level. *)
+  let eol =
+    Sc_rollup_helpers.make_eol
+      ~inbox_level:level_two
+      ~message_counter:(Z.of_int 3)
+  in
+  let* () =
+    assert_input_included
+      ~snapshot
+      ~full_history_inbox
+      (level_two, Z.of_int 3)
       (Some eol)
   in
   (* Assert EOL was the last message of the inbox level. *)
@@ -2153,7 +2192,7 @@ let test_sol_and_eol () =
     assert_input_included
       ~snapshot
       ~full_history_inbox
-      (level_two, Z.of_int 3)
+      (level_two, Z.of_int 4)
       None
   in
 
@@ -2493,9 +2532,9 @@ let tests =
       `Quick
       test_refute_invalid_metadata;
     Tztest.tztest
-      "Test that SOL/EOL are added in the inbox"
+      "Test that SOL/Info_per_level/EOL are added in the inbox"
       `Quick
-      test_sol_and_eol;
+      test_automatically_added_internal_messages;
     Tztest.tztest
       "0-tick commitments are forbidden"
       `Quick
