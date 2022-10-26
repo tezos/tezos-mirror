@@ -61,6 +61,12 @@ type internal_inbox_message =
   | Start_of_level
       (** Internal message put at the beginning of each inbox's level. *)
   | End_of_level  (** Internal message put at the end of each inbox's level. *)
+  | Info_per_level of {
+      timestamp : Time.t;
+          (** Timestamp of the block where this message is pushed. *)
+      predecessor : Block_hash.t;
+          (** Predecessor of the block this message is pushed. *)
+    }
 
 (** A type representing messages from Layer 1 to Layer 2. Internal ones are
     originated from Layer 1 smart-contracts and external ones are messages from

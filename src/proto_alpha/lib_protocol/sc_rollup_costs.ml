@@ -120,6 +120,7 @@ let cost_serialize_internal_inbox_message
         + Constants.cost_decoding_key_hash_optimized)
   | Start_of_level -> Saturation_repr.zero
   | End_of_level -> Saturation_repr.zero
+  | Info_per_level _ -> Saturation_repr.zero
 
 (** TODO: #3212
     Confirm gas cost model.

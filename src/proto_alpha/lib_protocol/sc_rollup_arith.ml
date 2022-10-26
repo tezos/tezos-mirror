@@ -968,6 +968,9 @@ module Make (Context : P) :
       | Ok (Internal End_of_level) ->
           let* () = incr_internal_message_counter in
           return None
+      | Ok (Internal (Info_per_level _)) ->
+          let* () = incr_internal_message_counter in
+          return None
     in
     match payload with
     | Some payload ->

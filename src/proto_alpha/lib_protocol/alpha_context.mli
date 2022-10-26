@@ -3166,6 +3166,7 @@ module Sc_rollup : sig
         }
       | Start_of_level
       | End_of_level
+      | Info_per_level of {timestamp : Time.t; predecessor : Block_hash.t}
 
     type t = Internal of internal_inbox_message | External of string
 
