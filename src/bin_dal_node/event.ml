@@ -82,9 +82,9 @@ let stored_slot =
   declare_2
     ~section
     ~name:"stored_slot"
-    ~msg:"Slot stored: size {size}, shards {shards}"
+    ~msg:"Slot stored: slot_header {slot_header}, shards {shards}"
     ~level:Notice
-    ("size", Data_encoding.int31)
+    ("slot_header", Data_encoding.string)
     ("shards", Data_encoding.int31)
 
 let fetched_slot =
@@ -120,6 +120,15 @@ let protocol_plugin_resolved =
     ~msg:"Resolved plugin on protocol {proto_hash}"
     ~level:Notice
     ("proto_hash", Data_encoding.string)
+
+let daemon_error =
+  declare_1
+    ~section
+    ~name:"dal_node_daemon_error"
+    ~msg:"Daemon thrown an error: {error}"
+    ~level:Notice
+    ~pp1:Error_monad.pp_print_trace
+    ("error", Error_monad.trace_encoding)
 
 let proto_short_hash_string hash =
   Format.asprintf "%a" Protocol_hash.pp_short hash

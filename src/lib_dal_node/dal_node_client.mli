@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
 open Tezos_crypto_dal
 
 (** Instance of [Tezos_client_base.Client_context] that only handles IOs and
@@ -41,15 +39,15 @@ class unix_cctxt :
 
 (** [make_unix_client_context config] generates a cctxt from
     the client configuration. *)
-val make_unix_cctxt : Configuration.t -> cctxt
+val make_unix_cctxt : addr:string -> port:int -> cctxt
 
 val get_slot :
-  #cctxt -> ?trim_slot:bool -> Dal.Slot.Commitment.t -> string tzresult Lwt.t
+  #cctxt -> ?trim_slot:bool -> Cryptobox.Commitment.t -> string tzresult Lwt.t
 
 val get_shard :
-  #cctxt -> Dal.Slot.Commitment.t -> int -> Cryptobox.shard tzresult Lwt.t
+  #cctxt -> Cryptobox.Commitment.t -> int -> Cryptobox.shard tzresult Lwt.t
 
 (** [get_slot_pages cctxt header ] fetches from the dal node the pages
     of the slot with header [header]. *)
 val get_slot_pages :
-  #cctxt -> Dal.Slot.Commitment.t -> Dal.Page.content list tzresult Lwt.t
+  #cctxt -> Cryptobox.Commitment.t -> bytes list tzresult Lwt.t

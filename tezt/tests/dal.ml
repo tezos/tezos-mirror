@@ -199,6 +199,27 @@ let subscribe_to_dal_slot client ~sc_rollup_address ~slot_index =
   let* () = Client.bake_for_and_wait client in
   return op_hash
 
+let update_neighbors dal_node neighbors =
+  let neighbors =
+    `A
+      (List.map
+         (fun dal_node ->
+           `O
+             [
+               ("rpc-addr", `String (Dal_node.rpc_host dal_node));
+               ("rpc-port", `Float (float_of_int (Dal_node.rpc_port dal_node)));
+             ])
+         neighbors)
+  in
+  Dal_node.Config_file.update
+    dal_node
+    (JSON.put ("neighbors", JSON.annotate ~origin:"dal_node_config" neighbors))
+
+let wait_for_stored_slot dal_node slot_header =
+  Dal_node.wait_for dal_node "stored_slot.v0" (fun e ->
+      if JSON.(e |-> "slot_header" |> as_string) = slot_header then Some ()
+      else None)
+
 let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
   (* This test ensures the feature flag works:
 
@@ -604,7 +625,8 @@ let test_dal_node_rebuild_from_shards =
   (* Steps in this integration test:
      1. Run a dal node
      2. Generate and publish a full slot, then bake
-     3. Download exactly 1/16 shards from this slot (it would work with more)
+     3. Download exactly 1/redundancy_factor shards
+        from this slot (it would work with more)
      4. Ensure we can rebuild the original data using the above shards
   *)
   Protocol.register_test
@@ -657,6 +679,39 @@ let test_dal_node_rebuild_from_shards =
     Check.(string)
     ~error_msg:"Reconstructed slot is different from original slot (%L = %R)" ;
   return ()
+
+let test_dal_node_test_slots_propagation =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"dal node slots propagation"
+    ~tags:["dal"; "dal_node"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  let* node, _client, dal_node1 = init_dal_node protocol in
+  let dal_node2 = Dal_node.create ~node () in
+  let dal_node3 = Dal_node.create ~node () in
+  let dal_node4 = Dal_node.create ~node () in
+  let* _ = Dal_node.init_config dal_node2 in
+  let* _ = Dal_node.init_config dal_node3 in
+  let* _ = Dal_node.init_config dal_node4 in
+  update_neighbors dal_node3 [dal_node1; dal_node2] ;
+  update_neighbors dal_node4 [dal_node3] ;
+  let* () = Dal_node.run dal_node2 in
+  let* () = Dal_node.run dal_node3 in
+  let* () = Dal_node.run dal_node4 in
+  let* slot_header1 =
+    RPC.call dal_node1 (Rollup.Dal.RPC.split_slot "content1")
+  in
+  let* slot_header2 =
+    RPC.call dal_node2 (Rollup.Dal.RPC.split_slot "content2")
+  in
+  Lwt.join
+    [
+      wait_for_stored_slot dal_node3 slot_header1;
+      wait_for_stored_slot dal_node3 slot_header2;
+      wait_for_stored_slot dal_node4 slot_header1;
+      wait_for_stored_slot dal_node4 slot_header2;
+    ]
 
 let test_dal_node_startup =
   Protocol.register_test
@@ -945,6 +1000,7 @@ let register ~protocols =
   test_dal_node_slots_headers_tracking protocols ;
   test_dal_node_rebuild_from_shards protocols ;
   test_dal_node_startup protocols ;
+  test_dal_node_test_slots_propagation protocols ;
   test_dal_rollup_scenario
     ~dal_enable:true
     "rollup_node_downloads_slots"

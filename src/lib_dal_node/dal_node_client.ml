@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,20 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3517
-    If the layer1 node reboots, the rpc stream breaks.
-*)
-let on_new_head cctxt handle =
-  let open Lwt_result_syntax in
-  let* stream, stopper =
-    Tezos_shell_services.Monitor_services.heads cctxt `Main
+open Tezos_dal_node_services
+
+class type cctxt =
+  object
+    inherit RPC_context.generic
+  end
+
+class unix_cctxt ~rpc_config : cctxt =
+  object
+    inherit
+      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+        rpc_config
+        (Tezos_rpc_http.Media_type.Command_line.of_command_line
+           rpc_config.media_type)
+  end
+
+let make_unix_cctxt ~addr ~port =
+  let endpoint = Uri.of_string ("http://" ^ addr ^ ":" ^ string_of_int port) in
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
   in
-  let rec go () =
-    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-    match tok with
-    | None -> return_unit
-    | Some element ->
-        let* () = handle element in
-        go ()
-  in
-  return (go (), stopper)
+  new unix_cctxt ~rpc_config
+
+let call (cctxt : #cctxt) = cctxt#call_service
+
+let get_slot cctxt ?(trim_slot = false) header =
+  call cctxt (Services.slot ()) ((), header) trim_slot ()
+
+let get_shard cctxt header shard_index =
+  call cctxt (Services.shard ()) (((), header), shard_index) () ()
+
+let get_slot_pages cctxt header =
+  call cctxt (Services.slot_pages ()) ((), header) () ()

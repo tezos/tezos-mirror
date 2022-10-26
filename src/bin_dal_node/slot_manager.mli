@@ -36,8 +36,8 @@
 
 type slot = bytes
 
-(** [split_and_store watcher dal_constants store slot] splits [slot] in
-    shards, stores it onto the disk and returns the corresponding [slot_header],
+(** [split_and_store watcher dal_constants store slot] splits [slot] in shards,
+    stores it onto the [store] and returns the corresponding [slot_header],
     using [dal_constants].
 
     [watcher] is notified when the slot is added to the store. *)
@@ -76,6 +76,16 @@ val get_slot_pages :
   Store.t ->
   Cryptobox.commitment ->
   bytes list tzresult Lwt.t
+
+(** [save_shards store slot_header shards] stores [shards] onto the [store]
+    associated to the given [slot_header] *)
+val save_shards :
+  Store.t ->
+  Cryptobox.commitment Lwt_watcher.input ->
+  Cryptobox.t ->
+  Cryptobox.commitment ->
+  Cryptobox.share Cryptobox.IntMap.t ->
+  unit tzresult Lwt.t
 
 module Utils : sig
   (** [trim_x00 s] removes trailing '\000' at the end of [s] and returns

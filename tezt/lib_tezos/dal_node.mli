@@ -91,3 +91,20 @@ val wait : t -> Unix.process_status Lwt.t
 *)
 
 val init_config : ?use_unsafe_srs:bool -> t -> string Lwt.t
+
+module Config_file : sig
+  (** DAL node configuration files. *)
+
+  (** Read the configuration file ([config.json]) of a DAL node. *)
+  val read : t -> JSON.t
+
+  (** Write the configuration file of a DAL node, replacing the existing one. *)
+  val write : t -> JSON.t -> unit
+
+  (** Update the configuration file of a DAL node. If the DAL node is already
+      running, it needs to be restarted manually.
+
+      Example:
+        [Node.Config_file.update node (JSON.put ("use_unsafe_srs", "true"))] *)
+  val update : t -> (JSON.t -> JSON.t) -> unit
+end
