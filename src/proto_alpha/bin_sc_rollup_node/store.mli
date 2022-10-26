@@ -191,14 +191,14 @@ module Dal_confirmed_slots_histories :
 (** [Dal_slot_pages] is a [Store_utils.Nested_map] used to store the contents
     of dal slots fetched by the rollup node, as a list of pages. The values of
     this storage module have type `string list`. A value of the form
-    [Some page_contents] refers to a page of a slot that has been confirmed, and
+    [page_contents] refers to a page of a slot that has been confirmed, and
     whose contents are [page_contents].
 *)
 module Dal_slot_pages :
   Store_sigs.Nested_map
     with type primary_key = Block_hash.t
      and type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
-     and type value = Dal.Page.content option
+     and type value = Dal.Page.content
      and type store = t
 
 (** [Dal_processed_slots] is a [Store_utils.Nested_map] used to store the processing

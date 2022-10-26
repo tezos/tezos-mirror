@@ -210,7 +210,7 @@ let save_confirmed_slot store current_block_hash slot_index pages =
           store
           ~primary_key:current_block_hash
           ~secondary_key:(slot_index, page_number)
-          (Some page))
+          page)
       pages
   in
   Store.Dal_processed_slots.add

@@ -75,24 +75,10 @@ let slot_pages ~dal_endorsement_lag store
           store
           ~primary_key:confirmed_in_block_hash
       in
-      let pages =
-        List.filter
-          (fun ((slot_idx, _page_idx), _v) ->
-            Dal.Slot_index.equal index slot_idx)
-          pages
-      in
-      (* This should not happen. *)
-      assert (not (List.is_empty pages)) ;
-      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4033
-         This could be simplified with a simpler interface to store data.
-         Otherwise, we should ideally check that we only have [Some <data>] or only
-         [None] in the list. (i.e., all the pages of the slot are confirmed, or none
-         is confirmed). *)
-      List.fold_left
-        (fun acc (_, v) -> match v with None -> acc | Some v -> v :: acc)
-        []
-        (List.rev pages)
-      |> return
+      List.filter
+        (fun ((slot_idx, _page_idx), _v) -> Dal.Slot_index.equal index slot_idx)
+        pages
+      |> List.map snd |> return
 
 let page_content ~dal_endorsement_lag store page_id =
   let open Lwt_result_syntax in
@@ -116,5 +102,5 @@ let page_content ~dal_endorsement_lag store page_id =
         ~primary_key:confirmed_in_block_hash
         ~secondary_key:(index, page_index)
       >|= Option.fold
-            ~some:(fun v -> Ok v)
+            ~some:(fun v -> Ok (Some v))
             ~none:(error (Dal_slot_not_found_in_store slot_id))

@@ -387,9 +387,9 @@ module Dal_slot_pages =
       let name = "slot_index"
     end)
     (struct
-      type value = Dal.Page.content option
+      type value = Dal.Page.content
 
-      let encoding = Data_encoding.option Dal.Page.content_encoding
+      let encoding = Dal.Page.content_encoding
 
       let name = "slot_pages"
     end)

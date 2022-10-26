@@ -84,7 +84,8 @@ let get_dal_slot_pages store block =
       (fun map ((index, _page), page) ->
         Slot_pages_map.update
           index
-          (function None -> Some [page] | Some pages -> Some (page :: pages))
+          (function
+            | None -> Some [Some page] | Some pages -> Some (Some page :: pages))
           map)
       Slot_pages_map.empty
       slot_pages
@@ -106,18 +107,15 @@ let get_dal_slot_page store block slot_index slot_page =
   | None -> return ("Slot page has not been downloaded", None)
   | Some `Unconfirmed -> return ("Slot was not confirmed", None)
   | Some `Confirmed -> (
-      let*! contents_opt_opt =
+      let*! contents_opt =
         Store.Dal_slot_pages.find
           store
           ~primary_key:block
           ~secondary_key:(slot_index, slot_page)
       in
-      match contents_opt_opt with
+      match contents_opt with
       | None -> assert false
-      | Some contents_opt -> (
-          match contents_opt with
-          | None -> assert false
-          | Some contents -> return ("Slot page is available", Some contents)))
+      | Some _contents -> return ("Slot page is available", contents_opt))
 
 module type PARAM = sig
   include Sc_rollup_services.PREFIX
