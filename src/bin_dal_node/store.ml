@@ -26,8 +26,13 @@
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3207
    use another storage solution that irmin as we don't need backtracking *)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4097
+   Add an interface to this module *)
+
 (* Relative path to store directory from base-dir *)
 let path = "store"
+
+let slot_header_store = "slot_header_store"
 
 module StoreMaker = Irmin_pack_unix.KV (Tezos_context_encoding.Context.Conf)
 include StoreMaker.Make (Irmin.Contents.String)
@@ -38,10 +43,25 @@ let info message =
 
 let set ~msg store path v = set_exn store path v ~info:(fun () -> info msg)
 
+(** Store context *)
+type node_store = {
+  slots_store : t;
+  slot_headers_store : Slot_headers_store.t;
+  slots_watcher : Cryptobox.Commitment.t Lwt_watcher.input;
+}
+
+(** [open_slots_watcher node_store] opens a stream that should be notified when
+    the storage is updated with a new slot. *)
+let open_slots_stream {slots_watcher; _} =
+  Lwt_watcher.create_stream slots_watcher
+
+(** [init config] inits the store on the filesystem using the given [config]. *)
 let init config =
   let open Lwt_syntax in
   let dir = Configuration.data_dir_path config path in
+  let* slot_headers_store = Slot_headers_store.load dir in
+  let slots_watcher = Lwt_watcher.create_input () in
   let* repo = Repo.v (Irmin_pack.config dir) in
-  let* store = main repo in
+  let* slots_store = main repo in
   let* () = Event.(emit store_is_ready ()) in
-  Lwt.return store
+  Lwt.return {slots_store; slots_watcher; slot_headers_store}

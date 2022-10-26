@@ -30,7 +30,6 @@ type ready_ctxt = {
   dal_constants : Cryptobox.t;
   dal_parameters : Cryptobox.parameters;
   plugin : (module Dal_plugin.T);
-  slot_header_store : Slot_headers_store.t;
 }
 
 (** The status of the dal node *)
@@ -42,20 +41,19 @@ type t
 
 (** [init config] creates a [t] with a status set to [Starting] with a given dal
     node configuration.*)
-val init : Configuration.t -> t
+val init : Configuration.t -> Store.node_store -> t
 
 (** Raised by [set_ready] when the status is already [Ready _] *)
 exception Status_already_ready
 
-(** [set_ready ctxt slot_header_store plugin dal_constants dal_params] updates
-    in place the status value to ready, and initializes the inner [ready_ctxt]
-    value with the given parameters.
+(** [set_ready ctxt plugin dal_constants dal_params] updates in place the status
+    value to [Ready], and initializes the inner [ready_ctxt] value with the given
+    parameters.
 
     @raise Status_already_ready when the status is already [Ready _] *)
 val set_ready :
   t ->
-  Slot_headers_store.t ->
-  (module Dal_plugin.T) ->
+  (module Tezos_dal_node_lib.Dal_plugin.T) ->
   Cryptobox.t ->
   Cryptobox.parameters ->
   unit
@@ -72,3 +70,6 @@ val get_config : t -> Configuration.t
 
 (** [get_status ctxt] returns the dal node status *)
 val get_status : t -> status
+
+(** [get_store ctxt] returns the dal node store. *)
+val get_store : t -> Store.node_store

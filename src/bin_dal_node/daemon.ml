@@ -91,9 +91,9 @@ let run ~data_dir cctxt =
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
-  let ctxt = Node_context.init config in
   let*! store = Store.init config in
-  let* rpc_server = RPC_server.(start config (register ctxt store)) in
+  let ctxt = Node_context.init config store in
+  let* rpc_server = RPC_server.(start config (register ctxt)) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
@@ -113,20 +113,15 @@ let run ~data_dir cctxt =
             let* dal_constants, dal_parameters =
               init_cryptobox config.use_unsafe_srs cctxt plugin
             in
-            let*! slot_header_store =
-              Slot_headers_store.load
-                (Configuration.data_dir_path config "slot_header_store")
-            in
             Node_context.set_ready
               ctxt
-              slot_header_store
               (module Plugin)
               dal_constants
               dal_parameters ;
             let*! () = Event.(emit node_is_ready ()) in
             return_unit
         | None -> return_unit)
-    | Ready {plugin = (module Plugin); slot_header_store; _} ->
+    | Ready {plugin = (module Plugin); _} ->
         let* slot_headers =
           Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
         in
@@ -134,7 +129,7 @@ let run ~data_dir cctxt =
           List.iter_s
             (fun (slot_index, slot_header) ->
               Slot_headers_store.add
-                slot_header_store
+                (Node_context.get_store ctxt).slot_headers_store
                 ~primary_key:block_hash
                 ~secondary_key:slot_index
                 slot_header)

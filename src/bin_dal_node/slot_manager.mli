@@ -30,13 +30,23 @@
    - reading a slot means rebuild it from the shards
    *)
 
+(** FIXME: https://gitlab.com/tezos/tezos/-/issues/4099
+    DAL/Node: make slot_header/commitment definition consistent with
+    alpha_context.mli *)
+
 type slot = bytes
 
-(** [split_and_store dal_constants ts store slot] splits [slot] in shards, stores
-    it onto the disk and returns the corresponding [slot_header], using
-    [dal_constants] and trusted setup [ts] *)
+(** [split_and_store watcher dal_constants store slot] splits [slot] in
+    shards, stores it onto the disk and returns the corresponding [slot_header],
+    using [dal_constants].
+
+    [watcher] is notified when the slot is added to the store. *)
 val split_and_store :
-  Cryptobox.t -> Store.t -> slot -> Cryptobox.Commitment.t tzresult Lwt.t
+  Cryptobox.commitment Lwt_watcher.input ->
+  Cryptobox.t ->
+  Store.t ->
+  slot ->
+  Cryptobox.Commitment.t tzresult Lwt.t
 
 (** [get_shard store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id] *)

@@ -29,7 +29,7 @@ open Tezos_rpc_http
 open Tezos_rpc_http_server
 open Tezos_dal_node_services
 
-let handle_split_slot ctxt store fill slot =
+let handle_split_slot ctxt fill slot =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
   let slot = String.to_bytes slot in
@@ -38,37 +38,58 @@ let handle_split_slot ctxt store fill slot =
       Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
     else slot
   in
-  let+ commitment = Slot_manager.split_and_store dal_constants store slot in
+  let store = Node_context.get_store ctxt in
+  let+ commitment =
+    Slot_manager.split_and_store
+      store.slots_watcher
+      dal_constants
+      store.slots_store
+      slot
+  in
   Cryptobox.Commitment.to_b58check commitment
 
-let handle_slot ctxt store (_, commitment) trim () =
+let handle_slot ctxt (_, commitment) trim () =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
   let* slot =
-    Slot_manager.get_slot dal_parameters dal_constants store commitment
+    Slot_manager.get_slot
+      dal_parameters
+      dal_constants
+      (Node_context.get_store ctxt).slots_store
+      commitment
   in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
   return (String.of_bytes slot)
 
 let handle_stored_slot_headers ctxt (_, block_hash) () () =
   let open Lwt_result_syntax in
-  let*? {plugin = (module Plugin); slot_header_store; _} =
-    Node_context.get_ready ctxt
-  in
   let*! shs =
     Slot_headers_store.list_secondary_keys_with_values
-      slot_header_store
+      (Node_context.get_store ctxt).slot_headers_store
       ~primary_key:block_hash
   in
   return @@ shs
 
-let handle_slot_pages ctxt store (_, commitment) () () =
+let handle_slot_pages ctxt (_, commitment) () () =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
-  Slot_manager.get_slot_pages dal_parameters dal_constants store commitment
+  Slot_manager.get_slot_pages
+    dal_parameters
+    dal_constants
+    (Node_context.get_store ctxt).slots_store
+    commitment
 
-let handle_shard store ((_, commitment), shard) () () =
-  Slot_manager.get_shard store commitment shard
+let handle_shard ctxt ((_, commitment), shard) () () =
+  Slot_manager.get_shard
+    (Node_context.get_store ctxt).slots_store
+    commitment
+    shard
+
+let handle_monitor_slot_headers ctxt () () () =
+  let stream, stopper = Store.open_slots_stream (Node_context.get_store ctxt) in
+  let shutdown () = Lwt_watcher.shutdown stopper in
+  let next () = Lwt_stream.get stream in
+  RPC_answer.return_stream {next; shutdown}
 
 let register_stored_slot_headers ctxt dir =
   RPC_directory.register
@@ -76,31 +97,30 @@ let register_stored_slot_headers ctxt dir =
     (Services.stored_slot_headers ())
     (handle_stored_slot_headers ctxt)
 
-let register_split_slot ctxt store dir =
-  RPC_directory.register0
+let register_split_slot ctxt dir =
+  RPC_directory.register0 dir (Services.split_slot ()) (handle_split_slot ctxt)
+
+let register_show_slot ctxt dir =
+  RPC_directory.register dir (Services.slot ()) (handle_slot ctxt)
+
+let register_show_slot_pages ctxt dir =
+  RPC_directory.register dir (Services.slot_pages ()) (handle_slot_pages ctxt)
+
+let register_shard ctxt dir =
+  RPC_directory.register dir (Services.shard ()) (handle_shard ctxt)
+
+let register_monitor_slot_headers ctxt dir =
+  RPC_directory.gen_register
     dir
-    (Services.split_slot ())
-    (handle_split_slot ctxt store)
+    (Services.monitor_slot_headers ())
+    (handle_monitor_slot_headers ctxt)
 
-let register_show_slot ctxt store dir =
-  RPC_directory.register dir (Services.slot ()) (handle_slot ctxt store)
-
-let register_show_slot_pages ctxt store dir =
-  RPC_directory.register
-    dir
-    (Services.slot_pages ())
-    (handle_slot_pages ctxt store)
-
-let register_shard store dir =
-  RPC_directory.register dir (Services.shard ()) (handle_shard store)
-
-let register ctxt store =
+let register ctxt =
   RPC_directory.empty
   |> register_stored_slot_headers ctxt
-  |> register_split_slot ctxt store
-  |> register_show_slot ctxt store
-  |> register_shard store
-  |> register_show_slot_pages ctxt store
+  |> register_split_slot ctxt |> register_show_slot ctxt |> register_shard ctxt
+  |> register_show_slot_pages ctxt
+  |> register_monitor_slot_headers ctxt
 
 let start configuration dir =
   let open Lwt_syntax in
