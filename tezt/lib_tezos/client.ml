@@ -1249,6 +1249,58 @@ let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
         client_output
   | Some hash -> return hash
 
+let spawn_originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init
+    ?burn_cap ?gas_limit ?dry_run ~amount ~src client name protocol =
+  let alias =
+    match List.rev name with
+    | [] -> Test.fail "name must not be an empty list"
+    | last :: _ -> last
+  in
+  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let process =
+    spawn_originate_contract
+      ?hooks
+      ?log_output
+      ?endpoint
+      ?wait
+      ?init
+      ?burn_cap
+      ?gas_limit
+      ?dry_run
+      ~alias
+      ~amount
+      ~src
+      ~prg
+      client
+  in
+  (alias, process)
+
+let originate_contract_at ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap
+    ?gas_limit ?dry_run ~amount ~src client name protocol =
+  let alias =
+    match List.rev name with
+    | [] -> Test.fail "name must not be an empty list"
+    | last :: _ -> last
+  in
+  let prg = Michelson_script.find name protocol |> Michelson_script.path in
+  let* res =
+    originate_contract
+      ?hooks
+      ?log_output
+      ?endpoint
+      ?wait
+      ?init
+      ?burn_cap
+      ?gas_limit
+      ?dry_run
+      ~alias
+      ~amount
+      ~src
+      ~prg
+      client
+  in
+  Lwt.return (alias, res)
+
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?fresh_probability ?smart_contract_parameters client =
