@@ -295,7 +295,7 @@ module History : sig
     page_info:(Page.content * Page.proof) option ->
     t ->
     History_cache.t ->
-    (proof * Page.content option) tzresult Lwt.t
+    (proof * Page.content option) tzresult
 
   (** [verify_proof dal_params page_id snapshot proof] verifies that the given
       [proof] is a valid proof to show that either:
@@ -308,7 +308,7 @@ module History : sig
       the candidate slot (if any).
   *)
   val verify_proof :
-    parameters -> Page.t -> t -> proof -> Page.content option tzresult Lwt.t
+    parameters -> Page.t -> t -> proof -> Page.content option tzresult
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 
