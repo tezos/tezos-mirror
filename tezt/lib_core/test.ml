@@ -933,7 +933,9 @@ let run_with_scheduler scheduler =
         let test_instance = {iteration = !refills; index = !index} in
         Queue.add (test, test_instance) test_queue
       in
-      refill_queue () ;
+      (match Cli.options.loop_mode with
+      | Count n when n <= 0 -> ()
+      | Count _ | Infinite -> refill_queue ()) ;
       (* [stop] is used to stop dequeuing tests.
          When [stop] is [true] we no longer start new tests but we wait for
          running ones to finish. *)
