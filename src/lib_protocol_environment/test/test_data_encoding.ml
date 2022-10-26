@@ -69,8 +69,14 @@ let test_unparsable_lazyexpr () =
     json ;
   Lwt.return_unit
 
-let tests =
-  [
-    Alcotest_lwt.test_case "unparsable_lazyexpr" `Quick (fun _ ->
-        test_unparsable_lazyexpr);
-  ]
+let () =
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       "proto-env-v8-data-encoding"
+       [
+         ( "lazy",
+           [
+             Alcotest_lwt.test_case "unparsable_lazyexpr" `Quick (fun _ ->
+                 test_unparsable_lazyexpr);
+           ] );
+       ]

@@ -61,3 +61,7 @@ let tests =
       `Quick
       load_missing_json_err;
   ]
+
+let () =
+  Alcotest_lwt.run "tezos-benchmark" [("benchmark_helpers", tests)]
+  |> Lwt_main.run

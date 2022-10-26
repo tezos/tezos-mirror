@@ -2,7 +2,15 @@
 ; Edit file manifest/main.ml instead.
 
 (executables
- (names test test_locator)
+ (names
+  test
+  test_consistency
+  test_locator
+  test_cemented_store
+  test_block_store
+  test_protocol_store
+  test_store
+  test_testchain)
  (libraries
   tezos-base
   tezos-context-ops
@@ -34,6 +42,31 @@
   -open Tezos_validation
   -open Tezos_protocol_alpha_parameters
   -open Tezos_protocol_plugin_alpha))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (run %{exe:test_cemented_store.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (run %{exe:test_block_store.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (run %{exe:test_protocol_store.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (run %{exe:test_store.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
+ (action (run %{exe:test_testchain.exe})))
 
 (rule
  (alias runtest)

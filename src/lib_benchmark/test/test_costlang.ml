@@ -153,3 +153,6 @@ let tests =
       `Quick
       test_eval_to_lincomb_fail;
   ]
+
+let () =
+  Alcotest_lwt.run "tezos-benchmark" [("costlang", tests)] |> Lwt_main.run

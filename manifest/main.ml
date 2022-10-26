@@ -1363,7 +1363,7 @@ let octez_test_helpers_extra =
 
 let _octez_shell_services_tests =
   test
-    "test"
+    "test_block_services"
     ~path:"src/lib_shell_services/test"
     ~opam:"tezos-shell-services"
     ~deps:
@@ -1931,7 +1931,12 @@ let octez_shell_context =
 
 let _octez_protocol_environment_tests =
   tests
-    ["test"; "test_mem_context_array_theory"]
+    [
+      "test_mem_context";
+      "test_mem_context_array_theory";
+      "test_cache";
+      "test_data_encoding";
+    ]
     ~path:"src/lib_protocol_environment/test"
     ~opam:"tezos-protocol-environment"
     ~deps:
@@ -2908,8 +2913,14 @@ let octez_benchmark_examples =
       ]
 
 let _octez_benchmark_tests =
-  test
-    "main_ci"
+  tests
+    [
+      "test_sparse_vec";
+      "test_costlang";
+      "test_probe";
+      "test_measure";
+      "test_benchmark_helpers";
+    ]
     ~path:"src/lib_benchmark/test"
     ~opam:"tezos-benchmark-tests"
     ~synopsis:"Tezos: tests for lib-benchmarks"
@@ -5077,7 +5088,16 @@ let _octez_micheline_rewriting_tests =
 
 let _octez_store_tests =
   tests
-    ["test"; "test_locator"]
+    [
+      "test";
+      "test_consistency";
+      "test_locator";
+      "test_cemented_store";
+      "test_block_store";
+      "test_protocol_store";
+      "test_store";
+      "test_testchain";
+    ]
     ~path:"src/lib_store/unix/test"
     ~opam:"tezos-store"
     ~deps:
@@ -5110,6 +5130,26 @@ let _octez_store_tests =
          run these tests in the CI. *)
       Dune.
         [
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_cemented_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_block_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_protocol_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_store" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(run_exe "test_testchain" []);
           alias_rule
             "runtest"
             ~package:"tezos-store"

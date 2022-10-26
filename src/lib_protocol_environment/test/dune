@@ -2,7 +2,11 @@
 ; Edit file manifest/main.ml instead.
 
 (executables
- (names test test_mem_context_array_theory)
+ (names
+  test_mem_context
+  test_mem_context_array_theory
+  test_cache
+  test_data_encoding)
  (libraries
   tezos-base
   tezos-base.unix
@@ -19,9 +23,19 @@
 (rule
  (alias runtest)
  (package tezos-protocol-environment)
- (action (run %{dep:./test.exe})))
+ (action (run %{dep:./test_mem_context.exe})))
 
 (rule
  (alias runtest)
  (package tezos-protocol-environment)
  (action (run %{dep:./test_mem_context_array_theory.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (action (run %{dep:./test_cache.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-environment)
+ (action (run %{dep:./test_data_encoding.exe})))
