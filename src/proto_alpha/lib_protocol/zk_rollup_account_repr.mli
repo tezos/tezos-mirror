@@ -34,9 +34,8 @@ type static = {
       (** Input to the Plonk verifier that are fixed once the circuits
           are decided. *)
   state_length : int;  (** Number of scalars in the state. *)
-  circuits_info : bool SMap.t;
-      (** Circuit names, alongside a boolean flag indicating
-      if they can be used for private ops. *)
+  circuits_info : [`Public | `Private | `Fee] SMap.t;
+      (** Circuit names, alongside a tag indicating its kind. *)
   nb_ops : int;  (** Valid op codes of L2 operations must be in \[0, nb_ops) *)
 }
 
@@ -59,4 +58,4 @@ val encoding : t Data_encoding.t
 
 (* Encoding for the [circuits_info] field.
    Checks that keys are not duplicated in serialized representation. *)
-val circuits_info_encoding : bool SMap.t Data_encoding.t
+val circuits_info_encoding : [`Public | `Private | `Fee] SMap.t Data_encoding.t

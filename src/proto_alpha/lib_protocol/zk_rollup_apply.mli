@@ -122,7 +122,7 @@ val originate :
   ctxt_before_op:t ->
   ctxt:t ->
   public_parameters:Plonk.public_parameters ->
-  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (t

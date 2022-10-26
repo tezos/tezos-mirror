@@ -469,7 +469,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup_account_repr.SMap.t;
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup_account_repr.SMap.t;
       init_state : Zk_rollup_state_repr.t;
       nb_ops : int;
     }

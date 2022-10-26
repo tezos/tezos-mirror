@@ -743,7 +743,7 @@ val zk_rollup_origination :
   public_parameters:
     Plonk.Main_protocol.verifier_public_parameters
     * Plonk.Main_protocol.transcript ->
-  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  circuits_info:[`Public | `Private | `Fee] Zk_rollup.Account.SMap.t ->
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (Operation.packed * Zk_rollup.t) tzresult Lwt.t

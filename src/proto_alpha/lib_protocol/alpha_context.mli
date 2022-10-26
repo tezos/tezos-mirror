@@ -2387,7 +2387,7 @@ module Zk_rollup : sig
     type static = {
       public_parameters : Plonk.public_parameters;
       state_length : int;
-      circuits_info : bool SMap.t;
+      circuits_info : [`Public | `Private | `Fee] SMap.t;
       nb_ops : int;
     }
 
@@ -4537,7 +4537,7 @@ and _ manager_operation =
       -> Kind.sc_rollup_recover_bond manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
-      circuits_info : bool Zk_rollup.Account.SMap.t;
+      circuits_info : [`Public | `Private | `Fee] Zk_rollup.Account.SMap.t;
       init_state : Zk_rollup.State.t;
       nb_ops : int;
     }

@@ -330,9 +330,8 @@ end) : sig
   (** Initial state of the rollup  *)
   val init_state : Zk_rollup.State.t
 
-  (** Map associating every circuit identifier to a boolean representing
-      whether the circuit can be part of a private batch *)
-  val circuits : bool Plonk.Main_protocol.SMap.t
+  (** Map associating every circuit identifier to its kind *)
+  val circuits : [`Public | `Private | `Fee] Plonk.Main_protocol.SMap.t
 
   (** Commitment to the circuits  *)
   val public_parameters :
@@ -415,7 +414,7 @@ end = struct
          ]
 
   let circuits =
-    SMap.(add "op" false @@ add batch_name true @@ add "fee" false empty)
+    SMap.(add "op" `Public @@ add batch_name `Private @@ add "fee" `Fee empty)
 
   let public_parameters, _prover_pp =
     let (ppp, vpp), t =
