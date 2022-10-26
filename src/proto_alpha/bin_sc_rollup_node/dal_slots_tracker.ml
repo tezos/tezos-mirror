@@ -223,10 +223,14 @@ let download_and_save_slots
     {Node_context.store; dal_cctxt; protocol_constants; _} ~current_block_hash
     {published_block_hash; subscribed_slots_indexes; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
-  let*? subscribed_not_confirmed =
+  let*? all_slots =
+    Misc.(0 --> (protocol_constants.parametric.dal.number_of_slots - 1))
+    |> Bitset.from_list |> Environment.wrap_tzresult
+  in
+  let*? not_confirmed =
     Environment.wrap_tzresult
     @@ to_slot_index_list protocol_constants.parametric
-    @@ Bitset.diff subscribed_slots_indexes confirmed_slots_indexes
+    @@ Bitset.diff all_slots confirmed_slots_indexes
   in
   let*? subscribed_and_confirmed =
     Environment.wrap_tzresult
@@ -241,9 +245,9 @@ let download_and_save_slots
      disk, therefore calls to store contents for different slot indexes can
      be parallelized. *)
   let*! () =
-    subscribed_not_confirmed
-    |> List.iter_p (fun s_slot ->
-           save_unconfirmed_slot store current_block_hash s_slot)
+    List.iter_p
+      (fun s_slot -> save_unconfirmed_slot store current_block_hash s_slot)
+      not_confirmed
   in
   let* () =
     subscribed_and_confirmed
