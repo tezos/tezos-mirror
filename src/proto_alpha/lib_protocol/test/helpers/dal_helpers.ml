@@ -152,18 +152,18 @@ struct
   let produce_and_verify_proof ~check_produce ?check_verify skip_list cache
       ~page_info ~page_id =
     let open Lwt_result_syntax in
-    let*! res =
+    let res =
       Hist.produce_proof params ~page_info page_id skip_list cache
-      >|= Environment.wrap_tzresult
+      |> Environment.wrap_tzresult
     in
     let* () = check_produce res page_info in
     match check_verify with
     | None -> return_unit
     | Some check_verify ->
         let*? proof, _input_opt = res in
-        let*! res =
+        let res =
           Hist.verify_proof params page_id skip_list proof
-          >|= Environment.wrap_tzresult
+          |> Environment.wrap_tzresult
         in
         check_verify res page_info
 

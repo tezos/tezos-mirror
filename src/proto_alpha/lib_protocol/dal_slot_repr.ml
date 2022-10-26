@@ -319,14 +319,14 @@ module History = struct
         guarantee that it can only be called with the adequate compare function.
     *)
 
-    let compare = Header.compare_slot_id
-
     let next ~prev_cell ~prev_cell_ptr elt =
       let open Tzresult_syntax in
       let* () =
         error_when
           (Compare.Int.( <= )
-             (compare elt.Header.id (content prev_cell).Header.id)
+             (Header.compare_slot_id
+                elt.Header.id
+                (content prev_cell).Header.id)
              0)
           Add_element_in_slots_skip_list_violates_ordering
       in
@@ -334,7 +334,7 @@ module History = struct
 
     let search ~deref ~cell ~target_id =
       search ~deref ~cell ~compare:(fun slot ->
-          compare slot.Header.id target_id)
+          Header.compare_slot_id slot.Header.id target_id)
   end
 
   module V1 = struct
@@ -568,7 +568,7 @@ module History = struct
 
       union [case_page_confirmed; case_page_unconfirmed]
 
-    (** Proof's type is set to bytes and not a structural datatype because 
+    (** Proof's type is set to bytes and not a structural datatype because
         when a proof appears in a tezos operation or in an rpc, a user can not
         reasonably understand the proof, thus it eases the work of people decoding
         the proof by only supporting bytes and not the whole structured proof. *)
@@ -666,10 +666,10 @@ module History = struct
 
     let dal_proof_error reason = Dal_proof_error reason
 
-    let proof_error reason = fail @@ dal_proof_error reason
+    let proof_error reason = error @@ dal_proof_error reason
 
     let check_page_proof dal_params proof data pid commitment =
-      let open Lwt_tzresult_syntax in
+      let open Tzresult_syntax in
       let* dal =
         match Dal.make dal_params with
         | Ok dal -> return dal
@@ -694,7 +694,7 @@ module History = struct
                (Bytes.length page.content)
 
     let produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache =
-      let open Lwt_tzresult_syntax in
+      let open Tzresult_syntax in
       let Page.{slot_id; page_index = _} = page_id in
       let deref ptr = History_cache.find ptr hist_cache in
       (* We search for a slot whose ID is equal to target_id. *)
@@ -715,7 +715,7 @@ module History = struct
           let Header.{id; commitment} = Skip_list.content target_cell in
           (* We check that the slot is not the dummy slot. *)
           let* () =
-            fail_when
+            error_when
               Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
                  "Skip_list.search returned 'Found <zero_slot>': No existence \
@@ -726,7 +726,7 @@ module History = struct
           in
           let inc_proof = List.rev search_result.Skip_list.rev_path in
           let* () =
-            fail_when
+            error_when
               (List.is_empty inc_proof)
               (dal_proof_error "The inclusion proof cannot be empty")
           in
@@ -750,7 +750,7 @@ module History = struct
             | [] -> assert false (* Not reachable *)
             | prev :: rev_next_inc_proof ->
                 let* () =
-                  fail_unless
+                  error_unless
                     (equal_history prev prev_cell)
                     (dal_proof_error
                        "Internal error: search's Nearest result is \
@@ -770,11 +770,11 @@ module History = struct
              are provided."
 
     let produce_proof dal_params page_id ~page_info slots_hist hist_cache =
-      let open Lwt_tzresult_syntax in
+      let open Tzresult_syntax in
       let* proof_repr, page_data =
         produce_proof_repr dal_params page_id ~page_info slots_hist hist_cache
       in
-      let*? serialized_proof = serialize_proof proof_repr in
+      let* serialized_proof = serialize_proof proof_repr in
       return (serialized_proof, page_data)
 
     (* Given a starting cell [snapshot] and a (final) [target], this function
@@ -790,7 +790,7 @@ module History = struct
       in
       let snapshot_ptr = hash_skip_list_cell snapshot in
       let target_ptr = hash_skip_list_cell target in
-      fail_unless
+      error_unless
         (Skip_list.valid_back_path
            ~equal_ptr:Pointer_hash.equal
            ~deref
@@ -800,7 +800,7 @@ module History = struct
         (dal_proof_error "verify_proof_repr: invalid inclusion Dal proof.")
 
     let verify_proof_repr dal_params page_id snapshot proof =
-      let open Lwt_tzresult_syntax in
+      let open Tzresult_syntax in
       let Page.{slot_id; page_index = _} = page_id in
       match proof with
       | Page_confirmed {target_cell; page_data; page_proof; inc_proof} ->
@@ -808,7 +808,7 @@ module History = struct
              [inc_proof] should store the slot of the page. *)
           let Header.{id; commitment} = Skip_list.content target_cell in
           let* () =
-            fail_when
+            error_when
               Compare.Int.(Header.compare_slot_id id Header.zero.id = 0)
               (dal_proof_error
                  "verify_proof_repr: cannot construct a confirmation page \
@@ -835,7 +835,7 @@ module History = struct
             match next_cell_opt with
             | None ->
                 let* () =
-                  fail_unless
+                  error_unless
                     (List.is_empty next_inc_proof)
                     (dal_proof_error
                        "verify_proof_repr: invalid next_inc_proof")
@@ -848,7 +848,7 @@ module History = struct
                    {!compare_slot_id}, we are sure that the skip list whose head
                    is [snapshot] = [prev_cell] cannot contain a slot whose ID is
                    [slot_id]. *)
-                fail_unless
+                error_unless
                   ((Skip_list.content prev_cell).id < slot_id
                   && equal_history snapshot prev_cell)
                   (dal_proof_error "verify_proof_repr: invalid next_inc_proof")
@@ -866,7 +866,7 @@ module History = struct
                    sure that the skip list whose head is [snapshot] cannot
                    contain a slot whose ID is [slot_id]. *)
                 let* () =
-                  fail_unless
+                  error_unless
                     ((Skip_list.content prev_cell).id < slot_id
                     && slot_id < (Skip_list.content next_cell).id
                     &&
@@ -890,8 +890,8 @@ module History = struct
           return_none
 
     let verify_proof dal_params page_id snapshot serialized_proof =
-      let open Lwt_tzresult_syntax in
-      let*? proof_repr = deserialize_proof serialized_proof in
+      let open Tzresult_syntax in
+      let* proof_repr = deserialize_proof serialized_proof in
       verify_proof_repr dal_params page_id snapshot proof_repr
 
     module Internal_for_tests = struct
