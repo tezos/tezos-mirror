@@ -144,6 +144,10 @@ module V1 : sig
       [inbox] or its initial level. *)
   val inbox_level : t -> Raw_level_repr.t
 
+  (** A [level_proof] contains the root hash of the level tree and its
+      corresponding level. *)
+  type level_proof
+
   (** A [history_proof] is a [Skip_list.cell] that stores multiple
     hashes. [Skip_list.content history_proof] gives the hash of the
     level tree for this cell, while [Skip_list.back_pointers
@@ -211,11 +215,11 @@ include Sc_rollup_data_version_sig.S with type t = V1.t
 
 include module type of V1 with type t = V1.t
 
-(** This extracts the current level hash from the inbox. Note: the
+(** This extracts the current {!level_proof} from the inbox. Note: the
     current level hash is stored lazily as [fun () -> ...], and this
     function will call that function. So don't use this if you want to
     preserve the laziness. *)
-val current_level_hash : t -> Hash.t
+val current_level_proof : t -> level_proof
 
 type serialized_proof
 
@@ -236,7 +240,7 @@ module type Merkelized_operations = sig
   (** Initialise a new level. [new_level_tree ctxt level] is a merkle
       tree with no messages yet, but has the [level] stored so we can
       check that in proofs. *)
-  val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
+  val new_level_tree : inbox_context -> tree Lwt.t
 
   (** [add_messages ctxt history inbox level payloads level_tree] inserts
       a list of [payloads] as new messages in the [level_tree] of the

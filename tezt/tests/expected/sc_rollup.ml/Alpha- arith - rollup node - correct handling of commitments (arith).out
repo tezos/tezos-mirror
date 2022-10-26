@@ -61,15 +61,15 @@ This sequence of operations was run:
       This smart contract rollup messages submission was successfully applied
       Consumed gas: 1001.497
       Resulting inbox state: { level = 3
-                               current messages hash  = [SC_ROLLUP_INBOX_HASH]
-                               nb_messages_in_commitment_period = 6
+                               current messages hash  = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 3 nb_messages_in_commitment_period = 6
                                message_counter = 2
-                               old_levels_messages = hash : [SC_ROLLUP_INBOX_HASH]
-                                                     
-       content = [SC_ROLLUP_INBOX_HASH]
+                               old_levels_messages = 
+       content = hash: [SC_ROLLUP_INBOX_HASH]
+                               level: 2
        index = 2
        back_pointers = [SC_ROLLUP_INBOX_HASH]
-                                                     [SC_ROLLUP_INBOX_HASH]
+                               [SC_ROLLUP_INBOX_HASH]
     
                                }
 

@@ -184,9 +184,9 @@ module type S = sig
      logarithmic. *)
   val search :
     deref:('ptr -> ('content, 'ptr) cell option) ->
-    compare:('content -> int Lwt.t) ->
+    compare:('content -> int) ->
     cell:('content, 'ptr) cell ->
-    ('content, 'ptr) search_result Lwt.t
+    ('content, 'ptr) search_result
 end
 
 module Make (_ : sig

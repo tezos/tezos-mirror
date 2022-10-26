@@ -97,9 +97,9 @@ module type S = sig
 
   val search :
     deref:('ptr -> ('content, 'ptr) cell option) ->
-    compare:('content -> int Lwt.t) ->
+    compare:('content -> int) ->
     cell:('content, 'ptr) cell ->
-    ('content, 'ptr) search_result Lwt.t
+    ('content, 'ptr) search_result
 end
 
 module Make (Parameters : sig
@@ -380,7 +380,6 @@ end) : S = struct
 
   let search (type ptr) ~(deref : ptr -> ('content, ptr) cell option) ~compare
       ~cell =
-    let open Lwt_syntax in
     let ( = ), ( < ), ( > ) = Compare.Int.(( = ), ( < ), ( > )) in
     (* Given a cell, to compute the minimal path, we need to find the
        good back-pointer. This is done linearly with respect to the
@@ -407,7 +406,7 @@ end) : S = struct
       let back_pointers_length = FallbackArray.length cell.back_pointers in
       if back_pointers_length = 0 then
         (* [cell] is the genesis cell. *)
-        return {rev_path; last_cell = No_exact_or_lower_ptr}
+        {rev_path; last_cell = No_exact_or_lower_ptr}
       else
         let candidate_ptr =
           match back_pointer cell ix with
@@ -423,13 +422,13 @@ end) : S = struct
         | None ->
             (* If we cannot dereference a pointer, We stop the search
                and returns the current path. *)
-            return {rev_path; last_cell = Deref_returned_none}
+            {rev_path; last_cell = Deref_returned_none}
         | Some next_cell -> (
-            let* comparison = compare next_cell.content in
+            let comparison = compare next_cell.content in
             if comparison = 0 then
               (* We have found the target.*)
               let rev_path = next_cell :: rev_path in
-              return {rev_path; last_cell = Found next_cell}
+              {rev_path; last_cell = Found next_cell}
             else if comparison > 0 then
               if ix < back_pointers_length - 1 then
                 (* There might be a short path by dereferencing the next pointer. *)
@@ -442,11 +441,10 @@ end) : S = struct
               (* We found a cell lower than the target. *)
               (* The first back pointers gives a cell below the target *)
               let rev_path = next_cell :: rev_path in
-              return
-                {
-                  rev_path;
-                  last_cell = Nearest {lower = next_cell; upper = Some cell};
-                }
+              {
+                rev_path;
+                last_cell = Nearest {lower = next_cell; upper = Some cell};
+              }
             else
               (* We found a cell lower than the target. *)
               (* The previous pointer was actually the good one. *)
@@ -463,12 +461,11 @@ end) : S = struct
                   let rev_path = good_next_cell :: rev_path in
                   aux rev_path good_next_cell 0)
     in
-    let* comparison = compare cell.content in
+    let comparison = compare cell.content in
     if Compare.Int.(comparison = 0) then
       (* Particular case where the target is the start cell. *)
-      return {rev_path = [cell]; last_cell = Found cell}
+      {rev_path = [cell]; last_cell = Found cell}
     else if Compare.Int.(comparison < 0) then
-      return
-        {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
+      {rev_path = [cell]; last_cell = Nearest {lower = cell; upper = None}}
     else aux [cell] cell 0
 end

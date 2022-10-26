@@ -97,11 +97,10 @@ struct
     back_path ~deref:(deref list) ~cell_ptr:start ~target_index:stop
 
   let search list start target_content =
-    Lwt_main.run
-      (search
-         ~deref:(deref list)
-         ~compare:(fun x -> Lwt.return Compare.Int.(compare x target_content))
-         ~cell:start)
+    search
+      ~deref:(deref list)
+      ~compare:(fun x -> Compare.Int.(compare x target_content))
+      ~cell:start
 
   let valid_back_path list start stop path =
     valid_back_path

@@ -146,30 +146,46 @@ end
 
 module Skip_list = Skip_list_repr.Make (Skip_list_parameters)
 
-let hash_skip_list_cell cell =
-  let current_level_hash = Skip_list.content cell in
-  let back_pointers_hashes = Skip_list.back_pointers cell in
-  Hash.to_bytes current_level_hash
-  :: List.map Hash.to_bytes back_pointers_hashes
-  |> Hash.hash_bytes
-
 module V1 = struct
-  type history_proof = (Hash.t, Hash.t) Skip_list.cell
+  type level_proof = {hash : Hash.t; level : Raw_level_repr.t}
 
-  let equal_history_proof = Skip_list.equal Hash.equal Hash.equal
+  let level_proof_encoding =
+    let open Data_encoding in
+    conv
+      (fun {hash; level} -> (hash, level))
+      (fun (hash, level) -> {hash; level})
+      (obj2 (req "hash" Hash.encoding) (req "level" Raw_level_repr.encoding))
+
+  let equal_level_proof {hash; level} level_proof_2 =
+    Hash.equal hash level_proof_2.hash
+    && Raw_level_repr.equal level level_proof_2.level
+
+  type history_proof = (level_proof, Hash.t) Skip_list.cell
+
+  let hash_history_proof cell =
+    let {hash; level} = Skip_list.content cell in
+    let back_pointers_hashes = Skip_list.back_pointers cell in
+    Hash.to_bytes hash
+    :: (Raw_level_repr.to_int32 level |> Int32.to_string |> Bytes.of_string)
+    :: List.map Hash.to_bytes back_pointers_hashes
+    |> Hash.hash_bytes
+
+  let equal_history_proof = Skip_list.equal Hash.equal equal_level_proof
 
   let history_proof_encoding : history_proof Data_encoding.t =
-    Skip_list.encoding Hash.encoding Hash.encoding
+    Skip_list.encoding Hash.encoding level_proof_encoding
 
-  let pp_history_proof fmt history =
-    let history_hash = hash_skip_list_cell history in
+  let pp_level_proof fmt {hash; level} =
     Format.fprintf
       fmt
-      "@[hash : %a@;%a@]"
+      "hash: %a@,level: %a"
       Hash.pp
-      history_hash
-      (Skip_list.pp ~pp_content:Hash.pp ~pp_ptr:Hash.pp)
-      history
+      hash
+      Raw_level_repr.pp
+      level
+
+  let pp_history_proof fmt history_proof =
+    (Skip_list.pp ~pp_content:pp_level_proof ~pp_ptr:Hash.pp) fmt history_proof
 
   (** Construct an inbox [history] with a given [capacity]. If you
       are running a rollup node, [capacity] needs to be large enough to
@@ -202,13 +218,13 @@ module V1 = struct
      the number of messages that have not been consumed by a commitment cementing ;
    - [nb_messages_in_commitment_period] :
      the number of messages during the commitment period ;
-   - [current_level_hash] : the root hash of [current_level] ;
+   - [current_level_proof] : the [current_level] and its root hash ;
    - [old_levels_messages] : a witness of the inbox history.
 
    When new messages are appended to the current level inbox, the
    metadata stored in the context may be related to an older level.
    In that situation, an archival process is applied to the metadata.
-   This process saves the [current_level_hash] in the
+   This process saves the [current_level_proof] in the
    [old_levels_messages] and empties [current_level]. It then
    initialises a new level tree for the new messages---note that any
    intermediate levels are simply skipped. See
@@ -220,7 +236,7 @@ module V1 = struct
     nb_messages_in_commitment_period : int64;
     message_counter : Z.t;
     (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
-    current_level_hash : unit -> Hash.t;
+    current_level_proof : unit -> level_proof;
     old_levels_messages : history_proof;
   }
 
@@ -235,7 +251,7 @@ module V1 = struct
       level;
       nb_messages_in_commitment_period;
       message_counter;
-      current_level_hash;
+      current_level_proof;
       old_levels_messages;
     } =
       inbox1
@@ -246,7 +262,9 @@ module V1 = struct
            nb_messages_in_commitment_period
            inbox2.nb_messages_in_commitment_period)
     && Z.equal message_counter inbox2.message_counter
-    && Hash.equal (current_level_hash ()) (inbox2.current_level_hash ())
+    && equal_level_proof
+         (current_level_proof ())
+         (inbox2.current_level_proof ())
     && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
   let pp fmt
@@ -254,7 +272,7 @@ module V1 = struct
         level;
         nb_messages_in_commitment_period;
         message_counter;
-        current_level_hash;
+        current_level_proof;
         old_levels_messages;
       } =
     Format.fprintf
@@ -267,8 +285,8 @@ module V1 = struct
        }@]"
       Raw_level_repr.pp
       level
-      Hash.pp
-      (current_level_hash ())
+      pp_level_proof
+      (current_level_proof ())
       (Int64.to_string nb_messages_in_commitment_period)
       Z.pp_print
       message_counter
@@ -281,10 +299,7 @@ module V1 = struct
 
   let old_levels_messages inbox = inbox.old_levels_messages
 
-  let current_level_hash inbox = inbox.current_level_hash ()
-
-  let old_levels_messages_encoding =
-    Skip_list.encoding Hash.encoding Hash.encoding
+  let current_level_proof inbox = inbox.current_level_proof ()
 
   let encoding =
     Data_encoding.(
@@ -293,32 +308,32 @@ module V1 = struct
                message_counter;
                nb_messages_in_commitment_period;
                level;
-               current_level_hash;
+               current_level_proof;
                old_levels_messages;
              } ->
           ( message_counter,
             nb_messages_in_commitment_period,
             level,
-            current_level_hash (),
+            current_level_proof (),
             old_levels_messages ))
         (fun ( message_counter,
                nb_messages_in_commitment_period,
                level,
-               current_level_hash,
+               current_level_proof,
                old_levels_messages ) ->
           {
             message_counter;
             nb_messages_in_commitment_period;
             level;
-            current_level_hash = (fun () -> current_level_hash);
+            current_level_proof = (fun () -> current_level_proof);
             old_levels_messages;
           })
         (obj5
            (req "message_counter" n)
            (req "nb_messages_in_commitment_period" int64)
            (req "level" Raw_level_repr.encoding)
-           (req "current_level_hash" Hash.encoding)
-           (req "old_levels_messages" old_levels_messages_encoding)))
+           (req "current_level_proof" level_proof_encoding)
+           (req "old_levels_messages" history_proof_encoding)))
 
   let number_of_messages_during_commitment_period inbox =
     inbox.nb_messages_in_commitment_period
@@ -347,8 +362,6 @@ let to_versioned inbox = V1 inbox [@@inline]
 let key_of_message ix =
   ["message"; Data_encoding.Binary.to_string_exn Data_encoding.n ix]
 
-let level_key = ["level"]
-
 let number_of_messages_key = ["number_of_messages"]
 
 type serialized_proof = bytes
@@ -362,7 +375,7 @@ module type Merkelized_operations = sig
 
   val hash_level_tree : tree -> Hash.t
 
-  val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
+  val new_level_tree : inbox_context -> tree Lwt.t
 
   val add_messages :
     inbox_context ->
@@ -477,33 +490,16 @@ struct
 
   let hash_level_tree level_tree = Hash.of_context_hash (Tree.hash level_tree)
 
-  let set_level tree level =
-    let level_bytes =
-      Data_encoding.Binary.to_bytes_exn Raw_level_repr.encoding level
-    in
-    Tree.add tree level_key level_bytes
-
-  let find_level tree =
-    let open Lwt_syntax in
-    let+ level_bytes = Tree.(find tree level_key) in
-    Option.bind
-      level_bytes
-      (Data_encoding.Binary.of_bytes_opt Raw_level_repr.encoding)
-
   let set_number_of_messages tree number_of_messages =
     let number_of_messages_bytes =
       Data_encoding.Binary.to_bytes_exn Data_encoding.n number_of_messages
     in
     Tree.add tree number_of_messages_key number_of_messages_bytes
 
-  (** Initialise the merkle tree for a new level in the inbox. We have
-      to include the [level] in this structure so that it cannot be
-      forged by a malicious rollup node. *)
-  let new_level_tree ctxt level =
-    let open Lwt_syntax in
+  (** Initialise the merkle tree for a new level in the inbox. *)
+  let new_level_tree ctxt =
     let tree = Tree.empty ctxt in
-    let* tree = set_number_of_messages tree Z.zero in
-    set_level tree level
+    set_number_of_messages tree Z.zero
 
   let add_message inbox payload level_tree =
     let open Lwt_tzresult_syntax in
@@ -522,7 +518,7 @@ struct
     in
     let inbox =
       {
-        current_level_hash = inbox.current_level_hash;
+        current_level_proof = inbox.current_level_proof;
         level = inbox.level;
         old_levels_messages = inbox.old_levels_messages;
         message_counter;
@@ -565,16 +561,15 @@ struct
       let*! tree =
         match level_tree with
         | Some tree -> Lwt.return tree
-        | None -> new_level_tree ctxt inbox.level
+        | None -> new_level_tree ctxt
       in
       commit_tree ctxt tree inbox.level
     in
     let prev_cell = inbox.old_levels_messages in
-    let prev_cell_ptr = hash_skip_list_cell prev_cell in
+    let prev_cell_ptr = hash_history_proof prev_cell in
     let*? history = History.remember prev_cell_ptr prev_cell history in
-    let cell =
-      Skip_list.next ~prev_cell ~prev_cell_ptr (current_level_hash inbox)
-    in
+    let level_proof = current_level_proof inbox in
+    let cell = Skip_list.next ~prev_cell ~prev_cell_ptr level_proof in
     return (history, cell)
 
   (** [archive_if_needed ctxt history inbox new_level level_tree]
@@ -585,7 +580,7 @@ struct
       adding messages, and archive the earlier levels depending on the
       [history] parameter's [capacity]. If [level_tree] is [None] (this
       happens when the inbox is first created) we similarly create a new
-      empty level tree with the right [level] key.
+      empty level tree.
 
       This function and {!form_history_proof} are the only places we
       begin new level trees. *)
@@ -595,16 +590,16 @@ struct
       match level_tree with
       | Some tree -> return (history, inbox, tree)
       | None ->
-          let*! tree = new_level_tree ctxt new_level in
+          let*! tree = new_level_tree ctxt in
           return (history, inbox, tree)
     else
       let* history, old_levels_messages =
         form_history_proof ctxt history inbox level_tree
       in
-      let*! tree = new_level_tree ctxt new_level in
+      let*! tree = new_level_tree ctxt in
       let inbox =
         {
-          current_level_hash = inbox.current_level_hash;
+          current_level_proof = inbox.current_level_proof;
           nb_messages_in_commitment_period =
             inbox.nb_messages_in_commitment_period;
           old_levels_messages;
@@ -636,8 +631,11 @@ struct
         (level_tree, inbox)
         payloads
     in
-    let current_level_hash () = hash_level_tree level_tree in
-    return (level_tree, history, {inbox with current_level_hash})
+    let current_level_proof () =
+      let hash = hash_level_tree level_tree in
+      {hash; level}
+    in
+    return (level_tree, history, {inbox with current_level_proof})
 
   let add_messages_no_history ctxt inbox level payloads level_tree =
     let open Lwt_tzresult_syntax in
@@ -673,15 +671,15 @@ struct
     aux [] ptr_path
 
   let verify_inclusion_proof proof a b =
-    let assoc = List.map (fun c -> (hash_skip_list_cell c, c)) proof in
+    let assoc = List.map (fun c -> (hash_history_proof c, c)) proof in
     let path = List.split assoc |> fst in
     let deref =
       let open Hash.Map in
       let map = of_seq (List.to_seq assoc) in
       fun ptr -> find_opt ptr map
     in
-    let cell_ptr = hash_skip_list_cell b in
-    let target_ptr = hash_skip_list_cell a in
+    let cell_ptr = hash_history_proof b in
+    let target_ptr = hash_history_proof a in
     Skip_list.valid_back_path
       ~equal_ptr:Hash.equal
       ~deref
@@ -696,20 +694,20 @@ struct
        [starting_point] into [(l, n)] where [l] is a level and [n] is a
        message index.
 
-       In a [Single_level] proof, [level] is the skip list cell for the
-       level [l], [inc] is an inclusion proof of [level] into
-       [snapshot] and [message_proof] is a tree proof showing that
+       In a [Single_level] proof, [history_proof] is the skip list cell for the
+       level [l], [inc] is an inclusion proof of [history_proof] into [snapshot]
+       and [message_proof] is a tree proof showing that
 
          [exists level_tree .
               (hash_level_tree level_tree = level.content)
-          AND (payload_and_level n level_tree = (_, (message, l)))]
+          AND (get_messages_payload n level_tree = (_, message))]
 
-       Note: in the case that [message] is [None] this shows that
-       there's no value at the index [n]; in this case we also must
-       check that [level] equals [snapshot] (otherwise, we'd need a
-       [Next_level] proof instead. *)
+       Note: in the case that [message] is [None] this shows that there's no
+       value at the index [n]; in this case we also must check that
+       [history_proof] equals [snapshot] (otherwise, we'd need a [Next_level]
+       proof instead. *)
     | Single_level of {
-        level : history_proof;
+        history_proof : history_proof;
         inc : inclusion_proof;
         message_proof : P.proof;
       }
@@ -722,25 +720,37 @@ struct
        In a [Next_level] proof, we prove that:
 
        - There is no message at [(l, n)] with [lower_message_proof].
-       - [lower] belongs to the snapshot with [inc]
+       - [lower_history_proof] belongs to the snapshot with [inc]
 
        The first message to read at the next level of [l] is the
        first input [Start_of_level].
     *)
     | Next_level of {
         lower_message_proof : P.proof;
-        lower : history_proof;
+        lower_history_proof : history_proof;
         inc : inclusion_proof;
       }
 
   let pp_proof fmt proof =
     match proof with
-    | Single_level {level; _} ->
-        let hash = Skip_list.content level in
-        Format.fprintf fmt "Single_level inbox proof at %a" Hash.pp hash
-    | Next_level {lower; _} ->
-        let lower_hash = Skip_list.content lower in
-        Format.fprintf fmt "Next_level of lower: %a" Hash.pp lower_hash
+    | Single_level {history_proof; _} ->
+        let {hash; level} = Skip_list.content history_proof in
+        Format.fprintf
+          fmt
+          "Single_level inbox proof at %a for level %a"
+          Hash.pp
+          hash
+          Raw_level_repr.pp
+          level
+    | Next_level {lower_history_proof; _} ->
+        let lower_level_proof = Skip_list.content lower_history_proof in
+        Format.fprintf
+          fmt
+          "Next_level of lower %a and level %a"
+          Hash.pp
+          lower_level_proof.hash
+          Raw_level_repr.pp
+          lower_level_proof.level
 
   let proof_encoding =
     let open Data_encoding in
@@ -751,28 +761,28 @@ struct
           ~title:"Single_level"
           (Tag 0)
           (obj3
-             (req "level" history_proof_encoding)
+             (req "history_proof" history_proof_encoding)
              (req "inclusion_proof" inclusion_proof_encoding)
              (req "message_proof" P.proof_encoding))
           (function
-            | Single_level {level; inc; message_proof} ->
-                Some (level, inc, message_proof)
+            | Single_level {history_proof; inc; message_proof} ->
+                Some (history_proof, inc, message_proof)
             | _ -> None)
-          (fun (level, inc, message_proof) ->
-            Single_level {level; inc; message_proof});
+          (fun (history_proof, inc, message_proof) ->
+            Single_level {history_proof; inc; message_proof});
         case
           ~title:"Next_level"
           (Tag 1)
           (obj3
              (req "lower_message_proof" P.proof_encoding)
-             (req "lower" history_proof_encoding)
+             (req "lower_history_proof" history_proof_encoding)
              (req "inclusion_proof" inclusion_proof_encoding))
           (function
-            | Next_level {lower_message_proof; lower; inc} ->
-                Some (lower_message_proof, lower, inc)
+            | Next_level {lower_message_proof; lower_history_proof; inc} ->
+                Some (lower_message_proof, lower_history_proof, inc)
             | _ -> None)
-          (fun (lower_message_proof, lower, inc) ->
-            Next_level {lower_message_proof; lower; inc});
+          (fun (lower_message_proof, lower_history_proof, inc) ->
+            Next_level {lower_message_proof; lower_history_proof; inc});
       ]
 
   let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
@@ -788,98 +798,82 @@ struct
   (** Utility function that checks the inclusion proof [inc] for any
       inbox proof.
 
-      In the case of a [Single_level] proof this is just an inclusion
-      proof between [level] and the inbox snapshot targeted the proof.
+      In the case of a [Single_level] proof this is just an inclusion proof
+      between [history_proof] and the inbox snapshot targeted the proof.
 
       In the case of a [Next_level] proof [inc] must be an inclusion
-      proof between [upper] and the inbox snapshot.
+      proof between [lower_history_proof] and the inbox snapshot.
   *)
   let check_inclusions proof snapshot =
     check
       (match proof with
-      | Single_level {inc; level; message_proof = _} ->
-          verify_inclusion_proof inc level snapshot
-      | Next_level {inc; lower; lower_message_proof = _} ->
-          verify_inclusion_proof inc lower snapshot)
+      | Single_level {inc; history_proof; message_proof = _} ->
+          verify_inclusion_proof inc history_proof snapshot
+      | Next_level {inc; lower_history_proof; lower_message_proof = _} ->
+          verify_inclusion_proof inc lower_history_proof snapshot)
       "invalid inclusions"
 
   (** To construct or verify a tree proof we need a function of type
 
       [tree -> (tree, result) Lwt.t]
 
-      where [result] is some data extracted from the tree that we care
-      about proving. [payload_and_level n] is such a function, used for
-      checking both the inbox level specified inside the tree and the
-      message at a particular index, [n].
+      where [result] is some data extracted from the tree that we care about
+      proving. [payload_and_message_tree n] is such a function, used for checking
+      the message at a particular index, [n].
 
       For this function, the [result] is
 
-      [(payload, level) : string option * Raw_level_repr.t option]
+      [payload : Sc_rollup_inbox_message_repr.serialized option]
 
-      where [payload] is [None] if there was no message at the index.
-      The [level] part of the result will only be [None] if the [tree]
-      is not in the correct format for an inbox level. This should not
-      happen if the [tree] was correctly initialised with
-      [new_level_tree]. *)
-  let payload_and_level n tree =
+      where [payload] is [None] if there was no message at the index. *)
+  let payload_and_message_tree n tree =
     let open Lwt_syntax in
     let* payload = get_message_payload tree n in
-    let* level = find_level tree in
-    return (tree, (payload, level))
+    return (tree, payload)
 
   (** Utility function that handles all the verification needed for a
       particular message proof at a particular level. It calls
       [P.verify_proof], but also checks the proof has the correct
-      [P.proof_before] hash and the [level] stored inside the tree is
-      the expected one. *)
-  let check_message_proof message_proof level_hash (l, n) label =
+      [P.proof_before] hash. *)
+  let check_message_proof message_proof level_hash n label =
     let open Lwt_tzresult_syntax in
     let* () =
       check
         (Hash.equal level_hash (P.proof_before message_proof))
         (Format.sprintf "message_proof (%s) does not match history" label)
     in
-    let*! result = P.verify_proof message_proof (payload_and_level n) in
+    let*! result = P.verify_proof message_proof (payload_and_message_tree n) in
     match result with
     | None -> proof_error (Format.sprintf "message_proof is invalid (%s)" label)
-    | Some (_, (_, None)) ->
-        proof_error
-          (Format.sprintf "badly encoded level in message_proof (%s)" label)
-    | Some (_, (payload_opt, Some proof_level)) ->
-        let* () =
-          check
-            (Raw_level_repr.equal proof_level l)
-            (Format.sprintf "incorrect level in message_proof (%s)" label)
-        in
-        return payload_opt
+    | Some (_, payload_opt) -> return payload_opt
 
   let verify_proof (l, n) snapshot proof =
     assert (Z.(geq n zero)) ;
     let open Lwt_tzresult_syntax in
     let* () = check_inclusions proof snapshot in
     match proof with
-    | Single_level {level; inc = _; message_proof} -> (
-        let level_hash = Skip_list.content level in
+    | Single_level {history_proof; inc = _; message_proof} -> (
+        let level_proof = Skip_list.content history_proof in
         let* payload_opt =
-          check_message_proof message_proof level_hash (l, n) "single level"
+          check_message_proof message_proof level_proof.hash n "single level"
         in
         match payload_opt with
         | None ->
-            if equal_history_proof snapshot level then return_none
+            if equal_history_proof snapshot history_proof then return_none
             else proof_error "payload is None but proof.level not top level"
         | Some payload ->
             return_some
               Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload})
-    | Next_level {lower_message_proof; lower; inc = _} -> (
+    | Next_level {lower_message_proof; lower_history_proof; inc = _} -> (
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
            We could prove that the last message to read is SOL, and is
            before [n]. *)
-        let lower_level_hash = Skip_list.content lower in
+        let lower_level_proof = Skip_list.content lower_history_proof in
         let* should_be_none =
           check_message_proof
             lower_message_proof
-            lower_level_hash
-            (l, n)
+            lower_level_proof.hash
+            n
             "lower"
         in
         match should_be_none with
@@ -903,22 +897,12 @@ struct
   let produce_proof ctxt history inbox (l, n) =
     let open Lwt_tzresult_syntax in
     let deref ptr = History.find ptr history in
-    let compare hash =
-      let*! tree = P.lookup_tree ctxt hash in
-      match tree with
-      | None -> Lwt.return (-1)
-      | Some tree -> (
-          let open Lwt_syntax in
-          let+ level = find_level tree in
-          match level with
-          | None -> -1
-          | Some level -> Raw_level_repr.compare level l)
-    in
-    let*! result = Skip_list.search ~deref ~compare ~cell:inbox in
-    let* inc, level =
+    let compare {hash = _; level} = Raw_level_repr.compare level l in
+    let result = Skip_list.search ~deref ~compare ~cell:inbox in
+    let* inc, history_proof =
       match result with
-      | Skip_list.{rev_path; last_cell = Found level} ->
-          return (List.rev rev_path, level)
+      | Skip_list.{rev_path; last_cell = Found history_proof} ->
+          return (List.rev rev_path, history_proof)
       | {last_cell = Nearest _; _}
       | {last_cell = No_exact_or_lower_ptr; _}
       | {last_cell = Deref_returned_none; _} ->
@@ -934,26 +918,26 @@ struct
     let* level_tree =
       option_to_result
         "could not find level_tree in the inbox_context"
-        (P.lookup_tree ctxt (Skip_list.content level))
+        (P.lookup_tree ctxt (Skip_list.content history_proof).hash)
     in
-    let* message_proof, (payload_opt, _) =
+    let* message_proof, payload_opt =
       option_to_result
         "failed to produce message proof for level_tree"
-        (P.produce_proof ctxt level_tree (payload_and_level n))
+        (P.produce_proof ctxt level_tree (payload_and_message_tree n))
     in
     match payload_opt with
     | Some payload ->
         return
-          ( Single_level {level; inc; message_proof},
+          ( Single_level {history_proof; inc; message_proof},
             Some
               Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
           )
     | None ->
-        if equal_history_proof inbox level then
-          return (Single_level {level; inc; message_proof}, None)
+        if equal_history_proof inbox history_proof then
+          return (Single_level {history_proof; inc; message_proof}, None)
         else
           let lower_message_proof = message_proof in
-          let lower = level in
+          let lower_history_proof = history_proof in
           let* input_given =
             let inbox_level = Raw_level_repr.succ l in
             let message_counter = Z.zero in
@@ -963,21 +947,26 @@ struct
             return_some
               Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
           in
-          return (Next_level {lower_message_proof; lower; inc}, input_given)
+          return
+            ( Next_level {lower_message_proof; lower_history_proof; inc},
+              input_given )
 
   let empty context level =
     let open Lwt_syntax in
     let pre_genesis_level = Raw_level_repr.root in
-    let* initial_level = new_level_tree context pre_genesis_level in
+    let* initial_level = new_level_tree context in
     let* () = commit_tree context initial_level pre_genesis_level in
-    let initial_hash = hash_level_tree initial_level in
+    let initial_level_proof =
+      let hash = hash_level_tree initial_level in
+      {hash; level = pre_genesis_level}
+    in
     return
       {
         level;
         message_counter = Z.zero;
         nb_messages_in_commitment_period = 0L;
-        current_level_hash = (fun () -> initial_hash);
-        old_levels_messages = Skip_list.genesis initial_hash;
+        current_level_proof = (fun () -> initial_level_proof);
+        old_levels_messages = Skip_list.genesis initial_level_proof;
       }
 
   module Internal_for_tests = struct
@@ -985,7 +974,7 @@ struct
 
     let produce_inclusion_proof history a b =
       let open Tzresult_syntax in
-      let cell_ptr = hash_skip_list_cell b in
+      let cell_ptr = hash_history_proof b in
       let target_index = Skip_list.index a in
       let* history = History.remember cell_ptr b history in
       let deref ptr = History.find ptr history in

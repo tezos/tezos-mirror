@@ -534,10 +534,11 @@ let send_text_messages ?src client msgs =
 
 let parse_inbox json =
   let go () =
-    let inbox = JSON.as_object json in
     return
-      ( List.assoc "current_level_hash" inbox |> JSON.as_string,
-        List.assoc "nb_messages_in_commitment_period" inbox |> JSON.as_int )
+      JSON.
+        ( json |-> "current_level_proof" |-> "hash" |> as_string,
+          json |-> "current_level_proof" |-> "level" |> as_int,
+          json |-> "nb_messages_in_commitment_period" |> JSON.as_int )
   in
   Lwt.catch go @@ fun exn ->
   failwith
@@ -570,7 +571,7 @@ let test_rollup_inbox_size ~kind =
       ( with_fresh_rollup ~kind @@ fun _sc_rollup _sc_rollup_node _filename ->
         let n = 10 in
         let* () = send_messages n client in
-        let* _, inbox_msg_during_commitment_period =
+        let* _hash, _level, inbox_msg_during_commitment_period =
           get_inbox_from_tezos_node client
         in
         (* Expect [n] messages per level + SOL/EOL for each level including
@@ -631,7 +632,7 @@ let test_rollup_inbox_of_rollup_node variant scenario ~kind =
         return
         @@ Check.(
              (inbox_from_sc_rollup_node = inbox_from_tezos_node)
-               (tuple2 string int)
+               (tuple3 string int int)
                ~error_msg:"expected value %R, got %L") )
         node
         client)
