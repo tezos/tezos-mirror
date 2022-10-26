@@ -108,6 +108,7 @@ let pp_state fmt state =
   | Init _ -> pp_s "Init"
   | Snapshot -> pp_s "Snapshot"
   | Link _ -> pp_s "Link"
+  | Padding -> pp_s "Padding"
 
 (** [check_error kind reason error] checks a Wasm PVM error [error] is of a
     given [kind] with a possible [reason].
@@ -157,6 +158,13 @@ let wrap_as_durable_storage tree =
   in
   Tezos_webassembly_interpreter.Durable_storage.of_tree
   @@ Tezos_tree_encoding.Wrapped.wrap tree
+
+let has_stuck_flag tree =
+  let open Lwt_syntax in
+  let* durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let+ allows_stuck = Durable.(find_value durable Constants.stuck_flag_key) in
+  Option.is_some allows_stuck
 
 let make_durable list_key_vals =
   let open Lwt_syntax in

@@ -48,3 +48,5 @@ let reboot_flag_key = Durable.key_of_string_exn "/kernel/env/reboot"
 
 (* The path to where the WASM kernel is stored. *)
 let kernel_key = Durable.key_of_string_exn "/kernel/boot.wasm"
+
+let stuck_flag_key = Durable.key_of_string_exn "/kernel/env/stuck"
