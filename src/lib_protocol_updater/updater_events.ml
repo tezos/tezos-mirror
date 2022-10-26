@@ -87,4 +87,4 @@ let internal_error =
     ~level
     ~name:"internal_error"
     ~msg:"internal error while compiling {protocol}"
-    ("protocol", Protocol_hash.encoding)
+    ("protocol", Tezos_crypto.Protocol_hash.encoding)

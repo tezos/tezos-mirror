@@ -72,6 +72,6 @@ type proto_env =
 
 val register : string -> proto_env -> unit
 
-val mem : Protocol_hash.t -> bool
+val mem : Tezos_crypto.Protocol_hash.t -> bool
 
-val get : Protocol_hash.t -> proto_env option
+val get : Tezos_crypto.Protocol_hash.t -> proto_env option

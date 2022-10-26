@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val compile : Protocol_hash.t -> Protocol.t -> bool Lwt.t
+val compile : Tezos_crypto.Protocol_hash.t -> Protocol.t -> bool Lwt.t
 
 val init : string -> unit
 
