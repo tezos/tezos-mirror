@@ -29,19 +29,19 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val metadata : Node_context.t -> Sc_rollup.Metadata.t
+  val metadata : _ Node_context.t -> Sc_rollup.Metadata.t
 
   (** [process_head node_ctxt head] interprets the messages associated
       with a [head] from a chain [event]. This requires the inbox to be updated
       beforehand. *)
   val process_head :
-    Node_context.t -> Context.t -> Layer1.head -> unit tzresult Lwt.t
+    Node_context.rw -> Context.t -> Layer1.head -> unit tzresult Lwt.t
 
   (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
       for a given [tick] if this [tick] happened before
       [level]. Otherwise, returns [None].*)
   val state_of_tick :
-    Node_context.t ->
+    _ Node_context.t ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
@@ -59,7 +59,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
       stored in [node_ctxt]. *)
-  let metadata (node_ctxt : Node_context.t) =
+  let metadata (node_ctxt : _ Node_context.t) =
     let address = node_ctxt.rollup_address in
     let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
     Sc_rollup.Metadata.{address; origination_level}
@@ -69,7 +69,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       we're following.
       It must be called with [block_hash.level] = [node_ctxt.genesis_info.level].
   *)
-  let get_boot_sector block_hash (node_ctxt : Node_context.t) =
+  let get_boot_sector block_hash (node_ctxt : _ Node_context.t) =
     let open Lwt_result_syntax in
     let exception Found_boot_sector of string in
     let* block = Layer1.fetch_tezos_block node_ctxt.l1_ctxt block_hash in
@@ -195,7 +195,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     return_unit
 
   (** [process_head node_ctxt head] runs the PVM for the given head. *)
-  let process_head (node_ctxt : Node_context.t) ctxt head =
+  let process_head (node_ctxt : _ Node_context.t) ctxt head =
     let open Lwt_result_syntax in
     let first_inbox_level =
       Raw_level.to_int32 node_ctxt.genesis_info.level |> Int32.succ

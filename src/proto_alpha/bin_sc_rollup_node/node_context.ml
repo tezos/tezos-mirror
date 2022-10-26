@@ -26,7 +26,7 @@
 open Protocol
 open Alpha_context
 
-type t = {
+type 'a t = {
   cctxt : Protocol_client_context.full;
   dal_cctxt : Dal_node_client.cctxt;
   data_dir : string;
@@ -39,9 +39,13 @@ type t = {
   fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
-  store : Store.t;
+  store : 'a Store.t;
   context : Context.index;
 }
+
+type rw = [`Read | `Write] t
+
+type ro = [`Read] t
 
 let get_operator node_ctxt purpose =
   Configuration.Operator_purpose_map.find purpose node_ctxt.operators
@@ -101,3 +105,6 @@ let checkout_context node_ctxt block_hash =
         (Sc_rollup_node_errors.Cannot_checkout_context
            (block_hash, Some (Context.hash_to_raw_string context_hash)))
   | Some ctxt -> return ctxt
+
+let readonly (node_ctxt : _ t) =
+  {node_ctxt with store = Store.readonly node_ctxt.store}

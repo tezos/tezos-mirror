@@ -38,7 +38,7 @@ module type S = sig
     metadata:Sc_rollup.Metadata.t ->
     dal_attestation_lag:int ->
     fuel:fuel ->
-    Node_context.t ->
+    Node_context.rw ->
     Tezos_crypto.Block_hash.t ->
     state ->
     (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t

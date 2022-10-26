@@ -120,7 +120,7 @@ module type PARAM = sig
 
   type context
 
-  val context_of_prefix : Node_context.t -> prefix -> context tzresult Lwt.t
+  val context_of_prefix : Node_context.ro -> prefix -> context tzresult Lwt.t
 end
 
 module Make_directory (S : PARAM) = struct
@@ -148,7 +148,7 @@ end
 module Global_directory = Make_directory (struct
   include Sc_rollup_services.Global
 
-  type context = Node_context.t
+  type context = Node_context.ro
 
   let context_of_prefix node_ctxt () = return node_ctxt
 end)
@@ -156,7 +156,7 @@ end)
 module Local_directory = Make_directory (struct
   include Sc_rollup_services.Local
 
-  type context = Node_context.t
+  type context = Node_context.ro
 
   let context_of_prefix node_ctxt () = return node_ctxt
 end)
@@ -164,7 +164,7 @@ end)
 module Block_directory = Make_directory (struct
   include Sc_rollup_services.Global.Block
 
-  type context = Node_context.t * Tezos_crypto.Block_hash.t
+  type context = Node_context.ro * Tezos_crypto.Block_hash.t
 
   let context_of_prefix node_ctxt (((), block) : prefix) =
     let open Lwt_result_syntax in
@@ -223,7 +223,7 @@ module Make (PVM : Pvm.S) = struct
   module PVM = PVM
   module Outbox = Outbox.Make (PVM)
 
-  let get_state (node_ctxt : Node_context.t) block_hash =
+  let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in
@@ -349,7 +349,7 @@ module Make (PVM : Pvm.S) = struct
     let host = Ipaddr.V6.to_string rpc_addr in
     let node = `TCP (`Port rpc_port) in
     let acl = RPC_server.Acl.default rpc_addr in
-    let dir = register node_ctxt in
+    let dir = register (Node_context.readonly node_ctxt) in
     let server =
       RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
     in

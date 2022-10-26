@@ -32,13 +32,20 @@
 
 open Protocol
 open Alpha_context
-open Store_sigs
 
 type +'a store
 
 include Store_sigs.Store with type 'a t = 'a store
 
-type t = rw store
+(** Type of store. The parameter indicates if the store can be written or only
+    read. *)
+type 'a t = ([< `Read | `Write > `Read] as 'a) store
+
+(** Read/write store {!t}. *)
+type rw = Store_sigs.rw t
+
+(** Read only store {!t}. *)
+type ro = Store_sigs.ro t
 
 type state_info = {
   num_messages : Z.t;
@@ -47,10 +54,13 @@ type state_info = {
 }
 
 (** [close store] closes the store. *)
-val close : _ store -> unit Lwt.t
+val close : _ t -> unit Lwt.t
 
 (** [load mode directory] loads a store from the data persisted in [directory].*)
-val load : 'a mode -> string -> 'a store Lwt.t
+val load : 'a Store_sigs.mode -> string -> 'a store Lwt.t
+
+(** [readonly store] returns a read-only version of [store]. *)
+val readonly : _ t -> ro
 
 (** Extraneous state information for the PVM *)
 module StateInfo :
@@ -83,10 +93,10 @@ module StateHistory : sig
       with type value = StateHistoryRepr.value
        and type 'a store = 'a store
 
-  val insert : t -> StateHistoryRepr.event -> unit Lwt.t
+  val insert : rw -> StateHistoryRepr.event -> unit Lwt.t
 
   val event_of_largest_tick_before :
-    t ->
+    _ t ->
     StateHistoryRepr.TickMap.key ->
     StateHistoryRepr.event option tzresult Lwt.t
 end

@@ -54,13 +54,13 @@ type t = private {
 val start :
   Configuration.t ->
   Protocol_client_context.full ->
-  Store.t ->
+  _ Store.t ->
   (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
 
 (** [reconnect cfg l1_ctxt store] reconnects (and retries with delay) to the
     Tezos node. The delay for each reconnection is increased with a randomized
     exponential backoff (capped to 1.5h) . *)
-val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
+val reconnect : Configuration.t -> t -> _ Store.t -> t tzresult Lwt.t
 
 (** [get_predecessor_opt state head] returns the predecessor of block [head],
     when [head] is not the genesis block. *)

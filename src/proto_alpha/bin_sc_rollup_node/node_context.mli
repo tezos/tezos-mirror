@@ -28,7 +28,7 @@
 open Protocol
 open Alpha_context
 
-type t = {
+type 'a t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
   dal_cctxt : Dal_node_client.cctxt;
@@ -52,26 +52,34 @@ type t = {
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
-  store : Store.t;  (** The store for the persistent storage. *)
+  store : 'a Store.t;  (** The store for the persistent storage. *)
   context : Context.index;  (** The persistent context for the rollup node. *)
 }
+
+(** Read/write node context {!t}. *)
+type rw = [`Read | `Write] t
+
+(** Read only node context {!t}. *)
+type ro = [`Read] t
 
 (** [get_operator cctxt purpose] returns the public key hash for the operator
     who has purpose [purpose], if any.
 *)
 val get_operator :
-  t -> Configuration.purpose -> Tezos_crypto.Signature.Public_key_hash.t option
+  _ t ->
+  Configuration.purpose ->
+  Tezos_crypto.Signature.Public_key_hash.t option
 
 (** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
     operator for the node (for any purpose). *)
-val is_operator : t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
+val is_operator : _ t -> Tezos_crypto.Signature.Public_key_hash.t -> bool
 
 (** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
     operation for a given [purpose]. If no specific fee parameters were
     configured for this purpose, returns the default fee parameter for this
     purpose.
 *)
-val get_fee_parameter : t -> Configuration.purpose -> Injection.fee_parameter
+val get_fee_parameter : _ t -> Configuration.purpose -> Injection.fee_parameter
 
 (** [init cctxt dal_cctxt ~data_dir l1_ctxt sc_rollup genesis_info kind operators fees
     ~loser_mode store context] initialises the rollup representation. The rollup
@@ -88,11 +96,15 @@ val init :
   Configuration.operators ->
   Configuration.fee_parameters ->
   loser_mode:Loser_mode.t ->
-  Store.t ->
+  'a Store.t ->
   Context.index ->
-  t tzresult Lwt.t
+  'a t tzresult Lwt.t
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context :
-  t -> Tezos_crypto.Block_hash.t -> Context.t tzresult Lwt.t
+  _ t -> Tezos_crypto.Block_hash.t -> Context.t tzresult Lwt.t
+
+(** [readonly node_ctxt] returns a read only version of the node context
+    [node_ctxt].  *)
+val readonly : _ t -> ro

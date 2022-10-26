@@ -38,11 +38,17 @@ include Store_utils.Make (IStore)
 
 type 'a store = 'a IStore.t
 
-type t = rw store
+type 'a t = ([< `Read | `Write > `Read] as 'a) store
+
+type rw = Store_sigs.rw t
+
+type ro = Store_sigs.ro t
 
 let close = IStore.close
 
 let load = IStore.load
+
+let readonly = IStore.readonly
 
 type state_info = {
   num_messages : Z.t;

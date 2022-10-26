@@ -83,7 +83,7 @@ module type BACKEND = sig
   val path_to_string : path -> string
 
   (** [readonly t] returns a read only version of the storage [t]. *)
-  val readonly : [< `Read | `Write > `Read] t -> [`Read] t
+  val readonly : [> `Read] t -> [`Read] t
 end
 
 (** Module type respresenting a [Mutable_value] that is persisted on store. *)

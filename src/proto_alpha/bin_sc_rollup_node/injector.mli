@@ -25,5 +25,5 @@
 
 include
   Injector_sigs.S
-    with type rollup_node_state := Node_context.t
+    with type rollup_node_state := Node_context.ro
      and type tag := Configuration.purpose
