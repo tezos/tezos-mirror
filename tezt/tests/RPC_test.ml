@@ -832,6 +832,67 @@ let test_mempool _test_mode_tag protocol ?endpoint client =
   let* complete_mempool =
     Mempool.get_mempool ?endpoint ~hooks:mempool_hooks client
   in
+
+  let* consensus_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[0]
+      client
+  in
+  let expected_consensus_mempool =
+    {Mempool.empty with outdated = complete_mempool.outdated}
+  in
+  Check.(
+    (expected_consensus_mempool = consensus_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* manager_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[3]
+      client
+  in
+  let expected_manager_mempool =
+    {
+      Mempool.empty with
+      applied = complete_mempool.applied;
+      refused = complete_mempool.refused;
+      branch_refused = complete_mempool.branch_refused;
+      branch_delayed = complete_mempool.branch_delayed;
+    }
+  in
+  Check.(
+    (expected_manager_mempool = manager_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* consensus_manager_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[0; 3]
+      client
+  in
+  Check.(
+    (consensus_manager_mempool = complete_mempool)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
+  let* voting_anonymous_mempool =
+    Mempool.get_mempool
+      ?endpoint
+      ~hooks:mempool_hooks
+      ~validation_passes:[1; 2]
+      client
+  in
+  Check.(
+    (voting_anonymous_mempool = Mempool.empty)
+      Mempool.classified_typ
+      ~error_msg:"Expected mempool %L, got %R") ;
+
   let* _ =
     Lwt_list.iter_s
       (fun i ->
