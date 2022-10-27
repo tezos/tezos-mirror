@@ -3157,6 +3157,15 @@ let octez_openapi =
        format"
     ~deps:[ezjsonm; json_data_encoding; tezt_lib]
 
+let _octez_michelson_script_locator =
+  private_exe
+    "michelson_script_locator"
+    ~path:"tests_python/scripts"
+    ~opam:""
+    ~deps:[tezt_tezos]
+    ~bisect_ppx:false
+    ~static:false
+
 let _octez_protocol_compiler_bin =
   public_exe
     "octez-protocol-compiler"
