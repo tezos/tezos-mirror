@@ -269,7 +269,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   Log.info "TPS of injection (target): %d" target_tps_of_injection ;
   Log.info "TPS of injection (de facto): %.2f" de_facto_tps_of_injection ;
   Log.info "Empirical TPS: %.2f" empirical_tps ;
-  let* () = Node.terminate ~kill:true node in
+  let* () = Node.kill node in
   return (de_facto_tps_of_injection, empirical_tps)
 
 let regression_handling defacto_tps_of_injection empirical_tps

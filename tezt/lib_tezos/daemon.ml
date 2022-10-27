@@ -102,13 +102,25 @@ module Make (X : PARAMETERS) = struct
 
   let name daemon = daemon.name
 
-  let terminate ?(kill = false) daemon =
+  (* Having to wait more that 3 seconds after hitting Ctrl+C is already unreasonable.
+     We choose a timeout one order of magnitude larger to reduce flakiness in case
+     the CPU happens to be slower etc. *)
+  let terminate ?(timeout = 30.) daemon =
     match daemon.status with
     | Not_running -> unit
     | Running {event_loop_promise = None; _} ->
         invalid_arg "you cannot call Daemon.terminate before Daemon.run returns"
     | Running {process; event_loop_promise = Some event_loop_promise; _} ->
-        if kill then Process.kill process else Process.terminate process ;
+        Process.terminate ~timeout process ;
+        event_loop_promise
+
+  let kill daemon =
+    match daemon.status with
+    | Not_running -> unit
+    | Running {event_loop_promise = None; _} ->
+        invalid_arg "you cannot call Daemon.terminate before Daemon.run returns"
+    | Running {process; event_loop_promise = Some event_loop_promise; _} ->
+        Process.kill process ;
         event_loop_promise
 
   let next_name = ref 1

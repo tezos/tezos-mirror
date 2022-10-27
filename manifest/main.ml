@@ -3088,6 +3088,13 @@ let _tezt_self_tests =
           ];
         ]
 
+let _tezt_self_tests_catch_sigterm =
+  private_exe
+    "main"
+    ~path:"tezt/self_tests/bin_catch_sigterm"
+    ~opam:"tezt-self-tests"
+    ~deps:[unix]
+
 let octez_openapi =
   public_lib
     "tezos-openapi"

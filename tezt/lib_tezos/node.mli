@@ -211,8 +211,13 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+(** Send SIGTERM and wait for the process to terminate.
+
+    Default [timeout] is 30 seconds, after which SIGKILL is sent. *)
+val terminate : ?timeout:float -> t -> unit Lwt.t
+
+(** Send SIGKILL and wait for the process to terminate. *)
+val kill : t -> unit Lwt.t
 
 (** {2 Commands} *)
 

@@ -578,7 +578,7 @@ let test_node_disconnect =
   let* () = Client.bake_for client in
   let* () = block_notify_promise in
   Log.info "Brutally killing Tezos node" ;
-  let* () = Node.terminate ~kill:true node in
+  let* () = Node.kill node in
   let* () = Lwt_unix.sleep 2. in
   let* () = Node.run node Node.[Connections 0; Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node in

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tests that test Tezt itself. *)
+(* Executable used by [self_tests/test_process.ml] to test the [?timeout]
+   argument of [Process.terminate]. *)
+
+let on_sigterm _ = print_endline "received SIGTERM, ignoring"
+
+let () = Sys.set_signal Sys.sigterm (Signal_handle on_sigterm)
 
 let () =
-  Test_check.register () ;
-  Test_daemon.register () ;
-  Test_retry.register () ;
-  Test_diff.register () ;
-  Test_process.register () ;
-  Test.run ()
+  print_endline "waiting..." ;
+  Unix.sleep 3

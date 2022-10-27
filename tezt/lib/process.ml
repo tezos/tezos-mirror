@@ -427,15 +427,29 @@ let kill_remote_if_needed process =
           let cmd = (ssh, Array.of_list (ssh :: ssh_args)) in
           Lwt_process.exec cmd >>= fun _ -> Lwt.return_unit )
 
-let terminate (process : t) =
-  Log.debug "Send SIGTERM to %s." process.name ;
-  kill_remote_if_needed process ;
-  process.lwt_process#kill Sys.sigterm
-
 let kill (process : t) =
   Log.debug "Send SIGKILL to %s." process.name ;
   kill_remote_if_needed process ;
   process.lwt_process#terminate
+
+let terminate ?timeout (process : t) =
+  Log.debug "Send SIGTERM to %s." process.name ;
+  kill_remote_if_needed process ;
+  process.lwt_process#kill Sys.sigterm ;
+  match timeout with
+  | None -> ()
+  | Some timeout ->
+      let wait_and_ignore_status =
+        let* (_ : Unix.process_status) = wait process in
+        unit
+      in
+      let kill_after_timeout =
+        let* () = Lwt_unix.sleep timeout in
+        kill process ;
+        unit
+      in
+      Background.register
+        (Lwt.pick [wait_and_ignore_status; kill_after_timeout])
 
 let pid (process : t) = process.lwt_process#pid
 
@@ -467,9 +481,9 @@ let run ?log_status_on_exit ?name ?color ?env ?hooks ?expect_failure command
   spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
   |> check ?expect_failure
 
-let clean_up () =
+let clean_up ?(timeout = 60.) () =
   let list = ID_map.bindings !live_processes |> List.map snd in
-  List.iter terminate list ;
+  List.iter (terminate ~timeout) list ;
   Lwt_list.iter_p
     (fun process ->
       let* _ = wait process in

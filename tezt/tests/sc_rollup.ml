@@ -2731,7 +2731,7 @@ let test_interrupt_rollup_node =
   in
   let* () = bake_levels 15 client in
   let* () = Sc_rollup_node.run sc_rollup_node and* () = processing_promise in
-  let* () = Sc_rollup_node.terminate ~kill:true sc_rollup_node in
+  let* () = Sc_rollup_node.kill sc_rollup_node in
   let* () = bake_levels 1 client in
   let* () = Sc_rollup_node.run sc_rollup_node in
   let* _ = Sc_rollup_node.wait_for_level ~timeout:20. sc_rollup_node 18 in
