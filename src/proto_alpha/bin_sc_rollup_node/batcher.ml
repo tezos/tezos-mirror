@@ -135,6 +135,10 @@ module Make (Simulation : Simulation.S) : S = struct
     | [] -> return_unit
     | _ ->
         let* () = inject_batches state batches in
+        let*! () =
+          Batcher_events.(emit batched)
+            (List.length batches, List.length to_remove)
+        in
         List.iter
           (fun tr_hash -> Message_queue.remove state.messages tr_hash)
           to_remove ;
@@ -181,6 +185,7 @@ module Make (Simulation : Simulation.S) : S = struct
             in
             state.simulation_ctxt <- Some simulation_ctxt
     in
+    let*! () = Batcher_events.(emit queue) (List.length messages) in
     let hashes =
       List.map
         (fun message ->
@@ -264,11 +269,29 @@ module Make (Simulation : Simulation.S) : S = struct
       let*! state = init_batcher_state node_ctxt ~signer conf in
       return state
 
-    let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
+    let on_error (type a b) _w st (r : (a, b) Request.t) (errs : b) :
         unit tzresult Lwt.t =
-      return_unit
+      let open Lwt_result_syntax in
+      let request_view = Request.view r in
+      let emit_and_return_errors errs =
+        let*! () =
+          Batcher_events.(emit Worker.request_failed) (request_view, st, errs)
+        in
+        return_unit
+      in
+      match r with
+      | Request.Register _ -> emit_and_return_errors errs
+      | Request.Batch -> emit_and_return_errors errs
+      | Request.New_head _ -> emit_and_return_errors errs
 
-    let on_completion _w _r _ _st = Lwt.return_unit
+    let on_completion _w r _ st =
+      match Request.view r with
+      | Request.View (Register _ | New_head _) ->
+          Batcher_events.(emit Worker.request_completed_debug)
+            (Request.view r, st)
+      | View Batch ->
+          Batcher_events.(emit Worker.request_completed_notice)
+            (Request.view r, st)
 
     let on_no_request _ = Lwt.return_unit
 
