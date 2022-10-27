@@ -194,10 +194,9 @@ module V2_0_0 = struct
 
     open Monad
 
-    let initial_state ctxt =
+    let initial_state ~empty =
       let open Lwt_syntax in
-      let state = Tree.empty ctxt in
-      let* state = Tree.add state ["wasm-version"] (Bytes.of_string "2.0.0") in
+      let* state = Tree.add empty ["wasm-version"] (Bytes.of_string "2.0.0") in
       Lwt.return state
 
     let install_boot_sector state boot_sector =
@@ -375,7 +374,7 @@ module V2_0_0 = struct
 
     let produce_origination_proof context boot_sector =
       let open Lwt_result_syntax in
-      let*! state = initial_state context in
+      let*! state = initial_state ~empty:(Tree.empty context) in
       let*! result =
         Context.produce_proof context state (fun state ->
             let open Lwt_syntax in
