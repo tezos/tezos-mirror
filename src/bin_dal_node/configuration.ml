@@ -167,4 +167,5 @@ let load ~data_dir =
         fail e
     | Error e -> fail e
   in
-  Data_encoding.Json.destruct encoding json
+  let config = Data_encoding.Json.destruct encoding json in
+  {config with data_dir}
