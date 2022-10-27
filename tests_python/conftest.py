@@ -308,14 +308,14 @@ def pytest_addoption(parser: _pytest.config.argparsing.Parser) -> None:
     )
     parser.addoption(
         '--on-unknown-regression-files',
-        choices=['warn', 'ignore', 'fail', 'check', 'delete'],
-        default='warn',
+        choices=['ignore', 'warn', 'fail', 'check', 'delete'],
+        default='ignore',
         help='''How to handle regression test outputs that are not
         declared by any of the collected test. MODE should be either
-        'warn', 'ignore', 'fail' or 'delete'.
+        'ignore' (default), 'warn', 'fail' or 'delete'.
 
-        If set to 'warn', emit a warning for unknown output files.
         If set to 'ignore', ignore unknown output files.
+        If set to 'warn', emit a warning for unknown output files.
         If set to 'fail', terminate execution with exit code 1 and
         without running any further action when unknown output files
         are found.
