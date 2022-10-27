@@ -9,6 +9,7 @@ def all_contracts(
     if directories is None:
         directories = [
             'attic',
+            'entrypoints',
             'opcodes',
             'macros',
             'mini_scenarios',
