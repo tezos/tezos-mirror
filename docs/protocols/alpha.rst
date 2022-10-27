@@ -35,8 +35,11 @@ Breaking Changes
 RPC Changes
 -----------
 
-- Add RPC to get contract's balance of ticket with specified ticketer, content type, and content:
+- Add RPC to get contract's balance of ticket with specified ticketer, content type, and content. Can be used for both implicit and originated contracts.
   ``POST /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/ticket_balance``. (MR :gl:`!6488`)
+
+- Add RPC to get the complete list of tickets owned by a given contract by scanning the contract's storage. Can only be used for originated contracts.
+  ``POST /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/all_ticket_balances``. (MR :gl:`!6712`)
 
 Operation receipts
 ------------------
