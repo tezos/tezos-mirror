@@ -25,15 +25,29 @@
 
 open Protocol
 open Alpha_context
+open Store_sigs
 
-(** The type of indexed repository for contexts  *)
-type index
+(** The type of indexed repository for contexts. The parameter indicates if the
+    index can be written or only read. *)
+type 'a index constraint 'a = [< `Read | `Write > `Read]
+
+(** Read/write {!index}. *)
+type rw_index = [`Read | `Write] index
+
+(** Read only {!index}. *)
+type ro_index = [`Read] index
 
 (** The type of trees stored in the context, i.e. the actual data. *)
 type tree
 
-(** The type of context with its content *)
-type t
+(** The type of context with its content. *)
+type 'a t constraint 'a = [< `Read | `Write > `Read]
+
+(** Read/write context {!t}. *)
+type rw = [`Read | `Write] t
+
+(** Read-only context {!t}. *)
+type ro = [`Read] t
 
 (** A context hash is the hash produced when the data of the context is
     committed to disk, i.e. the {!commit} hash. *)
@@ -54,34 +68,37 @@ val pp_hash : Format.formatter -> hash -> unit
 
 (** [load config] initializes from disk a context using the [data_dir]
     information contained in the configuration [config]. *)
-val load : Configuration.t -> index Lwt.t
+val load : 'a mode -> Configuration.t -> 'a index Lwt.t
 
 (** [index context] is the repository of the context [context]. *)
-val index : t -> index
+val index : 'a t -> 'a index
 
 (** [close ctxt] closes the context index [ctxt]. *)
-val close : index -> unit Lwt.t
+val close : _ index -> unit Lwt.t
+
+(** [readonly index] returns a read-only version of the index. *)
+val readonly : [> `Read] index -> [`Read] index
 
 (** [raw_commit ?message ctxt tree] commits the [tree] in the context repository
     [ctxt] on disk, and return the commit. *)
-val raw_commit : ?message:string -> index -> tree -> commit Lwt.t
+val raw_commit : ?message:string -> [> `Write] index -> tree -> commit Lwt.t
 
 (** [commit ?message context] commits content of the context [context] on disk,
     and return the commit hash. *)
-val commit : ?message:string -> t -> hash Lwt.t
+val commit : ?message:string -> [> `Write] t -> hash Lwt.t
 
 (** [checkout ctxt hash] checkouts the content that corresponds to the commit
     hash [hash] in the repository [ctxt] and returns the corresponding
     context. If there is no commit that corresponds to [hash], it returns
     [None].  *)
-val checkout : index -> hash -> t option Lwt.t
+val checkout : 'a index -> hash -> 'a t option Lwt.t
 
 (** [empty ctxt] is the context with an empty content for the repository [ctxt]. *)
-val empty : index -> t
+val empty : 'a index -> 'a t
 
 (** [is_empty context] returns [true] iff the context content of [context] is
     empty. *)
-val is_empty : t -> bool
+val is_empty : _ t -> bool
 
 (** Module for generating and verifying proofs for a context *)
 module Proof (Hash : sig
@@ -92,11 +109,17 @@ end) (Proof_encoding : sig
   val proof_encoding :
     Environment.Context.Proof.tree Environment.Context.Proof.t Data_encoding.t
 end) : sig
+  (** Tree representation for proof generation.
+
+      NOTE: The index needs to be accessed with write permissions because we
+      need to commit on disk to generate the proofs (e.g. in
+      {!Inbox.produce_proof}, {!PVM.produce_proof}. or
+      {!PVM.produce_output_proof}). *)
   module Tree :
     Tezos_context_sigs.Context.TREE
       with type key = string list
        and type value = bytes
-       and type t = index
+       and type t = rw_index
        and type tree = tree
 
   type tree = Tree.tree
@@ -120,7 +143,7 @@ end) : sig
   (** [produce_proof ctxt tree f] produces and returns a proof for the execution
       of [f] on the state [tree]. *)
   val produce_proof :
-    index -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
+    rw_index -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
 
   (** [verify_proof proof f] verifies that [f] produces the proof [proof] and
       returns the resulting [tree], or [None] if the proof cannot be
@@ -135,12 +158,12 @@ module MessageTrees : sig
   type value
 
   (** [find context] returns the messages tree stored in the [context], if any. *)
-  val find : t -> value option Lwt.t
+  val find : _ t -> value option Lwt.t
 
   (** [set context msg_tree] saves the messages tree [msg_tree] in the context
       and returns the updated context. Note: [set] does not perform any write on
       disk, this information must be committed using {!commit}. *)
-  val set : t -> value -> t Lwt.t
+  val set : 'a t -> value -> 'a t Lwt.t
 end
 
 (** L1 inboxes representation in the rollup node. This is a version of the
@@ -162,7 +185,7 @@ module Inbox : sig
   include
     Sc_rollup.Inbox.Merkelized_operations
       with type tree = MessageTrees.value
-       and type inbox_context = index
+       and type inbox_context = rw_index
 end
 
 (** State of the PVM that this rollup node deals with *)
@@ -171,7 +194,7 @@ module PVMState : sig
   type value = tree
 
   (** [find context] returns the PVM state stored in the [context], if any. *)
-  val find : t -> value option Lwt.t
+  val find : _ t -> value option Lwt.t
 
   (** [lookup state path] returns the data stored for the path [path] in the PVM
       state [state].  *)
@@ -180,5 +203,5 @@ module PVMState : sig
   (** [set context state] saves the PVM state [state] in the context and returns
       the updated context. Note: [set] does not perform any write on disk, this
       information must be committed using {!commit}. *)
-  val set : t -> value -> t Lwt.t
+  val set : 'a t -> value -> 'a t Lwt.t
 end

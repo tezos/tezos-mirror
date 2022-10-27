@@ -35,13 +35,13 @@ module type S = sig
       with a [head] from a chain [event]. This requires the inbox to be updated
       beforehand. *)
   val process_head :
-    Node_context.rw -> Context.t -> Layer1.head -> unit tzresult Lwt.t
+    Node_context.rw -> Context.rw -> Layer1.head -> unit tzresult Lwt.t
 
   (** [state_of_tick node_ctxt tick level] returns [Some (state, hash)]
       for a given [tick] if this [tick] happened before
       [level]. Otherwise, returns [None].*)
   val state_of_tick :
-    _ Node_context.t ->
+    Node_context.rw ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t

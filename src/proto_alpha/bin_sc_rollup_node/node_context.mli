@@ -53,7 +53,7 @@ type 'a t = {
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
   store : 'a Store.t;  (** The store for the persistent storage. *)
-  context : Context.index;  (** The persistent context for the rollup node. *)
+  context : 'a Context.index;  (** The persistent context for the rollup node. *)
 }
 
 (** Read/write node context {!t}. *)
@@ -97,13 +97,13 @@ val init :
   Configuration.fee_parameters ->
   loser_mode:Loser_mode.t ->
   'a Store.t ->
-  Context.index ->
+  'a Context.index ->
   'a t tzresult Lwt.t
 
 (** [checkout_context node_ctxt block_hash] returns the context at block
     [block_hash]. *)
 val checkout_context :
-  _ t -> Tezos_crypto.Block_hash.t -> Context.t tzresult Lwt.t
+  'a t -> Tezos_crypto.Block_hash.t -> 'a Context.t tzresult Lwt.t
 
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)

@@ -427,7 +427,7 @@ let run ~data_dir (configuration : Configuration.t)
       Read_write
       Configuration.(default_storage_dir configuration.data_dir)
   in
-  let*! context = Context.load configuration in
+  let*! context = Context.load Read_write configuration in
   let* l1_ctxt, kind = Layer1.start configuration cctxt store in
   let* node_ctxt =
     Node_context.init

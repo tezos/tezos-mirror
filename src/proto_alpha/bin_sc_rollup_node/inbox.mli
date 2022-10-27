@@ -38,7 +38,7 @@ open Protocol.Alpha_context
 (** [process_head node_ctxt head operations] changes the state of the inbox to
     react to [head]. In particular, this process filters the provided
     [operations] of the [head] block. *)
-val process_head : Node_context.rw -> Layer1.head -> Context.t tzresult Lwt.t
+val process_head : Node_context.rw -> Layer1.head -> Context.rw tzresult Lwt.t
 
 (** [inbox_of_hash node_ctxt block_hash] returns the rollup inbox at the end of
     the given validation of [block_hash]. *)

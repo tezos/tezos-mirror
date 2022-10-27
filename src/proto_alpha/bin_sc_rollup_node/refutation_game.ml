@@ -49,7 +49,7 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val process : Layer1.head -> _ Node_context.t -> unit tzresult Lwt.t
+  val process : Layer1.head -> Node_context.rw -> unit tzresult Lwt.t
 end
 
 module Make (Interpreter : Interpreter.S) :

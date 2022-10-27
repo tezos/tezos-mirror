@@ -40,7 +40,7 @@ type 'a t = {
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
   store : 'a Store.t;
-  context : Context.index;
+  context : 'a Context.index;
 }
 
 type rw = [`Read | `Write] t
@@ -107,4 +107,8 @@ let checkout_context node_ctxt block_hash =
   | Some ctxt -> return ctxt
 
 let readonly (node_ctxt : _ t) =
-  {node_ctxt with store = Store.readonly node_ctxt.store}
+  {
+    node_ctxt with
+    store = Store.readonly node_ctxt.store;
+    context = Context.readonly node_ctxt.context;
+  }
