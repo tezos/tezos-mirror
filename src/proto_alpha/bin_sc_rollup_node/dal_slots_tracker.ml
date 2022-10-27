@@ -181,8 +181,8 @@ let download_and_save_slots
     {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
-    Misc.(0 --> (protocol_constants.parametric.dal.number_of_slots - 1))
-    |> Bitset.from_list |> Environment.wrap_tzresult
+    Bitset.fill ~length:protocol_constants.parametric.dal.number_of_slots
+    |> Environment.wrap_tzresult
   in
   let*? not_confirmed =
     Environment.wrap_tzresult

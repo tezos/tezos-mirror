@@ -41,6 +41,10 @@ let add field pos =
 
 let from_list positions = List.fold_left_e add empty positions
 
+let fill ~length =
+  error_when Compare.Int.(length < 0) (Invalid_position length) >>? fun () ->
+  ok Z.(pred (shift_left one length))
+
 let inter = Z.logand
 
 let diff b1 b2 = Z.logand b1 (Z.lognot b2)
