@@ -34,6 +34,7 @@
 open Tztest
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
+open Wasm_utils
 
 (* Use context-binary for testing. *)
 module Context = Tezos_context_memory.Context_binary
@@ -59,14 +60,10 @@ module Tree : Tezos_tree_encoding.TREE with type tree = Context.tree = struct
   let wrap t = Tree t
 end
 
-module Wasm = Wasm_pvm.Make (Tree)
 module Tree_encoding_runner = Tezos_tree_encoding.Runner.Make (Tree)
 
 let current_tick_encoding =
   Tezos_tree_encoding.value ["wasm"; "current_tick"] Data_encoding.n
-
-let inp_encoding =
-  Tezos_tree_encoding.value ["input"; "0"; "1"] Data_encoding.string
 
 (* Replicates the encoding of buffers from [Wasm_pvm] as part of the pvm_state. *)
 let buffers_encoding =

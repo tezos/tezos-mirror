@@ -35,11 +35,7 @@ open Tztest
 open Tezos_lazy_containers
 open Tezos_webassembly_interpreter
 open Tezos_scoru_wasm
-include Test_encodings_util
 open Wasm_utils
-module Wasm = Wasm_pvm.Make (Tree)
-module Wrapped_tree_runner =
-  Tezos_tree_encoding.Runner.Make (Tezos_tree_encoding.Wrapped)
 
 let value_store_key_too_large =
   Values.(Num (I32 Host_funcs.Error.(code Store_key_too_large)))
@@ -179,9 +175,9 @@ let test_store_get_nth_key () =
     /durable/a/short/path/one/_ = "..."
     /durable/a/short/path/three/_ = "..."
 
-  We expect that the  result at "/a/short/path/one" is 3 and at 
-  /durable/a/short/path/three 5. We also expect the truncated at 3 
-  result at /durable/a/short/path/three to be 3 
+  We expect that the  result at "/a/short/path/one" is 3 and at
+  /durable/a/short/path/three 5. We also expect the truncated at 3
+  result at /durable/a/short/path/three to be 3
   *)
   let* durable =
     make_durable
@@ -550,7 +546,7 @@ let test_store_move () =
   Store the following tree:
     /durable/a/short/path/_ = "..."
     /durable/a/long/path/_ = "..."
-    /durable/a/long/path/one/_ = "..." 
+    /durable/a/long/path/one/_ = "..."
 
   We expect that moving "/a/short/path" to "a/long/path" is leaves only
    "/durable/a/long/path".
