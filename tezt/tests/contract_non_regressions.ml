@@ -59,7 +59,7 @@ let register262 =
       ~alias:"contract"
       ~amount:Tez.one
       ~src:Constant.bootstrap1.alias
-      ~prg:(sf "file:%s" @@ contract_path protocol "non_regression" "bug_262.tz")
+      ~prg:(sf "file:%s" @@ contract_path protocol "non_regression" "262_bug.tz")
       ~init:"Unit"
       client
   in
@@ -87,7 +87,7 @@ let register843 =
      format before origination. *)
   let* client = Client.init_mockup ~protocol () in
   let addr = {|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|} in
-  let bug843 = contract_path protocol "non_regression" "bug_843.tz" in
+  let bug843 = contract_path protocol "non_regression" "843_bug.tz" in
   let* contract1 =
     Client.originate_contract
       ~hooks
