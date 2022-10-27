@@ -48,7 +48,7 @@ let dummy_manager_op_info =
   let manager_op =
     let open Alpha_context in
     let source = Signature.Public_key_hash.zero in
-    let counter = Z.zero in
+    let counter = Manager_counter.Internal_for_tests.of_int 0 in
     let storage_limit = Z.zero in
     let operation = Set_deposits_limit None in
     let contents =

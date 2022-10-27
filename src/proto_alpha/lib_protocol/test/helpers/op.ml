@@ -139,10 +139,10 @@ let batch_operations ?(recompute_counters = false) ~source ctxt
      List.fold_left
        (fun (counter, acc) -> function
          | Contents (Manager_operation m) ->
-             ( Z.succ counter,
+             ( Manager_counter.succ counter,
                Contents (Manager_operation {m with counter}) :: acc )
          | x -> (counter, x :: acc))
-       (Z.succ counter, [])
+       (Manager_counter.succ counter, [])
        operations
    in
    return (List.rev rev_operations)
@@ -211,7 +211,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
   | None -> Context.Contract.counter ctxt source)
   >>=? fun counter ->
   (* We increment the counter *)
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
   (Context.Contract.is_manager_key_revealed ctxt source >|=? function
@@ -227,7 +227,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
              storage_limit = Z.zero;
            }
        in
-       (Some (Contents reveal_op), Z.succ counter)
+       (Some (Contents reveal_op), Manager_counter.succ counter)
    | true -> (None, counter))
   >>=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
@@ -235,7 +235,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     List.fold_left
       (fun (counter, acc) -> function
         | Contents (Manager_operation m) ->
-            ( Z.succ counter,
+            ( Manager_counter.succ counter,
               Contents (Manager_operation {m with counter}) :: acc )
         | x -> (counter, x :: acc))
       (counter, match manager_op with None -> [] | Some op -> [op])
@@ -280,7 +280,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
   resolve_gas_limit ctxt gas_limit >>=? fun gas_limit ->
   Context.Contract.manager ctxt source >>=? fun account ->
   let public_key = Option.value ~default:account.pk public_key in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   Context.Contract.is_manager_key_revealed ctxt source >|=? fun revealed ->
   (* If the manager is revealed or we are not forcing reveals, we
      generate a singleton manager operation. *)
@@ -317,7 +317,7 @@ let manager_operation ?(force_reveal = false) ?counter ?(fee = Tez.zero)
         {
           source = Signature.Public_key.hash public_key;
           fee;
-          counter = Z.succ counter;
+          counter = Manager_counter.succ counter;
           operation;
           gas_limit;
           storage_limit;
@@ -343,7 +343,7 @@ let revelation ?(fee = Tez.zero) ?(gas_limit = High) ?(storage_limit = Z.zero)
   | Some ctr -> return ctr)
   >>=? fun counter ->
   Context.Contract.manager ctxt source >|=? fun account ->
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let sop =
     Contents_list
       (Single

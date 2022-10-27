@@ -236,7 +236,7 @@ let test_unparsable_script () =
             {
               source = pkh;
               fee = Tez.one;
-              counter = Z.of_int 1;
+              counter = Manager_counter.Internal_for_tests.of_int 1;
               operation = origination;
               gas_limit;
               storage_limit = Z.zero;

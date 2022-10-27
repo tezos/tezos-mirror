@@ -705,7 +705,8 @@ let manager_prelude (infos : Manager.infos) b =
   let add bootstrap counter ops ops_by_bootstrap =
     List.map
       (fun (bootstrap', counter', ops') ->
-        if bootstrap' = bootstrap then (bootstrap, Z.succ counter, ops)
+        if bootstrap' = bootstrap then
+          (bootstrap, Manager_counter.succ counter, ops)
         else (bootstrap', counter', ops'))
       ops_by_bootstrap
   in

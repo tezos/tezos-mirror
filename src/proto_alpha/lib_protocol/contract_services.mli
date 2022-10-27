@@ -35,7 +35,7 @@ val list : 'a #RPC_context.simple -> 'a -> Contract.t list shell_tzresult Lwt.t
 type info = {
   balance : Tez.t;
   delegate : public_key_hash option;
-  counter : counter option;
+  counter : Manager_counter.t option;
   script : Script.t option;
 }
 
@@ -79,7 +79,7 @@ val counter :
   'a #RPC_context.simple ->
   'a ->
   public_key_hash ->
-  counter shell_tzresult Lwt.t
+  Manager_counter.t shell_tzresult Lwt.t
 
 val script :
   'a #RPC_context.simple ->

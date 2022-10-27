@@ -387,7 +387,7 @@ let make_deposit b tx_rollup l1_src addr =
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     l1_src
@@ -874,7 +874,7 @@ let test_add_two_batches () =
   Context.Contract.counter (B b) contract >>=? fun counter ->
   let contents2 = "batch2" in
   Op.tx_rollup_submit_batch
-    ~counter:Z.(add counter (of_int 1))
+    ~counter:Manager_counter.(succ counter)
     (B b)
     contract
     tx_rollup
@@ -954,7 +954,10 @@ let fill_inbox b tx_rollup contract contents k =
     >>=? fun operation ->
     let new_inbox_size = inbox_size + message_size in
     if new_inbox_size < tx_rollup_inbox_limit then
-      fill_inbox new_inbox_size (Z.succ counter) (operation :: operations)
+      fill_inbox
+        new_inbox_size
+        (Manager_counter.succ counter)
+        (operation :: operations)
     else
       Incremental.begin_construction b >>=? fun i ->
       k i inbox_size (operation, operations)
@@ -1023,7 +1026,7 @@ let test_inbox_count_too_big () =
           (B b)
           [batch; op])
     >>=? fun op ->
-    if n > 0 then fill_inbox b (Z.succ counter) (n - 1) (Some op)
+    if n > 0 then fill_inbox b (Manager_counter.succ counter) (n - 1) (Some op)
     else return (op, counter)
   in
   Context.Contract.counter (B b) contract >>=? fun counter ->
@@ -1125,7 +1128,7 @@ let test_additional_space_allocation_for_valid_deposit () =
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1268,7 +1271,7 @@ let test_invalid_deposit_too_big_ticket () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1319,7 +1322,7 @@ let test_invalid_deposit_too_big_ticket_type () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account
@@ -1376,7 +1379,7 @@ let test_valid_deposit_big_ticket () =
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction
-    ~counter:(Z.of_int 2)
+    ~counter:(Manager_counter.Internal_for_tests.of_int 2)
     ~fee
     (B b)
     account

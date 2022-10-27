@@ -313,6 +313,12 @@ let non_negative_z_parameter =
 let non_negative_z_param ~name ~desc next =
   Tezos_clic.param ~name ~desc non_negative_z_parameter next
 
+let counter_parameter =
+  Tezos_clic.parameter (fun _ s ->
+      match Manager_counter.Internal_for_injection.of_string s with
+      | None -> failwith "Invalid counter, must be a non-negative number."
+      | Some c -> return c)
+
 let non_negative_parameter =
   Tezos_clic.parameter (fun _ s ->
       match int_of_string_opt s with
@@ -450,7 +456,7 @@ let counter_arg =
     ~short:'C'
     ~placeholder:"counter"
     ~doc:"Set the counter to be used by the transaction"
-    non_negative_z_parameter
+    counter_parameter
 
 let max_priority_arg =
   Tezos_clic.arg

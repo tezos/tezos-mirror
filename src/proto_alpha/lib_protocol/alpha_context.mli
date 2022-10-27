@@ -1597,6 +1597,29 @@ module Ticket_hash : sig
   end
 end
 
+(** This module re-exports definitions from {!Manager_counter_repr}. *)
+module Manager_counter : sig
+  include Compare.S
+
+  val succ : t -> t
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding_for_RPCs : t Data_encoding.t
+
+  module Internal_for_injection : sig
+    val of_string : string -> t option
+  end
+
+  module Internal_for_tests : sig
+    val of_int : int -> t
+
+    val to_int : t -> int
+
+    val add : t -> int -> t
+  end
+end
+
 (** This module re-exports definitions from {!Contract_repr} and
     {!Contract_storage}. *)
 module Contract : sig
@@ -1664,12 +1687,13 @@ module Contract : sig
     public_key ->
     context tzresult Lwt.t
 
-  val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
+  val get_counter :
+    context -> public_key_hash -> Manager_counter.t tzresult Lwt.t
 
   val increment_counter : context -> public_key_hash -> context tzresult Lwt.t
 
   val check_counter_increment :
-    context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
+    context -> public_key_hash -> Manager_counter.t -> unit tzresult Lwt.t
 
   (** See {!Contract_storage.check_allocated_and_get_balance}. *)
   val check_allocated_and_get_balance :
@@ -4346,7 +4370,7 @@ and _ contents =
   | Manager_operation : {
       source : public_key_hash;
       fee : Tez.tez;
-      counter : counter;
+      counter : Manager_counter.t;
       operation : 'kind manager_operation;
       gas_limit : Gas.Arith.integral;
       storage_limit : Z.t;
@@ -4502,8 +4526,6 @@ and _ manager_operation =
       ops : (Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list;
     }
       -> Kind.zk_rollup_publish manager_operation
-
-and counter = Z.t
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation

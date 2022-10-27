@@ -354,7 +354,7 @@ and _ contents =
   | Manager_operation : {
       source : Signature.Public_key_hash.t;
       fee : Tez_repr.tez;
-      counter : counter;
+      counter : Manager_counter_repr.t;
       operation : 'kind manager_operation;
       gas_limit : Gas_limit_repr.Arith.integral;
       storage_limit : Z.t;
@@ -580,13 +580,6 @@ and _ manager_operation =
           (* See {!Zk_rollup_apply} *)
     }
       -> Kind.zk_rollup_publish manager_operation
-
-(** Counters are used as anti-replay protection mechanism in
-    manager operations: each manager account stores a counter and
-    each manager operation declares a value for the counter. When
-    a manager operation is applied, the value of the counter of
-    its manager is checked and incremented. *)
-and counter = Z.t
 
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation

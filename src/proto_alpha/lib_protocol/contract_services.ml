@@ -37,7 +37,7 @@ let big_map_root =
 type info = {
   balance : Tez.t;
   delegate : public_key_hash option;
-  counter : counter option;
+  counter : Manager_counter.t option;
   script : Script.t option;
 }
 
@@ -52,7 +52,7 @@ let info_encoding =
        (req "balance" Tez.encoding)
        (opt "delegate" Signature.Public_key_hash.encoding)
        (opt "script" Script.encoding)
-       (opt "counter" n)
+       (opt "counter" Manager_counter.encoding_for_RPCs)
 
 let legacy = Script_ir_translator_config.make ~legacy:true ()
 
@@ -102,7 +102,7 @@ module S = struct
     RPC_service.get_service
       ~description:"Access the counter of a contract, if any."
       ~query:RPC_query.empty
-      ~output:z
+      ~output:Manager_counter.encoding_for_RPCs
       RPC_path.(custom_root /: Contract.rpc_arg / "counter")
 
   let script =

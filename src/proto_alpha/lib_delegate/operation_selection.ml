@@ -45,7 +45,7 @@ type prioritized_manager = {
   gas : Fixed_point_repr.integral_tag Gas.Arith.t;
   weight : Q.t;
   source : public_key_hash;
-  counter : counter;
+  counter : Manager_counter.t;
 }
 
 module PrioritizedManagerSet = Set.Make (struct
@@ -60,7 +60,7 @@ module PrioritizedManagerSet = Set.Make (struct
     let cmp_src = Signature.Public_key_hash.compare source source' in
     if cmp_src = 0 then
       (* we want the smallest counter first *)
-      let c = Z.compare counter counter' in
+      let c = Manager_counter.compare counter counter' in
       if c <> 0 then c
       else
         let c = Prioritized_operation.compare_priority op' op in

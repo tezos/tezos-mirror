@@ -96,7 +96,7 @@ val pp_gas_limit : Format.formatter -> gas_limit -> unit
 
 val transaction :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -122,7 +122,7 @@ val transaction :
     yet. Disabled (set to [false]) by default.}} *)
 val unsafe_transaction :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -139,7 +139,7 @@ val delegation :
   ?force_reveal:bool ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?storage_limit:Z.t ->
   Context.t ->
   Contract.t ->
@@ -151,7 +151,7 @@ val set_deposits_limit :
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   Context.t ->
   Contract.t ->
   Tez.tez option ->
@@ -159,7 +159,7 @@ val set_deposits_limit :
 
 val increase_paid_storage :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -191,7 +191,7 @@ val revelation :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?forge_pkh:public_key_hash option ->
   Context.t ->
   public_key ->
@@ -214,7 +214,7 @@ val failing_noop :
     yet. Disabled (set to [false]) by default.}} *)
 val contract_origination :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
@@ -228,7 +228,7 @@ val contract_origination :
 
 val contract_origination_hash :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
   ?public_key:public_key ->
@@ -244,7 +244,7 @@ val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?public_key:Signature.public_key ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
@@ -282,7 +282,7 @@ val activation :
 
 val combine_operations :
   ?public_key:public_key ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?spurious_operation:packed_operation ->
   source:Contract.t ->
   Context.t ->
@@ -372,7 +372,7 @@ val dummy_script_cost : Tez.t
     hash. *)
 val tx_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -391,7 +391,7 @@ val tx_rollup_origination :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_submit_batch :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?burn_limit:Tez.tez ->
   ?gas_limit:gas_limit ->
@@ -412,7 +412,7 @@ val tx_rollup_submit_batch :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_commit :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -432,7 +432,7 @@ val tx_rollup_commit :
     yet. Disabled (set to [false]) by default..}} *)
 val tx_rollup_return_bond :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -451,7 +451,7 @@ val tx_rollup_return_bond :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_finalize :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -464,7 +464,7 @@ val tx_rollup_finalize :
     remove a commitment from the rollup context. *)
 val tx_rollup_remove_commitment :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -486,7 +486,7 @@ val tx_rollup_remove_commitment :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_dispatch_tickets :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -526,7 +526,7 @@ val tx_rollup_dispatch_tickets :
     yet. Disabled (set to [false]) by default.}} *)
 val transfer_ticket :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -547,7 +547,7 @@ val transfer_ticket :
     protocol. *)
 val tx_rollup_raw_reject :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -575,7 +575,7 @@ val tx_rollup_raw_reject :
     yet. Disabled (set to [false]) by default.}} *)
 val tx_rollup_reject :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -605,7 +605,7 @@ val tx_rollup_reject :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -628,7 +628,7 @@ val sc_rollup_origination :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_publish :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -648,7 +648,7 @@ val sc_rollup_publish :
     yet. Disabled (set to [false]) by default.}} *)
 val sc_rollup_cement :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -659,7 +659,7 @@ val sc_rollup_cement :
   Operation.packed tzresult Lwt.t
 
 val sc_rollup_execute_outbox_message :
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -673,7 +673,7 @@ val sc_rollup_execute_outbox_message :
 
 (** [sc_rollup_recover_bond ctxt source sc_rollup] returns a commitment bond. *)
 val sc_rollup_recover_bond :
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -685,7 +685,7 @@ val sc_rollup_recover_bond :
 
 val sc_rollup_add_messages :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -696,7 +696,7 @@ val sc_rollup_add_messages :
 
 val sc_rollup_refute :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -709,7 +709,7 @@ val sc_rollup_refute :
 
 val sc_rollup_timeout :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.tez ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -721,7 +721,7 @@ val sc_rollup_timeout :
 
 val dal_publish_slot_header :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -734,7 +734,7 @@ val dal_publish_slot_header :
     ~init_state ~nb_ops] tries to originate a ZK Rollup. *)
 val zk_rollup_origination :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -750,7 +750,7 @@ val zk_rollup_origination :
 
 val update_consensus_key :
   ?force_reveal:bool ->
-  ?counter:counter ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
@@ -770,7 +770,7 @@ val drain_delegate :
     to the pending list of a ZK Rollup. *)
 val zk_rollup_publish :
   ?force_reveal:bool ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->

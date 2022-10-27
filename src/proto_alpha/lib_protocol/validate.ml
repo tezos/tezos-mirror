@@ -2129,13 +2129,13 @@ module Manager = struct
           Inconsistent_sources
       in
       error_unless
-        Compare.Z.(Z.succ previous_counter = counter)
+        Manager_counter.(succ previous_counter = counter)
         Inconsistent_counters
     in
     let rec check_batch_tail_sanity :
         type kind.
         public_key_hash ->
-        counter ->
+        Manager_counter.t ->
         kind Kind.manager contents_list ->
         unit tzresult =
      fun expected_source previous_counter -> function
@@ -2163,7 +2163,7 @@ module Manager = struct
     let check_batch :
         type kind.
         kind Kind.manager contents_list ->
-        (public_key_hash * public_key option * counter) tzresult =
+        (public_key_hash * public_key option * Manager_counter.t) tzresult =
      fun contents_list ->
       match contents_list with
       | Single (Manager_operation {source; operation = Reveal key; counter; _})

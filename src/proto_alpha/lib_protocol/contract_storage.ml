@@ -30,14 +30,14 @@ type error +=
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Branch *)
       Counter_in_the_future of {
       contract : Contract_repr.t;
-      expected : Z.t;
-      found : Z.t;
+      expected : Manager_counter_repr.t;
+      found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.t
@@ -88,17 +88,17 @@ let () =
       Format.fprintf
         ppf
         "Counter %a not yet reached for contract %a (expected %a)"
-        Z.pp_print
+        Manager_counter_repr.pp
         found
         Contract_repr.pp
         contract
-        Z.pp_print
+        Manager_counter_repr.pp
         exp)
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)
-        (req "expected" z)
-        (req "found" z))
+        (req "expected" Manager_counter_repr.encoding_for_errors)
+        (req "found" Manager_counter_repr.encoding_for_errors))
     (function
       | Counter_in_the_future {contract; expected; found} ->
           Some (contract, expected, found)
@@ -114,17 +114,17 @@ let () =
       Format.fprintf
         ppf
         "Counter %a already used for contract %a (expected %a)"
-        Z.pp_print
+        Manager_counter_repr.pp
         found
         Contract_repr.pp
         contract
-        Z.pp_print
+        Manager_counter_repr.pp
         exp)
     Data_encoding.(
       obj3
         (req "contract" Contract_repr.encoding)
-        (req "expected" z)
-        (req "found" z))
+        (req "expected" Manager_counter_repr.encoding_for_errors)
+        (req "found" Manager_counter_repr.encoding_for_errors))
     (function
       | Counter_in_the_past {contract; expected; found} ->
           Some (contract, expected, found)
@@ -504,18 +504,24 @@ let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
 let check_counter_increment c manager counter =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  let expected = Z.succ contract_counter in
-  if Compare.Z.(expected = counter) then return_unit
-  else if Compare.Z.(expected > counter) then
+  let expected = Manager_counter_repr.succ contract_counter in
+  if Manager_counter_repr.(expected = counter) then return_unit
+  else if Manager_counter_repr.(expected > counter) then
     fail (Counter_in_the_past {contract; expected; found = counter})
   else fail (Counter_in_the_future {contract; expected; found = counter})
 
 let increment_counter c manager =
   let contract = Contract_repr.Implicit manager in
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
-  Storage.Contract.Global_counter.update c (Z.succ global_counter) >>=? fun c ->
+  Storage.Contract.Global_counter.update
+    c
+    (Manager_counter_repr.succ global_counter)
+  >>=? fun c ->
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  Storage.Contract.Counter.update c contract (Z.succ contract_counter)
+  Storage.Contract.Counter.update
+    c
+    contract
+    (Manager_counter_repr.succ contract_counter)
 
 let get_script_code c contract_hash =
   let contract = Contract_repr.Originated contract_hash in
@@ -634,7 +640,7 @@ let credit_only_call_from_token c contract amount =
       Stake_storage.add_contract_stake c contract amount
 
 let init c =
-  Storage.Contract.Global_counter.init c Z.zero >>=? fun c ->
+  Storage.Contract.Global_counter.init c Manager_counter_repr.init >>=? fun c ->
   Lazy_storage_diff.init c
 
 let used_storage_space c contract =

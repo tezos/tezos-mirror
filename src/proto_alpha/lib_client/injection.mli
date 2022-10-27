@@ -109,7 +109,7 @@ val inject_manager_operation :
   fee:Tez.t Limit.t ->
   gas_limit:Gas.Arith.integral Limit.t ->
   storage_limit:Z.t Limit.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   ?replace_by_fees:bool ->
   fee_parameter:fee_parameter ->
   'kind Annotated_manager_operation.annotated_list ->

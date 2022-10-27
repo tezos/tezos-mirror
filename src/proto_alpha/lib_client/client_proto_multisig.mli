@@ -117,7 +117,7 @@ val call_multisig :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)
@@ -144,7 +144,7 @@ val call_multisig_on_bytes :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  ?counter:Z.t ->
+  ?counter:Manager_counter.t ->
   fee_parameter:Injection.fee_parameter ->
   unit ->
   (Kind.transaction Kind.manager Injection.result * Contract_hash.t list)

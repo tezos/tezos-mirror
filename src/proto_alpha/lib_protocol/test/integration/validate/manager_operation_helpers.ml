@@ -108,7 +108,7 @@ type manager_operation_kind =
 (** The requirements for a tested manager operation. *)
 type operation_req = {
   kind : manager_operation_kind;
-  counter : counter option;
+  counter : Manager_counter.t option;
   fee : Tez.t option;
   gas_limit : Op.gas_limit option;
   storage_limit : Z.t option;
@@ -226,7 +226,7 @@ let pp_operation_req pp
      amount: %a@,\
      @]"
     (kind_to_string kind)
-    (pp_opt Z.pp_print)
+    (pp_opt Manager_counter.pp)
     counter
     (pp_opt Tez.pp)
     fee
@@ -421,12 +421,12 @@ let fund_account_op block bootstrap account fund counter =
       (Contract.Implicit account)
       fund
   in
-  (op, Z.succ counter)
+  (op, Manager_counter.succ counter)
 
 let fund_account block bootstrap account fund =
   let open Lwt_result_syntax in
   let* counter = Context.Contract.counter (B block) bootstrap in
-  let* operation, (_counter : counter) =
+  let* operation, (_counter : Manager_counter.t) =
     fund_account_op block bootstrap account fund counter
   in
   let*! b = Block.bake ~operation block in
@@ -1322,7 +1322,9 @@ let expected_witness witness probes ~mode ctxt =
   let open Lwt_result_syntax in
   let b_in, c_in, g_in = witness in
   let*? b_expected = b_in -? probes.fee in
-  let c_expected = Z.add c_in (Z.of_int probes.nb_counter) in
+  let c_expected =
+    Manager_counter.Internal_for_tests.add c_in probes.nb_counter
+  in
   let+ g_expected =
     match (g_in, mode) with
     | Some g_in, Construction ->
@@ -1385,10 +1387,10 @@ let observe ~only_validate ~mode ctxt_pre ctxt_post op =
   let* () = b_cmp b_out b_expected in
   let _ =
     Assert.equal
-      Z.equal
+      Manager_counter.equal
       ~loc:__LOC__
       "Counter incrementation"
-      Z.pp_print
+      Manager_counter.pp
       c_out
       c_expected
   in

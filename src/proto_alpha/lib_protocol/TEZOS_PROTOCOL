@@ -44,6 +44,7 @@
         "Sampler",
         "Voting_period_repr",
         "Ticket_hash_repr",
+        "Manager_counter_repr",
         "Contract_repr",
         "Indexable",
         "Entrypoint_repr",

@@ -63,7 +63,7 @@ let batch_in_the_middle infos kind1 kind2 =
       (B infos.ctxt.block)
       (contract_of (get_source infos))
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* operation1 =
     select_op
       {
@@ -73,7 +73,7 @@ let batch_in_the_middle infos kind1 kind2 =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* reveal =
     mk_reveal
       {
@@ -83,7 +83,7 @@ let batch_in_the_middle infos kind1 kind2 =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* operation2 =
     select_op
       {
@@ -126,7 +126,7 @@ let batch_two_reveals infos kind =
       (B infos.ctxt.block)
       (contract_of (get_source infos))
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* reveal =
     mk_reveal
       {
@@ -136,7 +136,7 @@ let batch_two_reveals infos kind =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* reveal1 =
     mk_reveal
       {
@@ -146,7 +146,7 @@ let batch_two_reveals infos kind =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* operation =
     select_op
       {
@@ -184,7 +184,7 @@ let batch_two_sources infos kind1 kind2 =
   let open Lwt_result_syntax in
   let source = contract_of (get_source infos) in
   let* counter = Context.Contract.counter (B infos.ctxt.block) source in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* operation1 =
     select_op
       {
@@ -225,9 +225,9 @@ let batch_incons_counters infos kind1 kind2 =
   let op_infos = {{op_infos with fee} with counter = Some counter} in
   let* reveal = mk_reveal op_infos infos in
   let counter0 = counter in
-  let counter = Z.succ counter in
-  let counter2 = Z.succ counter in
-  let counter3 = Z.succ counter2 in
+  let counter = Manager_counter.succ counter in
+  let counter2 = Manager_counter.succ counter in
+  let counter3 = Manager_counter.succ counter2 in
   let operation counter kind =
     select_op
       {
@@ -328,7 +328,7 @@ let batch_emptying_balance_in_the_middle infos kind1 kind2 =
       {(operation_req_default K_Reveal) with counter = Some counter}
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation fee =
     select_op
       {
@@ -339,7 +339,7 @@ let batch_emptying_balance_in_the_middle infos kind1 kind2 =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation2 fee =
     select_op
       {
@@ -389,7 +389,7 @@ let batch_empty_at_end infos kind1 kind2 =
       {(operation_req_default K_Reveal) with counter = Some counter}
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation fee =
     select_op
       {
@@ -400,7 +400,7 @@ let batch_empty_at_end infos kind1 kind2 =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation2 fee =
     select_op
       {
@@ -449,7 +449,7 @@ let batch_reveal_transaction infos =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let* transaction =
     mk_transaction
       {
@@ -484,7 +484,7 @@ let batch_exceeding_block_gas ~mempool_mode infos kind1 kind2 =
       {(operation_req_default K_Reveal) with counter = Some counter}
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation gas_limit =
     select_op
       {
@@ -495,7 +495,7 @@ let batch_exceeding_block_gas ~mempool_mode infos kind1 kind2 =
       }
       infos
   in
-  let counter = Z.succ counter in
+  let counter = Manager_counter.succ counter in
   let operation2 gas_limit =
     select_op
       {

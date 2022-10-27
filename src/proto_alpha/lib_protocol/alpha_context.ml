@@ -140,6 +140,7 @@ module Zk_rollup = struct
 end
 
 module Entrypoint = Entrypoint_repr
+module Manager_counter = Manager_counter_repr
 include Operation_repr
 
 module Operation = struct
