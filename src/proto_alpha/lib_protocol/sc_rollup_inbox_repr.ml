@@ -670,22 +670,24 @@ struct
     in
     aux [] ptr_path
 
-  let verify_inclusion_proof proof a b =
-    let assoc = List.map (fun c -> (hash_history_proof c, c)) proof in
-    let path = List.split assoc |> fst in
-    let deref =
-      let open Hash.Map in
-      let map = of_seq (List.to_seq assoc) in
-      fun ptr -> find_opt ptr map
+  let verify_inclusion_proof inclusion_proof target_history_proof
+      snapshot_history_proof =
+    let rec aux (hash_map, ptr_list) = function
+      | [] -> (hash_map, List.rev ptr_list)
+      | history_proof :: tail ->
+          let ptr = hash_history_proof history_proof in
+          aux (Hash.Map.add ptr history_proof hash_map, ptr :: ptr_list) tail
     in
-    let cell_ptr = hash_history_proof b in
-    let target_ptr = hash_history_proof a in
+    let hash_map, ptr_list = aux (Hash.Map.empty, []) inclusion_proof in
+    let deref ptr = Hash.Map.find ptr hash_map in
+    let cell_ptr = hash_history_proof snapshot_history_proof in
+    let target_ptr = hash_history_proof target_history_proof in
     Skip_list.valid_back_path
       ~equal_ptr:Hash.equal
       ~deref
       ~cell_ptr
       ~target_ptr
-      path
+      ptr_list
 
   type proof =
     (* See the main docstring for this type (in the mli file) for
