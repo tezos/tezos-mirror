@@ -76,7 +76,7 @@ module Make (Simulation : Simulation.S) : S = struct
 
   let inject_batches state = List.iter_es (inject_batch state)
 
-  let get_batches state =
+  let get_batches state ~only_full =
     let ( current_rev_batch,
           current_batch_size,
           current_batch_elements,
@@ -114,8 +114,9 @@ module Make (Simulation : Simulation.S) : S = struct
     in
     let batches =
       if
-        current_batch_size >= state.min_batch_size
-        && current_batch_elements >= state.min_batch_elements
+        (not only_full)
+        || current_batch_size >= state.min_batch_size
+           && current_batch_elements >= state.min_batch_elements
       then
         (* We have enough to make a batch with the last non-full batch. *)
         List.rev current_rev_batch :: full_batches
@@ -131,9 +132,9 @@ module Make (Simulation : Simulation.S) : S = struct
       ([], [])
       batches
 
-  let on_batch state =
+  let produce_batches state ~only_full =
     let open Lwt_result_syntax in
-    let batches, to_remove = get_batches state in
+    let batches, to_remove = get_batches state ~only_full in
     match batches with
     | [] -> return_unit
     | _ ->
@@ -142,6 +143,8 @@ module Make (Simulation : Simulation.S) : S = struct
           (fun tr_hash -> Message_queue.remove state.messages tr_hash)
           to_remove ;
         return_unit
+
+  let on_batch state = produce_batches state ~only_full:false
 
   let simulate node_ctxt simulation_ctxt (messages : L2_message.t list) =
     let open Lwt_result_syntax in
@@ -168,7 +171,7 @@ module Make (Simulation : Simulation.S) : S = struct
           else Ok (L2_message.make message))
         messages
     in
-    let+ () =
+    let* () =
       if not state.simulate then return_unit
       else
         match state.simulation_ctxt with
@@ -179,12 +182,16 @@ module Make (Simulation : Simulation.S) : S = struct
             in
             state.simulation_ctxt <- Some simulation_ctxt
     in
-    List.map
-      (fun message ->
-        let msg_hash = L2_message.hash message in
-        Message_queue.replace state.messages msg_hash message ;
-        msg_hash)
-      messages
+    let hashes =
+      List.map
+        (fun message ->
+          let msg_hash = L2_message.hash message in
+          Message_queue.replace state.messages msg_hash message ;
+          msg_hash)
+        messages
+    in
+    let+ () = produce_batches state ~only_full:true in
+    hashes
 
   let on_new_head state head =
     let open Lwt_result_syntax in
