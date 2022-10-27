@@ -193,6 +193,9 @@ module PVMState : sig
   (** The value of a PVM state *)
   type value = tree
 
+  (** [empty ()] is the empty PVM state. *)
+  val empty : unit -> value
+
   (** [find context] returns the PVM state stored in the [context], if any. *)
   val find : _ t -> value option Lwt.t
 

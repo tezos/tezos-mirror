@@ -61,6 +61,9 @@ module type S = sig
 
   (** State storage for this PVM. *)
   module State : sig
+    (** [empty ()] is the empty state.  *)
+    val empty : unit -> state
+
     (** [find context] returns the PVM state stored in the [context], if any. *)
     val find : _ Context.t -> state option Lwt.t
 

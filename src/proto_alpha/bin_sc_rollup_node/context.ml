@@ -233,6 +233,8 @@ module PVMState = struct
 
   let key = ["pvm_state"]
 
+  let empty () = IStore.Tree.empty ()
+
   let find ctxt = IStore.Tree.find_tree ctxt.tree key
 
   let lookup tree path = IStore.Tree.find tree path

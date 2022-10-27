@@ -332,8 +332,7 @@ module Make (PVM : Pvm.S) = struct
     let* () = Event.shutdown_node exit_status in
     Tezos_base_unix.Internal_event_unix.close ()
 
-  let check_initial_state_hash {Node_context.cctxt; rollup_address; context; _}
-      =
+  let check_initial_state_hash {Node_context.cctxt; rollup_address; _} =
     let open Lwt_result_syntax in
     let* l1_reference_initial_state_hash =
       RPC.Sc_rollup.initial_pvm_state_hash
@@ -341,7 +340,7 @@ module Make (PVM : Pvm.S) = struct
         (cctxt#chain, cctxt#block)
         rollup_address
     in
-    let*! s = PVM.initial_state context in
+    let*! s = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! l2_initial_state_hash = PVM.state_hash s in
     if
       not

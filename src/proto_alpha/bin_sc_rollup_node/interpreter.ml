@@ -41,7 +41,7 @@ module type S = sig
       for a given [tick] if this [tick] happened before
       [level]. Otherwise, returns [None].*)
   val state_of_tick :
-    Node_context.rw ->
+    _ Node_context.t ->
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
@@ -111,10 +111,9 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         | _ -> missing_boot_sector ())
 
   let genesis_state block_hash node_ctxt ctxt =
-    let open Node_context in
     let open Lwt_result_syntax in
     let* boot_sector = get_boot_sector block_hash node_ctxt in
-    let*! initial_state = PVM.initial_state node_ctxt.context in
+    let*! initial_state = PVM.initial_state ~empty:(PVM.State.empty ()) in
     let*! genesis_state = PVM.install_boot_sector initial_state boot_sector in
     let*! ctxt = PVM.State.set ctxt genesis_state in
     return (ctxt, genesis_state)
