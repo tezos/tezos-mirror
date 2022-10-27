@@ -126,7 +126,7 @@ let test_calling_contract_with_global_constant_success =
   let value = "999" in
   let burn_cap = Some (Tez.of_int 1) in
   let* _ = Client.register_global_constant ~src ~value ?burn_cap client in
-  let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
+  let script = "file:./tezt/tests/contracts/proto_alpha/999_constant.tz" in
   let storage = "0" in
   let input = "Unit" in
   let* result = Client.run_script ~prg:script ~storage ~input client in
@@ -142,7 +142,7 @@ let test_calling_contract_with_global_constant_failure =
     ~tags:["mockup"; "client"; "global_constant"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
+  let script = "file:./tezt/tests/contracts/proto_alpha/999_constant.tz" in
   let storage = "0" in
   let input = "Unit" in
   let process = Client.spawn_run_script ~prg:script ~storage ~input client in
@@ -199,7 +199,7 @@ let test_originate_contract_with_global_constant_success =
       ~alias:"with_global_constant"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/constant_999.tz"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/999_constant.tz"
       ~init:"0"
       ~burn_cap:(Tez.of_int 2)
       client
