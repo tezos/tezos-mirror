@@ -265,6 +265,16 @@ let get_slot dal_parameters dal_constants store slot_header =
   in
   return slot
 
+let store_slot_headers store block_hash slot_headers =
+  List.iter_s
+    (fun (slot_index, slot_header) ->
+      Slot_headers_store.add
+        store
+        ~primary_key:block_hash
+        ~secondary_key:slot_index
+        slot_header)
+    slot_headers
+
 let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
     store slot_header =
   let open Lwt_result_syntax in

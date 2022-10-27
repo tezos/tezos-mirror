@@ -144,13 +144,9 @@ module Handler = struct
             Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
           in
           let*! () =
-            List.iter_s
-              (fun (slot_index, slot_header) ->
-                Slot_headers_store.add
-                  (Node_context.get_store ctxt).slot_headers_store
-                  ~primary_key:block_hash
-                  ~secondary_key:slot_index
-                  slot_header)
+            Slot_manager.store_slot_headers
+              (Node_context.get_store ctxt).slot_headers_store
+              block_hash
               slot_headers
           in
           return_unit
