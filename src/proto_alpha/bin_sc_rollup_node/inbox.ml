@@ -145,8 +145,14 @@ let get_messages Node_context.{l1_ctxt; _} head =
   in
   let eol = Sc_rollup.Inbox_message.Internal End_of_level in
   let messages = List.rev (eol :: rev_messages) in
+  let ({timestamp; predecessor; _} : Block_header.shell_header) =
+    block.header.shell
+  in
   let sol = Sc_rollup.Inbox_message.Internal Start_of_level in
-  return (sol :: messages)
+  let info_per_level =
+    Sc_rollup.Inbox_message.Internal (Info_per_level {timestamp; predecessor})
+  in
+  return (sol :: info_per_level :: messages)
 
 let same_inbox_as_layer_1 node_ctxt head_hash inbox =
   let open Lwt_result_syntax in

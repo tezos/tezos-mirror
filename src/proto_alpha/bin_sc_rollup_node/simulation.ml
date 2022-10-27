@@ -34,6 +34,11 @@ module type S = sig
 
   type level_position = Start | Middle | End
 
+  type info_per_level = {
+    timestamp : Timestamp.time;
+    predecessor : Tezos_crypto.Block_hash.t;
+  }
+
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
@@ -42,6 +47,7 @@ module type S = sig
     nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
+    info_per_level : info_per_level;
   }
 
   val start_simulation :
@@ -67,6 +73,11 @@ module Make (Interpreter : Interpreter.S) :
 
   type level_position = Start | Middle | End
 
+  type info_per_level = {
+    timestamp : Timestamp.time;
+    predecessor : Tezos_crypto.Block_hash.t;
+  }
+
   type t = {
     ctxt : Context.ro;
     inbox_level : Raw_level.t;
@@ -75,7 +86,22 @@ module Make (Interpreter : Interpreter.S) :
     nb_messages_period : int64;
     nb_messages_inbox : int;
     level_position : level_position;
+    info_per_level : info_per_level;
   }
+
+  let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) hash =
+    let open Lwt_result_syntax in
+    let* block = Layer1.fetch_tezos_block node_ctxt.l1_ctxt hash in
+    let ({timestamp; predecessor; _} : Block_header.shell_header) =
+      block.header.shell
+    in
+    let Constants.Parametric.{minimal_block_delay; _} =
+      node_ctxt.protocol_constants.Constants.parametric
+    in
+    let*? timestamp =
+      Environment.wrap_tzresult @@ Timestamp.(timestamp +? minimal_block_delay)
+    in
+    return {timestamp; predecessor}
 
   let start_simulation node_ctxt ~reveal_map (Layer1.{hash; level} as head) =
     let open Lwt_result_syntax in
@@ -94,19 +120,21 @@ module Make (Interpreter : Interpreter.S) :
       else Node_context.checkout_context node_ctxt hash
     in
     let* inbox = Inbox.inbox_of_head node_ctxt head in
-    let+ ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
+    let* ctxt, state = Interpreter.state_of_head node_ctxt ctxt head in
     let nb_messages_period =
       Sc_rollup.Inbox.number_of_messages_during_commitment_period inbox
     in
+    let+ info_per_level = simulate_info_per_level node_ctxt hash in
     let inbox_level = Raw_level.succ level in
     {
       ctxt;
-      state;
       inbox_level;
+      state;
       reveal_map;
       nb_messages_period;
       nb_messages_inbox = 0;
       level_position = Start;
+      info_per_level;
     }
 
   let simulate_messages_no_checks (node_ctxt : Node_context.ro)
@@ -118,6 +146,7 @@ module Make (Interpreter : Interpreter.S) :
          nb_messages_period;
          nb_messages_inbox;
          level_position = _;
+         info_per_level = _;
        } as sim) messages =
     let open Lwt_result_syntax in
     (* Build new state *)
@@ -158,7 +187,11 @@ module Make (Interpreter : Interpreter.S) :
     in
     let messages =
       if sim.level_position = Start then
-        Sc_rollup.Inbox_message.Internal Start_of_level :: messages
+        let {timestamp; predecessor} = sim.info_per_level in
+        let open Sc_rollup.Inbox_message in
+        Internal Start_of_level
+        :: Internal (Info_per_level {timestamp; predecessor})
+        :: messages
       else messages
     in
     let max_messages =
