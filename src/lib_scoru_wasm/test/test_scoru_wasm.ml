@@ -43,6 +43,7 @@ let () =
       ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
       ("Parser Encodings", Test_parser_encoding.tests);
       ("WASM PVM", Test_wasm_pvm.tests);
+      ("WASM VM", Test_wasm_vm.tests);
       ("Module Initialisation", Test_init.tests);
       ("Max nb of ticks", Test_fixed_nb_ticks.tests);
       ("Hash correspondence", Test_hash_consistency.tests);
