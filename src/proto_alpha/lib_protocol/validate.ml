@@ -2237,9 +2237,6 @@ module Manager = struct
   let assert_sc_rollup_feature_enabled vi =
     error_unless (Constants.sc_rollup_enable vi.ctxt) Sc_rollup_feature_disabled
 
-  let assert_dal_feature_enabled vi =
-    error_unless (Constants.dal_enable vi.ctxt) Dal_errors.Dal_feature_disabled
-
   let assert_not_zero_messages messages =
     match messages with
     | [] -> error Sc_rollup_errors.Sc_rollup_add_zero_messages
@@ -2436,9 +2433,6 @@ module Manager = struct
              the operations Branch_delayed if they cannot be successfully
              prechecked? *)
           assert_sc_rollup_feature_enabled vi
-      | Sc_rollup_dal_slot_subscribe _ ->
-          let* () = assert_sc_rollup_feature_enabled vi in
-          assert_dal_feature_enabled vi
       | Dal_publish_slot_header {slot_header} ->
           Dal_apply.validate_publish_slot_header vi.ctxt slot_header
       | Zk_rollup_origination _ | Zk_rollup_publish _ ->

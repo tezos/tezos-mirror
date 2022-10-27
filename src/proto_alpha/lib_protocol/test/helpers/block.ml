@@ -905,9 +905,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Sc_rollup_publish_result _ | Sc_rollup_refute_result _
               | Sc_rollup_timeout_result _
               | Sc_rollup_execute_outbox_message_result _
-              | Sc_rollup_recover_bond_result _
-              | Sc_rollup_dal_slot_subscribe_result _
-              | Zk_rollup_origination_result _ | Zk_rollup_publish_result _ ->
+              | Sc_rollup_recover_bond_result _ | Zk_rollup_origination_result _
+              | Zk_rollup_publish_result _ ->
                   balance_updates_rev
               | Transaction_result
                   ( Transaction_to_contract_result {balance_updates; _}
@@ -960,7 +959,6 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result
                 (Sc_rollup_execute_outbox_message_result _)
             | Successful_manager_result (Sc_rollup_recover_bond_result _)
-            | Successful_manager_result (Sc_rollup_dal_slot_subscribe_result _)
             | Successful_manager_result (Zk_rollup_origination_result _)
             | Successful_manager_result (Zk_rollup_publish_result _) ->
                 origination_results_rev

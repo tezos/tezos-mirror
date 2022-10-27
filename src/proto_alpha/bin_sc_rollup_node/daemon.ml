@@ -109,8 +109,7 @@ module Make (PVM : Pvm.S) = struct
       | Sc_rollup_refute {rollup; _}
       | Sc_rollup_timeout {rollup; _}
       | Sc_rollup_execute_outbox_message {rollup; _}
-      | Sc_rollup_recover_bond {sc_rollup = rollup}
-      | Sc_rollup_dal_slot_subscribe {rollup; _} ->
+      | Sc_rollup_recover_bond {sc_rollup = rollup} ->
           Sc_rollup.Address.(rollup = node_ctxt.Node_context.rollup_address)
       | Dal_publish_slot_header _ -> true
       | Reveal _ | Transaction _ | Origination _ | Delegation _

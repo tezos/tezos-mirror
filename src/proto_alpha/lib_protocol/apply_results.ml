@@ -174,12 +174,6 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
-  | Sc_rollup_dal_slot_subscribe_result : {
-      consumed_gas : Gas.Arith.fp;
-      slot_index : Dal.Slot_index.t;
-      level : Raw_level.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe successful_manager_operation_result
   | Zk_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;
@@ -1010,28 +1004,6 @@ module Manager_result = struct
             (balance_updates, consumed_gas))
       ~inj:(fun (balance_updates, consumed_gas) ->
         Sc_rollup_recover_bond_result {balance_updates; consumed_gas})
-
-  let sc_rollup_dal_slot_subscribe_case =
-    make
-      ~op_case:
-        Operation.Encoding.Manager_operations.sc_rollup_dal_slot_subscribe_case
-      ~encoding:
-        (obj3
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (req "slot_index" Dal.Slot_index.encoding)
-           (req "level" Raw_level.encoding))
-      ~select:(function
-        | Successful_manager_result
-            (Sc_rollup_dal_slot_subscribe_result _ as op) ->
-            Some op
-        | _ -> None)
-      ~proj:(function
-        | Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
-          ->
-            (consumed_gas, slot_index, level))
-      ~kind:Kind.Sc_rollup_dal_slot_subscribe_manager_kind
-      ~inj:(fun (consumed_gas, slot_index, level) ->
-        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level})
 end
 
 let successful_manager_operation_result_encoding :
@@ -1221,10 +1193,6 @@ let equal_manager_kind :
       Kind.Sc_rollup_recover_bond_manager_kind ) ->
       Some Eq
   | Kind.Sc_rollup_recover_bond_manager_kind, _ -> None
-  | ( Kind.Sc_rollup_dal_slot_subscribe_manager_kind,
-      Kind.Sc_rollup_dal_slot_subscribe_manager_kind ) ->
-      Some Eq
-  | Kind.Sc_rollup_dal_slot_subscribe_manager_kind, _ -> None
   | ( Kind.Zk_rollup_origination_manager_kind,
       Kind.Zk_rollup_origination_manager_kind ) ->
       Some Eq
@@ -1880,18 +1848,6 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
-  let sc_rollup_dal_slot_subscribe_case =
-    make_manager_case
-      Operation.Encoding.sc_rollup_dal_slot_subscribe_case
-      Manager_result.sc_rollup_dal_slot_subscribe_case
-      (function
-        | Contents_and_result
-            ( (Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _}
-              as op),
-              res ) ->
-            Some (op, res)
-        | _ -> None)
-
   let zk_rollup_origination_case =
     make_manager_case
       Operation.Encoding.zk_rollup_origination_case
@@ -1972,7 +1928,6 @@ let contents_result_encoding =
          make sc_rollup_timeout_case;
          make sc_rollup_execute_outbox_message_case;
          make sc_rollup_recover_bond_case;
-         make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
          make zk_rollup_publish_case;
        ]
@@ -2039,7 +1994,6 @@ let contents_and_result_encoding =
          make sc_rollup_timeout_case;
          make sc_rollup_execute_outbox_message_case;
          make sc_rollup_recover_bond_case;
-         make sc_rollup_dal_slot_subscribe_case;
          make zk_rollup_origination_case;
          make zk_rollup_publish_case;
        ]
@@ -2866,37 +2820,6 @@ let kind_equal :
       Some Eq
   | Manager_operation {operation = Sc_rollup_execute_outbox_message _; _}, _ ->
       None
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {operation_result = Applied (Sc_rollup_dal_slot_subscribe_result _); _}
-    ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Backtracked (Sc_rollup_dal_slot_subscribe_result _, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Failed
-              (Alpha_context.Kind.Sc_rollup_dal_slot_subscribe_manager_kind, _);
-          _;
-        } ) ->
-      Some Eq
-  | ( Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _},
-      Manager_operation_result
-        {
-          operation_result =
-            Skipped Alpha_context.Kind.Sc_rollup_dal_slot_subscribe_manager_kind;
-          _;
-        } ) ->
-      Some Eq
-  | Manager_operation {operation = Sc_rollup_dal_slot_subscribe _; _}, _ -> None
   | ( Manager_operation {operation = Zk_rollup_origination _; _},
       Manager_operation_result
         {operation_result = Applied (Zk_rollup_origination_result _); _} ) ->
