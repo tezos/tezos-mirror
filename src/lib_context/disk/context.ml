@@ -783,7 +783,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     in
     {path = root; repo; patch_context; readonly}
 
-  let close index = Store.Repo.close index.repo
+  let close index =
+    let _interrupted_gc = Store.Gc.cancel index.repo in
+    Store.Repo.close index.repo
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
@@ -942,7 +944,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         (* All commit objects in the context are indexed, so it's safe to build a
            hash-only key referencing them. *)
         List.map
-          (fun h -> Hash.of_context_hash h |> Irmin_pack.Pack_key.v_indexed)
+          (fun h ->
+            Hash.of_context_hash h |> Irmin_pack_unix.Pack_key.v_indexed)
           parents
       in
       let+ c = Store.Commit.v ctxt.index.repo ~info ~parents ctxt.tree in
