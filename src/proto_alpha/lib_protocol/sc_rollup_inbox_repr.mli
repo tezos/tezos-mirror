@@ -335,10 +335,11 @@ module type Merkelized_operations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [verify_inclusion_proof proof a b] returns [true] iff [proof] is a
-      minimal and valid proof that [a] is included in [b]. *)
+  (** [verify_inclusion_proof proof snapshot] returns [a] iff [proof] is a
+      minimal and valid proof that [a] is included in [snapshot], fails
+      otherwise. [a] is part of the proof. *)
   val verify_inclusion_proof :
-    inclusion_proof -> history_proof -> history_proof -> bool
+    inclusion_proof -> history_proof -> history_proof tzresult
 
   (** An inbox proof has three parameters:
 
