@@ -31,6 +31,8 @@ type 'a t = (Node.t, 'a) RPC_core.t
 module Query_arg = struct
   let opt name f = function None -> [] | Some x -> [(name, f x)]
 
+  let opt_list name f = function None -> [] | Some l -> List.map (f name) l
+
   let opt_bool name b = opt name string_of_bool b
 
   let switch name b = if b then [(name, "")] else []
@@ -415,7 +417,7 @@ let get_chain_block_operations_validation_pass ?(chain = "main")
   make ~query_string GET path Fun.id
 
 let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
-    ?branch_delayed ?branch_refused ?refused ?outdated () =
+    ?branch_delayed ?branch_refused ?refused ?outdated ?validation_passes () =
   let query_string =
     Query_arg.opt "version" Fun.id version
     @ Query_arg.opt_bool "applied" applied
@@ -423,6 +425,10 @@ let get_chain_mempool_pending_operations ?(chain = "main") ?version ?applied
     @ Query_arg.opt_bool "outdated" outdated
     @ Query_arg.opt_bool "branch_delayed" branch_delayed
     @ Query_arg.opt_bool "branch_refused" branch_refused
+    @ Query_arg.opt_list
+        "validation_pass"
+        (fun name vp -> (name, string_of_int vp))
+        validation_passes
   in
   make
     ~query_string

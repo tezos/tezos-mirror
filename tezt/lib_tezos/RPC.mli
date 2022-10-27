@@ -442,6 +442,7 @@ val get_chain_mempool_pending_operations :
   ?branch_refused:bool ->
   ?refused:bool ->
   ?outdated:bool ->
+  ?validation_passes:int list ->
   unit ->
   JSON.t t
 
