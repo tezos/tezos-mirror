@@ -31,7 +31,7 @@ module Make (PVM : Pvm.S) : sig
   (** [start node_ctxt config] starts an RPC server listening for requests on
       the port [config.rpc_port] and address [config.rpc_addr]. *)
   val start :
-    _ Node_context.t -> Configuration.t -> RPC_server.server tzresult Lwt.t
+    Node_context.rw -> Configuration.t -> RPC_server.server tzresult Lwt.t
 
   (** Shutdown a running RPC server. When this function is called, the rollup
       node will stop listening to incoming requests. *)

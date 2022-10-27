@@ -30,7 +30,7 @@ let get_state_value_command cctxt block key =
   Sc_rollup_services.Global.Block.(make_call1 state_value) cctxt block {key} ()
 
 let get_outbox_proof cctxt serialized_output =
-  Sc_rollup_services.Global.(make_call outbox_proof)
+  Sc_rollup_services.Global.Helpers.(make_call outbox_proof)
     cctxt
     ()
     serialized_output

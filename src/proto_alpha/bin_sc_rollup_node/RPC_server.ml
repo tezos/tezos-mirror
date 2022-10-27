@@ -120,7 +120,7 @@ module type PARAM = sig
 
   type context
 
-  val context_of_prefix : Node_context.ro -> prefix -> context tzresult Lwt.t
+  val context_of_prefix : Node_context.rw -> prefix -> context tzresult Lwt.t
 end
 
 module Make_directory (S : PARAM) = struct
@@ -150,6 +150,16 @@ module Global_directory = Make_directory (struct
 
   type context = Node_context.ro
 
+  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
+end)
+
+module Proof_helpers_directory = Make_directory (struct
+  include Sc_rollup_services.Global.Helpers
+
+  (* The context needs to be accessed with write permissions because we need to
+     commit on disk to generate the proofs. *)
+  type context = Node_context.rw
+
   let context_of_prefix node_ctxt () = return node_ctxt
 end)
 
@@ -158,7 +168,7 @@ module Local_directory = Make_directory (struct
 
   type context = Node_context.ro
 
-  let context_of_prefix node_ctxt () = return node_ctxt
+  let context_of_prefix node_ctxt () = return (Node_context.readonly node_ctxt)
 end)
 
 module Block_directory = Make_directory (struct
@@ -176,7 +186,7 @@ module Block_directory = Make_directory (struct
       | `Finalized -> get_finalized node_ctxt.Node_context.store
       | `Cemented -> get_last_cemented node_ctxt.Node_context.store
     in
-    (node_ctxt, block)
+    (Node_context.readonly node_ctxt, block)
 end)
 
 module Common = struct
@@ -329,7 +339,8 @@ module Make (PVM : Pvm.S) = struct
     return outbox
 
   let () =
-    Global_directory.register0 Sc_rollup_services.Global.outbox_proof
+    Proof_helpers_directory.register0
+      Sc_rollup_services.Global.Helpers.outbox_proof
     @@ fun node_ctxt output () -> Outbox.proof_of_output node_ctxt output
 
   let register node_ctxt =
@@ -340,6 +351,7 @@ module Make (PVM : Pvm.S) = struct
         Global_directory.build_directory;
         Local_directory.build_directory;
         Block_directory.build_directory;
+        Proof_helpers_directory.build_directory;
       ]
 
   let start node_ctxt configuration =
@@ -349,7 +361,7 @@ module Make (PVM : Pvm.S) = struct
     let host = Ipaddr.V6.to_string rpc_addr in
     let node = `TCP (`Port rpc_port) in
     let acl = RPC_server.Acl.default rpc_addr in
-    let dir = register (Node_context.readonly node_ctxt) in
+    let dir = register node_ctxt in
     let server =
       RPC_server.init_server dir ~acl ~media_types:Media_type.all_media_types
     in
