@@ -28,7 +28,7 @@
     -------
     Component:  Protocol Sc_rollup_storage
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
-      -- test "^\[Unit\] Sc_rollup_storage.ml$"
+      -- test "^\[Unit\] sc rollup storage$"
     Subject:    Tests for the SCORU storage module
 *)
 
