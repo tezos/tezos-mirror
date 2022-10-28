@@ -83,6 +83,8 @@ let shard () =
       open_root / "shard" /: Cryptobox.Commitment.rpc_arg /: shard_arg)
 
 let shards () =
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4111
+     Bound size of the input *)
   Tezos_rpc.Service.post_service
     ~description:"Fetch shards as bytes"
     ~query:Tezos_rpc.Query.empty
