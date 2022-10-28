@@ -1423,6 +1423,16 @@ let spawn_hash_script ?hooks ~script client =
 let hash_script ?hooks ~script client =
   spawn_hash_script ?hooks ~script client |> Process.check_and_read_stdout
 
+let spawn_get_contract_hash ?hooks ~contract client =
+  spawn_command
+    ?hooks
+    client
+    ["get"; "contract"; "script"; "hash"; "for"; contract]
+
+let get_contract_hash ?hooks ~contract client =
+  spawn_get_contract_hash ?hooks ~contract client
+  |> Process.check_and_read_stdout
+
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
   spawn_command ?hooks client cmd
