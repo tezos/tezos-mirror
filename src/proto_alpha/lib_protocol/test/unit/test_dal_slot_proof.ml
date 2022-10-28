@@ -219,9 +219,11 @@ struct
       ~check_produce:
         (failing_check_produce_result
            ~__LOC__
-           ~dal_proof_error:
-             "Wrong page content for the given page index and slot commitment \
-              (page id=(published_level: 11, slot_index: 0, page_index: 2)).")
+           ~expected_error:
+             (Hist.Dal_proof_error
+                "Wrong page content for the given page index and slot \
+                 commitment (page id=(published_level: 11, slot_index: 0, \
+                 page_index: 2))."))
 
   (** Test where a slot is confirmed, requesting a proof for a confirmed page,
       where correct page proof is provided, but given page data is altered. *)
@@ -239,9 +241,49 @@ struct
       ~check_produce:
         (failing_check_produce_result
            ~__LOC__
-           ~dal_proof_error:
-             "Wrong page content for the given page index and slot commitment \
-              (page id=(published_level: 11, slot_index: 0, page_index: 0)).")
+           ~expected_error:
+             (Hist.Dal_proof_error
+                "Wrong page content for the given page index and slot \
+                 commitment (page id=(published_level: 11, slot_index: 0, \
+                 page_index: 0))."))
+
+  (** Same as {!confirmed_slot_on_genesis_confirmed_page_bad_data_right_length}
+    but the data is too short. *)
+  let confirmed_slot_on_genesis_confirmed_page_bad_data_short =
+    let page_size = Parameters.dal_parameters.cryptobox_parameters.page_size in
+    helper_confirmed_slot_on_genesis
+      ~level:(Raw_level_repr.succ level_ten)
+      ~mk_page_info:
+        (mk_page_info
+           ~custom_data:
+             (Some
+                (fun ~default_char page_size ->
+                  Some (Bytes.make (page_size - 1) default_char))))
+      ~check_produce:
+        (failing_check_produce_result
+           ~__LOC__
+           ~expected_error:
+             (Hist.Unexpected_page_size
+                {expected_size = page_size; page_size = page_size - 1}))
+
+  (** Same as {!confirmed_slot_on_genesis_confirmed_page_bad_data_right_length}
+    but the data is too long. *)
+  let confirmed_slot_on_genesis_confirmed_page_bad_data_long =
+    let page_size = Parameters.dal_parameters.cryptobox_parameters.page_size in
+    helper_confirmed_slot_on_genesis
+      ~level:(Raw_level_repr.succ level_ten)
+      ~mk_page_info:
+        (mk_page_info
+           ~custom_data:
+             (Some
+                (fun ~default_char page_size ->
+                  Some (Bytes.make (page_size + 1) default_char))))
+      ~check_produce:
+        (failing_check_produce_result
+           ~__LOC__
+           ~expected_error:
+             (Hist.Unexpected_page_size
+                {expected_size = page_size; page_size = page_size + 1}))
 
   (* Variants of the tests above: Construct/verify proofs that attempt to
      unconfirm pages on top of a (confirmed) slot added in genesis_history skip
@@ -356,8 +398,14 @@ struct
           "Confirmed slot on top of genesis: confirmed page with bad proof"
           confirmed_slot_on_genesis_confirmed_page_bad_page_proof;
         tztest
-          "Confirmed slot on top of genesis: confirmed page with bad data "
+          "Confirmed slot on top of genesis: confirmed page with bad data"
           confirmed_slot_on_genesis_confirmed_page_bad_data_right_length;
+        tztest
+          "Confirmed slot on top of genesis: confirmed page with too short data"
+          confirmed_slot_on_genesis_confirmed_page_bad_data_short;
+        tztest
+          "Confirmed slot on top of genesis: confirmed page with too long data"
+          confirmed_slot_on_genesis_confirmed_page_bad_data_long;
       ]
     in
     let confirmed_slot_on_genesis_unconfirmed_page_tests =

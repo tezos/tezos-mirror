@@ -312,7 +312,9 @@ module History : sig
 
   type error += Add_element_in_slots_skip_list_violates_ordering
 
-  type error += Dal_proof_error of string
+  type error +=
+    | Dal_proof_error of string
+    | Unexpected_page_size of {expected_size : int; page_size : int}
 
   module Internal_for_tests : sig
     val content : t -> Header.t

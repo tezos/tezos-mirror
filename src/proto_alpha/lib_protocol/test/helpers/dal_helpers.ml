@@ -210,9 +210,14 @@ struct
       input_opt
       ~expected:(expected_data page_info proof_status)
 
-  let failing_check_produce_result ~__LOC__ ~dal_proof_error res _page_info =
-    Assert.proto_error ~loc:__LOC__ res (function
-        | Hist.Dal_proof_error s -> String.equal s dal_proof_error
+  let failing_check_produce_result ~__LOC__ ~expected_error res _page_info =
+    Assert.proto_error ~loc:__LOC__ res (fun e ->
+        match (e, expected_error) with
+        | Hist.Dal_proof_error s, Hist.Dal_proof_error expected ->
+            String.equal s expected
+        | ( Hist.Unexpected_page_size {expected_size = e1; page_size = p1},
+            Hist.Unexpected_page_size {expected_size = e2; page_size = p2} ) ->
+            e1 = e2 && p1 = p2
         | _ -> false)
 
   let successful_check_verify_result ~__LOC__ proof_status res page_info =
@@ -232,14 +237,16 @@ struct
   let slot_confirmed_but_page_data_not_provided ~__LOC__ =
     failing_check_produce_result
       ~__LOC__
-      ~dal_proof_error:
-        "The page ID's slot is confirmed, but no page content and proof are \
-         provided."
+      ~expected_error:
+        (Hist.Dal_proof_error
+           "The page ID's slot is confirmed, but no page content and proof are \
+            provided.")
 
   let slot_not_confirmed_but_page_data_provided ~__LOC__ =
     failing_check_produce_result
       ~__LOC__
-      ~dal_proof_error:
-        "The page ID's slot is not confirmed, but page content and proof are \
-         provided."
+      ~expected_error:
+        (Hist.Dal_proof_error
+           "The page ID's slot is not confirmed, but page content and proof \
+            are provided.")
 end
