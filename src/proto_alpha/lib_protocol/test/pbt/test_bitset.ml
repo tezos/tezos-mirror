@@ -35,74 +35,53 @@ open Protocol.Bitset
 
 let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
 
-let gen_storage =
-  let open QCheck2.Gen in
-  let* int_vector = list @@ int_bound 64 in
-  match from_list int_vector with
-  | Ok v -> return v
+let value_of res =
+  match res with
+  | Ok v -> v
   | Error e ->
       Alcotest.failf
         "An unxpected error %a occurred when generating Bitset.t"
         Environment.Error_monad.pp_trace
         e
 
+let gen_storage =
+  let open QCheck2.Gen in
+  let* int_vector = list @@ int_bound 64 in
+  from_list int_vector |> value_of |> return
+
 let test_get_set (c, ofs) =
   List.for_all
     (fun ofs' ->
-      let res =
-        let open Result_syntax in
-        let* c' = add c ofs in
-        let* v = mem c ofs' in
-        let* v' = mem c' ofs' in
-        return (if ofs = ofs' then v' = true else v = v')
-      in
-      match res with
-      | Error e ->
-          Alcotest.failf
-            "Unexpected error: %a"
-            Environment.Error_monad.pp_trace
-            e
-      | Ok res -> res)
+      let open Result_syntax in
+      value_of
+      @@ let* c' = add c ofs in
+         let* v = mem c ofs' in
+         let* v' = mem c' ofs' in
+         return (if ofs = ofs' then v' = true else v = v'))
     (0 -- 63)
 
 let test_inter (c1, c2) =
   let c3 = inter c1 c2 in
   List.for_all
     (fun ofs ->
-      let res =
-        let open Result_syntax in
-        let* v1 = mem c1 ofs in
-        let* v2 = mem c2 ofs in
-        let* v3 = mem c3 ofs in
-        return ((v1 && v2) = v3)
-      in
-      match res with
-      | Error e ->
-          Alcotest.failf
-            "Unexpected error: %a"
-            Environment.Error_monad.pp_trace
-            e
-      | Ok res -> res)
+      let open Result_syntax in
+      value_of
+      @@ let* v1 = mem c1 ofs in
+         let* v2 = mem c2 ofs in
+         let* v3 = mem c3 ofs in
+         return ((v1 && v2) = v3))
     (0 -- 63)
 
 let test_diff (c1, c2) =
   let c3 = diff c1 c2 in
   List.for_all
     (fun ofs ->
-      let res =
-        let open Result_syntax in
-        let* v1 = mem c1 ofs in
-        let* v2 = mem c2 ofs in
-        let* v3 = mem c3 ofs in
-        return ((v1 && not v2) = v3)
-      in
-      match res with
-      | Error e ->
-          Alcotest.failf
-            "Unexpected error: %a"
-            Environment.Error_monad.pp_trace
-            e
-      | Ok res -> res)
+      let open Result_syntax in
+      value_of
+      @@ let* v1 = mem c1 ofs in
+         let* v2 = mem c2 ofs in
+         let* v3 = mem c3 ofs in
+         return ((v1 && not v2) = v3))
     (0 -- 63)
 
 let () =
