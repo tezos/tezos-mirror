@@ -151,6 +151,8 @@ val snapshot_format_encoding : snapshot_format Data_encoding.t
 
 type snapshot_header
 
+val snapshot_header_encoding : snapshot_header Data_encoding.t
+
 (** [version snapshot_header] returns the version of a given
     [snapshot_header] as an integer value. *)
 val version : snapshot_header -> int

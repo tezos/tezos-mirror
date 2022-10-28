@@ -590,7 +590,7 @@ let () =
 module Version = struct
   type t = int
 
-  let (version_encoding : t Data_encoding.t) =
+  let (encoding : t Data_encoding.t) =
     let open Data_encoding in
     obj1 (req "version" int31)
 
@@ -672,6 +672,10 @@ let metadata_encoding =
    version. On the contrary, metadata may evolve with snapshot
    versions. *)
 type snapshot_header = Version.t * metadata
+
+let snapshot_header_encoding =
+  let open Data_encoding in
+  obj1 (req "snapshot_header" (merge_objs Version.encoding metadata_encoding))
 
 let pp_snapshot_header ppf
     (version, {chain_name; history_mode; block_hash; level; timestamp; _}) =
@@ -1394,7 +1398,7 @@ module Raw_exporter : EXPORTER = struct
       Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
     let version_json =
-      Data_encoding.Json.construct Version.version_encoding current_version
+      Data_encoding.Json.construct Version.encoding current_version
     in
     let* () = Lwt_utils_unix.Json.write_file version_file version_json in
     return
@@ -1629,7 +1633,7 @@ module Tar_exporter : EXPORTER = struct
       Naming.snapshot_version_file snapshot_tmp_dir |> Naming.file_path
     in
     let version_json =
-      Data_encoding.Json.construct Version.version_encoding current_version
+      Data_encoding.Json.construct Version.encoding current_version
     in
     let* () = Lwt_utils_unix.Json.write_file version_file version_json in
     let*! () =
@@ -2630,9 +2634,7 @@ module Raw_loader : LOADER = struct
     let snapshot_file =
       Naming.(snapshot_version_file t.snapshot_dir |> file_path)
     in
-    let read_json json =
-      Data_encoding.Json.destruct Version.version_encoding json
-    in
+    let read_json json = Data_encoding.Json.destruct Version.encoding json in
     let* json = Lwt_utils_unix.Json.read_file snapshot_file in
     return (read_json json)
 
@@ -2686,7 +2688,7 @@ module Tar_loader : LOADER = struct
           match Data_encoding.Json.from_string str with
           | Ok json ->
               Lwt.return_some
-                (Data_encoding.Json.destruct Version.version_encoding json)
+                (Data_encoding.Json.destruct Version.encoding json)
           | Error _ -> Lwt.return_none)
       | None -> Lwt.return_none
     in
