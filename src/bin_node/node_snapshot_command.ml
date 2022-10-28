@@ -129,20 +129,37 @@ module Term = struct
         if Sys.file_exists path then return path
         else tzfail (Cannot_locate_file path)
 
-  let export args snapshot_path block export_format rolling on_disk_index
-      progress_display_mode =
+  let export data_dir config_file snapshot_path block export_format rolling
+      on_disk_index progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir = Shared_arg.read_data_dir args in
-      let* () =
-        fail_unless
-          (Sys.file_exists data_dir)
-          (Data_dir_not_found {path = data_dir})
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
       in
-      let* node_config = Shared_arg.read_and_patch_config_file args in
+      let config_file =
+        Option.value
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
       let ({genesis; chain_name; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
+      in
+      let*! data_dir =
+        (* The --data-dir argument overrides the potentially given
+           configuration file. *)
+        match data_dir with
+        | Some data_dir ->
+            let*! () =
+              if not (String.equal data_dir node_config.data_dir) then
+                Event.(emit overriding_config_file_arg) data_dir
+              else Lwt.return_unit
+            in
+            Lwt.return data_dir
+        | None -> Lwt.return node_config.data_dir
       in
       let* () = Data_version.ensure_data_dir data_dir in
       let context_dir = Data_version.context_dir data_dir in
@@ -171,31 +188,37 @@ module Term = struct
     in
     Shared_arg.process_command run
 
-  let import args snapshot_path block disable_check reconstruct in_memory_index
-      sandbox_file progress_display_mode =
+  let import data_dir config_file operation_metadata_size_limit snapshot_path
+      block disable_check reconstruct in_memory_index sandbox_file
+      progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* config_file = Shared_arg.read_config_file args in
-      let* data_dir =
+      let actual_data_dir =
+        Option.value ~default:Config_file.default_data_dir data_dir
+      in
+      let config_file =
+        Option.value
+          ~default:
+            Filename.Infix.(
+              actual_data_dir // Data_version.default_config_file_name)
+          config_file
+      in
+      let* node_config = Config_file.read config_file in
+      let*! data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)
-        match args.Shared_arg.data_dir with
+        match data_dir with
         | Some data_dir ->
             let*! () =
-              if
-                not
-                  (String.equal
-                     config_file.data_dir
-                     Config_file.default_data_dir)
-              then Event.(emit overriding_config_file_arg) data_dir
+              if not (String.equal data_dir node_config.data_dir) then
+                Event.(emit overriding_config_file_arg) data_dir
               else Lwt.return_unit
             in
-            return data_dir
-        | None -> return config_file.data_dir
+            Lwt.return data_dir
+        | None -> Lwt.return node_config.data_dir
       in
       let*! existing_data_dir = Lwt_unix.file_exists data_dir in
-      let* node_config = Shared_arg.read_and_patch_config_file args in
       let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
@@ -279,6 +302,13 @@ module Term = struct
               genesis)
       in
       if reconstruct then
+        let operation_metadata_size_limit =
+          Option.value
+            ~default:
+              node_config.shell.block_validator_limits
+                .operation_metadata_size_limit
+            operation_metadata_size_limit
+        in
         Reconstruction.reconstruct
           ~patch_context
           ~store_dir:store_root
@@ -288,9 +318,7 @@ module Term = struct
             node_config.blockchain_network.user_activated_upgrades
           ~user_activated_protocol_overrides:
             node_config.blockchain_network.user_activated_protocol_overrides
-          ~operation_metadata_size_limit:
-            node_config.shell.block_validator_limits
-              .operation_metadata_size_limit
+          ~operation_metadata_size_limit
           ~progress_display_mode
       else return_unit
     in
@@ -443,14 +471,16 @@ module Term = struct
            "export")
         Term.(
           ret
-            (const export $ Shared_arg.Term.args $ file_arg $ block
-           $ export_format $ export_rolling $ on_disk_index
-           $ progress_display_mode));
+            (const export $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file $ file_arg $ block $ export_format
+           $ export_rolling $ on_disk_index $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"allows to import a snapshot from a given file" "import")
         Term.(
           ret
-            (const import $ Shared_arg.Term.args $ file_arg $ block
+            (const import $ Shared_arg.Term.data_dir
+           $ Shared_arg.Term.config_file
+           $ Shared_arg.Term.operation_metadata_size_limit $ file_arg $ block
            $ disable_check $ reconstruct $ in_memory_index $ sandbox
            $ progress_display_mode));
       Cmd.v
