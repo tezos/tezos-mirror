@@ -84,13 +84,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"4"
+"5"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"4"
+"5"
 
 ./octez-client --wait none send sc rollup message '["2 8 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -133,13 +133,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"7"
+"8"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"7"
+"8"
 
 ./octez-client --wait none send sc rollup message '["3 10 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -183,13 +183,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"10"
+"11"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"10"
+"11"
 
 ./octez-client --wait none send sc rollup message '["4 12 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -233,13 +233,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"13"
+"14"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"13"
+"14"
 
 ./octez-client --wait none send sc rollup message '["5 14 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -283,13 +283,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"16"
+"17"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"16"
+"17"
 
 ./octez-client --wait none send sc rollup message '["6 16 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -333,13 +333,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"19"
+"20"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"19"
+"20"
 
 ./octez-client --wait none send sc rollup message '["7 18 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -384,13 +384,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"22"
+"23"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"22"
+"23"
 
 ./octez-client --wait none send sc rollup message '["8 20 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -436,13 +436,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"25"
+"26"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"25"
+"26"
 
 ./octez-client --wait none send sc rollup message '["9 22 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -488,13 +488,13 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"28"
+"29"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/state_hash
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"28"
+"29"
 
 ./octez-client --wait none send sc rollup message '["10 24 + value"]' from bootstrap2
 Node is bootstrapped.
@@ -540,4 +540,4 @@ This sequence of operations was run:
 "[SC_ROLLUP_PVM_STATE_HASH]"
 
 ./octez-sc-rollup-client-alpha rpc get /global/block/head/total_ticks
-"31"
+"32"

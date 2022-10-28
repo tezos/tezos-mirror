@@ -33,7 +33,7 @@ let eval_has_finished = function
   | Eval {config = {step_kont = Wasm.Eval.(SK_Result _); _}; _} -> true
   | Padding -> true
   (* explicit pattern matching to avoid new states introducing silent bugs *)
-  | Decode _ | Link _ | Init _ | Eval _ | Snapshot | Stuck _ -> false
+  | Start | Decode _ | Link _ | Init _ | Eval _ | Snapshot | Stuck _ -> false
 
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
   let open Z in
@@ -107,7 +107,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       let* has_reboot_flag = has_reboot_flag durable in
       if has_reboot_flag then
         let* durable = Durable.(delete durable Constants.reboot_flag_key) in
-        return ~durable (initial_boot_state ())
+        return ~durable Start
       else
         return
           ~status:Failing
@@ -125,6 +125,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
   | _ when is_time_for_snapshot pvm_state ->
       (* Execution took too many ticks *)
       return ~status:Failing (Stuck Too_many_ticks)
+  | Start -> return (initial_boot_state ())
   | Decode {module_kont = MKStop ast_module; _} ->
       return
         (Link
@@ -254,7 +255,8 @@ let next_tick_state pvm_state =
           | Link _ -> Link_error error.Wasm_pvm_errors.raw_exception
           | Init _ -> Init_error error
           | Eval _ -> Eval_error error
-          | Stuck _ | Snapshot | Padding -> Unknown_error error.raw_exception)
+          | Start | Stuck _ | Snapshot | Padding ->
+              Unknown_error error.raw_exception)
       | `Unknown raw_exception -> Unknown_error raw_exception
     in
     Lwt.return (pvm_state.durable, Stuck wasm_error, Failing)
@@ -379,7 +381,11 @@ let set_input_step input_info message pvm_state =
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
            The goal is to read a complete inbox. *)
         (* Go back to decoding *)
-        initial_boot_state ()
+        Start
+    | Start ->
+        Lwt.return
+          (Stuck
+             (Wasm_pvm_errors.invalid_state "No input required during start"))
     | Decode _ ->
         Lwt.return
           (Stuck
@@ -413,6 +419,9 @@ let reveal_step payload pvm_state =
   | Eval {config; module_reg} ->
       let* config = Eval.reveal_step module_reg payload config in
       return (Eval {config; module_reg})
+  | Start ->
+      return
+        (Stuck (Wasm_pvm_errors.invalid_state "No reveal expected during start"))
   | Decode _ ->
       return
         (Stuck
