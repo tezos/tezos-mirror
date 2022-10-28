@@ -1633,7 +1633,9 @@ function chart_endorsement_inclusion_based_on_threshold_time(data) {
     }
 
 }
-
+function chart_progress_status(msg_){
+    
+}
 function chart_endorsement_inclusion_based_on_multiple_threshold_time(data) {
     if (!(isEmpty(data))) {
         var margin = ({ top: 40, right: 180, bottom: 30, left: 40 }),

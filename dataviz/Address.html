@@ -34,7 +34,26 @@
             
 
         </div>
+        
     </form>
+    <div id="statut">
+        <strong>
+            <label for="progress">Status:</label>
+            <span id="progress"> </span>
+        </strong>
+    </div>
+    <style type="text/css">
+        #statut {
+            position: absolute;
+            top: 10;
+            right: 10;
+            border-radius: 20px;
+            border: 2px solid #73AD21;
+            padding: 5px;  
+
+        }
+        
+    </style>
     <script>
         var dict_data = {};
         function main() {
@@ -57,28 +76,37 @@
                     document.getElementById("selectedLevel_end").value = last_block;             
 
                     address =params.address;
-                    document.getElementById("adress_").value = address;             
+                    document.getElementById("adress_").value = address;    
 
+                    document.getElementById("progress").textContent = "Extracting data";
                     let dict_data = populate_v1(server_adress, first_block, last_block).then(dict_data => {
+                        document.getElementById("progress").textContent = "Computing data";
                         let t_valide=delegate_delays_distribution_of_operations(dict_data, address,true);
                         console.log(t_valide);
                         let ope_observation = classify_operations(dict_data, address,true);
                         console.log("ope_observation",ope_observation);
                         let result = get_info_block(dict_data,true);
                         let t_baker=result[1]
+                        document.getElementById("progress").textContent = "Preparing visualization";
                         chart_consensus_operation_specific_address(t_valide);
                         chart_time_mean_deviation(t_valide);
                         resume_obs(ope_observation,t_baker, address);
+                        document.getElementById("progress").textContent = "Finished";
                     });
 
                 }else if(params.address){
                     console.log("ah",console.log(params.address))
                     address =params.address;
+                    document.getElementById("progress").textContent = "Extracting data";
+
                     var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
+                    
                     var b= a.then(level=>{
                         return populate_v1(server_adress, level-50, level);
                     });
                     Promise.all([a,b]).then(([block_value,dict_data])=>{
+                        document.getElementById("progress").textContent = "Computing data";
+
                         document.getElementById("selectedLevel_begin").value = block_value-50;             
                         document.getElementById("selectedLevel_end").value = block_value;             
                         
@@ -88,19 +116,26 @@
                         console.log("ope_observation",ope_observation);
                         let result = get_info_block(dict_data,true);
                         let t_baker=result[1]
+                        document.getElementById("progress").textContent = "Preparing visualization";
                         chart_consensus_operation_specific_address(t_valide);
                         chart_time_mean_deviation(t_valide);
                         resume_obs(ope_observation,t_baker, address);
+                        document.getElementById("progress").textContent = "Finished";
+
                     });
 
                 }
                 else{
                     address =document.getElementById("adress_").value;
+                    document.getElementById("progress").textContent = "Extracting data";
+
                     var a = getHead(server_adress); // https://stackoverflow.com/questions/28250680/how-do-i-access-previous-promise-results-in-a-then-chain
                     var b= a.then(level=>{
                         return populate_v1(server_adress, level-50, level);
                     });
                     Promise.all([a,b]).then(([block_value,dict_data])=>{
+                        document.getElementById("progress").textContent = "Computing data";
+
                         document.getElementById("selectedLevel_begin").value = block_value-50;             
                         document.getElementById("selectedLevel_end").value = block_value;             
                         
@@ -110,18 +145,22 @@
                         console.log("ope_observation",ope_observation);
                         let result = get_info_block(dict_data,true);
                         let t_baker=result[1]
+                        document.getElementById("progress").textContent = "Preparing visualization";
                         chart_consensus_operation_specific_address(t_valide);
                         chart_time_mean_deviation(t_valide);
                         resume_obs(ope_observation,t_baker, address);
+                        document.getElementById("progress").textContent = "Finished";
+
                     });
                     
                 }
                 $('#submit_').mouseup(async function (e) {
                     console.log(document.getElementById('adress_').value)
+                    let location_web = String(window.location.href).split('?')[0]
                     if((!(isNaN(document.getElementById('selectedLevel_begin').value)))&&(!(isNaN(document.getElementById('selectedLevel_end').value)))&&(""!=document.getElementById('adress_').value)){
-                        window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value+"&first_block="+document.getElementById('selectedLevel_begin').value +"&last_block="+document.getElementById('selectedLevel_end').value;
+                        window.location = location_web+"?address="+document.getElementById('adress_').value+"&first_block="+document.getElementById('selectedLevel_begin').value +"&last_block="+document.getElementById('selectedLevel_end').value;
                     }else if(""!=(document.getElementById('adress_').value)){
-                        window.location = server_adress+"visualization/Address.html?address="+document.getElementById('adress_').value;
+                        window.location = location_web+"?address="+document.getElementById('adress_').value;
 
                     }
                 });

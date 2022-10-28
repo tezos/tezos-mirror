@@ -85,7 +85,8 @@
                 }
                 $('#submit_').mouseup(async function (e) {
                     if ((!(isNaN(document.getElementById('selectedLevel_begin').value))) && (!(isNaN(document.getElementById('selectedLevel_end').value))) && (!(isNaN(document.getElementById('selectedThreshold').value)))) {
-                        window.location = server_adress + "visualization/Delay_to_consensus.html?threshold=" + document.getElementById('selectedThreshold').value + "&threshold_high=" + "&first_bloc=" + document.getElementById('selectedLevel_begin').value + "&last_bloc=" + document.getElementById('selectedLevel_end').value;
+                        let location_web = String(window.location.href).split('?')[0];
+                        window.location = location_web + "?threshold=" + document.getElementById('selectedThreshold').value + "&threshold_high=" + "&first_bloc=" + document.getElementById('selectedLevel_begin').value + "&last_bloc=" + document.getElementById('selectedLevel_end').value;
                     }
                 });
 

@@ -87,7 +87,8 @@
                 }
 
                 $('#go').click(function (e) {
-                    window.location = server_adress + "visualization/Level.html?block=" + document.getElementById('selectedLevel').value;
+                    let location_web = String(window.location.href).split('?')[0];
+                    window.location = location_web + "?block=" + document.getElementById('selectedLevel').value;
                 })
 
                 $('#plus').click(function (e) {

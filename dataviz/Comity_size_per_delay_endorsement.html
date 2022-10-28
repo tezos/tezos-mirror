@@ -102,7 +102,9 @@
                 }
                 $('#submit_').mouseup(async function (e) {
                     if ((!(isNaN(document.getElementById('selectedLevel_begin').value))) && (!(isNaN(document.getElementById('selectedLevel_end').value))) && (!(isNaN(document.getElementById('selectedThreshold_beg').value))) && (!(isNaN(document.getElementById('selectedThreshold_end').value)))) {
-                        window.location = server_adress + "visualization/Comity_size_per_delay.html?threshold_low=" + document.getElementById('selectedThreshold_beg').value + "&threshold_high=" + document.getElementById('selectedThreshold_end').value + "&first_block=" + document.getElementById('selectedLevel_begin').value + "&last_block=" + document.getElementById('selectedLevel_end').value;
+                        //window.location = server_adress + "visualization/Comity_size_per_delay.html?threshold_low=" + document.getElementById('selectedThreshold_beg').value + "&threshold_high=" + document.getElementById('selectedThreshold_end').value + "&first_block=" + document.getElementById('selectedLevel_begin').value + "&last_block=" + document.getElementById('selectedLevel_end').value;
+                        let location_web = String(window.location.href).split('?')[0]
+                        window.location = location_web +"?threshold_low=" + document.getElementById('selectedThreshold_beg').value + "&threshold_high=" + document.getElementById('selectedThreshold_end').value + "&first_block=" + document.getElementById('selectedLevel_begin').value + "&last_block=" + document.getElementById('selectedLevel_end').value;
                     }
                 });
             } catch (e) {
