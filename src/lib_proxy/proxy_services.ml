@@ -62,12 +62,6 @@ end
 
 module Hashtbl = Stdlib.Hashtbl
 
-let raw_hash_of_block (block : Tezos_shell_services.Block_services.block) :
-    Block_hash.t option =
-  match block with
-  | `Hash (h, 0) -> Some h
-  | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) -> None
-
 module BlockToHashClient : BLOCK_TO_HASH = struct
   let table = Hashtbl.create 17
 
@@ -77,46 +71,41 @@ module BlockToHashClient : BLOCK_TO_HASH = struct
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
     let open Lwt_result_syntax in
-    match raw_hash_of_block block with
-    | Some h ->
-        (* Block is defined by its hash *)
-        return_some h
-    | None -> (
-        match Hashtbl.find_opt table (chain, block) with
-        | Some hash ->
-            (* Result is in cache *)
-            return_some hash
-        | None ->
-            if Hashtbl.length table = 0 then
-              (* The table is empty. We do not need to retrieve the hash
-                 before retrieving the initial context, because we have
-                 no reference hash yet. I mean that, if block is <head>,
-                 we are about to retrieve the node's head, no matter its value.
-                 Any value is fine and its hash is going to be put right away in
-                 the cache (see the call to [B2H.add]).
-                 This avoids one RPC call, but it is
-                 important because it is the first one: often there is
-                 a single call. Skipping it reduces the node's load.
+    match Hashtbl.find_opt table (chain, block) with
+    | Some hash ->
+        (* Result is in cache *)
+        return_some hash
+    | None ->
+        if Hashtbl.length table = 0 then
+          (* The table is empty. We do not need to retrieve the hash
+             before retrieving the initial context, because we have
+             no reference hash yet. I mean that, if block is <head>,
+             we are about to retrieve the node's head, no matter its value.
+             Any value is fine and its hash is going to be put right away in
+             the cache (see the call to [B2H.add]).
+             This avoids one RPC call, but it is
+             important because it is the first one: often there is
+             a single call. Skipping it reduces the node's load.
 
-                 In the heavyduty.py scenario (see the proxy's original MR:
-                 !1943), it reduces the number of calls to RPC .../hash
-                 from 1200 to 700.
-              *)
-              return_none
-            else
-              (* Table is not empty, We need to be consistent with the previous call
-                 and we dont have the data available:
-                 need to do an RPC call to get the hash *)
-              let* hash =
-                Tezos_shell_services.Block_services.Empty.hash
-                  rpc_context
-                  ~chain
-                  ~block
-                  ()
-              in
-              (* Fill cache with result *)
-              Hashtbl.add table (chain, block) hash ;
-              return_some hash)
+             In the heavyduty.py scenario (see the proxy's original MR:
+             !1943), it reduces the number of calls to RPC .../hash
+             from 1200 to 700.
+          *)
+          return_none
+        else
+          (* Table is not empty, We need to be consistent with the previous call
+             and we dont have the data available:
+             need to do an RPC call to get the hash *)
+          let* hash =
+            Tezos_shell_services.Block_services.Empty.hash
+              rpc_context
+              ~chain
+              ~block
+              ()
+          in
+          (* Fill cache with result *)
+          Hashtbl.add table (chain, block) hash ;
+          return_some hash
 end
 
 type mode =
@@ -182,14 +171,17 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
     (proxy_env : Registration.proxy_environment) (mode : mode) envs_cache key
     chain block =
   let open Lwt_syntax in
-  match (mode, raw_hash_of_block block) with
-  | Light_client _, _ | Proxy_client, _ | _, Some _ ->
-      (* - If octez-client executes: don't clear anything, because the client
-           is short-lived and should not observe chain reorganization
-         - If raw_hash_of_blocks returns [Some]: don't clear anything, because
-           block is identified by its hash, hence it doesn't deprecate.
-           Remember that contexts are kept in an LRU cache though, so clearing
-           will eventually happen; but we don't schedule it. *)
+  match (mode, block) with
+  | Light_client _, _ | Proxy_client, _ ->
+      (* If octez-client executes: don't clear anything, because the
+         client is short-lived and should not observe chain
+         reorganization *)
+      Lwt.return_unit
+  | _, `Hash (_, n) when n >= 0 ->
+      (* If block is identified by a hash in its future, don't clear
+         anything as it doesn't deprecate.  Remember that contexts are
+         kept in an LRU cache though, so clearing will eventually
+         happen; but we don't schedule it. *)
       Lwt.return_unit
   | Proxy_server {sleep; sym_block_caching_time; _}, _ ->
       let chain_string, block_string =
