@@ -30,68 +30,13 @@
    Subject:      Check that run view command to octez-client behaves correctly
 *)
 
-let viewable_script =
-  {|
-{ parameter nat;
-  storage nat;
-  code { CAR; NIL operation ; PAIR };
-  view "add_v" nat nat { UNPAIR; ADD };
-  view "mul_v" nat nat { UNPAIR; MUL };
-  view "value" unit nat { CDR };
-  view
-    "loop" int unit
-    {CAR; DUP; EQ;
-     IF{DROP; UNIT}
-       {SELF_ADDRESS; SWAP; PUSH int -1; ADD; VIEW "loop" unit; ASSERT_SOME}};
-  view "my_external_view"
-       int
-       int
-       { LAMBDA int int { DUP ; MUL } ;
-         SWAP ;
-         UNPAIR ;
-         DUP 3 ;
-         SWAP ;
-         EXEC ;
-         SWAP ;
-         DIG 2 ;
-         SWAP ;
-         INT ;
-         EXEC ;
-         ADD ;
-         PUSH int 1000000 ;
-         NEG ;
-         ADD } ;
-  view "v_external"
-       address
-       int
-       { UNPAIR ;
-         PUSH int 33 ;
-         VIEW "my_external_view" int ;
-         IF_NONE
-           { DROP ; PUSH string "Call to 'my_external_view' returned None" ; FAILWITH }
-           { ADD } } ;
-  view "v_entrypoint"
-       int
-       int
-       { LAMBDA int int { DUP ; MUL } ;
-         SWAP ;
-         UNPAIR ;
-         DUP 3 ;
-         SWAP ;
-         EXEC ;
-         SWAP ;
-         DIG 2 ;
-         SWAP ;
-         INT ;
-         EXEC ;
-         ADD } ;
-}
-|}
+let viewable_script = ["mini_scenarios"; "viewable"]
 
 (* Initializes the client and a viewable contract with a storage of 10 *)
 let init_with_contract ?(alias = "viewable_script") ?(prg = viewable_script)
     ~protocol () =
   let* client = Client.init_mockup ~protocol () in
+  let prg = Michelson_script.(find prg protocol |> path) in
   let* contract =
     Client.originate_contract
       ~alias
@@ -161,18 +106,16 @@ let check_storage_is contract client expected =
      contract that implements the desired interface. It could be 'SELF' or
      another deployed contract, as tested below. *)
 let test_run_external_nested_view ~protocol () =
-  let* client, contract =
-    init_with_contract ~prg:viewable_script ~alias:"contract1" ~protocol ()
-  in
-  let* contract' =
-    Client.originate_contract
-      ~alias:"contract2"
+  let* client, contract = init_with_contract ~alias:"contract1" ~protocol () in
+  let* _alias, contract' =
+    Client.originate_contract_at
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:viewable_script
       ~init:"10"
       ~burn_cap:(Tez.of_int 1)
       client
+      viewable_script
+      protocol
   in
   let view = "v_external" in
   let expected = "-998801" in

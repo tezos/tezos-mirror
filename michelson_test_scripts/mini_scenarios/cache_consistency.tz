@@ -1,0 +1,19 @@
+# In the left case, the stored big_map is reinitialized. In the right,
+# it is kept unchanged. Used by tezt/tests/cache_cache.ml to test that
+# annotations are preserved in the same way by the cache and the
+# storage.
+parameter (or (unit %renew) (unit %keep));
+storage (big_map (nat :a) string);
+code {
+       UNPAIR;
+       IF_LEFT
+         {
+           DROP 2;
+           EMPTY_BIG_MAP nat string;
+         }
+         {
+           DROP;
+         };
+       NIL operation;
+       PAIR
+     }

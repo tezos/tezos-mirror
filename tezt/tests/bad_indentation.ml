@@ -32,13 +32,6 @@
             badly-indented scripts
 *)
 
-let badly_indented_script =
-  {|
-parameter string;
-  storage string;
- code {CAR; NIL operation; PAIR}
-|}
-
 let script_hash = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
 
 let tags = ["client"; "michelson"; "typechecking"]
@@ -50,9 +43,10 @@ let test_bad_indentation_ill_typed =
     ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let process =
-    Client.spawn_typecheck_script ~script:badly_indented_script client
+  let script =
+    Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
   in
+  let process = Client.spawn_typecheck_script ~script client in
   Process.check_error ~exit_code:1 ~msg:(rex "syntax error in program") process
 
 let test_bad_indentation_hash =
@@ -62,7 +56,10 @@ let test_bad_indentation_hash =
     ~tags
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* received = Client.hash_script ~script:badly_indented_script client in
+  let script =
+    Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
+  in
+  let* received = Client.hash_script ~script client in
   let returned_hash = String.trim received in
   Check.(
     (returned_hash = script_hash)
@@ -80,7 +77,8 @@ let test_formatted_typechecks =
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =
     Client.convert_script
-      ~script:badly_indented_script
+      ~script:
+        Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
       ~src_format:`Michelson
       ~dst_format:`Michelson
       client
@@ -97,7 +95,8 @@ let test_formatted_hash =
   let* client = Client.init_mockup ~protocol () in
   let* formatted_script =
     Client.convert_script
-      ~script:badly_indented_script
+      ~script:
+        Michelson_script.(find ["ill_typed"; "badly_indented"] protocol |> path)
       ~src_format:`Michelson
       ~dst_format:`Michelson
       client

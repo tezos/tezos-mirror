@@ -1,0 +1,28 @@
+/* This script calls views on register_callers contract and verifies whether
+   its responses are consistent, i.e. if the view calls_count returned 0, then
+   last caller is None, otherwise – it's Some address. */
+parameter address ;
+storage (option address) ;
+code {
+       CAR ;
+       DUP ;
+       UNIT ;
+       VIEW "calls_count" nat ;
+       IF_NONE { UNIT ; FAILWITH } {} ;
+       DIP {
+              UNIT ;
+              VIEW "last_caller" (option address) ;
+           } ;
+       PUSH nat 0 ;
+       /* Check if the caller address is consistent with given calls count. */
+       IFCMPEQ {
+                 IF_NONE { UNIT ; FAILWITH } { IF_NONE {} { UNIT ; FAILWITH }} ;
+                 NONE address ;
+               }
+               {
+                 IF_NONE { UNIT ; FAILWITH } { IF_NONE { UNIT ; FAILWITH } {}} ;
+                 SOME ;
+               } ;
+       NIL operation ;
+       PAIR ;
+     }

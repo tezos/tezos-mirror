@@ -849,17 +849,17 @@ module Deserialisation = struct
     String.make (size_kB * 2000) '0'
 
   (* Originate a contract that takes a byte sequence as argument and does nothing *)
-  let originate_noop_contract nc =
-    let* contract =
-      Client.originate_contract
+  let originate_noop_contract protocol nc =
+    let* _alias, contract =
+      Client.originate_contract_at
         ~wait:"none"
         ~init:"Unit"
-        ~alias:"deserialization_gas"
         ~amount:Tez.zero
         ~burn_cap:Tez.one
         ~src:Constant.bootstrap1.alias
-        ~prg:"parameter bytes; storage unit; code {CDR; NIL operation; PAIR}"
         nc.client
+        ["mini_scenarios"; "noop_bytes"]
+        protocol
     in
     let* () = Helpers.bake_and_wait_block nc in
     return contract
@@ -893,7 +893,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"; "canary"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in
@@ -922,7 +922,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas =
       Constant.manager_operation_gas_cost + deserialization_gas ~size_kB
@@ -947,7 +947,7 @@ module Deserialisation = struct
       ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
-    let* contract = originate_noop_contract nodes.main in
+    let* contract = originate_noop_contract protocol nodes.main in
     let size_kB = 20 in
     let min_deserialization_gas = deserialization_gas ~size_kB in
     let gas_for_the_rest = gas_to_execute_rest_noop protocol in

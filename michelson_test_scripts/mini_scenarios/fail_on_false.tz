@@ -1,0 +1,4 @@
+# Calling this contract succeeds if the parameter is True and fails if it is False.
+parameter bool;
+storage unit;
+code { UNPAIR; IF { NIL operation; PAIR } { DROP; PUSH string "bang"; FAILWITH } }
