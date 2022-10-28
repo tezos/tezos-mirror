@@ -285,18 +285,22 @@ let wrong_proto protocol client =
         Test.fail
           "No other protocol than %s is available."
           (Protocol.name protocol)
-    | Some other_proto -> other_proto
+    | Some other_proto -> Protocol.hash other_proto
   in
   let* stderr =
-    Client.spawn_bake_for ~protocol:other_proto client
-    |> Process.check_and_read_stderr ~expect_failure:true
+    Client.spawn_rpc
+      ~protocol_hash:other_proto
+      Client.GET
+      ["chains"; "main"; "chain_id"]
+      client
+    |> Process.check_and_read_stderr ~expect_failure:false
   in
   let regexp =
     Re.Str.regexp
     @@ Format.sprintf
          ".*Protocol passed to the proxy (%s) and protocol of the node (%s) \
           differ."
-         (Protocol.hash other_proto)
+         other_proto
          (Protocol.hash protocol)
   in
   if matches regexp stderr then return ()
