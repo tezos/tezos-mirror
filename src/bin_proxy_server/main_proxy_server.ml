@@ -184,13 +184,6 @@ let main_promise (config_file : string option)
   let http_ctxt =
     new RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
   in
-  let* proxy_env =
-    Tezos_proxy.Registration.get_registered_proxy
-      printer
-      http_ctxt
-      `Mode_proxy
-      None
-  in
   (* This should probably be extracted into Lwt_result or similar. *)
   let lift_lwt (a : 'a Lwt.t) : 'a tzresult Lwt.t =
     let*! r = a in
@@ -242,7 +235,7 @@ let main_promise (config_file : string option)
       http_ctxt
       (Tezos_proxy.Proxy_services.Proxy_server
          {sleep; sym_block_caching_time; on_disk_proxy_builder})
-      proxy_env
+      None
   in
   let server_args : Proxy_server_main_run.args =
     {

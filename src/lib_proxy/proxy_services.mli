@@ -68,5 +68,5 @@ val build_directory :
   Tezos_client_base.Client_context.printer ->
   RPC_context.generic ->
   mode ->
-  Registration.proxy_environment ->
+  Protocol_hash.t option ->
   unit RPC_directory.t

@@ -33,5 +33,5 @@ class http_local_ctxt :
   Tezos_client_base.Client_context.printer
   -> RPC_context.generic
   -> Tezos_proxy.Proxy_services.mode
-  -> Tezos_proxy.Registration.proxy_environment
+  -> Protocol_hash.t option
   -> RPC_context.generic

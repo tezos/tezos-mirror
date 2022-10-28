@@ -52,11 +52,11 @@ let method_is_writer = function
   | `GET -> false
 
 class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
-  (http_ctxt : RPC_context.generic) (mode : Proxy_services.mode)
-  (proxy_env : Registration.proxy_environment) : RPC_context.generic =
+  (http_ctxt : RPC_context.generic) (mode : Proxy_services.mode) protocol :
+  RPC_context.generic =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
-      (Proxy_services.build_directory printer http_ctxt mode proxy_env)
+      (Proxy_services.build_directory printer http_ctxt mode protocol)
   in
   let dispatch_local_or_distant ~debug_name ~local ~distant meth path =
     let open Lwt_syntax in

@@ -223,58 +223,22 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
       Lwt.dont_wait schedule (fun exc -> ignore exc) ;
       Lwt.return_unit
 
-(** [protocols hash] returns the implementation of the RPC
-    [/chains/<chain_id>/blocks/<block_id>/protocols] of the proxy server.
-
-    It is conservative: it always return the protocol that was
-    returned by the node for its [head] block when [tezos-proxy-server]
-    started. While it look like we could do something smarter in
-    [build_directory] (such as inspecting the header of the block being queried),
-    it is impossible to have a different implementation than this one.
-    That's because the proxy server will anyway only succeed on blocks that are
-    in the protocol returned initially by the node, as the
-    proxy server's implementation is protocol-dependent (see [proxy_env]
-    in [build_directory]).
-
-    That is why users of proxy servers need to be aware that proxy servers are
-    imprecise near the time of a protocol change and that proxy servers
-    should be eventually discarded and restarted. *)
-let protocols protocol_hash =
-  let open Tezos_shell_services in
-  let path =
-    let open Tezos_rpc.RPC_path in
-    prefix Block_services.chain_path Block_services.path
-  in
-  let service =
-    Tezos_rpc.RPC_service.prefix path Block_services.Empty.S.protocols
-  in
-  Directory.register Directory.empty service (fun _prefix () () ->
-      Lwt.return
-        (`Ok
-          {
-            Block_services.current_protocol = protocol_hash;
-            next_protocol = protocol_hash;
-          }))
-
 let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.generic) (mode : mode)
-    (proxy_env : Registration.proxy_environment) : unit RPC_directory.t =
-  let (module Proxy_environment) = proxy_env in
+    (rpc_context : RPC_context.generic) (mode : mode) force_protocol :
+    unit RPC_directory.t =
   let b2h : (module BLOCK_TO_HASH) =
     match mode with
     | Proxy_server _ -> (module BlockToHashServer)
     | Light_client _ | Proxy_client -> (module BlockToHashClient)
   in
   let module B2H = (val b2h : BLOCK_TO_HASH) in
-  let make chain block =
+  let make proxy_env chain block =
     match mode with
     | Light_client sources ->
         Proxy_getter.Of_rpc
           (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
             let open Lwt_syntax in
-            let (module C) =
-              Light_core.get_core (module Proxy_environment) printer sources
-            in
+            let (module C) = Light_core.get_core proxy_env printer sources in
             let chain_string, block_string =
               Tezos_shell_services.Block_services.
                 (chain_to_string chain, to_string block)
@@ -315,10 +279,20 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     in
     let key = (chain, block_key) in
     let compute_value (chain, block_key) =
+      let* proxy_env =
+        Registration.get_registered_proxy
+          printer
+          rpc_context
+          (match mode with Light_client _ -> `Mode_light | _ -> `Mode_proxy)
+          ~chain
+          ~block
+          force_protocol
+      in
+      let (module Proxy_environment) = proxy_env in
       let ctx : Proxy_getter.rpc_context_args =
         {
           printer = Some printer;
-          proxy_builder = make chain block_key;
+          proxy_builder = make (module Proxy_environment) chain block_key;
           rpc_context;
           mode = to_client_server_mode mode;
           chain;
@@ -338,7 +312,24 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           chain
           block
       in
-      return initial_context
+      let mapped_directory =
+        RPC_directory.map
+          (fun (_chain, _block) -> Lwt.return initial_context)
+          Proxy_environment.directory
+      in
+      return
+        (RPC_directory.register
+           mapped_directory
+           Tezos_shell_services.Block_services.Empty.S.protocols
+           (fun _ctxt () () ->
+             return
+               Tezos_shell_services.Block_services.
+                 {
+                   current_protocol =
+                     (* wrong if the block is a transition block! *)
+                     Proxy_environment.protocol_hash;
+                   next_protocol = Proxy_environment.protocol_hash;
+                 }))
     in
     Env_cache_lwt.find_or_replace envs_cache key compute_value
   in
@@ -379,26 +370,20 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     | Ok res -> Lwt.return res
   in
   let proto_directory =
-    let ( // ) = RPC_directory.prefix in
     (* register protocol-specific RPCs *)
-    Tezos_shell_services.Chain_services.path
-    // (Tezos_shell_services.Block_services.path
-       // (* The Tezos_protocol_environment.rpc_context values returned
-             by init_env_rpc_context contain proxy_getter's RPC
-             cache. We wanna keep it in between RPC calls, hence
-             the use of get_env_rpc_context' to cache init_env_rpc_context
-             values. *)
-       RPC_directory.map
-         (fun ((_, chain), block) -> get_env_rpc_context' chain block)
-         Proxy_environment.directory)
-  in
-  let whole_directory =
-    Directory.merge
-      (match mode with
-      | Proxy_server _ -> protocols Proxy_environment.protocol_hash
-      | Light_client _ | Proxy_client -> Directory.empty)
-      proto_directory
+    RPC_directory.register_dynamic_directory
+      RPC_directory.empty
+      (Tezos_rpc.RPC_path.prefix
+         Tezos_shell_services.Chain_services.path
+         Tezos_shell_services.Block_services.path)
+      (fun ((_, chain), block) ->
+        (* The Tezos_protocol_environment.rpc_context values returned
+           by init_env_rpc_context contain proxy_getter's RPC
+           cache. We wanna keep it in between RPC calls, hence
+           the use of get_env_rpc_context' to cache init_env_rpc_context
+           values. *)
+        get_env_rpc_context' chain block)
   in
   RPC_directory.register_describe_directory_service
-    whole_directory
+    proto_directory
     RPC_service.description_service
