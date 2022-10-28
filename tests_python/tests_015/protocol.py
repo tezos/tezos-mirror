@@ -7,6 +7,7 @@ from tools import constants, utils
 HASH = constants.LIMA
 DAEMON = constants.LIMA_DAEMON
 PARAMETERS = constants.LIMA_PARAMETERS
+NUMBER = constants.LIMA_NUMBER
 
 TENDERBAKE_PARAMETERS = deepcopy(PARAMETERS)
 TENDERBAKE_PARAMETERS['consensus_threshold'] = 45

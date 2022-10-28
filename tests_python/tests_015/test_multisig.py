@@ -7,13 +7,12 @@
 # interact with the multisig contract when invoking it by its address
 # or by its alias.
 
-import os
 import re
 from typing import List
 import pytest
 from tools import utils, constants
 from client.client import Client
-from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, ATTIC_CONTRACT_PATH
+from .contract_paths import find_script
 
 
 def get_keys(client):
@@ -33,9 +32,7 @@ def keys(client):
 
 
 def msig_path(msig_version: str) -> str:
-    return os.path.join(
-        MINI_SCENARIOS_CONTRACT_PATH, f'{msig_version}_multisig.tz'
-    )
+    return find_script(['mini_scenarios', f'{msig_version}_multisig'])
 
 
 MSIG_PARAMS = [
@@ -599,7 +596,7 @@ class TestUnsupportedMultisig:
     """Verify that non-multisig contracts are rejected"""
 
     def test_deploy_nonmultisig(self, client: Client):
-        contract = os.path.join(ATTIC_CONTRACT_PATH, 'id.tz')
+        contract = find_script(['attic', 'id'])
         client.originate(
             'id',
             0,
