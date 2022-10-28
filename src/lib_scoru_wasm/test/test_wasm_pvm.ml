@@ -1325,6 +1325,102 @@ let test_kernel_reboot_failing () =
      then fail after 10. *)
   test_kernel_reboot_gen ~reboots:15l ~expected_reboots:10l ~pvm_max_reboots:10l
 
+(* Set a certain number `n` of dummy inputs and check the scheduling is
+   consistent:
+   - `Collect` as initial state
+   - `Collect` after Start_of_level
+   - `Collect` after `n` internal messages
+   - `Eval` after End_of_level
+*)
+let test_set_inputs number_of_inputs level tree =
+  let open Lwt_syntax in
+  let next_message_counter = new_message_counter () in
+
+  (* [set_input_and_check] takes a function that from a counter returns a tree,
+     and the expected kind of scheduling status after `set_input`. *)
+  let set_input_and_check set_input =
+    let counter = next_message_counter () in
+    let+ tree = set_input counter in
+    tree
+  in
+
+  (* First set `Start_of_level` and check the result will be `Collect`: still
+     waiting for inputs. *)
+  let* tree_with_sol =
+    set_input_and_check (fun _ -> set_sol_input level tree)
+  in
+
+  (* Then, adds `number_of_inputs` messages to the PVM, and check the scheduling
+     status after each message. *)
+  let inputs =
+    List.init ~when_negative_length:[] number_of_inputs string_of_int
+    |> Stdlib.Result.get_ok
+  in
+  let* tree_with_inputs =
+    List.fold_left_s
+      (fun tree input ->
+        set_input_and_check (fun counter ->
+            set_internal_message level counter input tree))
+      tree_with_sol
+      inputs
+  in
+
+  (* Finally, set `End_of_level`. The state should be padding. *)
+  let* tree =
+    set_input_and_check (fun counter ->
+        set_eol_input level counter tree_with_inputs)
+  in
+
+  let+ state = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (state = Padding) ;
+  tree
+
+let test_scheduling_multiple_inboxes input_numbers =
+  let open Lwt_result_syntax in
+  let module_ =
+    {|
+      (module
+        (memory 0)
+        (export "mem" (memory 0))
+        (func (export "kernel_next")
+          (nop)
+        )
+      )
+    |}
+  in
+  let*! initial_tree = initial_tree ~from_binary:false module_ in
+  let*! initial_tree = eval_until_input_requested initial_tree in
+  let+ (_ : Wasm.tree) =
+    List.fold_left_i_es
+      (fun level tree input_number ->
+        let*! tree = test_set_inputs input_number (Int32.of_int level) tree in
+        let*! info_during_inputs = Wasm.get_info tree in
+        (* Right after `set_input`, no new input is required and the current
+           phase is Collect. *)
+        assert (info_during_inputs.input_request = No_input_required) ;
+
+        let*! tree = eval_to_snapshot tree in
+        let*! info_end_of_inputs = Wasm.get_info tree in
+        (* We evaluate until a snapshot, we now go into the `Eval` phase. *)
+        assert (info_end_of_inputs.input_request = No_input_required) ;
+
+        (* We finally evaluate an `Eval` phase that doesn't ask for reboot: it
+           should now wait for inputs and be in `Collect` phase. *)
+        let*! tree = eval_to_snapshot tree (* Snapshot *) in
+        let*! tree = Wasm.compute_step tree (* Collect *) in
+        let*! info_after_eval = Wasm.get_info tree in
+        assert (info_after_eval.input_request = Input_required) ;
+        return tree)
+      initial_tree
+      input_numbers
+  in
+  ()
+
+let test_scheduling_one_inbox () = test_scheduling_multiple_inboxes [10]
+
+let test_scheduling_five_inboxes () =
+  test_scheduling_multiple_inboxes [10; 5; 15; 8; 2]
+
 let tests =
   [
     tztest
@@ -1400,4 +1496,12 @@ let tests =
          ~binary:false
          ~error:`Init
          "(module (memory 1))");
+    tztest
+      "Test scheduling with 10 inputs in a unique inbox"
+      `Quick
+      test_scheduling_one_inbox;
+    tztest
+      "Test scheduling with 5 inboxes with a different input number"
+      `Quick
+      test_scheduling_five_inboxes;
   ]
