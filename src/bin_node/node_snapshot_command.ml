@@ -324,16 +324,24 @@ module Term = struct
     in
     Shared_arg.process_command run
 
-  let get_info snapshot_path =
+  let get_info snapshot_path format_json =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let* snapshot_path = check_snapshot_path snapshot_path in
       let* snapshot_header = Snapshots.read_snapshot_header ~snapshot_path in
-      Format.printf
-        "@[<v 2>Snapshot information:@ %a@]@."
-        Snapshots.pp_snapshot_header
-        snapshot_header ;
+      if format_json then
+        let json =
+          Data_encoding.Json.construct
+            Snapshots.snapshot_header_encoding
+            snapshot_header
+        in
+        Format.printf "@[<v 2>%a@]@." Data_encoding.Json.pp json
+      else
+        Format.printf
+          "@[<v 2>Snapshot information:@ %a@]@."
+          Snapshots.pp_snapshot_header
+          snapshot_header ;
       return_unit
     in
     Shared_arg.process_command run
@@ -446,11 +454,10 @@ module Term = struct
   let progress_display_mode =
     let open Cmdliner in
     let doc =
-      Format.sprintf
-        "Determine whether the progress animation will be displayed to the \
-         logs. 'auto' will display progress animation only to a TTY. 'always' \
-         will display progress animation to any file descriptor. 'never' will \
-         not display progress animation."
+      "Determine whether the progress animation will be displayed to the logs. \
+       'auto' will display progress animation only to a TTY. 'always' will \
+       display progress animation to any file descriptor. 'never' will not \
+       display progress animation."
     in
     Arg.(
       value
@@ -460,6 +467,11 @@ module Term = struct
           ~doc
           ~docv:"<auto|always|never>"
           ["progress-display-mode"])
+
+  let format_json =
+    let open Cmdliner in
+    let doc = "Displays the snapshot's information in JSON format." in
+    Arg.(value & flag & info ~doc ["json"])
 
   let cmds =
     let open Cmdliner in
@@ -485,7 +497,7 @@ module Term = struct
            $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"displays information about the snapshot file" "info")
-        Term.(ret (const get_info $ file_arg));
+        Term.(ret (const get_info $ file_arg $ format_json));
     ]
 end
 
