@@ -32,3 +32,5 @@ val durable_buffers_encoding :
 
 module Make (T : Tezos_tree_encoding.TREE) :
   Wasm_pvm_sig.S with type tree = T.tree
+
+module Make_pvm (Wasm_vm : Wasm_vm_sig.S) : module type of Make
