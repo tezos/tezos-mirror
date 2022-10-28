@@ -49,6 +49,15 @@ val add : t -> int -> t tzresult
     [positions]. *)
 val from_list : int list -> t tzresult
 
+(** [fill ~length] is equivalent to setting all bits for positions in
+    [0, length - 1] to [one]. i.e., to [from_list (0 -- size -1)] or to
+    [(2 ^ length) - 1]. But it's more efficient than folding on individual
+    positions to set them.
+
+    The function returns [Invalid_position length] if [length] is negative.
+*)
+val fill : length:int -> t tzresult
+
 (** [inter set_l set_r] returns [set] which is result of the
     intersection of [set_l] and [set_r]. *)
 val inter : t -> t -> t
@@ -60,3 +69,7 @@ val diff : t -> t -> t
 (** [occupied_size_in_bits bitset] returns the current number of bits
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
+
+module Internal_for_tests : sig
+  val to_z : t -> Z.t
+end

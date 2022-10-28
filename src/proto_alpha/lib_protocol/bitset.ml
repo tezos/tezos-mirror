@@ -41,6 +41,10 @@ let add field pos =
 
 let from_list positions = List.fold_left_e add empty positions
 
+let fill ~length =
+  error_when Compare.Int.(length < 0) (Invalid_position length) >>? fun () ->
+  ok Z.(pred (shift_left one length))
+
 let inter = Z.logand
 
 let diff b1 b2 = Z.logand b1 (Z.lognot b2)
@@ -57,3 +61,7 @@ let () =
     (fun i -> Invalid_position i)
 
 let occupied_size_in_bits = Z.numbits
+
+module Internal_for_tests = struct
+  let to_z z = z
+end
