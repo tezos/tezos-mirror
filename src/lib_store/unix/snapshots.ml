@@ -671,29 +671,26 @@ let metadata_encoding =
    encoding of the version aims to be fixed between snapshots
    version. On the contrary, metadata may evolve with snapshot
    versions. *)
-type header = Version.t * metadata
+type snapshot_header = Version.t * metadata
 
-type snapshot_header = Current_header of header
+let pp_snapshot_header ppf
+    (version, {chain_name; history_mode; block_hash; level; timestamp; _}) =
+  Format.fprintf
+    ppf
+    "chain %a, block hash %a at level %ld, timestamp %a in %a (snapshot \
+     version %d)"
+    Distributed_db_version.Name.pp
+    chain_name
+    Tezos_crypto.Block_hash.pp
+    block_hash
+    level
+    Time.Protocol.pp_hum
+    timestamp
+    History_mode.pp_short
+    history_mode
+    version
 
-let pp_snapshot_header ppf = function
-  | Current_header
-      (version, {chain_name; history_mode; block_hash; level; timestamp; _}) ->
-      Format.fprintf
-        ppf
-        "chain %a, block hash %a at level %ld, timestamp %a in %a (snapshot \
-         version %d)"
-        Distributed_db_version.Name.pp
-        chain_name
-        Tezos_crypto.Block_hash.pp
-        block_hash
-        level
-        Time.Protocol.pp_hum
-        timestamp
-        History_mode.pp_short
-        history_mode
-        version
-
-let version = function Current_header (version, _) -> version
+let version (version, _) = version
 
 type snapshot_format = Tar | Raw
 
@@ -2616,7 +2613,7 @@ module type LOADER = sig
 
   val load : string -> t Lwt.t
 
-  val load_snapshot_header : t -> header tzresult Lwt.t
+  val load_snapshot_header : t -> snapshot_header tzresult Lwt.t
 
   val close : t -> unit Lwt.t
 end
@@ -2730,7 +2727,8 @@ end
 module type Snapshot_loader = sig
   type t
 
-  val load_snapshot_header : snapshot_path:string -> header tzresult Lwt.t
+  val load_snapshot_header :
+    snapshot_path:string -> snapshot_header tzresult Lwt.t
 end
 
 module Make_snapshot_loader (Loader : LOADER) : Snapshot_loader = struct
@@ -2760,7 +2758,7 @@ module type IMPORTER = sig
     Tezos_crypto.Chain_id.t ->
     t Lwt.t
 
-  val load_snapshot_header : t -> header tzresult Lwt.t
+  val load_snapshot_header : t -> snapshot_header tzresult Lwt.t
 
   val load_block_data : t -> block_data tzresult Lwt.t
 
@@ -3349,7 +3347,7 @@ end
 module type Snapshot_importer = sig
   type t
 
-  val read_snapshot_header : t -> header tzresult Lwt.t
+  val read_snapshot_header : t -> snapshot_header tzresult Lwt.t
 
   val import :
     snapshot_path:string ->
@@ -3688,10 +3686,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       else Lwt.return_unit
     in
     let*! () =
-      import_log_notice
-        ~snapshot_header:(Current_header snapshot_header)
-        snapshot_path
-        user_expected_block
+      import_log_notice ~snapshot_header snapshot_path user_expected_block
     in
     let* legacy = Version.is_legacy snapshot_version in
     let indexing_strategy = if legacy then `Always else `Minimal in
@@ -3884,7 +3879,7 @@ let read_snapshot_header ~snapshot_path =
     | Raw -> (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
   in
   let* version, metadata = Loader.load_snapshot_header ~snapshot_path in
-  return (Current_header (version, metadata))
+  return (version, metadata)
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
