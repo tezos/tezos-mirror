@@ -378,11 +378,7 @@ let check_dal_raw_context node =
     unit
 
 let test_slot_management_logic =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"dal basic logic"
-    ~tags:["dal"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  Protocol.register_test ~__FILE__ ~title:"dal basic logic" ~tags:["dal"]
   @@ fun protocol ->
   setup ~dal_enable:true ~protocol
   @@ fun parameters cryptobox node client _bootstrap ->
@@ -505,7 +501,6 @@ let test_dal_node_slot_management =
     ~__FILE__
     ~title:"dal node slot management"
     ~tags:["dal"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let* _node, _client, dal_node = init_dal_node protocol in
   let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
@@ -535,7 +530,6 @@ let test_dal_node_slots_headers_tracking =
     ~__FILE__
     ~title:"dal node slot headers tracking"
     ~tags:["dal"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let* node, client, dal_node = init_dal_node protocol in
   let publish = publish_and_store_slot node client dal_node in
@@ -569,7 +563,6 @@ let test_dal_node_rebuild_from_shards =
     ~__FILE__
     ~title:"dal node shard fetching and slot reconstruction"
     ~tags:["dal"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let open Tezos_crypto_dal in
   let* node, client, dal_node = init_dal_node protocol in
@@ -621,7 +614,6 @@ let test_dal_node_test_slots_propagation =
     ~__FILE__
     ~title:"dal node slots propagation"
     ~tags:["dal"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let* node, _client, dal_node1 = init_dal_node protocol in
   let dal_node2 = Dal_node.create ~node () in
@@ -650,7 +642,6 @@ let test_dal_node_startup =
     ~__FILE__
     ~title:"dal node startup"
     ~tags:["dal"; "dal_node"]
-    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let run_dal = Dal_node.run ~wait_ready:false in
   let nodes_args = Node.[Synchronisation_threshold 0] in
@@ -675,7 +666,7 @@ let test_dal_node_startup =
   Node.Config_file.update
     node
     (Node.Config_file.set_sandbox_network_with_user_activated_overrides
-       [(Protocol.hash previous_protocol, Protocol.hash Alpha)]) ;
+       [(Protocol.hash previous_protocol, Protocol.hash protocol)]) ;
   let* () = Node.run node nodes_args in
   let* () = Node.wait_for_ready node in
   let* () = run_dal dal_node in
