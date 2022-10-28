@@ -24,6 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the implementation of the legacy mempool,
+   which is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
+
+   When you modify this file, consider whether you should also change
+   the files that implement the more recent mempool for Lima and newer
+   protocols. *)
+
 module Prevalidation := Legacy_prevalidation
 
 (** The priority of a pending operation.

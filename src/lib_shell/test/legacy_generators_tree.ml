@@ -23,6 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
+
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
+
+   When you modify this file, consider whether you should also change
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
+
 (** Generators building on top of {!Generators}, that are capable of
     producing trees of blocks. *)
 
