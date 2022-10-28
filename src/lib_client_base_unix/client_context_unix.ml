@@ -114,10 +114,15 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
                let*! () = Lwt_utils_unix.create_dir base_dir in
                let filename = self#filename alias_name in
                let json = Data_encoding.Json.construct encoding list in
-               let filename_tmp = filename ^ "_tmp" in
-               let* () = Lwt_utils_unix.Json.write_file filename_tmp json in
-               let*! () = Lwt_unix.rename filename_tmp filename in
-               return_unit)
+               let content = Data_encoding.Json.to_string ~minify:false json in
+               let*! res =
+                 Lwt_utils_unix.with_atomic_open_out ~overwrite:true filename
+                 @@ fun chan -> Lwt_utils_unix.write_string chan content
+               in
+               match res with
+               | Ok x -> return x
+               | Error {unix_code; caller; arg; _} ->
+                   tzfail (Exn (Unix.Unix_error (unix_code, caller, arg))))
 
     method last_modification_time : string -> float option tzresult Lwt.t =
       let open Lwt_result_syntax in
