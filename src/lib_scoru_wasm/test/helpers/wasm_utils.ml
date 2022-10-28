@@ -28,6 +28,7 @@ open Tezos_scoru_wasm
 open Test_encodings_util
 open Tezos_lazy_containers
 module Wasm = Wasm_pvm.Make (Tree)
+module Wasm_fast = Tezos_scoru_wasm_fast.Pvm.Make (Tree)
 
 let parse_module code =
   let def = Parse.string_to_module code in
@@ -65,13 +66,21 @@ let eval_until_stuck ?(max_steps = 20000L) tree =
   in
   go max_steps tree
 
-let rec eval_until_input_requested ?(max_steps = Int64.max_int) tree =
+let rec eval_until_input_requested ?after_fast_exec ?(fast_exec = false)
+    ?(max_steps = Int64.max_int) tree =
   let open Lwt_syntax in
+  let run =
+    if fast_exec then
+      Wasm_fast.Internal_for_tests.compute_step_many_with_hooks ?after_fast_exec
+    else Wasm.compute_step_many
+  in
   let* info = Wasm.get_info tree in
   match info.input_request with
   | No_input_required ->
-      let* tree, _ = Wasm.compute_step_many ~max_steps tree in
-      eval_until_input_requested tree
+      let* tree, _ = run ~max_steps tree in
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/4175
+         We don't pass [~max_steps] here because some tests are buggy. *)
+      eval_until_input_requested ?after_fast_exec ~fast_exec tree
   | Input_required | Reveal_required _ -> return tree
 
 let rec eval_until_init tree =

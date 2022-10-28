@@ -39,3 +39,16 @@ cp target/wasm32-unknown-unknown/release/test_kernel.wasm unreachable.wasm
 # Strips binary down to 9.7K
 wasm-strip unreachable.wasm
 ```
+
+## [computation.wasm](./computation.wasm)
+
+The computation kernel is a simple program that does in-memory addition and
+optionally dumps inputs it gets to the output buffer.
+
+It can be reproduced in the kernel repository like so:
+
+```
+git checkout tx-kernel-vRAM
+./scripts/build-unit-kernel.sh "test-kernel,wee_alloc"
+mv test-kernel,wee_alloc.wasm computation.wasm
+```
