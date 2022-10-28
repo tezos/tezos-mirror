@@ -1710,7 +1710,10 @@ module Arith_pvm = Sc_rollup_helpers.Arith_pvm
 let dumb_proof ~choice =
   let open Lwt_result_syntax in
   let context_arith_pvm = Tezos_context_memory.make_empty_context () in
-  let*! arith_state = Arith_pvm.initial_state context_arith_pvm in
+  let empty =
+    Sc_rollup_helpers.In_memory_context.Tree.empty context_arith_pvm
+  in
+  let*! arith_state = Arith_pvm.initial_state ~empty in
   let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
   let input = Sc_rollup_helpers.make_external_input "c4c4" in
   let* proof =
@@ -1875,7 +1878,8 @@ let test_dissection_during_final_move () =
 let init_arith_state ~boot_sector =
   let open Lwt_syntax in
   let context = Tezos_context_memory.make_empty_context () in
-  let* state = Arith_pvm.initial_state context in
+  let empty = Sc_rollup_helpers.In_memory_context.Tree.empty context in
+  let* state = Arith_pvm.initial_state ~empty in
   let* state = Arith_pvm.install_boot_sector state boot_sector in
   return (context, state)
 

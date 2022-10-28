@@ -789,17 +789,16 @@ module Store_inbox = Sc_rollup_helpers.Store_inbox
 module Arith_test_pvm = struct
   include ArithPVM
 
-  let init_context () = Tezos_context_memory.make_empty_context ()
-
-  let initial_state ctxt =
+  let initial_state () =
     let open Lwt_syntax in
-    let* state = initial_state ctxt in
+    let empty = Tezos_context_memory.make_empty_tree () in
+    let* state = initial_state ~empty in
     let* state = install_boot_sector state "" in
     return state
 
   let initial_hash =
     let open Lwt_syntax in
-    let* state = initial_state (init_context ()) in
+    let* state = initial_state () in
     state_hash state
 
   let consume_fuel = Option.map pred
@@ -869,9 +868,9 @@ module Arith_test_pvm = struct
       (state, fuel, tick, [])
       messages
 
-  let eval_levels_and_messages ~metadata ?fuel ctxt levels_and_messages =
+  let eval_levels_and_messages ~metadata ?fuel levels_and_messages =
     let open Lwt_result_syntax in
-    let*! state = initial_state ctxt in
+    let*! state = initial_state () in
     let*! state_hash = state_hash state in
     let tick = 0 in
     let our_states = [(tick, state_hash)] in
@@ -1050,7 +1049,7 @@ module Player_client = struct
   (** Generate [our_states] for [levels_and_messages] based on the strategy.
       It needs [start_level] and [max_level] in case it will need to generate
       new inputs. *)
-  let gen_our_states ~metadata ctxt strategy ~start_level ~max_level
+  let gen_our_states ~metadata strategy ~start_level ~max_level
       levels_and_messages =
     let open QCheck2.Gen in
     let eval_messages
@@ -1059,10 +1058,7 @@ module Player_client = struct
       @@
       let open Lwt_result_syntax in
       let*! r =
-        Arith_test_pvm.eval_levels_and_messages
-          ~metadata
-          ctxt
-          levels_and_messages
+        Arith_test_pvm.eval_levels_and_messages ~metadata levels_and_messages
       in
       Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
@@ -1168,7 +1164,6 @@ module Player_client = struct
     let* tick, our_states, levels_and_messages =
       gen_our_states
         ~metadata
-        ctxt
         player.strategy
         ~start_level
         ~max_level
@@ -1241,12 +1236,13 @@ let build_proof ~player_client start_tick (game : Game.t) =
     Arith_test_pvm.eval_levels_and_messages
       ~metadata
       ~fuel
-      (Arith_test_pvm.init_context ())
       player_client.levels_and_messages
   in
   let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
   let module P = struct
     include Arith_test_pvm
+
+    let initial_state ~empty:_ = initial_state ()
 
     let context = inbox_context
 
