@@ -1591,7 +1591,7 @@ let _octez_p2p_tests =
               ];
         ])
 
-let _octez_wasmer =
+let octez_wasmer =
   public_lib
     "tezos-wasmer"
     ~path:"src/lib_wasmer"
@@ -1627,6 +1627,21 @@ let octez_scoru_wasm =
         octez_context_sigs;
         octez_lwt_result_stdlib;
         data_encoding;
+      ]
+
+let octez_scoru_wasm_fast =
+  public_lib
+    "tezos-scoru-wasm-fast"
+    ~path:"src/lib_scoru_wasm/fast"
+    ~synopsis:"WASM functionality for SCORU Fast Execution"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_webassembly_interpreter;
+        lazy_containers;
+        octez_scoru_wasm;
+        octez_wasmer;
       ]
 
 let octez_context_encoding =
@@ -3235,6 +3250,7 @@ let octez_scoru_wasm_tests_helpers =
         octez_base_test_helpers |> open_;
         octez_test_helpers;
         octez_scoru_wasm;
+        octez_scoru_wasm_fast;
         qcheck_alcotest;
         alcotest_lwt;
         tezt_lib;
@@ -4792,7 +4808,7 @@ module Protocol = Protocol
             ringo;
             ringo_lwt;
             injector |> if_some |> open_;
-            octez_scoru_wasm;
+            octez_scoru_wasm_fast;
             octez_crypto_dal |> if_ N.(number >= 016) |> open_;
           ]
     in

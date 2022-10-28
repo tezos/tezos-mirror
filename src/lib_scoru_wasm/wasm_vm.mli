@@ -45,4 +45,24 @@ val compute_step_many_until :
   pvm_state ->
   (pvm_state * int64) Lwt.t
 
+(** [eval_has_finished tick_state] returns [true] if the evaluation phase has
+    finished successfully. *)
 val eval_has_finished : tick_state -> bool
+
+(** [should_compute pvm_state] probes whether it is possible to continue with
+    more computational steps. *)
+val should_compute : pvm_state -> bool Lwt.t
+
+(** [has_reboot_flag durable] checks if the reboot flag is set in the durable storage. *)
+val has_reboot_flag : Durable.t -> bool Lwt.t
+
+(** [mark_for_reboot reboot_counter durable] figures out the computational
+    status with respect to what the PVM shall do next. E.g. schedule a reboot. *)
+val mark_for_reboot : Z.t -> Durable.t -> computation_status Lwt.t
+
+(** [next_reboot_counter pvm_state status] computes the next reboot counter. *)
+val next_reboot_counter : pvm_state -> computation_status -> Z.t
+
+(** [save_fallback_kernel durable] stores the current kernel as a fallback
+    kernel. *)
+val save_fallback_kernel : Durable.t -> Durable.t Lwt.t

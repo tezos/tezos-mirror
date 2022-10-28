@@ -26,6 +26,16 @@
 open Wasm_pvm_state
 open Internal_state
 
+module type Internal_for_tests = sig
+  type state
+
+  val compute_step_many_with_hooks :
+    ?after_fast_exec:(unit -> unit) ->
+    max_steps:int64 ->
+    state ->
+    (state * int64) Lwt.t
+end
+
 module type Generic = sig
   type state
 
@@ -61,6 +71,8 @@ module type Generic = sig
   (** [get_info pvm_state] provides a typed view of the current machine state.
       Should not raise. *)
   val get_info : state -> info Lwt.t
+
+  module Internal_for_tests : Internal_for_tests with type state := state
 end
 
 module type S = sig

@@ -34,7 +34,7 @@ depends: [
   "ringo" { >= "0.9" }
   "ringo-lwt" { >= "0.9" }
   "tezos-injector-alpha"
-  "tezos-scoru-wasm"
+  "tezos-scoru-wasm-fast"
   "tezos-crypto-dal"
 ]
 build: [

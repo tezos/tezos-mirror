@@ -9,23 +9,16 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "3.0" }
-  "ppx_import"
-  "ppx_deriving"
   "tezos-base"
   "tezos-tree-encoding"
-  "tezos-context"
-  "tezos-base-test-helpers"
-  "tezos-test-helpers"
+  "tezos-webassembly-interpreter"
+  "tezos-lazy-containers"
   "tezos-scoru-wasm"
-  "tezos-scoru-wasm-fast"
-  "qcheck-alcotest" { >= "0.18" }
-  "alcotest-lwt" { >= "1.5.0" }
-  "tezt"
-  "tezos-webassembly-interpreter-extra"
+  "tezos-wasmer"
 ]
 build: [
   ["rm" "-r" "vendors"]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "helpers for testing for the scoru-wasm functionality"
+synopsis: "WASM functionality for SCORU Fast Execution"
