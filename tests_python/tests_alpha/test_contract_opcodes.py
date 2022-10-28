@@ -1,5 +1,3 @@
-from os import path
-
 import pytest
 
 from tools.client_regression import ClientRegression
@@ -9,7 +7,7 @@ from tools.utils import (
     assert_run_script_failwith,
     assert_run_script_success,
 )
-from .contract_paths import MINI_SCENARIOS_CONTRACT_PATH, OPCODES_CONTRACT_PATH
+from .contract_paths import find_script
 
 
 PUBLIC_KEY = IDENTITIES['bootstrap1']['public']
@@ -24,8 +22,7 @@ class TestContractOpcodes:
     @pytest.mark.parametrize("balance", [0, 0.000001, 0.5, 1, 5, 1000, 8e12])
     def test_balance(self, client_regtest: ClientRegression, balance: float):
         client = client_regtest
-        contract = 'balance.tz'
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', 'balance'])
         run_script_res = client.run_script(
             contract, '0', 'Unit', balance=balance, trace_stack=True
         )
@@ -37,10 +34,10 @@ class TestContractOpcodes:
         test_contract_onchain_opcodes.py for a complementary test of the NOW
         instruction."""
         client = client_regtest
-        contract = 'store_now.tz'
+        contract = 'store_now'
         initial_storage = '"2017-07-13T09:19:01Z"'
         now = '2021-10-13T10:16:52Z'
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', contract])
         run_script_res = client.run_script(
             contract,
             storage=initial_storage,
@@ -56,10 +53,10 @@ class TestContractOpcodes:
         test_contract_onchain_opcodes.py for a complementary test of the LEVEL
         instuction."""
         client = client_regtest
-        contract = 'level.tz'
+        contract = 'level'
         initial_storage = '9999999'
         level = 10
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', contract])
         run_script_res = client.run_script(
             contract,
             storage=initial_storage,
@@ -263,7 +260,7 @@ class TestContractOpcodes:
         big_map_diff: str,
     ):
         client = client_regtest
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', contract.removesuffix('.tz')])
         run_script_res = client.run_script(
             contract, param, storage, trace_stack=True
         )
@@ -353,7 +350,7 @@ class TestContractOpcodes:
         big_map_diff: str,
     ):
         client = client_regtest
-        contract = path.join(MINI_SCENARIOS_CONTRACT_PATH, 'big_map_magic.tz')
+        contract = find_script(['mini_scenarios', 'big_map_magic'])
         run_script_res = client.run_script(
             contract, storage, param, trace_stack=True
         )
@@ -365,7 +362,7 @@ class TestContractOpcodes:
         client = client_regtest
         assert_run_script_success(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'packunpack.tz'),
+            find_script(['opcodes', 'packunpack']),
             'Unit',
             '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) '
             + '0x05070707070100000004746f746f020000000800030'
@@ -373,7 +370,7 @@ class TestContractOpcodes:
         )
         assert_run_script_failwith(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'packunpack.tz'),
+            find_script(['opcodes', 'packunpack']),
             'Unit',
             '(Pair (Pair (Pair "toto" {3;7;9;1}) {1;2;3}) '
             + '0x05070707070100000004746f746f020000000800030'
@@ -388,13 +385,13 @@ class TestContractOpcodes:
         )
         assert_run_script_success(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'check_signature.tz'),
+            find_script(['opcodes', 'check_signature']),
             f'(Pair "{sig}" "hello")',
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"',
         )
         assert_run_script_failwith(
             client,
-            path.join(OPCODES_CONTRACT_PATH, 'check_signature.tz'),
+            find_script(['opcodes', 'check_signature']),
             f'(Pair "{sig}" "abcd")',
             '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"',
         )
@@ -407,9 +404,7 @@ class TestContractOpcodes:
             '(Pair 22220000000 (Pair "2017-12-13T04:49:00Z" 034))',
             '(pair mutez (pair timestamp int))',
         ).blake2b
-        hash_contract = path.join(
-            OPCODES_CONTRACT_PATH, 'hash_consistency_checker.tz'
-        )
+        hash_contract = find_script(['opcodes', 'hash_consistency_checker'])
         run_script_res = client.run_script(
             hash_contract,
             '0x00',
@@ -445,7 +440,7 @@ class TestContractOpcodes:
         storage: str,
     ):
         client = client_regtest_scrubbed
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', contract.removesuffix('.tz')])
 
         with assert_run_failure(r'unexpected arithmetic overflow'):
             client.run_script(contract, param, storage, trace_stack=True)
@@ -459,7 +454,7 @@ class TestContractOpcodes:
 
         with assert_run_failure(r'The two annotations do not match'):
             client.run_script(
-                path.join(OPCODES_CONTRACT_PATH, 'set_car.tz'),
+                find_script(['opcodes', 'set_car']),
                 '(Pair %wrong %field "hello" 0)',
                 '""',
                 trace_stack=True,
@@ -493,7 +488,7 @@ class TestContractOpcodes:
         expected: str,
     ):
         client = client_regtest
-        contract = path.join(OPCODES_CONTRACT_PATH, contract)
+        contract = find_script(['opcodes', contract.removesuffix('.tz')])
         run_script_res = client.run_script(
             contract, storage, param, trace_stack=True
         )

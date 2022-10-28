@@ -7,6 +7,7 @@ from tools import constants, utils
 HASH = constants.ALPHA
 DAEMON = constants.ALPHA_DAEMON
 PARAMETERS = constants.ALPHA_PARAMETERS
+NUMBER = constants.ALPHA_NUMBER
 
 TENDERBAKE_PARAMETERS = deepcopy(PARAMETERS)
 TENDERBAKE_PARAMETERS['consensus_threshold'] = 45
