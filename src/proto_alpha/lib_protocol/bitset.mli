@@ -69,3 +69,7 @@ val diff : t -> t -> t
 (** [occupied_size_in_bits bitset] returns the current number of bits
    occupied by the [bitset]. *)
 val occupied_size_in_bits : t -> int
+
+module Internal_for_tests : sig
+  val to_z : t -> Z.t
+end

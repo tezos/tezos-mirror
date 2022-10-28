@@ -84,6 +84,16 @@ let test_diff (c1, c2) =
          return ((v1 && not v2) = v3))
     (0 -- 63)
 
+let test_fill =
+  let two = Z.of_int 2 in
+  fun length ->
+    let f1 = fill ~length |> value_of |> Internal_for_tests.to_z in
+    let f2 =
+      from_list (0 -- (length - 1)) |> value_of |> Internal_for_tests.to_z
+    in
+    let f3 = Z.(pow two length |> pred) in
+    Z.equal f1 f2 && Z.equal f2 f3
+
 let () =
   Alcotest.run
     "bits"
@@ -106,5 +116,10 @@ let () =
               ~name:"diff"
               QCheck2.Gen.(pair gen_storage gen_storage)
               test_diff;
+            QCheck2.Test.make
+              ~count:10000
+              ~name:"fill"
+              QCheck2.Gen.(small_nat)
+              test_fill;
           ] );
     ]
