@@ -45,6 +45,16 @@ val ticket_diffs :
   lazy_storage_diff:Lazy_storage.diffs_item list ->
   (Z.t Ticket_token_map.t * Ticket_receipt.t * context) tzresult Lwt.t
 
+(** [ticket_balances_of_value ctxt ~include_lazy has_tickets value]
+    scans all tickets in the given [value] using the type-witness [has_tickets]
+    and returns a map from ticket-tokens to the amount. *)
+val ticket_balances_of_value :
+  context ->
+  include_lazy:bool ->
+  'a Ticket_scanner.has_tickets ->
+  'a ->
+  (Z.t Ticket_token_map.t * context) tzresult Lwt.t
+
 (** [update_ticket_balances ctxt ~self_contract ~ticket_diffs operations] updates the
     ticket balances according to the [ticket_diffs] map and the set of
     operations. The function also returns the storage size diff resulting from
