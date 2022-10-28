@@ -34,14 +34,6 @@ module type Proxy_sig = sig
   (** RPCs provided by the protocol *)
   val directory : Tezos_protocol_environment.rpc_context RPC_directory.t
 
-  (** The protocol's /chains/<chain>/blocks/<block_id>/hash RPC *)
-  val hash :
-    #RPC_context.simple ->
-    ?chain:Block_services.chain ->
-    ?block:Block_services.block ->
-    unit ->
-    Block_hash.t tzresult Lwt.t
-
   (** How to build the context to execute RPCs on. Arguments are:
 
       - A printer (for logging)
@@ -76,9 +68,7 @@ val register_proxy_context : proxy_environment -> unit
     registered so far with {!register_proxy_context} *)
 val get_all_registered : unit -> proxy_environment list
 
-(** Returns a proxy environment for the given protocol (or the
-    first one in the list of registered protocols
-    if the [Protocol_hash.t] is [None], see the [Registration] module). *)
+(** Returns a proxy environment for the given protocol. *)
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
   #RPC_context.simple ->

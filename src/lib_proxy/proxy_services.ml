@@ -68,7 +68,7 @@ let raw_hash_of_block (block : Tezos_shell_services.Block_services.block) :
   | `Hash (h, 0) -> Some h
   | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) -> None
 
-module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
+module BlockToHashClient : BLOCK_TO_HASH = struct
   let table = Hashtbl.create 17
 
   let add chain block hash = Hashtbl.add table (chain, block) hash
@@ -107,7 +107,13 @@ module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
               (* Table is not empty, We need to be consistent with the previous call
                  and we dont have the data available:
                  need to do an RPC call to get the hash *)
-              let* hash = S.hash rpc_context ~chain ~block () in
+              let* hash =
+                Tezos_shell_services.Block_services.Empty.hash
+                  rpc_context
+                  ~chain
+                  ~block
+                  ()
+              in
               (* Fill cache with result *)
               Hashtbl.add table (chain, block) hash ;
               return_some hash)
@@ -265,8 +271,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   let b2h : (module BLOCK_TO_HASH) =
     match mode with
     | Proxy_server _ -> (module BlockToHashServer)
-    | Light_client _ | Proxy_client ->
-        (module BlockToHashClient (Proxy_environment))
+    | Light_client _ | Proxy_client -> (module BlockToHashClient)
   in
   let module B2H = (val b2h : BLOCK_TO_HASH) in
   let make chain block =
