@@ -89,7 +89,6 @@ let manager_kinds =
     `KSc_rollup_timeout;
     `KSc_rollup_execute_outbox_message;
     `KSc_rollup_recover_bond;
-    `KSc_rollup_dal_slot_subscribe;
   ]
 
 let pass_to_operation_kinds = function
@@ -725,12 +724,6 @@ let generate_sc_rollup_recover_bond =
   let+ sc_rollup = random_sc_rollup in
   Sc_rollup_recover_bond {sc_rollup}
 
-let generate_sc_rollup_dal_slot_subscribe =
-  let open QCheck2.Gen in
-  let+ rollup = random_sc_rollup in
-  let slot_index = Alpha_context.Dal.Slot_index.zero in
-  Sc_rollup_dal_slot_subscribe {rollup; slot_index}
-
 (** {By Kind Operation Generator} *)
 
 let generator_of ?source = function
@@ -782,8 +775,6 @@ let generator_of ?source = function
         generate_sc_rollup_execute_outbox_message
   | `KSc_rollup_recover_bond ->
       generate_manager_operation ?source generate_sc_rollup_recover_bond
-  | `KSc_rollup_dal_slot_subscribe ->
-      generate_manager_operation ?source generate_sc_rollup_dal_slot_subscribe
 
 let generate_manager_operation batch_size =
   let open QCheck2.Gen in

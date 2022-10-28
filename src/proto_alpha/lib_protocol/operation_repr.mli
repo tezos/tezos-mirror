@@ -152,8 +152,6 @@ module Kind : sig
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
-  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
-
   type zk_rollup_origination = Zk_rollup_origination_kind
 
   type zk_rollup_publish = Zk_rollup_publish_kind
@@ -190,8 +188,6 @@ module Kind : sig
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
-    | Sc_rollup_dal_slot_subscribe_manager_kind
-        : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
@@ -560,11 +556,6 @@ and _ manager_operation =
       sc_rollup : Sc_rollup_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
-  | Sc_rollup_dal_slot_subscribe : {
-      rollup : Sc_rollup_repr.t;
-      slot_index : Dal_slot_repr.Index.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
       circuits_info : bool Zk_rollup_account_repr.SMap.t;
@@ -823,9 +814,6 @@ module Encoding : sig
   val sc_rollup_recover_bond_case :
     Kind.sc_rollup_recover_bond Kind.manager case
 
-  val sc_rollup_dal_slot_subscribe_case :
-    Kind.sc_rollup_dal_slot_subscribe Kind.manager case
-
   val zk_rollup_origination_case : Kind.zk_rollup_origination Kind.manager case
 
   val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
@@ -897,9 +885,6 @@ module Encoding : sig
       Kind.sc_rollup_execute_outbox_message case
 
     val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
-
-    val sc_rollup_dal_slot_subscribe_case :
-      Kind.sc_rollup_dal_slot_subscribe case
 
     val zk_rollup_origination_case : Kind.zk_rollup_origination case
 

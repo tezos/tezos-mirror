@@ -2961,10 +2961,6 @@ module Dal_errors : sig
   type error +=
     | Dal_feature_disabled
     | Dal_slot_index_above_hard_limit
-    | Dal_subscribe_rollup_invalid_slot_index of {
-        given : Dal.Slot_index.t;
-        maximum : Dal.Slot_index.t;
-      }
     | Dal_endorsement_unexpected_size of {expected : int; got : int}
     | Dal_publish_slot_header_invalid_index of {
         given : Dal.Slot_index.t;
@@ -3905,17 +3901,6 @@ module Sc_rollup : sig
 
   val get_boot_sector : context -> t -> (context * string) tzresult Lwt.t
 
-  module Dal_slot : sig
-    val subscribe :
-      context ->
-      t ->
-      slot_index:Dal.Slot_index.t ->
-      (Dal.Slot_index.t * Raw_level.t * context) tzresult Lwt.t
-
-    val subscribed_slot_indices :
-      context -> t -> Raw_level.t -> Dal.Slot_index.t list tzresult Lwt.t
-  end
-
   (** This module discloses definitions that are only useful for tests and
     must not be used otherwise. *)
   module Internal_for_tests : sig
@@ -4229,8 +4214,6 @@ module Kind : sig
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
-  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
-
   type zk_rollup_origination = Zk_rollup_origination_kind
 
   type zk_rollup_publish = Zk_rollup_publish_kind
@@ -4267,8 +4250,6 @@ module Kind : sig
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
-    | Sc_rollup_dal_slot_subscribe_manager_kind
-        : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
@@ -4509,11 +4490,6 @@ and _ manager_operation =
       sc_rollup : Sc_rollup.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
-  | Sc_rollup_dal_slot_subscribe : {
-      rollup : Sc_rollup.t;
-      slot_index : Dal.Slot_index.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
       circuits_info : bool Zk_rollup.Account.SMap.t;
@@ -4718,9 +4694,6 @@ module Operation : sig
     val sc_rollup_recover_bond_case :
       Kind.sc_rollup_recover_bond Kind.manager case
 
-    val sc_rollup_dal_slot_subscribe_case :
-      Kind.sc_rollup_dal_slot_subscribe Kind.manager case
-
     val zk_rollup_origination_case :
       Kind.zk_rollup_origination Kind.manager case
 
@@ -4794,9 +4767,6 @@ module Operation : sig
         Kind.sc_rollup_execute_outbox_message case
 
       val sc_rollup_recover_bond_case : Kind.sc_rollup_recover_bond case
-
-      val sc_rollup_dal_slot_subscribe_case :
-        Kind.sc_rollup_dal_slot_subscribe case
 
       val zk_rollup_origination_case : Kind.zk_rollup_origination case
 

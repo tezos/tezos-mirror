@@ -121,8 +121,6 @@ module Kind = struct
 
   type sc_rollup_recover_bond = Sc_rollup_recover_bond_kind
 
-  type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
-
   type zk_rollup_origination = Zk_rollup_origination_kind
 
   type zk_rollup_publish = Zk_rollup_publish_kind
@@ -159,8 +157,6 @@ module Kind = struct
     | Sc_rollup_execute_outbox_message_manager_kind
         : sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
-    | Sc_rollup_dal_slot_subscribe_manager_kind
-        : sc_rollup_dal_slot_subscribe manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
@@ -471,11 +467,6 @@ and _ manager_operation =
       sc_rollup : Sc_rollup_repr.t;
     }
       -> Kind.sc_rollup_recover_bond manager_operation
-  | Sc_rollup_dal_slot_subscribe : {
-      rollup : Sc_rollup_repr.t;
-      slot_index : Dal_slot_repr.Index.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe manager_operation
   | Zk_rollup_origination : {
       public_parameters : Plonk.public_parameters;
       circuits_info : bool Zk_rollup_account_repr.SMap.t;
@@ -520,8 +511,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_execute_outbox_message _ ->
       Kind.Sc_rollup_execute_outbox_message_manager_kind
   | Sc_rollup_recover_bond _ -> Kind.Sc_rollup_recover_bond_manager_kind
-  | Sc_rollup_dal_slot_subscribe _ ->
-      Kind.Sc_rollup_dal_slot_subscribe_manager_kind
   | Zk_rollup_origination _ -> Kind.Zk_rollup_origination_manager_kind
   | Zk_rollup_publish _ -> Kind.Zk_rollup_publish_manager_kind
 
@@ -614,9 +603,6 @@ let sc_rollup_operation_timeout_tag = sc_rollup_operation_tag_offset + 5
 let sc_rollup_execute_outbox_message_tag = sc_rollup_operation_tag_offset + 6
 
 let sc_rollup_operation_recover_bond_tag = sc_rollup_operation_tag_offset + 7
-
-let sc_rollup_operation_dal_slot_subscribe_tag =
-  sc_rollup_operation_tag_offset + 8
 
 let dal_offset = 230
 
@@ -1282,28 +1268,6 @@ module Encoding = struct
           proj = (function Sc_rollup_recover_bond {sc_rollup} -> sc_rollup);
           inj = (fun sc_rollup -> Sc_rollup_recover_bond {sc_rollup});
         }
-
-    let sc_rollup_dal_slot_subscribe_case =
-      MCase
-        {
-          tag = sc_rollup_operation_dal_slot_subscribe_tag;
-          name = "sc_rollup_dal_slot_subscribe";
-          encoding =
-            obj2
-              (req "rollup" Sc_rollup_repr.encoding)
-              (req "slot_index" Dal_slot_repr.Index.encoding);
-          select =
-            (function
-            | Manager (Sc_rollup_dal_slot_subscribe _ as op) -> Some op
-            | _ -> None);
-          proj =
-            (function
-            | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-                (rollup, slot_index));
-          inj =
-            (fun (rollup, slot_index) ->
-              Sc_rollup_dal_slot_subscribe {rollup; slot_index});
-        }
   end
 
   type 'b case =
@@ -1751,11 +1715,6 @@ module Encoding = struct
       sc_rollup_operation_recover_bond_tag
       Manager_operations.sc_rollup_recover_bond_case
 
-  let sc_rollup_dal_slot_subscribe_case =
-    make_manager_case
-      sc_rollup_operation_dal_slot_subscribe_tag
-      Manager_operations.sc_rollup_dal_slot_subscribe_case
-
   let zk_rollup_origination_case =
     make_manager_case
       zk_rollup_operation_create_tag
@@ -1817,7 +1776,6 @@ module Encoding = struct
            make sc_rollup_timeout_case;
            make sc_rollup_execute_outbox_message_case;
            make sc_rollup_recover_bond_case;
-           make sc_rollup_dal_slot_subscribe_case;
            make zk_rollup_origination_case;
            make zk_rollup_publish_case;
          ]
@@ -2077,8 +2035,6 @@ let equal_manager_operation_kind :
   | Sc_rollup_execute_outbox_message _, _ -> None
   | Sc_rollup_recover_bond _, Sc_rollup_recover_bond _ -> Some Eq
   | Sc_rollup_recover_bond _, _ -> None
-  | Sc_rollup_dal_slot_subscribe _, Sc_rollup_dal_slot_subscribe _ -> Some Eq
-  | Sc_rollup_dal_slot_subscribe _, _ -> None
   | Zk_rollup_origination _, Zk_rollup_origination _ -> Some Eq
   | Zk_rollup_origination _, _ -> None
   | Zk_rollup_publish _, Zk_rollup_publish _ -> Some Eq

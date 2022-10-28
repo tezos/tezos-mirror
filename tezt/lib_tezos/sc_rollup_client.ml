@@ -220,16 +220,6 @@ let last_published_commitment ?hooks sc_client =
   let+ json = rpc_get ?hooks sc_client ["local"; "last_published_commitment"] in
   commitment_with_hash_and_level_from_json json
 
-let dal_slot_subscriptions ?hooks ?(block = "head") sc_client =
-  let open Lwt.Syntax in
-  let+ json =
-    rpc_get
-      ?hooks
-      sc_client
-      ["global"; "block"; block; "dal"; "slot_subscriptions"]
-  in
-  JSON.as_list json |> List.map JSON.as_int
-
 let dal_slot_headers ?hooks ?(block = "head") sc_client =
   let open Lwt.Syntax in
   let+ json =

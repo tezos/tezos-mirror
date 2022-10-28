@@ -315,29 +315,6 @@ module Commitments_published_at_level =
       let encoding = Raw_level.encoding
     end)
 
-(* Slot subscriptions per block hash, saved as a list of
-   `Dal.Slot_index.t`, which is a bounded integer between `0` and `255`
-   included. *)
-module Dal_slot_subscriptions =
-  Make_append_only_map
-    (struct
-      let path = ["dal"; "slot_subscriptions"]
-
-      let keep_last_n_entries_in_memory = None
-    end)
-    (struct
-      type key = Block_hash.t
-
-      let to_path_representation = Block_hash.to_b58check
-    end)
-    (struct
-      type value = Dal.Slot_index.t list
-
-      let name = "slot_indexes"
-
-      let encoding = Data_encoding.list Dal.Slot_index.encoding
-    end)
-
 module Contexts =
   Make_append_only_map
     (struct
@@ -395,7 +372,7 @@ module Dal_slot_pages =
     end)
 
 (** stores slots whose data have been considered and pages stored to disk (if
-    they are confirmed and the rollup node subscribed to them). *)
+    they are confirmed). *)
 module Dal_processed_slots =
   Make_nested_map
     (struct

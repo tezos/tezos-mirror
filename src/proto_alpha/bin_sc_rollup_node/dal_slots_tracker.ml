@@ -45,25 +45,6 @@ let () =
     (function Cannot_read_block_metadata hash -> Some hash | _ -> None)
     (fun hash -> Cannot_read_block_metadata hash)
 
-let get_slot_subscriptions cctxt head rollup =
-  let open Lwt_result_syntax in
-  let*? level = Environment.wrap_tzresult @@ Raw_level.of_int32 (snd head) in
-  Plugin.RPC.Sc_rollup.dal_slot_subscriptions
-    cctxt
-    (cctxt#chain, cctxt#block)
-    rollup
-    level
-
-(* [fetch_and_save_subscribed_slot_headers cctxt head rollup] fetches the slot
-   indices to which [rollup] is subscribed to at [head], and stores them. *)
-let fetch_and_save_subscribed_slot_headers
-    Node_context.{cctxt; rollup_address; store; _}
-    Layer1.{level; hash = head_hash} =
-  let open Lwt_result_syntax in
-  let* res = get_slot_subscriptions cctxt (head_hash, level) rollup_address in
-  let*! () = Store.Dal_slot_subscriptions.add store head_hash res in
-  return_unit
-
 let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
     =
   let genesis_level = genesis_info.level in
@@ -80,29 +61,21 @@ let ancestor_hash ~number_of_levels {Node_context.genesis_info; l1_ctxt; _} head
   go number_of_levels head
 
 (* Values of type `confirmations_info` are used to catalog the status of slots
-   published in a given block hash. These values record whether the rollup was
-   subscribed to a given slot index when the block was published, and whether
+   published in a given block hash. These values record whether
    the slot has been confirmed after the endorsement_lag has passed. *)
 type confirmations_info = {
   (* The hash of the block in which the slots have been published. *)
   published_block_hash : Block_hash.t;
-  (* The slot indexes to which the rollup is subscribed to in
-     the block with hash `published_block_hash. *)
-  subscribed_slots_indexes : Bitset.t;
   (* The indexes of slots that have beenp published in block
      with hash `published_block_hash`, and have later been confirmed. *)
   confirmed_slots_indexes : Bitset.t;
 }
 
-(** [slots_info node_ctxt head] gathers information about the slot subscriptions
-    and confirmations of slot indexes. It reads the slot indexes that have been
-    declared available from [head]'s block receipt, and the list of slot index
-    subscriptions from the block to which the confirmations refer to.
-    It then returns the hash of the block where the slot headers have been
-    published, the list of slots indexes to which the rollup was
-    subscribed to in that block, and the list of slot indexes that have
-    been confirmed for that block. There is no relationship between
-    the confirmed and subscribed slot indexes returned by this function. *)
+(** [slots_info node_ctxt head] gathers information about the slot confirmations
+    of slot indexes. It reads the slot indexes that have been declared available
+    from [head]'s block receipt. It then returns the hash of
+    the block where the slot headers have been published and the list of
+    slot indexes that have been confirmed for that block.  *)
 let slots_info node_ctxt (Layer1.{hash; _} as head) =
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3722
      The case for protocol migrations when the lag constant has
@@ -118,15 +91,14 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
   in
   (* we are downloading endorsemented for slots at level [level], so
      we need to download the data at level [level - lag].
-     Therefore, we need to check only the slots to which the rollup node
-     was subscribed to at level `level - lag`
   *)
   let* published_slots_block_hash =
     ancestor_hash ~number_of_levels:lag node_ctxt head
   in
   match published_slots_block_hash with
   | None ->
-      (* Less then lag levels have passed from the rollup origination, and confirmed slots should not be applied *)
+      (* Less then lag levels have passed from the rollup origination, and
+         confirmed slots should not be applied *)
       return None
   | Some published_block_hash ->
       let* {metadata; _} =
@@ -145,15 +117,6 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           ~default:Dal.Endorsement.empty
           metadata.protocol_data.dal_slot_availability
       in
-      let*! subscribed_slots_indexes_list =
-        Store.Dal_slot_subscriptions.get node_ctxt.store published_block_hash
-      in
-      let*? subscribed_slots_indexes =
-        Environment.wrap_tzresult
-          (subscribed_slots_indexes_list
-          |> List.map Dal.Slot_index.to_int
-          |> Bitset.from_list)
-      in
       let*! published_slots_indexes =
         Store.Dal_slots_headers.list_secondary_keys
           node_ctxt.store
@@ -170,13 +133,7 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
           |> List.map Dal.Slot_index.to_int
           |> Bitset.from_list)
       in
-      return
-      @@ Some
-           {
-             published_block_hash;
-             subscribed_slots_indexes;
-             confirmed_slots_indexes;
-           }
+      return @@ Some {published_block_hash; confirmed_slots_indexes}
 
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3884
    avoid going back and forth between bitsets and lists of slot indexes. *)
@@ -221,7 +178,7 @@ let save_confirmed_slot store current_block_hash slot_index pages =
 
 let download_and_save_slots
     {Node_context.store; dal_cctxt; protocol_constants; _} ~current_block_hash
-    {published_block_hash; subscribed_slots_indexes; confirmed_slots_indexes} =
+    {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
     Misc.(0 --> (protocol_constants.parametric.dal.number_of_slots - 1))
@@ -232,10 +189,9 @@ let download_and_save_slots
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
-  let*? subscribed_and_confirmed =
+  let*? confirmed =
     Environment.wrap_tzresult
-    @@ to_slot_index_list protocol_constants.parametric
-    @@ Bitset.inter subscribed_slots_indexes confirmed_slots_indexes
+    @@ to_slot_index_list protocol_constants.parametric confirmed_slots_indexes
   in
   (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/2766.
      As part of the clean rollup storage workflow, we should make sure that
@@ -250,7 +206,7 @@ let download_and_save_slots
       not_confirmed
   in
   let* () =
-    subscribed_and_confirmed
+    confirmed
     |> List.iter_ep (fun s_slot ->
            (* slot_header is missing but the slot with index s_slot has been
                 confirmed. This scenario should not be possible. *)
@@ -269,13 +225,13 @@ let download_and_save_slots
                  ~primary_key:published_block_hash
                  ~secondary_key:s_slot
              in
+             (* The slot with index s_slot is confirmed. We can
+                proceed retrieving it from the dal node and save it
+                in the store. *)
              let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
              let*! () =
                save_confirmed_slot store current_block_hash s_slot pages
              in
-             (* The slot with index s_slot is subscribed to and endorsed,
-                we can proceed retrieving it from the dal node and save it
-                in the store. *)
              let*! () =
                Dal_slots_tracker_event.slot_has_been_confirmed
                  s_slot
@@ -287,9 +243,9 @@ let download_and_save_slots
   return_unit
 
 module Confirmed_slots_history = struct
-  (** [confirmed_slots_with_headers node_ctxt confirmations_info] returns
-    the headers of confirmed (but not necessarily subscribed to) slot indexes
-    for the block with hash [confirmations_info.published_block_hash]. *)
+  (** [confirmed_slots_with_headers node_ctxt confirmations_info] returns the
+      headers of confirmed slot indexes for the block with hash
+      [confirmations_info.published_block_hash]. *)
   let confirmed_slots_with_headers node_ctxt
       {published_block_hash; confirmed_slots_indexes; _} =
     let open Lwt_result_syntax in
@@ -428,17 +384,10 @@ end
 
 let process_head node_ctxt (Layer1.{hash = head_hash; _} as head) =
   let open Lwt_result_syntax in
-  let* () = fetch_and_save_subscribed_slot_headers node_ctxt head in
   let* confirmation_info = slots_info node_ctxt head in
   match confirmation_info with
   | None -> return_unit
   | Some confirmation_info ->
-      (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3867.
-         Pre-fetch the slots to which the rollup node is subscribed to.
-         Note that subscriptions are not used anymore to determine the slot pages
-         that will be applied in the PVM. However, we currently use them to
-         determine the slot indexes that will be pre-fetched by the rollup node.
-      *)
       let* () =
         download_and_save_slots
           ~current_block_hash:head_hash

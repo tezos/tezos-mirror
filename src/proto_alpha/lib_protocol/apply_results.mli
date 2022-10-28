@@ -277,12 +277,6 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_recover_bond successful_manager_operation_result
-  | Sc_rollup_dal_slot_subscribe_result : {
-      consumed_gas : Gas.Arith.fp;
-      slot_index : Dal.Slot_index.t;
-      level : Raw_level.t;
-    }
-      -> Kind.sc_rollup_dal_slot_subscribe successful_manager_operation_result
   | Zk_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       originated_zk_rollup : Zk_rollup.t;

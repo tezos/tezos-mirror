@@ -1403,16 +1403,6 @@ let apply_manager_operation :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-      let open Lwt_tzresult_syntax in
-      let+ slot_index, level, ctxt =
-        Sc_rollup.Dal_slot.subscribe ctxt rollup ~slot_index
-      in
-      let consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt in
-      let result =
-        Sc_rollup_dal_slot_subscribe_result {consumed_gas; slot_index; level}
-      in
-      (ctxt, result, [])
   | Zk_rollup_origination {public_parameters; circuits_info; init_state; nb_ops}
     ->
       Zk_rollup_apply.originate
@@ -1654,7 +1644,6 @@ let burn_manager_storage_fees :
         Sc_rollup_execute_outbox_message_result {payload with balance_updates}
       )
   | Sc_rollup_recover_bond_result _ -> return (ctxt, storage_limit, smopr)
-  | Sc_rollup_dal_slot_subscribe_result _ -> return (ctxt, storage_limit, smopr)
   | Zk_rollup_origination_result payload ->
       Fees.burn_zk_rollup_origination_fees
         ctxt

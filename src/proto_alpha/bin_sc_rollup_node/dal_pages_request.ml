@@ -29,10 +29,9 @@ open Alpha_context
 (** If a slot, published at some level L, is expected to be confirmed at level
     L+D then, once the confirmation level is over, the rollup node is supposed to:
     - Download and save the content of the slot's pages in the store, if the slot
-      is confirmed and the rollup is subscribed to it;
+      is confirmed;
     - Add entries [None] for the slot's pages in the store, if the slot
-      is not confirmed and the rollup is subscribed to it;
-    - Do nothing, if the rollup node is not subscribed to that slot. *)
+      is not confirmed. *)
 
 type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
 

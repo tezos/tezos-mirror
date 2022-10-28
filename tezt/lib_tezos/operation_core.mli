@@ -284,11 +284,6 @@ module Manager : sig
     commitment:Tezos_crypto_dal.Cryptobox.commitment ->
     payload
 
-  (** [sc_rollup_dal_slot_subscribe ~rollup ~slot_index] builds an
-     operation for the sc rollup [rollup] to subscribe to the data
-     availability layer slot with index [slot_index]. *)
-  val sc_rollup_dal_slot_subscribe : rollup:string -> slot_index:int -> payload
-
   (** [delegation ?(delegate=Constant.bootstrap2) ()] builds a
      delegation operation. *)
   val delegation : ?delegate:Account.key -> unit -> payload

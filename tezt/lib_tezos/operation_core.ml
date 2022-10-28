@@ -344,7 +344,6 @@ module Manager = struct
         index : int;
         commitment : Tezos_crypto_dal.Cryptobox.commitment;
       }
-    | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
     | Sc_rollup_refute of {
         (* See details in {!Operation_repr} module. *)
@@ -364,9 +363,6 @@ module Manager = struct
 
   let dal_publish_slot_header ~level ~index ~commitment =
     Dal_publish_slot_header {level; index; commitment}
-
-  let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
-    Sc_rollup_dal_slot_subscribe {rollup; slot_index}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
 
@@ -413,12 +409,6 @@ module Manager = struct
         [
           ("kind", `String "dal_publish_slot_header");
           ("slot_header", slot_header);
-        ]
-    | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
-        [
-          ("kind", `String "sc_rollup_dal_slot_subscribe");
-          ("rollup", `String rollup);
-          ("slot_index", json_of_int slot_index);
         ]
     | Delegation {delegate} ->
         [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
@@ -478,8 +468,7 @@ module Manager = struct
         let gas_limit = Option.value gas_limit ~default:1_040 in
         let storage_limit = Option.value storage_limit ~default:257 in
         {source; counter; fee; gas_limit; storage_limit; payload}
-    | Reveal _ | Dal_publish_slot_header _ | Delegation _
-    | Sc_rollup_dal_slot_subscribe _ ->
+    | Reveal _ | Dal_publish_slot_header _ | Delegation _ ->
         let fee = Option.value fee ~default:1_450 in
         let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in

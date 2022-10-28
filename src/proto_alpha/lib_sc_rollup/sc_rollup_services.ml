@@ -288,13 +288,6 @@ module Global = struct
         ~output:Data_encoding.(list Sc_rollup.output_encoding)
         (path / "outbox")
 
-    let dal_slot_subscriptions =
-      RPC_service.get_service
-        ~description:"Data availability layer slot subscriptions at block"
-        ~query:RPC_query.empty
-        ~output:Data_encoding.(option @@ list Dal.Slot_index.encoding)
-        (path / "dal" / "slot_subscriptions")
-
     let dal_slots =
       RPC_service.get_service
         ~description:"Availability slots for a given block"

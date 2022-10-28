@@ -1953,17 +1953,6 @@ module Sc_rollup = struct
           path /: Sc_rollup.Address.rpc_arg / "commitment"
           /: Sc_rollup.Commitment.Hash.rpc_arg)
 
-    let dal_slot_subscriptions =
-      RPC_service.get_service
-        ~description:
-          "List of slot indices to which a rollup is subscribed to at a given \
-           level"
-        ~query:RPC_query.empty
-        ~output:(Data_encoding.list Dal.Slot_index.encoding)
-        RPC_path.(
-          path /: Sc_rollup.Address.rpc_arg / "dal_slot_subscriptions"
-          /: Raw_level.rpc_arg)
-
     let ongoing_refutation_game =
       let query =
         let open RPC_query in
@@ -2151,11 +2140,6 @@ module Sc_rollup = struct
     in
     commitment
 
-  let register_dal_slot_subscriptions () =
-    Registration.register2 ~chunked:false S.dal_slot_subscriptions
-    @@ fun ctxt address level () () ->
-    Alpha_context.Sc_rollup.Dal_slot.subscribed_slot_indices ctxt address level
-
   let register_root () =
     Registration.register0 ~chunked:true S.root (fun context () () ->
         Sc_rollup.list_unaccounted context)
@@ -2232,7 +2216,6 @@ module Sc_rollup = struct
     register_last_cemented_commitment_hash_with_level () ;
     register_staked_on_commitment () ;
     register_commitment () ;
-    register_dal_slot_subscriptions () ;
     register_root () ;
     register_ongoing_refutation_game () ;
     register_conflicts () ;
@@ -2264,16 +2247,6 @@ module Sc_rollup = struct
       block
       sc_rollup_address
       commitment_hash
-      ()
-      ()
-
-  let dal_slot_subscriptions ctxt block sc_rollup_address level =
-    RPC_context.make_call2
-      S.dal_slot_subscriptions
-      ctxt
-      block
-      sc_rollup_address
-      level
       ()
       ()
 

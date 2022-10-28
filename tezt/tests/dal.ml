@@ -185,20 +185,6 @@ let test_dal_scenario ?dal_enable variant =
       description = "Testing data availability layer functionality ";
     }
 
-let subscribe_to_dal_slot client ~sc_rollup_address ~slot_index =
-  let* op_hash =
-    Operation.Manager.(
-      inject
-        ~force:true
-        [
-          make
-          @@ sc_rollup_dal_slot_subscribe ~rollup:sc_rollup_address ~slot_index;
-        ]
-        client)
-  in
-  let* () = Client.bake_for_and_wait client in
-  return op_hash
-
 let update_neighbors dal_node neighbors =
   let neighbors =
     `A
@@ -220,7 +206,7 @@ let wait_for_stored_slot dal_node slot_header =
       if JSON.(e |-> "slot_header" |> as_string) = slot_header then Some ()
       else None)
 
-let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
+let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
   (* This test ensures the feature flag works:
 
      - 1. It checks the feature flag is not enabled by default
@@ -264,11 +250,8 @@ let test_feature_flag _protocol _sc_rollup_node sc_rollup_address node client =
         [make @@ dal_publish_slot_header ~index:0 ~level:1 ~commitment]
         client)
   in
-  let* (`OpHash oph3) =
-    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
-  in
   let* mempool = Mempool.get_mempool client in
-  let expected_mempool = Mempool.{empty with refused = [oph1; oph2; oph3]} in
+  let expected_mempool = Mempool.{empty with refused = [oph1; oph2]} in
   Check.(
     (mempool = expected_mempool)
       Mempool.classified_typ
@@ -496,61 +479,6 @@ let test_slot_management_logic =
       ~error_msg:"Expected slot 1 to be available") ;
   check_dal_raw_context node
 
-(* Tests for integration between Dal and Scoru *)
-let rollup_node_subscribes_to_dal_slots _protocol sc_rollup_node
-    sc_rollup_address _node client =
-  (* Steps in this integration test:
-
-     1. Run rollup node for an originated rollup
-     2. Fetch the list of subscribed slots, determine that it's empty
-     3. Execute a client command to subscribe the rollup to dal slot 0, bake one level
-     4. Fetch the list of subscribed slots, determine that it contains slot 0
-     5. Execute a client command to subscribe the rollup to dal slot 1, bake one level
-     6. Fetch the list of subscribed slots, determine that it contains slots 0 and 1
-  *)
-  let* genesis_info =
-    RPC.Client.call ~hooks client
-    @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
-  in
-  let init_level = JSON.(genesis_info |-> "level" |> as_int) in
-  let* () = Sc_rollup_node.run sc_rollup_node in
-  let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
-  let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
-  Check.(level = init_level)
-    Check.int
-    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* subscribed_slots =
-    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
-  in
-  Check.(subscribed_slots = [])
-    (Check.list Check.int)
-    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
-  let* (`OpHash _) =
-    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
-  in
-  let* first_subscription_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
-  in
-  let* subscribed_slots =
-    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
-  in
-  Check.(subscribed_slots = [0])
-    (Check.list Check.int)
-    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
-  let* (`OpHash _) =
-    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:1
-  in
-  let* _second_subscription_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
-  in
-  let* subscribed_slots =
-    Sc_rollup_client.dal_slot_subscriptions ~hooks sc_rollup_client
-  in
-  Check.(subscribed_slots = [0; 1])
-    (Check.list Check.int)
-    ~error_msg:"Unexpected list of slot subscriptions (%L = %R)" ;
-  return ()
-
 let init_dal_node protocol =
   let* node, client =
     let* parameter_file = Rollup.Dal.Parameters.parameter_file protocol in
@@ -764,13 +692,13 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
      0. Run dal node
      1. Send three slots to dal node and obtain corresponding headers
      2. Run rollup node for an originated rollup
-     3. Subscribe rollup node to slots 0 and 1
+     3. (Rollup node is implicitely subscribed to all slots)
      4. Publish the three slot headers for slots 0, 1, 2
      5. Check that the rollup node fetched the slot headers from L1
      6. After lag levels, endorse only slots 1 and 2
      7. Wait for the rollup node to download the slots
-     8. Verify that rollup node has downloaded slot 1, slot 0 is
-        unconfirmed, and slot 2 has not been downloaded
+     8. Verify that rollup node has downloaded slots 1 and 2. Slot 0 is
+        unconfirmed.
   *)
 
   (* 0. run dl node. *)
@@ -795,25 +723,17 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     @@ RPC.get_chain_block_context_sc_rollup_genesis_info sc_rollup_address
   in
   let init_level = JSON.(genesis_info |-> "level" |> as_int) in
+
   let* () = Sc_rollup_node.run sc_rollup_node in
   let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
   let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+
   Check.(level = init_level)
     Check.int
     ~error_msg:"Current level has moved past origination level (%L = %R)" ;
-  let* (`OpHash _) =
-    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:0
-  in
-  (* 3. Subscribe rollup node to slots 0 and 1. *)
-  let* first_subscription_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
-  in
-  let* (`OpHash _) =
-    subscribe_to_dal_slot client ~sc_rollup_address ~slot_index:1
-  in
-  let* second_subscription_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (first_subscription_level + 1)
-  in
+
+  (* 3. (Rollup node is implicitely subscribed to all slots) *)
+
   (* 4. Publish the three slot headers for slots with indexes 0, 1 and 2. *)
   let* _op_hash =
     publish_slot_header
@@ -842,7 +762,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   (* 5. Check that the slot_headers are fetched by the rollup node. *)
   let* () = Client.bake_for_and_wait client in
   let* slots_published_level =
-    Sc_rollup_node.wait_for_level sc_rollup_node (second_subscription_level + 1)
+    Sc_rollup_node.wait_for_level sc_rollup_node (init_level + 1)
   in
   let* slots_headers =
     Sc_rollup_client.dal_slot_headers ~hooks sc_rollup_client
@@ -884,9 +804,9 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   let* downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
   in
-  (* 8. Verify that rollup node has downloaded slot 1, slot 0 is
-        unconfirmed, and slot 2 has not been downloaded *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 1 in
+  (* 8. Verify that rollup node has downloaded slots 1 and 2. Slot 0 is
+        unconfirmed. *)
+  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
@@ -894,17 +814,27 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
        unconfirmed (%L = %R)" ;
-  let confirmed_slot_index, confirmed_slot_contents =
-    List.nth downloaded_confirmed_slots 0
+  let submitted_slots_contents =
+    [slot_contents_0; slot_contents_1; slot_contents_2]
   in
-  Check.(confirmed_slot_index = 1)
-    Check.int
-    ~error_msg:"Index of confirmed slot is not as expected (%L = %R)" ;
-  let relevant_slot = List.nth confirmed_slot_contents 0 in
-  let message = String.sub relevant_slot 0 (String.length slot_contents_1) in
-  Check.(message = slot_contents_1)
-    Check.string
-    ~error_msg:"unexpected message in slot (%L = %R)" ;
+  List.iter
+    (fun i ->
+      let index = i + 1 in
+      let confirmed_slot_index, confirmed_slot_contents =
+        List.nth downloaded_confirmed_slots i
+      in
+      let relevant_page = List.nth confirmed_slot_contents 0 in
+      let confirmed_slot_content = List.nth submitted_slots_contents index in
+      let message =
+        String.sub relevant_page 0 (String.length confirmed_slot_content)
+      in
+      Check.(confirmed_slot_index = index)
+        Check.int
+        ~error_msg:"Index of confirmed slot is not as expected (%L = %R)" ;
+      Check.(message = confirmed_slot_content)
+        Check.string
+        ~error_msg:"unexpected message in slot (%L = %R)")
+    [0; 1] ;
   match expand_test with
   | None -> return ()
   | Some f -> f client sc_rollup_address sc_rollup_node
@@ -929,35 +859,34 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
       - the page 0 of slot 0 contains 10,
       - the page 0 of slot 1 contains 200,
       - the page 0 of slot 2 contains 400.
-     The rollup subscribed to slots 0 and 1, but only slot 1 is confirmed.
-     Below, we expect to have value = 302. *)
+     Only slot 1 is confirmed. Below, we expect to have value = 302. *)
   let expected_value = 302 in
   (* The code should be adapted if the current level changes. *)
-  assert (level = 6) ;
+  assert (level = 4) ;
   let* () =
     send_messages
       client
       [
         " 99 3 ";
         (* Total sum is now 99 + 3 = 102 *)
-        " dal:5:1:0 ";
+        " dal:3:1:0 ";
         (* Page 0 of Slot 1 contains 200, total sum is 302. *)
-        " dal:5:1:1 ";
-        " dal:5:0:0 ";
+        " dal:3:1:1 ";
+        " dal:3:0:0 ";
         (* Slot 0 is not confirmed, total sum doesn't change. *)
-        " dal:5:0:2 ";
+        " dal:3:0:2 ";
         (* Page 2 of Slot 0 empty, total sum unchanged. *)
         (* Page 1 of Slot 1 is empty, total sum unchanged. *)
-        " dal:4:1:0 ";
+        " dal:2:1:0 ";
         (* It's too late to import a page published at level 5. *)
-        " dal:6:1:0 ";
+        " dal:5:1:0 ";
         (* It's too early to import a page published at level 7. *)
-        " dal:5:10000:0 ";
-        " dal:5:0:100000 ";
-        " dal:5:-10000:0 ";
-        " dal:5:0:-100000 ";
-        " dal:5:expecting_integer:0 ";
-        " dal:5:0:expecting_integer ";
+        " dal:3:10000:0 ";
+        " dal:3:0:100000 ";
+        " dal:3:-10000:0 ";
+        " dal:3:0:-100000 ";
+        " dal:3:expecting_integer:0 ";
+        " dal:3:0:expecting_integer ";
         (* The 6 pages requests above are ignored by the PVM because
            slot/page ID is out of bounds or illformed. *)
         " dal:1002147483647:1:1 "
@@ -990,11 +919,6 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
 
 let register ~protocols =
   test_dal_scenario "feature_flag_is_disabled" test_feature_flag protocols ;
-  test_dal_scenario
-    ~dal_enable:true
-    "rollup_node_dal_subscriptions"
-    rollup_node_subscribes_to_dal_slots
-    protocols ;
   test_slot_management_logic protocols ;
   test_dal_node_slot_management protocols ;
   test_dal_node_slots_headers_tracking protocols ;

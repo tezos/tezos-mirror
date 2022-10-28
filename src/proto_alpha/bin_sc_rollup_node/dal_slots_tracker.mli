@@ -23,21 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The rollup node keeps the list of dal slots to which the rollup is
-    subscribed to for each block it needs to process. This is to determine
-    whether the inbox for a given block will need to be retrieved from the
-    block operations, or from the data availability layer after lag levels
-    have passed and the slot for the block has been declared available.
+(** The rollup node keeps the list of dal slots for each block it needs to
+    process.  This is to determine whether the inbox for a given block will need
+    to be retrieved from the block operations, or from the data availability
+    layer after lag levels have passed and the slot for the block has been
+    declared available.
 
-    The state of subscribed slots per block is persistent.
-*)
+    The state of slots per block is persistent.  *)
 
 type error += Cannot_read_block_metadata of Block_hash.t
 
 (** [process_head node_ctxt head] performs the following operations:
     {ul
-      {li it fetches the slot indices to which the rollup is subscribed to,
-       and stores them in [Store.Dal_slot_subbscriptions] }
       {li it reads the endorsements for headers published endorsement_lag
       levels preceding [head] from the block metadata, determines which
       ones the rollup node will download, and stores the results in
