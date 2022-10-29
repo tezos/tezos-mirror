@@ -235,6 +235,14 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
     (feature_flag = false)
       bool
       ~error_msg:"Feature flag for the DAL should be disabled") ;
+  let*? process =
+    RPC.(Client.spawn client @@ get_chain_block_context_dal_shards ())
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Data-availability layer will be enabled in a future proposal")
+      process
+  in
   let* (`OpHash oph1) =
     Operation.Consensus.(
       inject

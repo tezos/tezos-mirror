@@ -23,14 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
-
-let () =
-  Migration.register () ;
-  Migration_voting.register [Kathmandu] ;
-  Stresstest_command.register ~protocols:Protocol.all ;
-  Dal.register [Alpha] ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+(** [shards ctxt ~level] returns the DAL committee as an association
+   list that associates to the public key hash [pkh] of the member of
+   the committee an interval [(s,n)], meaning that the slots
+   [s;s+1;...;s+n-1] belongs to [pkh]. It is guaranteed that [n>0]. *)
+val shards :
+  Alpha_context.t ->
+  level:Alpha_context.Raw_level.t ->
+  (Signature.Public_key_hash.t * (int * int)) list tzresult Lwt.t

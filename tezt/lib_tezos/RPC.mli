@@ -967,3 +967,7 @@ val get_chain_block_votes_successor_period :
     [block] defaults to ["head"]. *)
 val get_chain_block_votes_total_voting_power :
   ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/[chain]/blocks/[block]/context/dal/shards?level=[level]] *)
+val get_chain_block_context_dal_shards :
+  ?chain:string -> ?block:string -> ?level:int -> unit -> JSON.t t

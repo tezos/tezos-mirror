@@ -38,10 +38,7 @@ val validate_data_availability : t -> Dal.Endorsement.t -> unit tzresult
    [endorsement] into the [ctxt] assuming [endorser] issued those
    endorsements. *)
 val apply_data_availability :
-  t ->
-  Dal.Endorsement.t ->
-  endorser:Signature.Public_key_hash.t ->
-  t tzresult Lwt.t
+  t -> Dal.Endorsement.t -> endorser:Signature.Public_key_hash.t -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
    valid and cannot prevent an operation containing [slot_header] to be
@@ -54,10 +51,16 @@ val validate_publish_slot_header : t -> Dal.Slot.Header.t -> unit tzresult
    already a slot header. *)
 val apply_publish_slot_header : t -> Dal.Slot.Header.t -> t tzresult
 
-(** [dal_finalisation ctxt] should be executed at block finalisation
+(** [finalisation ctxt] should be executed at block finalisation
    time. A set of slots available at level [ctxt.current_level - lag]
    is returned encapsulated into the endorsement data-structure.
 
    [lag] is a parametric constant specific to the data-availability
    layer.  *)
-val dal_finalisation : t -> (t * Dal.Endorsement.t option) tzresult Lwt.t
+val finalisation : t -> (t * Dal.Endorsement.t option) tzresult Lwt.t
+
+(** [initialize ctxt ~level] should be executed at block
+   initialisation time. It allows to cache the committee for [level]
+   in memory so that every time we need to use this committee, there
+   is no need to recompute it again. *)
+val initialisation : t -> level:Level.t -> t tzresult Lwt.t

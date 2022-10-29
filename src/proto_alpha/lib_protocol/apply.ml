@@ -2171,7 +2171,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
          operation should be merged with an endorsement or at least
          refined. *)
       Dal_apply.apply_data_availability ctxt slot_availability ~endorser
-      >>=? fun ctxt ->
+      >>?= fun ctxt ->
       return
         ( ctxt,
           Single_result (Dal_slot_availability_result {delegate = endorser}) )
@@ -2682,7 +2682,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     may_start_new_cycle ctxt
   in
   let* ctxt = Amendment.may_start_new_voting_period ctxt in
-  let* ctxt, dal_slot_availability = Dal_apply.dal_finalisation ctxt in
+  let* ctxt, dal_slot_availability = Dal_apply.finalisation ctxt in
   let* _inbox, _diff, ctxt = Sc_rollup.Inbox.add_end_of_level ctxt in
   let balance_updates =
     migration_balance_updates @ baking_receipts @ cycle_end_balance_updates

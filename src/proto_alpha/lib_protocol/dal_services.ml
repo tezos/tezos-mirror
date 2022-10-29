@@ -23,14 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* This module runs the tests implemented in all other modules of this directory.
-   Each module defines tests which are thematically related,
-   as functions to be called here. *)
+open Alpha_context
 
-let () =
-  Migration.register () ;
-  Migration_voting.register [Kathmandu] ;
-  Stresstest_command.register ~protocols:Protocol.all ;
-  Dal.register [Alpha] ;
-  (* Test.run () should be the last statement, don't register afterwards! *)
-  Test.run ()
+let assert_dal_feature_enabled ctxt =
+  let open Constants in
+  let Parametric.{dal = {feature_enable; _}; _} = parametric ctxt in
+  error_unless
+    Compare.Bool.(feature_enable = true)
+    Dal_errors.Dal_feature_disabled
+
+let shards ctxt ~level =
+  let open Lwt_tzresult_syntax in
+  let open Dal.Endorsement in
+  assert_dal_feature_enabled ctxt >>?= fun () ->
+  let level = Level.from_raw ctxt level in
+  let pkh_from_tenderbake_slot slot =
+    Stake_distribution.slot_owner ctxt level slot
+    >|=? fun (ctxt, consensus_key) -> (ctxt, consensus_key.delegate)
+  in
+  (* We do not cache this committee. This function being used by RPCs
+     to know the DAL committee at some particular level. *)
+  let* committee =
+    Dal.Endorsement.compute_committee ctxt pkh_from_tenderbake_slot
+  in
+  Signature.Public_key_hash.Map.bindings committee.pkh_to_shards |> return

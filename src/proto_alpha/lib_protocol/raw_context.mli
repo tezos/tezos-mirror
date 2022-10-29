@@ -418,7 +418,57 @@ module Dal : sig
      [0;number_of_slots - 1], returns [false]. *)
   val is_slot_index_available : t -> Dal_slot_repr.Index.t -> bool
 
-  (** [shards ctxt ~endorser] returns the shard assignment for the
-     [endorser] for the current level. *)
-  val shards : t -> endorser:Signature.Public_key_hash.t -> int list
+  (** [shards_of_endorser ctxt ~endorser] returns the shard assignment
+     of the DAL committee of the current level for [endorser]. This
+     function never returns an empty list. *)
+  val shards_of_endorser :
+    t -> endorser:Signature.Public_key_hash.t -> int list option
+
+  (** The DAL committee is a subset of the Tenderbake committee.  A
+     shard from [0;number_of_shards] is associated to a public key
+     hash. For efficiency reasons, the committee is two-folds: a
+     mapping public key hash to shards and shards to public key
+     hashes. The DAL committee ensures the shards associated to the
+     same public key hash are contiguous. The list of shards is
+     represented as two natural numbers [(initial, power)] which
+     encodes the list of shards:
+     [initial;initial + 1;...;initial + power - 1].
+
+      This data-type ensures the following invariants:
+
+      - \forall pkh shard, find pkh_to_shards pkh = Some (start,n) ->
+     \forall i, i \in [start; start + n -1] -> find shard_to_pkh shard
+     = Some pkh
+
+      - forall pkh shard, find shard_to_pkh shard = Some pkh ->
+     \exists (start,n), find pkh_to_shards pkh = Some (start,n) /\
+     start <= shard <= start + n -1
+
+      - Given an endorser, all its shards assignement are contiguous
+     *)
+  type committee = {
+    pkh_to_shards :
+      (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+    shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+  }
+
+  (** [compute_committee ctxt pkh_from_tenderbake_slot] computes the
+     DAL committee using the [pkh_from_tenderbake_slot] function. This
+     functions takes into account the fact that the DAL committee and
+     the Tenderbake committee may have different size. If the DAL
+     committee is smaller, then we simply take a projection of the
+     Tenderbake committee for the first [n] slots. If the DAL
+     committee is larger, shards are computed moduloe the Tenderbake
+     committee. Slots assignements are reordered for a given a public
+     key hash, to ensure all the slots (or shards in the context of
+     DAL) shards are contiguous (see {!type:committee}). *)
+  val compute_committee :
+    t ->
+    (Slot_repr.t -> (t * Signature.Public_key_hash.t) tzresult Lwt.t) ->
+    committee tzresult Lwt.t
+
+  (** [init_committee ctxt committee] returns a context where the
+     [committee] is cached. The committee is expected to be the one
+     for the current level. *)
+  val init_committee : t -> committee -> t
 end

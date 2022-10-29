@@ -630,7 +630,31 @@ let endorsement_descriptor =
         List.filter_map_es gen state.delegates);
   }
 
+let dal_slot_availibility ctxt delegate =
+  let open Lwt_result_syntax in
+  let level = Alpha_context.Level.current ctxt in
+  let pkh_from_tenderbake_slot slot =
+    Alpha_context.Stake_distribution.slot_owner ctxt level slot
+    >|=? fun (ctxt, consensus_pk1) -> (ctxt, consensus_pk1.delegate)
+  in
+  let* committee =
+    Alpha_context.Dal.Endorsement.compute_committee
+      ctxt
+      pkh_from_tenderbake_slot
+  in
+  match
+    Environment.Signature.Public_key_hash.Map.find
+      delegate
+      committee.pkh_to_shards
+  with
+  | None -> return_none
+  | Some _interval ->
+      (* The content of the endorsement does not matter for covalidity. *)
+      let attestation = Dal.Endorsement.empty in
+      return_some (Dal_slot_availability (delegate, attestation))
+
 let dal_slot_availability_descriptor =
+  let open Lwt_result_syntax in
   {
     parameters =
       (fun params ->
@@ -643,12 +667,17 @@ let dal_slot_availability_descriptor =
     opt_prelude = None;
     candidates_generator =
       (fun state ->
-        let open Lwt_result_syntax in
-        let gen (del, _) =
-          let op = Dal_slot_availability (del, Dal.Endorsement.empty) in
-          Op.pack_operation (B state.block) None (Single op)
+        let gen (delegate, _) =
+          let* ctxt = Context.to_alpha_ctxt (B state.block) in
+          let* op =
+            dal_slot_availibility ctxt delegate >|= Environment.wrap_tzresult
+          in
+          return
+            (op
+            |> Option.map (fun op ->
+                   Op.pack_operation (B state.block) None (Single op)))
         in
-        return (List.map gen state.delegates));
+        List.filter_map_es gen state.delegates);
   }
 
 module Manager = Manager_operation_helpers

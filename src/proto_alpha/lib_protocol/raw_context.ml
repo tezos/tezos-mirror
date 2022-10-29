@@ -223,6 +223,18 @@ module Raw_consensus = struct
     {t with grand_parent_branch = Some grand_parent_branch}
 end
 
+type dal_committee = {
+  pkh_to_shards :
+    (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+  shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+}
+
+let empty_dal_committee =
+  {
+    pkh_to_shards = Signature.Public_key_hash.Map.empty;
+    shard_to_pkh = Dal_endorsement_repr.Shard_map.empty;
+  }
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -262,6 +274,7 @@ type back = {
          - We need to provide an incentive to avoid byzantines to post
      dummy slot headers. *)
   dal_endorsement_slot_accountability : Dal_endorsement_repr.Accountability.t;
+  dal_committee : dal_committee;
 }
 
 (*
@@ -819,6 +832,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         dal_endorsement_slot_accountability =
           Dal_endorsement_repr.Accountability.init
             ~length:constants.Constants_parametric_repr.dal.number_of_slots;
+        dal_committee = empty_dal_committee;
       };
   }
 
@@ -1534,39 +1548,105 @@ module Dal = struct
       ~threshold
       ~number_of_shards
 
+  type committee = dal_committee = {
+    pkh_to_shards :
+      (Dal_endorsement_repr.shard_index * int) Signature.Public_key_hash.Map.t;
+    shard_to_pkh : Signature.Public_key_hash.t Dal_endorsement_repr.Shard_map.t;
+  }
+
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
 
-     We have to choose for the sampling. Here we use the one used by
-     the consensus which is hackish and probably not what we want at
-     the end. However, it should be enough for a prototype. This has a
-     very bad complexity too. *)
-  let rec compute_shards ?(index = 0) ctxt ~endorser =
-    let max_shards =
-      ctxt.back.constants.dal.cryptobox_parameters.number_of_shards
-    in
-    Slot_repr.Map.fold_e
-      (fun _ (consensus_key, power) (index, shards) ->
-        let limit = Compare.Int.min (index + power) max_shards in
-        (* Early fail when we have reached the desired number of shards *)
-        if Compare.Int.(index >= max_shards) then Error shards
-        else if
-          Signature.Public_key_hash.(consensus_key.consensus_pkh = endorser)
-        then
-          let shards = Misc.(index --> (limit - 1)) in
-          Ok (index + power, shards)
-        else Ok (index + power, shards))
-      ctxt.back.consensus.allowed_endorsements
-      (index, [])
-    |> function
-    | Ok (index, []) ->
-        (* This happens if the number of Tenderbake slots is below the
-           number of shards. Therefore, we reuse the committee using a
-           shift (index being the size of the committee). *)
-        compute_shards ~index ctxt ~endorser
-    | Ok (_index, shards) -> shards
-    | Error shards -> shards
+     A committee is selected by the callback function
+     [pkh_from_tenderbake_slot]. We use a callback because of circular
+     dependencies. It is not clear whether it will be the final choice
+     for the DAL committee. The current solution is a bit hackish but
+     should work. If we decide to differ from the Tenderbake
+     committee, one could just draw a new committee.
 
-  let shards ctxt ~endorser = compute_shards ~index:0 ctxt ~endorser
+     The problem with drawing a new committee is that it is not
+     guaranteed that everyone in the DAL committee will be in the
+     Tenderbake committee. Consequently, either we decide to have a
+     new consensus operation which does not count for Tenderbake,
+     and/or we take into account for the model of DAL that at every
+     level, a percentage of DAL endorsements cannot be received. *)
+  let compute_committee ctxt pkh_from_tenderbake_slot =
+    let Constants_parametric_repr.
+          {
+            dal = {cryptobox_parameters = {number_of_shards; _}; _};
+            consensus_committee_size;
+            _;
+          } =
+      ctxt.back.constants
+    in
+    (* We first draw a committee by drawing slots from the Tenderbake
+       committee. To have a compact representation of slots, we can
+       sort the Tenderbake slots by [pkh], so that a committee is
+       actually only an interval. This is done by recomputing a
+       committee from the first one. *)
+    let update_committee committee pkh ~slot_index ~power =
+      {
+        pkh_to_shards =
+          Signature.Public_key_hash.Map.update
+            pkh
+            (function
+              | None -> Some (slot_index, power)
+              | Some (initial_shard_index, old_power) ->
+                  Some (initial_shard_index, old_power + power))
+            committee.pkh_to_shards;
+        shard_to_pkh =
+          List.fold_left
+            (fun shard_to_pkh slot ->
+              Dal_endorsement_repr.Shard_map.add slot pkh shard_to_pkh)
+            committee.shard_to_pkh
+            Misc.(slot_index --> (slot_index + (power - 1)));
+      }
+    in
+    let rec compute_power index committee =
+      if Compare.Int.(index < 0) then return committee
+      else
+        let shard_index = index mod consensus_committee_size in
+        Slot_repr.of_int shard_index >>?= fun slot ->
+        pkh_from_tenderbake_slot slot >>=? fun (_ctxt, pkh) ->
+        (* The [Slot_repr] module is related to the Tenderbake committee. *)
+        let slot_index = Slot_repr.to_int slot in
+        (* An optimisation could be to return only [pkh_to_shards] map
+           because the second one is not used. This can be done later
+           on if it is a good optimisation. *)
+        let committee = update_committee committee pkh ~slot_index ~power:1 in
+        compute_power (index - 1) committee
+    in
+    (* This committee is an intermediate to compute the final DAL
+       commitee. This one only projects the Tenderbake committee into
+       the DAL committee. The next one reorder the slots so that they
+       are grouped by public key hash. *)
+    compute_power (number_of_shards - 1) empty_dal_committee
+    >>=? fun unordered_committee ->
+    let dal_committee =
+      Signature.Public_key_hash.Map.fold
+        (fun pkh (_, power) (total_power, committee) ->
+          let committee =
+            update_committee committee pkh ~slot_index:total_power ~power
+          in
+          let new_total_power = total_power + power in
+          (new_total_power, committee))
+        unordered_committee.pkh_to_shards
+        (0, empty_dal_committee)
+      |> snd
+    in
+    return dal_committee
+
+  let init_committee ctxt committee =
+    {ctxt with back = {ctxt.back with dal_committee = committee}}
+
+  let shards_of_endorser ctxt ~endorser:pkh =
+    let rec make acc (initial_shard_index, power) =
+      if Compare.Int.(power <= 0) then List.rev acc
+      else make (initial_shard_index :: acc) (initial_shard_index + 1, power - 1)
+    in
+    Signature.Public_key_hash.Map.find_opt
+      pkh
+      ctxt.back.dal_committee.pkh_to_shards
+    |> Option.map (fun pre_shards -> make [] pre_shards)
 end
 
 (* The type for relative context accesses instead from the root. In order for
