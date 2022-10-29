@@ -42,71 +42,30 @@ module Events = struct
       ("block", Data_encoding.string)
 end
 
-module type BLOCK_TO_HASH = sig
-  (** A [None] result value means the caller should use the block passed
-      as third argument, even if not identified by a hash *)
-  val hash_of_block :
-    #RPC_context.simple ->
-    Tezos_shell_services.Shell_services.chain ->
-    Tezos_shell_services.Block_services.block ->
-    Block_hash.t option tzresult Lwt.t
-
-  (** [add chain block hash] records that [block] (which
-      may be symbolic, like [head]) has the given [hash] *)
-  val add :
-    Tezos_shell_services.Shell_services.chain ->
-    Tezos_shell_services.Block_services.block ->
-    Block_hash.t ->
-    unit
-end
-
-module Hashtbl = Stdlib.Hashtbl
-
-module BlockToHashClient : BLOCK_TO_HASH = struct
-  let table = Hashtbl.create 17
-
-  let add chain block hash = Hashtbl.add table (chain, block) hash
-
-  let hash_of_block (rpc_context : #RPC_context.simple)
-      (chain : Tezos_shell_services.Shell_services.chain)
-      (block : Tezos_shell_services.Block_services.block) =
-    let open Lwt_result_syntax in
-    match Hashtbl.find_opt table (chain, block) with
-    | Some hash ->
-        (* Result is in cache *)
-        return_some hash
-    | None ->
-        if Hashtbl.length table = 0 then
-          (* The table is empty. We do not need to retrieve the hash
-             before retrieving the initial context, because we have
-             no reference hash yet. I mean that, if block is <head>,
-             we are about to retrieve the node's head, no matter its value.
-             Any value is fine and its hash is going to be put right away in
-             the cache (see the call to [B2H.add]).
-             This avoids one RPC call, but it is
-             important because it is the first one: often there is
-             a single call. Skipping it reduces the node's load.
-
-             In the heavyduty.py scenario (see the proxy's original MR:
-             !1943), it reduces the number of calls to RPC .../hash
-             from 1200 to 700.
-          *)
-          return_none
-        else
-          (* Table is not empty, We need to be consistent with the previous call
-             and we dont have the data available:
-             need to do an RPC call to get the hash *)
-          let* hash =
-            Tezos_shell_services.Block_services.Empty.hash
-              rpc_context
-              ~chain
-              ~block
-              ()
-          in
-          (* Fill cache with result *)
-          Hashtbl.add table (chain, block) hash ;
-          return_some hash
-end
+let hash_of_block ?cache (rpc_context : #RPC_context.simple)
+    (chain : Tezos_shell_services.Shell_services.chain)
+    (block : Tezos_shell_services.Block_services.block) =
+  let open Lwt_result_syntax in
+  match
+    Option.bind cache (fun table ->
+        Stdlib.Hashtbl.find_opt table (chain, block))
+  with
+  | Some hash ->
+      (* Result is in cache *)
+      return hash
+  | None ->
+      let* hash =
+        Tezos_shell_services.Block_services.Empty.hash
+          rpc_context
+          ~chain
+          ~block
+          ()
+      in
+      (* Fill cache with result *)
+      Option.iter
+        (fun table -> Stdlib.Hashtbl.add table (chain, block) hash)
+        cache ;
+      return hash
 
 type mode =
   | Light_client of Light.sources
@@ -124,28 +83,15 @@ let to_client_server_mode = function
   | Light_client _ | Proxy_client -> Proxy.Client
   | Proxy_server _ -> Proxy.Server
 
-module BlockToHashServer : BLOCK_TO_HASH = struct
-  let hash_of_block __ _ =
-    let open Lwt_result_syntax in
-    function
-    | `Hash (h, 0) -> return_some h
-    | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
-        return_none
-
-  let add _ _ _ = ()
-end
-
-type env_cache_key =
-  Tezos_shell_services.Chain_services.chain
-  * Tezos_shell_services.Block_services.block
+type env_cache_key = Tezos_shell_services.Chain_services.chain * Block_hash.t
 
 module Env_cache_key_hashed_type :
-  Hashtbl.HashedType with type t = env_cache_key = struct
+  Stdlib.Hashtbl.HashedType with type t = env_cache_key = struct
   type t = env_cache_key
 
   let equal ((lchain, lblock) : t) ((rchain, rblock) : t) =
     (* Avoid using polymorphic equality *)
-    lchain = rchain && lblock = rblock
+    lchain = rchain && Block_hash.equal lblock rblock
 
   let hash = Hashtbl.hash
 end
@@ -226,12 +172,15 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
 let build_directory (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : RPC_context.generic) (mode : mode) force_protocol :
     unit RPC_directory.t =
-  let b2h : (module BLOCK_TO_HASH) =
+  let block_hash_cache =
+    (* We consider that the duration of a run of a client command is
+       below the time between blocks so that aliases (`head`, levels,
+       ...) don't change. Obviously, this assumption is incorrect in
+       a long living proxy server. *)
     match mode with
-    | Proxy_server _ -> (module BlockToHashServer)
-    | Light_client _ | Proxy_client -> (module BlockToHashClient)
+    | Proxy_server _ -> None
+    | Light_client _ | Proxy_client -> Some (Stdlib.Hashtbl.create 17)
   in
-  let module B2H = (val b2h : BLOCK_TO_HASH) in
   let make proxy_env chain block =
     match mode with
     | Light_client sources ->
@@ -271,21 +220,26 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   in
   let get_env_rpc_context chain block =
     let open Lwt_result_syntax in
-    let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
-    let block_key, (fill_b2h : Block_hash.t -> unit) =
-      match block_hash_opt with
-      | None -> (block, fun block_hash -> B2H.add chain block block_hash)
-      | Some block_hash -> (`Hash (block_hash, 0), ignore)
+    let* block_hash =
+      hash_of_block ?cache:block_hash_cache rpc_context chain block
     in
-    let key = (chain, block_key) in
-    let compute_value (chain, block_key) =
+    let key = (chain, block_hash) in
+    let compute_value (chain, block_hash) =
+      let block_key = `Hash (block_hash, 0) in
+      let* block_header =
+        Tezos_shell_services.Block_services.Empty.Header.shell_header
+          rpc_context
+          ~chain
+          ~block:block_key
+          ()
+      in
       let* proxy_env =
         Registration.get_registered_proxy
           printer
           rpc_context
           (match mode with Light_client _ -> `Mode_light | _ -> `Mode_proxy)
           ~chain
-          ~block
+          ~block:block_key
           force_protocol
       in
       let (module Proxy_environment) = proxy_env in
@@ -296,11 +250,12 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           rpc_context;
           mode = to_client_server_mode mode;
           chain;
-          block;
+          block = block_key;
         }
       in
-      let* initial_context = Proxy_environment.init_env_rpc_context ctx in
-      fill_b2h @@ initial_context.block_hash ;
+      let* initial_context =
+        Proxy_environment.initial_context ctx block_header.context
+      in
       let*! () =
         schedule_clearing
           printer
@@ -314,7 +269,10 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
       in
       let mapped_directory =
         RPC_directory.map
-          (fun (_chain, _block) -> Lwt.return initial_context)
+          (fun (_chain, _block) ->
+            Lwt.return
+              Tezos_protocol_environment.
+                {block_hash; block_header; context = initial_context})
           Proxy_environment.directory
       in
       return

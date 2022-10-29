@@ -37,7 +37,7 @@ let () =
 
     let directory = RPC_directory.empty
 
-    let init_env_rpc_context _ = failwith "%s" msg
+    let initial_context _ _ = failwith "%s" msg
 
     let merkle_tree _ _ _ = failwith "%s" msg
 

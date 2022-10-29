@@ -42,9 +42,10 @@ module type Proxy_sig = sig
       - The chain for which the context is required
       - The block for which the context is required
     *)
-  val init_env_rpc_context :
+  val initial_context :
     Proxy_getter.rpc_context_args ->
-    Tezos_protocol_environment.rpc_context tzresult Lwt.t
+    Context_hash.t ->
+    Tezos_protocol_environment.Context.t tzresult Lwt.t
 
   (** The [time_between_blocks] constant for the given block, if any. *)
   val time_between_blocks :

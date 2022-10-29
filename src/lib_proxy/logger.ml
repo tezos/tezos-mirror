@@ -5,8 +5,6 @@ module type S = sig
 
   val proxy_getter_created : (string * string) t
 
-  val proxy_block_header : (string * string) t
-
   val proxy_block_rpc : (string * string * string list) t
 
   val no_tree_received : unit t
@@ -28,15 +26,6 @@ let logger ~protocol_name : (module S) =
         ~name:(mk_name "proxy_getter_created")
         ~level:Internal_event.Debug
         ~msg:"proxy cache created for chain {chain} and block {block}"
-        ("chain", Data_encoding.string)
-        ("block", Data_encoding.string)
-
-    let proxy_block_header =
-      declare_2
-        ~section
-        ~name:(mk_name "proxy_block_header")
-        ~level:Internal_event.Debug
-        ~msg:"chains/<{chain}>/blocks/<{block}>/header"
         ("chain", Data_encoding.string)
         ("block", Data_encoding.string)
 

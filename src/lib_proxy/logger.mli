@@ -5,8 +5,6 @@ module type S = sig
 
   val proxy_getter_created : (string * string) t
 
-  val proxy_block_header : (string * string) t
-
   val proxy_block_rpc : (string * string * string list) t
 
   val no_tree_received : unit t
