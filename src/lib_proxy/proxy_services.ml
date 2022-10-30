@@ -68,6 +68,24 @@ let to_client_server_mode = function
   | Light_client _ | Proxy_client -> Proxy.Client
   | Proxy_server _ -> Proxy.Server
 
+let get_protocols ?expected_protocol rpc_context chain block =
+  let open Lwt_result_syntax in
+  let* ({next_protocol; _} as protocols) =
+    Tezos_shell_services.Block_services.protocols rpc_context ~chain ~block ()
+  in
+  match expected_protocol with
+  | None -> return protocols
+  | Some proto_hash ->
+      if Protocol_hash.equal next_protocol proto_hash then return protocols
+      else
+        failwith
+          "Protocol passed to the proxy (%a) and protocol of the node (%a) \
+           differ."
+          Protocol_hash.pp
+          proto_hash
+          Protocol_hash.pp
+          next_protocol
+
 type env_cache_key = Tezos_shell_services.Chain_services.chain * Block_hash.t
 
 module Env_cache_key_hashed_type :
@@ -98,7 +116,7 @@ module Env_cache =
 module Env_cache_lwt = Ringo_lwt.Functors.Make_result (Env_cache)
 
 let build_directory (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.generic) (mode : mode) force_protocol :
+    (rpc_context : RPC_context.generic) (mode : mode) expected_protocol :
     unit RPC_directory.t =
   let block_hash_cache =
     (* We consider that the duration of a run of a client command is
@@ -161,13 +179,11 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           ~block:block_key
           ()
       in
+      let* protocols =
+        get_protocols ?expected_protocol rpc_context chain block_key
+      in
       let* proxy_env =
-        Registration.get_registered_proxy
-          printer
-          rpc_context
-          ~chain
-          ~block:block_key
-          force_protocol
+        Registration.get_registered_proxy printer protocols.next_protocol
       in
       let (module Proxy_environment) = proxy_env in
       let ctx : Proxy_getter.rpc_context_args =
@@ -195,15 +211,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         (RPC_directory.register
            mapped_directory
            Tezos_shell_services.Block_services.Empty.S.protocols
-           (fun _ctxt () () ->
-             return
-               Tezos_shell_services.Block_services.
-                 {
-                   current_protocol =
-                     (* wrong if the block is a transition block! *)
-                     Proxy_environment.protocol_hash;
-                   next_protocol = Proxy_environment.protocol_hash;
-                 }))
+           (fun _ctxt () () -> return protocols))
     in
     Env_cache_lwt.find_or_replace envs_cache key compute_value
   in

@@ -72,8 +72,5 @@ val get_all_registered : unit -> proxy_environment list
 (** Returns a proxy environment for the given protocol. *)
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
-  #RPC_context.simple ->
-  ?chain:Block_services.chain ->
-  ?block:Block_services.block ->
-  Protocol_hash.t option ->
+  Protocol_hash.t ->
   proxy_environment tzresult Lwt.t
