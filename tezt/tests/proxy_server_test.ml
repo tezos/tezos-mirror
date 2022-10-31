@@ -206,7 +206,7 @@ let test_equivalence =
   let* node, _, alternative = init ~protocol () in
   let vanilla = Client.create ~endpoint:(Node node) () in
   let clients = {vanilla; alternative} in
-  let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
+  let tz_log = [("proxy_rpc", "debug"); ("proxy_getter", "debug")] in
   check_equivalence ~tz_log alt_mode clients
 
 let test_wrong_data_dir =

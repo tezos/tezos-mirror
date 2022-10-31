@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module L = (val Tezos_proxy.Logger.logger ~protocol_name:Protocol.name
-              : Tezos_proxy.Logger.S)
-
 module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
   (** Split done only when the mode is [Tezos_proxy.Proxy.server]. Getting
       an entire big map at once is useful for dapp developers that
@@ -79,8 +76,8 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       (key : Tezos_protocol_environment.Proxy_context.M.key) =
     let chain = pgi.chain in
     let block = pgi.block in
-    L.emit
-      L.proxy_block_rpc
+    Tezos_proxy.Logger.emit
+      Tezos_proxy.Logger.proxy_block_rpc
       ( Tezos_shell_services.Block_services.chain_to_string chain,
         Tezos_shell_services.Block_services.to_string block,
         key )
@@ -92,7 +89,7 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
       key
     >>=? fun (raw_context : Tezos_context_sigs.Context.Proof_types.raw_context)
       ->
-    L.emit L.tree_received
+    Tezos_proxy.Logger.emit Tezos_proxy.Logger.tree_received
     @@ Int64.of_int (Tezos_proxy.Proxy_getter.raw_context_size raw_context)
     >>= fun () -> return raw_context
 end
@@ -102,8 +99,8 @@ let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
     Tezos_protocol_environment.Context.t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*! () =
-    L.emit
-      L.proxy_getter_created
+    Tezos_proxy.Logger.emit
+      Tezos_proxy.Logger.proxy_getter_created
       ( Tezos_shell_services.Block_services.chain_to_string ctx.chain,
         Tezos_shell_services.Block_services.to_string ctx.block )
   in

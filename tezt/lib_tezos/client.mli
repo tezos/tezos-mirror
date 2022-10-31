@@ -173,8 +173,7 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     [log_*], [hooks] and [env] arguments.
 
     In particular, [env] can be used to pass [TEZOS_LOG], e.g.
-    [("TEZOS_LOG", Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")] to enable
-    logging. *)
+    [("TEZOS_LOG", "proxy_rpc->debug")] to enable logging. *)
 val rpc :
   ?log_command:bool ->
   ?log_status_on_exit:bool ->

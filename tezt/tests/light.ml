@@ -281,11 +281,7 @@ let test_compare_light =
   let* vanilla = Client.init ~endpoint:(Node node) () in
   let clients = {vanilla; alternative = light_client} in
   let tz_log =
-    [
-      ("alpha.proxy_rpc", "debug");
-      ("light_mode", "debug");
-      ("proxy_getter", "debug");
-    ]
+    [("proxy_rpc", "debug"); ("light_mode", "debug"); ("proxy_getter", "debug")]
   in
   check_equivalence ~tz_log alt_mode clients
 

@@ -88,13 +88,10 @@ is doing differently, you may use three debug variables:
 
 * ``proxy_rpc_ctxt`` shows whether the proxy client is delegating RPCs
   to the node or doing them locally. This is the main debug variable.
-* ``PROTO.proxy_rpc`` shows the RPCs that the proxy client is performing to retrieve
+* ``proxy_rpc`` shows the RPCs that the proxy client is performing to retrieve
   up-to-date data from the node. This debug variable is useful to understand
   if the proxy is performing slowly. It might be because it is performing
   a lot of such RPCs.
-
-  This variable is dependent on the protocol being used. Replace ``PROTO``
-  by one of these values: ``genesis``, or ``alpha``.
 * ``proxy_context`` shows low-level detail implementations of the client,
   you likely do not need it.
 

@@ -61,8 +61,7 @@ let test_cache_at_most_once ?query_string path =
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")]
-    |> List.to_seq |> String_map.of_seq
+    [("TEZOS_LOG", "proxy_rpc->debug")] |> List.to_seq |> String_map.of_seq
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
@@ -170,18 +169,18 @@ let starts_with ~(prefix : string) (s : string) : bool =
     In this scenario, the proxy client should look directly in the data within the tree received by the first request.
 
     For this, this test inspects the debug output produced by
-    setting TEZOS_LOG to alpha.proxy_rpc->debug. This causes the client
+    setting TEZOS_LOG to proxy_rpc->debug. This causes the client
     to print the RPCs done to get pieces of the context:
 
-    alpha.proxy_rpc: P/v1/constants
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/v1/first_level
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/random_seed
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/stake_snapshot
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/last_roll/0
+    proxy_rpc: P/v1/constants
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/v1/first_level
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/random_seed
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/stake_snapshot
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/last_roll/0
 
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
@@ -196,11 +195,7 @@ let test_context_suffix_no_rpc ?query_string path =
     ~tags:["proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
-  let env =
-    String_map.singleton
-      "TEZOS_LOG"
-      (Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")
-  in
+  let env = String_map.singleton "TEZOS_LOG" "proxy_rpc->debug" in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
     |> Process.check_and_read_stderr
