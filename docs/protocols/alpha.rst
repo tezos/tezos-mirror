@@ -20,13 +20,14 @@ Smart Contract Optimistic Rollups (ongoing)
 
 Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
 :gl:`!6252`, :gl:`!6396`, :gl:`!6364`, :gl:`!6413`, :gl:`!6545`, :gl:`!6543`,
-:gl:`!6590`, :gl:`!6623`)
+:gl:`!6590`, :gl:`!6623`, :gl:`!6641`, :gl:`!6549`, :gl:`!6672`, :gl:`!6500`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
 Distribution of rollup operations data off-chain. (MRs :gl:`!6174`, :gl:`!6388`,
-:gl:`!6527`, :gl:`!6505`)
+:gl:`!6527`, :gl:`!6505`, :gl:`!6553`, :gl:`!6685`, :gl:`!6470`, :gl:`!6643`,
+:gl:`!6704`, :gl:`!6683`, :gl:`!6702`, :gl:`!6728`, :gl:`!5905`)
 
 Breaking Changes
 ----------------
@@ -77,3 +78,8 @@ Internal
 
 - Remove function for computing baking rights without cache update.
   (MR :gl:`!6605`)
+
+- Move the definition of ``boxed_list`` to ``Script_list``. (MR :gl:`!5954`)
+
+- Make ``counter`` an abstract type instead of an alias of ``Z.t``.
+  (MRs :gl:`!6647`, :gl:`!6648`)
