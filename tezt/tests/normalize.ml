@@ -1,6 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -45,9 +46,9 @@ let test_normalize_unparsing_mode =
   let typ = "list (pair nat nat nat nat)" in
   let* () =
     modes
-    |> Lwt_list.iter_s (fun mode ->
-           let* _ = Client.normalize_data client ~hooks ?mode ~data ~typ in
-           unit)
+    |> Lwt_list.iter_s @@ fun mode ->
+       let* _ = Client.normalize_data client ~hooks ?mode ~data ~typ in
+       unit
   in
   unit
 
@@ -79,20 +80,44 @@ let test_normalize_script =
   let* client = Client.init_mockup ~protocol () in
   let* () =
     modes
-    |> Lwt_list.iter_s (fun mode ->
-           let* _ =
-             Client.normalize_script
-               client
-               ~hooks
-               ?mode
-               ~script:
-                 "file:./tezt/tests/contracts/proto_alpha/comb-literals.tz"
-           in
-           unit)
+    |> Lwt_list.iter_s @@ fun mode ->
+       let* _ =
+         Client.normalize_script
+           client
+           ~hooks
+           ?mode
+           ~script:"file:./tezt/tests/contracts/proto_alpha/comb-literals.tz"
+       in
+       unit
+  in
+  unit
+
+let test_normalize_type =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Test normalize type"
+    ~tags:["client"; "normalize"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    [
+      "nat";
+      "list nat";
+      "pair nat int";
+      "list (pair nat int)";
+      "pair nat int bool";
+      "list (pair nat int bool)";
+      "pair nat int bool bytes";
+      "list (pair nat int bool bytes)";
+    ]
+    |> Lwt_list.iter_s @@ fun typ ->
+       let* _ = Client.normalize_type client ~hooks ~typ in
+       unit
   in
   unit
 
 let register ~protocols =
   test_normalize_unparsing_mode protocols ;
   test_normalize_legacy_flag protocols ;
-  test_normalize_script protocols
+  test_normalize_script protocols ;
+  test_normalize_type protocols
