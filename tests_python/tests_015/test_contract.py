@@ -1595,54 +1595,6 @@ expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
 
 
 @pytest.mark.contract
-@pytest.mark.regression
-class TestNormalize:
-    """Regression tests for the "normalize data" command."""
-
-    modes = [None, 'Readable', 'Optimized', 'Optimized_legacy']
-
-    @pytest.mark.parametrize('mode', modes)
-    def test_normalize_unparsing_mode(self, client_regtest_scrubbed, mode):
-        client = client_regtest_scrubbed
-        input_data = (
-            '{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}'
-        )
-        input_type = 'list (pair nat nat nat nat)'
-        client.normalize(input_data, input_type, mode=mode)
-
-    def test_normalize_legacy_flag(self, client_regtest_scrubbed):
-        client = client_regtest_scrubbed
-        input_data = '{Elt %a 0 1}'
-        input_type = 'map nat nat'
-        client.normalize(input_data, input_type, legacy=True)
-        error_pattern = 'unexpected annotation.'
-        with utils.assert_run_failure(error_pattern):
-            client.normalize(input_data, input_type, legacy=False)
-
-    @pytest.mark.parametrize('mode', modes)
-    def test_normalize_script(self, client_regtest_scrubbed, mode):
-        client = client_regtest_scrubbed
-        path = os.path.join(CONTRACT_PATH, 'opcodes', 'comb-literals.tz')
-        client.normalize_script(path, mode=mode)
-
-    types = [
-        'nat',
-        'list nat',
-        'pair nat int',
-        'list (pair nat int)',
-        'pair nat int bool',
-        'list (pair nat int bool)',
-        'pair nat int bool bytes',
-        'list (pair nat int bool bytes)',
-    ]
-
-    @pytest.mark.parametrize('typ', types)
-    def test_normalize_type(self, client_regtest_scrubbed, typ):
-        client = client_regtest_scrubbed
-        client.normalize_type(typ)
-
-
-@pytest.mark.contract
 @pytest.mark.incremental
 class TestContractTypeChecking:
     """Typechecking tests for the address and (contract _) types."""

@@ -1178,6 +1178,7 @@ val spawn_get_contract_hash :
 
 (** Run [octez-client normalize data .. of type ...]*)
 val normalize_data :
+  ?hooks:Process_hooks.t ->
   ?mode:normalize_mode ->
   ?legacy:bool ->
   data:string ->
@@ -1187,6 +1188,7 @@ val normalize_data :
 
 (** Same as [normalize_data], but do not wait for the process to exit. *)
 val spawn_normalize_data :
+  ?hooks:Process_hooks.t ->
   ?mode:normalize_mode ->
   ?legacy:bool ->
   data:string ->
@@ -1196,11 +1198,26 @@ val spawn_normalize_data :
 
 (** Run [octez-client normalize script ..]*)
 val normalize_script :
-  ?mode:normalize_mode -> script:string -> t -> string Lwt.t
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  script:string ->
+  t ->
+  string Lwt.t
 
 (** Same as [normalize_script], but do not wait for the process to exit. *)
 val spawn_normalize_script :
-  ?mode:normalize_mode -> script:string -> t -> Process.t
+  ?hooks:Process_hooks.t ->
+  ?mode:normalize_mode ->
+  script:string ->
+  t ->
+  Process.t
+
+(** Run [octez-client normalize type ..]*)
+val normalize_type : ?hooks:Process_hooks.t -> typ:string -> t -> string Lwt.t
+
+(** Same as [normalize_type], but do not wait for the process to exit. *)
+val spawn_normalize_type :
+  ?hooks:Process_hooks.t -> typ:string -> t -> Process.t
 
 (** Run [octez-client typecheck data ..]*)
 val typecheck_data :

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,58 +26,98 @@
 
 (* Testing
    -------
-   Component: Client - normalize command
-   Invocation: dune exec tezt/tests/main.exe -- --file normalize.ml
-   Subject: Test the client's command 'normalize data .. of type ...'
+   Component:    Client
+   Invocation:   dune exec tezt/tests/main.exe -- --file normalize.ml
+   Subject:      Regression tests for the "normalize data" command.
 *)
 
-let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}"
+let hooks = Tezos_regression.hooks
 
-let typ = "list (pair nat nat nat nat)"
+let modes = Client.[None; Some Readable; Some Optimized; Some Optimized_legacy]
 
-let normalize_modes =
-  let open Client in
-  [Readable; Optimized; Optimized_legacy]
-
-let execute_all_modes client =
-  let legacy = true in
-  Lwt_list.map_s
-    (fun mode -> Client.normalize_data ~mode ~legacy ~data ~typ client)
-    normalize_modes
-
-let test_normalize_vanilla =
-  Protocol.register_test
+let test_normalize_unparsing_mode =
+  Protocol.register_regression_test
     ~__FILE__
-    ~title:(sf "normalize data")
-    ~tags:["normalize"; "data"]
-  @@ fun protocol ->
-  let* node = Node.init [] in
-  let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
-
-let test_normalize_mockup =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"normalize data (mockup)"
-    ~tags:["mockup"; "normalize"; "data"]
+    ~title:"Test normalize in unparsing mode"
+    ~tags:["client"; "normalize"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
+  let data = "{Pair 0 3 6 9; Pair 1 (Pair 4 (Pair 7 10)); {2; 5; 8; 11}}" in
+  let typ = "list (pair nat nat nat nat)" in
+  let* () =
+    modes
+    |> Lwt_list.iter_s @@ fun mode ->
+       let* _ = Client.normalize_data client ~hooks ?mode ~data ~typ in
+       unit
+  in
+  unit
 
-let test_normalize_proxy =
-  Protocol.register_test
+let test_normalize_legacy_flag =
+  Protocol.register_regression_test
     ~__FILE__
-    ~title:"normalize data (proxy)"
-    ~tags:["proxy"; "normalize"; "data"]
+    ~title:"Test normalize with legacy flag"
+    ~tags:["client"; "normalize"]
   @@ fun protocol ->
-  let* _, client = Proxy.init ~protocol () in
-  let* _ = execute_all_modes client in
-  Lwt.return_unit
+  let* client = Client.init_mockup ~protocol () in
+  let data = "{Elt %a 0 1}" in
+  let typ = "map nat nat" in
+  let* () =
+    let* _ = Client.normalize_data client ~legacy:true ~hooks ~data ~typ in
+    unit
+  in
+  let* () =
+    Client.spawn_normalize_data client ~legacy:false ~hooks ~data ~typ
+    |> Process.check_error ~msg:(rex "unexpected annotation.")
+  in
+  unit
+
+let test_normalize_script =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Test normalize script"
+    ~tags:["client"; "normalize"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    modes
+    |> Lwt_list.iter_s @@ fun mode ->
+       let* _ =
+         Client.normalize_script
+           client
+           ~hooks
+           ?mode
+           ~script:"file:./tezt/tests/contracts/proto_alpha/comb-literals.tz"
+       in
+       unit
+  in
+  unit
+
+let test_normalize_type =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"Test normalize type"
+    ~tags:["client"; "normalize"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    [
+      "nat";
+      "list nat";
+      "pair nat int";
+      "list (pair nat int)";
+      "pair nat int bool";
+      "list (pair nat int bool)";
+      "pair nat int bool bytes";
+      "list (pair nat int bool bytes)";
+    ]
+    |> Lwt_list.iter_s @@ fun typ ->
+       let* _ = Client.normalize_type client ~hooks ~typ in
+       unit
+  in
+  unit
 
 let register ~protocols =
-  test_normalize_vanilla protocols ;
-  test_normalize_mockup protocols ;
-  test_normalize_proxy protocols
+  test_normalize_unparsing_mode protocols ;
+  test_normalize_legacy_flag protocols ;
+  test_normalize_script protocols ;
+  test_normalize_type protocols
