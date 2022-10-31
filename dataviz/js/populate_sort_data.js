@@ -9,16 +9,16 @@ function range(start, end) {
 function onlyUnique(value, index, self) {
     return self.indexOf(value) === index;
 }
-const getHead = function(server){
+const getHead = function (server) {
     let level;
     return axios
-        .get(server+"head.json")
+        .get(server + "head.json")
         .then(json => {
-            let json_data=json.data
-            level= json_data["level"]
+            let json_data = json.data
+            level = json_data["level"]
             console.log(level)
         })
-        .then(_=>{return level-1}) 
+        .then(_ => { return level - 1 })
         .catch(error => { console.error(error); throw error; });
 }
 
@@ -582,8 +582,7 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
                 minValue = value;
             }
         }
-
-        bins = d3.bin().thresholds(maxValue - minValue)(data[0])
+        new_data = (data[1].concat(data[0])).concat([recep_block_time])
 
         for (const [key, value] of Object.entries(data[1])) {
             if (value > maxValue) {
@@ -594,23 +593,27 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             }
         }
 
-        bins2 = d3.bin().thresholds(maxValue - minValue)(data[1]);
-        bins3 = d3.bin().thresholds(maxValue - minValue)([recep_block_time]);
-        console.log(bins3);
-
-        bins_tot = d3.bin().thresholds(maxValue - minValue)((data[1].concat(data[0])).concat([recep_block_time]));
-
         x = d3.scaleLinear()
-            .domain([0, bins_tot[bins_tot.length - 1].x1])
+            .domain([0, maxValue+500])
             .range([margin.left, width - margin.right]);
 
+
+        var ticks = d3.range(-500, maxValue + 500, 500);  //define size of paquet (500) ; //fix ticks
+        bins = d3.bin().thresholds(ticks)(data[0].concat([-1]));//fix ticks
+        bins.shift(); //fix ticks
+        bins2 = d3.bin().thresholds(ticks)(data[1].concat([-1])); //fix ticks
+        bins2.shift(); //fix ticks
+        bins3 = d3.bin().thresholds(ticks)([recep_block_time, 0]); //fix ticks
+
+        new_data = (data[1].concat(data[0])).concat([recep_block_time])
+        bins_tot = d3.bin().thresholds(ticks)(new_data); //define size of paquet  
+        
+        ticks.shift()
         y = d3.scaleLinear()
             .domain([0, d3.max(bins_tot, d => d.length)]).nice()
             .range([height - margin.bottom, margin.top])
 
-        tickArr = d3.axisBottom(x).scale().ticks();//adjust width of the bar
-        tickDistance = x(tickArr[tickArr.length - 1]) - x(tickArr[tickArr.length - 2]);//adjust width of the bar
-
+        tickDistance = x(ticks[ticks.length - 1]) - x(ticks[ticks.length - 2]);//adjust width of the bar
 
         graph.selectAll("rect")
             .data(bins)
@@ -631,7 +634,6 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .attr("height", d => y(0) - y(d.length))
             .style("fill", "#404080")
             .style("opacity", 0.6);
-
         graph.selectAll("rect3")//block
             .data(bins3)
             .join("rect")
@@ -659,10 +661,10 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
 
         svg.append("text")
             .attr("x", width)
-            .attr("y", height+5)
+            .attr("y", height + 5)
             .attr("fill", "currentColor")
             .attr("text-anchor", "end")
-            .text("Reception times (seconds) →");
+            .text("Reception times (ms) →");
 
         svg.append("circle").attr("cx", width - 170).attr("cy", 30).attr("r", 6).style("fill", "#69b3a2")
         svg.append("circle").attr("cx", width - 170).attr("cy", 60).attr("r", 6).style("fill", "#404080")
@@ -671,12 +673,12 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
         svg.append("circle").attr("cx", width - 170).attr("cy", 90).attr("r", 6).style("fill", "rgba(198, 0, 0, 1)")
         svg.append("text").attr("x", width - 150).attr("y", 90).text("Candidate block").style("font-size", "15px").attr("alignment-baseline", "middle")
 
-        xAxis.call(d3.axisBottom(x))
+        /*xAxis.call(d3.axisBottom(x))
             .selectAll("text")
             .attr("transform", "translate(" + tickDistance / 2 + ",0)rotate(-45)")
             .style("text-anchor", "end");
 
-
+*/
         //xAxis.call(d3.axisBottom(x).tickSizeOuter(2));
         xAxis.call(d3.axisBottom(x))
             .selectAll("text")
@@ -695,7 +697,7 @@ const resume_obs = function (data, t_baker, delegate = "") {
                 var new_v2 = [];
                 for (const element of v2) {
                     var address_comp = element.slice(0, 7) + "..." + element.slice(-6, -1) + ", ";
-                    new_v2.push(" "+element);
+                    new_v2.push(" " + element);
                 }
                 data[level][k1][k2] = new_v2;
             })
@@ -1633,8 +1635,8 @@ function chart_endorsement_inclusion_based_on_threshold_time(data) {
     }
 
 }
-function chart_progress_status(msg_){
-    
+function chart_progress_status(msg_) {
+
 }
 function chart_endorsement_inclusion_based_on_multiple_threshold_time(data) {
     if (!(isEmpty(data))) {

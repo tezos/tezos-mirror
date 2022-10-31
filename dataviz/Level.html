@@ -49,7 +49,8 @@
                     document.getElementById("selectedLevel").value = block_value;
                     let dict_data = populate_v1(server_adress, block_value, block_value).then(dict_data => {
                         console.log(dict_data)
-                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
+                        console.log(ditribution_delays)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_block(dict_data);
                         let t_delay_block = result[0]
@@ -70,7 +71,8 @@
                     Promise.all([a, b]).then(([block_value, dict_data]) => {
                         console.log([block_value, dict_data])
                         document.getElementById("selectedLevel").value = block_value;
-                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
+                        console.log(ditribution_delays)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_block(dict_data);
                         let t_delay_block = result[0]
@@ -95,7 +97,7 @@
 
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
-                        let ditribution_delays = delays_distribution_of_operations(dict_data)
+                        let ditribution_delays = delays_distribution_of_operations(dict_data, true)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_block(dict_data);
                         let t_delay_block = result[0]
@@ -113,7 +115,7 @@
 
                     var va = document.getElementById('selectedLevel').value; e.target.value;
                     let dict_data = populate_v1(server_adress, va, va).then(dict_data => {
-                        let distrib_t = delays_distribution_of_operations(dict_data)
+                        let distrib_t = delays_distribution_of_operations(dict_data, true)
                         let logs_operation = classify_operations(dict_data)
                         let result = get_info_block(dict_data);
                         let t_delay_block = result[0]
