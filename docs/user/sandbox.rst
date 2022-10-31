@@ -108,7 +108,7 @@ we can do so with the following command:
 If the previous transaction is valid, the operation is included in the
 chain and the transfer terminates returning the usual receipt.
 Note that the ``bake for`` command of the client is exclusively for
-testing purposes, all baking should be done using the ``tezos-baker``
+testing purposes, all baking should be done using the ``octez-baker``
 binary.
 
 

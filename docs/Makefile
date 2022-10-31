@@ -43,15 +43,15 @@ full: odoc
 # Build the manuals for a given protocol
 %/tezos-client.html:
 	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-baker.html:
-	@../tezos-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-accuser.html:
-	@../tezos-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-baker.html:
+	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-accuser.html:
+	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
 	 $(PROTOCOLS:%=%/tezos-client.html) \
-	 $(PROTOCOLS:%=%/tezos-baker.html) \
-	 $(PROTOCOLS:%=%/tezos-accuser.html)
+	 $(PROTOCOLS:%=%/octez-baker.html) \
+	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html

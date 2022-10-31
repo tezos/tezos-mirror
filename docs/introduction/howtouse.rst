@@ -18,8 +18,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-node``: the tezos daemon itself (see `Node`_);
 - ``tezos-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
-- ``tezos-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
-  note that prior to v12 of Octez, there was also an endorser daemon ``tezos-endorser-*``;
+- ``octez-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
+  note that prior to v12 of Octez, there was also an endorser daemon ``octez-endorser-*``;
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
@@ -30,8 +30,8 @@ After a successful compilation, you should have the following binaries:
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``tezos-baker-014-PtKathma`` is the baker
-for the Kathmandu protocol, and ``tezos-baker-alpha`` is the baker
+For instance, ``octez-baker-014-PtKathma`` is the baker
+for the Kathmandu protocol, and ``octez-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
@@ -110,7 +110,7 @@ network.
 
 Other than passively observing the network, your node can also inject
 its own new operations when instructed by the ``tezos-client`` and even
-send new blocks when guided by the ``tezos-baker-*``.
+send new blocks when guided by the ``octez-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
 :doc:`../active/consensus`).

@@ -31,7 +31,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker.html
+         :file: octez-baker.html
 
 
 .. _accuser_manual:
@@ -41,4 +41,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser.html
+         :file: octez-accuser.html

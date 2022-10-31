@@ -280,7 +280,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and Baking Daemons
 -------------------------
 
-For now, ``tezos-client``, ``tezos-{baker,accuser}-*``, etc.
+For now, ``tezos-client``, ``octez-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.
 
 There is one common option ``--log-requests`` which can be used to trace

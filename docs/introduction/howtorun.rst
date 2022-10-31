@@ -169,7 +169,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   tezos-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
+   octez-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
@@ -187,7 +187,7 @@ Note that ``--liquidity-baking-toggle-vote`` must be placed
 .. note::
 
    In protocols before Ithaca, a separate daemon, the endorser, is responsible for emitting endorsements.
-   In these protocols, one needs to run the daemon ``tezos-endorser-NNN-*`` to endorse.
+   In these protocols, one needs to run the daemon ``octez-endorser-NNN-*`` to endorse.
 
 Accuser
 ~~~~~~~
@@ -205,7 +205,7 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
 
 ::
 
-   tezos-accuser-alpha run
+   octez-accuser-alpha run
 
 
 Docker

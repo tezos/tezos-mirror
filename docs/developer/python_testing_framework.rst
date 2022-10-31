@@ -495,8 +495,8 @@ Testing on a production branch (``zeronet``, ``mainnet``,...)
 
 On ``master``, protocol Alpha is named
 ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and daemons binary
-name are suffixed with ``alpha`` (``tezos-baker-alpha``,
-``tezos-accuser-alpha``...). However, on *production* branches, an actual
+name are suffixed with ``alpha`` (``octez-baker-alpha``,
+``octez-accuser-alpha``...). However, on *production* branches, an actual
 hash of the protocol is used, and a shortened string is used to specify
 daemons.
 

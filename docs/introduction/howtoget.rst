@@ -337,7 +337,7 @@ Now, install all the binaries by:
   :end-before: [test executables]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-baker-alpha``, ... In that case, it is enough to install
+install octez-baker-alpha``, ... In that case, it is enough to install
 the system dependencies of this package only by running ``opam depext
 tezos-node`` for example instead of ``opam depext tezos``.
 

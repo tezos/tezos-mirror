@@ -494,9 +494,9 @@ Baker
 -----
 
 The following breaking changes affect the Octez v13.0~rc1 baker daemon
-for the Jakarta 2 protocol ``tezos-baker-013-PtJakart``, but **not** the
+for the Jakarta 2 protocol ``octez-baker-013-PtJakart``, but **not** the
 corresponding one for the the Ithaca 2 protocol,
-``tezos-baker-012-Psithaca``.
+``octez-baker-012-Psithaca``.
 
 - **Breaking change**:
   The ``--liquidity-baking-escape-vote`` command-line option has been renamed
