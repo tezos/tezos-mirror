@@ -597,11 +597,12 @@ val spawn_list_known_addresses : t -> Process.t
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
-val gen_keys : ?alias:string -> t -> string Lwt.t
+val gen_keys : ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
 
 (** A helper to run [octez-client gen keys] followed by
     [octez-client show address] to get the generated key. *)
-val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
+val gen_and_show_keys :
+  ?alias:string -> ?sig_alg:string -> t -> Account.key Lwt.t
 
 (** Run [octez-client bls gen keys <alias>]. *)
 val bls_gen_keys :
@@ -1198,6 +1199,14 @@ val normalize_script :
 (** Same as [normalize_script], but do not wait for the process to exit. *)
 val spawn_normalize_script :
   ?mode:normalize_mode -> script:string -> t -> Process.t
+
+(** Run [octez-client typecheck data ..]*)
+val typecheck_data :
+  data:string -> typ:string -> ?gas:int -> ?legacy:bool -> t -> unit Lwt.t
+
+(** Same as [typecheck_data], but do not wait for the process to exit. *)
+val spawn_typecheck_data :
+  data:string -> typ:string -> ?gas:int -> ?legacy:bool -> t -> Process.t
 
 (** Run [octez-client typecheck script ..]*)
 val typecheck_script :
