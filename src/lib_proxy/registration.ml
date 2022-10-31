@@ -29,26 +29,26 @@ let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
     (proto_hash : Protocol_hash.t) (chain : Block_services.chain)
     (block : Block_services.block) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* {current_protocol; _} =
+  let* {next_protocol; _} =
     Block_services.protocols rpc_context ~chain ~block ()
   in
-  if Protocol_hash.equal current_protocol proto_hash then return_unit
+  if Protocol_hash.equal next_protocol proto_hash then return_unit
   else
     failwith
       "Protocol passed to the proxy (%a) and protocol of the node (%a) differ."
       Protocol_hash.pp
       proto_hash
       Protocol_hash.pp
-      current_protocol
+      next_protocol
 
 let get_node_protocol (rpc_context : #RPC_context.simple)
     (chain : Block_services.chain) (block : Block_services.block) :
     Protocol_hash.t tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let* {current_protocol; _} =
+  let* {next_protocol; _} =
     Block_services.protocols rpc_context ~chain ~block ()
   in
-  return current_protocol
+  return next_protocol
 
 module type Proxy_sig = sig
   val protocol_hash : Protocol_hash.t
