@@ -73,13 +73,33 @@ let test_cache_at_most_once ?query_string path =
     Re.Str.regexp
       {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block \([a-zA-Z0-9]*\)|}
   in
-  let extract_chain_block line =
-    (* Groups are 1-based (0 is for the whole match). *)
-    if Re.Str.string_match proxy_cache_regexp line 0 then
-      Some (Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)
-    else None
+  let proxy_cache_multi_regexp1 =
+    Re.Str.regexp
+      {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block|}
   in
-  let chain_block_list = lines |> List.filter_map extract_chain_block in
+  let proxy_cache_multi_regexp2 =
+    Re.Str.regexp {|^.*proxy_rpc: *\([a-zA-Z0-9]*\)|}
+  in
+  let rec extract_chain_block = function
+    | [] -> []
+    | [line] ->
+        (* Groups are 1-based (0 is for the whole match). *)
+        if Re.Str.string_match proxy_cache_regexp line 0 then
+          [(Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)]
+        else []
+    | l1 :: (l2 :: acc' as acc) ->
+        if Re.Str.string_match proxy_cache_regexp l1 0 then
+          let out = (Re.Str.matched_group 1 l1, Re.Str.matched_group 2 l1) in
+          out :: extract_chain_block acc
+        else if Re.Str.string_match proxy_cache_multi_regexp1 l1 0 then
+          let chain = Re.Str.matched_group 1 l1 in
+          if Re.Str.string_match proxy_cache_multi_regexp2 l2 0 then
+            let block = Re.Str.matched_group 1 l2 in
+            (chain, block) :: extract_chain_block acc'
+          else extract_chain_block acc
+        else extract_chain_block acc
+  in
+  let chain_block_list = extract_chain_block lines in
   let find_duplicate l =
     let rec go with_duplicates without_duplicates =
       match (with_duplicates, without_duplicates) with
