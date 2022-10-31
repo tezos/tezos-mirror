@@ -1085,6 +1085,7 @@ val run_script :
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?gas:int ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -1098,6 +1099,7 @@ val spawn_run_script :
   ?self_address:string ->
   ?source:string ->
   ?payer:string ->
+  ?gas:int ->
   prg:string ->
   storage:string ->
   input:string ->
