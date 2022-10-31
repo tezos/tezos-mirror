@@ -165,7 +165,6 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         Registration.get_registered_proxy
           printer
           rpc_context
-          (match mode with Light_client _ -> `Mode_light | _ -> `Mode_proxy)
           ~chain
           ~block:block_key
           force_protocol

@@ -73,7 +73,6 @@ val get_all_registered : unit -> proxy_environment list
 val get_registered_proxy :
   Tezos_client_base.Client_context.printer ->
   #RPC_context.simple ->
-  [< `Mode_light | `Mode_proxy] ->
   ?chain:Block_services.chain ->
   ?block:Block_services.block ->
   Protocol_hash.t option ->

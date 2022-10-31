@@ -94,30 +94,18 @@ let register_proxy_context m =
 let get_all_registered () : proxy_environment list = !registered
 
 let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : #RPC_context.simple) (mode : [< `Mode_light | `Mode_proxy])
-    ?(chain = `Main) ?(block = `Head 0)
+    (rpc_context : #RPC_context.simple) ?(chain = `Main) ?(block = `Head 0)
     (protocol_hash_opt : Protocol_hash.t option) :
     proxy_environment tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let mode_str =
-    match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
-  in
   let* protocol_hash =
     match protocol_hash_opt with
-    | None ->
-        let* protocol_hash = get_node_protocol rpc_context chain block in
-        let*! () =
-          printer#warning
-            "protocol of %s unspecified, using the node's protocol: %a"
-            mode_str
-            Protocol_hash.pp
-            protocol_hash
+    | None -> get_node_protocol rpc_context chain block
+    | Some protocol_hash ->
+        let* () =
+          check_client_node_proto_agree rpc_context protocol_hash chain block
         in
         return protocol_hash
-    | Some protocol_hash -> return protocol_hash
-  in
-  let* () =
-    check_client_node_proto_agree rpc_context protocol_hash chain block
   in
   let available = !registered in
   let proxy_opt =
