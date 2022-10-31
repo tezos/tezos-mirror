@@ -208,15 +208,22 @@ let test_context_suffix_no_rpc ?query_string path =
   let lines = String.split_on_char '\n' stderr in
   let rpc_path_regexp =
     Re.Str.regexp
-      {|.*proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/\(.*\)|}
+      {|.*proxy_rpc: /chains/<main>/blocks/<\([a-zA-Z0-9]*\)>/context/raw/bytes/\(.*\)|}
   in
-  let extract_rpc_path line =
+  let extract_rpc_path acc line =
     (* Groups are 1-based (0 is for the whole match). *)
     if Re.Str.string_match rpc_path_regexp line 0 then
-      Some (Re.Str.matched_group 1 line)
-    else None
+      let block = Re.Str.matched_group 1 line in
+      let l, r =
+        match List.partition (fun (b, _) -> String.equal block b) acc with
+        | _ :: _ :: _, _ -> assert false
+        | [(_, l)], r -> (l, r)
+        | [], _ -> ([], acc)
+      in
+      (block, Re.Str.matched_group 2 line :: l) :: r
+    else acc
   in
-  let context_queries = lines |> List.filter_map extract_rpc_path in
+  let context_queries = List.fold_left extract_rpc_path [] lines in
   let rec test_no_overlap_rpc = function
     | [] -> ()
     | query_after :: queries_before ->
@@ -233,8 +240,11 @@ let test_context_suffix_no_rpc ?query_string path =
           queries_before ;
         test_no_overlap_rpc queries_before
   in
-  assert (List.compare_length_with context_queries 2 >= 0) ;
-  Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
+  List.iter
+    (fun (_, l) -> assert (List.compare_length_with l 2 >= 0))
+    context_queries ;
+  Lwt.return
+  @@ List.iter (fun (_, l) -> test_no_overlap_rpc (List.rev l)) context_queries
 
 let paths =
   [
