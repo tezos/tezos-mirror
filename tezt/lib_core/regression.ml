@@ -216,17 +216,38 @@ let check_unknown_output_files output_dir relative_output_files =
     | _ -> ()
   in
   browse output_dir ;
-  if !found_unknown then (
-    Log.warn
-      "Use --on-unknown-regression-files delete to delete those files and/or \
-       directories." ;
-    if mode = Fail then exit 1) ;
-  if mode = Delete then exit 0
+  !found_unknown
 
 let () =
   (* We cannot run [check_unknown_output_files] before [Cli.init],
      and we cannot run it from the [Test] module because it would create
      a circular dependency. *)
   Test.before_test_run @@ fun () ->
-  if Cli.options.on_unknown_regression_files_mode <> Ignore then
-    String_map.iter check_unknown_output_files !output_dirs_and_files
+  let check_all_unknown_output_files () =
+    String_map.fold
+      (fun output_dir relative_output_files found_unknown ->
+        check_unknown_output_files output_dir relative_output_files
+        || found_unknown)
+      !output_dirs_and_files
+      false
+  in
+  let warn_unknown_output_files () =
+    Log.warn
+      "Use --on-unknown-regression-files delete to delete those files and/or \
+       directories."
+  in
+  match Cli.options.on_unknown_regression_files_mode with
+  | Ignore -> ()
+  | Warn ->
+      let found_unknown = check_all_unknown_output_files () in
+      if found_unknown then warn_unknown_output_files ()
+  | Fail ->
+      let found_unknown = check_all_unknown_output_files () in
+      if found_unknown then (
+        warn_unknown_output_files () ;
+        exit 1)
+  | Delete ->
+      let _ = check_all_unknown_output_files () in
+      (* Unknown output files are deleted inside [check_unknown_output_files]
+         so we do nothing here. *)
+      exit 0
