@@ -26,52 +26,37 @@
 
 (* Testing
    -------
-   Components: Michelson
-   Invocation: dune exec tezt/tests/main.exe -- --file self_address_transfer.ml
-   Subject: Regression tests for the Michelson [SELF_ADDRESS] instruction
+   Component:    Script
+   Invocation:   dune exec tezt/tests/main.exe -- --file order_in_top_level.ml
+   Subject:      Test that the storage, code, and parameter sections can appear in any order in a contract script.
 *)
 
-let hooks = Tezos_regression.hooks
+(** [interleave x l] inserts [x] into all positions of [l].
+    For example, [interleave 1 [2; 3]] will return [[[1; 2; 3]; [2; 1; 3]; [2; 3; 1]]]. *)
+let rec interleave (x : 'a) (l : 'a list) : 'a list list =
+  match l with
+  | [] -> [[x]]
+  | h :: t -> (x :: h :: t) :: (interleave x t |> List.map (fun t' -> h :: t'))
 
-let test_self_address_transfer =
-  Protocol.register_regression_test
+(** [permutations l] returns all permutations of [l] *)
+let rec permutations : 'a list -> 'a list list = function
+  | [] -> [[]]
+  | x :: xs -> permutations xs |> List.map (interleave x) |> List.flatten
+
+let test_order_in_top_level =
+  Protocol.register_test
     ~__FILE__
-    ~title:"Self address transfer"
-    ~tags:["client"; "michelson"]
+    ~title:"Order in top level of the script does not matter."
+    ~tags:["client"; "script"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
-  let* send_contract_hash =
-    Client.originate_contract
-      ~alias:"self_address_sender.tz"
-      ~amount:Tez.zero
-      ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/self_address_sender.tz"
-      ~init:"Unit"
-      ~burn_cap:Tez.one
-      ~hooks
-      client
+  let top_level_elements =
+    ["parameter nat"; "storage unit"; "code { CDR; NIL operation; PAIR }"]
   in
-  let* receive_contract_hash =
-    Client.originate_contract
-      ~alias:"self_address_receiver.tz"
-      ~amount:Tez.zero
-      ~src:"bootstrap1"
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/self_address_receiver.tz"
-      ~init:"Unit"
-      ~burn_cap:Tez.one
-      ~hooks
-      client
-  in
-  let* () =
-    Client.transfer
-      ~burn_cap:(Tez.of_int 2)
-      ~amount:Tez.zero
-      ~giver:"bootstrap2"
-      ~receiver:send_contract_hash
-      ~arg:(sf {|"%s"|} receive_contract_hash)
-      ~hooks
-      client
-  in
-  unit
+  permutations top_level_elements
+  |> Lwt_list.iter_s @@ fun elements ->
+     let script = String.concat ";\n" elements in
+     let* _ = Client.typecheck_script client ~script in
+     unit
 
-let register ~protocols = test_self_address_transfer protocols
+let register ~protocols = test_order_in_top_level protocols
