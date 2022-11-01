@@ -1,0 +1,24 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_014/opcodes/and_logical_1.tz on storage False and input '(Pair True True)' --level 1 --trace-stack
+storage
+  True
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039994.634 units remaining)
+    [ (Pair (Pair True True) False) ]
+  - location: 9 (remaining gas: 1039994.624 units remaining)
+    [ (Pair True True) ]
+  - location: 10 (remaining gas: 1039994.614 units remaining)
+    [ True
+      True ]
+  - location: 11 (remaining gas: 1039994.604 units remaining)
+    [ True ]
+  - location: 12 (remaining gas: 1039994.594 units remaining)
+    [ {}
+      True ]
+  - location: 14 (remaining gas: 1039994.584 units remaining)
+    [ (Pair {} True) ]
+

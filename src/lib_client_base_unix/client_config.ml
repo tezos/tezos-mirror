@@ -433,6 +433,13 @@ let base_dir_arg () =
          default_base_dir)
     (string_parameter ())
 
+let no_base_dir_warnings_switch () =
+  Tezos_clic.switch
+    ~long:"no-base-dir-warnings"
+    ~short:'n'
+    ~doc:"silence warnings about client data directory"
+    ()
+
 let config_file_arg () =
   Tezos_clic.arg
     ~long:"config-file"
@@ -859,8 +866,9 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  Tezos_clic.args18
+  Tezos_clic.args19
     (base_dir_arg ())
+    (no_base_dir_warnings_switch ())
     (config_file_arg ())
     (timings_switch ())
     (chain_arg ())
@@ -903,7 +911,8 @@ let default_parsed_config_args =
  * (when all/most commands will fail) or emits a warning (some commands may
  * fail).
  *)
-let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
+let check_base_dir_for_mode (ctx : #Client_context.full) client_mode
+    no_base_dir_warnings base_dir =
   let open Lwt_result_syntax in
   let open Tezos_mockup.Persistence in
   let* base_dir_class = classify_base_dir base_dir in
@@ -928,12 +937,14 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
   | `Mode_mockup -> (
       let warn_might_not_work explain =
         let*! () =
-          ctx#warning
-            "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
-             not work correctly.@]"
-            base_dir
-            explain
-            ()
+          if not no_base_dir_warnings then
+            ctx#warning
+              "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) \
+               might not work correctly.@]"
+              base_dir
+              explain
+              ()
+          else Lwt.return_unit
         in
         return_unit
       in
@@ -1031,6 +1042,7 @@ let light_mode_checks mode endpoint sources =
 let parse_config_args (ctx : #Client_context.full) argv =
   let open Lwt_result_syntax in
   let* ( ( base_dir,
+           no_base_dir_warnings,
            config_file,
            timings,
            chain,
@@ -1077,7 +1089,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
             (* In mockup mode base dir may be created automatically. *)
             return dir)
   in
-  let* () = check_base_dir_for_mode ctx client_mode base_dir in
+  let* () =
+    check_base_dir_for_mode ctx client_mode no_base_dir_warnings base_dir
+  in
   let* () =
     when_
       (Option.is_some sources && client_mode <> `Mode_light)
@@ -1219,6 +1233,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
 
 type t =
   string option
+  * bool
   * string option
   * bool
   * Shell_services.chain

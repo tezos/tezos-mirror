@@ -86,6 +86,14 @@ val take : int -> 'a list -> 'a list
     else the empty list. Raise [invalid_arg] if [n] is negative. *)
 val drop : int -> 'a list -> 'a list
 
+(** Split a list based on a predicate.
+
+    [span f l] returns a pair of lists [(l1, l2)], where [l1] is the
+    longest prefix of [l] that satisfies the predicate [f], and [l2] is
+    the rest of the list. The order of the elements in the input list
+    is preserved such that [l = l1 @ l2]. *)
+val span : ('a -> bool) -> 'a list -> 'a list * 'a list
+
 (** {2 Regular Expressions} *)
 
 (** Compiled regular expressions. *)

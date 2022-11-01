@@ -16,6 +16,7 @@ To browse the documentation:
 
 Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
+  -n --no-base-dir-warnings: silence warnings about client data directory
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
   --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the context associated with the specified chain). Possible tags are 'main' and 'test'.

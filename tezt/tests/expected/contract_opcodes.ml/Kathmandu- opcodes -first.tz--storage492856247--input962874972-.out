@@ -1,0 +1,30 @@
+
+./octez-client --protocol PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg --mode mockup --no-base-dir-warnings run script ./tests_python/contracts_014/opcodes/first.tz on storage 111 and input '{ 1 ; 2 ; 3 ; 4 }' --level 1 --trace-stack
+storage
+  1
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039992.133 units remaining)
+    [ (Pair { 1 ; 2 ; 3 ; 4 } 111) ]
+  - location: 8 (remaining gas: 1039992.123 units remaining)
+    [ { 1 ; 2 ; 3 ; 4 } ]
+  - location: 9 (remaining gas: 1039992.123 units remaining)
+    [ 1
+      { 2 ; 3 ; 4 } ]
+  - location: 11 (remaining gas: 1039992.123 units remaining)
+    [ { 2 ; 3 ; 4 } ]
+  - location: 13 (remaining gas: 1039992.113 units remaining)
+    [  ]
+  - location: 11 (remaining gas: 1039992.093 units remaining)
+    [ 1 ]
+  - location: 9 (remaining gas: 1039992.083 units remaining)
+    [ 1 ]
+  - location: 18 (remaining gas: 1039992.073 units remaining)
+    [ {}
+      1 ]
+  - location: 20 (remaining gas: 1039992.063 units remaining)
+    [ (Pair {} 1) ]
+
