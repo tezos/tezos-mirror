@@ -11,44 +11,17 @@ Welcome to the Tezos Developer Documentation!
 
 To start browsing, either follow one of the guided paths below, or directly pick any topics in the documentation menu.
 
-.. image:: images/tezos_meta.jpg
-      :width: 400px
-      :height: 230px
-      :target: tezos_project_
+.. image:: images/what_is_tezos_1.png
+      :width: 100%
       :alt: What is Tezos
-.. image:: images/getting_started.png
-      :width: 400px
-      :height: 230px
-      :target: getting_started_
-      :alt: Getting started
-.. image:: images/tezos_xtz.jpg
-      :width: 400px
-      :height: 230px
-      :target: tezos_users_
-      :alt: Using Octez
-.. image:: images/octopus.png
-      :width: 400px
-      :height: 230px
-      :target: understanding_tezos_
-      :alt: Understanding
-.. image:: images/smart_contract.png
-      :width: 400px
-      :height: 230px
-      :target: tezos_devs_
-      :alt: Building on Tezos
-.. image:: images/solving_puzzle.jpg
-      :width: 400px
-      :height: 230px
-      :target: octez_devs_
-      :alt: Contributing
 
-.. _tezos_project:
+.. raw:: html
 
-The Tezos blockchain
---------------------
+    <details>
+    <summary><a>Tezos is a distributed consensus platform with meta-consensus
+    capability. (See more) </a></summary>
 
-Tezos is a distributed consensus platform with meta-consensus
-capability. Tezos not only comes to consensus about the state of its ledger,
+Tezos not only comes to consensus about the state of its ledger,
 like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 
@@ -116,26 +89,35 @@ themselves with Tezos before using their real tez.
 
 See the list of test networks in :ref:`test network <test-networks>`.
 
-Guided paths
-------------
+.. raw:: html
 
-The following subsection provide some guided paths to the documentation available on this website.
-A complete map of the website is provided at the botton of this page.
+    </details><br/>
 
-.. _getting_started:
+.. image:: images/getting_started_2.png
+      :width: 100%
+      :alt: Getting started
 
-Getting started
-~~~~~~~~~~~~~~~
+.. raw:: html
 
-The best place to start exploring the project is following the ``Introduction`` section in the documentation menu.
+    <details>
+
+    <summary><a>Start exploring by following the <var>Introduction</var> section in the documentation menu. (See more) </a> </summary>
 
 These tutorials explain how to :doc:`get the latest implementation of Octez <introduction/howtoget>` in various forms, how to :doc:`start using Octez to join Tezos <introduction/howtouse>`, different :doc:`ways to participate to the network <introduction/howtorun>`, and more.
 
+.. raw:: html
 
-.. _tezos_users:
+    </details><br/>
 
-Using Tezos/Octez
-~~~~~~~~~~~~~~~~~
+.. image:: images/using_octez_3.png
+      :width: 100%
+      :alt: Using Octez
+
+.. raw:: html
+
+    <details>
+
+    <summary><a>Using Tezos/Octez (See more)</a></summary>
 
 If you already installed Octez and can participate in the Tezos blockchain, the most useful resources are grouped in the ``User`` section in the documentation menu.
 These pages:
@@ -145,10 +127,21 @@ These pages:
 
 If you intend to participate to Tezos not just as a mere user, but also as a baker, you could also check more specialized resources such as the `NL Knowledge Center <https://docs.nomadic-labs.com/nomadic-labs-knowledge-center/>`__ or `Open Tezos <https://opentezos.com>`__.
 
-.. _understanding_tezos:
+.. raw:: html
 
-Understanding Tezos/Octez
-~~~~~~~~~~~~~~~~~~~~~~~~~
+    </details><br/>
+
+
+.. image:: images/understanding_octez_4.png
+      :width: 100%
+      :alt: Understanding
+
+.. raw:: html
+
+    <details>
+
+    <summary><a>Understanding Tezos/Octez (See more)</a></summary>
+
 
 If you want to know more about the Tezos *technology*, there are several sections in the documentation presenting the main design principles of Tezos, and some high-level implementation principles of Octez:
 
@@ -156,10 +149,21 @@ If you want to know more about the Tezos *technology*, there are several section
 
 - Sections named ``<name> Protocol`` explain the design principles and the salient features of several Tezos protocols, current or upcoming, such as: the :doc:`the active protocol <active/protocol>`, a :doc:`protocol proposal under development <alpha/protocol>`, and possibly some protocol(s) that are currently candidate(s) for future adoption.
 
-.. _tezos_devs:
 
-Building on Tezos
-~~~~~~~~~~~~~~~~~
+.. raw:: html
+
+    </details><br/>
+
+
+.. image:: images/building_on_tezos_5.png
+      :width: 100%
+      :alt: Building on Tezos
+
+.. raw:: html
+
+    <details>
+
+    <summary><a>Building on Tezos (See more)</a></summary>
 
 Tezos is an open platform. As any programmable blockchain, its value lies in the increasing base of smart contracts and distributed applications covering various domains, but also in the tools that make the ecosystem easier to use and more efficient, such as wallets, indexers, and many others.
 
@@ -172,10 +176,20 @@ For Tezos developers, this website mostly provides API documentation, but also s
 
 If you are looking for a more accessible and pedagogical exposition on how to write smart contracts or Dapps, there are many great resources out there for developing on Tezos, such as the `Tezos Developer Portal <https://developers.tezos.com>`__ and `Open Tezos <https://opentezos.com>`__.
 
-.. _octez_devs:
+.. raw:: html
 
-Contributing to Octez
-~~~~~~~~~~~~~~~~~~~~~
+    </details><br/>
+
+
+.. image:: images/core_developer_6.png
+      :width: 100%
+      :alt: Contributing
+
+.. raw:: html
+
+    <details>
+
+    <summary><a>Contributing to Octez (See more)</a></summary>
 
 The main focus of this technical documentation website is on resources for core developers, that is, contributors to the Tezos platform, and in particular to its Octez implementation.
 
@@ -192,6 +206,11 @@ Core developers are also provided reference materials for internal APIs of Octez
 - The :doc:`API of OCaml libraries and modules <api/api-inline>` reference
 - The :doc:`shell/p2p_api` reference
 - The :doc:`developer/merkle-proof-encoding-formats` reference.
+
+.. raw:: html
+
+    </details><br/>
+
 
 Website map
 -----------
