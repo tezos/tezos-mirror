@@ -42,7 +42,7 @@ class unix_cctxt :
 val make_unix_cctxt : addr:string -> port:int -> cctxt
 
 val get_slot :
-  #cctxt -> ?trim_slot:bool -> Cryptobox.Commitment.t -> string tzresult Lwt.t
+  #cctxt -> ?trim_slot:bool -> Cryptobox.Commitment.t -> bytes tzresult Lwt.t
 
 val get_shard :
   #cctxt -> Cryptobox.Commitment.t -> int -> Cryptobox.shard tzresult Lwt.t

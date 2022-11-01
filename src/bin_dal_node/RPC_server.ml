@@ -32,7 +32,6 @@ open Tezos_dal_node_services
 let handle_split_slot ctxt fill slot =
   let open Lwt_result_syntax in
   let*? {dal_parameters; dal_constants; _} = Node_context.get_ready ctxt in
-  let slot = String.to_bytes slot in
   let slot =
     if fill then
       Slot_manager.Utils.fill_x00 dal_parameters.Cryptobox.slot_size slot
@@ -59,7 +58,7 @@ let handle_slot ctxt (_, commitment) trim () =
       commitment
   in
   let slot = if trim then Slot_manager.Utils.trim_x00 slot else slot in
-  return (String.of_bytes slot)
+  return slot
 
 let handle_stored_slot_headers ctxt (_, block_hash) () () =
   let open Lwt_result_syntax in
