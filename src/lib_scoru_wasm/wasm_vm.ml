@@ -196,6 +196,7 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
             if kernel_hash <> kernel_fallback_hash then
               Durable.copy_tree_exn
                 durable
+                ~edit_readonly:true
                 Constants.kernel_key
                 Constants.kernel_fallback_key
             else Lwt.return durable

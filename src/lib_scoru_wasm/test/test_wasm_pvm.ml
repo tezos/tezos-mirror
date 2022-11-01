@@ -460,6 +460,94 @@ let should_run_store_copy_kernel () =
   let* () = assert_store_value tree "/a/b" (Some "ab") in
   return_ok_unit
 
+let test_modify_read_only_storage_kernel () =
+  let open Lwt_syntax in
+  let module_ =
+    {|
+(module
+ (import "rollup_safe_core" "store_write"
+         (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
+ (import "rollup_safe_core" "store_delete"
+         (func $store_delete (param i32 i32) (result i32)))
+ (import "rollup_safe_core" "store_move"
+         (func $store_move (param i32 i32 i32 i32) (result i32)))
+ (import "rollup_safe_core" "store_copy"
+         (func $store_copy (param i32 i32 i32 i32) (result i32)))
+ ;; Durable keys
+ (data (i32.const 100) "/readonly/kernel/boot.wasm")
+ (memory 1)
+ (export "mem" (memory 0))
+ (func $assert_readonly_error
+       (param $return_val i32)
+       (local.get $return_val)
+       (i32.const -9)
+       (i32.ne)
+       (if (then unreachable)))
+
+ (func (export "kernel_next")
+       (local $fallback_kernel_address i32)
+       (local $fallback_kernel_length i32)
+       (local $kernel_address i32)
+       (local $kernel_length i32)
+
+       (local.set $fallback_kernel_address (i32.const 100))
+       (local.set $fallback_kernel_length (i32.const 26))
+       (local.set $kernel_address (i32.const 109))
+       (local.set $kernel_length (i32.const 17))
+
+       ;; try writing "/readonly/kernel/boot.wasm"
+       ;;          to "/readonly/kernel/boot.wasm"
+       (call $assert_readonly_error
+             (call $store_write (local.get $fallback_kernel_address)
+                                (local.get $fallback_kernel_length)
+                                (i32.const 0)
+                                (local.get $fallback_kernel_address)
+                                (local.get $fallback_kernel_length)))
+
+       ;; try deleting "/readonly/kernel/boot.wasm"
+       (call $assert_readonly_error
+             (call $store_delete (local.get $fallback_kernel_address)
+                                 (local.get $fallback_kernel_length)))
+
+       ;; try copying "/readonly/kernel/boot.wasm" to "" (root of durable)
+       (call $assert_readonly_error
+             (call $store_copy (local.get $fallback_kernel_address)
+                               (local.get $fallback_kernel_length)
+                               (local.get $fallback_kernel_address)
+                               (i32.const 0)))
+
+       ;; try moving "/kernel/boot.wasm"
+       ;;     to "/readonly/kernel/boot.wasm"
+       (call $assert_readonly_error
+             (call $store_move (local.get $kernel_address)
+                               (local.get $kernel_length)
+                               (local.get $fallback_kernel_address)
+                               (local.get $fallback_kernel_length)))
+       (nop))
+ )
+  |}
+  in
+  let* tree = initial_tree ~from_binary:false module_ in
+  (* Make the first ticks of the WASM PVM (parsing of origination message), to
+     switch it to “Input_requested” mode. *)
+  let* tree = eval_until_input_requested tree in
+  (* The kernel is not expected to fail, the PVM should not have stuck state on.
+      *)
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state) ;
+  let* stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
+  (* We first evaluate the kernel normally, and it shouldn't fail. *)
+  let* tree = set_input_step "test" 0 tree in
+  let* tree = eval_until_input_requested tree in
+  (* The kernel is not expected to fail, the PVM should not have stuck state on.
+      *)
+  let* state = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state) ;
+  let* stuck_flag = has_stuck_flag tree in
+  assert (not stuck_flag) ;
+  return_ok_unit
+
 (* This function can build snapshotable state out of a tree. It currently
    assumes it follows a tree resulting from `set_input_step`.*)
 let build_snapshot_wasm_state_from_set_input
@@ -518,6 +606,7 @@ let build_snapshot_wasm_state_from_set_input
   let* durable =
     Durable.copy_tree_exn
       durable
+      ~edit_readonly:true
       Constants.kernel_key
       Constants.kernel_fallback_key
   in
@@ -1266,6 +1355,10 @@ let tests =
     tztest "Test store-delete kernel" `Quick should_run_store_delete_kernel;
     tztest "Test store-move kernel" `Quick should_run_store_move_kernel;
     tztest "Test store-copy kernel" `Quick should_run_store_copy_kernel;
+    tztest
+      "Test modifying read-only storage fails"
+      `Quick
+      test_modify_read_only_storage_kernel;
     tztest "Test snapshotable state" `Quick test_snapshotable_state;
     tztest
       "Test rebuild snapshotable state"

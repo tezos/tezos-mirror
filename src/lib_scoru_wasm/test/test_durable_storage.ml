@@ -831,6 +831,20 @@ let test_durable_invalid_keys () =
     assert_invalid_key (fun () ->
         Lwt.return @@ Durable.key_of_string_exn "/!\"?I")
   in
+  let* _ =
+    assert_invalid_key (fun () -> Lwt.return @@ Durable.key_of_string_exn "/")
+  in
+  Lwt.return_ok ()
+
+let test_readonly_key () =
+  let is_readonly k =
+    Durable.Internal_for_tests.key_is_readonly @@ Durable.key_of_string_exn k
+  in
+  assert (is_readonly "") ;
+  assert (is_readonly "/readonly") ;
+  assert (is_readonly "/readonly/hi") ;
+  assert (not @@ is_readonly "/hi") ;
+  assert (not @@ is_readonly "/readonly.actually.writeable") ;
   Lwt.return_ok ()
 
 let tests =
@@ -849,4 +863,5 @@ let tests =
     tztest "Durable: find value" `Quick test_durable_find_value;
     tztest "Durable: count subtrees" `Quick test_durable_count_subtrees;
     tztest "Durable: invalid keys" `Quick test_durable_invalid_keys;
+    tztest "Durable: readonly keys" `Quick test_readonly_key;
   ]

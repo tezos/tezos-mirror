@@ -51,6 +51,7 @@ module Error = struct
     | Memory_invalid_access
     | Input_output_too_large
     | Generic_invalid_access
+    | Store_readonly_value
 
   let code = function
     | Store_key_too_large -> -1l
@@ -61,6 +62,7 @@ module Error = struct
     | Memory_invalid_access -> -6l
     | Input_output_too_large -> -7l
     | Generic_invalid_access -> -8l
+    | Store_readonly_value -> -9l
 
   let return e = Lwt.return (code e)
 end
@@ -76,6 +78,7 @@ module Safe_access = struct
         return res)
       (function
         | Durable.Out_of_bounds _ -> fail Error.Store_invalid_access
+        | Durable.Readonly_value -> fail Error.Store_readonly_value
         | Memory.Bounds -> fail Error.Memory_invalid_access
         | Durable.Invalid_key _ -> fail Error.Store_invalid_key
         | _ -> fail Error.Generic_invalid_access)
