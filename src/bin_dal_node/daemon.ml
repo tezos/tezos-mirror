@@ -235,7 +235,9 @@ let get_dac_keys cctxt {Configuration.dac = {addresses; threshold; _}; _} =
        signatures"
       recovered_keys
       threshold
-  else return keys
+  else
+    let*! () = Event.(emit dac_is_ready) () in
+    return keys
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 

@@ -68,6 +68,14 @@ let node_is_ready =
     ~level:Notice
     ()
 
+let dac_is_ready =
+  declare_0
+    ~section
+    ~name:"dac_is_ready"
+    ~msg:"The Data Availability Committee is ready"
+    ~level:Notice
+    ()
+
 let data_dir_not_found =
   declare_1
     ~section
