@@ -187,7 +187,7 @@ module Revamped = struct
         (fun i ->
           let alias = Account.Bootstrap.alias i in
           let* key = Client.gen_and_show_keys ~alias client in
-          return (key, None))
+          return (key, None, true))
         (range
            (1 + bootstrap_accounts)
            (bootstrap_accounts + nb_additional_bootstrap_accounts))
@@ -205,7 +205,7 @@ module Revamped = struct
     log_step 2 "Inject %d transfer operations." number_of_operations ;
     let* _ =
       Tezos_base__TzPervasives.List.iter_s
-        (fun ((key : Account.key), _) ->
+        (fun ((key : Account.key), _, _) ->
           Client.transfer
             ~amount:(Tez.of_int 1)
             ~giver:key.alias

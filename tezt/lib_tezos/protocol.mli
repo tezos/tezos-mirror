@@ -108,12 +108,14 @@ type parameter_overrides =
     - [bootstrap_accounts], when given these accounts are used instead of
       [Account.Bootstrap.keys]
     - [parameters_overrides]
-    - [additional_bootstrap_accounts] (with their optional default balance) are
-      added to the list of bootstrap accounts of the protocol.
-    *)
+    - [additional_bootstrap_accounts] is a list of bootstrap accounts to
+      add to activation parameters. Each account is a triplet
+      [(key, balance, revealed)]. If [revealed] the public key is added,
+      else the public key hash is added. Revealed keys are expected to bake
+      from the start. Default [balance] is 4000000 tez. *)
 val write_parameter_file :
   ?bootstrap_accounts:(Account.key * int option) list ->
-  ?additional_bootstrap_accounts:(Account.key * int option) list ->
+  ?additional_bootstrap_accounts:(Account.key * int option * bool) list ->
   base:(string, t * constants option) Either.t ->
   parameter_overrides ->
   string Lwt.t

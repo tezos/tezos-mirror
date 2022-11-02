@@ -2515,26 +2515,40 @@ let stresstest_gen_keys ?endpoint ?alias_prefix n client =
   Lwt.return additional_bootstraps
 
 let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
-    ?parameter_file protocol =
-  match additional_bootstrap_accounts with
-  | None -> return parameter_file
-  | Some additional_account_keys ->
-      let additional_bootstraps =
-        List.map
-          (fun x -> (x, default_accounts_balance))
-          additional_account_keys
-      in
-      let* parameter_file =
-        Protocol.write_parameter_file
-          ~additional_bootstrap_accounts:additional_bootstraps
-          ~base:
-            (Option.fold
-               ~none:(Either.right protocol)
-               ~some:Either.left
-               parameter_file)
-          []
-      in
-      return (Some parameter_file)
+    ?additional_revealed_bootstrap_accounts ?parameter_file protocol =
+  if
+    Option.is_none additional_bootstrap_accounts
+    && Option.is_none additional_revealed_bootstrap_accounts
+  then return parameter_file
+  else
+    let additional_accounts acc ~revealed = function
+      | None -> acc
+      | Some accounts ->
+          List.fold_left
+            (fun acc x -> (x, default_accounts_balance, revealed) :: acc)
+            acc
+            accounts
+    in
+    let additional_unreveal_bootstrap_accounts =
+      additional_accounts [] ~revealed:false additional_bootstrap_accounts
+    in
+    let additional_bootstrap_accounts =
+      additional_accounts
+        additional_unreveal_bootstrap_accounts
+        ~revealed:true
+        additional_revealed_bootstrap_accounts
+    in
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~additional_bootstrap_accounts
+        ~base:
+          (Option.fold
+             ~none:(Either.right protocol)
+             ~some:Either.left
+             parameter_file)
+        []
+    in
+    return (Some parameter_file)
 
 let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels
@@ -2562,8 +2576,8 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file ?timestamp ?keys tag ~protocol ()
-    =
+    ?additional_revealed_bootstrap_account_count ?default_accounts_balance
+    ?parameter_file ?timestamp ?keys tag ~protocol () =
   let* node, client =
     init_with_node
       ?path
@@ -2585,10 +2599,18 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
         let* r = stresstest_gen_keys n client in
         return (Some r)
   in
+  let* additional_revealed_bootstrap_accounts =
+    match additional_revealed_bootstrap_account_count with
+    | None -> return None
+    | Some n ->
+        let* r = stresstest_gen_keys n client in
+        return (Some r)
+  in
   let* parameter_file =
     get_parameter_file
       ?additional_bootstrap_accounts
       ?default_accounts_balance
+      ?additional_revealed_bootstrap_accounts
       ?parameter_file
       (protocol, None)
   in

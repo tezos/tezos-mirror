@@ -82,9 +82,10 @@ val base_dir : t -> string
 (** Get [Account.key list] of all extra bootstraps.
 
     Additional bootstrap accounts are created when you use the
-    [additional_bootstrap_account_count] argument of [init_with_protocol].
-    They do not include the default accounts that are always created.
- *)
+    [additional_bootstrap_account_count] or
+    [additional_revealed_bootstrap_account_count] arguments of
+    [init_with_protocol]. They do not include the default accounts that are
+    always created. *)
 val additional_bootstraps : t -> Account.key list
 
 (** Create a client.
@@ -2002,8 +2003,9 @@ val init_with_node :
 
     - Create a client with mode [Client], [Light], or [Proxy]
     - Import all secret keys listed in {!Constant.all_secret_keys}
-    - Create [additional_account_count] accounts with
-      [default_accounts_balance]
+    - Create [additional_bootstrap_account_count] unrevealed accounts and
+      [additional_revealed_bootstrap_account_count] revealed accounts. These
+      accounts are created with [default_accounts_balance].
     - Activate the given protocol with [additional_account_count]
       additional bootstrap accounts whose aliases are given by
      [Account.bootstrap].
@@ -2021,6 +2023,7 @@ val init_with_protocol :
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?nodes_args:Node.argument list ->
   ?additional_bootstrap_account_count:int ->
+  ?additional_revealed_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
   ?parameter_file:string ->
   ?timestamp:timestamp ->
