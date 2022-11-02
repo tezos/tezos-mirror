@@ -25,23 +25,11 @@ be documented here either.
 Node
 ----
 
-- Fixed the restoration of protocols table when restoring from a
-  inconsistent data directory.
-
-- Improved the response time of RPCs computing the (baking/endorsing)
-  rights of delegates
-
-- Added the built-in network alias for Limanet (``--network limanet``).
-
 - Fixed a bug that caused snapshot import to ignore the data directory
   of the configuration file when the configuration file was specified
   from the command-line using ``--config-file``. Note that ``--data-dir``
   can still be used to override the data directory location from the
   configuration file, whether it is specified from the command-line or not.
-
-- Fixed a bug that caused the ``snapshot import`` command to fail when
-  used on data directories configured with an explicit number
-  additional cycles.
 
 Client
 ------
