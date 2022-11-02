@@ -34,7 +34,7 @@ let split_slot () =
   RPC_service.post_service
     ~description:"Split and store a slot"
     ~query:split_query
-    ~input:Data_encoding.string
+    ~input:Data_encoding.bytes
     ~output:Data_encoding.string
       (* see [Slot_manager.Slot_header.to_b58check] *)
     RPC_path.(open_root / "slot" / "split")
@@ -49,7 +49,7 @@ let slot () =
   RPC_service.get_service
     ~description:"Show content of a slot"
     ~query:slot_query
-    ~output:Data_encoding.string
+    ~output:Data_encoding.bytes
     RPC_path.(open_root / "slot" / "content" /: Cryptobox.Commitment.rpc_arg)
 
 let slot_pages () =

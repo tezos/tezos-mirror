@@ -540,11 +540,20 @@ module Dal = struct
         ~get_host:Dal_node.rpc_host
         ~get_port:Dal_node.rpc_port
 
+    (** [encode_bytes_for_json raw] encodes arbitrary byte sequence as hex string for JSON *)
+    let encode_bytes_to_hex_string raw =
+      "\"" ^ match Hex.of_string raw with `Hex s -> s ^ "\""
+
+    let decode_hex_string_to_bytes s = Hex.to_string (`Hex s)
+
+    let get_bytes_from_json_string_node json =
+      JSON.as_string json |> decode_hex_string_to_bytes
+
     let split_slot slot =
       let slot =
         JSON.parse
           ~origin:"dal_node_split_slot_rpc"
-          (Format.sprintf "\"%s\"" slot)
+          (encode_bytes_to_hex_string slot)
       in
       let data = JSON.unannotate slot in
       make
@@ -559,11 +568,11 @@ module Dal = struct
         GET
         ["slot"; "content"; slot_header]
         ~query_string:[("trim", "")]
-        JSON.as_string
+        get_bytes_from_json_string_node
 
     let slot_pages slot_header =
       make GET ["slot"; "pages"; slot_header] (fun pages ->
-          pages |> JSON.as_list |> List.map JSON.as_string)
+          pages |> JSON.as_list |> List.map get_bytes_from_json_string_node)
 
     let stored_slot_headers block_hash =
       make GET ["stored_slot_headers"; block_hash] @@ fun json ->

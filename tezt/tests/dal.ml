@@ -498,6 +498,8 @@ let init_dal_node protocol =
   let* () = Dal_node.run dal_node in
   return (node, client, dal_node)
 
+let split_slot node slot = RPC.call node (Rollup.Dal.RPC.split_slot slot)
+
 let test_dal_node_slot_management =
   Protocol.register_test
     ~__FILE__
@@ -506,10 +508,8 @@ let test_dal_node_slot_management =
     ~supports:Protocol.(From_protocol (Protocol.number Alpha))
   @@ fun protocol ->
   let* _node, _client, dal_node = init_dal_node protocol in
-  let slot_content = "test" in
-  let* slot_header =
-    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_content)
-  in
+  let slot_content = "test with invalid UTF-8 byte sequence \xFA" in
+  let* slot_header = split_slot dal_node slot_content in
   let* received_slot_content =
     RPC.call dal_node (Rollup.Dal.RPC.slot_content slot_header)
   in
@@ -522,7 +522,7 @@ let test_dal_node_slot_management =
   return ()
 
 let publish_and_store_slot node client dal_node source index content =
-  let* slot_header = RPC.call dal_node (Rollup.Dal.RPC.split_slot content) in
+  let* slot_header = split_slot dal_node content in
   let commitment =
     Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt slot_header
     |> mandatory "The b58check-encoded slot header is not valid"
@@ -635,12 +635,8 @@ let test_dal_node_test_slots_propagation =
   let* () = Dal_node.run dal_node2 in
   let* () = Dal_node.run dal_node3 in
   let* () = Dal_node.run dal_node4 in
-  let* slot_header1 =
-    RPC.call dal_node1 (Rollup.Dal.RPC.split_slot "content1")
-  in
-  let* slot_header2 =
-    RPC.call dal_node2 (Rollup.Dal.RPC.split_slot "content2")
-  in
+  let* slot_header1 = split_slot dal_node1 "content1" in
+  let* slot_header2 = split_slot dal_node2 "content2" in
   Lwt.join
     [
       wait_for_stored_slot dal_node3 slot_header1;
@@ -714,17 +710,11 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 
   (* 1. Send three slots to dal node and obtain corresponding headers. *)
   let slot_contents_0 = " 10 " in
-  let* commitment_0 =
-    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_0)
-  in
+  let* commitment_0 = split_slot dal_node slot_contents_0 in
   let slot_contents_1 = " 200 " in
-  let* commitment_1 =
-    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_1)
-  in
+  let* commitment_1 = split_slot dal_node slot_contents_1 in
   let slot_contents_2 = " 400 " in
-  let* commitment_2 =
-    RPC.call dal_node (Rollup.Dal.RPC.split_slot slot_contents_2)
-  in
+  let* commitment_2 = split_slot dal_node slot_contents_2 in
   (* 2. Run rollup node for an originated rollup. *)
   let* genesis_info =
     RPC.Client.call ~hooks client
