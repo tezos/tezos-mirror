@@ -1,0 +1,15 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# x86_64 static binaries are necessary for development branches, as we want to make
+# sure the build does not break. We also need it for release tags, to as its artifacts
+# are published in the stage `publish_release`. For this reason, we build it in all pipelines,
+# except on latest release branches.
+build:static-x86_64-linux-binaries:
+  extends:
+    - .build_static_binaries_template
+    # Even though not many tests depend on static executables, some of those that do
+    # are limiting factors in the total duration of pipelines.
+    # So we start this job as early as possible, without waiting for sanity_ci.
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"

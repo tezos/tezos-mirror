@@ -57,9 +57,9 @@ Acceptance testing
    more costly and less amenable to automation than integration or
    system testing. It is often the final step in the testing process,
    performed before a release. However, in Tezos, acceptance testing
-   is decoupled from releases, and currently consists in manually running 
+   is decoupled from releases, and currently consists in manually running
    a net of resilience tests on a regular base. These tests use various
-   testing frameworks. 
+   testing frameworks.
 
 ..
    Inline testing
@@ -509,7 +509,7 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/test/integration.yml`). This number is
+   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/jobs/test/python_integration_tests.yml`). This number is
    chosen to keep the duration of job each lower under 10 minutes on
    average, and to accommodate the addition of new protocol test
    suites.
@@ -551,7 +551,7 @@ The OCaml package tests (Alcotest & QCheck)
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
-  Protocol tests must be added to :src:`.gitlab/ci/test/unit.yml` under the
+  Protocol tests must be added to :src:`.gitlab/ci/jobs/test/unit.yml` under the
   protocol that they are testing. For example, to run a new protocol test for
   ``proto_XXX_YYYYYYYY``, add the corresponding
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``

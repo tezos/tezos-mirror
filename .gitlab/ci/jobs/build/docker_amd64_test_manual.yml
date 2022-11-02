@@ -1,0 +1,12 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+docker:amd64:
+  extends:
+    - .build_docker_release_template
+  stage: manual
+  needs: []
+  when: manual
+  variables:
+    IMAGE_ARCH_PREFIX: "amd64_"
+    CI_DOCKER_HUB: "false"
+  allow_failure: true

@@ -62,11 +62,10 @@ The release of a new protocol requires some manual configuration in the CI:
 - The old ``n-1`` protocol must be removed from those being built and tested
 
 This is done by adding and removing the respective protocols to
-``active_protocol_versions``, and by changing the ``build`` job in
-:src:`.gitlab/ci/build.yml` to ``rm`` the appropriate older protocol.
+``active_protocol_versions``, :src:`scripts/remove-old-protocols.sh` will ``rm`` the appropriate older protocol.
 
 Additionally, the ``unit:NNN_PROTONAME`` unit test jobs in
-:src:`.gitlab/ci/test/unit.yml` must be updated to test the new protocols and stop
+:src:`.gitlab/ci/jobs/test/unit.yml` must be updated to test the new protocols and stop
 testing the old ones, in the same manner as above.
 
 **Final Tests and sign-off:**

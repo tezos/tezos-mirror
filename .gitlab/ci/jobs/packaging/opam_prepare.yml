@@ -1,0 +1,37 @@
+# This template is used by the opam test jobs defined in opam-ci.yml
+.opam_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies_template
+  stage: packaging
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
+  # At the time of writing, the opam tests were quite flaky.
+  # Therefore, a retry was added. This should be removed once the
+  # underlying tests have been fixed.
+  retry: 2
+  script:
+    - make  -C ${CI_PROJECT_DIR}/.gitlab/ci opam-configure
+  needs: [opam:prepare]
+  dependencies: [opam:prepare]
+  after_script:
+    # Stores logs in opam_logs for artifacts and outputs an excerpt on failure.
+    - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
+  artifacts:
+    paths:
+      - opam_logs/
+    expire_in: 1 week
+    when: always
+
+opam:prepare:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies_template
+    - .rules_template__trigger_opam_batch_1
+  stage: packaging
+  needs: [trigger]
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-prepare
+  artifacts:
+    paths:
+      - _opam-repo-for-release/

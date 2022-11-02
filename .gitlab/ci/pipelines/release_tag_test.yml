@@ -1,0 +1,47 @@
+include:
+  # Stage: sanity
+  - .gitlab/ci/jobs/sanity/sanity_ci.yml
+  - .gitlab/ci/jobs/sanity/docker_hadolint.yml
+
+  # Stage: build
+  - .gitlab/ci/jobs/build/arm64.yml
+  - .gitlab/ci/jobs/build/x86_64.yml
+  - .gitlab/ci/jobs/build/static_x86_64_linux_binaries.yml
+  - .gitlab/ci/jobs/build/static_arm64_linux_binaries.yml
+  - .gitlab/ci/jobs/build/docker_amd64_test.yml
+  - .gitlab/ci/jobs/build/docker_arm64_test.yml
+  - .gitlab/ci/jobs/build/get_contracts.yml
+  - .gitlab/ci/jobs/doc/build_all.yml
+
+  # Stage: Coverage
+  - .gitlab/ci/jobs/coverage/coverage_default.yml
+
+  # Stage: test
+  - .gitlab/ci/jobs/test/check_precommit_hook.yml
+  - .gitlab/ci/jobs/test/misc_checks.yml
+  - .gitlab/ci/jobs/test/misc_opam_checks.yml
+  - .gitlab/ci/jobs/test/semgrep.yml
+  - .gitlab/ci/jobs/test/unit.yml
+  - .gitlab/ci/jobs/test/integration_compiler_rejections.yml
+  - .gitlab/ci/jobs/test/check_scripts.yml
+  - .gitlab/ci/jobs/test/python_integration_tests.yml
+  - .gitlab/ci/jobs/test/integration_pytest_old_protocols.yml
+  - .gitlab/ci/jobs/test/liquidity_baking_scripts-integrity.yml
+  - .gitlab/ci/jobs/test/tezt.yml
+  - .gitlab/ci/jobs/test/tezt_build_long.yml
+  - .gitlab/ci/jobs/test/tezt_self_tests.yml
+
+  # Stage: prepare_release
+  - .gitlab/ci/jobs/prepare_release/docker_merge_manifests_test.yml
+
+  # Stage: publish_release_gitlab
+  - .gitlab/ci/jobs/publish/gitlab.yml
+
+  # Stage: publish_release
+  - .gitlab/ci/jobs/publish/opam.yml
+  - .gitlab/ci/jobs/publish/deb_packages_stable_amd64.yml
+  - .gitlab/ci/jobs/publish/rpm_packages_stable_amd64.yml
+
+  # Stage: doc
+  - .gitlab/ci/jobs/doc/linkcheck.yml
+  - .gitlab/ci/jobs/doc/tests.yml

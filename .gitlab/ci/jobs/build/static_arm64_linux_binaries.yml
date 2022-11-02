@@ -1,0 +1,10 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+# arm64 static binaries are only built for master and releases.
+build:static-arm64-linux-binaries:
+  extends:
+    - .build_static_binaries_template
+  variables:
+    ARCH: "arm64"
+  tags:
+    - arm64

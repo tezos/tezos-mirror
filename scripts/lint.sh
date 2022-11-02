@@ -154,7 +154,7 @@ update_gitlab_ci_yml () {
     # Check that a rule is not defined twice, which would result in the first
     # one being ignored. Gitlab linter doesn't warn for it
     # Job key `unified_coverage` is allowed to be duplicated because we use a conditional include
-    # on files `.gitlab/ci/test_coverage.yml` and `.gitlab/ci/test_coverage_default.yml`
+    # on files `.gitlab/ci/coverage/coverage.yml` and `.gitlab/ci/jobs/coverage_default.yml`
     repeated=$(find .gitlab-ci.yml .gitlab/ci/ -iname \*.yml -exec grep '^[^ #-]' \{\} \;  \
                    | sort \
                    | grep -v unified_coverage \

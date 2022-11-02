@@ -1,0 +1,25 @@
+include: .gitlab/ci/jobs/shared/templates.yml
+
+# here we use this hack to publish the tezos documentation on
+# gitlab.io because we want to publish the doc for the project
+# tezos under https://tezos.gitlab.io and not  https://tezos.gitlab.io/tezos
+# The latter follows the gitlab url convention of
+# https://<projectname_space>.gitlab.io/<project_name>/
+# Notice that we push only if CI_COMMIT_REF_NAME is really master .
+# This allows to test the release workflow
+publish:documentation:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+  stage: doc
+  before_script:
+    - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - chmod 400 ~/.ssh/id_ed25519
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-publish
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false

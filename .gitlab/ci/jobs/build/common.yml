@@ -1,0 +1,53 @@
+.build:
+  extends: .build_template
+  variables:
+    ARCH: ""
+    # We fix the value of GIT_{SHORTREF,DATETIME,VERSION} (these are
+    # read by src/lib_version and output by the binaries `--version`
+    # option). Fixing these values on development builds improves
+    # cache usage.
+    GIT_SHORTREF: "00000000"
+    GIT_DATETIME: "1970-01-01 00:00:00 +0000%"
+    GIT_VERSION: "dev"
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci  build-full-unreleased
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - _build
+  artifacts:
+    name: "build-$ARCH-$CI_COMMIT_REF_SLUG"
+    paths:
+      - octez-*
+      - tezos-*
+      - src/proto_*/parameters/*.json
+      - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    expire_in: 1 day
+    when: on_success
+
+# similar to the build template above, this template
+# compiles all binaries using the static profile.
+.build_static_binaries_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies_template
+  stage: build
+  variables:
+    ARCH: ""
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci build-static-binaries
+
+  artifacts:
+    paths:
+      - "octez-binaries/$ARCH/*"
+
+.build_docker_release_template:
+  extends:
+    - .default_settings_template
+    - .image_template__docker
+  variables:
+    IMAGE_ARCH_PREFIX: ""
+  before_script:
+    - ./scripts/ci/docker_registry_auth.sh
+  script:
+    - ./scripts/ci/docker_release.sh

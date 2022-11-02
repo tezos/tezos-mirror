@@ -5,8 +5,8 @@ endif
 
 last_proto_name := $(shell find ${CI_PROJECT_DIR}/src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $$NF}' | sort -r | head -1)
 last_proto_version := $(shell echo ${last_proto_name} | cut -d'_' -f2 | sed 's/^0*//')
-$(eval new_proto_version=$(shell echo $$(($(last_proto_version)+1))))
-new_proto_version := $(shell if [ "${new_proto_version}" -lt "100" ]; then echo 0${new_proto_version}; else echo ${new_proto_version}; fi)
+new_proto_version_int:=$(shell echo $$(($(last_proto_version)+1)))
+new_proto_version := $(shell if [ "${new_proto_version_int}" -lt "100" ]; then echo 0${new_proto_version_int}; else echo ${new_proto_version_int}; fi)
 
 .PHONY: test-protocol-compiles
 test-protocol-compiles:

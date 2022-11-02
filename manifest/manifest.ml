@@ -2935,7 +2935,7 @@ let generate_opam_ci () =
   Target.iter_internal_by_opam (fun package_name _internal_pkgs ->
       let (_ : int) = compute_rank package_name in
       ()) ;
-  write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
+  write ".gitlab/ci/jobs/packaging/opam_package.yml" @@ fun fmt ->
   Format.fprintf fmt "# This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "# Edit file manifest/manifest.ml instead.@." ;
   (* Decide whether an opam package should be tested in the CI or
@@ -2965,12 +2965,9 @@ let generate_opam_ci () =
       {|@..rules_template__trigger_opam_batch_%d:
   rules:
     # Run on scheduled builds.
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: delayed
       start_in: %d minutes
-    # Never run on branch pipelines for master.
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: never
     # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: delayed

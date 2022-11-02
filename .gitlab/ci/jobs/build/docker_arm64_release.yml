@@ -1,0 +1,11 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+docker:arm64:
+  extends:
+    - .build_docker_release_template
+  stage: build
+  variables:
+    IMAGE_ARCH_PREFIX: "arm64_"
+    CI_DOCKER_HUB: "true"
+  tags:
+    - arm64
