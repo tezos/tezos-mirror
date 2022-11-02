@@ -14,7 +14,7 @@ class Codec:
     Tezos node.
 
     This class offers two commands `encode` and `decode`. The encoding
-    name can be obtained using `tezos-codec list encodings`.
+    name can be obtained using `octez-codec list encodings`.
     """
 
     def __init__(self, codec_path: str):
@@ -29,7 +29,7 @@ class Codec:
     def run(self, params: List[str], check: bool = True) -> str:
         """
         Args:
-            params (list): list of parameters given to the tezos-codec,
+            params (list): list of parameters given to the octez-codec,
             check (bool): raises an exception if codec call fails
         """
         cmd = [self._codec] + params

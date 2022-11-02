@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Tezos_context_encoding.Context
+module Env = Env
 
 module type DB = Irmin.Generic_key.S with module Schema = Schema
 
@@ -50,6 +51,8 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
 
   val of_raw : raw -> DB.tree
 
+  val unshallow : DB.tree -> DB.tree Lwt.t
+
   type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]
 
   type repo = DB.repo
@@ -67,7 +70,7 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
   exception Context_dangling_hash of string
 end
 
-module Proof_encoding = Merkle_proof_encoding
+module Proof_encoding = Tezos_context_merkle_proof_encoding
 
 module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) : sig
   module Proof : Tezos_context_sigs.Context.PROOF

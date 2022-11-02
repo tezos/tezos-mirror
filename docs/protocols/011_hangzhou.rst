@@ -208,7 +208,7 @@ Minor Changes
   delays in proposal injection and/or a restarted voting process,
   while still making sure it won't extend to two protocols after this
   one without a more significant increase. This follows the spirit of
-  `the liquidity baking TZIP <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft-liquidity_baking.md>`_ in that it is still roughly six months
+  `the liquidity baking TZIP <https://gitlab.com/tezos/tzip/-/blob/367628e1a576c3926bedc1d6107b2945607c2605/drafts/current/draft-liquidity_baking.md>`_ in that it is still roughly six months
   from Granada activation and requires a referendum on the subsidy in
   the protocol after this one. (MR :gl:`!3425` :gl:`!3464`)
 

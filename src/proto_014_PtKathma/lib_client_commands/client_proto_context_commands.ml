@@ -33,8 +33,10 @@ open Client_proto_rollups
 open Client_keys
 open Client_proto_args
 
-let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name tx_rollup =
-  TxRollupAlias.add ~force cctxt alias_name tx_rollup >>=? fun () ->
+let save_tx_rollup ~force (cctxt : #Client_context.full) alias_name rollup
+    ~origination_level =
+  TxRollupAlias.add ~force cctxt alias_name {rollup; origination_level}
+  >>=? fun () ->
   cctxt#message "Transaction rollup memorized as %s" alias_name >>= fun () ->
   return_unit
 
@@ -594,7 +596,7 @@ let commands_ro () =
    read-write (or RW for short) the commands that are removed.
 
    There are some exceptions to this rule however, for example the command
-   "tezos-client wait for <op> to be included" is classified as RW despite having
+   "octez-client wait for <op> to be included" is classified as RW despite having
    no effect on the context because it has no use case once all RW commands are
    removed.
 
@@ -1054,11 +1056,12 @@ let commands_rw () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args12
+      (args13
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          default_gas_limit_arg
          default_storage_limit_arg
          counter_arg
@@ -1087,6 +1090,7 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1098,6 +1102,22 @@ let commands_rw () =
            source
            operations_json
            cctxt ->
+        (* When --force is used we want to inject the transfer even if it fails.
+           In that case we cannot rely on simulation to compute limits and fees
+           so we require the corresponding options to be set. *)
+        let check_force_dependency name = function
+          | None ->
+              cctxt#error
+                "When the --force switch is used, the %s option is required."
+                name
+          | _ -> Lwt.return_unit
+        in
+        (if force && not simulation then
+         check_force_dependency "--gas-limit" gas_limit >>= fun () ->
+         check_force_dependency "--storage-limit" storage_limit >>= fun () ->
+         check_force_dependency "--fee" fee
+        else Lwt.return_unit)
+        >>= fun () ->
         let prepare i =
           prepare_batch_operation
             cctxt
@@ -1139,6 +1159,7 @@ let commands_rw () =
               ~dry_run
               ~verbose_signing
               ~simulation
+              ~force
               ~source
               ~fee:(Limit.of_option fee)
               ~gas_limit:(Limit.of_option gas_limit)
@@ -1913,6 +1934,10 @@ let commands_rw () =
             failwith "Only implicit accounts can originate transaction rollups"
         | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            Protocol_client_context.Alpha_block_services.Header.shell_header
+              cctxt
+              ()
+            >>=? fun {level = head_level; _} ->
             originate_tx_rollup
               cctxt
               ~chain:cctxt#chain
@@ -1944,7 +1969,11 @@ let commands_rw () =
                   } ) ->
                 ok originated_tx_rollup
             | _ -> error_with "transaction rollup was not correctly originated")
-            >>?= fun res -> save_tx_rollup ~force cctxt alias_name res);
+            >>?= fun res ->
+            (* Approximate origination level, needs to be <= actual origination
+               level *)
+            let origination_level = Some head_level in
+            save_tx_rollup ~force cctxt alias_name res ~origination_level);
     command
       ~group
       ~desc:"Submit a batch of transaction rollup operations."

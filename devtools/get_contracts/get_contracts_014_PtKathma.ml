@@ -22,8 +22,13 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Tezos_protocol_014_PtKathma
+open Tezos_client_014_PtKathma
+open Protocol
 
 module Proto = struct
+  let hash = hash
+
   let wrap_tzresult = Environment.wrap_tzresult
 
   module Context = struct
@@ -60,6 +65,16 @@ module Proto = struct
     module Hash = Script_expr_hash
 
     let print_expr = Michelson_v1_printer.print_expr
+
+    let decode_and_costs lazy_expr =
+      let open Result_syntax in
+      let decode_cost = Script_repr.stable_force_decode_cost lazy_expr in
+      let+ expr = wrap_tzresult @@ Script_repr.force_decode lazy_expr in
+      let encode_cost =
+        let decoded_lazy_expr = Script_repr.lazy_expr expr in
+        Script_repr.force_bytes_cost decoded_lazy_expr
+      in
+      (expr, (decode_cost :> int), (encode_cost :> int))
   end
 
   module Translator = struct
@@ -71,19 +86,19 @@ module Proto = struct
 
     let expected_code_size Script_ir_translator.(Ex_code (Code {code_size; _}))
         =
-      Obj.magic code_size
+      (code_size :> int)
 
     let actual_code_size Script_ir_translator.(Ex_code (Code {code; _})) =
       8 * Obj.(reachable_words @@ repr code)
 
-    let parse_ty (ctxt : Raw_context.t) ~legacy ~allow_lazy_storage
-        ~allow_operation ~allow_contract ~allow_ticket script =
+    let parse_ty (ctxt : Raw_context.t) ~allow_lazy_storage ~allow_operation
+        ~allow_contract ~allow_ticket script =
       let open Result_syntax in
       let+ ty, _ =
         wrap_tzresult
         @@ Script_ir_translator.parse_ty
              (Obj.magic ctxt)
-             ~legacy
+             ~legacy:true
              ~allow_lazy_storage
              ~allow_operation
              ~allow_contract
@@ -92,15 +107,14 @@ module Proto = struct
       in
       ty
 
-    let parse_data ?type_logger (ctxt : Raw_context.t) ~legacy ~allow_forged ty
-        expr =
+    let parse_data ?type_logger (ctxt : Raw_context.t) ~allow_forged ty expr =
       let open Lwt_result_syntax in
       let+ data, _ =
         Lwt.map wrap_tzresult
         @@ Script_ir_translator.parse_data
              ?type_logger
              (Obj.magic ctxt)
-             ~legacy
+             ~legacy:true
              ~allow_forged
              ty
              expr
@@ -115,19 +129,22 @@ module Proto = struct
       in
       expr
 
-    let parse_toplevel (ctxt : Raw_context.t) ~legacy expr =
+    let parse_toplevel (ctxt : Raw_context.t) expr =
       let open Lwt_result_syntax in
       let+ toplevel, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_toplevel (Obj.magic ctxt) ~legacy expr
+        @@ Script_ir_translator.parse_toplevel
+             (Obj.magic ctxt)
+             ~legacy:true
+             expr
       in
       toplevel
 
-    let parse_code ctxt ~legacy code =
+    let parse_code ctxt code =
       let open Lwt_result_syntax in
       let+ parsed_code, _ =
         Lwt.map wrap_tzresult
-        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy ~code
+        @@ Script_ir_translator.parse_code (Obj.magic ctxt) ~legacy:true ~code
       in
       parsed_code
   end
@@ -217,7 +234,7 @@ module Proto = struct
         (Ex_ty_lambdas (ty, getters)) =
       let open Lwt_syntax in
       let+ parse_result =
-        Translator.parse_data ctxt ~legacy:true ~allow_forged:true ty expr
+        Translator.parse_data ctxt ~allow_forged:true ty expr
       in
       match parse_result with
       | Error _ -> acc
@@ -235,6 +252,4 @@ module Proto = struct
   let code_storage_type ({storage_type; _} : Translator.toplevel) = storage_type
 end
 
-module Main = Get_contracts.Make (Proto)
-
-let () = Get_contracts.main (module Main)
+let () = Known_protocols.register (module Proto)

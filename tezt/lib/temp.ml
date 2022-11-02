@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,7 +52,11 @@ let get_fs ?runner () =
 
 let next_name = ref 0
 
-let base_main_dir () = "tezt-" ^ string_of_int (Unix.getpid ())
+let pid = ref 0
+
+let set_pid value = pid := value
+
+let base_main_dir () = "tezt-" ^ string_of_int !pid
 
 (* [add_file], [add_dir] and [add_parent] select the file system to use.*)
 let add_file ?runner file =
@@ -120,7 +124,7 @@ let dir ?runner ?(perms = 0o755) base_name =
   filename
 
 let rec remove_recursively filename =
-  match (Unix.stat filename).st_kind with
+  match (Unix.lstat filename).st_kind with
   | exception Unix.Unix_error (error, _, _) ->
       Log.warn
         "Failed to read file type for %s: %s"
@@ -180,7 +184,7 @@ let clean_up_aux (runner : Runner.t option) runner_fs =
           let dirtype =
             if Option.is_some runner then "Remote directory" else "Directory"
           in
-          Log.warn "%s directory is not empty %s" dirtype dirname)
+          Log.warn "%s is not empty %s" dirtype dirname)
     runner_fs.parents
 
 let clean_up () =

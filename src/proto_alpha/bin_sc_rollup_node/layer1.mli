@@ -54,6 +54,7 @@ type t = private {
   events : chain_event Lwt_stream.t;
   cctxt : Protocol_client_context.full;
   stopper : RPC_context.stopper;
+  genesis_info : Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info;
 }
 
 val chain_event_head_hash : chain_event -> Block_hash.t
@@ -69,11 +70,12 @@ val start :
   Configuration.t ->
   Protocol_client_context.full ->
   Store.t ->
-  (t
-  * Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info
-  * Protocol.Alpha_context.Sc_rollup.Kind.t)
-  tzresult
-  Lwt.t
+  (t * Protocol.Alpha_context.Sc_rollup.Kind.t) tzresult Lwt.t
+
+(** [reconnect cfg l1_ctxt store] reconnects (and retries with delay) to the
+    Tezos node. The delay for each reconnection is increased with a randomized
+    exponential backoff (capped to 1.5h) . *)
+val reconnect : Configuration.t -> t -> Store.t -> t tzresult Lwt.t
 
 (** [current_head_hash store] is the current hash of the head of the
    Tezos chain as far as the smart-contract rollup node knows from the
@@ -107,7 +109,7 @@ val genesis_hash : Block_hash.t
     processing of some layer 1 [chain_event]. *)
 val processed : chain_event -> unit Lwt.t
 
-(** [mark_process_head store head] remembers that the [head]
+(** [mark_processed_head store head] remembers that the [head]
     is processed. The system should not have to come back to
     it. *)
 val mark_processed_head : Store.t -> head -> unit Lwt.t
@@ -115,6 +117,18 @@ val mark_processed_head : Store.t -> head -> unit Lwt.t
 (** [last_processed_head_hash store] returns the hash of
     the last processed head. *)
 val last_processed_head_hash : Store.t -> Block_hash.t option Lwt.t
+
+(** [set_heads_not_finalized store heads] remembers that heads in [heads]
+    have not been finalized yet, that is for each head in [heads] the rollup
+    node has never seen another head which is
+    [(node_ctxt : Node_context).block_finality_time] confirmations ahead.
+*)
+val set_heads_not_finalized : Store.t -> head list -> unit Lwt.t
+
+(** [get_heads_not_finalized store] retrieves from [store]
+    the heads that have not been finalized yet.
+*)
+val get_heads_not_finalized : Store.t -> head list Lwt.t
 
 (** [shutdown store] properly shut the layer 1 down. *)
 val shutdown : Store.t -> unit Lwt.t

@@ -1187,20 +1187,27 @@ let get_targets ?(path = "gnuplot") () =
       let _ = Unix.dup2 ~cloexec:false for_writing_by_child Unix.stdout in
       let _ = Unix.dup2 ~cloexec:false for_writing_by_child Unix.stderr in
       Unix.execvp path [|path; "-e"; "print(GPVAL_TERMINALS); quit"|]
-  | child_pid -> (
+  | child_pid ->
       Unix.close for_writing_by_child ;
-      match Unix.waitpid [] child_pid with
-      | _, WEXITED 0 ->
-          let ic = Unix.in_channel_of_descr for_reading_by_parent in
-          let buf = Buffer.create 1024 in
-          (try
-             while true do
-               Buffer.add_channel buf ic 512
-             done
-           with End_of_file -> ()) ;
-          close_in ic ;
-          let file = Buffer.contents buf in
-          Option.some (String.split_on_char ' ' (String.trim file))
-      | _ ->
-          Format.eprintf "Child process terminated abnormally@." ;
-          None)
+      let rec waitloop () =
+        match Unix.waitpid [] child_pid with
+        | exception Unix.Unix_error (Unix.EINTR, _, _) ->
+            (* [waitpid] gets interrupted, probably because some other child of
+               the parent process terminated while waiting (?) *)
+            waitloop ()
+        | _, WEXITED 0 ->
+            let ic = Unix.in_channel_of_descr for_reading_by_parent in
+            let buf = Buffer.create 1024 in
+            (try
+               while true do
+                 Buffer.add_channel buf ic 512
+               done
+             with End_of_file -> ()) ;
+            close_in ic ;
+            let file = Buffer.contents buf in
+            Option.some (String.split_on_char ' ' (String.trim file))
+        | _ ->
+            Format.eprintf "Child process terminated abnormally@." ;
+            None
+      in
+      waitloop ()

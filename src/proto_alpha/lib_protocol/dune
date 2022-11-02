@@ -15,7 +15,7 @@
  (action
   (write-file
    %{targets}
-   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V6.Make(Name)()\nmodule CamlinternalFormatBasics = struct include CamlinternalFormatBasics end\n")))
+   "module Name = struct let name = \"alpha\" end\ninclude Tezos_protocol_environment.V8.Make(Name)()\n")))
 
 (library
  (name tezos_raw_protocol_alpha)
@@ -73,11 +73,13 @@
   Contract_repr
   Indexable
   Entrypoint_repr
+  Bounded_history_repr
   Sc_rollup_repr
+  Sc_rollup_metadata_repr
   Sc_rollup_tick_repr
   Sc_rollup_inbox_message_repr
   Sc_rollup_outbox_message_repr
-  Sc_rollup_PVM_sem
+  Sc_rollup_PVM_sig
   Sc_rollup_arith
   Sc_rollup_wasm
   Sc_rollups
@@ -107,11 +109,19 @@
   Dal_slot_repr
   Dal_endorsement_repr
   Dal_errors_repr
+  Zk_rollup_scalar
+  Zk_rollup_repr
+  Zk_rollup_state_repr
+  Zk_rollup_account_repr
+  Zk_rollup_ticket_repr
+  Zk_rollup_operation_repr
   Bond_id_repr
   Vote_repr
   Liquidity_baking_repr
   Block_header_repr
   Destination_repr
+  Script_int
+  Ticket_amount
   Operation_repr
   Manager_repr
   Commitment_repr
@@ -122,6 +132,7 @@
   Migration_repr
   Carbonated_map_costs
   Carbonated_map
+  Ticket_receipt_repr
   Raw_context_intf
   Raw_context
   Storage_costs
@@ -143,14 +154,20 @@
   Commitment_storage
   Voting_period_storage
   Cache_repr
+  Zk_rollup_storage
   Contract_delegate_storage
   Stake_storage
   Contract_storage
   Token
+  Fees_storage
+  Delegate_consensus_key
   Delegate_storage
+  Delegate_sampler
+  Delegate_missed_endorsements_storage
+  Delegate_slashed_deposits_storage
+  Delegate_cycles
   Bootstrap_storage
   Vote_storage
-  Fees_storage
   Ticket_storage
   Liquidity_baking_storage
   Liquidity_baking_cpmm
@@ -172,12 +189,12 @@
   Sc_rollup_inbox_storage
   Sc_rollup_outbox_storage
   Sc_rollup_stake_storage
-  Sc_rollup_refutation_storage
   Sc_rollup_storage
+  Sc_rollup_refutation_storage
+  Zk_rollup_errors
   Dal_slot_storage
   Alpha_context
   Script_string
-  Script_int
   Script_timestamp
   Tx_rollup_l2_storage_sig
   Tx_rollup_l2_context_sig
@@ -204,6 +221,8 @@
   Apply_operation_result
   Apply_internal_results
   Apply_results
+  Script_ir_translator_config
+  Script_ir_unparser
   Script_ir_translator
   Script_big_map
   Script_cache
@@ -214,6 +233,7 @@
   Ticket_balance_key
   Ticket_lazy_storage_diff
   Tx_rollup_parameters
+  Zk_rollup_parameters
   Ticket_token_map
   Ticket_operations_diff
   Ticket_accounting
@@ -224,9 +244,12 @@
   Sc_rollup_management_protocol
   Sc_rollup_operations
   Dal_apply
+  Zk_rollup_apply
   Baking
+  Validate_errors
   Amendment
-  Validate_operation
+  Validate
+  Mempool_validation
   Apply
   Services_registration
   Constants_services
@@ -315,11 +338,13 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
@@ -350,11 +375,19 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -365,6 +398,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -386,14 +420,21 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml
@@ -415,12 +456,12 @@
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
@@ -447,6 +488,8 @@
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
@@ -457,6 +500,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -467,9 +511,12 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -481,7 +528,7 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:tezos-protocol-compiler} -no-hash-check -warn-error +a .)))
+ (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
 
 (library
  (name tezos_protocol_alpha_functor)
@@ -538,11 +585,13 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
@@ -573,11 +622,19 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -588,6 +645,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -609,14 +667,21 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml
@@ -638,12 +703,12 @@
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
@@ -670,6 +735,8 @@
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
@@ -680,6 +747,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -690,9 +758,12 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -708,7 +779,7 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-protocol-compiler.tezos-protocol-packer} %{src_dir})))))
+    (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
  (name tezos_embedded_protocol_alpha)
@@ -766,11 +837,13 @@
   contract_repr.ml contract_repr.mli
   indexable.ml indexable.mli
   entrypoint_repr.ml entrypoint_repr.mli
+  bounded_history_repr.ml bounded_history_repr.mli
   sc_rollup_repr.ml sc_rollup_repr.mli
+  sc_rollup_metadata_repr.ml sc_rollup_metadata_repr.mli
   sc_rollup_tick_repr.ml sc_rollup_tick_repr.mli
   sc_rollup_inbox_message_repr.ml sc_rollup_inbox_message_repr.mli
   sc_rollup_outbox_message_repr.ml sc_rollup_outbox_message_repr.mli
-  sc_rollup_PVM_sem.ml sc_rollup_PVM_sem.mli
+  sc_rollup_PVM_sig.ml
   sc_rollup_arith.ml sc_rollup_arith.mli
   sc_rollup_wasm.ml sc_rollup_wasm.mli
   sc_rollups.ml sc_rollups.mli
@@ -801,11 +874,19 @@
   dal_slot_repr.ml dal_slot_repr.mli
   dal_endorsement_repr.ml dal_endorsement_repr.mli
   dal_errors_repr.ml
+  zk_rollup_scalar.ml zk_rollup_scalar.mli
+  zk_rollup_repr.ml zk_rollup_repr.mli
+  zk_rollup_state_repr.ml zk_rollup_state_repr.mli
+  zk_rollup_account_repr.ml zk_rollup_account_repr.mli
+  zk_rollup_ticket_repr.ml zk_rollup_ticket_repr.mli
+  zk_rollup_operation_repr.ml zk_rollup_operation_repr.mli
   bond_id_repr.ml bond_id_repr.mli
   vote_repr.ml vote_repr.mli
   liquidity_baking_repr.ml liquidity_baking_repr.mli
   block_header_repr.ml block_header_repr.mli
   destination_repr.ml destination_repr.mli
+  script_int.ml script_int.mli
+  ticket_amount.ml ticket_amount.mli
   operation_repr.ml operation_repr.mli
   manager_repr.ml manager_repr.mli
   commitment_repr.ml commitment_repr.mli
@@ -816,6 +897,7 @@
   migration_repr.ml migration_repr.mli
   carbonated_map_costs.ml carbonated_map_costs.mli
   carbonated_map.ml carbonated_map.mli
+  ticket_receipt_repr.ml ticket_receipt_repr.mli
   raw_context_intf.ml
   raw_context.ml raw_context.mli
   storage_costs.ml storage_costs.mli
@@ -837,14 +919,21 @@
   commitment_storage.ml commitment_storage.mli
   voting_period_storage.ml voting_period_storage.mli
   cache_repr.ml cache_repr.mli
+  zk_rollup_storage.ml zk_rollup_storage.mli
   contract_delegate_storage.ml contract_delegate_storage.mli
   stake_storage.ml stake_storage.mli
   contract_storage.ml contract_storage.mli
   token.ml token.mli
+  fees_storage.ml fees_storage.mli
+  delegate_consensus_key.ml delegate_consensus_key.mli
   delegate_storage.ml delegate_storage.mli
+  delegate_sampler.ml delegate_sampler.mli
+  delegate_missed_endorsements_storage.ml
+  delegate_missed_endorsements_storage.mli
+  delegate_slashed_deposits_storage.ml delegate_slashed_deposits_storage.mli
+  delegate_cycles.ml delegate_cycles.mli
   bootstrap_storage.ml bootstrap_storage.mli
   vote_storage.ml vote_storage.mli
-  fees_storage.ml fees_storage.mli
   ticket_storage.ml ticket_storage.mli
   liquidity_baking_storage.ml liquidity_baking_storage.mli
   liquidity_baking_cpmm.ml
@@ -866,12 +955,12 @@
   sc_rollup_inbox_storage.ml sc_rollup_inbox_storage.mli
   sc_rollup_outbox_storage.ml sc_rollup_outbox_storage.mli
   sc_rollup_stake_storage.ml sc_rollup_stake_storage.mli
-  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   sc_rollup_storage.ml sc_rollup_storage.mli
+  sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
+  zk_rollup_errors.ml
   dal_slot_storage.ml dal_slot_storage.mli
   alpha_context.ml alpha_context.mli
   script_string.ml script_string.mli
-  script_int.ml script_int.mli
   script_timestamp.ml script_timestamp.mli
   tx_rollup_l2_storage_sig.ml
   tx_rollup_l2_context_sig.ml
@@ -898,6 +987,8 @@
   apply_operation_result.ml apply_operation_result.mli
   apply_internal_results.ml apply_internal_results.mli
   apply_results.ml apply_results.mli
+  script_ir_translator_config.ml
+  script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
   script_cache.ml script_cache.mli
@@ -908,6 +999,7 @@
   ticket_balance_key.ml ticket_balance_key.mli
   ticket_lazy_storage_diff.ml ticket_lazy_storage_diff.mli
   tx_rollup_parameters.ml tx_rollup_parameters.mli
+  zk_rollup_parameters.ml zk_rollup_parameters.mli
   ticket_token_map.ml ticket_token_map.mli
   ticket_operations_diff.ml ticket_operations_diff.mli
   ticket_accounting.ml ticket_accounting.mli
@@ -918,9 +1010,12 @@
   sc_rollup_management_protocol.ml sc_rollup_management_protocol.mli
   sc_rollup_operations.ml sc_rollup_operations.mli
   dal_apply.ml dal_apply.mli
+  zk_rollup_apply.ml zk_rollup_apply.mli
   baking.ml baking.mli
+  validate_errors.ml validate_errors.mli
   amendment.ml amendment.mli
-  validate_operation.ml validate_operation.mli
+  validate.ml validate.mli
+  mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
   services_registration.ml services_registration.mli
   constants_services.ml constants_services.mli
@@ -936,4 +1031,4 @@
    %{targets}
    (chdir
     %{workspace_root}
-    (run %{bin:tezos-embedded-protocol-packer} %{src_dir} alpha)))))
+    (run %{bin:octez-embedded-protocol-packer} %{src_dir} alpha)))))

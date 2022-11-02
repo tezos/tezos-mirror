@@ -35,7 +35,7 @@
    rollup, there are only two possibilities: either these two claims
    correspond to two distinct interpretations of the same inbox ; or,
    these two claims differ on their views about the contents of the
-   inbox itself. {!Sc_rollup_PVM_sem} is meant to arbitrate the first
+   inbox itself. {!Sc_rollup_PVM_sig} is meant to arbitrate the first
    kind of conflicts while {!Sc_rollup_inbox} focuses on the second
    kind of conflicts.
 
@@ -62,7 +62,7 @@
 
    {1 Merkelization of the inbox}
 
-   As for the state of the {!Sc_rollup_PVM_sem}, the layer 1 does not
+   As for the state of the {!Sc_rollup_PVM_sig}, the layer 1 does not
    have to store the entire inbox but only a compressed form
    (typically a low number of hashes) that witnesses its contents, so
    that the protocol can check the validity of a proof about its contents.
@@ -117,6 +117,14 @@
 
 *)
 
+module Hash : sig
+  include S.HASH
+
+  val of_context_hash : Context_hash.t -> t
+
+  val to_context_hash : t -> Context_hash.t
+end
+
 module V1 : sig
   (** The type of the inbox for a smart-contract rollup as stored
     by the protocol in the context. Values that inhabit this type
@@ -162,6 +170,24 @@ module V1 : sig
   *)
   type history_proof
 
+  (** A [History.t] is basically a lookup table of {!history_proof}s. We
+      need this if we want to produce inbox proofs because it allows us
+      to dereference the 'pointer' hashes in any of the
+      [history_proof]s. This [deref] function is passed to
+      [Skip_list.back_path] or [Skip_list.search] to allow these
+      functions to construct valid paths back through the skip list.
+
+      A subtlety of this [history] type is that it is customizable
+      depending on how much of the inbox history you actually want to
+      remember, using the [capacity] parameter. In the L1 we use this with
+      [capacity] set to zero, which makes it immediately forget an old
+      level as soon as we move to the next. By contrast, the rollup node
+      uses a history that is sufficiently large to be able to take part
+      in all potential refutation games occurring during the challenge
+      period. *)
+  module History :
+    Bounded_history_repr.S with type key = Hash.t and type value = history_proof
+
   val pp_history_proof : Format.formatter -> history_proof -> unit
 
   val history_proof_encoding : history_proof Data_encoding.t
@@ -179,27 +205,18 @@ module V1 : sig
     the current commitment period. *)
   val number_of_messages_during_commitment_period : t -> int64
 
-  (** [start_new_commitment_period inbox level] marks the beginning of a
-    new commitment period at some [level]. *)
-  val start_new_commitment_period : t -> Raw_level_repr.t -> t
-
-  (** [starting_level_of_current_commitment_period inbox] returns the
-    level at the beginning of a current commitment period. *)
-  val starting_level_of_current_commitment_period : t -> Raw_level_repr.t
+  (** [refresh_commitment_period ~commitment_period ~level inbox] updates
+      [inbox] to take into account the commitment_period: this resets a
+      counter for the number of messages in a given commitment period
+      (which is limited). *)
+  val refresh_commitment_period :
+    commitment_period:int32 -> level:Raw_level_repr.t -> t -> t
 end
 
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
 include Sc_rollup_data_version_sig.S with type t = V1.t
 
 include module type of V1 with type t = V1.t
-
-module Hash : sig
-  include S.HASH
-
-  val of_context_hash : Context_hash.t -> t
-
-  val to_context_hash : t -> Context_hash.t
-end
 
 (** This extracts the current level hash from the inbox. Note: the
     current level hash is stored lazily as [fun () -> ...], and this
@@ -213,7 +230,7 @@ val serialized_proof_encoding : serialized_proof Data_encoding.t
 
 (** The following operations are subject to cross-validation between
     rollup nodes and the layer 1. *)
-module type MerkelizedOperations = sig
+module type Merkelized_operations = sig
   (** The type for the Merkle trees used in this module. *)
   type tree
 
@@ -227,32 +244,6 @@ module type MerkelizedOperations = sig
       tree with no messages yet, but has the [level] stored so we can
       check that in proofs. *)
   val new_level_tree : inbox_context -> Raw_level_repr.t -> tree Lwt.t
-
-  (** A [history] is basically a lookup table of {!history_proof}s. We
-      need this if we want to produce inbox proofs because it allows us
-      to dereference the 'pointer' hashes in any of the
-      [history_proof]s. This [deref] function is passed to
-      [Skip_list.back_path] or [Skip_list.search] to allow these
-      functions to construct valid paths back through the skip list.
-
-      A subtlety of this [history] type is that it is customizable
-      depending on how much of the inbox history you actually want to
-      remember, using the [bound] parameter. In the L1 we use this with
-      [bound] set to zero, which makes it immediately forget an old
-      level as soon as we move to the next. By contrast, the rollup node
-      uses a history that is sufficiently large to be able to take part
-      in all potential refutation games occurring during the challenge
-      period.  *)
-  type history
-
-  val history_encoding : history Data_encoding.t
-
-  val pp_history : Format.formatter -> history -> unit
-
-  (** Construct an empty initial [history] with a given [bound]. If you
-      are running a rollup node, [bound] needs to be large enough to
-      remember any levels for which you may need to produce proofs. *)
-  val history_at_genesis : bound:int64 -> history
 
   (** [add_messages ctxt history inbox level payloads level_tree] inserts
       a list of [payloads] as new messages in the [level_tree] of the
@@ -271,12 +262,12 @@ module type MerkelizedOperations = sig
   *)
   val add_messages :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     Raw_level_repr.t ->
     Sc_rollup_inbox_message_repr.serialized list ->
     tree option ->
-    (tree * history * t) tzresult Lwt.t
+    (tree * History.t * t) tzresult Lwt.t
 
   (** [add_messages_no_history ctxt inbox level payloads level_tree] behaves
       as {!add_external_messages} except that it does not remember the inbox
@@ -309,10 +300,10 @@ module type MerkelizedOperations = sig
       if the inbox hasn't been added to for a while). *)
   val form_history_proof :
     inbox_context ->
-    history ->
+    History.t ->
     t ->
     tree option ->
-    (history * history_proof) Lwt.t
+    (History.t * history_proof) tzresult Lwt.t
 
   (** This is similar to {!form_history_proof} except that it is just to
       be used on the protocol side because it doesn't ensure the history
@@ -320,10 +311,13 @@ module type MerkelizedOperations = sig
       the beginning of a refutation game to create the snapshot against
       which proofs in that game must be valid.
 
-      This will however produce a [history_proof] with exactly the same
-      hash as the one produced by [form_history_proof], run on a node
-      with a complete [inbox_context]. *)
-  val take_snapshot : t -> history_proof
+      One important note:
+      It takes the snapshot of the inbox for the [current_level]. The snapshot
+      points to the inbox at the *beginning* of the current block level.
+      This prevents to create a mid-level snapshot for a refutation game
+      if new messages are added before and/or after in the same block.
+  *)
+  val take_snapshot : current_level:Raw_level_repr.t -> t -> history_proof
 
   (** Given a inbox [A] at some level [L] and another inbox [B] at
       some level [L' >= L], an [inclusion_proof] guarantees that [A] is
@@ -344,11 +338,6 @@ module type MerkelizedOperations = sig
   (** [number_of_proof_steps proof] returns the length of [proof]. *)
   val number_of_proof_steps : inclusion_proof -> int
 
-  (** [produce_inclusion_proof history a b] exploits [history] to produce
-      a self-contained proof that [a] is an older version of [b]. *)
-  val produce_inclusion_proof :
-    history -> history_proof -> history_proof -> inclusion_proof option
-
   (** [verify_inclusion_proof proof a b] returns [true] iff [proof] is a
       minimal and valid proof that [a] is included in [b]. *)
   val verify_inclusion_proof :
@@ -359,7 +348,7 @@ module type MerkelizedOperations = sig
       - the [starting_point], of type [Raw_level_repr.t * Z.t], specifying
         a location in the inbox ;
 
-      - the [message], of type [Sc_rollup_PVM_sem.input option] ;
+      - the [message], of type [Sc_rollup_PVM_sig.input option] ;
 
       - and a reference [snapshot] inbox.
 
@@ -389,7 +378,7 @@ module type MerkelizedOperations = sig
     Raw_level_repr.t * Z.t ->
     history_proof ->
     proof ->
-    Sc_rollup_PVM_sem.input option tzresult Lwt.t
+    Sc_rollup_PVM_sig.inbox_message option tzresult Lwt.t
 
   (** [produce_proof ctxt history inbox (level, counter)] creates an
       inbox proof proving the first message after the index [counter] at
@@ -398,14 +387,30 @@ module type MerkelizedOperations = sig
       full history). *)
   val produce_proof :
     inbox_context ->
-    history ->
+    History.t ->
     history_proof ->
     Raw_level_repr.t * Z.t ->
-    (proof * Sc_rollup_PVM_sem.input option) tzresult Lwt.t
+    (proof * Sc_rollup_PVM_sig.inbox_message option) tzresult Lwt.t
 
   (** [empty ctxt level] is an inbox started at some given [level] with no
       message at all. *)
   val empty : inbox_context -> Sc_rollup_repr.t -> Raw_level_repr.t -> t Lwt.t
+
+  module Internal_for_tests : sig
+    val eq_tree : tree -> tree -> bool
+
+    (** [produce_inclusion_proof history a b] exploits [history] to produce
+      a self-contained proof that [a] is an older version of [b]. *)
+    val produce_inclusion_proof :
+      History.t ->
+      history_proof ->
+      history_proof ->
+      inclusion_proof option tzresult
+
+    (** Allows to create a dumb {!serialized_proof} from a string, instead
+        of serializing a proof with {!to_serialized_proof}. *)
+    val serialized_proof_of_string : string -> serialized_proof
+  end
 end
 
 module type P = sig
@@ -442,14 +447,14 @@ end
    We provide a functor that takes a {!Context.TREE} module from any
    context, checks that the assumptions made about tree's arity and
    hashing scheme are valid, and returns a standard compliant
-   implementation of the {!MerkelizedOperations}.
+   implementation of the {!Merkelized_operations}.
 
 *)
-module MakeHashingScheme (P : P) :
-  MerkelizedOperations with type tree = P.tree and type inbox_context = P.t
+module Make_hashing_scheme (P : P) :
+  Merkelized_operations with type tree = P.tree and type inbox_context = P.t
 
 include
-  MerkelizedOperations
+  Merkelized_operations
     with type tree = Context.tree
      and type inbox_context = Context.t
 

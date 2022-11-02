@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Ithaca | Jakarta | Kathmandu | Alpha
+type t = Kathmandu | Lima | Alpha
 
 (** Protocol parameters.
 
@@ -59,6 +59,9 @@ val hash : t -> string
 (** Hash of protocol genesis *)
 val genesis_hash : string
 
+(** Hash of protocol demo_noops *)
+val demo_noops_hash : string
+
 (** Hash of protocol demo_counter *)
 val demo_counter_hash : string
 
@@ -68,26 +71,30 @@ val demo_counter_hash : string
     directory of the protocol, relative to the root of the repository. *)
 val parameter_file : ?constants:constants -> t -> string
 
-(** Get the path of the accuser of a protocol, such as ["./tezos-accuser-alpha"]. *)
+(** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
 val accuser : t -> string
 
-(** Get the path of the baker of a protocol, such as ["./tezos-baker-alpha"]. *)
+(** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
 val baker : t -> string
 
-(** Get the part of the daemon name that is specific to a protocol (e.g. ["008-PtEdo2Zk"]). *)
+(** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
+
+    This should not be used for anything except to compute the name of executables. *)
 val daemon_name : t -> string
 
-(** Get the part which is added at the beginning of all encoding names.
-
-    It turns out this is equal to what the [daemon_name] function returns. *)
+(** Get the part which is added at the beginning of all encoding names. *)
 val encoding_prefix : t -> string
 
 (** Values to override in protocol parameters.
 
-    The are pairs of JSON paths and optional values that can be used
-    to override or remove (when the value is [None]) the default parameters
-    when activating protocol. *)
-type parameter_overrides = (string list * string option) list
+    They are pairs of JSON paths and optional values that can be used
+    to override or remove (when the value is [`None]) the default parameters
+    when activating a protocol.
+
+    [`Int i] is a short-hand for [`Float (float i)] and
+    [`String_of_int i] is a short-hand for [`String (string_of_int i)]. *)
+type parameter_overrides =
+  (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
 (** Write a protocol parameter file.
 

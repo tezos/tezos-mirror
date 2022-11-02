@@ -90,10 +90,6 @@ module Pp : S with type 'a repr = string and type size = string
 module Free_variables :
   S with type 'a repr = Free_variable.Set.t and type size = unit
 
-(* Extracts model parameters, corresponding to head lambdas. *)
-module Parameters :
-  S with type 'a repr = bool -> String.Set.t and type size = unit
-
 (* Evaluating implementation for closed terms.  Fails if free variables are
    present. Use the [Subst] implementation transformer to get rid of free
    variables. *)
@@ -130,15 +126,6 @@ type transform = (module Transform)
 val compose : transform -> transform -> transform
 
 module Identity : Transform
-
-(* [Map_const] maps functions to integer and float constants. *)
-module type Map_const_params = sig
-  val map_int : int -> int
-
-  val map_float : float -> float
-end
-
-module Map_const (P : Map_const_params) : Transform
 
 (* [Subst] allows to subtitute free variables by constants. *)
 module Subst (P : sig

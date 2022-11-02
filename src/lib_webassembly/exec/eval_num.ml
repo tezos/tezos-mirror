@@ -94,7 +94,7 @@ module FloatOp (FXX : Fxx.S) (Num : NumType with type t = FXX.t) = struct
     in
     fun v1 v2 -> to_num (f (of_num 1 v1) (of_num 2 v2))
 
-  let testop op = assert false
+  let testop _ = assert false
 
   let relop op =
     let f =

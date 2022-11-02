@@ -25,7 +25,3 @@ opam env
 ## $ make; find _build/default | grep -e "dll.*\.so\|dylib$"
 
 add_ld_path "_build/default/src/lib_sapling"
-add_ld_path "_build/default/vendors/ocaml-bls12-381/src"
-add_ld_path "_build/default/vendors/benchmark-utils"
-add_ld_path "_build/default/vendors/numerics/lib"
-add_ld_path "_build/default/vendors/ocaml-lmdb/src"

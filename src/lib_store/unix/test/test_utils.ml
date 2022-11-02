@@ -182,9 +182,19 @@ let dummy_patch_context ctxt =
   let*? {context; _} = Environment.wrap_tzresult res in
   return context
 
+let register_gc store =
+  let open Lwt_result_syntax in
+  let chain_store = Store.main_chain_store store in
+  let gc ch =
+    let*! () = Context_ops.gc (Store.context_index store) ch in
+    return_unit
+  in
+  Store.Chain.register_gc_callback chain_store gc
+
 let wrap_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.Archive) ?(allow_testchains = true)
-    ?(keep_dir = false) k _ () : unit Lwt.t =
+    ?(keep_dir = false) ?(with_gc = true) ?block_cache_limit
+    ?(manual_close = false) k _ () : unit Lwt.t =
   let open Lwt_result_syntax in
   let prefix_dir = "tezos_indexed_store_test_" in
   let run f =
@@ -202,6 +212,7 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
         let context_dir = base_dir // "context" in
         let* store =
           Store.init
+            ?block_cache_limit
             ~patch_context
             ~history_mode
             ~store_dir
@@ -209,17 +220,25 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
+        if with_gc then register_gc store ;
         protect
           ~on_error:(fun err ->
             let*! pp_store = Store.make_pp_store store in
             Format.eprintf "@[<v>DEBUG:@ %a@]@." pp_store () ;
-            let*! () = Store.close_store store in
+            let*! () =
+              if manual_close then Lwt.return_unit else Store.close_store store
+            in
             Lwt.return (Error err))
           (fun () ->
             let* () = k (store_dir, context_dir) store in
             Format.printf "Invariants check before closing@." ;
-            let* () = check_invariants (Store.main_chain_store store) in
-            let*! () = Store.close_store store in
+            let* () =
+              if manual_close then return_unit
+              else
+                let* () = check_invariants (Store.main_chain_store store) in
+                let*! () = Store.close_store store in
+                return_unit
+            in
             let* store' =
               Store.init
                 ~history_mode
@@ -244,16 +263,23 @@ let wrap_store_init ?(patch_context = dummy_patch_context)
       Lwt.fail Alcotest.Test_error
   | Ok r -> Lwt.return r
 
-let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir (name, f)
-    =
+let wrap_test ?history_mode ?(speed = `Quick) ?patch_context ?keep_dir ?with_gc
+    ?block_cache_limit ?manual_close (name, f) =
   test_case
     name
     speed
-    (wrap_store_init ?patch_context ?history_mode ?keep_dir f)
+    (wrap_store_init
+       ?patch_context
+       ?history_mode
+       ?keep_dir
+       ?with_gc
+       ?block_cache_limit
+       ?manual_close
+       f)
 
 let wrap_simple_store_init ?(patch_context = dummy_patch_context)
     ?(history_mode = History_mode.default) ?(allow_testchains = true)
-    ?(keep_dir = false) k _ () : unit Lwt.t =
+    ?(keep_dir = false) ?(with_gc = true) k _ () : unit Lwt.t =
   let open Lwt_result_syntax in
   let prefix_dir = "tezos_indexed_store_test_" in
   let run f =
@@ -277,6 +303,7 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
             ~allow_testchains
             genesis
         in
+        if with_gc then register_gc store ;
         protect
           ~on_error:(fun err ->
             let*! () = Store.close_store store in
@@ -304,11 +331,11 @@ let wrap_simple_store_init ?(patch_context = dummy_patch_context)
   | Ok () -> Lwt.return_unit
 
 let wrap_simple_store_init_test ?history_mode ?(speed = `Quick) ?patch_context
-    ?keep_dir (name, f) =
+    ?keep_dir ?with_gc (name, f) =
   test_case
     name
     speed
-    (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir f)
+    (wrap_simple_store_init ?history_mode ?patch_context ?keep_dir ?with_gc f)
 
 let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
     ?(constants = default_protocol_constants) ?(context = Context_hash.zero)
@@ -348,6 +375,19 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
     | Some min_lafl -> Compare.Int32.max min_lafl last_allowed_fork_level
     | None -> last_allowed_fork_level
   in
+  let operations =
+    List.map
+      (fun _ ->
+        Stdlib.List.init (Random.int 10) (fun _i ->
+            Operation.
+              {
+                shell = {branch = pred_block_hash};
+                proto =
+                  Data_encoding.(
+                    Binary.to_bytes_exn int31 Random.(int (bits ())));
+              }))
+      Tezos_protocol_alpha.Protocol.Main.validation_passes
+  in
   let metadata =
     Some
       {
@@ -357,24 +397,36 @@ let make_raw_block ?min_lafl ?(max_operations_ttl = default_max_operations_ttl)
         block_metadata = Bytes.create 1;
         operations_metadata =
           List.map
-            (fun _ -> [])
-            Tezos_protocol_alpha.Protocol.Main.validation_passes;
+            (List.map (fun _ ->
+                 if Random.bool () then Block_validation.Too_large_metadata
+                 else
+                   Metadata
+                     Data_encoding.(
+                       Binary.to_bytes_exn int31 Random.(int (bits ())))))
+            operations;
       }
   in
-  let operations =
-    List.map (fun _ -> []) Tezos_protocol_alpha.Protocol.Main.validation_passes
+  let b =
+    {
+      Block_repr.hash;
+      contents =
+        {
+          header;
+          operations;
+          block_metadata_hash =
+            (if Random.bool () then Some Block_metadata_hash.zero else None);
+          operations_metadata_hashes =
+            (if Random.bool () then
+             Some
+               (List.map
+                  (List.map (fun _ -> Operation_metadata_hash.zero))
+                  operations)
+            else None);
+        };
+      metadata;
+    }
   in
-  {
-    Block_repr.hash;
-    contents =
-      {
-        header;
-        operations;
-        block_metadata_hash = None;
-        operations_metadata_hashes = None;
-      };
-    metadata;
-  }
+  b
 
 let prune_block block = block.Block_repr.metadata <- None
 
@@ -476,8 +528,22 @@ let make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ?(kind = `Full)
   let blk = List.hd l |> WithExceptions.Option.get ~loc:__LOC__ in
   Lwt.return (List.rev l, blk)
 
+let incr_fitness b =
+  match b with
+  | [] ->
+      let b = Bytes.create 8 in
+      Bytes.set_int32_be b 0 1l ;
+      [b]
+  | [fitness_b] ->
+      let fitness = Bytes.get_int32_be fitness_b 0 in
+      let b = Bytes.create 8 in
+      Bytes.set_int32_be b 0 (Int32.succ fitness) ;
+      [b]
+  | _ -> assert false
+
 let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
-    ?(should_set_head = false) ?(should_commit = false) chain_store n =
+    ?(should_set_head = false) ?(should_commit = false) ?protocol_level
+    ?set_protocol chain_store n =
   let open Lwt_result_syntax in
   let*! root =
     match root with
@@ -495,6 +561,11 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
   let*! blocks, _last =
     make_raw_block_list ?min_lafl ?constants ?max_operations_ttl ~kind root n
   in
+  let proto_level =
+    match protocol_level with
+    | None -> Store.Block.proto_level root_b
+    | Some proto_level -> proto_level
+  in
   let* _, _, blocks =
     List.fold_left_es
       (fun (ctxt_opt, last_opt, blocks) b ->
@@ -507,17 +578,24 @@ let append_blocks ?min_lafl ?constants ?max_operations_ttl ?root ?(kind = `Full)
                 ["level"]
                 (Bytes.of_string (Format.asprintf "%ld" (Block_repr.level b)))
             in
+            let*! ctxt =
+              match set_protocol with
+              | None -> Lwt.return ctxt
+              | Some proto -> Context_ops.add_protocol ctxt proto
+            in
             let*! ctxt_hash =
               Context_ops.commit ~time:Time.Protocol.epoch ctxt
             in
             let predecessor =
-              Option.value ~default:(Block_repr.predecessor b) last_opt
+              match List.hd blocks with None -> root_b | Some pred -> pred
             in
             let shell =
               {
                 b.contents.header.Block_header.shell with
+                fitness = incr_fitness (Store.Block.fitness predecessor);
+                proto_level;
                 context = ctxt_hash;
-                predecessor;
+                predecessor = Store.Block.hash predecessor;
               }
             in
             let header =
@@ -720,12 +798,12 @@ module Example_tree = struct
 
   let vblock tbl k = Nametbl.find tbl k
 
-  let wrap_test ?keep_dir ?history_mode (name, g) =
+  let wrap_test ?keep_dir ?history_mode ?with_gc (name, g) =
     let open Lwt_result_syntax in
     let f _ store =
       let chain_store = Store.main_chain_store store in
       let* tbl = build_example_tree store in
       g chain_store tbl
     in
-    wrap_test ?keep_dir ?history_mode (name, f)
+    wrap_test ?keep_dir ?history_mode ?with_gc (name, f)
 end

@@ -138,12 +138,13 @@ let replacement_op = {default_op with fee = replacement_fee}
 
 (* Auxiliary function to get the current counter *)
 let get_counter ?(contract = default_source) client =
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:contract.Account.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:contract.Account.public_key_hash
+         ()
   in
-  Lwt.return @@ JSON.as_int counter
+  Lwt.return @@ JSON.as_int counter_json
 
 (* Auxiliary function that constructs a batch transfer of the given size *)
 let mk_batch client op_data size =
@@ -345,9 +346,9 @@ let replacement_fees_below_threshold_even_if_gas_is_decreased =
    implemented policy doesn't allow to decrease amount of fees when replacing
    and operation. *)
 let fees_of_second_op_below_fees_of_first_one =
-  let op1 = {default_op with fee = 50_000; gas = 100_000} in
+  let op1 = {default_op with fee = 500_000; gas = 1_000_000} in
   (* The ratio fee/gas is more important, but fee is lower to replace *)
-  let op2 = {op1 with fee = op1.fee; gas = op1.gas / 100} in
+  let op2 = {op1 with fee = op1.fee; gas = op1.gas / 10} in
   replacement_test_helper
     ~__LOC__
     ~title:"Op2's gas/fee is more important, but fees are not higher than max"

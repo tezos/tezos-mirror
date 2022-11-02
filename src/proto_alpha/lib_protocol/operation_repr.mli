@@ -49,6 +49,8 @@
       - tx rollup withdraw
       - tx rollup reveal withdrawals
       - smart contract rollup origination
+      - zk rollup origination
+      - zk rollup publish
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -105,6 +107,10 @@ module Kind : sig
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
+  type drain_delegate = Drain_delegate_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -148,6 +154,10 @@ module Kind : sig
 
   type sc_rollup_dal_slot_subscribe = Sc_rollup_dal_slot_subscribe_kind
 
+  type zk_rollup_origination = Zk_rollup_origination_kind
+
+  type zk_rollup_publish = Zk_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -157,6 +167,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -181,6 +192,8 @@ module Kind : sig
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Sc_rollup_dal_slot_subscribe_manager_kind
         : sc_rollup_dal_slot_subscribe manager
+    | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
+    | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
 end
 
 type 'a consensus_operation_type =
@@ -321,6 +334,15 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  (* [Drain_delegate { consensus_key ; delegate ; destination }]
+     transfers the spendable balance of the [delegate] to [destination]
+     when [consensus_key] is the active consensus key of [delegate].. *)
+  | Drain_delegate : {
+      consensus_key : Signature.Public_key_hash.t;
+      delegate : Signature.Public_key_hash.t;
+      destination : Signature.Public_key_hash.t;
+    }
+      -> Kind.drain_delegate contents
   (* Failing_noop: An operation never considered by the state machine
      and which will always fail at [apply]. This allows end-users to
      sign arbitrary messages which have no computational semantics. *)
@@ -389,6 +411,11 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  (* [Update_consensus_key pk] updates the consensus key of
+     the signing delegate to [pk]. *)
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
@@ -428,7 +455,7 @@ and _ manager_operation =
       message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       previous_message_result : Tx_rollup_message_result_repr.t;
       previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
-      proof : Tx_rollup_l2_proof.t;
+      proof : Tx_rollup_l2_proof.serialized;
     }
       -> Kind.tx_rollup_rejection manager_operation
   | Tx_rollup_dispatch_tickets : {
@@ -458,7 +485,7 @@ and _ manager_operation =
       ty : Script_repr.lazy_expr;
           (** Type of the withdrawn ticket's contents *)
       ticketer : Contract_repr.t;  (** Ticketer of the withdrawn ticket *)
-      amount : Z.t;
+      amount : Ticket_amount.t;
           (** Quantity of the withdrawn ticket. Must match the
           amount that was enabled.  *)
       destination : Contract_repr.t;
@@ -468,7 +495,7 @@ and _ manager_operation =
     }
       -> Kind.transfer_ticket manager_operation
   | Dal_publish_slot_header : {
-      slot : Dal_slot_repr.t;
+      slot_header : Dal_slot_repr.Header.t;
     }
       -> Kind.dal_publish_slot_header manager_operation
       (** [Sc_rollup_originate] allows an implicit account to originate a new
@@ -480,7 +507,7 @@ and _ manager_operation =
   | Sc_rollup_originate : {
       kind : Sc_rollups.Kind.t;
       boot_sector : string;
-      origination_proof : Sc_rollups.wrapped_proof;
+      origination_proof : string;
       parameters_ty : Script_repr.lazy_expr;
     }
       -> Kind.sc_rollup_originate manager_operation
@@ -540,6 +567,21 @@ and _ manager_operation =
       slot_index : Dal_slot_repr.Index.t;
     }
       -> Kind.sc_rollup_dal_slot_subscribe manager_operation
+  | Zk_rollup_origination : {
+      public_parameters : Plonk.public_parameters;
+      circuits_info : bool Zk_rollup_account_repr.SMap.t;
+          (** Circuit names, alongside a boolean flag indicating
+              if they can be used for private ops. *)
+      init_state : Zk_rollup_state_repr.t;
+      nb_ops : int;
+    }
+      -> Kind.zk_rollup_origination manager_operation
+  | Zk_rollup_publish : {
+      zk_rollup : Zk_rollup_repr.t;
+      ops : (Zk_rollup_operation_repr.t * Zk_rollup_ticket_repr.t option) list;
+          (* See {!Zk_rollup_apply} *)
+    }
+      -> Kind.zk_rollup_publish manager_operation
 
 (** Counters are used as anti-replay protection mechanism in
     manager operations: each manager account stores a counter and
@@ -591,7 +633,93 @@ val hash : _ operation -> Operation_hash.t
 
 val hash_packed : packed_operation -> Operation_hash.t
 
-val acceptable_passes : packed_operation -> int list
+(** Each operation belongs to a validation pass that is an integer
+   abstracting its priority in a block. Except Failing_noop. *)
+
+(** The validation pass of consensus operations. *)
+val consensus_pass : int
+
+(** The validation pass of voting operations. *)
+val voting_pass : int
+
+(** The validation pass of anonymous operations. *)
+val anonymous_pass : int
+
+(** The validation pass of anonymous operations. *)
+val manager_pass : int
+
+(** [acceptable_pass op] returns either the validation_pass of [op]
+   when defines and None when [op] is [Failing_noop]. *)
+val acceptable_pass : packed_operation -> int option
+
+(** [compare_by_passes] orders two operations in the reverse order of
+   their acceptable passes. *)
+val compare_by_passes : packed_operation -> packed_operation -> int
+
+(** [compare (oph1,op1) (oph2,op2)] defines a total ordering relation
+   on operations.
+
+   The following requirements must be satisfied: [oph1] is the
+   [Operation.hash op1], [oph2] is [Operation.hash op2], and that
+   [op1] and [op2] are valid in the same context.
+
+   [compare (oph1,op1) (oph2,op2) = 0] happens only if
+   [Operation_hash.compare oph1 oph2 = 0], meaning when [op1] and
+   [op2] are structurally identical.
+
+   Two valid operations of different [validation_pass] are compared
+   according to {!acceptable_passes}: the one with the smaller pass
+   being the greater.
+
+   Two valid operations of the same [validation_pass] are compared
+   according to a [weight], computed thanks to their static
+   information.
+
+   The global order is as follows:
+
+   {!Endorsement} and {!Preendorsement} > {!Dal_slot_availability} >
+   {!Proposals} > {!Ballot} > {!Double_preendorsement_evidence} >
+   {!Double_endorsement_evidence} > {!Double_baking_evidence} >
+   {!Vdf_revelation} > {!Seed_nonce_revelation} > {!Activate_account}
+   > {!Drain_delegate} > {!Manager_operation}.
+
+   {!Endorsement} and {!Preendorsement} are compared by the pair of
+   their [level] and [round] such as the farther to the current state
+   [level] and [round] is greater; e.g. the greater pair in
+   lexicographic order being the better. When equal and both
+   operations being of the same kind, we compare their [slot]: the
+   The smaller being the better, assuming that the more slots an endorser
+   has, the smaller is its smallest [slot]. When the pair is equal
+   and comparing an {!Endorsement] to a {!Preendorsement}, the
+   {!Endorsement} is better.
+
+   Two {!Dal_slot_availability} ops are compared in the lexicographic
+   order of the pair of their number of endorsed slots as available
+   and their endorsers.
+
+   Two voting operations are compared in the lexicographic order of
+   the pair of their [period] and [source]. A {!Proposals} is better
+   than a {!Ballot}.
+
+   Two denunciations of the same kind are compared such as the farther
+   to the current state the better. For {!Double_baking_evidence}
+   in the case of equality, they are compared by the hashes of their first
+   denounced block_header.
+
+   Two {!Vdf_revelation} ops are compared by their [solution].
+
+   Two {!Seed_nonce_relevation} ops are compared by their [level].
+
+   Two {!Activate_account} ops are compared by their [id].
+
+   Two {!Drain_delegate} ops are compared by their [delegate].
+
+   Two {!Manager_operation}s are compared in the lexicographic order of
+   the pair of their [fee]/[gas_limit] ratios and [source]. *)
+val compare :
+  Operation_hash.t * packed_operation ->
+  Operation_hash.t * packed_operation ->
+  int
 
 type error += Missing_signature (* `Permanent *)
 
@@ -639,6 +767,8 @@ module Encoding : sig
 
   val ballot_case : Kind.ballot case
 
+  val drain_delegate_case : Kind.drain_delegate case
+
   val failing_noop_case : Kind.failing_noop case
 
   val reveal_case : Kind.reveal Kind.manager case
@@ -648,6 +778,8 @@ module Encoding : sig
   val origination_case : Kind.origination Kind.manager case
 
   val delegation_case : Kind.delegation Kind.manager case
+
+  val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
 
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
@@ -703,6 +835,10 @@ module Encoding : sig
   val sc_rollup_dal_slot_subscribe_case :
     Kind.sc_rollup_dal_slot_subscribe Kind.manager case
 
+  val zk_rollup_origination_case : Kind.zk_rollup_origination Kind.manager case
+
+  val zk_rollup_publish_case : Kind.zk_rollup_publish Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -722,6 +858,10 @@ module Encoding : sig
     val origination_case : Kind.origination case
 
     val delegation_case : Kind.delegation case
+
+    val update_consensus_key_tag : int
+
+    val update_consensus_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
 
@@ -769,5 +909,9 @@ module Encoding : sig
 
     val sc_rollup_dal_slot_subscribe_case :
       Kind.sc_rollup_dal_slot_subscribe case
+
+    val zk_rollup_origination_case : Kind.zk_rollup_origination case
+
+    val zk_rollup_publish_case : Kind.zk_rollup_publish case
   end
 end

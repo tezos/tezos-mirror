@@ -19,7 +19,8 @@
   ringo
   zarith
   zarith_stubs_js
-  bls12-381)
+  bls12-381
+  bls12-381-signature)
  (js_of_ocaml)
  (flags
   (:standard)

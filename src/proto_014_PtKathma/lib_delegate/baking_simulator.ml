@@ -80,7 +80,7 @@ let check_context_consistency (abstract_index : Abstract_context_index.t)
           | true -> return_unit
           | false -> fail Invalid_context))
 
-let begin_construction ~timestamp ?protocol_data
+let begin_construction ~timestamp ~protocol_data
     (abstract_index : Abstract_context_index.t) predecessor chain_id =
   protect (fun () ->
       let {Baking_state.shell = pred_shell; hash = pred_hash; _} =
@@ -103,17 +103,17 @@ let begin_construction ~timestamp ?protocol_data
                   Operation_list_list_hash.zero (* fake op hash *);
               }
           in
-          Lifted_protocol.begin_construction
-            ~chain_id
-            ~predecessor_context:context
-            ~predecessor_timestamp:pred_shell.timestamp
-            ~predecessor_fitness:pred_shell.fitness
-            ~predecessor_level:pred_shell.level
-            ~predecessor:pred_hash
-            ?protocol_data
-            ~timestamp
+          Lifted_protocol.begin_application
+            context
+            chain_id
+            (Construction
+               {
+                 predecessor_hash = predecessor.hash;
+                 timestamp;
+                 block_header_data = protocol_data;
+               })
+            ~predecessor:pred_shell
             ~cache:`Lazy
-            ()
           >>=? fun state ->
           return {predecessor; context; state; rev_operations = []; header})
 

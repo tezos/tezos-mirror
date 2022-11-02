@@ -1,17 +1,13 @@
 open Types
-open Values
 
-type ('input, 'inst) t = ('input, 'inst) func
+type 'inst t = 'inst func
 
-and ('input, 'inst) func =
+and 'inst func =
   | AstFunc of func_type * 'inst * Ast.func
-  | HostFunc of func_type * ('input -> 'inst -> value list -> value list Lwt.t)
+  | HostFunc of func_type * string
 
-val alloc : func_type -> 'inst -> Ast.func -> ('input, 'inst) func
+val alloc : func_type -> 'inst -> Ast.func -> 'inst func
 
-val alloc_host :
-  func_type ->
-  ('input -> 'inst -> value list -> value list Lwt.t) ->
-  ('input, 'inst) func
+val alloc_host : global_name:string -> func_type -> 'inst func
 
-val type_of : ('input, 'inst) func -> func_type
+val type_of : 'inst func -> func_type

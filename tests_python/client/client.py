@@ -13,12 +13,14 @@ from typing import Any, List, Optional, Tuple
 from process.process_utils import format_command
 from . import client_output
 
+HTTP_VERBS = {'put', 'get', 'post', 'delete', 'patch'}
+
 
 class Client:
     """Client to a Tezos node.
 
     Manage the persistent client state and provides methods to call
-    tezos-client/tezos-admin-client commands, and return structured
+    octez-client/octez-admin-client commands, and return structured
     representation of the client output.
 
     The most generic method to call the client is `run`. It calls the client
@@ -77,7 +79,7 @@ class Client:
         self._is_tmp_dir = base_dir is None
 
         if base_dir is None:
-            base_dir = tempfile.mkdtemp(prefix='tezos-client.')
+            base_dir = tempfile.mkdtemp(prefix='octez-client.')
             assert base_dir
         self.base_dir = base_dir
 
@@ -133,9 +135,9 @@ class Client:
         """Run an arbitrary command
 
         Args:
-            params (list): list of parameters given to the tezos-client,
-            admin (bool): False to call tezos-client, True to call
-                          tezos-admin-client
+            params (list): list of parameters given to the octez-client,
+            admin (bool): False to call octez-client, True to call
+                          octez-admin-client
             check (bool): raises an exception if client call fails
             trace (bool): use '-l' option to trace RPCs
             stdin (string): string that will be passed as standard
@@ -209,11 +211,28 @@ class Client:
 
         See `run` for more details.
         """
-        assert verb in {'put', 'get', 'post', 'delete', 'patch'}
+        assert verb in HTTP_VERBS
         params = [] if params is None else params
         params = params + ['--better-errors'] + ['rpc', verb, path]
         if data is not None:
             params = params + ['with', json.dumps(data)]
+        compl_pr = self.run(params)
+        return client_output.extract_rpc_answer(compl_pr)
+
+    def rpc_schema(self, verb: str, path: str) -> Any:
+        """Get the input and output JSON schemas of an RPC.
+
+        Args:
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
+            path (str): rpc path
+        Returns:
+            dict representing the json schema, raise exception
+            if schema isn't json.
+
+        See `run` for more details.
+        """
+        assert verb.lower() in HTTP_VERBS
+        params = ['rpc', 'schema', verb, path]
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 

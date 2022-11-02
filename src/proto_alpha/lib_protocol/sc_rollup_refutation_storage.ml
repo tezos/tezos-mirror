@@ -38,12 +38,43 @@ type point = {
 
 type conflict_point = point * point
 
-let timeout_level ctxt =
-  let level = Raw_context.current_level ctxt in
+(** [initial_timeout ctxt] set the initial timeout of players. The initial
+    timeout of each player is equal to [sc_rollup_timeout_period_in_blocks]. *)
+let initial_timeout ctxt =
+  let last_turn_level = (Raw_context.current_level ctxt).level in
   let timeout_period_in_blocks =
     Constants_storage.sc_rollup_timeout_period_in_blocks ctxt
   in
-  Raw_level_repr.add level.level timeout_period_in_blocks
+  Sc_rollup_game_repr.
+    {
+      alice = timeout_period_in_blocks;
+      bob = timeout_period_in_blocks;
+      last_turn_level;
+    }
+
+(** [update_timeout ctxt rollup game idx] update the timeout left for the
+    current player [game.turn]. Her new timeout is equal to [nb_of_block_left -
+    (current_level - last_turn_level)] where [nb_of_block_left] is her current
+    timeout. *)
+let update_timeout ctxt rollup (game : Sc_rollup_game_repr.t) idx =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) idx in
+  let current_level = (Raw_context.current_level ctxt).level in
+  let sub_block_left nb_of_block_left =
+    nb_of_block_left
+    - Int32.to_int (Raw_level_repr.diff current_level timeout.last_turn_level)
+  in
+  let new_timeout =
+    match game.turn with
+    | Alice ->
+        let nb_of_block_left = sub_block_left timeout.alice in
+        {timeout with last_turn_level = current_level; alice = nb_of_block_left}
+    | Bob ->
+        let nb_of_block_left = sub_block_left timeout.bob in
+        {timeout with last_turn_level = current_level; bob = nb_of_block_left}
+  in
+  let* ctxt, _ = Store.Game_timeout.update (ctxt, rollup) idx new_timeout in
+  return ctxt
 
 let get_ongoing_game ctxt rollup staker1 staker2 =
   let open Lwt_tzresult_syntax in
@@ -163,7 +194,7 @@ let get_game ctxt rollup stakers =
   let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
   match game with Some g -> return (g, ctxt) | None -> fail Sc_rollup_no_game
 
-(** [init_game ctxt rollup refuter defender] initialises the game or
+(** [start_game ctxt rollup refuter defender] initialises the game or
     if it already exists fails with `Sc_rollup_game_already_started`.
 
     The game is created with `refuter` as the first player to move. The
@@ -195,124 +226,164 @@ let get_game ctxt rollup stakers =
       {li [Sc_rollup_staker_in_game] if one of the [refuter] or [defender]
          is already playing a game}
     } *)
-let init_game ctxt rollup ~refuter ~defender =
+let start_game ctxt rollup ~player:refuter ~opponent:defender =
   let open Lwt_tzresult_syntax in
   let stakers = Sc_rollup_game_repr.Index.make refuter defender in
-  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  match game with
-  | Some _ -> fail Sc_rollup_game_already_started
-  | None ->
-      let* ctxt, opp_1 = Store.Opponent.find (ctxt, rollup) refuter in
-      let* ctxt, opp_2 = Store.Opponent.find (ctxt, rollup) defender in
-      let* _ =
-        match (opp_1, opp_2) with
-        | None, None -> return ()
-        | Some _refuter_opponent, None ->
-            fail (Sc_rollup_staker_in_game (`Refuter refuter))
-        | None, Some _defender_opponent ->
-            fail (Sc_rollup_staker_in_game (`Defender defender))
-        | Some _refuter_opponent, Some _defender_opponent ->
-            fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
-      in
-      let* ( ( {hash = _refuter_commit; commitment = _info},
-               {hash = _defender_commit; commitment = child_info} ),
-             ctxt ) =
-        get_conflict_point ctxt rollup refuter defender
-      in
-      let* parent_info, ctxt =
-        Commitment_storage.get_commitment_unsafe
-          ctxt
-          rollup
-          child_info.predecessor
-      in
-      let* ctxt, inbox = Store.Inbox.get ctxt rollup in
-      let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
-      let default_number_of_sections =
-        Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
-      in
-
-      let game =
-        Sc_rollup_game_repr.initial
-          (Sc_rollup_inbox_repr.take_snapshot inbox)
-          ~pvm_name:(Sc_rollups.Kind.name_of kind)
-          ~parent:parent_info
-          ~child:child_info
-          ~refuter
-          ~defender
-          ~default_number_of_sections
-      in
-      let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
-      let* ctxt, _ =
-        Store.Game_timeout.init (ctxt, rollup) stakers (timeout_level ctxt)
-      in
-      let* ctxt, _ = Store.Opponent.init (ctxt, rollup) refuter defender in
-      let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
-      return (game, ctxt)
-
-let start_game ctxt rollup ~player ~opponent =
-  let open Lwt_tzresult_syntax in
-  let idx = Sc_rollup_game_repr.Index.make player opponent in
-  let* game, ctxt = init_game ctxt rollup ~refuter:player ~defender:opponent in
-  let* ctxt, _ = Store.Game.update (ctxt, rollup) idx game in
-  let* ctxt, _ =
-    Store.Game_timeout.update (ctxt, rollup) idx (timeout_level ctxt)
+  let* ctxt, game_exists = Store.Game.mem (ctxt, rollup) stakers in
+  let* () = fail_when game_exists Sc_rollup_game_already_started in
+  let* ctxt, opp_1 = Store.Opponent.find (ctxt, rollup) refuter in
+  let* ctxt, opp_2 = Store.Opponent.find (ctxt, rollup) defender in
+  let* () =
+    match (opp_1, opp_2) with
+    | None, None -> return ()
+    | Some _refuter_opponent, None ->
+        fail (Sc_rollup_staker_in_game (`Refuter refuter))
+    | None, Some _defender_opponent ->
+        fail (Sc_rollup_staker_in_game (`Defender defender))
+    | Some _refuter_opponent, Some _defender_opponent ->
+        fail (Sc_rollup_staker_in_game (`Both (refuter, defender)))
   in
+  let* ( ( {hash = _refuter_commit; commitment = _info},
+           {hash = _defender_commit; commitment = child_info} ),
+         ctxt ) =
+    get_conflict_point ctxt rollup refuter defender
+  in
+  let* parent_info, ctxt =
+    Commitment_storage.get_commitment_unsafe ctxt rollup child_info.predecessor
+  in
+  let* ctxt, inbox = Store.Inbox.get ctxt rollup in
+  let* ctxt, kind = Store.PVM_kind.get ctxt rollup in
+  let default_number_of_sections =
+    Constants_storage.sc_rollup_number_of_sections_in_dissection ctxt
+  in
+
+  let current_level = (Raw_context.current_level ctxt).level in
+  let game =
+    Sc_rollup_game_repr.initial
+      ~start_level:current_level
+      (Sc_rollup_inbox_repr.take_snapshot ~current_level inbox)
+      ~pvm_name:(Sc_rollups.Kind.name_of kind)
+      ~parent:parent_info
+      ~child:child_info
+      ~refuter
+      ~defender
+      ~default_number_of_sections
+  in
+  let* ctxt, _ = Store.Game.init (ctxt, rollup) stakers game in
+  let* ctxt, _ =
+    Store.Game_timeout.init (ctxt, rollup) stakers (initial_timeout ctxt)
+  in
+  let* ctxt, _ = Store.Opponent.init (ctxt, rollup) refuter defender in
+  let* ctxt, _ = Store.Opponent.init (ctxt, rollup) defender refuter in
   return ctxt
 
 let game_move ctxt rollup ~player ~opponent refutation =
   let open Lwt_tzresult_syntax in
-  let idx = Sc_rollup_game_repr.Index.make player opponent in
-  let* game, ctxt = get_game ctxt rollup idx in
+  let stakers = Sc_rollup_game_repr.Index.make player opponent in
+  let* game, ctxt = get_game ctxt rollup stakers in
   let* () =
     fail_unless
       (Sc_rollup_repr.Staker.equal
          player
-         (Sc_rollup_game_repr.Index.staker idx game.turn))
+         (Sc_rollup_game_repr.Index.staker stakers game.turn))
       Sc_rollup_wrong_turn
   in
+  let* ctxt, metadata = Sc_rollup_storage.get_metadata ctxt rollup in
   let* move_result =
-    Lwt.map Result.ok @@ Sc_rollup_game_repr.play game refutation
+    Sc_rollup_game_repr.play ~stakers metadata game refutation
   in
   match move_result with
-  | Either.Left outcome -> return (Some outcome, ctxt)
+  | Either.Left game_result -> return (Some game_result, ctxt)
   | Either.Right new_game ->
-      let* ctxt, _ = Store.Game.update (ctxt, rollup) idx new_game in
-      let* ctxt, _ =
-        Store.Game_timeout.update (ctxt, rollup) idx (timeout_level ctxt)
-      in
+      let* ctxt, _ = Store.Game.update (ctxt, rollup) stakers new_game in
+      let* ctxt = update_timeout ctxt rollup game stakers in
       return (None, ctxt)
+
+let get_timeout ctxt rollup stakers =
+  let open Lwt_tzresult_syntax in
+  let* ctxt, timeout_opt =
+    Storage.Sc_rollup.Game_timeout.find (ctxt, rollup) stakers
+  in
+  match timeout_opt with
+  | Some timeout -> return (timeout, ctxt)
+  | None -> fail Sc_rollup_no_game
 
 let timeout ctxt rollup stakers =
   let open Lwt_tzresult_syntax in
   let level = (Raw_context.current_level ctxt).level in
-  let* ctxt, game = Store.Game.find (ctxt, rollup) stakers in
-  match game with
-  | None -> fail Sc_rollup_no_game
-  | Some game ->
-      let* ctxt, timeout_level =
-        Store.Game_timeout.get (ctxt, rollup) stakers
-      in
-      let* () =
-        fail_unless
-          Raw_level_repr.(level > timeout_level)
-          Sc_rollup_timeout_level_not_reached
-      in
-      return (Sc_rollup_game_repr.{loser = game.turn; reason = Timeout}, ctxt)
-
-let apply_outcome ctxt rollup stakers (outcome : Sc_rollup_game_repr.outcome) =
-  let open Lwt_tzresult_syntax in
-  let losing_staker = Sc_rollup_game_repr.Index.staker stakers outcome.loser in
-  let* ctxt, balance_updates =
-    Stake_storage.remove_staker ctxt rollup losing_staker
+  let* game, ctxt = get_game ctxt rollup stakers in
+  let* ctxt, timeout = Store.Game_timeout.get (ctxt, rollup) stakers in
+  let* () =
+    let block_left_before_timeout =
+      match game.turn with Alice -> timeout.alice | Bob -> timeout.bob
+    in
+    let level_of_timeout =
+      Raw_level_repr.add timeout.last_turn_level block_left_before_timeout
+    in
+    fail_unless
+      Raw_level_repr.(level > level_of_timeout)
+      (let blocks_left = Raw_level_repr.(diff level_of_timeout level) in
+       let staker =
+         match game.turn with Alice -> stakers.alice | Bob -> stakers.bob
+       in
+       Sc_rollup_timeout_level_not_reached (blocks_left, staker))
   in
-  let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+  let game_result =
+    match game.game_state with
+    | Dissecting _ ->
+        (* Timeout during the dissecting results in a loss. *)
+        let loser = Sc_rollup_game_repr.Index.staker stakers game.turn in
+        Sc_rollup_game_repr.(Loser {loser; reason = Timeout})
+    | Final_move {agreed_start_chunk = _; refuted_stop_chunk = _} ->
+        (* Timeout-ed because the opponent played an invalid move and
+           the current player is not playing. Both are invalid moves. *)
+        Sc_rollup_game_repr.Draw
+  in
+  return (game_result, ctxt)
+
+let reward ctxt winner =
+  let open Lwt_tzresult_syntax in
+  let winner_contract = Contract_repr.Implicit winner in
+  let stake = Constants_storage.sc_rollup_stake_amount ctxt in
+  let*? reward = Tez_repr.(stake /? 2L) in
+  Token.transfer
+    ctxt
+    `Sc_rollup_refutation_rewards
+    (`Contract winner_contract)
+    reward
+
+let apply_game_result ctxt rollup (stakers : Sc_rollup_game_repr.Index.t)
+    (game_result : Sc_rollup_game_repr.game_result) =
+  let open Lwt_tzresult_syntax in
+  let status = Sc_rollup_game_repr.Ended game_result in
+  let* ctxt, balances_updates =
+    match game_result with
+    | Loser {loser; reason = _} ->
+        let losing_staker = loser in
+        let winning_staker =
+          let Sc_rollup_game_repr.Index.{alice; bob} = stakers in
+          if Signature.Public_key_hash.(alice = loser) then bob else alice
+        in
+        let* ctxt, balance_updates_winner = reward ctxt winning_staker in
+        let* ctxt, _, _ = Store.Game.remove (ctxt, rollup) stakers in
+        let* ctxt, balance_updates_loser =
+          Stake_storage.remove_staker ctxt rollup losing_staker
+        in
+        let balances_updates = balance_updates_loser @ balance_updates_winner in
+        return (ctxt, balances_updates)
+    | Draw ->
+        let* ctxt, balances_updates_alice =
+          Stake_storage.remove_staker ctxt rollup stakers.alice
+        in
+        let* ctxt, balances_updates_bob =
+          Stake_storage.remove_staker ctxt rollup stakers.bob
+        in
+        return (ctxt, balances_updates_alice @ balances_updates_bob)
+  in
   let* ctxt, _, _ = Store.Game_timeout.remove (ctxt, rollup) stakers in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.alice in
   let* ctxt, _, _ = Store.Opponent.remove (ctxt, rollup) stakers.bob in
-  return
-    ( Sc_rollup_game_repr.Ended (outcome.reason, losing_staker),
-      ctxt,
-      balance_updates )
+  return (status, ctxt, balances_updates)
 
 module Internal_for_tests = struct
   let get_conflict_point = get_conflict_point
@@ -348,7 +419,7 @@ let conflicting_stakers_uncarbonated ctxt rollup staker =
     let parent_commitment = our_commitment.predecessor in
     return {other; their_commitment; our_commitment; parent_commitment}
   in
-  let* _, stakers = Store.stakers ctxt rollup in
+  let* _ctxt, stakers = Store.stakers ctxt rollup in
   List.fold_left_es
     (fun conflicts (other_staker, _) ->
       let*! res = get_conflict_point ctxt rollup staker other_staker in

@@ -49,18 +49,18 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Jakarta RPCs
-------------
+Kathmandu RPCs
+--------------
 
-The OpenAPI specification for RPCs which are specific to the Jakarta (``PtJakart``)
+The OpenAPI specification for RPCs which are specific to the Kathmandu (``PtKathma``)
 protocol can be found at:
 
-- `jakarta-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-openapi.json>`_
+- `kathmandu-openapi.json (version 14.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/kathmandu-openapi.json>`_
 
 The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Jakarta protocol can be found at:
+and specific to the Kathmandu protocol can be found at:
 
-- `jakarta-mempool-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-mempool-openapi.json>`_
+- `kathmandu-mempool-openapi.json (version 14.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/kathmandu-mempool-openapi.json>`_
 
 .. _openapi_generate:
 

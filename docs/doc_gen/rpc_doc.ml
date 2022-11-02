@@ -33,14 +33,14 @@ let protocols =
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO tezos/tezos#2170: adapt rest of this list *)
-    ( "jakarta",
-      "Jakarta",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY" );
     ( "kathmandu",
       "Kathmandu",
       Some "/include/rpc_introduction.rst.inc",
       "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg" );
+    ( "lima",
+      "Lima",
+      Some "/include/rpc_introduction.rst.inc",
+      "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW" );
   ]
 
 let pp_name ppf = function

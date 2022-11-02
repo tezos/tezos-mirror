@@ -137,6 +137,9 @@ val meta_connect : ('a -> 'a -> unit) -> 'a list -> 'a list -> unit
     on [a] and [b]. *)
 val meta_clique : ('a -> 'a -> unit) -> 'a list -> unit
 
+(** Lwt-version of {!meta_clique}. *)
+val meta_clique_lwt : ('a -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
+
 (** Meta-version of {!ring}.
 
     For a list [x1; x2; ...; xN], this calls the connection function
@@ -154,8 +157,9 @@ val meta_star : ('a -> 'b -> unit) -> 'a -> 'b list -> unit
 
 (** Start a cluster of nodes.
 
-    This runs [Node.identity_generate], [Node.config_init] and [Node.run] for all nodes.
-    This is similar to iterating [Node.init] except that the node are already created.
+    This runs [Node.identity_generate], [Node.config_init], [Node.run]
+    and [Node.wait_for_ready] for all nodes. This is similar to
+    iterating [Node.init] except that the node are already created.
 
     If [public] is [false] (which is the default), nodes are started with [--private_mode].
     Set [public] to [true] to allow the topology to change over time.

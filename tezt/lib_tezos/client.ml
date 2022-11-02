@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -159,7 +159,8 @@ let mode_arg client =
   | Proxy _ -> ["--mode"; "proxy"]
 
 let spawn_command ?log_command ?log_status_on_exit ?log_output
-    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) client command =
+    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) ?protocol_hash
+    client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -167,6 +168,7 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
       (fun o -> Option.value ~default:"Y" o |> Option.some)
       env
   in
+  let protocol_arg = Cli_arg.optional_arg "protocol" Fun.id protocol_hash in
   Process.spawn
     ~name:client.name
     ~color:client.color
@@ -177,7 +179,8 @@ let spawn_command ?log_command ?log_status_on_exit ?log_output
     ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
-  @ media_type_arg client.mode @ mode_arg client @ base_dir_arg client @ command
+  @ protocol_arg @ media_type_arg client.mode @ mode_arg client
+  @ base_dir_arg client @ command
 
 let url_encode str =
   let buffer = Buffer.create (String.length str * 3) in
@@ -221,8 +224,8 @@ let rpc_path_query_to_string ?(query_string = []) path =
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client :
-      JSON.t Runnable.process =
+      ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth
+      path client : JSON.t Runnable.process =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
@@ -243,6 +246,7 @@ module Spawn = struct
         ?endpoint
         ?hooks
         ?env
+        ?protocol_hash
         client
         (better_error
         @ ["rpc"; string_of_meth meth; full_path]
@@ -256,7 +260,8 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path
+    client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -269,6 +274,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
@@ -276,7 +282,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?filename ?query_string meth path client =
+    ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -289,6 +295,7 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?data
       ?filename
       ?query_string
+      ?protocol_hash
       meth
       path
       client
@@ -374,17 +381,24 @@ module Admin = struct
   let kick_peer ?endpoint ~peer client =
     spawn_kick_peer ?endpoint ~peer client |> Process.check
 
+  let spawn_ban_peer ?endpoint ~peer client =
+    spawn_command ?endpoint client ["ban"; "peer"; peer]
+
+  let ban_peer ?endpoint ~peer client =
+    spawn_ban_peer ?endpoint ~peer client |> Process.check
+
   let spawn_inject_protocol ?endpoint ~protocol_path client =
     spawn_command ?endpoint client ["inject"; "protocol"; protocol_path]
 
   let inject_protocol ?endpoint ~protocol_path client =
-    let process = spawn_inject_protocol ?endpoint ~protocol_path client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_inject_protocol ?endpoint ~protocol_path client
+      |> Process.check_and_read_stdout
+    in
     match output =~* rex "Injected protocol ([^ ]+) successfully" with
     | None ->
         Test.fail
-          "tezos-admin-client inject protocol did not answer \"Injected \
+          "octez-admin-client inject protocol did not answer \"Injected \
            protocol ... successfully\""
     | Some hash -> return hash
 
@@ -392,10 +406,25 @@ module Admin = struct
     spawn_command ?endpoint client ["list"; "protocols"]
 
   let list_protocols ?endpoint client =
-    let process = spawn_list_protocols ?endpoint client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
+    let* output =
+      spawn_list_protocols ?endpoint client |> Process.check_and_read_stdout
+    in
     return (parse_list_protocols_output output)
+
+  let spawn_protocol_environment ?endpoint client protocol =
+    spawn_command ?endpoint client ["protocol"; "environment"; protocol]
+
+  let protocol_environment ?endpoint client protocol =
+    let* output =
+      spawn_protocol_environment ?endpoint client protocol
+      |> Process.check_and_read_stdout
+    in
+    match output =~* rex "Protocol [^ ]+ uses environment (V\\d+)" with
+    | None ->
+        Test.fail
+          "octez-admin-client protocol environment did not answer \"Protocol \
+           ... uses environment V...\""
+    | Some version -> return version
 end
 
 let spawn_version client = spawn_command client ["--version"]
@@ -440,17 +469,32 @@ let time_of_timestamp timestamp =
       | Some tm -> tm)
   | At tm -> tm
 
-let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
+let spawn_activate_protocol ?endpoint ?protocol ?protocol_hash ?(fitness = 1)
     ?(key = Constant.activator.alias) ?(timestamp = Ago default_delay)
     ?parameter_file client =
   let timestamp = time_of_timestamp timestamp in
+  let protocol_hash, parameter_file =
+    match (protocol, protocol_hash, parameter_file) with
+    | Some protocol, None, _ ->
+        ( Protocol.hash protocol,
+          Option.value
+            parameter_file
+            ~default:(Protocol.parameter_file protocol) )
+    | None, Some protocol_hash, Some parameter_file ->
+        (protocol_hash, parameter_file)
+    | _, _, _ ->
+        Test.fail
+          ~__LOC__
+          "Must pass either protocol or both protocol_file and parameter_file \
+           to spawn_activate_protocol"
+  in
   spawn_command
     ?endpoint
     client
     [
       "activate";
       "protocol";
-      Protocol.hash protocol;
+      protocol_hash;
       "with";
       "fitness";
       string_of_int fitness;
@@ -459,22 +503,57 @@ let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
       key;
       "and";
       "parameters";
-      Option.value parameter_file ~default:(Protocol.parameter_file protocol);
+      parameter_file;
       "--timestamp";
       Time.to_notation timestamp;
     ]
 
-let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?parameter_file client =
+let activate_protocol ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file client =
   spawn_activate_protocol
     ?endpoint
-    ~protocol
+    ?protocol
+    ?protocol_hash
     ?fitness
     ?key
     ?timestamp
     ?parameter_file
     client
   |> Process.check
+
+let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
+
+let node_of_client_mode = function
+  | Client (Some endpoint, _) -> node_of_endpoint endpoint
+  | Proxy endpoint -> node_of_endpoint endpoint
+  | Light (_, endpoints) -> List.find_map node_of_endpoint endpoints
+  | Client (None, _) -> None
+  | Mockup -> None
+
+let activate_protocol_and_wait ?endpoint ?protocol ?protocol_hash ?fitness ?key
+    ?timestamp ?parameter_file ?node client =
+  let node =
+    match node with
+    | Some n -> n
+    | None -> (
+        match node_of_client_mode client.mode with
+        | Some n -> n
+        | None -> Test.fail "No node found for activate_protocol_and_wait")
+  in
+  let level_before = Node.get_level node in
+  let* () =
+    activate_protocol
+      ?endpoint
+      ?protocol
+      ?protocol_hash
+      ?fitness
+      ?key
+      ?timestamp
+      ?parameter_file
+      client
+  in
+  let* _lvl = Node.wait_for_level node (level_before + 1) in
+  unit
 
 let empty_mempool_file ?(filename = "mempool.json") () =
   let mempool_str = "[]" in
@@ -508,7 +587,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path client =
+    ?mempool ?ignore_node_mempool ?force ?context_path ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -522,16 +601,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     client
-  |> Process.check
-
-let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
-
-let node_of_client_mode = function
-  | Client (Some endpoint, _) -> node_of_endpoint endpoint
-  | Proxy endpoint -> node_of_endpoint endpoint
-  | Light (_, endpoints) -> List.find_map node_of_endpoint endpoints
-  | Client (None, _) -> None
-  | Mockup -> None
+  |> Process.check ?expect_failure
 
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
@@ -651,6 +721,27 @@ let show_address ~alias client =
   in
   return @@ Account.parse_client_output ~alias ~client_output
 
+let spawn_list_known_addresses client =
+  spawn_command client ["list"; "known"; "addresses"]
+
+let list_known_addresses client =
+  let* client_output =
+    spawn_list_known_addresses client |> Process.check_and_read_stdout
+  in
+  let addresses =
+    client_output |> String.trim |> String.split_on_char '\n'
+    |> List.map @@ fun line ->
+       match line =~** rex "(.*): ([^ ]*)" with
+       | Some (alias, pkh) -> (alias, pkh)
+       | None ->
+           Test.fail
+             "Cannot parse line %S from list of known addresses from \
+              client_output: %s"
+             line
+             client_output
+  in
+  return addresses
+
 let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
@@ -723,7 +814,7 @@ let bls_import_secret_key ?hooks ?force key sc_client =
   spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
-    ?gas_limit ?storage_limit ?counter ?arg ?(simulation = false)
+    ?gas_limit ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
     ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?log_output
@@ -740,13 +831,14 @@ let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ optional_arg "gas-limit" string_of_int gas_limit
     @ optional_arg "storage-limit" string_of_int storage_limit
     @ optional_arg "counter" string_of_int counter
+    @ optional_arg "entrypoint" Fun.id entrypoint
     @ optional_arg "arg" Fun.id arg
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?arg ?simulation ?force ?expect_failure ~amount
-    ~giver ~receiver client =
+    ?storage_limit ?counter ?entrypoint ?arg ?simulation ?force ?expect_failure
+    ~amount ~giver ~receiver client =
   spawn_transfer
     ?log_output
     ?endpoint
@@ -757,6 +849,7 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     ?gas_limit
     ?storage_limit
     ?counter
+    ?entrypoint
     ?arg
     ?simulation
     ?force
@@ -766,40 +859,28 @@ let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
     client
   |> Process.check ?expect_failure
 
-let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee_cap ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
-  spawn_command
-    ?log_output
-    ?endpoint
-    client
-    (["--wait"; wait]
-    @ ["multiple"; "transfers"; "from"; giver; "using"; json_batch]
-    @ Option.fold
-        ~none:[]
-        ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
-        fee_cap
-    @ optional_arg "burn-cap" Tez.to_string burn_cap
-    @ optional_arg "gas-limit" string_of_int gas_limit
-    @ optional_arg "storage-limit" string_of_int storage_limit
-    @ optional_arg "counter" string_of_int counter
-    @ optional_arg "arg" Fun.id arg)
-
-let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
-    ?storage_limit ?counter ?arg ~giver ~json_batch client =
-  spawn_multiple_transfers
-    ?log_output
-    ?endpoint
-    ?wait
-    ?burn_cap
-    ?fee_cap
-    ?gas_limit
-    ?storage_limit
-    ?counter
-    ?arg
-    ~giver
-    ~json_batch
-    client
-  |> Process.check
+let multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
+    ?gas_limit ?storage_limit ?counter ?(simulation = false) ?(force = false)
+    ~giver ~json_batch client =
+  let value =
+    spawn_command
+      ?log_output
+      ?endpoint
+      client
+      (["--wait"; wait]
+      @ ["multiple"; "transfers"; "from"; giver; "using"; json_batch]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
+          fee_cap
+      @ optional_arg "burn-cap" Tez.to_string burn_cap
+      @ optional_arg "gas-limit" string_of_int gas_limit
+      @ optional_arg "storage-limit" string_of_int storage_limit
+      @ optional_arg "counter" string_of_int counter
+      @ (if simulation then ["--simulation"] else [])
+      @ if force then ["--force"] else [])
+  in
+  {value; run = Process.check}
 
 let spawn_get_delegate ?endpoint ~src client =
   spawn_command ?endpoint client ["get"; "delegate"; "for"; src]
@@ -811,7 +892,7 @@ let get_delegate ?endpoint ~src client =
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
 let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ~src ~delegate client =
+    ?(force_low_fee = false) ?expect_failure ~src ~delegate client =
   let value =
     spawn_command
       ?endpoint
@@ -822,7 +903,7 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
       @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ if force_low_fee then ["--force-low-fee"] else [])
   in
-  {value; run = Process.check}
+  {value; run = Process.check ?expect_failure}
 
 let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
     ~src client =
@@ -842,33 +923,42 @@ let spawn_withdraw_delegate ?endpoint ?(wait = "none") ~src client =
   spawn_command
     ?endpoint
     client
-    (["--wait"; wait] @ ["withdraw"; "delegate"; "for"; src])
+    (["--wait"; wait] @ ["withdraw"; "delegate"; "from"; src])
 
-let withdraw_delegate ?endpoint ?wait ~src client =
-  spawn_withdraw_delegate ?endpoint ?wait ~src client |> Process.check
+let withdraw_delegate ?endpoint ?wait ?expect_failure ~src client =
+  spawn_withdraw_delegate ?endpoint ?wait ~src client
+  |> Process.check ?expect_failure
 
 let spawn_get_balance_for ?endpoint ~account client =
   spawn_command ?endpoint client ["get"; "balance"; "for"; account]
 
 let get_balance_for ?endpoint ~account client =
-  let process = spawn_get_balance_for ?endpoint ~account client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_get_balance_for ?endpoint ~account client
+    |> Process.check_and_read_stdout
+  in
   return @@ Tez.parse_floating output
 
-let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
-    client =
+let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file
+    ?bootstrap_accounts_file ~protocol client =
   let cmd =
     let common = ["--protocol"; Protocol.hash protocol; "create"; "mockup"] in
     (match sync_mode with
     | Synchronous -> common
     | Asynchronous -> common @ ["--asynchronous"])
     @ optional_arg "protocol-constants" Fun.id parameter_file
+    @ optional_arg "bootstrap-accounts" Fun.id bootstrap_accounts_file
   in
   spawn_command client cmd
 
-let create_mockup ?sync_mode ?parameter_file ~protocol client =
-  spawn_create_mockup ?sync_mode ?parameter_file ~protocol client
+let create_mockup ?sync_mode ?parameter_file ?bootstrap_accounts_file ~protocol
+    client =
+  spawn_create_mockup
+    ?sync_mode
+    ?parameter_file
+    ?bootstrap_accounts_file
+    ~protocol
+    client
   |> Process.check
 
 let spawn_submit_proposals ?(key = Constant.bootstrap1.alias) ?(wait = "none")
@@ -934,12 +1024,57 @@ let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
         "of";
         contract;
         "by";
-        amount;
+        string_of_int amount;
         "bytes";
         "from";
         payer;
       ])
   |> Process.check_and_read_stdout
+
+let used_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["get"; "contract"; "used"; "storage"; "space"; "for"; contract])
+  |> Process.check_and_read_stdout
+
+let paid_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["get"; "contract"; "paid"; "storage"; "space"; "for"; contract])
+  |> Process.check_and_read_stdout
+
+let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
+    ?expect_failure ~src ~pk client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "consensus"; "key"; "for"; src; "to"; pk]
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  |> Process.check ?expect_failure
+
+let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
+    ~consensus_key ?destination client =
+  let destination =
+    match destination with
+    | None -> []
+    | Some destination -> [destination; "with"]
+  in
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["drain"; "delegate"; delegate; "to"]
+    @ destination @ [consensus_key])
+  |> Process.check ?expect_failure
 
 let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
     ?burn_cap ?gas_limit ?(dry_run = false) ~alias ~amount ~src ~prg client =
@@ -1170,6 +1305,20 @@ let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
     ["stresstest"; "originate"; "smart"; "contracts"; "from"; source.alias]
   |> Process.check
 
+let stresstest_fund_accounts_from_source ?endpoint ~source_key_pkh ?batch_size
+    ?batches_per_block ?initial_amount client =
+  spawn_command
+    ?endpoint
+    client
+    (["stresstest"; "fund"; "accounts"; "from"; source_key_pkh]
+    @ optional_arg "batch-size" string_of_int batch_size
+    @ optional_arg "batches-per-block" string_of_int batches_per_block
+    @ optional_arg
+        "initial-amount"
+        (fun v -> string_of_int (Tez.to_mutez v))
+        initial_amount)
+  |> Process.check
+
 let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
     client =
   let* client_output =
@@ -1211,6 +1360,12 @@ let register_global_constant ?wait ?burn_cap ~src ~value client =
         "Cannot extract constant hash from client_output: %s"
         client_output
   | Some hash -> return hash
+
+let spawn_hash_script ?hooks ~script client =
+  spawn_command ?hooks client ["hash"; "script"; script]
+
+let hash_script ?hooks ~script client =
+  spawn_hash_script ?hooks ~script client |> Process.check_and_read_stdout
 
 let spawn_hash_data ?hooks ~data ~typ client =
   let cmd = ["hash"; "data"; data; "of"; "type"; typ] in
@@ -1299,6 +1454,37 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
     client
   |> Process.check_and_read_stdout
 
+let spawn_run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
+    ~contract ?input ?(unlimited_gas = false) client =
+  let input_params =
+    match input with None -> [] | Some input -> ["with"; "input"; input]
+  in
+  spawn_command
+    ?hooks
+    client
+    (["run"; "tzip4"; "view"; entrypoint; "on"; "contract"; contract]
+    @ input_params
+    @ optional_arg "payer" Fun.id payer
+    @ optional_arg "source" Fun.id source
+    @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode
+    @ optional_arg "gas" Int.to_string gas
+    @ optional_switch "unlimited-gas" unlimited_gas)
+
+let run_tzip4_view ?hooks ?source ?payer ?gas ?unparsing_mode ~entrypoint
+    ~contract ?input ?unlimited_gas client =
+  spawn_run_tzip4_view
+    ?hooks
+    ?source
+    ?payer
+    ?gas
+    ?unparsing_mode
+    ~entrypoint
+    ~contract
+    ?input
+    ?unlimited_gas
+    client
+  |> Process.check_and_read_stdout
+
 let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
     ?input ?(unlimited_gas = false) client =
   let input_params =
@@ -1340,9 +1526,9 @@ let spawn_list_protocols mode client =
   spawn_command client (mode_arg client @ ["list"; mode_str; "protocols"])
 
 let list_protocols mode client =
-  let process = spawn_list_protocols mode client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_list_protocols mode client |> Process.check_and_read_stdout
+  in
   return (parse_list_protocols_output output)
 
 let spawn_migrate_mockup ~next_protocol client =
@@ -1597,13 +1783,13 @@ let spawn_show_voting_period ?endpoint client =
   spawn_command ?endpoint client (mode_arg client @ ["show"; "voting"; "period"])
 
 let show_voting_period ?endpoint client =
-  let process = spawn_show_voting_period ?endpoint client in
-  let* () = Process.check process
-  and* output = Lwt_io.read (Process.stdout process) in
+  let* output =
+    spawn_show_voting_period ?endpoint client |> Process.check_and_read_stdout
+  in
   match output =~* rex "Current period: \"([a-z]+)\"" with
   | None ->
       Test.fail
-        "tezos-client show voting period did not print the current period"
+        "octez-client show voting period did not print the current period"
   | Some period -> return period
 
 module Sc_rollup = struct
@@ -1720,6 +1906,30 @@ module Sc_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
+  let timeout ?expect_failure ?hooks ?(wait = "none") ?burn_cap ~staker ~src
+      ~dst client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "timeout";
+            "dispute";
+            "on";
+            "sc";
+            "rollup";
+            dst;
+            "with";
+            staker;
+            "from";
+            src;
+          ]
+        @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    in
+    let parse process = Process.check ?expect_failure process in
+    {value = process; run = parse}
+
   let submit_recover_bond ?(wait = "none") ?burn_cap ?storage_limit ?fee ?hooks
       ~rollup ~src client =
     let process =
@@ -1728,6 +1938,35 @@ module Sc_rollup = struct
         client
         (["--wait"; wait]
         @ ["recover"; "bond"; "of"; src; "for"; "sc"; "rollup"; rollup]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun fee -> ["--fee"; Tez.to_string fee])
+            fee
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  (** Run [octez-client execute outbox message of sc rollup <rollup> from <src>
+      for commitment hash <hash> and output proof <proof>]. *)
+  let execute_outbox_message ?(wait = "none") ?burn_cap ?storage_limit ?fee
+      ?hooks ~rollup ~src ~commitment_hash ~proof client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["execute"; "outbox"; "message"; "of"; "sc"; "rollup"; rollup]
+        @ ["from"; src]
+        @ ["for"; "commitment"; "hash"; commitment_hash]
+        @ ["and"; "output"; "proof"; proof]
         @ Option.fold
             ~none:[]
             ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
@@ -1839,12 +2078,13 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
-let stresstest_gen_keys ?endpoint n client =
+let stresstest_gen_keys ?endpoint ?alias_prefix n client =
   let* output =
     spawn_command
       ?endpoint
       client
-      ["stresstest"; "gen"; "keys"; Int.to_string n]
+      (["stresstest"; "gen"; "keys"; Int.to_string n]
+      @ optional_arg "alias-prefix" Fun.id alias_prefix)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in
@@ -1942,12 +2182,19 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key owner client =
+let spawn_register_key ?hooks ?consensus owner client =
   spawn_command
+    ?hooks
     client
-    ["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    @
+    match consensus with
+    | None -> []
+    | Some pk -> ["with"; "consensus"; "key"; pk])
 
-let register_key owner client = spawn_register_key owner client |> Process.check
+let register_key ?hooks ?expect_failure ?consensus owner client =
+  spawn_register_key ?hooks ?consensus owner client
+  |> Process.check ?expect_failure
 
 let contract_storage ?unparsing_mode address client =
   spawn_command
@@ -1990,3 +2237,24 @@ let convert_script ~script ~src_format ~dst_format client =
       fmt_to_string dst_format;
     ]
   |> Process.check_and_read_stdout
+
+let bootstrapped client = spawn_command client ["bootstrapped"] |> Process.check
+
+let spawn_config_show ?protocol client =
+  spawn_command client
+  @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
+  @ ["config"; "show"]
+
+let config_show ?protocol client =
+  spawn_config_show ?protocol client |> Process.check
+
+let spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
+  spawn_command client
+  @@ Cli_arg.optional_arg "protocol" Protocol.hash protocol
+  @ ["config"; "init"]
+  @ Cli_arg.optional_arg "bootstrap-accounts" Fun.id bootstrap_accounts
+  @ Cli_arg.optional_arg "protocol-constants" Fun.id protocol_constants
+
+let config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
+  spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client
+  |> Process.check

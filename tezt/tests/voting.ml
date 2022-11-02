@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 6
+    "expected_env_version": 8
 }
 |}
 
@@ -95,6 +95,16 @@ type period = {
   remaining : int;
 }
 
+let pp_period fmt period =
+  Format.fprintf
+    fmt
+    "{ index: %d; kind: %s; start_position: %d; position: %d; remaining: %d }"
+    period.index
+    (period_kind_to_string period.kind)
+    period.start_position
+    period.position
+    period.remaining
+
 let period_type : period Check.typ =
   Check.convert
     (fun {index; kind; start_position; position; remaining} ->
@@ -116,15 +126,19 @@ let decode_period json =
 
 let get_current_period ?level client =
   let* json =
-    RPC.Votes.get_current_period ?block:(Option.map string_of_int level) client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_current_period
+         ?block:(Option.map string_of_int level)
+         ()
   in
   return (decode_period json)
 
 let get_successor_period ?level client =
   let* json =
-    RPC.Votes.get_successor_period
-      ?block:(Option.map string_of_int level)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_successor_period
+         ?block:(Option.map string_of_int level)
+         ()
   in
   return (decode_period json)
 
@@ -140,31 +154,14 @@ let check_successor_period ?level client expected_period =
     ~error_msg:"expected successor_period = %R, got %L" ;
   unit
 
-type level = {
-  level : int;
-  level_position : int;
-  cycle : int;
-  cycle_position : int;
-  expected_commitment : bool;
-}
-
-let level_type : level Check.typ =
+let level_type : RPC.level Check.typ =
   Check.convert
-    (fun {level; level_position; cycle; cycle_position; expected_commitment} ->
+    (fun RPC.{level; level_position; cycle; cycle_position; expected_commitment} ->
       (level, level_position, cycle, cycle_position, expected_commitment))
     Check.(tuple5 int int int int bool)
 
-let decode_level json =
-  let level = JSON.(json |-> "level" |> as_int) in
-  let level_position = JSON.(json |-> "level_position" |> as_int) in
-  let cycle = JSON.(json |-> "cycle" |> as_int) in
-  let cycle_position = JSON.(json |-> "cycle_position" |> as_int) in
-  let expected_commitment = JSON.(json |-> "expected_commitment" |> as_bool) in
-  {level; level_position; cycle; cycle_position; expected_commitment}
-
 let get_current_level client =
-  let* json = RPC.get_current_level client in
-  return (decode_level json)
+  RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
 
 let check_current_level client expected_level =
   let* level = get_current_level client in
@@ -174,7 +171,10 @@ let check_current_level client expected_level =
 
 let get_proposals ?level client =
   let* proposals =
-    RPC.Votes.get_proposals ?block:(Option.map string_of_int level) client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_proposals
+         ?block:(Option.map string_of_int level)
+         ()
   in
   JSON.as_list proposals |> List.map JSON.as_list
   |> List.map (function
@@ -186,9 +186,10 @@ let get_proposals ?level client =
 
 let get_current_proposal ?level client =
   let* proposal =
-    RPC.Votes.get_current_proposal
-      ?block:(Option.map string_of_int level)
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_votes_current_proposal
+         ?block:(Option.map string_of_int level)
+         ()
   in
   if JSON.is_null proposal then return None
   else return (Some JSON.(proposal |> as_string))
@@ -210,7 +211,9 @@ let check_protocols ?level client expected_protocols =
   unit
 
 let check_listings_not_empty client =
-  let* listings = RPC.Votes.get_listings client in
+  let* listings =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_listings ()
+  in
   match JSON.as_list listings with
   | [] ->
       Test.fail "Expected GET .../votes/listing RPC to return a non-empty list"
@@ -259,7 +262,8 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          "amendment: %s -> %s (losers: %s)"
          (Protocol.tag from_protocol)
          (target_protocol_tag to_protocol)
-         (String.concat ", " (List.map Protocol.tag loser_protocols)))
+         (if loser_protocols = [] then "none"
+         else String.concat ", " (List.map Protocol.tag loser_protocols)))
     ~tags:
       ("amendment"
        :: ("from_" ^ Protocol.tag from_protocol)
@@ -282,23 +286,11 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
      of blocks for all protocols, and we do not need to handle
      different cases when checking levels and periods in tests. *)
   let parameters =
-    if Protocol.number from_protocol >= 013 then
-      [
-        (["blocks_per_cycle"], Some "4");
-        (["nonce_revelation_threshold"], Some "2");
-        (["cycles_per_voting_period"], Some "1");
-      ]
-    else
-      (* Note: the test fails with [blocks_per_voting_period] < [blocks_per_cycle]
-         when migrating to protocol Alpha, as this will cause the migration to
-         set [cycles_per_voting_period] = 0. The test also fails when
-         [blocks_per_voting_period] % [blocks_per_cycle] <> 0, as the starting
-         position of a period will change when migrating a protocol to Alpha.
-      *)
-      [
-        (["blocks_per_cycle"], Some "4");
-        (["blocks_per_voting_period"], Some "4");
-      ]
+    [
+      (["blocks_per_cycle"], `Int 4);
+      (["nonce_revelation_threshold"], `Int 2);
+      (["cycles_per_voting_period"], `Int 1);
+    ]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
@@ -385,7 +377,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   let* () = check_listings_not_empty client in
   let* period = Client.show_voting_period client in
   Check.((period = "proposal") string)
-    ~error_msg:"expected tezos-client show voting period to return %R, got %L" ;
+    ~error_msg:"expected octez-client show voting period to return %R, got %L" ;
   (* Inject test protocol, or use known protocol. *)
   let* to_protocol_hash =
     match to_protocol with
@@ -427,13 +419,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
        cycle = 7/4 = 1,
        cycle_position = 7 % 4 = 3
     *)
-    {
-      level = 8;
-      level_position = 7;
-      cycle = 1;
-      cycle_position = 3;
-      expected_commitment = true;
-    }
+    RPC.
+      {
+        level = 8;
+        level_position = 7;
+        cycle = 1;
+        cycle_position = 3;
+        expected_commitment = true;
+      }
   in
   let* () = check_current_level client expected_level in
   let* () =
@@ -484,13 +477,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 9/4 = 2
          cycle_position = 9 % 4 = 1
       *)
-      {
-        level = 10;
-        level_position = 9;
-        cycle = 2;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 10;
+          level_position = 9;
+          cycle = 2;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -544,13 +538,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 13/4 = 3
          cycle_position = 13 % 4 = 1
       *)
-      {
-        level = 14;
-        level_position = 13;
-        cycle = 3;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 14;
+          level_position = 13;
+          cycle = 3;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -610,13 +605,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 17/4 = 4
          cycle_position = 17 % 4 = 1
       *)
-      {
-        level = 18;
-        level_position = 17;
-        cycle = 4;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 18;
+          level_position = 17;
+          cycle = 4;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -670,13 +666,14 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
          cycle = 21/4 = 5
          cycle_position = 21 % 4 = 1
       *)
-      {
-        level = 22;
-        level_position = 21;
-        cycle = 5;
-        cycle_position = 1;
-        expected_commitment = false;
-      }
+      RPC.
+        {
+          level = 22;
+          level_position = 21;
+          cycle = 5;
+          cycle_position = 1;
+          expected_commitment = false;
+        }
     in
     check_current_level client expected_level
   in
@@ -907,7 +904,10 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
      contains a proposal for protocol [proto_hash].
   *)
   let proposal_in_level ~proto_hash client level =
-    let* ops = RPC.get_operations ~block:(string_of_int level) client in
+    let* ops =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_operations ~block:(string_of_int level) ()
+    in
     let proposals =
       List.concat_map
         (fun op ->
@@ -1108,9 +1108,8 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
     Protocol.write_parameter_file
       ~base:(Right (from_protocol, None))
       [
-        (["blocks_per_cycle"], Some (string_of_int blocks_per_cycle));
-        ( ["blocks_per_voting_period"],
-          Some (string_of_int blocks_per_voting_period) );
+        (["blocks_per_cycle"], `Int blocks_per_cycle);
+        (["blocks_per_voting_period"], `Int blocks_per_voting_period);
       ]
   in
 

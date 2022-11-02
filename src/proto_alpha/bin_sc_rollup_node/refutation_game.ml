@@ -50,16 +50,15 @@ module type S = sig
   module PVM : Pvm.S
 
   val process :
-    Layer1.head -> Node_context.t -> PVM.context -> unit tzresult Lwt.t
+    Layer1.head -> Configuration.t -> Node_context.t -> unit tzresult Lwt.t
 end
 
-module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
-  module PVM = PVM
-  module Interpreter = Interpreter.Make (PVM)
+module Make (Interpreter : Interpreter.S) :
+  S with module PVM = Interpreter.PVM = struct
+  module PVM = Interpreter.PVM
   open Sc_rollup.Game
 
-  let node_role node_ctxt Sc_rollup.Game.Index.{alice; bob} =
-    let self = node_ctxt.Node_context.operator in
+  let node_role ~self Sc_rollup.Game.Index.{alice; bob} =
     if Sc_rollup.Staker.equal alice self then Alice
     else if Sc_rollup.Staker.equal bob self then Bob
     else (* By validity of [ongoing_game] RPC. *)
@@ -67,125 +66,109 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
 
   type role = Our_turn of {opponent : public_key_hash} | Their_turn
 
-  let turn node_ctxt game players =
+  let turn ~self game players =
     let Sc_rollup.Game.Index.{alice; bob} = players in
-    match (node_role node_ctxt players, game.turn) with
+    match (node_role ~self players, game.turn) with
     | Alice, Alice -> Our_turn {opponent = bob}
     | Bob, Bob -> Our_turn {opponent = alice}
     | Alice, Bob -> Their_turn
     | Bob, Alice -> Their_turn
 
-  (** [inject_next_move node_ctxt move] submits an L1 operation to
-      issue the next move in the refutation game. [node_ctxt] provides
-      the connection to the Tezos node. *)
-  let inject_next_move node_ctxt ~refutation ~opponent =
-    let open Node_context in
-    let open Lwt_result_syntax in
-    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
-    let {rollup_address; cctxt; _} = node_ctxt in
-    let* _, _, Manager_operation_result {operation_result; _} =
-      Client_proto_context.sc_rollup_refute
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~refutation
-        ~opponent
-        ~source
-        ~rollup:rollup_address
-        ~src_pk
-        ~src_sk
-        ~fee_parameter:Configuration.default_fee_parameter
-        ()
+  (** [inject_next_move node_ctxt source ~refutation ~opponent] submits an L1
+      operation (signed by [source]) to issue the next move in the refutation
+      game. *)
+  let inject_next_move (node_ctxt : Node_context.t) source ~refutation ~opponent
+      =
+    let refute_operation =
+      Sc_rollup_refute {rollup = node_ctxt.rollup_address; refutation; opponent}
     in
-    let open Apply_results in
-    let*! () =
-      match operation_result with
-      | Applied (Sc_rollup_refute_result _) ->
-          Refutation_game_event.refutation_published opponent refutation
-      | Failed (Sc_rollup_refute_manager_kind, _errors) ->
-          Refutation_game_event.refutation_failed opponent refutation
-      | Backtracked (Sc_rollup_refute_result _, _errors) ->
-          Refutation_game_event.refutation_backtracked opponent refutation
-      | Skipped Sc_rollup_refute_manager_kind ->
-          Refutation_game_event.refutation_skipped opponent refutation
-    in
-    return_unit
+    Injector.add_pending_operation ~source refute_operation
 
-  let generate_proof node_ctxt store game start_state =
+  let generate_proof configuration node_ctxt game start_state =
     let open Lwt_result_syntax in
-    let*! hash = Layer1.hash_of_level store (Raw_level.to_int32 game.level) in
-    let* history = Inbox.history_of_hash node_ctxt store hash in
-    let* inbox = Inbox.inbox_of_hash node_ctxt store hash in
-    let*! messages_tree = Inbox.find_message_tree store hash in
-    let*! history, history_proof =
-      Store.Inbox.form_history_proof store history inbox messages_tree
+    let*! snapshot_hash =
+      Layer1.hash_of_level
+        node_ctxt.Node_context.store
+        (Int32.pred Raw_level.(to_int32 game.start_level))
+    in
+    let* snapshot_inbox = Inbox.inbox_of_hash node_ctxt snapshot_hash in
+    let* snapshot_history = Inbox.history_of_hash node_ctxt snapshot_hash in
+    let* snapshot_ctxt =
+      Node_context.checkout_context node_ctxt snapshot_hash
+    in
+    let snapshot_ctxt_index = Context.index snapshot_ctxt in
+    let*! snapshot_messages_tree = Context.MessageTrees.find snapshot_ctxt in
+    let* snapshot_history, snapshot =
+      Context.Inbox.form_history_proof
+        snapshot_ctxt_index
+        snapshot_history
+        snapshot_inbox
+        snapshot_messages_tree
+      >|= Environment.wrap_tzresult
     in
     let module P = struct
       include PVM
 
-      let context = store
+      let context = snapshot_ctxt_index
 
       let state = start_state
 
+      let reveal hash =
+        Reveals.get
+          ~data_dir:configuration.Configuration.data_dir
+          ~pvm_name:PVM.name
+          ~hash
+
       module Inbox_with_history = struct
-        include Store.Inbox
+        include Context.Inbox
 
-        let history = history
+        let history = snapshot_history
 
-        let inbox = history_proof
+        let inbox = snapshot
       end
     end in
-    let* r =
+    let metadata = Interpreter.metadata node_ctxt in
+    let* proof =
       trace
-        (Sc_rollup_node_errors.Cannot_produce_proof (inbox, history, game.level))
-      @@ (Sc_rollup.Proof.produce (module P) game.level
+        (Sc_rollup_node_errors.Cannot_produce_proof
+           (snapshot_inbox, snapshot_history, game.inbox_level))
+      @@ (Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level
          >|= Environment.wrap_tzresult)
     in
-    let+ check =
-      Sc_rollup.Proof.valid history_proof game.level ~pvm_name:game.pvm_name r
+    let*! res =
+      Sc_rollup.Proof.valid
+        ~metadata
+        snapshot
+        game.inbox_level
+        ~pvm_name:game.pvm_name
+        proof
       >|= Environment.wrap_tzresult
     in
-    assert check ;
-    r
+    if Result.is_ok res then return proof else assert false
 
-  let new_dissection node_ctxt store last_level ok our_view =
-    let open Lwt_result_syntax in
-    let _start_hash, start_tick = ok in
-    let our_state, stop_tick = our_view in
-    let Node_context.{protocol_constants; _} = node_ctxt in
-    (* TODO: #3200
-       We should not rely on an hard-coded constant here but instead
-       introduce a protocol constant for the maximum number of sections
-       in a dissection.
-    *)
-    let max_number_of_sections =
-      Z.of_int
-        protocol_constants.parametric.sc_rollup.number_of_sections_in_dissection
+  let new_dissection ~default_number_of_sections node_ctxt last_level ok
+      our_view =
+    let state_hash_from_tick tick =
+      let open Lwt_result_syntax in
+      let* r = Interpreter.state_of_tick node_ctxt tick last_level in
+      return (Option.map snd r)
     in
-    let trace_length = Z.succ (Sc_rollup.Tick.distance stop_tick start_tick) in
-    let number_of_sections = Z.min max_number_of_sections trace_length in
-    let section_length =
-      Z.(max (of_int 1) (div trace_length number_of_sections))
-    in
-    (* [k] is the number of sections in [rev_dissection]. *)
-    let rec make rev_dissection k tick =
-      if Z.equal k (Z.pred number_of_sections) then
-        return
-        @@ List.rev
-             ({state_hash = our_state; tick = stop_tick} :: rev_dissection)
-      else
-        let* r = Interpreter.state_of_tick node_ctxt store tick last_level in
-        let state_hash = Option.map snd r in
-        let next_tick = Sc_rollup.Tick.jump tick section_length in
-        make ({state_hash; tick} :: rev_dissection) (Z.succ k) next_tick
-    in
-    make [] Z.zero start_tick
+    let start_hash, start_tick = ok in
+    let start_chunk = {state_hash = Some start_hash; tick = start_tick} in
+    let start_hash, start_tick = our_view in
+    let our_stop_chunk = {state_hash = start_hash; tick = start_tick} in
+    Game_helpers.new_dissection
+      ~start_chunk
+      ~our_stop_chunk
+      ~default_number_of_sections
+      ~state_hash_from_tick
 
-  (** [generate_from_dissection node_ctxt store game]
-      traverses the current [game.dissection] and returns a move which
-      performs a new dissection of the execution trace or provides a
-      refutation proof to serve as the next move of the [game]. *)
-  let generate_next_dissection node_ctxt store game =
+  (** [generate_from_dissection ~default_number_of_sections node_ctxt game
+      dissection] traverses the current [dissection] and returns a move which
+      performs a new dissection of the execution trace or provides a refutation
+      proof to serve as the next move of the [game]. *)
+  let generate_next_dissection ~default_number_of_sections node_ctxt game
+      dissection =
     let open Lwt_result_syntax in
     let rec traverse ok = function
       | [] ->
@@ -199,7 +182,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       | {state_hash = their_hash; tick} :: dissection -> (
           let open Lwt_result_syntax in
           let* our =
-            Interpreter.state_of_tick node_ctxt store tick game.level
+            Interpreter.state_of_tick node_ctxt tick game.inbox_level
           in
           match (their_hash, our) with
           | None, None ->
@@ -213,11 +196,18 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
                 traverse (their_hash, tick) dissection
               else return (ok, (Some our_hash, tick)))
     in
-    match game.dissection with
+    match dissection with
     | {state_hash = Some hash; tick} :: dissection ->
         let* ok, ko = traverse (hash, tick) dissection in
         let choice = snd ok in
-        let* dissection = new_dissection node_ctxt store game.level ok ko in
+        let* dissection =
+          new_dissection
+            ~default_number_of_sections
+            node_ctxt
+            game.inbox_level
+            ok
+            ko
+        in
         let chosen_section_len = Sc_rollup.Tick.distance (snd ko) choice in
         return (choice, chosen_section_len, dissection)
     | [] | {state_hash = None; _} :: _ ->
@@ -230,11 +220,11 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           Sc_rollup_node_errors
           .Unreliable_tezos_node_returning_inconsistent_game
 
-  let next_move node_ctxt store game =
+  let next_move configuration node_ctxt game =
     let open Lwt_result_syntax in
     let final_move start_tick =
       let* start_state =
-        Interpreter.state_of_tick node_ctxt store start_tick game.level
+        Interpreter.state_of_tick node_ctxt start_tick game.inbox_level
       in
       match start_state with
       | None ->
@@ -242,72 +232,47 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
             Sc_rollup_node_errors
             .Unreliable_tezos_node_returning_inconsistent_game
       | Some (start_state, _start_hash) ->
-          let* proof = generate_proof node_ctxt store game start_state in
+          let* proof =
+            generate_proof configuration node_ctxt game start_state
+          in
           let choice = start_tick in
           return {choice; step = Proof proof}
     in
-    let* choice, chosen_section_len, dissection =
-      generate_next_dissection node_ctxt store game
-    in
-    if Z.(equal chosen_section_len one) then final_move choice
-    else return {choice; step = Dissection dissection}
 
-  let try_ f =
+    match game.game_state with
+    | Dissecting {dissection; default_number_of_sections} ->
+        let* choice, chosen_section_len, dissection =
+          generate_next_dissection
+            ~default_number_of_sections
+            node_ctxt
+            game
+            dissection
+        in
+        if Z.(equal chosen_section_len one) then final_move choice
+        else return {choice; step = Dissection dissection}
+    | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
+        let choice = agreed_start_chunk.tick in
+        final_move choice
+
+  let play_next_move configuration node_ctxt game self opponent =
     let open Lwt_result_syntax in
-    let*! _res = f () in
-    return_unit
+    let* refutation = next_move configuration node_ctxt game in
+    inject_next_move node_ctxt self ~refutation:(Some refutation) ~opponent
 
-  let play_next_move node_ctxt store game opponent =
-    let open Lwt_result_syntax in
-    let* refutation = next_move node_ctxt store game in
-    (* FIXME: #3008
-
-       We currently do not remember that we already have
-       injected a refutation move but it is not included yet.
-       Hence, we ignore errors here temporarily, waiting for
-       the injector to enter the scene.
-    *)
-    try_ @@ fun () ->
-    inject_next_move node_ctxt ~refutation:(Some refutation) ~opponent
-
-  let play_timeout node_ctxt players =
-    let Sc_rollup.Game.Index.{alice; bob} = players in
-    let open Node_context in
-    let open Lwt_result_syntax in
-    let* source, src_pk, src_sk = Node_context.get_operator_keys node_ctxt in
-    let {rollup_address; cctxt; _} = node_ctxt in
-    let* _, _, Manager_operation_result {operation_result; _} =
-      Client_proto_context.sc_rollup_timeout
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~source
-        ~alice
-        ~bob
-        ~rollup:rollup_address
-        ~src_pk
-        ~src_sk
-        ~fee_parameter:Configuration.default_fee_parameter
-        ()
+  let play_timeout (node_ctxt : Node_context.t) self stakers =
+    let timeout_operation =
+      Sc_rollup_timeout {rollup = node_ctxt.rollup_address; stakers}
     in
-    let open Apply_results in
-    let*! () =
-      match operation_result with
-      | Applied (Sc_rollup_timeout_result _) ->
-          Refutation_game_event.timeout_published players
-      | Failed (Sc_rollup_timeout_manager_kind, _errors) ->
-          Refutation_game_event.timeout_failed players
-      | Backtracked (Sc_rollup_timeout_result _, _errors) ->
-          Refutation_game_event.timeout_backtracked players
-      | Skipped Sc_rollup_timeout_manager_kind ->
-          Refutation_game_event.timeout_skipped players
+    let source =
+      Node_context.get_operator node_ctxt Timeout |> Option.value ~default:self
+      (* We fallback on the [Refute] operator if none is provided for [Timeout] *)
     in
-    return_unit
+    Injector.add_pending_operation ~source timeout_operation
 
-  let timeout_reached head_block node_ctxt players =
+  let timeout_reached ~self head_block node_ctxt players =
     let open Lwt_result_syntax in
     let Node_context.{rollup_address; cctxt; _} = node_ctxt in
-    let* res =
+    let* game_result =
       Plugin.RPC.Sc_rollup.timeout_reached
         cctxt
         (cctxt#chain, head_block)
@@ -316,52 +281,53 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         ()
     in
     let open Sc_rollup.Game in
-    let index = Index.make (fst players) (snd players) in
-    let node_player = node_role node_ctxt index in
-    match res with
-    | Some player when not (player_equal node_player player) -> return_true
-    | None -> return_false
-    | Some _myself -> return_false
+    match game_result with
+    | Some (Loser {loser; _}) ->
+        let is_it_me = Signature.Public_key_hash.(self = loser) in
+        return (not is_it_me)
+    | _ -> return_false
 
-  let play head_block node_ctxt store game staker1 staker2 =
+  let play head_block configuration node_ctxt self game staker1 staker2 =
     let open Lwt_result_syntax in
     let players = (staker1, staker2) in
     let index = Sc_rollup.Game.Index.make staker1 staker2 in
-    match turn node_ctxt game index with
-    | Our_turn {opponent} -> play_next_move node_ctxt store game opponent
+    match turn ~self game index with
+    | Our_turn {opponent} ->
+        play_next_move configuration node_ctxt game self opponent
     | Their_turn ->
-        let* timeout_reached = timeout_reached head_block node_ctxt players in
-        unless timeout_reached @@ fun () ->
-        try_ @@ fun () -> play_timeout node_ctxt index
+        let* timeout_reached =
+          timeout_reached ~self head_block node_ctxt players
+        in
+        unless timeout_reached @@ fun () -> play_timeout node_ctxt self index
 
-  let ongoing_game head_block node_ctxt =
-    let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
+  let ongoing_game head_block node_ctxt self =
+    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     Plugin.RPC.Sc_rollup.ongoing_refutation_game
       cctxt
       (cctxt#chain, head_block)
       rollup_address
-      operator
+      self
       ()
 
-  let play_opening_move node_ctxt conflict =
+  let play_opening_move node_ctxt self conflict =
     let open Lwt_syntax in
     let open Sc_rollup.Refutation_storage in
     let* () = Refutation_game_event.conflict_detected conflict in
-    inject_next_move node_ctxt ~refutation:None ~opponent:conflict.other
+    inject_next_move node_ctxt self ~refutation:None ~opponent:conflict.other
 
-  let start_game_if_conflict head_block node_ctxt =
+  let start_game_if_conflict head_block node_ctxt self =
     let open Lwt_result_syntax in
-    let Node_context.{rollup_address; cctxt; operator; _} = node_ctxt in
+    let Node_context.{rollup_address; cctxt; _} = node_ctxt in
     let* conflicts =
       Plugin.RPC.Sc_rollup.conflicts
         cctxt
         (cctxt#chain, head_block)
         rollup_address
-        operator
+        self
         ()
     in
     let*! res =
-      Option.iter_es (play_opening_move node_ctxt) (List.hd conflicts)
+      Option.iter_es (play_opening_move node_ctxt self) (List.hd conflicts)
     in
     match res with
     | Ok r -> return r
@@ -375,12 +341,18 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         return_unit
     | Error errs -> Lwt.return (Error errs)
 
-  let process (Layer1.Head {hash; _}) node_ctxt store =
+  let process (Layer1.Head {hash; _}) configuration node_ctxt =
     let head_block = `Hash (hash, 0) in
     let open Lwt_result_syntax in
-    let* res = ongoing_game head_block node_ctxt in
-    match res with
-    | Some (game, staker1, staker2) ->
-        play head_block node_ctxt store game staker1 staker2
-    | None -> start_game_if_conflict head_block node_ctxt
+    let refute_signer = Node_context.get_operator node_ctxt Refute in
+    match refute_signer with
+    | None ->
+        (* Not injecting refutations, don't play refutation games *)
+        return_unit
+    | Some self -> (
+        let* res = ongoing_game head_block node_ctxt self in
+        match res with
+        | Some (game, staker1, staker2) ->
+            play head_block configuration node_ctxt self game staker1 staker2
+        | None -> start_game_if_conflict head_block node_ctxt self)
 end

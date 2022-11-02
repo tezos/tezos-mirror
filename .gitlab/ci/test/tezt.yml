@@ -5,41 +5,60 @@
 #   make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
 
 .tezt_template:
+  variables:
+    TESTS: "/protocol_override"
+    JUNIT: "tezt-junit.xml"
   artifacts:
     reports:
-      junit: tezt-junit.xml
+      junit: $JUNIT
     paths:
       - tezt.log
       - tezt-results-$CI_NODE_INDEX.json
       - $BISECT_FILE
+      - $JUNIT
     expire_in: 1 day
     # certain tests can be blacklisted by adding it to this variable
     when: always
-  variables:
-    TESTS: "/protocol_override"
   script:
-    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 1800 --on-unknown-regression-files fail --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4 --retry 1
-    - ./scripts/ci/merge_coverage.sh
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt
 
 tezt:
   extends:
     - .integration_template
     - .template__coverage_files
     - .tezt_template
-  parallel: 9
+  # WARNING: if you increase the number of parallel jobs, you need to
+  # update test_coverage.yml with the new list of jobs.
+  parallel: 30
 
 # these are tezt tests as above, but run using the static binaries
 tezt:static-binaries:
   extends:
-    - .integration_template
+    # Expansion of .integration_template but without coverage.
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
     - .tezt_template
   dependencies:
+    # Fetch src/proto_*/parameters/*.json from build_x86_64
+    - build_x86_64
+    # And fetch the static executables from build:static
     - build:static-x86_64-linux-binaries
   needs:
+    - build_x86_64
     - build:static-x86_64-linux-binaries
+  # WARNING: if you increase the number of parallel jobs, you need to
+  # update test_coverage.yml with the new list of jobs.
   parallel: 2
   variables:
     TESTS: "cli"
+  before_script:
+    - mv octez-binaries/x86_64/octez-* .
+  # Override script from .tezt_template to disable coverage reports.
+  # Note that the set of tests that are run for static executables
+  # is a subset, so this should not reduce apparent coverage.
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-static-binaries
 
 # Long Tezt tests are not ran in the CI, but we want them to type-check so that
 # they can be built in the performance regression test framework executors.
@@ -49,7 +68,7 @@ tezt:build-long:
     - .rules_template__development
   stage: test
   script:
-    - dune build @tezt/long_tests/check
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-build-long
 
 # Tests tezt itself
 tezt:self_tests:
@@ -58,7 +77,7 @@ tezt:self_tests:
     - .rules_template__development
   stage: test
   script:
-    - dune runtest tezt/self_tests/
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci test-tezt-self-test
 
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #
@@ -73,7 +92,6 @@ tezt:self_tests:
 #    - cat mainnet.roll.* | xz -d -v -T0 > mainnet.rolling
 #    - scripts/prepare_migration_test.sh auto mainnet.rolling "$block_hash"
 #  script:
-#    - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] ; then make; fi
 #    - dune exec ./tezt/manual_tests/main.exe -- migration --color --log-buffer-size 5000 --log-file tezt-migration.log
 #  artifacts:
 #    when: always

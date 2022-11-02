@@ -138,6 +138,9 @@ module Bytes : S with type t = bytes
 (** [Z] is a comparison module for Zarith numbers. *)
 module Z : S with type t = Z.t
 
+(** [Q] is a comparison module for Zarith-based rational numbers. *)
+module Q : S with type t = Q.t
+
 (** {2 Type constructors}
 
     Provided the functor argument(s) are compatible with the polymorphic
@@ -163,7 +166,7 @@ module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
 
 {[
 if Compare.List_length_with.(chunks > max_number_of_chunks) then
-   raise Maximum_size_exceeeded
+   raise Maximum_size_exceeded
 else
    ..
 ]}

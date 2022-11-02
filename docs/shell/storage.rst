@@ -138,7 +138,7 @@ Context
 
 The context is a versioned key/value store that associates for each
 block a view of its ledger state. The versioning uses concepts similar
-to `Git <http://git-scm.com/>`_. The current implementation is using
+to `Git <https://git-scm.com/>`_. The current implementation is using
 `irmin <https://github.com/mirage/irmin>`_ as backend and abstracted
 by the ``lib_context`` library.
 

@@ -22,47 +22,69 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
-module Config = struct
-  let collect_storage = true
-
-  let collect_lambdas = true
-
-  let measure_code_size = true
-
-  let mainnet_genesis =
-    {
-      Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-
-  let hangzhounet_genesis =
-    {
-      Genesis.time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-end
+open Tezos_clic
 
 let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
+  type serialization_costs = {decode : int; encode : int}
+
+  module Storage_helpers = struct
+    include Storage_helpers
+
+    let decode_and_costs expr =
+      match P.Script.decode_and_costs expr with
+      | Ok res -> Ok res
+      | Error err ->
+          Format.eprintf
+            "Failed decoding expression:\n%a\n"
+            Error_monad.pp_print_trace
+            err ;
+          assert (not Config.fatal) ;
+          Error `AlreadyWarned
+
+    let get_lazy_expr ~what ~getter ~pp ctxt x =
+      let open Lwt_result_syntax in
+      let* _, expr = get_value ~what ~getter ~pp ctxt x in
+      let*? expr, decode, encode = decode_and_costs expr in
+      return (expr, {decode; encode})
+  end
+
   module ExprMap = Map.Make (P.Script.Hash)
+
+  type gas = {
+    code_costs : serialization_costs;
+    storage_costs : serialization_costs;
+  }
+
+  let gas_headers, gas_to_list =
+    (* [gas_to_list] returns the field values corresponding to the [gas_headers].
+       Hence it should return lists of the same length as [gas_headers]. *)
+    let headers =
+      List.flatten
+      @@ List.map
+           (fun name -> [name ^ "_decode"; name ^ "_encode"])
+           ["code"; "storage"]
+    in
+    let to_list {code_costs; storage_costs} =
+      List.flatten
+      @@ List.map
+           (fun {decode; encode} -> [decode; encode])
+           [code_costs; storage_costs]
+    in
+    (headers, to_list)
+
+  type storage = {
+    contract : P.Contract.repr;
+    storage : P.Script.expr;
+    gas : gas option;
+  }
 
   type contract = {
     script : P.Script.expr;
     addresses : P.Contract.repr list;
-    storages : P.Script.expr ExprMap.t;
+    storages : storage ExprMap.t;
   }
 
   module File_helpers = struct
@@ -129,7 +151,6 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
       match
         P.Translator.parse_ty
           ctxt
-          ~legacy:true
           ~allow_lazy_storage:true
           ~allow_operation:true
           ~allow_contract:true
@@ -141,7 +162,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
 
     let get_script_storage_type ctxt script_expr =
       let open Lwt_syntax in
-      let+ result = P.Translator.parse_toplevel ctxt ~legacy:true script_expr in
+      let+ result = P.Translator.parse_toplevel ctxt script_expr in
       match result with
       | Ok code ->
           let storage_type_expr =
@@ -313,10 +334,10 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
             contract
         in
         match code_opt with
-        | None -> Lwt.return (m, i) (* Should not happen *)
-        | Some script ->
+        | Error `AlreadyWarned -> Lwt.return (m, i)
+        | Ok (script, code_costs) ->
             let+ add_storage =
-              if Config.(collect_lambdas || collect_storage) then
+              if Config.(collect_lambdas || collect_storage || collect_gas) then
                 let+ storage_opt =
                   Storage_helpers.get_lazy_expr
                     ~what:"contract storage"
@@ -326,10 +347,16 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                     contract
                 in
                 match storage_opt with
-                | None -> fun x -> x
-                | Some storage ->
+                | Error `AlreadyWarned -> fun x -> x
+                | Ok (storage, storage_costs) ->
+                    let gas =
+                      if Config.collect_gas then
+                        Some {code_costs; storage_costs}
+                      else None
+                    in
                     let key = hash_expr storage in
-                    fun storages -> ExprMap.add key storage storages
+                    fun storages ->
+                      ExprMap.add key {contract; storage; gas} storages
               else Lwt.return (fun x -> x)
             in
             let key = hash_expr script in
@@ -364,24 +391,26 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   let output_contract_results ctxt output_dir hash ctr total_size =
     let open Lwt_result_syntax in
     let hash_string = P.Script.Hash.to_b58check hash in
-    File_helpers.print_expr_file
-      ~dirname:output_dir
-      ~ext:".tz"
-      ~hash_string
-      ctr.script ;
     let filename ~ext =
       Filename.concat output_dir (Format.sprintf "%s.%s" hash_string ext)
     in
-    File_helpers.print_to_file
-      (filename ~ext:"address")
-      "%a"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
-      ctr.addresses ;
+    let () =
+      if Config.print_contracts then
+        File_helpers.print_expr_file
+          ~dirname:output_dir
+          ~ext:".tz"
+          ~hash_string
+          ctr.script ;
+      File_helpers.print_to_file
+        (filename ~ext:"address")
+        "%a"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
+        ctr.addresses
+    in
     let* contract_size =
       if Config.measure_code_size then (
         let* script_code =
-          P.Translator.parse_code ctxt ~legacy:true
-          @@ P.Script.lazy_expr ctr.script
+          P.Translator.parse_code ctxt @@ P.Script.lazy_expr ctr.script
         in
         let size =
           Contract_size.
@@ -400,8 +429,48 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     in
     (if Config.collect_storage then
      let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-     File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages) ;
+     let storages = ExprMap.map (fun {storage; _} -> storage) ctr.storages in
+     File_helpers.print_expr_dir ~dirname ~ext:".storage" storages) ;
     return @@ Contract_size.add contract_size total_size
+
+  let write_gas_file ~output_dir contract_map =
+    let file = Filename.concat output_dir "gas.csv" in
+    Format.printf "Writing gas file %s...\n" file ;
+    let pp_sep fmt () = Format.pp_print_char fmt ',' in
+    let pp_list pp fmt list = Format.pp_print_list ~pp_sep pp fmt list in
+    let pp_contracts_gas fmt =
+      ExprMap.iter
+        (fun hash {script = _; addresses = _; storages} ->
+          let hash_string = P.Script.Hash.to_b58check hash in
+          ExprMap.iter
+            (fun _hash {contract; storage = _; gas} ->
+              match gas with
+              | None -> assert false
+              | Some gas ->
+                  let gas_list = gas_to_list gas in
+                  let total = List.fold_left ( + ) 0 gas_list in
+                  Format.fprintf
+                    fmt
+                    "%a%a%s%a%a\n"
+                    P.Contract.pp
+                    contract
+                    pp_sep
+                    ()
+                    hash_string
+                    pp_sep
+                    ()
+                    (pp_list Format.pp_print_int)
+                    (gas_list @ [total]))
+            storages)
+        contract_map
+    in
+    File_helpers.print_to_file
+      file
+      "%a\n%t"
+      (pp_list Format.pp_print_string)
+      (("address" :: "code_hash" :: gas_headers) @ ["TOTAL"])
+      pp_contracts_gas ;
+    print_endline "Done writing gas file."
 
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
@@ -421,7 +490,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         ~f:Michelson_helpers.(add_expr_to_map ctxt)
     in
     print_endline "Listing addresses done." ;
-    let* contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map) =
+    let* lambda_map, lambda_ty_map, lambda_legacy_map =
       if Config.collect_lambdas then (
         let add_typed_expr hash expr ty_hash ty exprs =
           ExprMap.update
@@ -446,9 +515,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 Michelson_helpers.get_script_storage_type ctxt script
               in
               ExprMap.fold_es
-                (fun storage_hash storage_expr exprs ->
-                  return
-                  @@ add_typed_expr storage_hash storage_expr ty_hash ty exprs)
+                (fun storage_hash {contract = _; storage; gas = _} exprs ->
+                  return @@ add_typed_expr storage_hash storage ty_hash ty exprs)
                 storages
                 exprs)
             contract_map
@@ -472,8 +540,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                   id
               in
               match value_opt with
-              | None -> return (exprs, i) (* should not happen *)
-              | Some value_type_expr ->
+              | Error `AlreadyWarned -> return (exprs, i)
+              | Ok value_type_expr ->
                   let ty_hash, ty =
                     Michelson_helpers.parse_ty ctxt value_type_expr
                   in
@@ -495,17 +563,22 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         let*! lambda_map =
           Michelson_helpers.collect_lambdas_in_exprs ctxt exprs unpack_types
         in
-        return (contract_map, lambda_map))
-      else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
+        return lambda_map)
+      else return (ExprMap.empty, ExprMap.empty, ExprMap.empty)
     in
-    print_endline "Writing contract files..." ;
     let* total_ir_size =
-      ExprMap.fold_es
-        (output_contract_results ctxt output_dir)
-        contract_map
-        Contract_size.zero
+      if Config.(print_contracts || measure_code_size || collect_storage) then (
+        print_endline "Writing contract files and measuring code size..." ;
+        let+ total_ir_size =
+          ExprMap.fold_es
+            (output_contract_results ctxt output_dir)
+            contract_map
+            Contract_size.zero
+        in
+        print_endline "Done writing contract files." ;
+        total_ir_size)
+      else return Contract_size.zero
     in
-    print_endline "Done writing contract files." ;
     if Config.measure_code_size then
       Format.printf
         "@[<v 2>Total IR size:@;%a@]@."
@@ -524,11 +597,21 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         print_endline "Done writing lambda files.")
       else ()
     in
+    let () =
+      if Config.collect_gas then write_gas_file ~output_dir contract_map
+    in
     return ()
 end
 
-let ensure_target_dir_exists () =
-  let dir = try Sys.argv.(2) with Invalid_argument _ -> "." in
+let ensure_target_dir_exists list_target_dir =
+  let dir =
+    match list_target_dir with
+    | [] -> "."
+    | [dir] -> dir
+    | _ :: _ ->
+        Printf.printf "Got more than one target dir!" ;
+        exit 1
+  in
   try
     if Sys.is_directory dir then dir
     else (
@@ -543,31 +626,87 @@ let ensure_target_dir_exists () =
         dir
     | _ -> exit 0)
 
-let run (module Main : Sigs.MAIN) =
-  let open Lwt_result_syntax in
-  let data_dir = Sys.argv.(1) in
-  let output_dir = ensure_target_dir_exists () in
-  Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
-  let* store =
-    Tezos_store.Store.init
-      ~store_dir:(Filename.concat data_dir "store")
-      ~context_dir:(Filename.concat data_dir "context")
-      ~allow_testchains:true
-      ~readonly:true
-      Config.mainnet_genesis
-  in
-  Printf.printf "Getting main chain storage and head...\n%!" ;
-  let chain_store = Tezos_store.Store.main_chain_store store in
-  let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
-  Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
-  let*! head = Tezos_store.Store.Chain.current_head chain_store in
-  let* proto_hash = Tezos_store.Store.Block.protocol_hash chain_store head in
-  Format.printf "Protocol is %a\n%!" Protocol_hash.pp proto_hash ;
-  let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
-  print_endline "Pre-preparing raw context..." ;
-  Main.main ~output_dir ctxt ~head
+let get_main proto_hash =
+  match
+    List.find
+      (fun (module Proto : Sigs.PROTOCOL) ->
+        Protocol_hash.(Proto.hash = proto_hash))
+      (Known_protocols.get_all ())
+  with
+  | None ->
+      Format.kasprintf
+        invalid_arg
+        "Unknown protocol: %a"
+        Protocol_hash.pp
+        proto_hash
+  | Some (module Proto) ->
+      let module Main = Make (Proto) in
+      (module Main : Sigs.MAIN)
 
-let main (module Main : Sigs.MAIN) =
-  match Lwt_main.run (run (module Main)) with
+let data_dir_param = Clic.string ~name:"data-dir" ~desc:"Path to context"
+
+let list_target_dir_param =
+  Clic.seq_of_param @@ Clic.string ~name:"target-dir" ~desc:"Output path"
+
+let network_parameter =
+  Clic.parameter (fun () network_name ->
+      match
+        List.assoc ~equal:String.equal network_name Config.known_networks
+      with
+      | None -> failwith "Unknown network name"
+      | Some n -> Lwt_result_syntax.return n)
+
+let network_arg =
+  Clic.default_arg
+    ~doc:"Network to use"
+    ~long:"network"
+    ~placeholder:"network name"
+    ~default:"mainnet"
+    network_parameter
+
+let commands =
+  let open Clic in
+  [
+    command
+      ~desc:"Extracts all contracts from the storage"
+      (args1 network_arg)
+      (data_dir_param @@ list_target_dir_param)
+      (fun genesis data_dir list_target_dir () ->
+        let open Lwt_result_syntax in
+        let output_dir = ensure_target_dir_exists list_target_dir in
+        Printf.printf "Initializing store from data dir '%s'...\n%!" data_dir ;
+        let* store =
+          Tezos_store.Store.init
+            ~store_dir:(Filename.concat data_dir "store")
+            ~context_dir:(Filename.concat data_dir "context")
+            ~allow_testchains:true
+            ~readonly:true
+            genesis
+        in
+        Printf.printf "Getting main chain storage and head...\n%!" ;
+        let chain_store = Tezos_store.Store.main_chain_store store in
+        let chain_id = Tezos_store.Store.Chain.chain_id chain_store in
+        Format.printf "Chain id: %a\n%!" Chain_id.pp chain_id ;
+        let*! head = Tezos_store.Store.Chain.current_head chain_store in
+        Format.printf
+          "Head block: %a\n%!"
+          Block_hash.pp
+          (Tezos_store.Store.Block.hash head) ;
+        let* proto_hash =
+          Tezos_store.Store.Block.protocol_hash chain_store head
+        in
+        Format.printf "Protocol hash: %a\n%!" Protocol_hash.pp proto_hash ;
+        let*! ctxt = Tezos_store.Store.Block.context_exn chain_store head in
+        print_endline "Pre-preparing raw context..." ;
+        let (module Main : Sigs.MAIN) = get_main proto_hash in
+        Main.main ~output_dir ctxt ~head);
+  ]
+
+let run () =
+  let argv = Sys.argv |> Array.to_list |> List.tl |> Option.value ~default:[] in
+  Clic.dispatch commands () argv
+
+let () =
+  match Lwt_main.run (run ()) with
   | Ok () -> ()
   | Error trace -> Format.printf "ERROR: %a%!" Error_monad.pp_print_trace trace

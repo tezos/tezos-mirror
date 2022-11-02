@@ -1,9 +1,11 @@
 (* This file was automatically generated, do not edit.*)
 (* Edit file v1.in.ml instead. *)
 # 1 "v1.in.ml"
-open Tezos_protocol_environment_sigs_stdlib_compat.V_all
-
 module type T = sig
+  module CamlinternalFormatBasics : module type of struct
+    include Tezos_protocol_environment_sigs_internals.CamlinternalFormatBasics
+  end
+
   module Pervasives : sig
 # 1 "v1/pervasives.mli"
 (**************************************************************************)
@@ -489,7 +491,7 @@ val ( ^^ ) :
   Right-associative operator, see {!Ocaml_operators} for more information.
 *)
 end
-# 4 "v1.in.ml"
+# 6 "v1.in.ml"
 
 
   open Pervasives
@@ -787,7 +789,7 @@ val merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
     Not tail-recursive (sum of the lengths of the arguments).
 *)
 end
-# 8 "v1.in.ml"
+# 10 "v1.in.ml"
 
 
   module String : sig
@@ -1035,7 +1037,7 @@ val split_on_char: char -> string -> string list
     @since 4.04.0
 *)
 end
-# 10 "v1.in.ml"
+# 12 "v1.in.ml"
 
 
   module Char : sig
@@ -1095,7 +1097,7 @@ val equal: t -> t -> bool
 (** The equal function for chars.
     @since 4.03.0 *)
 end
-# 12 "v1.in.ml"
+# 14 "v1.in.ml"
 
 
   module Bytes : sig
@@ -1361,7 +1363,7 @@ val equal: t -> t -> bool
 (** The equality function for byte sequences.
     @since 4.03.0 *)
 end
-# 14 "v1.in.ml"
+# 16 "v1.in.ml"
 
 
   module Int32 : sig
@@ -1511,7 +1513,7 @@ val equal: t -> t -> bool
 (** The equal function for int32s.
     @since 4.03.0 *)
 end
-# 16 "v1.in.ml"
+# 18 "v1.in.ml"
 
 
   module Int64 : sig
@@ -1669,7 +1671,7 @@ val equal: t -> t -> bool
 (** The equal function for int64s.
     @since 4.03.0 *)
 end
-# 18 "v1.in.ml"
+# 20 "v1.in.ml"
 
 
   module Format : sig
@@ -2422,7 +2424,7 @@ val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
   @since 4.03
 *)
 end
-# 20 "v1.in.ml"
+# 22 "v1.in.ml"
 
 
   module Hex : sig
@@ -2501,7 +2503,7 @@ val show : t -> string
 (** [show t] will return a human-readable hex representation of [t] as
     a string. *)
 end
-# 22 "v1.in.ml"
+# 24 "v1.in.ml"
 
 
   module Z : sig
@@ -2975,7 +2977,7 @@ external of_bits: string -> t = "ml_z_of_bits"
     trailing zeros in s.
  *)
 end
-# 24 "v1.in.ml"
+# 26 "v1.in.ml"
 
 
   module Lwt : sig
@@ -3246,7 +3248,7 @@ val return_false : bool t
 (** [Lwt.return_false] is like {!Lwt.return_unit}, but for
     {!Lwt.return}[ false]. *)
 end
-# 26 "v1.in.ml"
+# 28 "v1.in.ml"
 
 
   module Lwt_list : sig
@@ -3293,7 +3295,7 @@ val filter_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
 val partition_s : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
 end
-# 28 "v1.in.ml"
+# 30 "v1.in.ml"
 
 
   module Data_encoding : sig
@@ -3722,7 +3724,7 @@ end
     the JSON encoding. *)
 val check_size : int -> 'a encoding -> 'a encoding
 end
-# 30 "v1.in.ml"
+# 32 "v1.in.ml"
 
 
   module Raw_hashes : sig
@@ -3764,7 +3766,7 @@ val sha3_256 : bytes -> bytes
 
 val sha3_512 : bytes -> bytes
 end
-# 32 "v1.in.ml"
+# 34 "v1.in.ml"
 
 
   module Compare : sig
@@ -3850,7 +3852,7 @@ module List (P : COMPARABLE) : S with type t = P.t list
 
 module Option (P : COMPARABLE) : S with type t = P.t option
 end
-# 34 "v1.in.ml"
+# 36 "v1.in.ml"
 
 
   module Error_monad : sig
@@ -4119,7 +4121,7 @@ type shell_error
 
 type 'a shell_tzresult = ('a, shell_error list) result
 end
-# 36 "v1.in.ml"
+# 38 "v1.in.ml"
 
 
   open Error_monad
@@ -4173,7 +4175,7 @@ val lwt_warn : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
 val lwt_log_error : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 end
-# 40 "v1.in.ml"
+# 42 "v1.in.ml"
 
 
   module Time : sig
@@ -4227,7 +4229,7 @@ val rfc_encoding : t Data_encoding.t
 
 val pp_hum : Format.formatter -> t -> unit
 end
-# 42 "v1.in.ml"
+# 44 "v1.in.ml"
 
 
   module Option : sig
@@ -4353,7 +4355,7 @@ val pp :
   'a option ->
   unit
 end
-# 44 "v1.in.ml"
+# 46 "v1.in.ml"
 
 
   module TzEndian : sig
@@ -4403,7 +4405,7 @@ val get_uint8 : bytes -> int -> int
 
 val get_uint16 : bytes -> int -> int
 end
-# 46 "v1.in.ml"
+# 48 "v1.in.ml"
 
 
   module RPC_arg : sig
@@ -4465,7 +4467,7 @@ type ('a, 'b) eq = Eq : ('a, 'a) eq
 
 val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
-# 48 "v1.in.ml"
+# 50 "v1.in.ml"
 
 
   module RPC_path : sig
@@ -4521,7 +4523,7 @@ val add_final_args :
 val ( /:* ) :
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 end
-# 50 "v1.in.ml"
+# 52 "v1.in.ml"
 
 
   module RPC_query : sig
@@ -4593,7 +4595,7 @@ exception Invalid of string
 
 val parse : 'a query -> untyped -> 'a
 end
-# 52 "v1.in.ml"
+# 54 "v1.in.ml"
 
 
   module RPC_service : sig
@@ -4670,7 +4672,7 @@ val put_service :
   ('prefix, 'params) RPC_path.t ->
   ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service
 end
-# 54 "v1.in.ml"
+# 56 "v1.in.ml"
 
 
   module RPC_answer : sig
@@ -4722,7 +4724,7 @@ val not_found : 'o t Lwt.t
 
 val fail : error list -> 'a t Lwt.t
 end
-# 56 "v1.in.ml"
+# 58 "v1.in.ml"
 
 
   module RPC_directory : sig
@@ -4961,7 +4963,7 @@ val register_dynamic_directory :
   ('a -> 'a directory Lwt.t) ->
   'prefix directory
 end
-# 58 "v1.in.ml"
+# 60 "v1.in.ml"
 
 
   module Base58 : sig
@@ -5011,7 +5013,7 @@ val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
 val decode : string -> data option
 end
-# 60 "v1.in.ml"
+# 62 "v1.in.ml"
 
 
   module S : sig
@@ -5745,72 +5747,8 @@ module type PAIRING = sig
 
   val pairing : G1.t -> G2.t -> Gt.t
 end
-
-module type PVSS_ELEMENT = sig
-   type t
-
-   include B58_DATA with type t := t
-
-   include ENCODER with type t := t
 end
-
-module type PVSS_PUBLIC_KEY = sig
-   type t
-
-   val pp : Format.formatter -> t -> unit
-
-   include Compare.S with type t := t
-
-   include RAW_DATA with type t := t
-
-   include B58_DATA with type t := t
-
-   include ENCODER with type t := t
-end
-
-module type PVSS_SECRET_KEY = sig
-   type public_key
-
-   type t
-
-    include ENCODER with type t := t
-
-    val to_public_key : t -> public_key
-end
-
-module type PVSS = sig
-  type proof
-
-  module Clear_share : PVSS_ELEMENT
-
-  module Commitment : PVSS_ELEMENT
-
-  module Encrypted_share : PVSS_ELEMENT
-
-  module Public_key : PVSS_PUBLIC_KEY
-
-  module Secret_key : PVSS_SECRET_KEY with type public_key := Public_key.t
-
-  val proof_encoding : proof Data_encoding.t
-
-  val check_dealer_proof :
-    Encrypted_share.t list ->
-    Commitment.t list ->
-    proof:proof ->
-    public_keys:Public_key.t list ->
-    bool
-
-  val check_revealed_share :
-    Encrypted_share.t ->
-    Clear_share.t ->
-    public_key:Public_key.t ->
-    proof ->
-    bool
-
-  val reconstruct : Clear_share.t list -> int list -> Public_key.t
-end
-end
-# 62 "v1.in.ml"
+# 64 "v1.in.ml"
 
 
   module Set : sig
@@ -5881,7 +5819,7 @@ module Make (Ord : OrderedType) : S.SET with type elt = Ord.t
 (** Functor building an implementation of the set structure
    given a totally ordered type. *)
 end
-# 64 "v1.in.ml"
+# 66 "v1.in.ml"
 
 
   module Map : sig
@@ -5951,7 +5889,7 @@ module Make (Ord : OrderedType) : S.MAP with type key = Ord.t
 (** Functor building an implementation of the map structure
    given a totally ordered type. *)
 end
-# 66 "v1.in.ml"
+# 68 "v1.in.ml"
 
 
   module Blake2B : sig
@@ -6015,7 +5953,7 @@ end
 
 module Make (Register : Register) (Name : PrefixedName) : S.HASH
 end
-# 68 "v1.in.ml"
+# 70 "v1.in.ml"
 
 
   module Bls12_381 : sig
@@ -6055,7 +5993,7 @@ include
      and type G1.Scalar.t = Fr.t
      and type G2.Scalar.t = Fr.t
 end
-# 70 "v1.in.ml"
+# 72 "v1.in.ml"
 
 
   module Ed25519 : sig
@@ -6089,7 +6027,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 72 "v1.in.ml"
+# 74 "v1.in.ml"
 
 
   module Secp256k1 : sig
@@ -6123,7 +6061,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 74 "v1.in.ml"
+# 76 "v1.in.ml"
 
 
   module P256 : sig
@@ -6157,7 +6095,7 @@ end
 
 include S.SIGNATURE with type watermark := bytes
 end
-# 76 "v1.in.ml"
+# 78 "v1.in.ml"
 
 
   module Chain_id : sig
@@ -6189,7 +6127,7 @@ end
 
 include S.HASH
 end
-# 78 "v1.in.ml"
+# 80 "v1.in.ml"
 
 
   module Signature : sig
@@ -6241,7 +6179,7 @@ include
      and type Public_key.t = public_key
      and type watermark := watermark
 end
-# 80 "v1.in.ml"
+# 82 "v1.in.ml"
 
 
   module Block_hash : sig
@@ -6274,7 +6212,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.HASH
 end
-# 82 "v1.in.ml"
+# 84 "v1.in.ml"
 
 
   module Operation_hash : sig
@@ -6307,7 +6245,7 @@ end
 (** Operations hashes / IDs. *)
 include S.HASH
 end
-# 84 "v1.in.ml"
+# 86 "v1.in.ml"
 
 
   module Operation_list_hash : sig
@@ -6340,7 +6278,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_hash.t
 end
-# 86 "v1.in.ml"
+# 88 "v1.in.ml"
 
 
   module Operation_list_list_hash : sig
@@ -6373,7 +6311,7 @@ end
 (** Blocks hashes / IDs. *)
 include S.MERKLE_TREE with type elt = Operation_list_hash.t
 end
-# 88 "v1.in.ml"
+# 90 "v1.in.ml"
 
 
   module Protocol_hash : sig
@@ -6406,7 +6344,7 @@ end
 (** Protocol hashes / IDs. *)
 include S.HASH
 end
-# 90 "v1.in.ml"
+# 92 "v1.in.ml"
 
 
   module Context_hash : sig
@@ -6438,40 +6376,6 @@ end
 
 (** Committed context hashes / IDs. *)
 include S.HASH
-end
-# 92 "v1.in.ml"
-
-
-  module Pvss_secp256k1 : sig
-# 1 "v1/pvss_secp256k1.mli"
-(*****************************************************************************)
-(*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <contact@metastate.ch>                    *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
-(*                                                                           *)
-(*****************************************************************************)
-
-(** Tezos - PVSS Secp256k1 cryptography *)
-
-include S.PVSS
 end
 # 94 "v1.in.ml"
 

@@ -34,6 +34,8 @@ module type MAIN = sig
 end
 
 module type PROTOCOL = sig
+  val hash : Tezos_crypto.Protocol_hash.t
+
   module Context : sig
     type t
 
@@ -59,6 +61,8 @@ module type PROTOCOL = sig
     val expr_encoding : expr Data_encoding.t
 
     val lazy_expr : expr -> lazy_expr
+
+    val decode_and_costs : lazy_expr -> (expr * int * int) tzresult
 
     val print_expr : Format.formatter -> expr -> unit
 
@@ -102,7 +106,6 @@ module type PROTOCOL = sig
 
     val parse_ty :
       context ->
-      legacy:bool ->
       allow_lazy_storage:bool ->
       allow_operation:bool ->
       allow_contract:bool ->
@@ -112,11 +115,9 @@ module type PROTOCOL = sig
 
     val unparse_ty : context -> ex_ty -> Script.node tzresult
 
-    val parse_toplevel :
-      context -> legacy:bool -> Script.expr -> toplevel tzresult Lwt.t
+    val parse_toplevel : context -> Script.expr -> toplevel tzresult Lwt.t
 
-    val parse_code :
-      context -> legacy:bool -> Script.lazy_expr -> ex_code tzresult Lwt.t
+    val parse_code : context -> Script.lazy_expr -> ex_code tzresult Lwt.t
   end
 
   module Storage : sig

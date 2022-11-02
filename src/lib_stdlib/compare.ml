@@ -245,6 +245,8 @@ module Z = struct
   let min = Z.min
 end
 
+module Q = Q
+
 module List_length_with = struct
   let ( = ) l i = Stdlib.List.compare_length_with l i = 0
 

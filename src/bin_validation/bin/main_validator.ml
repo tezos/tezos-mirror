@@ -23,6 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
+let () =
+  (* warn_if_argv0_name_not_octez *)
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let prefix = "tezos-" in
+  if TzString.has_prefix executable_name ~prefix then
+    let expected_name =
+      let len_prefix = String.length prefix in
+      "octez-"
+      ^ String.sub
+          executable_name
+          len_prefix
+          (String.length executable_name - len_prefix)
+    in
+    Format.eprintf
+      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+       The executable with name @{<kwd>%s@} has been renamed to @{<kwd>%s@}. \
+       The name @{<kwd>%s@} is now@,\
+       deprecated, and it will be removed in a future release. Please update@,\
+       your scripts to use the new name.@]@\n\
+       @."
+      executable_name
+      expected_name
+      executable_name
+  else ()
+
 let () =
   (* The default allocation policy of Octez is "best-fit" which gives
      the best compromise in terms of performances and memory

@@ -218,7 +218,7 @@ let test_rewards_block_and_payload_producer () =
   let fee = Tez.one in
   Op.transaction (B b1) ~fee baker_b1_contract baker_b1_contract Tez.zero
   >>=? fun tx ->
-  Block.bake ~policy:(By_round 0) ~operations:(tx :: endos) b1 >>=? fun b2 ->
+  Block.bake ~policy:(By_round 0) ~operations:(endos @ [tx]) b1 >>=? fun b2 ->
   Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
@@ -262,7 +262,7 @@ let test_rewards_block_and_payload_producer () =
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)
     ~policy:(By_account baker_b2')
-    ~operations:((tx :: preendos) @ endos)
+    ~operations:(preendos @ endos @ [tx])
     b1
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
@@ -304,12 +304,12 @@ let test_rewards_block_and_payload_producer () =
 let test_enough_active_stake_to_bake ~has_active_stake () =
   Context.init1 () >>=? fun (b_for_constants, _contract) ->
   Context.get_constants (B b_for_constants)
-  >>=? fun Constants.{parametric = {tokens_per_roll; _}; _} ->
-  let tpr = Tez.to_mutez tokens_per_roll in
+  >>=? fun Constants.{parametric = {minimal_stake; _}; _} ->
+  let tpr = Tez.to_mutez minimal_stake in
   (* N.B. setting the balance has an impact on the active stake; without
      delegation, the full balance is the same as the staking balance and the
      active balance is less or equal the staking balance (see
-     [Delegate_storage.select_distribution_for_cycle]). *)
+     [Delegate_sampler.select_distribution_for_cycle]). *)
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
   Context.init2 ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 ()
   >>=? fun (b0, (account1, _account2)) ->
@@ -329,7 +329,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
     in
     Assert.equal_tez ~loc:__LOC__ bal expected_bal
   else
-    (* pkh1 has less than tokens_per_roll so it will have no slots, thus it
+    (* pkh1 has less than minimal_stake so it will have no slots, thus it
        cannot be a proposer, thus it cannot bake. Precisely, bake fails because
        get_next_baker_by_account fails with "No slots found for pkh1" *)
     Assert.error ~loc:__LOC__ b1 (fun _ -> true)
@@ -344,7 +344,7 @@ let test_committee_sampling () =
       List.map
         (fun (acc, tez, delegate_to) ->
           Default_parameters.make_bootstrap_account
-            (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
+            (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
         accounts
     in
     let consensus_committee_size = max_round in

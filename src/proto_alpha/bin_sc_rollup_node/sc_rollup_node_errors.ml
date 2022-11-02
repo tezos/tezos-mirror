@@ -25,14 +25,26 @@
 
 open Protocol.Alpha_context
 
-type error += Bad_minimal_fees of string
-
-type error += Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
-
-type error += Unreliable_tezos_node_returning_inconsistent_game
+let tez_sym = "\xEA\x9C\xA9"
 
 type error +=
-  | Cannot_produce_proof of Store.Inbox.t * Store.Inbox.history * Raw_level.t
+  | Cannot_produce_proof of
+      Sc_rollup.Inbox.t * Sc_rollup.Inbox.History.t * Raw_level.t
+  | Missing_mode_operators of {mode : string; missing_operators : string list}
+  | Bad_minimal_fees of string
+  | Commitment_predecessor_should_be_LCC of Sc_rollup.Commitment.t
+  | Unreliable_tezos_node_returning_inconsistent_game
+  | Inconsistent_inbox of {
+      layer1_inbox : Sc_rollup.Inbox.t;
+      inbox : Sc_rollup.Inbox.t;
+    }
+  | Missing_PVM_state of Block_hash.t * Raw_level.t
+  | Cannot_checkout_context of Block_hash.t * string option
+  | Cannot_retrieve_reveal of Sc_rollup.Input_hash.t
+
+type error +=
+  | Lost_game of
+      public_key_hash * Protocol.Alpha_context.Sc_rollup.Game.reason * Tez.t
 
 let () =
   register_error_kind
@@ -82,29 +94,161 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"internal.cannnot_produce_proof"
-    ~title:"Internal error: Rollup node cannot produce refutation proof"
+    ~id:"internal.cannot_produce_proof"
+    ~title:"Internal error: rollup node cannot produce refutation proof"
     ~description:
-      "The rollup node is in a state that prevent it from produce refutation \
-       proofs."
+      "The rollup node is in a state that prevents it from producing \
+       refutation proofs."
     ~pp:(fun ppf (inbox, history, level) ->
       Format.fprintf
         ppf
         "cannot produce proof for inbox %a of level %a with history %a"
-        Store.Inbox.pp
+        Sc_rollup.Inbox.pp
         inbox
         Raw_level.pp
         level
-        Store.Inbox.pp_history
+        Sc_rollup.Inbox.History.pp
         history)
     Data_encoding.(
       obj3
-        (req "inbox" Store.Inbox.encoding)
-        (req "history" Store.Inbox.history_encoding)
+        (req "inbox" Sc_rollup.Inbox.encoding)
+        (req "history" Sc_rollup.Inbox.History.encoding)
         (req "level" Raw_level.encoding))
     (function
       | Cannot_produce_proof (inbox, history, level) ->
           Some (inbox, history, level)
       | _ -> None)
     (fun (inbox, history, level) ->
-      Cannot_produce_proof (inbox, history, level))
+      Cannot_produce_proof (inbox, history, level)) ;
+
+  register_error_kind
+    ~id:"sc_rollup.node.missing_mode_operators"
+    ~title:"Missing operators for the chosen mode"
+    ~description:"Missing operators for the chosen mode."
+    ~pp:(fun ppf (mode, missing_operators) ->
+      Format.fprintf
+        ppf
+        "@[<hov>Missing operators %a for mode %s.@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+           Format.pp_print_string)
+        missing_operators
+        mode)
+    `Permanent
+    Data_encoding.(
+      obj2 (req "mode" string) (req "missing_operators" (list string)))
+    (function
+      | Missing_mode_operators {mode; missing_operators} ->
+          Some (mode, missing_operators)
+      | _ -> None)
+    (fun (mode, missing_operators) ->
+      Missing_mode_operators {mode; missing_operators}) ;
+
+  register_error_kind
+    ~id:"internal.inconsistent_inbox"
+    ~title:"Internal error: Rollup node has an inconsistent inbox"
+    ~description:
+      "The rollup node inbox should be the same as the layer 1 inbox."
+    ~pp:(fun ppf (layer1_inbox, inbox) ->
+      Format.fprintf
+        ppf
+        "@[Rollup inbox:@;%a@]@;should be equal to @[Layer1 inbox:@;%a@]"
+        Sc_rollup.Inbox.pp
+        inbox
+        Sc_rollup.Inbox.pp
+        layer1_inbox)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "layer1_inbox" Sc_rollup.Inbox.encoding)
+        (req "inbox" Sc_rollup.Inbox.encoding))
+    (function
+      | Inconsistent_inbox {layer1_inbox; inbox} -> Some (layer1_inbox, inbox)
+      | _ -> None)
+    (fun (layer1_inbox, inbox) -> Inconsistent_inbox {layer1_inbox; inbox}) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.missing_pvm_state"
+    ~title:"Internal error: Missing PVM state"
+    ~description:"The rollup node cannot retrieve the state of the PVM."
+    ~pp:(fun ppf (block, level) ->
+      Format.fprintf
+        ppf
+        "Cannot retrieve PVM state for block %a at level %a"
+        Block_hash.pp
+        block
+        Raw_level.pp
+        level)
+    Data_encoding.(
+      obj2 (req "block" Block_hash.encoding) (req "level" Raw_level.encoding))
+    (function
+      | Missing_PVM_state (block, level) -> Some (block, level) | _ -> None)
+    (fun (block, level) -> Missing_PVM_state (block, level)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.cannot_checkout_context"
+    ~title:"Internal error: Cannot checkout context"
+    ~description:
+      "The rollup node cannot checkout the context registered for the block."
+    ~pp:(fun ppf (block, context_hash) ->
+      Format.fprintf
+        ppf
+        "The context %sfor block %a cannot be checkouted"
+        (Option.fold
+           ~none:""
+           ~some:(fun c -> Hex.(show (of_string c)))
+           context_hash)
+        Block_hash.pp
+        block)
+    Data_encoding.(
+      obj2
+        (req "block" Block_hash.encoding)
+        (opt "context" (conv Bytes.of_string Bytes.to_string bytes)))
+    (function
+      | Cannot_checkout_context (block, context) -> Some (block, context)
+      | _ -> None)
+    (fun (block, context) -> Cannot_checkout_context (block, context)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup.node.lost_game"
+    ~title:"Lost refutation game"
+    ~description:"The rollup node lost a refutation game."
+    ~pp:(fun ppf (loser, reason, slashed) ->
+      Format.fprintf
+        ppf
+        "The rollup node lost the refutation game for operator %a and was \
+         slashed %s%a, for reason: %a."
+        Signature.Public_key_hash.pp
+        loser
+        tez_sym
+        Tez.pp
+        slashed
+        Protocol.Alpha_context.Sc_rollup.Game.pp_reason
+        reason)
+    Data_encoding.(
+      obj3
+        (req "loser" Signature.Public_key_hash.encoding)
+        (req "reason" Protocol.Alpha_context.Sc_rollup.Game.reason_encoding)
+        (req "slashed" Tez.encoding))
+    (function
+      | Lost_game (loser, reason, slashed) -> Some (loser, reason, slashed)
+      | _ -> None)
+    (fun (loser, reason, slashed) -> Lost_game (loser, reason, slashed)) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"internal.cannot_retrieve_reveal"
+    ~title:"Internal error: Cannot retrieve reveal of hash"
+    ~description:"The rollup node cannot retrieve a reveal asked by the rollup."
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "The node cannot retrieve a reveal for hash %a"
+        Sc_rollup.Input_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "hash" Sc_rollup.Input_hash.encoding))
+    (function Cannot_retrieve_reveal hash -> Some hash | _ -> None)
+    (fun hash -> Cannot_retrieve_reveal hash)

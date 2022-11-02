@@ -56,6 +56,17 @@ to report bugs and to request new simple features. The [Tezos Agora
 forum](https://forum.tezosagora.org/) is another great place to
 discuss the future of Tezos with the community at large.
 
+#### Continuous Integration
+
+Running CI pipelines in your forks using GitLab's shared runners
+may fail, for instance because tests may take too long to run.
+The CI of `tezos/tezos` (i.e. https://gitlab.com/tezos/tezos)
+uses custom runners that do not have this issue.
+If you create a merge request targeting `tezos/tezos`, pipelines
+for your branch will run using those custom runners.
+To trigger those pipelines you need to be a developer in the
+`tezos/tezos` project. Otherwise, reviewers can do that for you.
+
 ### Development of the Tezos protocol
 
 The core of the Tezos software that implements the economic ruleset is

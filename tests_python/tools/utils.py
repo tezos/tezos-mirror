@@ -576,7 +576,7 @@ def check_static_binary(execname: str):
         ['file', execname], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
     # Example of line returned by "file":
-    # tezos-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV),
+    # octez-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV),
     # statically linked, no section header
     return "statically linked" in str(ret.communicate()[0])
 

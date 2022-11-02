@@ -53,6 +53,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_kathmandu:
 
 A delegate can be marked as either active or passive. A passive
@@ -71,6 +72,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake. In what follows we detail the selection mechanism used in Tezos.
 
+.. _random_seed:
 .. _random_seed_kathmandu:
 
 Random seed
@@ -82,6 +84,7 @@ values in the protocol, in particular for selecting delegates to participate in 
 
 For more information on randomness generation, see :doc:`randomness-generation<randomness_generation>`.
 
+.. _snapshots:
 .. _snapshots_kathmandu:
 
 Stake snapshots
@@ -104,6 +107,7 @@ cycle ``n``.
 
 Only the stake of active delegates with the minimal stake of ``TOKENS_PER_ROLL`` is snapshot.
 
+.. _rights:
 .. _rights_kathmandu:
 
 Slot selection
@@ -136,23 +140,11 @@ simple procedure which has as its initial state: the level, the
 level belongs, and the slot.
 
 
-.. _protocol_constants_kathmandu:
-
-Protocol constants
-------------------
-
-Protocols are parameterized by several parameters called *protocol constants*, which may vary from one protocol to another or from one network to another (for instance, test networks move faster).
-
-The list of protocol constants can be found in the API of the `Constants module <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`__.
-
-The values of protocol constants can be found using a :ref:`specific RPC call <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`.
-
-In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
-
+.. _ps_constants:
 .. _ps_constants_kathmandu:
 
 Proof-of-stake parameters
-^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------
 
 .. list-table::
    :widths: 55 25

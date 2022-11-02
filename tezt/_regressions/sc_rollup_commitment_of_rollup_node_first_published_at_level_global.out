@@ -1,6 +1,6 @@
 sc_rollup_commitment_of_rollup_node_first_published_at_level_global.out
 
-./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
+./octez-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
 Node is bootstrapped.
 Estimated gas: 1600.696 units (will add 100 for safety)
 Estimated storage: 6534 bytes added (will add 20 for safety)
@@ -8,7 +8,7 @@ Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -30,10 +30,10 @@ This sequence of operations was run:
         storage fees ........................... +ꜩ1.6335
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
+./octez-client rpc get '/chains/main/blocks/head/context/sc_rollup/[SC_ROLLUP_HASH]/initial_level'
 2
 
-./tezos-client rpc get /chains/main/blocks/head/context/constants
+./octez-client rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
@@ -84,7 +84,7 @@ This sequence of operations was run:
   "sc_rollup_commitment_storage_size_in_bytes": 84,
   "sc_rollup_max_lookahead_in_blocks": 30000 }
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",
@@ -94,7 +94,7 @@ This sequence of operations was run:
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }
 
-./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
+./octez-sc-rollup-client-alpha rpc get /last_published_commitment
 { "commitment":
     { "compressed_state":
         "[SC_ROLLUP_STATE_HASH]",

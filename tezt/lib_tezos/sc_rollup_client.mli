@@ -33,6 +33,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type slot_header = {level : int; commitment : string; index : int}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -68,6 +70,43 @@ val state_value : ?hooks:Process.hooks -> t -> key:string -> bytes Lwt.t
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
 
+(** [outbox client] gets the rollup outbox for the current head block. *)
+val outbox : ?hooks:Process.hooks -> t -> string Lwt.t
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+(** [outbox_proof_single] asks the rollup node for a proof that an
+    output of a given [message_index] is available in the outbox at a
+    given [outbox_level] as a latent call to [destination]'s
+    [entrypoint] with the given [parameters]. *)
+val outbox_proof_single :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  ?entrypoint:string ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  destination:string ->
+  parameters:string ->
+  outbox_proof option Lwt.t
+
+type transaction = {
+  destination : string;
+  entrypoint : string option;
+  parameters : string;
+}
+
+(** Same as [outbox_proof_single] except that the claim is about a batch
+    of output transactions. *)
+val outbox_proof_batch :
+  ?hooks:Process.hooks ->
+  ?expected_error:Base.rex ->
+  t ->
+  message_index:int ->
+  outbox_level:int ->
+  transaction list ->
+  outbox_proof option Lwt.t
+
 (** [commitment_from_json] parses a commitment from its JSON representation. *)
 val commitment_from_json : JSON.t -> commitment option
 
@@ -89,6 +128,15 @@ val last_published_commitment :
 
 (** [dal_slot_subscriptions client] gets the slots to which the rollup node is subscribed to *)
 val dal_slot_subscriptions : ?hooks:Process.hooks -> t -> int list Lwt.t
+
+(** [dal_slot_headers client] returns the dal slot headers of the last
+   tezos head seen by the rollup node. *)
+val dal_slot_headers : ?hooks:Process.hooks -> t -> slot_header list Lwt.t
+
+(** [dal_downloaded_slots client] returns the slots downloaded after processing
+    the last tezos head seen by the rollup node. *)
+val dal_downloaded_slots :
+  ?hooks:Process.hooks -> t -> (int * string option list) list Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

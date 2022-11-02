@@ -31,60 +31,51 @@ open Alpha_context
 
     It is imperative that this is aligned with the protocol's implementation.
 *)
-module Wasm_2_0_0_proof_format = struct
-  open Store
+module Wasm_2_0_0_proof_format =
+  Context.Proof
+    (struct
+      include Sc_rollup.State_hash
 
-  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
+      let of_context_hash = Sc_rollup.State_hash.context_hash_to_state_hash
+    end)
+    (struct
+      let proof_encoding =
+        Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
+        .tree_proof_encoding
+    end)
 
-  let produce_proof context tree step =
-    let open Lwt_syntax in
-    match IStoreTree.kinded_key tree with
-    | Some k ->
-        let* p = IStoreProof.produce_tree_proof (IStore.repo context) k step in
-        return (Some p)
-    | None -> return None
+module type TreeS =
+  Tezos_context_sigs.Context.TREE
+    with type key = string list
+     and type value = bytes
 
-  let verify_proof proof step =
-    (* The rollup node is not supposed to verify proof. We keep
-       this part in case this changes in the future. *)
-    let open Lwt_syntax in
-    let* result = IStoreProof.verify_tree_proof proof step in
-    match result with
-    | Ok v -> return (Some v)
-    | Error _ ->
-        (* We skip the error analysis here since proof verification is not a
-           job for the rollup node. *)
-        return None
+module Make_backend (Tree : TreeS) = struct
+  type Tezos_lazy_containers.Lazy_map.tree += PVM_tree of Tree.tree
 
-  let kinded_hash_to_state_hash :
-      IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
-    | `Value hash | `Node hash ->
-        Sc_rollup.State_hash.context_hash_to_state_hash hash
+  include Tezos_scoru_wasm.Wasm_pvm.Make (struct
+    include Tree
 
-  let proof_before proof =
-    kinded_hash_to_state_hash proof.IStoreProof.Proof.before
+    let select = function
+      | PVM_tree t -> t
+      | _ -> raise Tezos_tree_encoding.Incorrect_tree_type
 
-  let proof_after proof =
-    kinded_hash_to_state_hash proof.IStoreProof.Proof.after
-
-  let proof_encoding =
-    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32.tree_proof_encoding
+    let wrap t = PVM_tree t
+  end)
 end
 
 module Impl : Pvm.S = struct
-  include Sc_rollup.Wasm_2_0_0PVM.Make (struct
-    open Store
-    module Tree = IStoreTree
+  include Sc_rollup.Wasm_2_0_0PVM.Make (Make_backend) (Wasm_2_0_0_proof_format)
+  module State = Context.PVMState
 
-    type tree = IStoreTree.tree
-
-    include Wasm_2_0_0_proof_format
-  end)
-
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3093
-     Print a more informative status.
-  *)
-  let string_of_status _status = "<wasm PVM status>"
+  let string_of_status : status -> string = function
+    | Waiting_for_input_message -> "Waiting for input message"
+    | Waiting_for_reveal (Sc_rollup.Reveal_raw_data hash) ->
+        Format.asprintf
+          "Waiting for preimage reveal %a"
+          Sc_rollup.Input_hash.pp
+          hash
+    | Waiting_for_reveal Sc_rollup.Reveal_metadata -> "Waiting for metadata"
+    | Computing -> "Computing"
 end
 
 include Impl

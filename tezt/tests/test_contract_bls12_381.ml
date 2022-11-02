@@ -39,7 +39,7 @@ let contract_path protocol contract =
     "file:./tests_python/contracts_%s/%s"
     (match protocol with
     | Protocol.Alpha -> "alpha"
-    | _ -> string_of_int @@ Protocol.number protocol)
+    | _ -> sf "%03d" @@ Protocol.number protocol)
     contract
 
 let check_contract protocol client ~contract ~input ~expected_storage =

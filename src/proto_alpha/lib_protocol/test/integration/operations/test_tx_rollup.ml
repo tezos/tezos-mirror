@@ -86,7 +86,7 @@ let test_disable_feature_flag () =
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
     ~expect_failure:
-      (check_proto_error Validate_operation.Manager.Tx_rollup_feature_disabled)
+      (check_proto_error Validate_errors.Manager.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit
@@ -109,7 +109,7 @@ let test_sunset () =
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
     ~expect_failure:
-      (check_proto_error Validate_operation.Manager.Tx_rollup_feature_disabled)
+      (check_proto_error Validate_errors.Manager.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit
@@ -319,15 +319,14 @@ let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 let rng_state = Random.State.make_self_init ()
 
 let gen_l2_account ?rng_state () =
-  (* TODO: when add bls into env6 we could use directly the pkh *)
   let seed =
     Option.map
       (fun rng_state ->
         Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255))
       rng_state
   in
-  let _pkh, public_key, secret_key = Bls.generate_key ?seed () in
-  (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
+  let pkh, public_key, secret_key = Bls.generate_key ?seed () in
+  (secret_key, public_key, pkh)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
     of the ticket containing [contents] of type [ty], crafted by [ticketer] and
@@ -548,6 +547,7 @@ module Nat_ticket = struct
                 PUSH nat %a;
                 PUSH %s %d;
                 TICKET;
+                ASSERT_SOME;
                 PAIR ;
                 TRANSFER_TOKENS;
                 PUSH unit Unit;
@@ -2497,10 +2497,7 @@ module Rejection = struct
     let signatures =
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
-    let signature =
-      assert_some
-      @@ Environment.Bls_signature.aggregate_signature_opt signatures
-    in
+    let signature = assert_some @@ Bls.aggregate_signature_opt signatures in
     let batch =
       Tx_rollup_l2_batch.V1.
         {contents = [transaction]; aggregated_signature = signature}
@@ -2518,6 +2515,62 @@ module Rejection = struct
         all_transfers
     in
     make_and_sign_transaction ~signers transaction
+
+  (** Test that undecodable proofs are rejected by the protocol. *)
+  let test_undecodable_proof () =
+    let sk, pk, addr = gen_l2_account () in
+    init_with_deposit addr
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
+    hash_tree_from_store store >>= fun l2_context_hash ->
+    (* Create a transfer from [pk] to a new address *)
+    let _, _, addr2 = gen_l2_account () in
+    let message, batch_bytes =
+      make_message_transfer
+        ~signers:[sk]
+        [(bls_pk pk, None, [(addr2, ticket_hash, 1L)])]
+    in
+    let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
+    let message_path = single_message_path message_hash in
+    Op.tx_rollup_submit_batch (B b) account tx_rollup batch_bytes
+    >>=? fun operation ->
+    add_operation b operation >>=? fun b ->
+    (* Make a commitment for the submitted transfer *)
+    let level = Tx_rollup_level.(succ root) in
+    make_incomplete_commitment_for_batch (B b) level tx_rollup []
+    >>=? fun (commitment, _) ->
+    Op.tx_rollup_commit (B b) account tx_rollup commitment >>=? fun operation ->
+    add_operation b operation >>=? fun b ->
+    (* Now we produce an invalid serialized proof that cannot be
+       decoded by the protocol. *)
+    let proof =
+      Tx_rollup_l2_proof.Internal_for_tests.of_bytes @@ Bytes.make 1_000 'c'
+    in
+    let message_position = 0 in
+    let message_result_hash, message_result_path =
+      message_result_hash_and_path commitment ~message_position
+    in
+    Op.tx_rollup_raw_reject
+      (B b)
+      account
+      tx_rollup
+      level
+      message
+      ~gas_limit:Max
+      ~message_position
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof
+      ~previous_message_result:(message_result l2_context_hash [])
+      ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
+    >>=? fun operation ->
+    Incremental.begin_construction b >>=? fun i ->
+    Incremental.add_operation
+      ~expect_apply_failure:
+        (check_proto_error Tx_rollup_errors.Proof_undecodable)
+      i
+      operation
+    >>=? fun _i -> return_unit
 
   (** Test that we can produce a simple but valid proof. *)
   let test_valid_proof_on_invalid_commitment () =
@@ -3621,6 +3674,7 @@ module Rejection = struct
         "regression test empty_l2_context_hash"
         `Quick
         test_empty_l2_context_hash;
+      Tztest.tztest "unencodable proofs fail" `Quick test_undecodable_proof;
       Tztest.tztest
         "reject invalid commitment"
         `Quick
@@ -4082,6 +4136,7 @@ module Withdraw = struct
                  {
                    UNPAIR;
                    TICKET;
+                   ASSERT_SOME;
                    CONS;
                    NIL operation;
                    PAIR
@@ -4358,9 +4413,12 @@ module Withdraw = struct
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
       ~ticketer:deposit_contract
-      (Tx_rollup_l2_qty.to_z half_amount)
+      ~amount:
+        (WithExceptions.Option.get ~loc:__LOC__
+        @@ Ticket_amount.of_z
+        @@ Script_int.of_int64 int64_half_amount)
       ~destination:withdraw_contract
-      entrypoint
+      ~entrypoint
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
     (* 4.1 We assert that [withdraw_contract] has received the ticket as
@@ -4430,9 +4488,12 @@ module Withdraw = struct
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
       ~ticketer:deposit_contract
-      (Tx_rollup_l2_qty.to_z half_amount)
+      ~amount:
+        (WithExceptions.Option.get ~loc:__LOC__
+        @@ Ticket_amount.of_z
+        @@ Script_int.of_int64 int64_half_amount)
       ~destination:withdraw_dropping_contract
-      entrypoint
+      ~entrypoint
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
     (* 4. Finally, we assert that [withdraw_contract] has received the ticket as
@@ -4842,18 +4903,18 @@ module Withdraw = struct
         ~contents:(Script.lazy_expr Nat_ticket.contents)
         ~ty:(Script.lazy_expr Nat_ticket.ty)
         ~ticketer:deposit_contract
-        qty
+        ~amount:qty
         ~destination:withdraw_contract
-        Entrypoint.default
+        ~entrypoint:Entrypoint.default
     in
     (* Execute withdraw with half amount *)
-    withdraw_op account1 block Z.one >>=? fun operation ->
+    withdraw_op account1 block Ticket_amount.one >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
     (* Execute withdraw with the rest amount *)
-    withdraw_op account1 block Z.one >>=? fun operation ->
+    withdraw_op account1 block Ticket_amount.one >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
     (* Execute again, now should fail with a ticket table error *)
-    withdraw_op account1 block Z.one >>=? fun operation ->
+    withdraw_op account1 block Ticket_amount.one >>=? fun operation ->
     Incremental.begin_construction block >>=? fun incr ->
     Incremental.add_operation
       ~expect_apply_failure:(function
@@ -4880,8 +4941,10 @@ module Withdraw = struct
       [ticket_info3; ticket_info4]
     >>=? fun operation ->
     Block.bake ~operation block >>=? fun block ->
-    withdraw_op account1 block (Z.of_int 2) >>=? fun operation1 ->
-    withdraw_op account2 block (Z.of_int 2) >>=? fun operation2 ->
+    withdraw_op account1 block Ticket_amount.(add one one)
+    >>=? fun operation1 ->
+    withdraw_op account2 block Ticket_amount.(add one one)
+    >>=? fun operation2 ->
     Block.bake ~operations:[operation1; operation2] block >>=? fun _block ->
     return_unit
 
@@ -5460,9 +5523,12 @@ module Withdraw = struct
         ~contents:(Script.lazy_expr Nat_ticket.contents)
         ~ty:(Script.lazy_expr Nat_ticket.ty)
         ~ticketer:forge_withdraw_deposit_contract
-        (Tx_rollup_l2_qty.to_z Nat_ticket.amount)
+        ~amount:
+          (WithExceptions.Option.get ~loc:__LOC__
+          @@ Ticket_amount.of_zint
+          @@ Tx_rollup_l2_qty.to_z Nat_ticket.amount)
         ~destination:forge_withdraw_deposit_contract
-        (Entrypoint.of_string_strict_exn "withdraw")
+        ~entrypoint:(Entrypoint.of_string_strict_exn "withdraw")
       >>=? fun operation -> Block.bake ~operation block
     in
     let token_one =
@@ -5523,173 +5589,6 @@ module Withdraw = struct
     assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
     assert_account_ticket_balance ~__LOC__ block None
 
-  let test_0_amount_tickets () =
-    context_init1 () >>=? fun (block, account) ->
-    originate block account >>=? fun (block, tx_rollup) ->
-    originate_forge_withdraw_deposit_contract account block
-    >>=? fun (forge_withdraw_deposit_contract, block) ->
-    let forge_ticket block =
-      Op.transaction
-        (B block)
-        ~entrypoint:Entrypoint.default
-        ~parameters:
-          (Expr_common.(
-             pair_n [int (Z.of_int Nat_ticket.contents_nat); int Z.zero])
-          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
-        ~fee:Tez.one
-        account
-        forge_withdraw_deposit_contract
-        (Tez.of_mutez_exn 0L)
-      >>=? fun operation -> Block.bake ~operation block
-    in
-    let failing_deposit_ticket block =
-      Op.transaction
-        (B block)
-        ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
-        ~parameters:
-          (Expr_common.(
-             pair_n
-               [
-                 string (Tx_rollup.to_b58check tx_rollup);
-                 string "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K";
-               ])
-          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
-        ~fee:Tez.one
-        account
-        forge_withdraw_deposit_contract
-        (Tez.of_mutez_exn 0L)
-      >>=? fun operation ->
-      Incremental.begin_construction block >>=? fun incr ->
-      Incremental.add_operation
-        ~expect_apply_failure:
-          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
-        incr
-        operation
-      >>=? fun _incr -> return_unit
-    in
-    let failing_dispatch_ticket block =
-      Nat_ticket.withdrawal
-        ~amount:Tx_rollup_l2_qty.zero
-        (B block)
-        ~ticketer:forge_withdraw_deposit_contract
-        ~claimer:account
-        tx_rollup
-      >>=? fun (withdraw, ticket_info) ->
-      let message_index = 0 in
-      finalize_all_commitment_with_withdrawals
-        ~batches:["batch"]
-        ~account
-        ~tx_rollup
-        ~withdrawals:[(message_index, [withdraw])]
-        block
-      >>=? fun (commitment, context_hash_list, committed_level, block) ->
-      let context_hash =
-        WithExceptions.Option.get
-          ~loc:__LOC__
-          (List.nth context_hash_list message_index)
-      in
-      let message_result_path =
-        compute_message_result_path commitment ~message_position:message_index
-      in
-      Op.tx_rollup_dispatch_tickets
-        (B block)
-        ~source:account
-        ~message_index
-        ~message_result_path
-        tx_rollup
-        committed_level
-        context_hash
-        [ticket_info]
-      >>=? fun operation ->
-      Incremental.begin_construction block >>=? fun incr ->
-      Incremental.add_operation
-        ~expect_apply_failure:
-          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
-        incr
-        operation
-      >>=? fun _incr -> return_unit
-    in
-    let failing_transfer_ticket block =
-      Op.transfer_ticket
-        (B block)
-        ~source:account
-        ~contents:(Script.lazy_expr Nat_ticket.contents)
-        ~ty:(Script.lazy_expr Nat_ticket.ty)
-        ~ticketer:forge_withdraw_deposit_contract
-        Z.zero
-        ~destination:forge_withdraw_deposit_contract
-        (Entrypoint.of_string_strict_exn "withdraw")
-      >>=? fun operation ->
-      Incremental.begin_construction block >>=? fun incr ->
-      Incremental.add_operation
-        ~expect_apply_failure:
-          (check_proto_error Ticket_scanner.Forbidden_zero_ticket_quantity)
-        incr
-        operation
-      >>=? fun _incr -> return_unit
-    in
-    let token_one =
-      Nat_ticket.ex_token ~ticketer:forge_withdraw_deposit_contract
-    in
-    let assert_ticket_in_storage block =
-      let expected_storage =
-        Expr_common.(
-          seq
-            [
-              pair
-                (address forge_withdraw_deposit_contract)
-                (pair (int (Z.of_int Nat_ticket.contents_nat)) (int Z.zero));
-            ])
-        |> Tezos_micheline.Micheline.strip_locations |> Option.some
-      in
-      Incremental.begin_construction block >>=? fun incr ->
-      let ctxt = Incremental.alpha_ctxt incr in
-      Contract.get_storage ctxt forge_withdraw_deposit_contract
-      >>=?? fun (_ctxt, found_storage) ->
-      if expected_storage = found_storage then return_unit
-      else
-        Alcotest.fail
-          (Format.sprintf
-             "Found storage: %s@,expected storage: %s@,"
-             (match found_storage with
-             | Some s -> Expr.to_string s
-             | None -> "None")
-             (match expected_storage with
-             | Some s -> Expr.to_string s
-             | None -> "None"))
-    in
-    let assert_contract_ticket_balance ~__LOC__ block balance =
-      assert_ticket_balance
-        ~loc:__LOC__
-        block
-        token_one
-        (Contract forge_withdraw_deposit_contract)
-        balance
-    in
-    let assert_account_ticket_balance ~__LOC__ block balance =
-      assert_ticket_balance
-        ~loc:__LOC__
-        block
-        token_one
-        (Contract account)
-        balance
-    in
-    let assert_tx_rollup_ticket_balance ~__LOC__ block balance =
-      assert_ticket_balance
-        ~loc:__LOC__
-        block
-        token_one
-        (Tx_rollup tx_rollup)
-        balance
-    in
-    forge_ticket block >>=? fun block ->
-    assert_ticket_in_storage block >>=? fun () ->
-    assert_contract_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
-    assert_account_ticket_balance ~__LOC__ block None >>=? fun () ->
-    failing_deposit_ticket block >>=? fun () ->
-    failing_dispatch_ticket block >>=? fun () -> failing_transfer_ticket block
-
   let tests =
     [
       Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
@@ -5736,10 +5635,6 @@ module Withdraw = struct
          batches"
         `Quick
         test_forge_deposit_withdraw_deposit;
-      Tztest.tztest
-        "Test to deposit/dispatch/transfer 0 tickets"
-        `Quick
-        test_0_amount_tickets;
     ]
 end
 

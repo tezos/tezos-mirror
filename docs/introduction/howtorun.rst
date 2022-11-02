@@ -85,13 +85,8 @@ to delegates proportionally to their :ref:`active stake<active_stake>`,
 which usually is the same as their staking balance,
 that is, their own balance plus their delegated balance.
 
-A minimum active stake of one roll
+A :ref:`minimal active stake<glossary_minimal_stake>` of 6kꜩ
 is required for participating in consensus and in governance.
-A :ref:`roll<glossary_roll>` is just an amount of 6kꜩ and all
-computations with rolls are rounded to the nearest lower integer
-e.g. if you have 15kꜩ it amounts to 2 rolls. Rolls are used as a unit
-to determine delegates' voting rights in governance, while rights in
-consensus are not roll-based, they are based on the actual, non-approximated stake.
 
 Delegates are required to freeze around 10% of their active stake into
 a security deposit (more precisely, it's 10% of the maximum active
@@ -109,11 +104,11 @@ frozen deposits with the following command:
    tezos-client set deposits limit for <delegate> to <limit>
 
 
-On testnets, when you obtain coins from :ref:`the faucet<faucet>`, if you
-are lucky to obtain more than one roll, you can register a delegate
-using this identity.
-Otherwise, you need to ask the faucet for more accounts and
-delegate them to the first.
+On testnets, when you obtain coins from :ref:`a faucet<faucet>`, if
+you are lucky to obtain more than the minimum required to be a
+delegate, you can register the obtained account as a delegate.
+Otherwise, you need to ask the faucet for more accounts and delegate
+them to the first.
 
 
 .. _DelegateRegistration:
@@ -162,7 +157,7 @@ Alternatively, you may use the baking rights RPC and the endorsing rights RPC (s
 Baker
 ~~~~~
 
-The baker is a daemon that executes Tezos' :ref:<consensus algorithm<active/consensus>.
+The baker is a daemon that executes Tezos' :doc:`consensus algorithm<../active/consensus>`.
 The baker runs on behalf of one or more specified accounts or, if none is specified, on behalf of
 all accounts whose secret keys are known.
 
@@ -174,7 +169,7 @@ accounts have the necessary rights.
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
-   tezos-baker-alpha run with local node ~/.tezos-node bob
+   tezos-baker-alpha run with local node ~/.tezos-node bob --liquidity-baking-toggle-vote pass
 
 Note that the baker needs direct access to
 the node data directory for performance reasons (to reduce the number of RPC calls to the node).
@@ -222,14 +217,14 @@ If you are running the baker Docker image, you can watch the baker logs with
     docker ps
 
 If your container is running, its name will appear in the last column.
-For instance, if the name is ``mainnet_baker-013-PtJakart_1``, you can
+For instance, if the name is ``mainnet_baker-014-PtKathma``, you can
 view recent logs with::
 
-    docker logs mainnet_baker-013-PtJakart_1
+    docker logs mainnet_baker-014-PtKathma
 
 If you want to keep watching logs, use ``-f``::
 
-    docker logs mainnet_baker-013-PtJakart_1 -f
+    docker logs mainnet_baker-014-PtKathma -f
 
 This allows you to know if you baked.
 You should see lines such as::

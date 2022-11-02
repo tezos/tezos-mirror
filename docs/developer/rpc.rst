@@ -68,7 +68,7 @@ If you want to learn more about the exchange of RPCs between node and
 client you can pass the option `-l` and the client will print all the
 calls with their input/output.
 
-A useful util to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
+A useful tool to manipulate JSON is `jq <https://stedolan.github.io/jq/>`_.
 
 RPC versions
 ------------

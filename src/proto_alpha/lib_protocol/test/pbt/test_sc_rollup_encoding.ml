@@ -44,10 +44,18 @@ let gen_state_hash =
   let* bytes = bytes_fixed_gen Sc_rollup_repr.State_hash.size in
   return (Sc_rollup_repr.State_hash.of_bytes_exn bytes)
 
-let gen_raw_level =
+let gen_inbox_level =
   let open Gen in
   let* level = map Int32.abs int32 in
+  (* There is no inbox for level [0l]. *)
+  let level = if level = 0l then 1l else level in
   return (Raw_level_repr.of_int32_exn level)
+
+let gen_start_level =
+  let open Gen in
+  let* level = map Int32.abs int32 in
+  let start_level = Raw_level_repr.of_int32_exn level in
+  return start_level
 
 let gen_commitment_hash =
   let open Gen in
@@ -57,13 +65,13 @@ let gen_commitment_hash =
 let gen_number_of_ticks =
   let open Gen in
   let open Sc_rollup_repr.Number_of_ticks in
-  let* v = int32_range_gen min_int max_int in
-  return (WithExceptions.Option.get ~loc:__LOC__ (of_int32 v))
+  let* v = int64_range_gen min_value max_value in
+  return (WithExceptions.Option.get ~loc:__LOC__ (of_value v))
 
 let gen_commitment =
   let open Gen in
   let* compressed_state = gen_state_hash
-  and* inbox_level = gen_raw_level
+  and* inbox_level = gen_inbox_level
   and* predecessor = gen_commitment_hash
   and* number_of_ticks = gen_number_of_ticks in
   return
@@ -107,15 +115,10 @@ let gen_inbox rollup level =
       | Error e ->
           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
 
-let gen_inbox_history_proof rollup level =
+let gen_inbox_history_proof rollup inbox_level =
   let open Gen in
-  let* inbox = gen_inbox rollup level in
-  return (Sc_rollup_inbox_repr.take_snapshot inbox)
-
-let gen_raw_level =
-  let open Gen in
-  let* level = small_nat in
-  return @@ Raw_level_repr.of_int32_exn (Int32.of_int level)
+  let* inbox = gen_inbox rollup inbox_level in
+  return (Sc_rollup_inbox_repr.take_snapshot ~current_level:inbox_level inbox)
 
 let gen_pvm_name = Gen.string_printable
 
@@ -126,39 +129,48 @@ let gen_tick =
   | None -> assert false
   | Some r -> return r
 
+let gen_dissection_chunk =
+  let open Gen in
+  let* state_hash = opt gen_state_hash in
+  let+ tick = gen_tick in
+  Sc_rollup_game_repr.{state_hash; tick}
+
 let gen_dissection =
   let open Gen in
-  small_list (pair (opt gen_state_hash) gen_tick)
+  small_list gen_dissection_chunk
 
 let gen_rollup =
   let open Gen in
   let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
   return (Sc_rollup_repr.Address.hash_bytes [bytes])
 
+let gen_game_state =
+  let open Sc_rollup_game_repr in
+  let open Gen in
+  let gen_dissecting =
+    let* dissection = gen_dissection in
+    let+ default_number_of_sections = int_range 4 100 in
+    Dissecting {dissection; default_number_of_sections}
+  in
+  let gen_final_move =
+    let* agreed_start_chunk = gen_dissection_chunk in
+    let+ refuted_stop_chunk = gen_dissection_chunk in
+    Final_move {agreed_start_chunk; refuted_stop_chunk}
+  in
+  oneof [gen_dissecting; gen_final_move]
+
 let gen_game =
   let open Gen in
   let* turn = gen_player in
-  let* level = gen_raw_level in
+  let* inbox_level = gen_inbox_level in
+  let* start_level = gen_start_level in
   let* rollup = gen_rollup in
-  let* inbox_snapshot = gen_inbox_history_proof rollup level in
+  let* inbox_snapshot = gen_inbox_history_proof rollup inbox_level in
   let* pvm_name = gen_pvm_name in
-  let* dissection = gen_dissection in
-  let* default_number_of_sections = int_range 4 100 in
-  let dissection =
-    List.map
-      (fun (state_hash, tick) -> Sc_rollup_game_repr.{state_hash; tick})
-      dissection
-  in
+  let* game_state = gen_game_state in
   return
     Sc_rollup_game_repr.
-      {
-        turn;
-        inbox_snapshot;
-        level;
-        pvm_name;
-        dissection;
-        default_number_of_sections (* should be greater than 3 *);
-      }
+      {turn; inbox_snapshot; start_level; inbox_level; pvm_name; game_state}
 
 let gen_conflict =
   let open Gen in

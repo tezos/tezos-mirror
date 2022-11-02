@@ -90,7 +90,7 @@ module Nonces = struct
         "found too many nonces associated to blocks unknown by the node in \
          '$TEZOS_CLIENT/{filename}'; after checking that these blocks were \
          never included in the chain (e.g. via a block explorer), consider \
-         using `tezos-client filter orphan nonces` to clear them"
+         using `octez-client filter orphan nonces` to clear them"
       ("filename", Data_encoding.string)
 
   let found_nonce =

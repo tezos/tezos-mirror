@@ -27,7 +27,7 @@
 module V2_0_0 = struct
   (*
     This is the state hash of reference that both the prover of the
-    node and the verifier of the protocol {!ProtocolImplementation}
+    node and the verifier of the protocol {!Protocol_implementation}
     have to agree on (if they do, it means they are using the same
     tree structure).
 
@@ -39,7 +39,7 @@ module V2_0_0 = struct
 
     Utlimately, the value of this constant is decided by the prover of
     reference (the only need is for it to be compatible with
-    {!ProtocolImplementation}.)
+    {!Protocol_implementation}.)
 
     Its value is the result of the following snippet
 
@@ -53,11 +53,15 @@ module V2_0_0 = struct
       "scs11pDQTn37TBnWgQAiCPdMAcQPiXARjg9ZZVmLx26sZwxeSxovE5"
 
   open Sc_rollup_repr
-  module PS = Sc_rollup_PVM_sem
+  module PS = Sc_rollup_PVM_sig
+
+  module type TreeS =
+    Context.TREE with type key = string list and type value = bytes
+
+  module type Make_wasm = module type of Wasm_2_0_0.Make
 
   module type P = sig
-    module Tree :
-      Context.TREE with type key = string list and type value = bytes
+    module Tree : TreeS
 
     type tree = Tree.tree
 
@@ -77,7 +81,7 @@ module V2_0_0 = struct
   end
 
   module type S = sig
-    include Sc_rollup_PVM_sem.S
+    include Sc_rollup_PVM_sig.S
 
     val name : string
 
@@ -89,70 +93,53 @@ module V2_0_0 = struct
     val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
     (** PVM status *)
-    type status = Computing | WaitingForInputMessage
+    type status =
+      | Computing
+      | Waiting_for_input_message
+      | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
+
+    val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3091
+  (* [Make (Make_backend) (Context)] creates a PVM.
 
-     The tree proof contains enough information to derive given and requested.
-     Get rid of the duplication by writing the projection functions and
-     removing the [given] and [requested] fields.
+     The Make_backend is a functor that creates the backend of the PVM.
+     The Conext provides the tree and the proof types.
   *)
-  type 'a proof = {
-    tree_proof : 'a;
-    given : PS.input option;
-    requested : PS.input_request;
-  }
-
-  let proof_encoding e =
-    let open Data_encoding in
-    conv
-      (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-      (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-      (obj3
-         (req "tree_proof" e)
-         (req "given" (option PS.input_encoding))
-         (req "requested" PS.input_request_encoding))
-
-  module Make (Context : P) :
+  module Make (Make_backend : Make_wasm) (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
-       and type proof = Context.proof proof = struct
+       and type proof = Context.proof = struct
     module Tree = Context.Tree
 
     type context = Context.Tree.t
 
     type hash = State_hash.t
 
-    type nonrec proof = Context.proof proof
+    type proof = Context.proof
 
-    let proof_input_given p = p.given
+    let proof_encoding = Context.proof_encoding
 
-    let proof_input_requested p = p.requested
+    let proof_start_state proof = Context.proof_before proof
 
-    let proof_encoding = proof_encoding Context.proof_encoding
-
-    let proof_start_state p = Context.proof_before p.tree_proof
-
-    let proof_stop_state p =
-      match (p.given, p.requested) with
-      | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
-      | None, _ -> None
-      | _ -> Some (Context.proof_after p.tree_proof)
+    let proof_stop_state proof = Context.proof_after proof
 
     let name = "wasm_2_0_0"
 
-    let parse_boot_sector s = Some s
+    let parse_boot_sector s = Hex.to_string @@ `Hex s
 
     let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
 
     type tree = Tree.tree
 
-    type status = Computing | WaitingForInputMessage
+    type status =
+      | Computing
+      | Waiting_for_input_message
+      | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     module State = struct
       type state = tree
@@ -197,10 +184,10 @@ module V2_0_0 = struct
       end
     end
 
-    module WASM_machine = Wasm_2_0_0.Make (Tree)
-    open State
-
     type state = State.state
+
+    module WASM_machine = Make_backend (Tree)
+    open State
 
     let pp _state =
       Lwt.return @@ fun fmt () -> Format.pp_print_string fmt "<wasm-state>"
@@ -243,13 +230,24 @@ module V2_0_0 = struct
 
     let get_status : status Monad.t =
       let open Monad.Syntax in
+      let open Sc_rollup_PVM_sig in
       let* s = get in
       let* info = lift (WASM_machine.get_info s) in
       return
       @@
       match info.input_request with
       | No_input_required -> Computing
-      | Input_required -> WaitingForInputMessage
+      | Input_required -> Waiting_for_input_message
+      | Reveal_required (Wasm_2_0_0.Reveal_raw_data hash) -> (
+          match
+            Input_hash.of_bytes_opt
+              (Bytes.of_string (Wasm_2_0_0.input_hash_to_string hash))
+          with
+          | Some hash -> Waiting_for_reveal (Reveal_raw_data hash)
+          | None ->
+              (* In case of an invalid hash, the rollup is
+                 blocked. Any commitment will be invalid. *)
+              Waiting_for_reveal (Reveal_raw_data Input_hash.zero))
 
     let get_last_message_read : _ Monad.t =
       let open Monad.Syntax in
@@ -267,33 +265,54 @@ module V2_0_0 = struct
       let open Monad.Syntax in
       let* status = get_status in
       match status with
-      | WaitingForInputMessage -> (
+      | Waiting_for_input_message -> (
           let* last_read = get_last_message_read in
           match last_read with
           | Some (level, n) -> return (PS.First_after (level, n))
           | None -> return PS.Initial)
       | Computing -> return PS.No_input_required
+      | Waiting_for_reveal reveal -> return (PS.Needs_reveal reveal)
 
     let is_input_state = result_of is_input_state
 
     let get_status : state -> status Lwt.t = result_of get_status
 
+    let get_outbox _state =
+      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3790 *)
+      let open Lwt_syntax in
+      return []
+
     let set_input_state input =
-      let open PS in
-      let open Monad.Syntax in
-      let {inbox_level; message_counter; payload} = input in
-      let* s = get in
-      let* s =
-        lift
-          (WASM_machine.set_input_step
-             {
-               inbox_level = Raw_level_repr.to_int32_non_negative inbox_level;
-               message_counter;
-             }
-             (payload :> string)
-             s)
-      in
-      set s
+      match input with
+      | PS.Inbox_message input ->
+          let open PS in
+          let open Monad.Syntax in
+          let {inbox_level; message_counter; payload} = input in
+          let* s = get in
+          let* s =
+            lift
+              (WASM_machine.set_input_step
+                 {
+                   inbox_level = Raw_level_repr.to_int32_non_negative inbox_level;
+                   message_counter;
+                 }
+                 (payload :> string)
+                 s)
+          in
+          set s
+      | PS.Reveal (PS.Raw_data data) ->
+          let open Monad.Syntax in
+          let* s = get in
+          let* s = lift (WASM_machine.reveal_step (Bytes.of_string data) s) in
+          set s
+      | PS.Reveal (PS.Metadata _) ->
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/3890
+
+               The WASM PVM does not produce [Needs_metadata] input
+               requests.  Thus, no [set_input_state] should transmit a
+               [Metadata].
+          *)
+          assert false
 
     let set_input input = state_of @@ set_input_state input
 
@@ -318,42 +337,40 @@ module V2_0_0 = struct
       in
       return (state, request)
 
-    let verify_proof proof =
-      let open Lwt_syntax in
-      let* result =
-        Context.verify_proof proof.tree_proof (step_transition proof.given)
-      in
+    type error += WASM_proof_verification_failed
+
+    let verify_proof input_given proof =
+      let open Lwt_tzresult_syntax in
+      let*! result = Context.verify_proof proof (step_transition input_given) in
       match result with
-      | None -> return false
-      | Some (_, request) ->
-          return (PS.input_request_equal request proof.requested)
+      | None -> fail WASM_proof_verification_failed
+      | Some (_state, request) -> return request
 
     type error += WASM_proof_production_failed
 
     let produce_proof context input_given state =
-      let open Lwt_result_syntax in
+      let open Lwt_tzresult_syntax in
       let*! result =
         Context.produce_proof context state (step_transition input_given)
       in
       match result with
-      | Some (tree_proof, requested) ->
-          return {tree_proof; given = input_given; requested}
+      | Some (tree_proof, _requested) -> return tree_proof
       | None -> fail WASM_proof_production_failed
 
     let verify_origination_proof proof boot_sector =
       let open Lwt_syntax in
-      let before = Context.proof_before proof.tree_proof in
+      let before = Context.proof_before proof in
       if State_hash.(before <> reference_initial_state_hash) then return false
       else
         let* result =
-          Context.verify_proof proof.tree_proof (fun state ->
+          Context.verify_proof proof (fun state ->
               let* state = install_boot_sector state boot_sector in
               return (state, ()))
         in
         match result with None -> return false | Some (_, ()) -> return true
 
     let produce_origination_proof context boot_sector =
-      let open Lwt_result_syntax in
+      let open Lwt_tzresult_syntax in
       let*! state = initial_state context in
       let*! result =
         Context.produce_proof context state (fun state ->
@@ -362,8 +379,7 @@ module V2_0_0 = struct
             return (state, ()))
       in
       match result with
-      | Some (tree_proof, ()) ->
-          return {tree_proof; given = None; requested = No_input_required}
+      | Some (tree_proof, ()) -> return tree_proof
       | None -> fail WASM_proof_production_failed
 
     type output_proof = {
@@ -389,7 +405,7 @@ module V2_0_0 = struct
     let state_of_output_proof s = s.output_proof_state
 
     let has_output : PS.output -> bool Monad.t = function
-      | {outbox_level; message_index; message} ->
+      | {outbox_level; message_index; message} -> (
           let open Monad.Syntax in
           let* s = get in
           let* result =
@@ -407,7 +423,11 @@ module V2_0_0 = struct
               Sc_rollup_outbox_message_repr.encoding
               message
           in
-          return @@ Compare.String.(result = message_encoded)
+          return
+          @@
+          match result with
+          | Some result -> Compare.String.(result = message_encoded)
+          | None -> false)
 
     let verify_output_proof p =
       let open Lwt_syntax in
@@ -442,38 +462,44 @@ module V2_0_0 = struct
     end
   end
 
-  module ProtocolImplementation = Make (struct
-    module Tree = struct
-      include Context.Tree
+  module Protocol_implementation =
+    Make
+      (Wasm_2_0_0.Make)
+      (struct
+        module Tree = struct
+          include Context.Tree
 
-      type tree = Context.tree
+          type tree = Context.tree
 
-      type t = Context.t
+          type t = Context.t
 
-      type key = string list
+          type key = string list
 
-      type value = bytes
-    end
+          type value = bytes
+        end
 
-    type tree = Context.tree
+        type tree = Context.tree
 
-    type proof = Context.Proof.tree Context.Proof.t
+        type proof = Context.Proof.tree Context.Proof.t
 
-    let verify_proof p f =
-      Lwt.map Result.to_option (Context.verify_tree_proof p f)
+        let verify_proof p f =
+          Lwt.map Result.to_option (Context.verify_tree_proof p f)
 
-    let produce_proof _context _state _f =
-      (* Can't produce proof without full context*)
-      Lwt.return None
+        let produce_proof _context _state _f =
+          (* Can't produce proof without full context*)
+          Lwt.return None
 
-    let kinded_hash_to_state_hash = function
-      | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
+        let kinded_hash_to_state_hash = function
+          | `Value hash | `Node hash ->
+              State_hash.context_hash_to_state_hash hash
 
-    let proof_before proof =
-      kinded_hash_to_state_hash proof.Context.Proof.before
+        let proof_before proof =
+          kinded_hash_to_state_hash proof.Context.Proof.before
 
-    let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
+        let proof_after proof =
+          kinded_hash_to_state_hash proof.Context.Proof.after
 
-    let proof_encoding = Context.Proof_encoding.V1.Tree32.tree_proof_encoding
-  end)
+        let proof_encoding =
+          Context.Proof_encoding.V2.Tree32.tree_proof_encoding
+      end)
 end

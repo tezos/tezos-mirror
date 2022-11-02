@@ -35,13 +35,7 @@ let fail x = Printf.ksprintf failwith x
 
 (* First, we parse up to services. *)
 
-type arg = {
-  json : Json.t;
-  (* arg as JSON, used by rpcdiff; we could remove this *)
-  id : string;
-  name : string;
-  descr : string option;
-}
+type arg = {id : string; name : string; descr : string option}
 
 type 'a tree = Static of 'a static | Dynamic of Json.t
 
@@ -67,7 +61,6 @@ let opt_mandatory name json = function
 let parse_arg (json : Json.t) : arg =
   Json.as_record json @@ fun get ->
   {
-    json;
     id = get "id" |> opt_mandatory "id" json |> Json.as_string;
     name = get "name" |> opt_mandatory "name" json |> Json.as_string;
     descr = get "descr" |> Option.map Json.as_string;

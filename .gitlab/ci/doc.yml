@@ -9,12 +9,12 @@ documentation:build_all:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
+    - .needs_template__wait_for_trigger_job
   stage: build
-  needs: []
   before_script:
     - . $HOME/.venv/bin/activate
   script:
-    - make -C docs -j all
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-build-all
   artifacts:
     expose_as: 'Documentation - excluding old protocols'
     paths:
@@ -33,8 +33,7 @@ documentation:linkcheck:
     - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
-    - make -C docs redirectcheck
-    - make -C docs linkcheck
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-linkcheck
   allow_failure: true
 
 # here we use this hack to publish the tezos documentation on
@@ -58,22 +57,6 @@ publish:documentation:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   script:
-    - if [ "${CI_COMMIT_REF_NAME}" == "master" ] ; then
-        make -C docs -j full ;
-        git clone --depth 5 git@gitlab.com:${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAMESPACE}.gitlab.io gitlab.io ;
-        rsync --recursive --links --perms --delete
-          --exclude=.doctrees --exclude={{main,alpha,zero}net,master}/index.html
-          docs/_build/ gitlab.io/public/ ;
-        cd gitlab.io ;
-      else
-          echo "Skip pushing documentation. Only pushing for real master" ;
-      fi
-    - if [ -z "$(git status -s)" ] ; then
-        echo "Nothing to commit!" ;
-      else
-        git add public ;
-        git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
-        git push origin master ;
-      fi
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci doc-publish
   # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

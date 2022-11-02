@@ -18,4 +18,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: demo_noops (economic-protocol definition, embedded in `tezos-node`)"
+synopsis: "Tezos/Protocol: demo_noops (economic-protocol definition, embedded in `octez-node`)"

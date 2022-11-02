@@ -47,19 +47,20 @@ let compare_op op1 op2 =
 
 module Prioritized_operation = struct
   (* Higher priority operations will be included first *)
-  type t = High of packed_operation | Low of packed_operation
+  type t = Prioritized of int * packed_operation | Low of packed_operation
 
-  let extern op = High op
+  let extern ?(priority = 1) op = Prioritized (priority, op)
 
   let node op = Low op
 
-  let packed = function High op | Low op -> op
+  let packed = function Prioritized (_, op) | Low op -> op
 
   let compare_priority t1 t2 =
     match (t1, t2) with
-    | High _, Low _ -> 1
-    | Low _, High _ -> -1
-    | Low _, Low _ | High _, High _ -> 0
+    | Prioritized _, Low _ -> 1
+    | Low _, Prioritized _ -> -1
+    | Low _, Low _ -> 0
+    | Prioritized (p0, _), Prioritized (p1, _) -> Compare.Int.compare p0 p1
 
   let compare a b =
     let c = compare_priority a b in
@@ -371,15 +372,22 @@ module Prioritized = struct
     add_operation_to_pool Prioritized_operation_set.add (fun op ->
         classify (Prioritized_operation.packed op))
 
-  let add_external_operation pool operation =
-    add_operation pool (Prioritized_operation.extern operation)
+  let add_external_operation pool priority operation =
+    add_operation pool (Prioritized_operation.extern ~priority operation)
 
   let add_operations prioritized_pool operations =
     List.fold_left add_operation prioritized_pool operations
 
+  (* [merge_external_operations] considers that the list of operation
+     represents an ordererd list of operation with the head having the highest
+     prioritiy.
+  *)
   let merge_external_operations pool
       (external_operations : packed_operation list) =
-    List.fold_left add_external_operation pool external_operations
+    List.fold_left_i
+      (fun i pool op -> add_external_operation pool (-i) op)
+      pool
+      external_operations
 
   let filter p {consensus; votes; anonymous; managers} =
     let filter =

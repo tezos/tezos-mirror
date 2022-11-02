@@ -30,7 +30,7 @@ let bench_config name = Files.working_dir // sf "%s.json" name
 
 let default_bench_num = 300
 
-let default_nsamples = 3000
+let default_nsamples = 500
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
@@ -154,7 +154,6 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
               ~save_to:
                 Files.(
                   working_dir // benchmark_results_dir // workload bench_name)
-              ~determinizer:(Snoop.Percentile 50)
               ?config_dir
               ~csv_dump:
                 Files.(working_dir // benchmark_results_dir // csv bench_name)
@@ -271,6 +270,12 @@ let perform_tx_rollup_benchmarks snoop proto =
   in
   perform_benchmarks [] snoop benches
 
+let perform_big_map_benchmarks snoop proto =
+  let* benches =
+    Snoop.(list_benchmarks ~mode:All ~tags:[Big_map; Proto proto] snoop)
+  in
+  perform_benchmarks [] snoop benches
+
 let main protocol =
   Log.info "Entering Perform_inference.main" ;
   let snoop = Snoop.create () in
@@ -282,4 +287,5 @@ let main protocol =
   let* () = perform_cache_benchmarks snoop in
   let* () = perform_encoding_benchmarks snoop protocol in
   let* () = perform_tx_rollup_benchmarks snoop protocol in
+  let* () = perform_big_map_benchmarks snoop protocol in
   perform_carbonated_map_benchmarks snoop protocol

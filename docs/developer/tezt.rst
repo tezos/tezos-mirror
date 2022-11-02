@@ -1,14 +1,17 @@
 Tezt: OCaml Tezos Test Framework
 ================================
 
-Tezt is a test framework for Tezos written in OCaml.
-It focuses on integration tests that launch external processes
-(in particular Tezos nodes and clients).
+Tezt is a generic test framework written in OCaml (see :src:`tezt/lib/README.md`).
+It focuses on integration tests that launch external processes.
+In particular, Tezt can be used to orchestrate tests involving Tezos nodes and clients.
+
+To facilitate the use with Tezos, Tezt has been complemented by a specific library called Tezt-Tezos.
 
 Tezt is pronounced `/tɛzti/ <http://ipa-reader.xyz/?text=t%C9%9Bzti>`_
 (think "tezty", as in *Tez* are tas*ty*).
 
-Its main strengths are:
+
+The main benefits of using Tezt-Tezos are:
 
 - tests are written in the same language as Tezos itself (OCaml),
   which reduces context switch for developers;
@@ -22,140 +25,63 @@ Its main strengths are:
 
 - it should be easy to use and extend.
 
+Therefore, Tezt and Tezt-Tezos have been leveraged to build a test suite for Octez. See :src:`tezt/README.md` for details on its implementation.
+
+The rest of this page explains how to run the test suite and how to add new tests.
+
 How to Run Tests
 ----------------
 
-If you just want to run tests and see whether they succeed, run::
+It is recommended to set up an alias::
 
-    make test-tezt
+    alias tezt='dune exec tezt/tests/main.exe --'
 
-If you need more control, get the list of command-line options as follows::
+Try it with ``--help`` to get the list of command-line options as follows::
 
-    dune exec tezt/tests/main.exe -- --help
+    tezt --help
 
-Command-line options give you control over verbosity and the list of tests to run.
-It also allows to to keep temporary files or to keep going with other tests if a test fails.
-For instance, here is how to run all tests with tag ``node`` in verbose mode::
+Just run ``tezt`` with no options to run all tests.
+However, most often you only want to run a subset of the tests.
+You can get the list of tests with ``--list``::
 
-    dune exec tezt/tests/main.exe -- --verbose node
+    tezt --list
 
-And here is how to get the list of tests and their tags::
+For instance, to run only tests from files ``basic.ml`` and ``RPC_test.ml``
+that have tag ``alpha`` but not tag ``regression``, with log level "info", run::
 
-    dune exec tezt/tests/main.exe -- --list
+    tezt -f basic.ml -f RPC_test.ml alpha /regression -i
 
-To speed things up, you can run tests in parallel.
-Use ``parallel-tezt.Makefile`` and specify the number of parallel jobs with ``-j``::
+You can also run tests in parallel, although in that case it is recommended
+to use the default log level to avoid interleaving logs. For instance,
+the following command runs tests declared in file ``encoding.ml``
+with up to 8 tests in parallel::
 
-    make --makefile parallel-tezt.Makefile --jobs 8
+    tezt -f encoding.ml -j 8
 
-Regression Tests
-----------------
-
-This form of testing is used to prevent unintended changes to existing
-functionality by ensuring that the software behaves the same way as it did
-before introduced changes.
-
-Regression tests capture commands and output of commands executed during a test.
-An output of regression test is stored in the repository and is expected to
-match exactly with the captured output on subsequent runs. An added advantage of
-this is that when a change in behaviour is intentional, its effect is made
-visible by the change in test's output.
-
-To run all the regression tests, use the ``regression`` tag::
-
-    dune exec tezt/tests/main.exe regression
-
-When the change in behaviour is intentional or when a new regression test is
-introduced, the output of regression test must be (re-)generated. This can be
-done with the ``--reset-regressions`` option, e.g.::
-
-    dune exec tezt/tests/main.exe regression -- --reset-regressions
-
-Pre-commit hook
----------------
-
-The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
-hook located in ``scripts/pre_commit/pre_commit.py``
-executes modified tezt tests automatically. It looks for staged files
-(the default) or modified files (if ``--unstaged`` is passed) in
-``tezt/tests`` and executes them. This avoids
-pushing commits that will break the CI. It is also handy to execute
-the relevant subset of tests by calling
-``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
-
-We refer to the header of ``pre_commit.py`` and its ``--help`` flag
-for additional instructions.
-
-Architecture
-------------
-
-Tezt is composed of some generic, non-Tezos-related modules:
-
-- a small ``Base`` module with some generally useful "pervasive" functions;
-
-- a ``Log`` module to manage the output;
-
-- a ``Process`` module to manage processes — the output of those
-  processes is transparently logged;
-
-- a ``Temp`` module to manage temporary files and directories;
-
-- a ``JSON`` module with lightweight combinators to read JSON values;
-
-- a ``Cli`` module which reads command-line options on startup, such
-  as the list of tests to run and the verbosity level;
-
-- a ``Test`` module with a ``Test.register`` function to register tests
-  and a ``Test.run`` function to run them and clean up after them;
-
-- a ``Regression`` module for regression testing by comparing command outputs
-  with previous runs.
-
-- a ``Progress`` module to track and display progress of a test suite.
-
-All those modules are part of the ``tezt`` library which can be found in directory
-``tezt/lib`` of the Tezos repository.
-
-Tezt also contains the following Tezos-specific modules:
-
-- a ``Constant`` module with constants such as protocol hashes or identities;
-
-- a ``Client`` module to run client commands;
-
-- a ``Node`` module to run node commands and to manage node daemons;
-
-- an ``RPC`` module with some RPC implementations;
-
-- a ``Cluster`` module to start networks with many nodes with topologies
-  ranging from simple cliques to complex arrangements of rings, stars, etc.
-
-All those modules are part of the ``tezt-tezos`` library, which depends on ``tezt``
-and which can be found in directory ``tezt/lib_tezos`` of the Tezos repository.
-
-How to Write New Tests
-----------------------
+How to Write New Integration Tests
+----------------------------------
 
 The best way to get started is to have a look at existing tests in directory
 ``tezt/tests`` of the Tezos repository.
 
-Currently, all tests are part of the same binary ``main.exe``.
-The source of this module is ``tezt/tests/main.ml``.
-This binary runs all tests, but you can restrict the set of tests to run
+Most integration tests are part of the same executable ``tezt/tests/main.exe``.
+The source of this module is :src:`tezt/tests/main.ml`.
+This executable runs all tests, but you can restrict the set of tests to run
 by specifying tags on the command line, or even the titles of the tests to run
 (with the ``--test`` option).
 
-All tests do not have to be implemented in ``tezt/tests/main.ml`` though.
+All tests do not have to be implemented in :src:`tezt/tests/main.ml` though.
 You can of course add more modules and have them be linked into ``main.exe`` together.
 The best way to do this is to write your tests as functions and call them from
 the main module.
 
-For instance, let's create a new basic test in a new file named ``tezt/tests/basic.ml``:
+For instance, let's create a new basic test in a new file named :src:`tezt/tests/basic.ml`:
 
 .. literalinclude:: ../../tezt/tests/basic.ml
    :start-at: check_node_initialization
    :language: ocaml
 
-Then, let's launch the test from ``tezt/tests/main.ml`` by calling:
+Then, let's launch the test from :src:`tezt/tests/main.ml` by calling:
 
 .. code-block:: ocaml
 
@@ -166,7 +92,7 @@ Finally, let's try it with::
 
     dune exec tezt/tests/main.exe -- basic --info
 
-The ``--info`` flag allows you to see the ``Log.info`` messages.
+The ``--info`` flag allows you to see the ``Log.info`` messages. It is the same as ``-i``.
 Here is what you should see::
 
     $ dune exec tezt/tests/main.exe -- basic --info
@@ -189,8 +115,8 @@ Here is what you should see::
     [13:45:41.407] Identity is not empty.
     [13:45:41.422] [SUCCESS] (3/3) Alpha: node initialization (rolling mode)
 
-Detailed Walkthrough of the Basic Test
---------------------------------------
+Detailed Walk through the Basic Test
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's review what our basic test in the previous section does.
 
@@ -283,3 +209,118 @@ Let's review what our basic test in the previous section does.
   we can simply run ``dune exec tezt/tests/main.exe -- basic full``.
   You can see our list of basic tests and their tags
   with ``dune exec tezt/tests/main.exe -- basic --list``.
+
+How to Write New Unit Tests
+---------------------------
+
+For Tezt, the main difference between a unit test and an integration test is
+that a unit test does not use the ``Process`` module. Indeed, an integration
+test tests an executable by running it, while a unit test links with a library
+to test its functions directly.
+
+Since the scope of unit tests is much smaller, they are usually registered
+in executables that are dedicated to the library being tested. For instance,
+tests for ``src/lib_base`` could be put in an executable named
+``src/lib_base/tezt/main.exe``. Such executables are usually faster to
+compile and run than ``tezt/tests/main.exe`` since their dependency cone is limited.
+
+To add unit tests to a library which does not yet have a Tezt executable,
+create files such as ``src/lib_base/tezt/example.ml`` and ``src/lib_base/tezt/other.ml``
+and use ``Test.register`` to register tests in those files, at toplevel.
+Here is a minimal example::
+
+    let () =
+      Test.register
+        ~__FILE__
+        ~title:"test title here"
+        ~tags:["test"; "tags"; "here"]
+      @@ fun () ->
+      (* your test here *)
+      unit
+
+Then, declare those files in ``manifest/main.ml``::
+
+    let _octez_base_tezts =
+      tezt
+        ["example"; "other"]
+        ~path:"src/lib_base/tezt"
+        ~opam:"tezos-base"
+        ~deps:[octez_base]
+
+This causes the manifest to generate executable ``src/lib_base/tezt/main.exe`` for you.
+This executable calls ``Test.run``. It also declares a Dune alias ``runtezt``
+so that you can run your tests with either of the following commands::
+
+    dune build @src/lib_base/runtezt
+    dune exec src/lib_base/tezt/main.exe
+
+Note that your tests will actually also be available in ``tezt/tests/main.exe``.
+This executable gathers all tests so that the CI can auto-balance them.
+
+JavaScript
+~~~~~~~~~~
+
+If you want to be able to run your test with Node.js, declare them in the manifest
+with ``~js_compatible:true`` and with ``JS`` in ``~modes``. For instance::
+
+    let _octez_base_tezts =
+      tezt
+        ["example"; "other"]
+        ~path:"src/lib_base/tezt"
+        ~opam:"tezos-base"
+        ~js_compatible:true
+        ~modes:[Native; JS]
+        ~deps:[octez_base]
+
+Running ``dune build`` will generate not only a native executable
+(``src/lib_base/tezt/main.exe``) but also a JavaScript file
+(``src/lib_base/tezt/main_js.bc.js``) that you can run with Node.js::
+
+    nodejs _build/default/src/lib_base/tezt/main_js.bc.js
+
+Note however that tests that use ``Tezt.Process``, ``Tezt.Temp`` or ``Tezt.Runner``
+cannot use the JavaScript backend. In other words, integration tests cannot
+be run with Node.js, only unit tests.
+
+Regression Tests
+----------------
+
+Regression tests are used to prevent unintended changes to existing
+functionality by ensuring that the software behaves the same way as it did
+before introduced changes.
+
+Regression tests capture commands and output of commands executed during a test.
+An output of some regression test is stored in the repository and is expected to
+match exactly with the captured output on subsequent runs. An added advantage of
+this is that when a change in behaviour is intentional, its effect is made
+visible by the change in test's output.
+
+To run all the regression tests, use the ``regression`` tag::
+
+    dune exec tezt/tests/main.exe regression
+
+When the change in behaviour is intentional or when a new regression test is
+introduced, the output of regression test must be (re-)generated. This can be
+done with the ``--reset-regressions`` option, e.g.::
+
+    dune exec tezt/tests/main.exe regression -- --reset-regressions
+
+Regression tests are registered with ``Regression.register`` instead of
+``Test.register``. Use ``Regression.capture`` or ``Regression.hooks`` to
+capture output that you want to be stable. Regression tests can be used
+both in unit tests and integration tests.
+
+Pre-commit hook
+---------------
+
+The `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
+hook located in :src:`scripts/pre_commit/pre_commit.py`
+executes modified Tezt tests automatically. It looks for staged files
+(the default) or modified files (if ``--unstaged`` is passed) in
+:src:`tezt/tests` and executes them. This avoids
+pushing commits that will break the CI. It is also handy to execute
+the relevant subset of tests by calling
+``./scripts/pre_commit/pre_commit.py [--unstaged]`` manually.
+
+We refer to the header of ``pre_commit.py`` and its ``--help`` flag
+for additional instructions.

@@ -490,15 +490,9 @@ module Tx_rollup = struct
 
     let parameter_file ?(parameters = default) protocol =
       let args =
-        [(["tx_rollup_enable"], Some "true")]
-        @ [
-            ( ["tx_rollup_finality_period"],
-              Some (string_of_int parameters.finality_period) );
-          ]
-        @ [
-            ( ["tx_rollup_withdraw_period"],
-              Some (string_of_int parameters.withdraw_period) );
-          ]
+        [(["tx_rollup_enable"], `Bool true)]
+        @ [(["tx_rollup_finality_period"], `Int parameters.finality_period)]
+        @ [(["tx_rollup_withdraw_period"], `Int parameters.withdraw_period)]
       in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
   end
@@ -506,8 +500,111 @@ end
 
 module Dal = struct
   module Parameters = struct
+    type t = {
+      number_of_shards : int;
+      redundancy_factor : int;
+      slot_size : int;
+      page_size : int;
+    }
+
     let parameter_file protocol =
-      let args = [(["dal_parametric"; "feature_enable"], Some "true")] in
+      let args = [(["dal_parametric"; "feature_enable"], `Bool true)] in
       Protocol.write_parameter_file ~base:(Either.right (protocol, None)) args
+
+    let from_client client =
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+        |> Lwt.map (fun json -> JSON.(json |-> "dal_parametric"))
+      in
+      let number_of_shards = JSON.(json |-> "number_of_shards" |> as_int) in
+      let redundancy_factor = JSON.(json |-> "redundancy_factor" |> as_int) in
+      let slot_size = JSON.(json |-> "slot_size" |> as_int) in
+      let page_size = JSON.(json |-> "page_size" |> as_int) in
+      return {number_of_shards; redundancy_factor; slot_size; page_size}
+  end
+
+  module RPC = struct
+    let make ?data ?query_string =
+      RPC.make
+        ?data
+        ?query_string
+        ~get_host:Dal_node.rpc_host
+        ~get_port:Dal_node.rpc_port
+
+    let split_slot slot =
+      let slot =
+        JSON.parse
+          ~origin:"dal_node_split_slot_rpc"
+          (Format.sprintf "\"%s\"" slot)
+      in
+      let data = JSON.unannotate slot in
+      make
+        ~data
+        POST
+        ["slot"; "split"]
+        ~query_string:[("fill", "")]
+        JSON.as_string
+
+    let slot_content slot_header =
+      make
+        GET
+        ["slot"; "content"; slot_header]
+        ~query_string:[("trim", "")]
+        JSON.as_string
+
+    let slot_pages slot_header =
+      make GET ["slot"; "pages"; slot_header] (fun pages ->
+          pages |> JSON.as_list |> List.map JSON.as_string)
+
+    let stored_slot_headers block_hash =
+      make GET ["stored_slot_headers"; block_hash] @@ fun json ->
+      let open JSON in
+      let l = as_list json in
+      List.map
+        (fun json ->
+          (json |-> "index" |> as_int, json |-> "slot_header" |> as_string))
+        l
+
+    let shard ~slot_header ~shard_id =
+      make GET ["shard"; slot_header; string_of_int shard_id] @@ fun json ->
+      json |> JSON.encode
+  end
+
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
+
+  let make
+      ?(on_error =
+        fun msg -> Test.fail "Rollup.Dal.make: Unexpected error: %s" msg)
+      Parameters.{redundancy_factor; number_of_shards; slot_size; page_size} =
+    let initialisation_parameters =
+      Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
+        ~slot_size
+    in
+    Cryptobox.Internal_for_tests.load_parameters initialisation_parameters ;
+    match
+      Cryptobox.make {redundancy_factor; slot_size; page_size; number_of_shards}
+    with
+    | Ok cryptobox -> cryptobox
+    | Error (`Fail msg) -> on_error msg
+
+  module Commitment = struct
+    let pad n message =
+      let prefix = String.make n '\000' in
+      prefix ^ message
+
+    let dummy_commitment
+        ?(on_error =
+          fun str -> Test.fail "Rollup.Dal.dummy_commitment failed: %s" str)
+        parameters t message =
+      let padding_length =
+        parameters.Parameters.slot_size - String.length message
+      in
+      let padded_message =
+        if padding_length > 0 then pad padding_length message else message
+      in
+      let slot = String.to_bytes padded_message in
+      match Cryptobox.polynomial_from_slot t slot with
+      | Ok r -> Cryptobox.commit t r
+      | Error (`Slot_wrong_size str) -> on_error str
   end
 end

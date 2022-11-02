@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
 open Protocol
 open Protocol_client_context
 

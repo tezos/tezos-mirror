@@ -55,9 +55,11 @@ Performance testing
 Acceptance testing
    Testing of the software in real conditions. It is usually slower,
    more costly and less amenable to automation than integration or
-   system testing. It is often the final step in the testing process
-   and is performed before a release. In Tezos, acceptance testing is
-   done by running a test net.
+   system testing. It is often the final step in the testing process,
+   performed before a release. However, in Tezos, acceptance testing
+   is decoupled from releases, and currently consists in manually running 
+   a net of resilience tests on a regular base. These tests use various
+   testing frameworks. 
 
 ..
    Inline testing
@@ -78,13 +80,13 @@ in more detail.
 
 
 .. csv-table:: Testing frameworks and their applications in Tezos. PT:
-               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`
-   :header: "Component","Unit","Property","Integration","System","Regression"
+               :ref:`Python testing and execution framework <pytest_section>`, EXP: :ref:`ppx_expect_section`, AT: :ref:`alcotest_section`, PBT: :ref:`property_based_test`, TZ: :ref:`tezt_section`, LTF: :ref:`long_tezt_section`
+   :header: "Component","Unit","Property","Integration","System","Regression","Performance"
 
-   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`"
+   "Node",":ref:`AT <alcotest_section>`",":ref:`PBT <property_based_test>`",":ref:`AT <alcotest_section>`",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "-- Protocol",":ref:`AT <alcotest_section>`, :ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`",""
    "-- -- Michelson interpreter",":ref:`AT <alcotest_section>`","","",":ref:`PT <pytest_section>`",":ref:`PT <pytest_section>`"
-   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`"
+   "Client",":ref:`EXP <ppx_expect_section>`",":ref:`PBT <property_based_test>`","",":ref:`PT <pytest_section>`, :ref:`TZ <tezt_section>`","",":ref:`LTF <long_tezt_section>`"
    "Networked nodes","--","",":ref:`PT <pytest_section>`","", ""
    "Endorser","","","",""
    "Baker","","","",""
@@ -252,10 +254,12 @@ References:
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
-Long Tests and Performance regression Test Framework
-""""""""""""""""""""""""""""""""""""""""""""""""""""
+.. _long_tezt_section:
 
-Tezt is also used for tests that are too long to run in the CI. Those
+Long Tests and Performance regression Test Framework
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A library called `tezt-performance-regression`, which is a wrapper around Tezt, is used for tests that are too long to run in the CI and for performance testing. Those
 tests are run on dedicated machines and can send data points to an
 `InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
 graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or

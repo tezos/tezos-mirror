@@ -37,9 +37,10 @@
     Game state and moves
     ====================
 
-    At any given moment, the game stores a list [dissection] of state
-    hashes and tick counts. These are the claims about the PVM history
-    made by the player who has just moved.
+    The first step consists of dissecting the commitment's number of ticks.
+    The game stores a list [dissection] of state hashes and tick counts.
+    These are the claims about the PVM history made by the player who has
+    just moved.
 
     The next player to move will specify a tick count which appears in
     the [dissection]; this is the last of the state hashes which she
@@ -54,6 +55,11 @@
     there is no 'room' for a new [dissection]. In this case she must
     provide a Merkle proof that shows the step in the current
     [dissection] is invalid.
+
+    If a player failed to prove that the current [dissection] is valid.
+    We reach the final move of the game. The other player will have
+    a chance to prove that the [dissection] is valid.
+    If both player fails to invalidate each other, the game ends in a draw.
 
     Initializing a game
     ===================
@@ -112,32 +118,119 @@
       be translated into an honest initial [dissection]. By P1' the
       defender has a winning strategy.
 
-    In the case that both players are dishonest the outcome is slightly
-    harder to determine---it basically comes down to which player gets
-    to play the final move. That means that in this case the refutation
-    game is equivalent to a finite game of nim (by the Sprague-Grundy
-    Theorem, see en.wikipedia.org/wiki/Sprague-Grundy_theorem). However,
-    this fact is completely irrelevant, because if the rollup is working
-    correctly the winner will subsequently be defeated by some honest
-    opponent.
 *)
 
 open Sc_rollup_repr
+
+type error +=
+  | Dissection_choice_not_found of Sc_rollup_tick_repr.t
+        (** The given choice in a refutation is not a starting tick of any of
+          the sections in the current dissection. *)
+  | Dissection_number_of_sections_mismatch of {expected : Z.t; given : Z.t}
+        (** There are more or less than the expected number of sections in the
+          given dissection. *)
+  | Dissection_invalid_number_of_sections of Z.t
+        (** There are less than two sections in the given dissection, which is
+          not valid. *)
+  | Dissection_start_hash_mismatch of {
+      expected : Sc_rollup_repr.State_hash.t option;
+      given : Sc_rollup_repr.State_hash.t option;
+    }
+        (** The given start hash in a dissection is [None] or doesn't match the
+          expected one.*)
+  | Dissection_stop_hash_mismatch of Sc_rollup_repr.State_hash.t option
+        (** The given stop state hash in a dissection should not match the last
+          hash of the section being refuted. *)
+  | Dissection_edge_ticks_mismatch of {
+      dissection_start_tick : Sc_rollup_tick_repr.t;
+      dissection_stop_tick : Sc_rollup_tick_repr.t;
+      chunk_start_tick : Sc_rollup_tick_repr.t;
+      chunk_stop_tick : Sc_rollup_tick_repr.t;
+    }
+        (** The given dissection's edge ticks don't match the edge ticks of the
+          section being refuted. *)
+  | Dissection_ticks_not_increasing
+        (** Invalid provided dissection because ticks are not increasing between
+          two successive sections. *)
+  | Dissection_invalid_distribution
+        (** Invalid provided dissection because ticks split is not well balanced
+          across sections *)
+  | Dissection_invalid_successive_states_shape
+        (** A dissection cannot have a section with no state hash after another
+          section with some state hash. *)
+  | Proof_unexpected_section_size of Z.t
+        (** Invalid proof step because there is more than one tick. *)
+  | Proof_start_state_hash_mismatch of {
+      start_state_hash : Sc_rollup_repr.State_hash.t option;
+      start_proof : Sc_rollup_repr.State_hash.t;
+    }
+        (** The given proof's starting state doesn't match the expected one. *)
+  | Proof_stop_state_hash_failed_to_refute of {
+      stop_state_hash : Sc_rollup_repr.State_hash.t option;
+      stop_proof : Sc_rollup_repr.State_hash.t option;
+    }
+        (** The given proof's ending state should not match the state being
+          refuted. *)
+  | Proof_stop_state_hash_failed_to_validate of {
+      stop_state_hash : Sc_rollup_repr.State_hash.t option;
+      stop_proof : Sc_rollup_repr.State_hash.t option;
+    }
+        (** The given proof's ending state should match the state being
+          refuted. *)
+  | Dissecting_during_final_move
+        (** The step move is a dissecting where the final move has started
+            already. *)
 
 (** The two stakers index the game in the storage as a pair of public
     key hashes which is in lexical order. We use [Alice] and [Bob] to
     represent the first and second player in the pair respectively. *)
 type player = Alice | Bob
 
-(** A dissection chunk is made of a state hash (that could be [None], see
-    invariants below), and a tick count. *)
-type dissection_chunk = {
-  state_hash : State_hash.t option;
-  tick : Sc_rollup_tick_repr.t;
-}
-
 module V1 : sig
-  (** A game state is characterized by:
+  (** A dissection chunk is made of a state hash (that could be [None], see
+    invariants below), and a tick count. *)
+  type dissection_chunk = {
+    state_hash : State_hash.t option;
+    tick : Sc_rollup_tick_repr.t;
+  }
+
+  val pp_dissection_chunk : Format.formatter -> dissection_chunk -> unit
+
+  val dissection_chunk_encoding : dissection_chunk Data_encoding.t
+
+  (** Describes the current state of a game. *)
+  type game_state =
+    | Dissecting of {
+        dissection : dissection_chunk list;
+            (** [dissection], a list of states with tick counts. The current
+                player will specify, in the next move, a tick count that
+                indicates the last of these states that she agrees with. *)
+        default_number_of_sections : int;
+            (** [default_number_of_sections] is the number of sections a
+                disection should contain in the more general case where we still
+                have a high enough number of disputed ticks. *)
+      }
+        (** When the state is [Dissecting], both player are still dissecting
+            the commitment to find the tick to refute. *)
+    | Final_move of {
+        agreed_start_chunk : dissection_chunk;
+        refuted_stop_chunk : dissection_chunk;
+      }
+        (** When the state is [Final_move], either [Alice] or [Bob] already
+            played an invalid proof.
+
+            The other player will have a chance to prove that the
+            [refuted_stop_state] is valid.
+            If both players fail to either validate or refute the stop state,
+            the current game state describes a draw situation.
+            In the same way, the draw can be described by the situation where
+            the two players manage to validate or refute the stop state. *)
+
+  val game_state_encoding : game_state Data_encoding.t
+
+  val game_state_equal : game_state -> game_state -> bool
+
+  (** A game is characterized by:
 
     - [turn], the player that must provide the next move.
 
@@ -156,13 +249,8 @@ module V1 : sig
       have here so we can check that the proof provided in a refutation
       is of the correct kind.
 
-    - [dissection], a list of states with tick counts. The current
-      player will specify, in the next move, a tick count that
-      indicates the last of these states that she agrees with.
-
-    - [default_number_of_sections] is the number of sections a bisection should
-      contain in the more general case where we still have sufficiently many
-      disputed ticks.
+    - [game_state], the current state of the game, see {!game_state}
+      for more information.
 
     Invariants:
     -----------
@@ -176,10 +264,10 @@ module V1 : sig
   type t = {
     turn : player;
     inbox_snapshot : Sc_rollup_inbox_repr.history_proof;
-    level : Raw_level_repr.t;
+    start_level : Raw_level_repr.t;
+    inbox_level : Raw_level_repr.t;
     pvm_name : string;
-    dissection : dissection_chunk list;
-    default_number_of_sections : int;
+    game_state : game_state;
   }
 
   (** [equal g1 g2] returns [true] iff [g1] is equal to [g2]. *)
@@ -202,7 +290,11 @@ end
 (** Versioning, see {!Sc_rollup_data_version_sig.S} for more information. *)
 include Sc_rollup_data_version_sig.S with type t = V1.t
 
-include module type of V1 with type t = V1.t
+include
+  module type of V1
+    with type dissection_chunk = V1.dissection_chunk
+     and type game_state = V1.game_state
+     and type t = V1.t
 
 module Index : sig
   type t = private {alice : Staker.t; bob : Staker.t}
@@ -231,9 +323,9 @@ end
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
 
-    [initial inbox parent child refuter defender] will construct an
-    initial game where [refuter] is next to play. The game has
-    [dissection] with three states:
+    [initial inbox ~start_level ~pvm_name ~parent ~child ~refuter ~defender
+    ~default_number_of_sections] will construct an initial game where [refuter]
+    is next to play. The game has [dissection] with three states:
 
       - firstly, the state (with tick zero) of [parent], the commitment
       that both stakers agree on.
@@ -252,6 +344,7 @@ end
     increment from that state to its successor. *)
 val initial :
   Sc_rollup_inbox_repr.history_proof ->
+  start_level:Raw_level_repr.t ->
   pvm_name:string ->
   parent:Sc_rollup_commitment_repr.t ->
   child:Sc_rollup_commitment_repr.t ->
@@ -274,14 +367,22 @@ val pp_refutation : Format.formatter -> refutation -> unit
 
 val refutation_encoding : refutation Data_encoding.t
 
-(** A game ends for one of three reasons: the conflict has been
-    resolved via a proof, a player has been timed out, or a player has
-    forfeited because of attempting to make an invalid move. *)
-type reason = Conflict_resolved | Invalid_move of string | Timeout
+(** A game ends for one of two reasons: the conflict has been
+resolved via a proof or a player has been timed out. *)
+type reason = Conflict_resolved | Timeout
 
 val pp_reason : Format.formatter -> reason -> unit
 
 val reason_encoding : reason Data_encoding.t
+
+(** The game result. *)
+type game_result =
+  | Loser of {reason : reason; loser : Staker.t}  (** One player lost. *)
+  | Draw  (** The game ended in a draw *)
+
+val pp_game_result : Format.formatter -> game_result -> unit
+
+val game_result_encoding : game_result Data_encoding.t
 
 (** A type that represents the current game status in a way that is
     useful to the outside world (using actual [Staker.t] values
@@ -291,30 +392,46 @@ val reason_encoding : reason Data_encoding.t
     staker who will have their stake slashed.
 
     Used in operation result types. *)
-type status = Ongoing | Ended of (reason * Staker.t)
+type status = Ongoing | Ended of game_result
 
 val pp_status : Format.formatter -> status -> unit
 
 val status_encoding : status Data_encoding.t
 
-(** A game ends with a single [loser] and the [reason] for the game
-    ending. This type uses [Alice] or [Bob] to refer to the players
-    without knowing which stakers they are---so it cannot identify an
-    actual staker who should be punished without the associated game
-    index. *)
-type outcome = {loser : player; reason : reason}
+(** Decide the loser of the game, if it exists. *)
+val loser_of_results : alice_result:bool -> bob_result:bool -> player option
 
-val pp_outcome : Format.formatter -> outcome -> unit
-
-val outcome_encoding : outcome Data_encoding.t
-
-(** Applies the move [refutation] to the game. Checks the move is
-    valid and returns an [Invalid_move] outcome if not.
+(** Applies the move [refutation] to the game. Returns the game {!status}
+    after applying the move.
 
     In the case of the game continuing, this swaps the current
-    player and updates the [dissection]. In the case of a [Proof]
-    being provided this returns an [outcome]. *)
-val play : t -> refutation -> (outcome, t) Either.t Lwt.t
+    player and returns a [Ongoing] status. Otherwise, it returns a
+    [Ended <game_result>] status.
+*)
+val play :
+  stakers:Index.t ->
+  Sc_rollup_metadata_repr.t ->
+  t ->
+  refutation ->
+  (game_result, t) Either.t tzresult Lwt.t
+
+(** A type that represents the number of blocks left for players to play. Each
+    player has her timeout value. `timeout` is expressed in the number of
+    blocks.
+
+    Timeout logic is similar to a chess clock. Each player starts with the same
+    timeout. Each game move updates the timeout of the current player by
+    decreasing it by the amount of time she took to play, i.e. number of blocks
+    since the opponent last move. See {!Sc_rollup_refutation_storage.game_move}
+    to see the implementation.
+*)
+type timeout = {
+  alice : int;  (** Timeout of [Alice]. *)
+  bob : int;  (** Timeout of [Bob]. *)
+  last_turn_level : Raw_level_repr.t;  (** Block level of the last turn move. *)
+}
+
+val timeout_encoding : timeout Data_encoding.t
 
 module Internal_for_tests : sig
   (** Checks that the tick count chosen by the current move is one of
@@ -322,9 +439,9 @@ module Internal_for_tests : sig
     the current dissection interval (including the two states) between
     this tick and the next. *)
   val find_choice :
-    t ->
+    dissection_chunk list ->
     Sc_rollup_tick_repr.t ->
-    (dissection_chunk * dissection_chunk, reason) result Lwt.t
+    (dissection_chunk * dissection_chunk) tzresult
 
   (** We check firstly that [dissection] is the correct length. It must be
     [default_number_of_sections] values long, unless the distance between
@@ -348,5 +465,5 @@ module Internal_for_tests : sig
     start_chunk:dissection_chunk ->
     stop_chunk:dissection_chunk ->
     dissection_chunk list ->
-    (unit, reason) result Lwt.t
+    unit tzresult
 end

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,5 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Builds a WASM VM given a concrete implementation of {!Tree.S}. *)
-module Make (T : Tree.S) : Wasm_pvm_sig.S with type tree = T.tree
+(** Maximum number of reboots per inputs. *)
+val maximum_reboots_per_input : Z.t
+
+module Make (T : Tezos_tree_encoding.TREE) :
+  Gather_floppies.S with type tree = T.tree

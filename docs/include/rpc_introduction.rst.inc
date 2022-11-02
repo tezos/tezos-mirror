@@ -7,7 +7,10 @@ This page describes the RPCs specific to a particular version of the Tezos proto
 
 .. warning::
 
-    Some dynamic or plugin RPCs are not listed here due to a current limitation in the documentation generator. They are listed in the :doc:`../api/openapi` (search the ``.json`` files that are linked from that page).
+    This list could be missing RPC endpoints. The :doc:`OpenAPI
+    specification <../api/openapi>` may be used to retrieve the
+    complete list of protocol RPCs and their associated schemas
+    (search the ``.json`` files that are linked from that page).
 
 RPCs - Index
 ************
@@ -15,6 +18,11 @@ RPCs - Index
 Note that the RPCs served under a given prefix can also be listed using the client, e.g.::
 
     tezos-client rpc list /chains/main/blocks/head/context/constants
+
+Any RPC endpoint may also be described, using the ``describe`` RPC to
+retrieve all JSON and binary schemas, e.g.::
+
+    tezos-client rpc get /describe/chains/main/blocks/head/context/constants
 
 Shell
 =====

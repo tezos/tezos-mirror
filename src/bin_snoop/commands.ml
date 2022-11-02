@@ -45,8 +45,6 @@ module Benchmark_cmd = struct
 
   let set_nsamples nsamples options = {options with nsamples}
 
-  let set_determinizer determinizer options = {options with determinizer}
-
   let set_save_file save_file options = {options with save_file}
 
   let set_csv_export csv_export (options : Cmdline.benchmark_options) =
@@ -66,7 +64,6 @@ module Benchmark_cmd = struct
       {
         seed = None;
         nsamples = 3000;
-        determinizer = Percentile 50;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
         config_dir = None;
@@ -106,16 +103,10 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      ( det,
-        nsamples,
-        seed,
-        bench_number,
-        minor_heap_size,
-        config_dir,
-        csv_export ) bench_name save_file () =
+      (nsamples, seed, bench_number, minor_heap_size, config_dir, csv_export)
+      bench_name save_file () =
     let options =
       default_benchmark_options.options
-      |> lift_opt set_determinizer det
       |> lift_opt set_nsamples nsamples
       |> lift_opt set_seed seed
       |> lift_opt set_bench_number bench_number
@@ -131,34 +122,6 @@ module Benchmark_cmd = struct
     Lwt.return_ok ()
 
   module Options = struct
-    (* Sum type [mean| percentile [1-100]] argument --determinizer *)
-    let determinizer_arg =
-      let determinizer_arg_param =
-        Clic.parameter
-          ~autocomplete:(fun () -> Lwt.return_ok ["mean"; "percentile@[0-100]"])
-          (fun (_ : unit) parsed ->
-            match parsed with
-            | "mean" -> Lwt.return_ok Mean
-            | s -> (
-                let error () =
-                  Printf.eprintf "Wrong determinizer specification.\n" ;
-                  exit 1
-                in
-                match String.split_on_char '@' s with
-                | ["percentile"; i] ->
-                    let i =
-                      Option.value_f (int_of_string_opt i) ~default:error
-                    in
-                    if i < 1 || i > 100 then error ()
-                    else Lwt.return_ok (Percentile i)
-                | _ -> error ()))
-      in
-      Clic.arg
-        ~doc:"Method for determinizing empirical timing distribution"
-        ~long:"determinizer"
-        ~placeholder:"{mean | percentile@[1-100]}"
-        determinizer_arg_param
-
     (* Integer argument --nsamples *)
     let nsamples_arg =
       let nsamples_arg_param =
@@ -234,8 +197,7 @@ module Benchmark_cmd = struct
 
   let options =
     let open Options in
-    Clic.args7
-      determinizer_arg
+    Clic.args6
       nsamples_arg
       seed_arg
       bench_number_arg
@@ -333,6 +295,23 @@ module Infer_cmd = struct
     Printf.eprintf "lasso --lasso-alpha=<float> --lasso-positive\n" ;
     Printf.eprintf "nnls\n%!"
 
+  let set_plot_raw_workload plot_raw_workload options =
+    match plot_raw_workload with
+    | None ->
+        {
+          options with
+          display = {options.display with plot_raw_workload = false};
+        }
+    | Some save_directory ->
+        {
+          options with
+          display =
+            {options.display with plot_raw_workload = true; save_directory};
+        }
+
+  let set_empirical_plot empirical_plot options =
+    {options with display = {options.display with empirical_plot}}
+
   let infer_handler
       ( print_problem,
         csv,
@@ -344,7 +323,9 @@ module Infer_cmd = struct
         override_files,
         save_solution,
         dot_file,
-        full_plot_verbosity ) model_name workload_data solver () =
+        full_plot_verbosity,
+        plot_raw_workload,
+        empirical_plot ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -357,6 +338,8 @@ module Infer_cmd = struct
       |> set_save_solution save_solution
       |> set_dot_file dot_file
       |> set_full_plot_verbosity full_plot_verbosity
+      |> set_plot_raw_workload plot_raw_workload
+      |> lift_opt set_empirical_plot empirical_plot
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -468,11 +451,45 @@ module Infer_cmd = struct
         ~doc:"Produces all (possibly redundant) plots"
         ~long:"full-plot-verbosity"
         ()
+
+    let plot_raw_workload_arg =
+      let raw_workload_directory_param =
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+      in
+      Clic.arg
+        ~doc:
+          "For each workload, produces a file containing the plot of the raw \
+           data, in the specified directory"
+        ~long:"plot-raw-workload"
+        ~placeholder:"directory"
+        raw_workload_directory_param
+
+    let empirical_plot_arg =
+      let empirical_plot_param =
+        Clic.parameter (fun (_ : unit) parsed ->
+            match parsed with
+            | "full" -> Lwt.return_ok Display.Empirical_plot_full
+            | _ -> (
+                let splitted = String.split ',' parsed in
+                match List.map float_of_string splitted with
+                | exception Failure _ ->
+                    Error_monad.failwith "can't parse quantile"
+                | floats ->
+                    if List.exists (fun q -> q < 0.0 || q > 1.0) floats then
+                      Error_monad.failwith "quantile not in [0;1] interval"
+                    else Lwt.return_ok (Display.Empirical_plot_quantiles floats)
+                ))
+      in
+      Clic.arg
+        ~doc:"Options for plotting empirical data quantiles"
+        ~long:"empirical-plot"
+        ~placeholder:"full|q1,...,qn"
+        empirical_plot_param
   end
 
   let options =
     let open Options in
-    Clic.args11
+    Clic.args13
       print_problem
       dump_csv_arg
       plot_arg
@@ -484,6 +501,8 @@ module Infer_cmd = struct
       save_solution_arg
       dot_file_arg
       full_plot_verbosity_arg
+      plot_raw_workload_arg
+      empirical_plot_arg
 
   let model_param =
     Clic.param
@@ -525,53 +544,6 @@ module Infer_cmd = struct
       options
       params
       infer_handler
-end
-
-module Cull_outliers_cmd = struct
-  (* ----------------------------------------------------------------------- *)
-  (* Handling options for the "cull outliers" command *)
-
-  let cull_handler () workload_data sigmas save_file () =
-    let nsigmas =
-      match float_of_string_opt sigmas with
-      | Some s -> s
-      | None ->
-          Printf.eprintf "Could not parse back float value for nsigmas.\n" ;
-          exit 1
-    in
-    commandline_outcome_ref :=
-      Some (Cull_outliers {workload_data; nsigmas; save_file}) ;
-    Lwt.return_ok ()
-
-  let options = Clic.no_options
-
-  let params =
-    Clic.(
-      prefixes ["remove"; "outliers"; "from"; "data"]
-      @@ string
-           ~name:"WORKLOAD-DATA-FILE-IN"
-           ~desc:"File containing input workload data"
-      @@ prefixes ["above"]
-      @@ string
-           ~name:"SIGMAS"
-           ~desc:
-             "Standard deviations around the mean above which data will be \
-              culled"
-      @@ prefixes ["sigmas"]
-      @@ prefixes ["and"; "save"; "to"]
-      @@ string
-           ~name:"WORKLOAD-DATA-FILE-OUT"
-           ~desc:"File to which cleaned workload data will be saved"
-      @@ stop)
-
-  let group =
-    {
-      Clic.name = "cull_outlier";
-      title = "Command for removing outliers from raw data";
-    }
-
-  let command =
-    Clic.command ~group ~desc:"Cull outliers" options params cull_handler
 end
 
 module Codegen_cmd = struct
@@ -823,7 +795,6 @@ let all_commands =
   [
     Benchmark_cmd.command;
     Infer_cmd.command;
-    Cull_outliers_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
   ]

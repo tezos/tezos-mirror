@@ -3,12 +3,13 @@
 
 (executable
  (name main_signer)
- (public_name tezos-signer)
- (package tezos-signer)
+ (public_name octez-signer)
+ (package octez-signer)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-clic
   tezos-client-base
   tezos-client-base-unix
   tezos-client-commands

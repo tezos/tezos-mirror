@@ -216,6 +216,49 @@ end
 
 module Dal : sig
   module Parameters : sig
+    type t = {
+      number_of_shards : int;
+      redundancy_factor : int;
+      slot_size : int;
+      page_size : int;
+    }
+
     val parameter_file : Protocol.t -> string Lwt.t
+
+    val from_client : Client.t -> t Lwt.t
+  end
+
+  module RPC : sig
+    (** [split_slot data] posts [data] on slot/split *)
+    val split_slot : string -> (Dal_node.t, string) RPC_core.t
+
+    (** [slot_content slot_header] gets slot/content of [slot_header] *)
+    val slot_content : string -> (Dal_node.t, string) RPC_core.t
+
+    (** [slot_pages slot_header] gets slot/pages of [slot_header] *)
+    val slot_pages : string -> (Dal_node.t, string list) RPC_core.t
+
+    (** [stored_slot_headers slot_header] gets slot_headers stored for a given
+        block hash *)
+    val stored_slot_headers :
+      string -> (Dal_node.t, (int * string) list) RPC_core.t
+
+    (** [shard ~slot_header ~shard_id] gets a shard from
+        a given slot header and shard id *)
+    val shard :
+      slot_header:string -> shard_id:int -> (Dal_node.t, string) RPC_core.t
+  end
+
+  module Cryptobox = Tezos_crypto_dal.Cryptobox
+
+  val make : ?on_error:(string -> Cryptobox.t) -> Parameters.t -> Cryptobox.t
+
+  module Commitment : sig
+    val dummy_commitment :
+      ?on_error:(string -> Cryptobox.commitment) ->
+      Parameters.t ->
+      Cryptobox.t ->
+      string ->
+      Cryptobox.commitment
   end
 end

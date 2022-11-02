@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (libraries
+  tezos-lazy-containers
+  qcheck-core
+  qcheck-alcotest
+  alcotest
+  lwt.unix)
+ (flags
+  (:standard)
+  -open Tezos_lazy_containers))
+
+(rule
+ (alias runtest)
+ (package tezos-lazy-containers-tests)
+ (action (run %{dep:./main.exe})))
+
+(include_subdirs no)

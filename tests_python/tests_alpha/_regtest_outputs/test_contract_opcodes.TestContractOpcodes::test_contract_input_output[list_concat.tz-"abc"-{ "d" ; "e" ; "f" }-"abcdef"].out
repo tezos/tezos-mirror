@@ -17,11 +17,11 @@ trace
       { "d" ; "e" ; "f" } ]
   - location: 10 (remaining gas: 1039993.993 units remaining)
     [ { "abc" ; "d" ; "e" ; "f" } ]
-  - location: 11 (remaining gas: 1039993.853 units remaining)
+  - location: 11 (remaining gas: 1039993.850 units remaining)
     [ "abcdef" ]
-  - location: 12 (remaining gas: 1039993.843 units remaining)
+  - location: 12 (remaining gas: 1039993.840 units remaining)
     [ {}
       "abcdef" ]
-  - location: 14 (remaining gas: 1039993.833 units remaining)
+  - location: 14 (remaining gas: 1039993.830 units remaining)
     [ (Pair {} "abcdef") ]
 

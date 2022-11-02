@@ -26,6 +26,7 @@
 (** Definitions used in files with actual tests *)
 
 module Store = Tezos_proxy.Local_context
+module Proof = Tezos_context_sigs.Context.Proof_types
 open Lib_test.Qcheck2_helpers
 
 let check_irmin_tree_eq t1 t2 =
@@ -34,7 +35,7 @@ let check_irmin_tree_eq t1 t2 =
 (** [raw_context_rm_empty rc] returns [None] if [rc] is empty, otherwise
     a variant of [rc] where empty subtrees have been removed. *)
 let rec raw_context_rm_empty =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   function
   | Key _ as rc -> Some rc
   | Dir dir ->
@@ -43,7 +44,7 @@ let rec raw_context_rm_empty =
   | Cut -> None
 
 let rec merkle_node_rm_empty =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   function
   | Hash _ as h -> Some h
   | Data raw_context ->
@@ -85,7 +86,7 @@ let sdir_of_list l =
   SDir dir
 
 let rec raw_context_to_simple_tree raw_context : simple_tree =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   match raw_context with
   | Cut -> SLeaf
   | Key _ -> SLeaf
@@ -124,7 +125,7 @@ let rec irmin_tree_to_simple_tree tree =
         sdir_of_list l
 
 let rec merkle_node_to_simple_tree node =
-  let open Tezos_shell_services.Block_services in
+  let open Proof in
   match node with
   | Hash _ -> SLeaf
   | Data raw_context -> raw_context_to_simple_tree raw_context

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 module type M = (* This module type lists the parameters you can give to the
                    function [run] defined below; most calls use and will use the
                    default value for this module type, which is module

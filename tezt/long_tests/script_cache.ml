@@ -49,13 +49,15 @@
 
 *)
 let get_operations client =
-  let* operations = RPC.get_operations client in
+  let* operations =
+    RPC.Client.call client @@ RPC.get_chain_block_operations ()
+  in
   return JSON.(operations |> geti 3 |> geti 0 |> get "contents")
 
 let read_consumed_gas operation =
   JSON.(
-    operation |> get "metadata" |> get "operation_result" |> get "consumed_gas"
-    |> as_int)
+    operation |> get "metadata" |> get "operation_result"
+    |> get "consumed_milligas" |> as_int)
 
 let get_consumed_gas client =
   JSON.(
@@ -76,12 +78,13 @@ let get_consumed_gas_for_block client =
 let current_head = ["chains"; "main"; "blocks"; "head"]
 
 let get_counter client =
-  let*! counter =
-    RPC.Contracts.get_counter
-      ~contract_id:Constant.bootstrap1.public_key_hash
-      client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:Constant.bootstrap1.public_key_hash
+         ()
   in
-  return @@ JSON.as_int counter
+  return @@ JSON.as_int counter_json
 
 let get_size client =
   let* size =
@@ -91,10 +94,13 @@ let get_size client =
   return (JSON.as_int size)
 
 let get_storage ~contract_id client =
-  let*! storage = RPC.Contracts.get_storage ~contract_id client in
+  let* storage_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
+  in
   return
   @@ JSON.(
-       List.assoc "args" (as_object storage) |> geti 0 |> fun x ->
+       List.assoc "args" (as_object storage_json) |> geti 0 |> fun x ->
        List.assoc "string" (as_object x) |> as_string)
 
 (*
@@ -193,7 +199,7 @@ let call_contract contract_id k client =
 (** [call_contracts calls client] bakes a block with multiple contract
    [calls] using [client]. It returns the amount of consumed gas. *)
 let call_contracts calls client =
-  let* () =
+  let*! () =
     Client.multiple_transfers
       ~log_output:false
       ~fee_cap:Tez.(of_int 9999999)
@@ -339,7 +345,7 @@ let check_full_cache ~protocol =
       in
       aux contracts size nremoved (k - 1) (counter + 1)
   in
-  aux [] 0 0 80 counter
+  aux [] 0 0 120 counter
 
 (*
 
@@ -355,7 +361,10 @@ let check_full_cache ~protocol =
 
 *)
 let check_block_impact_on_cache ~protocol =
-  check "one cannot violate the cache size limit" ~protocol ~tags:["memory"]
+  check
+    "one cannot violate the cache size limit"
+    ~protocol
+    ~tags:["memory"; "limit"]
   @@ fun () ->
   let* node, client = init1 ~protocol in
 
@@ -595,7 +604,7 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
         } ],
       "signature": "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
     }, "chain_id" : "%s" %s } |}
-         (JSON.as_string block)
+         block
          Constant.bootstrap1.public_key_hash
          counter
          contract_id
@@ -606,9 +615,12 @@ let gas_from_simulation client chain_id contract_id ?blocks_before_activation
          | Some b -> Printf.sprintf {|, "blocks_before_activation" : %d |} b)
   in
 
-  let* block = RPC.get_branch ~offset:0 client in
+  let* block = RPC.Client.call client @@ RPC.get_chain_block_hash () in
   let data = data block counter in
-  let* result = RPC.post_simulate_operation client ~data in
+  let* result =
+    RPC.Client.call client
+    @@ RPC.post_chain_block_helpers_scripts_simulate_operation ~data ()
+  in
   return (read_consumed_gas JSON.(get "contents" result |> geti 0))
 
 let check_simulation_takes_cache_into_account ~protocol =
@@ -763,16 +775,7 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
     ~executors
   @@ fun () ->
   let parameters =
-    if Protocol.number migrate_from >= 013 then
-      [
-        (["blocks_per_cycle"], Some "8");
-        (["cycles_per_voting_period"], Some "1");
-      ]
-    else
-      [
-        (["blocks_per_cycle"], Some "8");
-        (["blocks_per_voting_period"], Some "8");
-      ]
+    [(["blocks_per_cycle"], `Int 8); (["cycles_per_voting_period"], `Int 1)]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (migrate_from, None)) parameters
@@ -806,7 +809,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
   let* () = Client.bake_for_and_wait client in
   let* final_period =
     let get_period () =
-      let* json = RPC.Votes.get_current_period client in
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+      in
       return @@ JSON.(json |-> "voting_period" |-> "kind" |> as_string)
     in
     let current_period = ref "proposal" in
@@ -836,7 +841,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       string
       ~error_msg:"We never reached the adoption period") ;
 
-  let* json = RPC.Votes.get_current_period client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+  in
   let level = JSON.(json |-> "remaining" |> as_int) in
   Log.info "Remaining %d blocks before the end of %s" level final_period ;
   Check.(
@@ -874,7 +881,9 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
       int
       ~error_msg:"Expecting %R, got %L") ;
 
-  let* _json = RPC.Votes.get_current_period client in
+  let* _json =
+    RPC.Client.call client @@ RPC.get_chain_block_votes_current_period ()
+  in
   let* () = Client.bake_for_and_wait client in
   let* predicted_gas_in_simulation = simulate 4 in
   Log.info
@@ -904,8 +913,8 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
    ----------------
 
 *)
-let register ~executors () =
-  (Protocol.[Ithaca; Alpha]
+let register ~executors ~protocols =
+  (protocols
   |> List.iter @@ fun protocol ->
      check_contract_cache_lowers_gas_consumption ~protocol ~executors ;
      check_full_cache ~protocol ~executors ;
@@ -913,7 +922,7 @@ let register ~executors () =
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
      check_simulation_takes_cache_into_account ~protocol ~executors) ;
-  Protocol.[Ithaca; Alpha]
+  Protocol.[Kathmandu; Alpha]
   |> List.iter @@ fun migrate_from ->
      check_simulation_close_to_protocol_user_activation
        ~executors

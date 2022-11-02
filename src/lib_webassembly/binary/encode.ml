@@ -36,11 +36,25 @@ let to_string s =
 
 (* Encoding *)
 
+let i32 = Int32.to_int
+
 module E (S : sig
   val stream : stream
+
+  val blocks : Ast.instr list list
+
+  val datas : Ast.datas_table
 end) =
 struct
   let s = S.stream
+
+  let lookup_block (Ast.Block_label l) =
+    let block = List.nth S.blocks (i32 l) in
+    let rec map acc pos =
+      if pos < 0l then acc
+      else map (List.nth block (i32 pos) :: acc) (Int32.pred pos)
+    in
+    map [] (Int32.pred (List.length block |> Int32.of_int))
 
   (* Generic values *)
 
@@ -103,7 +117,7 @@ struct
     len (String.length bs) ;
     put_string s bs
 
-  let name n = string (Utf8.encode_unsafe n)
+  let name n = string n
 
   let list f xs = List.iter f xs
 
@@ -159,7 +173,7 @@ struct
   let func_type = function
     | FuncType (ts1, ts2) ->
         let to_list m =
-          List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+          List.map snd (Lazy_vector.Int32Vector.loaded_bindings m)
         in
         vs7 (-0x20) ;
         vec value_type (to_list ts1) ;
@@ -217,19 +231,19 @@ struct
     | Block (bt, es) ->
         op 0x02 ;
         block_type bt ;
-        list instr es ;
+        list instr (lookup_block es) ;
         end_ ()
     | Loop (bt, es) ->
         op 0x03 ;
         block_type bt ;
-        list instr es ;
+        list instr (lookup_block es) ;
         end_ ()
     | If (bt, es1, es2) ->
         op 0x04 ;
         block_type bt ;
-        list instr es1 ;
-        if es2 <> [] then op 0x05 ;
-        list instr es2 ;
+        list instr (lookup_block es1) ;
+        if lookup_block es2 <> [] then op 0x05 ;
+        list instr (lookup_block es2) ;
         end_ ()
     | Br x ->
         op 0x0c ;
@@ -930,7 +944,7 @@ struct
         u8 i
 
   let const c =
-    list instr c.it ;
+    list instr (lookup_block c.it) ;
     end_ ()
 
   (* Sections *)
@@ -1054,12 +1068,12 @@ struct
   let code f =
     let {locals; body; _} = f.it in
     let locals =
-      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings locals)
+      List.map snd (Lazy_vector.Int32Vector.loaded_bindings locals)
     in
     let g = gap32 () in
     let p = pos s in
     vec local (compress locals) ;
-    list instr body ;
+    list instr (lookup_block body) ;
     end_ () ;
     patch_gap32 g (pos s - p)
 
@@ -1071,16 +1085,16 @@ struct
   let elem_kind = function FuncRefType -> u8 0x00 | _ -> assert false
 
   let is_elem_index e =
-    match e.it with [{it = RefFunc _; _}] -> true | _ -> false
+    match lookup_block e.it with [{it = RefFunc _; _}] -> true | _ -> false
 
   let elem_index e =
-    match e.it with [{it = RefFunc x; _}] -> var x | _ -> assert false
+    match lookup_block e.it with
+    | [{it = RefFunc x; _}] -> var x
+    | _ -> assert false
 
   let elem seg =
     let {etype; einit; emode} = seg.it in
-    let einit =
-      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings einit)
-    in
+    let einit = List.map snd (Lazy_vector.Int32Vector.loaded_bindings einit) in
     if is_elem_kind etype && List.for_all is_elem_index einit then (
       match emode.it with
       | Passive ->
@@ -1128,7 +1142,8 @@ struct
   let data seg =
     let open Lwt.Syntax in
     let {dinit; dmode} = seg.it in
-    let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
+    let* dinit = Ast.get_data dinit S.datas in
+    let+ dinit = Chunked_byte_vector.to_string dinit in
     match dmode.it with
     | Passive ->
         vu32 0x01l ;
@@ -1152,19 +1167,10 @@ struct
     let+ modl = Free.module_ m in
     section 12 len (List.length datas) Free.(modl.datas <> Set.empty)
 
-  (* Custom section *)
-  let custom (n, bs) =
-    name n ;
-    put_string s bs
-
-  let custom_section n bs = section 0 custom (n, bs) true
-
   (* Module *)
   let module_ m =
     let open Lwt.Syntax in
-    let to_list m =
-      List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
-    in
+    let to_list m = List.map snd (Lazy_vector.Int32Vector.loaded_bindings m) in
     u32 0x6d736100l ;
     u32 version ;
     type_section (to_list m.it.types) ;
@@ -1183,15 +1189,16 @@ end
 
 let encode m =
   let open Lwt.Syntax in
+  let* blocks =
+    let* bls = Ast.Vector.to_list m.Source.it.Ast.allocations.Ast.blocks in
+    TzStdLib.List.map_s Ast.Vector.to_list bls
+  in
   let module E = E (struct
     let stream = stream ()
+
+    let blocks = blocks
+
+    let datas = m.Source.it.Ast.allocations.Ast.datas
   end) in
   let+ () = E.module_ m in
-  to_string E.s
-
-let encode_custom name content =
-  let module E = E (struct
-    let stream = stream ()
-  end) in
-  E.custom_section name content ;
   to_string E.s

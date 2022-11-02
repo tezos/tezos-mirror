@@ -26,6 +26,18 @@
 
 type chain_name = Distributed_db_version.Name.t
 
+(** node parameters for the DAL. *)
+type dal = {
+  activated : bool;
+      (** [true] if the DAL is activated ([false] by default). This may have
+   an impact on the loading time of the node. *)
+  srs_size : int option;
+      (** If [None] (the default), the srs is read from the srs files. This
+   is the value expected for production. For testing purposes, we may
+   want to compute the srs instead but this is unsafe. In that case, a
+   size must be specified. *)
+}
+
 type blockchain_network = {
   alias : string option;
       (** as given to [--network], only for built-in networks *)
@@ -56,6 +68,7 @@ type t = {
   shell : shell;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
+  dal : dal;
 }
 
 and p2p = {
@@ -187,3 +200,6 @@ val encoding : t Data_encoding.t
 (** Return [p2p.bootstrap_peers] if not [None],
     [network.default_bootstrap_peers] otherwise. *)
 val bootstrap_peers : t -> string list
+
+(** [init_dal dal] initialises the DAL according to the dal configuration [dal]. *)
+val init_dal : dal -> unit tzresult Lwt.t

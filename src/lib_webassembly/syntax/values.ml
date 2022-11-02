@@ -7,12 +7,13 @@ type ('i32, 'i64, 'f32, 'f64) op =
   | I64 of 'i64
   | F32 of 'f32
   | F64 of 'f64
+[@@deriving show]
 
-type 'v128 vecop = V128 of 'v128
+type 'v128 vecop = V128 of 'v128 [@@deriving show]
 
-type num = (I32.t, I64.t, F32.t, F64.t) op
+type num = (I32.t, I64.t, F32.t, F64.t) op [@@deriving show]
 
-type vec = V128.t vecop
+type vec = V128.t vecop [@@deriving show]
 
 type ref_ = ..
 
@@ -83,7 +84,7 @@ module V128Vec = struct
 
   let to_vec i = V128 i
 
-  let of_vec n = function V128 z -> z
+  let of_vec _ = function V128 z -> z
 end
 
 (* Typing *)
@@ -161,7 +162,7 @@ let string_of_vec = function V128 v -> V128.to_string v
 
 let hex_string_of_vec = function V128 v -> V128.to_hex_string v
 
-let string_of_ref' = ref (function NullRef t -> "null" | _ -> "ref")
+let string_of_ref' = ref (function NullRef _ -> "null" | _ -> "ref")
 
 let string_of_ref r = !string_of_ref' r
 

@@ -45,10 +45,3 @@ module Request : sig
 end
 
 module Name : Worker_intf.NAME with type t = public_key_hash
-
-module Dummy_event : Worker_intf.EVENT with type t = unit
-
-module Logger :
-  Worker_intf.LOGGER
-    with module Event = Dummy_event
-     and type Request.view = Request.view

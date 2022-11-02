@@ -25,6 +25,11 @@
 (*****************************************************************************)
 
 open Data_encoding
+module Proof = Tezos_context_sigs.Context.Proof_types
+
+(* TODO: V2.Tree32 has been chosen arbitrarily ; maybe it's not the best option *)
+module Merkle_proof_encoding =
+  Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree32
 
 type chain = [`Main | `Test | `Hash of Chain_id.t]
 
@@ -145,6 +150,32 @@ let parse_block s =
     | _ -> raise Exit
   with _ -> Error ("Cannot parse block identifier: " ^ s)
 
+type range = [`Level of Int32.t] * [`Level of Int32.t]
+
+let parse_block_range r =
+  try
+    match String.split '.' r with
+    | [starts; ""; ends] ->
+        let to_level s =
+          let l = Int32.of_string s in
+          if Compare.Int32.(l < 0l) then raise Exit ;
+          `Level l
+        in
+        Ok (to_level starts, to_level ends)
+    | _ -> raise Exit
+  with _ ->
+    Error
+      (Format.asprintf
+         "Cannot parse block range: %S (expected <level>..<level>)"
+         r)
+
+type block_or_range = Block of block | Range of range
+
+let parse_block_or_range r =
+  if String.contains r '.' then
+    Result.map (fun r -> Range r) (parse_block_range r)
+  else Result.map (fun b -> Block b) (parse_block r)
+
 let alias_to_string = function
   | `Checkpoint -> "checkpoint"
   | `Savepoint -> "savepoint"
@@ -200,27 +231,8 @@ let operation_list_quota_encoding =
     (fun (max_size, max_op) -> {max_size; max_op})
     (obj2 (req "max_size" int31) (opt "max_op" int31))
 
-type raw_context = Key of Bytes.t | Dir of raw_context String.Map.t | Cut
-
-let rec raw_context_eq rc1 rc2 =
-  match (rc1, rc2) with
-  | Key bytes1, Key bytes2 -> Bytes.equal bytes1 bytes2
-  | Dir dir1, Dir dir2 -> String.Map.(equal raw_context_eq dir1 dir2)
-  | Cut, Cut -> true
-  | _ -> false
-
-let rec pp_raw_context ppf = function
-  | Cut -> Format.fprintf ppf "..."
-  | Key v -> Hex.pp ppf (Hex.of_bytes v)
-  | Dir l ->
-      Format.fprintf
-        ppf
-        "{@[<v 1>@,%a@]@,}"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
-             Format.fprintf ppf "%s : %a" s pp_raw_context t))
-        (String.Map.bindings l)
-
 let raw_context_encoding =
+  let open Proof in
   mu "raw_context" (fun encoding ->
       union
         [
@@ -250,6 +262,7 @@ let raw_context_encoding =
         ])
 
 let raw_context_insert =
+  let open Proof in
   let default = Dir String.Map.empty in
   (* not tail recursive but over the length of [k], which is small *)
   let rec aux (k, v) ctx =
@@ -268,42 +281,6 @@ let raw_context_insert =
   in
   aux
 
-type merkle_hash_kind = Contents | Node
-
-type merkle_node =
-  | Hash of (merkle_hash_kind * string)
-  | Data of raw_context
-  | Continue of merkle_tree
-
-and merkle_tree = merkle_node String.Map.t
-
-let rec merkle_node_eq n1 n2 =
-  match (n1, n2) with
-  | Hash (mhk1, s1), Hash (mhk2, s2) -> mhk1 = mhk2 && String.equal s1 s2
-  | Data rc1, Data rc2 -> raw_context_eq rc1 rc2
-  | Continue mtree1, Continue mtree2 -> merkle_tree_eq mtree1 mtree2
-  | _ -> false
-
-and merkle_tree_eq mtree1 mtree2 = String.Map.equal merkle_node_eq mtree1 mtree2
-
-type merkle_leaf_kind = Hole | Raw_context
-
-let rec pp_merkle_node ppf = function
-  | Hash (k, h) ->
-      let k_str = match k with Contents -> "Contents" | Node -> "Node" in
-      Format.fprintf ppf "Hash(%s, %s)" k_str h
-  | Data raw_context -> Format.fprintf ppf "Data(%a)" pp_raw_context raw_context
-  | Continue tree -> Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
-
-and pp_merkle_tree ppf mtree =
-  let pairs = String.Map.bindings mtree in
-  Format.fprintf
-    ppf
-    "{@[<v 1>@,%a@]@,}"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
-         Format.fprintf ppf "\"%s\": %a" s pp_merkle_node t))
-    pairs
-
 let stringmap_encoding value_encoding =
   let open Data_encoding in
   conv
@@ -315,7 +292,8 @@ let stringmap_encoding value_encoding =
         l)
     (list (tup2 string value_encoding))
 
-let merkle_tree_encoding : merkle_tree Data_encoding.t =
+let merkle_tree_encoding : Proof.merkle_tree Data_encoding.t =
+  let open Proof in
   let open Data_encoding in
   let hash_tag = 0 and hash_encoding = tup2 bool string in
   let data_tag = 1 and data_encoding = raw_context_encoding in
@@ -918,7 +896,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let raw_bytes_path = RPC_path.(path / "raw" / "bytes")
 
-      let merkle_tree_path = RPC_path.(path / "merkle_tree")
+      let merkle_tree_v1_path = RPC_path.(path / "merkle_tree")
+
+      (* The duplication of the ["/merkle_tree"] RPC path is due to MR !5535.
+         This MR introduces a breaking change in the former [merkle_tree] RPC,
+         because it changes the data type it returns.
+         In order to avoid breaking clients that still use the old code,
+         we keep the old RPC at path ["/merkle_tree"], and introduce the new one
+         at path ["/merkle_tree_v2"].
+         Once we are sure that all clients have migrated to the new code, we will
+         1) duplicate the behaviour of ["/merkle_tree_v2"] onto ["/merkle_tree"],
+            and make the clients call ["/merkle_tree"],
+         2) once all clients have applied patch 1), remove ["/merkle_tree_v2"]
+            altogether. *)
+      let merkle_tree_v2_path = RPC_path.(path / "merkle_tree_v2")
 
       let context_path_arg : string RPC_arg.t =
         let name = "context_path" in
@@ -960,8 +951,15 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         RPC_service.get_service
           ~description:"Returns the merkle tree of a piece of context."
           ~query:merkle_tree_query
-          ~output:Data_encoding.(option merkle_tree_encoding)
-          RPC_path.(merkle_tree_path /:* context_path_arg)
+          ~output:(option merkle_tree_encoding)
+          RPC_path.(merkle_tree_v1_path /:* context_path_arg)
+
+      let merkle_tree_v2 =
+        RPC_service.get_service
+          ~description:"Returns the Irmin merkle tree of a piece of context."
+          ~query:merkle_tree_query
+          ~output:(option Merkle_proof_encoding.tree_proof_encoding)
+          RPC_path.(merkle_tree_v2_path /:* context_path_arg)
     end
 
     let info =
@@ -1351,7 +1349,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       let set_filter path =
         RPC_service.post_service
           ~description:
-            {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
+            {|Set the configuration of the mempool filter. **If any of the fields is absent from the input JSON, then it is set to the default value for this field (i.e. its value in the default configuration), even if it previously had a different value.** If the input JSON does not describe a valid configuration, then the configuration is left unchanged. Also return the new configuration (which may differ from the input if it had omitted fields or was invalid). You may call [./octez-client rpc get '/chains/main/mempool/filter?include_default=true'] to see an example of JSON describing a valid configuration.|}
           ~query:RPC_query.empty
           ~input:json
           ~output:json
@@ -1543,7 +1541,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           ()
 
     let merkle_tree ctxt =
-      let f = make_call1 S.merkle_tree ctxt in
+      let f = make_call1 S.merkle_tree_v2 ctxt in
       fun ?(chain = `Main) ?(block = `Head 0) ?holey path ->
         f
           chain

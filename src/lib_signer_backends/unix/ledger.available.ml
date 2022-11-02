@@ -391,6 +391,8 @@ module Ledger_id = struct
   let to_animals = function Animals a -> a | Pkh pkh -> animals_of_pkh pkh
 
   let equal a b = to_animals a = to_animals b
+
+  let hash = Hashtbl.hash
 end
 
 (** An account is a given key-pair corresponding to a
@@ -486,7 +488,7 @@ module Ledger_uri = struct
       "An imported ledger alias or a ledger URI (e.g. \
        \"ledger://animal/curve/path\")."
     in
-    let open Clic in
+    let open Tezos_clic.Clic in
     param
       ~name
       ~desc
@@ -564,6 +566,19 @@ module Filter = struct
     | `Hid_path s -> fprintf ppf "HID-path: %s" s
     | `Version (s, _) -> fprintf ppf "%s" s
 end
+
+module Request_cache =
+  (val Ringo.(map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+    (Ledger_id)
+
+type request_info = {
+  version : Ledgerwallet_tezos.Version.t;
+  git_commit : string;
+  device_info : Hidapi.device_info;
+  ledger_id : Ledger_id.t;
+}
+
+let cache = Request_cache.create 7
 
 (* Those constants are provided by the vendor (e.g. check the udev
    rules they provide): *)
@@ -650,30 +665,60 @@ let is_derivation_scheme_supported version curve =
     let {major; minor; patch; _} = version in
     (major, minor, patch) >= min_version_of_derivation_scheme curve)
 
-let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
+let use_ledger_or_fail ~ledger_uri ?(filter = `None) ?msg f =
   let open Lwt_result_syntax in
+  let f hidapi (version, git_commit) device_info ledger_id =
+    let go () = f hidapi (version, git_commit) device_info ledger_id in
+    match ledger_uri with
+    | `Ledger_account {Ledger_account.curve; _} ->
+        if is_derivation_scheme_supported version curve then go ()
+        else
+          Ledgerwallet_tezos.(
+            failwith
+              "To use derivation scheme %a you need %a or later but you're \
+               using %a."
+              pp_curve
+              curve
+              Version.pp
+              (let a, b, c = min_version_of_derivation_scheme curve in
+               {version with major = a; minor = b; patch = c})
+              Version.pp
+              version)
+    | _ -> go ()
+  in
   let* o =
-    use_ledger
-      ?filter
-      (fun hidapi (version, git_commit) device_info ledger_id ->
-        Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
-            let go () = f hidapi (version, git_commit) device_info ledger_id in
-            match ledger_uri with
-            | `Ledger_account {curve; _} ->
-                if is_derivation_scheme_supported version curve then go ()
-                else
-                  Ledgerwallet_tezos.(
-                    failwith
-                      "To use derivation scheme %a you need %a or later but \
-                       you're using %a."
-                      pp_curve
-                      curve
-                      Version.pp
-                      (let a, b, c = min_version_of_derivation_scheme curve in
-                       {version with major = a; minor = b; patch = c})
-                      Version.pp
-                      version)
-            | _ -> go ()))
+    let check_filter (hid_path, version, git_commit) =
+      match (filter : Filter.t) with
+      | `None -> true
+      | `Hid_path path -> hid_path = path
+      | `Version (_, f) -> f (version, git_commit)
+    in
+    let ledger_id =
+      match ledger_uri with
+      | `Ledger id -> id
+      | `Ledger_account {ledger; _} -> ledger
+    in
+    match Request_cache.find_opt cache ledger_id with
+    | Some {version; git_commit; device_info; ledger_id}
+      when check_filter (device_info.path, version, git_commit) -> (
+        match Hidapi.(open_path device_info.path) with
+        | None -> return_none
+        | Some hidapi ->
+            Lwt.finalize
+              (fun () -> f hidapi (version, git_commit) device_info ledger_id)
+              (fun () ->
+                Hidapi.close hidapi ;
+                Lwt.return_unit))
+    | Some _ | None ->
+        use_ledger
+          ~filter
+          (fun hidapi (version, git_commit) device_info ledger_id ->
+            Ledger_uri.if_matches ledger_uri ledger_id (fun () ->
+                Request_cache.replace
+                  cache
+                  ledger_id
+                  {version; git_commit; device_info; ledger_id} ;
+                f hidapi (version, git_commit) device_info ledger_id))
   in
   match o with
   | Some o -> return o
@@ -684,10 +729,7 @@ let use_ledger_or_fail ~ledger_uri ?filter ?msg f =
         msg
         Ledger_uri.pp
         ledger_uri
-        (fun ppf ->
-          match filter with
-          | Some f -> Format.fprintf ppf " with filter \"%a\"" Filter.pp f
-          | None -> ())
+        (fun ppf -> Format.fprintf ppf " with filter \"%a\"" Filter.pp filter)
 
 (** A global {!Hashtbl.t} which allows us to avoid calling
     {!Signer_implementation.get_public_key} too often. *)
@@ -721,7 +763,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
        where:\n\
       \ - <animals> is the identifier of the ledger of the form \
        'crouching-tiger-hidden-dragon' and can be obtained with the command \
-       `tezos-client list connected ledgers` (which also provides full \
+       `octez-client list connected ledgers` (which also provides full \
        examples).\n\
        - <curve> is the signing curve, e.g. `ed1551`\n\
        - <path> is a BIP32 path anchored at m/%s. The ledger does not yet \
@@ -816,7 +858,7 @@ let pp_ledger_chain_id fmt s =
 (** Commands for both ledger applications. *)
 let generic_commands group =
   let open Lwt_result_syntax in
-  Clic.
+  Tezos_clic.Clic.
     [
       command
         ~group
@@ -864,7 +906,7 @@ let generic_commands group =
                           (fun curve ->
                             fprintf
                               ppf
-                              "  tezos-client import secret key ledger_%s \
+                              "  octez-client import secret key ledger_%s \
                                \"ledger://%a/%a/0h/0h\""
                               (Sys.getenv_opt "USER"
                               |> Option.value ~default:"user")
@@ -882,7 +924,7 @@ let generic_commands group =
                 return_none)
           in
           return_unit);
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Display version/public-key/address information for a Ledger URI"
         (args1 (switch ~doc:"Test signing operation" ~long:"test-sign" ()))
@@ -1010,9 +1052,9 @@ let generic_commands group =
     which get a specific treatment in {!high_water_mark_commands}. *)
 let baking_commands group =
   let open Lwt_result_syntax in
-  Clic.
+  Tezos_clic.Clic.
     [
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Query the path of the authorized key"
         no_options
@@ -1071,7 +1113,7 @@ let baking_commands group =
                         curve
                         Bip32_path.pp_path
                         (Bip32_path.tezos_root @ path))));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:
           "Authorize a Ledger to bake for a key (deprecated, use `setup ledger \
@@ -1130,7 +1172,7 @@ let baking_commands group =
                   pk
               in
               return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Setup a Ledger to bake for a key"
         (let hwm_arg kind =
@@ -1265,7 +1307,7 @@ let baking_commands group =
                   pk
               in
               return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:"Deauthorize Ledger from baking"
         no_options
@@ -1295,9 +1337,9 @@ let high_water_mark_commands group watermark_spelling =
       desc ^ " (legacy/deprecated spelling)"
     else desc
   in
-  Clic.
+  Tezos_clic.Clic.
     [
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:(make_desc "Get high water mark of a Ledger")
         (args1
@@ -1361,7 +1403,7 @@ let high_water_mark_commands group watermark_spelling =
                       tr
                   in
                   return_some ()));
-      Clic.command
+      Tezos_clic.Clic.command
         ~group
         ~desc:(make_desc "Set high water mark of a Ledger")
         no_options
@@ -1406,7 +1448,7 @@ let high_water_mark_commands group watermark_spelling =
 let commands =
   let group =
     {
-      Clic.name = "ledger";
+      Tezos_clic.Clic.name = "ledger";
       title = "Commands for managing the connected Ledger Nano devices";
     }
   in

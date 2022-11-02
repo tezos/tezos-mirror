@@ -35,6 +35,7 @@
 
 module StringMap = String.Map
 module Local = Tezos_proxy.Local_context
+module Proof = Tezos_context_sigs.Context.Proof_types
 
 (** Alias to make "empty list" intention more explicit *)
 let tree_root = []
@@ -69,10 +70,9 @@ let mock_proto_rpc () =
 
     let do_rpc _chain_n_block (k : Local.key) =
       let rec mock_raw_context = function
-        | [] -> Tezos_shell_services.Block_services.Key Bytes.empty
+        | [] -> Proof.Key Bytes.empty
         | hd :: tail ->
-            Tezos_shell_services.Block_services.Dir
-              (String.Map.singleton hd (mock_raw_context tail))
+            Proof.Dir (String.Map.singleton hd (mock_raw_context tail))
       in
       (* Remember call *)
       Stack.push k calls ;

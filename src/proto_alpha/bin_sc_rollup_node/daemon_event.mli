@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 (** This module defines functions that emit the events used by the smart
     contract rollup node daemon (see {!Daemon}). *)
 
@@ -42,3 +45,17 @@ val not_finalized_head : Block_hash.t -> int32 -> unit Lwt.t
     the [new_heads]. *)
 val processing_heads_iteration :
   Layer1.head list -> Layer1.head list -> unit Lwt.t
+
+(** [included_operation ~finalized op result] emits an event that an operation
+    for the rollup was included in a block (or finalized). *)
+val included_operation :
+  finalized:bool ->
+  'kind Protocol.Alpha_context.manager_operation ->
+  'kind Protocol.Apply_results.manager_operation_result ->
+  unit Lwt.t
+
+(** [wrong_initial_pvm_state_hash actual_hash expected_hash] emits the event
+    that the initial state hash of the PVM [actual_hash] does not agree with
+    [expected_hash]. *)
+val wrong_initial_pvm_state_hash :
+  Sc_rollup.State_hash.t -> Sc_rollup.State_hash.t -> unit Lwt.t

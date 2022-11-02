@@ -1,0 +1,48 @@
+# Contract that:
+# - Creates one "red" ticket and two "green" tickets and stores them in storage.
+# - Creates two "blue" tickets and sends them to the address passed in the parameter.
+{ parameter (pair address address) ;
+  storage (list (ticket string)) ;
+  code { CAR ;
+         UNPAIR ;
+         PUSH nat 1 ;
+         PUSH string "red" ;
+         TICKET ;
+         ASSERT_SOME ;
+         PUSH nat 1 ;
+         PUSH string "green" ;
+         TICKET ;
+         ASSERT_SOME ;
+         PUSH nat 1 ;
+         PUSH string "green" ;
+         TICKET ;
+         ASSERT_SOME ;
+         PUSH nat 1 ;
+         PUSH string "blue" ;
+         TICKET ;
+         ASSERT_SOME ;
+         PUSH nat 1 ;
+         PUSH string "blue" ;
+         TICKET ;
+         ASSERT_SOME ;
+         DIG 5 ;
+         CONTRACT (pair (pair (ticket string) (ticket string)) address) ;
+         IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+         PUSH mutez 0 ;
+         DIG 7 ;
+         DIG 3 ;
+         DIG 4 ;
+         PAIR ;
+         PAIR ;
+         TRANSFER_TOKENS ;
+         NIL (ticket string) ;
+         DIG 2 ;
+         CONS ;
+         DIG 2 ;
+         CONS ;
+         DIG 2 ;
+         CONS ;
+         NIL operation ;
+         DIG 2 ;
+         CONS ;
+         PAIR } }

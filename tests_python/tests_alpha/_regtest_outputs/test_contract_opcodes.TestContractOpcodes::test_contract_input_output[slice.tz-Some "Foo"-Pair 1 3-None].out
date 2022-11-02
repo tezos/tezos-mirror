@@ -25,13 +25,13 @@ trace
     [ 1
       3
       "Foo" ]
-  - location: 21 (remaining gas: 1039990.593 units remaining)
+  - location: 21 (remaining gas: 1039990.592 units remaining)
     [ None ]
-  - location: 13 (remaining gas: 1039990.583 units remaining)
+  - location: 13 (remaining gas: 1039990.577 units remaining)
     [ None ]
-  - location: 22 (remaining gas: 1039990.573 units remaining)
+  - location: 22 (remaining gas: 1039990.567 units remaining)
     [ {}
       None ]
-  - location: 24 (remaining gas: 1039990.563 units remaining)
+  - location: 24 (remaining gas: 1039990.557 units remaining)
     [ (Pair {} None) ]
 

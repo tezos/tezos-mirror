@@ -424,6 +424,7 @@ let make_tests speed parameters =
       in
       Some
         (wrap_simple_store_init_test
+           ~with_gc:true
            ~keep_dir:false
            ~history_mode:from_hm
            ~patch_context
@@ -450,6 +451,7 @@ let make_test_drag _speed parameters =
   let test_descr = "Check savepoint drag with cycles bigger that max_op_ttl" in
   let from_hm = default_full in
   wrap_simple_store_init_test
+    ~with_gc:true
     ~keep_dir:false
     ~history_mode:from_hm
     ~patch_context

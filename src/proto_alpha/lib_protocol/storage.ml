@@ -188,8 +188,13 @@ module Contract = struct
 
   let list = Indexed_context.keys
 
+  type local_context = Indexed_context.local_context
+
+  let with_local_context = Indexed_context.with_local_context
+
   module Spendable_balance =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["balance"]
       end)
@@ -197,6 +202,7 @@ module Contract = struct
 
   module Missed_endorsements =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["missed_endorsements"]
       end)
@@ -204,13 +210,32 @@ module Contract = struct
 
   module Manager =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["manager"]
       end)
       (Manager_repr)
 
+  module Consensus_key =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["consensus_key"; "active"]
+      end)
+      (Signature.Public_key)
+
+  module Pending_consensus_keys =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["consensus_key"; "pendings"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Signature.Public_key)
+
   module Delegate =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["delegate"]
       end)
@@ -225,6 +250,7 @@ module Contract = struct
 
   module Delegate_last_cycle_before_deactivation =
     Indexed_context.Make_map
+      (Registered)
       (struct
         (* FIXME? Change the key name to reflect the functor's name *)
         let name = ["delegate_desactivation"]
@@ -241,6 +267,7 @@ module Contract = struct
 
   module Counter =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["counter"]
       end)
@@ -254,8 +281,7 @@ module Contract = struct
        and type value = Script_repr.lazy_expr
        and type t := Raw_context.t = struct
     module I =
-      Indexed_context.Make_carbonated_map
-        (N)
+      Indexed_context.Make_carbonated_map (Registered) (N)
         (struct
           type t = Script_repr.lazy_expr
 
@@ -326,6 +352,7 @@ module Contract = struct
 
   module Paid_storage_space =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["paid_bytes"]
       end)
@@ -333,6 +360,7 @@ module Contract = struct
 
   module Used_storage_space =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["used_bytes"]
       end)
@@ -340,6 +368,7 @@ module Contract = struct
 
   module Frozen_deposits =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["frozen_deposits"]
       end)
@@ -347,6 +376,7 @@ module Contract = struct
 
   module Frozen_deposits_limit =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["frozen_deposits_limit"]
       end)
@@ -362,6 +392,7 @@ module Contract = struct
 
   module Frozen_bonds =
     Bond_id_index.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["frozen_bonds"]
       end)
@@ -371,6 +402,7 @@ module Contract = struct
 
   module Total_frozen_bonds =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_frozen_bonds"]
       end)
@@ -455,6 +487,7 @@ module Big_map = struct
 
   module Total_bytes =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_bytes"]
       end)
@@ -462,6 +495,7 @@ module Big_map = struct
 
   module Key_type =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["key_type"]
       end)
@@ -473,6 +507,7 @@ module Big_map = struct
 
   module Value_type =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["value_type"]
       end)
@@ -516,10 +551,7 @@ module Big_map = struct
 
     let add = I.add
 
-    let list_values ?offset ?length (ctxt, id) =
-      let open Lwt_tzresult_syntax in
-      let* ctxt, values = I.list_values ?offset ?length (ctxt, id) in
-      return (ctxt, List.map snd values)
+    let list_key_values = I.list_key_values
 
     let consume_deserialize_gas ctxt value =
       Raw_context.consume_gas ctxt (Script_repr.deserialized_cost value)
@@ -585,6 +617,7 @@ module Sapling = struct
 
   module Total_bytes =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_bytes"]
       end)
@@ -908,6 +941,14 @@ module Delegates =
        end))
        (Public_key_hash_index)
 
+module Consensus_keys =
+  Make_data_set_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["consensus_keys"]
+       end))
+       (Public_key_hash_index)
+
 (** Per cycle storage *)
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
@@ -945,6 +986,7 @@ module Cycle = struct
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["selected_stake_distribution"]
       end)
@@ -961,27 +1003,43 @@ module Cycle = struct
 
   module Total_active_stake =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["total_active_stake"]
       end)
       (Tez_repr)
 
-  let public_key_with_ghost_hash_encoding =
-    Data_encoding.conv
-      fst
-      (fun x -> (x, Signature.Public_key.hash x))
-      Signature.Public_key.encoding
+  module Migration_from_Kathmandu = struct
+    let public_key_with_ghost_hash_encoding =
+      Data_encoding.conv
+        fst
+        (fun x -> (x, Signature.Public_key.hash x))
+        Signature.Public_key.encoding
+
+    module Delegate_sampler_state =
+      Indexed_context.Make_map
+        (Ghost)
+        (struct
+          let name = ["delegate_sampler_state"]
+        end)
+        (struct
+          type t =
+            (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+
+          let encoding = Sampler.encoding public_key_with_ghost_hash_encoding
+        end)
+  end
 
   module Delegate_sampler_state =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["delegate_sampler_state"]
       end)
       (struct
-        type t =
-          (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+        type t = Raw_context.consensus_pk Sampler.t
 
-        let encoding = Sampler.encoding public_key_with_ghost_hash_encoding
+        let encoding = Sampler.encoding Raw_context.consensus_pk_encoding
       end)
 
   type unrevealed_nonce = {
@@ -1028,6 +1086,7 @@ module Cycle = struct
 
   module Seed =
     Indexed_context.Make_map
+      (Registered)
       (struct
         let name = ["random_seed"]
       end)
@@ -1051,10 +1110,12 @@ module Stake = struct
       (Public_key_hash_index)
       (Tez_repr)
 
-  module Active_delegate_with_one_roll =
+  module Active_delegates_with_minimal_stake =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
+           (* This name is for historical reasons, when the stake was
+              expressed in rolls (that is, pre-Ithaca). *)
            let name = ["active_delegate_with_one_roll"]
          end))
          (Int31_index)
@@ -1066,23 +1127,26 @@ module Stake = struct
       end)
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
+  module Total_active_stake = Cycle.Total_active_stake
 
   (* This is an index that is set to 0 by calls to
-     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and incremented
-     (by 1) by calls to {!val:Stake_storage.snapshot}.
+     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and
+     incremented (by 1) by calls to {!val:Stake_storage.snapshot}.
 
      {!val:Stake_storage.snapshot} is called in relation with constant
-     [blocks_per_stake_snapshot] in {!val:Level_storage.may_snapshot_rolls}.
+     [blocks_per_stake_snapshot] in
+     {!val:Level_storage.may_snapshot_stake_distribution}.
 
-     That is, the increment is done every [blocks_per_stake_snaphot] blocks and
-     reset at the end of cycles. So, it goes up to [blocks_per_cycle /
-     blocks_per_stake_snaphot], which is currently 16 (= 8192/512 -- the
-     concrete values can be found in
-     {!val:Default_parameters.constants_mainnet}), then comes back to 0, so that
-     a UInt16 is big enough.
+     That is, the increment is done every [blocks_per_stake_snaphot]
+     blocks and reset at the end of cycles. So, it goes up to
+     [blocks_per_cycle / blocks_per_stake_snaphot], which is currently
+     16 (= 8192/512 -- the concrete values can be found in
+     {!val:Default_parameters.constants_mainnet}), then comes back to
+     0, so that a UInt16 is big enough.
 
-     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is checked
-     in {!val:Constants_repr.check_constants} to fit in a UInt16. *)
+     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is
+     checked in {!val:Constants_repr.check_constants} to fit in a
+     UInt16. *)
   module Last_snapshot =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
@@ -1091,7 +1155,6 @@ module Stake = struct
       (Encoding.UInt16)
 end
 
-module Total_active_stake = Cycle.Total_active_stake
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
 
 (** Votes *)
@@ -1467,6 +1530,7 @@ module Tx_rollup = struct
 
   module State =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["state"]
       end)
@@ -1482,6 +1546,7 @@ module Tx_rollup = struct
 
   module Inbox =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["inbox"]
       end)
@@ -1493,6 +1558,7 @@ module Tx_rollup = struct
 
   module Revealed_withdrawals =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["withdrawals"]
       end)
@@ -1500,6 +1566,7 @@ module Tx_rollup = struct
 
   module Commitment =
     Level_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["commitment"]
       end)
@@ -1515,6 +1582,7 @@ module Tx_rollup = struct
 
   module Commitment_bond =
     Bond_indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["commitment"]
       end)
@@ -1596,6 +1664,7 @@ module Sc_rollup = struct
 
   module PVM_kind =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["kind"]
       end)
@@ -1607,6 +1676,7 @@ module Sc_rollup = struct
 
   module Boot_sector =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["boot_sector"]
       end)
@@ -1618,6 +1688,7 @@ module Sc_rollup = struct
 
   module Parameters_type =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["parameters_type"]
       end)
@@ -1628,7 +1699,8 @@ module Sc_rollup = struct
       end)
 
   module Genesis_info =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["genesis_info"]
       end)
@@ -1640,6 +1712,7 @@ module Sc_rollup = struct
 
   module Inbox_versioned =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["inbox"]
       end)
@@ -1656,6 +1729,7 @@ module Sc_rollup = struct
 
   module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["last_cemented_commitment"]
       end)
@@ -1679,10 +1753,11 @@ module Sc_rollup = struct
       end)
 
   let stakers (ctxt : Raw_context.t) (rollup : Sc_rollup_repr.t) =
-    Stakers.list_values (ctxt, rollup)
+    Stakers.list_key_values (ctxt, rollup)
 
   module Staker_count =
     Indexed_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["staker_count"]
       end)
@@ -1762,9 +1837,9 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_game_repr.Index))
       (struct
-        type t = Raw_level_repr.t
+        type t = Sc_rollup_game_repr.timeout
 
-        let encoding = Raw_level_repr.encoding
+        let encoding = Sc_rollup_game_repr.timeout_encoding
       end)
 
   module Opponent =
@@ -1836,6 +1911,7 @@ module Sc_rollup = struct
 
   module Applied_outbox_messages =
     Level_index_context.Make_carbonated_map
+      (Registered)
       (struct
         let name = ["applied_outbox_messages"]
       end)
@@ -1856,6 +1932,7 @@ module Sc_rollup = struct
 
   module Slot_subscriptions =
     Dal_level_index.Make_map
+      (Registered)
       (struct
         let name = ["slot_subscriptions"]
       end)
@@ -1873,26 +1950,142 @@ module Dal = struct
         let name = ["dal"]
       end)
 
-  module Level_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["level"]
-         end))
-         (Make_index (Raw_level_repr.Index))
-
   (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3113
 
      This is only for prototyping. Probably something smarter would be
      to index each header directly. *)
-  module Slot_headers =
-    Level_context.Make_map
-      (struct
-        let name = ["slots"]
-      end)
-      (struct
-        type t = Dal_slot_repr.t list
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3684
 
-        let encoding = Data_encoding.(list Dal_slot_repr.encoding)
+     This storage should be carbonated. *)
+  module Slot = struct
+    module Slot_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["slot"]
+        end)
+
+    module Level_context =
+      Make_indexed_subcontext
+        (Make_subcontext (Registered) (Raw_context)
+           (struct
+             let name = ["level"]
+           end))
+           (Make_index (Raw_level_repr.Index))
+
+    module Headers =
+      Level_context.Make_map
+        (Registered)
+        (struct
+          let name = ["slot_headers"]
+        end)
+        (struct
+          type t = Dal_slot_repr.Header.t list
+
+          let encoding = Data_encoding.(list Dal_slot_repr.Header.encoding)
+        end)
+
+    module History =
+      Make_single_data_storage (Registered) (Raw_context)
+        (struct
+          let name = ["slot_headers_history"]
+        end)
+        (struct
+          type t = Dal_slot_repr.History.t
+
+          let encoding = Dal_slot_repr.History.encoding
+        end)
+  end
+end
+
+module Zk_rollup = struct
+  module Indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["zk_rollup"]
+         end))
+         (Make_index (Zk_rollup_repr.Index))
+
+  module Account :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_account_repr.t =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["account"]
       end)
+      (Zk_rollup_account_repr)
+
+  module Pending_list =
+    Indexed_context.Make_carbonated_map
+      (Registered)
+      (struct
+        let name = ["pending_list"]
+      end)
+      (struct
+        type t = Zk_rollup_repr.pending_list
+
+        let encoding = Zk_rollup_repr.pending_list_encoding
+      end)
+
+  module Pending_operation :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Zk_rollup_repr.t
+       and type key = int64
+       and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["pending_operations"]
+         end))
+         (Make_index (struct
+           type t = int64
+
+           let rpc_arg =
+             let construct = Int64.to_string in
+             let destruct hash =
+               Int64.of_string_opt hash
+               |> Result.of_option
+                    ~error:"Cannot parse pending operation position"
+             in
+             RPC_arg.make
+               ~descr:
+                 "The position of an operation in a pending operations list"
+               ~name:"zkru_pending_op_position"
+               ~construct
+               ~destruct
+               ()
+
+           let encoding =
+             Data_encoding.def
+               "zkru_pending_op_position"
+               ~title:"Zkru pending operation position"
+               ~description:
+                 "The position of an operation in a pending operations list"
+               Data_encoding.Compact.(make ~tag_size:`Uint8 int64)
+
+           let compare = Compare.Int64.compare
+
+           let path_length = 1
+
+           let to_path c l = Int64.to_string c :: l
+
+           let of_path = function [c] -> Int64.of_string_opt c | _ -> None
+         end))
+      (struct
+        type t = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+
+        let encoding =
+          Data_encoding.(
+            tup2
+              Zk_rollup_operation_repr.encoding
+              (option Ticket_hash_repr.encoding))
+      end)
+end
+
+module Migration_from_Kathmandu = struct
+  module Delegate_sampler_state =
+    Cycle.Migration_from_Kathmandu.Delegate_sampler_state
 end

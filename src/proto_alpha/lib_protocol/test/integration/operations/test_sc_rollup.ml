@@ -77,10 +77,66 @@ let assert_fails ~loc ?error m =
 let assert_equal_z ~loc x y =
   Assert.equal ~loc Z.equal "Compare Z.t" Z.pp_print x y
 
+let get_game_status_result incr =
+  match Incremental.rev_tickets incr with
+  | [
+   Operation_metadata
+     {
+       contents =
+         Single_result
+           (Manager_operation_result {operation_result = Applied op; _});
+     };
+  ] -> (
+      match op with
+      | Sc_rollup_refute_result {game_status; _} -> (game_status, `Refute)
+      | Sc_rollup_timeout_result {game_status; _} -> (game_status, `Timeout)
+      | _ ->
+          Stdlib.failwith
+            "The operation applied is neither a [Sc_rollup_refute_result] or a \
+             [Sc_rollup_timeout_result]")
+  | _ ->
+      Stdlib.failwith
+        "Failed to found an applied operation result in the metadata"
+
+let assert_equal_game_status ?game_status actual_game_status =
+  match game_status with
+  | None -> return_unit
+  | Some game_status ->
+      if game_status = actual_game_status then return_unit
+      else
+        let msg =
+          Format.asprintf
+            "Expected game status [%a] but got [%a]"
+            Sc_rollup.Game.pp_status
+            game_status
+            Sc_rollup.Game.pp_status
+            actual_game_status
+        in
+        Stdlib.failwith msg
+
+let assert_refute_result ?game_status incr =
+  let actual_game_status, op_type = get_game_status_result incr in
+  assert (op_type = `Refute) ;
+  assert_equal_game_status ?game_status actual_game_status
+
+let assert_timeout_result ?game_status incr =
+  let actual_game_status, op_type = get_game_status_result incr in
+  assert (op_type = `Timeout) ;
+  assert_equal_game_status ?game_status actual_game_status
+
 (** [context_init tup] initializes a context for testing in which the
   [sc_rollup_enable] constant is set to true. It returns the created
   context and contracts. *)
-let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
+let context_init ?(sc_rollup_challenge_window_in_blocks = 10)
+    ?sc_rollup_max_number_of_messages_per_commitment_period
+    ?(timeout_period_in_blocks = 10) tup =
+  let max_number_of_messages_per_commitment_period =
+    match sc_rollup_max_number_of_messages_per_commitment_period with
+    | None ->
+        Context.default_test_constants.sc_rollup
+          .max_number_of_messages_per_commitment_period
+    | Some v -> v
+  in
   Context.init_with_constants_gen
     tup
     {
@@ -91,6 +147,8 @@ let context_init ?(sc_rollup_challenge_window_in_blocks = 10) tup =
           Context.default_test_constants.sc_rollup with
           enable = true;
           challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+          max_number_of_messages_per_commitment_period;
+          timeout_period_in_blocks;
         };
     }
 
@@ -103,11 +161,11 @@ let test_disable_feature_flag () =
   let kind = Sc_rollup.Kind.Example_arith in
   let* op, _ =
     let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
-    Op.sc_rollup_origination (I i) contract kind "" parameters_ty
+    Op.sc_rollup_origination (I i) contract kind ~boot_sector:"" ~parameters_ty
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
-        (Validate_operation.Manager.Sc_rollup_feature_disabled as e)
+        (Validate_errors.Manager.Sc_rollup_feature_disabled as e)
       :: _ ->
         Assert.test_error_encodings e ;
         return_unit
@@ -140,8 +198,8 @@ let sc_originate ?(boot_sector = "") ?origination_proof block contract
       (B block)
       contract
       kind
-      boot_sector
-      (Script.lazy_expr @@ Expr.from_string parameters_ty)
+      ~boot_sector
+      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string parameters_ty)
   in
   let* incr = Incremental.begin_construction block in
   let* incr = Incremental.add_operation incr operation in
@@ -161,25 +219,28 @@ let init_and_originate ?boot_sector ?origination_proof
   return (block, contracts, rollup)
 
 let number_of_ticks_exn n =
-  match Sc_rollup.Number_of_ticks.of_int32 n with
+  match Sc_rollup.Number_of_ticks.of_value n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
-let dummy_commitment ctxt rollup =
-  let ctxt = Incremental.alpha_ctxt ctxt in
-  let* genesis_info =
-    Sc_rollup.genesis_info ctxt rollup >|= Environment.wrap_tzresult
-  in
+let dummy_commitment ?compressed_state ?(number_of_ticks = 3000L) ctxt rollup =
+  let* genesis_info = Context.Sc_rollup.genesis_info ctxt rollup in
   let predecessor = genesis_info.commitment_hash in
-  let* {compressed_state; _}, ctxt =
-    Sc_rollup.Commitment.get_commitment ctxt rollup genesis_info.commitment_hash
-    >|= Environment.wrap_tzresult
+  let* compressed_state =
+    match compressed_state with
+    | None ->
+        let* {compressed_state; _} =
+          Context.Sc_rollup.commitment ctxt rollup genesis_info.commitment_hash
+        in
+        return compressed_state
+    | Some compressed_state -> return compressed_state
   in
   let root_level = genesis_info.level in
-  let inbox_level =
-    let commitment_freq =
-      Constants_storage.sc_rollup_commitment_period_in_blocks
-        (Alpha_context.Internal_for_tests.to_raw ctxt)
+  let* inbox_level =
+    let+ constants = Context.get_constants ctxt in
+    let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _}
+        =
+      constants.parametric.sc_rollup
     in
     Raw_level.of_int32_exn
       (Int32.add (Raw_level.to_int32 root_level) (Int32.of_int commitment_freq))
@@ -189,20 +250,18 @@ let dummy_commitment ctxt rollup =
       {
         predecessor;
         inbox_level;
-        number_of_ticks = number_of_ticks_exn 3000l;
+        number_of_ticks = number_of_ticks_exn number_of_ticks;
         compressed_state;
       }
 
 (* Verify that parameters and unparsed parameters match. *)
 let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
-  let show_stripped exp =
-    Expr.to_string @@ Environment.Micheline.strip_locations exp
-  in
+  let show exp = Expr.to_string @@ exp in
   let unparse ctxt parameters =
     wrap
       (Script_ir_translator.unparse_data
          ctxt
-         Script_ir_translator.Optimized
+         Script_ir_unparser.Optimized
          parameters_ty
          parameters)
   in
@@ -213,7 +272,7 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
       wrap
         (Script_ir_translator.parse_data
            ctxt
-           ~legacy:true
+           ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
            ~allow_forged:true
            parameters_ty
            (Environment.Micheline.root unparsed_parameters))
@@ -226,8 +285,8 @@ let verify_params ctxt ~parameters_ty ~parameters ~unparsed_parameters =
   (* Verify that both version match. *)
   Assert.equal_string
     ~loc:__LOC__
-    (show_stripped unparsed_parameters)
-    (show_stripped expected_unparsed_parameters)
+    (show unparsed_parameters)
+    (show expected_unparsed_parameters)
 
 (* Verify that the given list of transactions and transaction operations match.
    Also checks each transaction operation for type mismatches etc. *)
@@ -385,6 +444,13 @@ let originate_contract incr ~script ~baker ~storage ~source_contract =
   let* incr = Incremental.begin_construction block in
   return (contract, incr)
 
+let hash_commitment incr commitment =
+  let ctxt = Incremental.alpha_ctxt incr in
+  let+ ctxt, hash =
+    wrap @@ Lwt.return (Sc_rollup.Commitment.hash ctxt commitment)
+  in
+  (Incremental.set_alpha_ctxt incr ctxt, hash)
+
 let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* operation = Op.sc_rollup_publish (I incr) originator rollup commitment in
   let* incr = Incremental.add_operation incr operation in
@@ -393,10 +459,10 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   let* block =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks block
   in
-  let hash = Sc_rollup.Commitment.hash commitment in
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
+  let* incr, hash = hash_commitment incr commitment in
   let* cement_op = Op.sc_rollup_cement (I incr) originator rollup hash in
   let* incr = Incremental.add_operation incr cement_op in
   let* block = Incremental.finalize_block incr in
@@ -406,7 +472,7 @@ let publish_and_cement_commitment incr ~baker ~originator rollup commitment =
   return (hash, incr)
 
 let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
-  let* commitment = dummy_commitment incr rollup in
+  let* commitment = dummy_commitment (I incr) rollup in
   publish_and_cement_commitment incr ~baker ~originator rollup commitment
 
 (* Publishes repeated cemented commitments until a commitment with
@@ -414,19 +480,16 @@ let publish_and_cement_dummy_commitment incr ~baker ~originator rollup =
    is also published and cemented). *)
 let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
     ~min_inbox_level ~cemented_commitment_hash ~cemented_commitment =
-  let commitment_freq =
-    Constants_storage.sc_rollup_commitment_period_in_blocks
-      (Alpha_context.Internal_for_tests.to_raw @@ Incremental.alpha_ctxt incr)
+  let* constants = Context.get_constants (I incr) in
+  let Constants.Parametric.{commitment_period_in_blocks = commitment_freq; _} =
+    constants.parametric.sc_rollup
   in
   let rec aux incr hash ({Sc_rollup.Commitment.inbox_level; _} as commitment) =
-    let level = Int32.to_int @@ Raw_level.to_int32 inbox_level in
-    if level >= min_inbox_level then return (hash, incr)
+    let level = Raw_level.to_int32 inbox_level in
+    if level >= Int32.of_int min_inbox_level then return (hash, incr)
     else
       let next_inbox_level =
-        Raw_level.of_int32_exn
-          (Int32.add
-             (Raw_level.to_int32 inbox_level)
-             (Int32.of_int commitment_freq))
+        Raw_level.of_int32_exn (Int32.add level (Int32.of_int commitment_freq))
       in
       let commitment =
         {commitment with predecessor = hash; inbox_level = next_inbox_level}
@@ -438,20 +501,23 @@ let publish_commitments_until_min_inbox_level incr rollup ~baker ~originator
   in
   aux incr cemented_commitment_hash cemented_commitment
 
-let deposit_ticket_token incr rollup ticket_token delta =
-  wrap
-    (let ctxt = Incremental.alpha_ctxt incr in
-     let* rollup_red_token_hash, ctxt =
-       Ticket_balance_key.of_ex_token
-         ctxt
-         ~owner:(Destination.Sc_rollup rollup)
-         ticket_token
-     in
-     let* _, ctxt =
-       Ticket_balance.adjust_balance ctxt rollup_red_token_hash ~delta
-     in
-     let incr = Incremental.set_alpha_ctxt incr ctxt in
-     return incr)
+let adjust_ticket_token_balance_of_rollup ctxt rollup ticket_token ~delta =
+  let* incr =
+    Context.(
+      match ctxt with
+      | I incr -> return incr
+      | B block -> Incremental.begin_construction block)
+  in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
+  let* hash, alpha_ctxt =
+    Ticket_helpers.adjust_ticket_token_balance
+      alpha_ctxt
+      (Destination.Sc_rollup rollup)
+      ticket_token
+      ~delta
+  in
+  let incr = Incremental.set_alpha_ctxt incr alpha_ctxt in
+  return (hash, incr)
 
 (** A version of execute outbox message that output ignores proof validation. *)
 let execute_outbox_message_without_proof_validation incr rollup
@@ -484,15 +550,14 @@ let execute_outbox_message incr ~originator rollup ~output_proof
   let* block = Incremental.finalize_block incr in
   Incremental.begin_construction block
 
-let get_balance ctxt ~token ~owner =
-  let* key_hash, ctxt =
-    wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-  in
-  wrap (Ticket_balance.get_balance ctxt key_hash)
-
 let assert_ticket_token_balance ~loc incr token owner expected =
   let ctxt = Incremental.alpha_ctxt incr in
-  let* balance, _ = get_balance ctxt ~token ~owner in
+  let* balance, _ =
+    let* key_hash, ctxt =
+      wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
+    in
+    wrap (Ticket_balance.get_balance ctxt key_hash)
+  in
   match (balance, expected) with
   | Some b, Some e -> Assert.equal_int ~loc (Z.to_int b) e
   | Some b, None ->
@@ -567,13 +632,13 @@ let recover_bond_with_success i contract rollup =
     The comitter tries to withdraw stake before and after cementing. Only the
     second attempt is expected to succeed. *)
 let test_publish_cement_and_recover_bond () =
-  let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
+  let* block, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
-  let* i = Incremental.begin_construction ctxt in
+  let* i = Incremental.begin_construction block in
   (* not staked yet *)
   let* () = recover_bond_not_staked i contract rollup in
-  let* c = dummy_commitment i rollup in
-  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup c in
+  let* c = dummy_commitment (I i) rollup in
+  let* operation = Op.sc_rollup_publish (B block) contract rollup c in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   let* constants = Context.get_constants (B b) in
@@ -581,7 +646,7 @@ let test_publish_cement_and_recover_bond () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash c in
+  let* i, hash = hash_commitment i c in
   (* stake not on LCC *)
   let* () = recover_bond_not_lcc i contract rollup in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
@@ -609,9 +674,9 @@ let test_publish_fails_on_backtrack () =
   let* ctxt, contracts, rollup = init_and_originate Context.T2 "unit" in
   let _, contract = contracts in
   let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment i rollup in
+  let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
-    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
   let* operation1 = Op.sc_rollup_publish (B ctxt) contract rollup commitment1 in
   let* i = Incremental.add_operation i operation1 in
@@ -637,9 +702,9 @@ let test_cement_fails_on_conflict () =
   let* ctxt, contracts, rollup = init_and_originate Context.T3 "unit" in
   let _, contract1, contract2 = contracts in
   let* i = Incremental.begin_construction ctxt in
-  let* commitment1 = dummy_commitment i rollup in
+  let* commitment1 = dummy_commitment (I i) rollup in
   let commitment2 =
-    {commitment1 with number_of_ticks = number_of_ticks_exn 3001l}
+    {commitment1 with number_of_ticks = number_of_ticks_exn 3001L}
   in
   let* operation1 =
     Op.sc_rollup_publish (B ctxt) contract1 rollup commitment1
@@ -655,7 +720,7 @@ let test_cement_fails_on_conflict () =
     Block.bake_n constants.parametric.sc_rollup.challenge_window_in_blocks b
   in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash commitment1 in
+  let* i, hash = hash_commitment i commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
   let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
@@ -667,17 +732,17 @@ let test_cement_fails_on_conflict () =
   let* _ = Incremental.add_operation ~expect_apply_failure i cement_op in
   return_unit
 
-let commit_and_cement_after_n_bloc ?expect_apply_failure ctxt contract rollup n
+let commit_and_cement_after_n_bloc ?expect_apply_failure block contract rollup n
     =
-  let* i = Incremental.begin_construction ctxt in
-  let* commitment = dummy_commitment i rollup in
-  let* operation = Op.sc_rollup_publish (B ctxt) contract rollup commitment in
+  let* i = Incremental.begin_construction block in
+  let* commitment = dummy_commitment (I i) rollup in
+  let* operation = Op.sc_rollup_publish (B block) contract rollup commitment in
   let* i = Incremental.add_operation i operation in
   let* b = Incremental.finalize_block i in
   (* This pattern would add an additional block, so we decrement [n] by one. *)
   let* b = Block.bake_n (n - 1) b in
   let* i = Incremental.begin_construction b in
-  let hash = Sc_rollup.Commitment.hash commitment in
+  let* i, hash = hash_commitment i commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
   let* _ = Incremental.add_operation ?expect_apply_failure i cement_op in
   return_unit
@@ -694,11 +759,14 @@ let test_challenge_window_period_boundaries () =
      challenge window period. *)
   let* () =
     let expect_apply_failure = function
-      | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
+      | Environment.Ecoproto_error
+          (Sc_rollup_errors.Sc_rollup_commitment_too_recent _ as e)
         :: _ ->
           Assert.test_error_encodings e ;
           return_unit
-      | _ -> failwith "It should have failed with [Sc_rollup_too_recent]"
+      | _ ->
+          failwith
+            "It should have failed with [Sc_rollup_commitment_too_recent]"
     in
     commit_and_cement_after_n_bloc
       ~expect_apply_failure
@@ -747,6 +815,10 @@ let test_originating_with_invalid_boot_sector_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Example_arith
   in
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let origination_proof =
+    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+  in
   let*! res =
     init_and_originate
       ~boot_sector:"another boot sector"
@@ -768,9 +840,30 @@ let test_originating_with_invalid_kind_proof () =
       ~boot_sector:"a boot sector"
       Sc_rollup.Kind.Wasm_2_0_0
   in
+  let (module PVM) = Sc_rollup.wrapped_proof_module origination_proof in
+  let origination_proof =
+    Data_encoding.Binary.to_string_exn PVM.proof_encoding PVM.proof
+  in
   let*! res =
     init_and_originate
       ~boot_sector:"a boot sector"
+      ~origination_proof
+      Context.T1
+      "unit"
+  in
+  match res with
+  | Error
+      (Environment.Ecoproto_error (Sc_rollup.Proof.Sc_rollup_proof_check _ as e)
+      :: _) ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "It should have failed with [Sc_rollup_proof_check]"
+
+let test_originating_with_random_proof () =
+  let origination_proof = "bad proof" in
+  let*! res =
+    init_and_originate
+      ~boot_sector:"some boot sector"
       ~origination_proof
       Context.T1
       "unit"
@@ -900,7 +993,9 @@ let test_single_transaction_batch () =
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the self contract owns one ticket. *)
-  let* incr = deposit_ticket_token incr rollup red_token Z.one in
+  let* _ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup (I incr) rollup red_token ~delta:Z.one
+  in
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
       incr
@@ -986,7 +1081,13 @@ let test_multi_transaction_batch () =
   (* Create an atomic batch message. *)
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
   (* Set up the balance so that the rollup owns 10 units of red tokens. *)
-  let* incr = deposit_ticket_token incr rollup red_token (Z.of_int 10) in
+  let* _ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup
+      (I incr)
+      rollup
+      red_token
+      ~delta:(Z.of_int 10)
+  in
   let* Sc_rollup_operations.{operations; _}, incr =
     execute_outbox_message_without_proof_validation
       incr
@@ -1135,15 +1236,28 @@ let test_zero_amount_ticket () =
     ]
   in
   let output = make_output ~outbox_level:0 ~message_index:0 transactions in
-  assert_fails
-    ~loc:__LOC__
-    ~error:Ticket_scanner.Forbidden_zero_ticket_quantity
-    (execute_outbox_message_without_proof_validation
-       incr
-       rollup
-       ~cemented_commitment
-       ~source
-       output)
+  let*! result =
+    execute_outbox_message_without_proof_validation
+      incr
+      rollup
+      ~cemented_commitment
+      ~source
+      output
+  in
+  match result with
+  | Error e ->
+      if
+        Option.is_some
+        @@ List.find
+             (function
+               | Environment.Ecoproto_error
+                   Script_tc_errors.Forbidden_zero_ticket_quantity ->
+                   true
+               | _ -> false)
+             e
+      then return_unit
+      else Stdlib.failwith "Expected failure"
+  | Ok _ -> Stdlib.failwith "Expected failure"
 
 (* Check that executing an outbox message fails when the inclusion proof in
    invalid. *)
@@ -1202,7 +1316,7 @@ let test_execute_message_override_applied_messages_slot () =
     in
     return (paid_storage_size_diff, incr)
   in
-  let* cemented_commitment = dummy_commitment incr rollup in
+  let* cemented_commitment = dummy_commitment (I incr) rollup in
   let* cemented_commitment_hash, incr =
     publish_and_cement_commitment
       incr
@@ -1355,21 +1469,20 @@ let test_insufficient_ticket_balances () =
   (* Set up the balance so that the rollup owns 7 units of red tokens.
      This is insufficient wrt the set of transactions above.
   *)
-  let* incr = deposit_ticket_token incr rollup red_token (Z.of_int 7) in
-  let* key, ctxt =
-    wrap
-      (Ticket_balance_key.of_ex_token
-         (Incremental.alpha_ctxt incr)
-         ~owner:(Destination.Sc_rollup rollup)
-         red_token)
+  let* ticket_hash, incr =
+    adjust_ticket_token_balance_of_rollup
+      (I incr)
+      rollup
+      red_token
+      ~delta:(Z.of_int 7)
   in
-  let incr = Incremental.set_alpha_ctxt incr ctxt in
   (* Executing the batch fails because the rollup only has 7 units of tickets
      but attempts to transfer 10 units. *)
   assert_fails
     ~loc:__LOC__
     ~error:
-      (Ticket_balance.Negative_ticket_balance {key; balance = Z.of_int (-3)})
+      (Ticket_balance.Negative_ticket_balance
+         {key = ticket_hash; balance = Z.of_int (-3)})
     (execute_outbox_message_without_proof_validation
        incr
        rollup
@@ -1378,7 +1491,25 @@ let test_insufficient_ticket_balances () =
        output)
 
 let test_inbox_max_number_of_messages_per_commitment_period () =
-  let* block, (account1, account2) = context_init Context.T2 in
+  let sc_rollup_max_number_of_messages_per_commitment_period =
+    (*
+
+       We set this parameter constant with a low value for this test
+       because the default value is too high to be tested.
+
+       This limit exists to implement a (theoretical) defensive
+       programming scheme against large inbox refutations proofs. It
+       is theoretical because the lenght of these proofs is
+       logarithmic in the number of messages.
+
+    *)
+    1000
+  in
+  let* block, (account1, account2) =
+    context_init
+      ~sc_rollup_max_number_of_messages_per_commitment_period
+      Context.T2
+  in
   let* block, rollup = sc_originate block account1 "unit" in
   let* constants = Context.get_constants (B block) in
   let Constants.Parametric.{max_number_of_messages_per_commitment_period; _} =
@@ -1407,6 +1538,473 @@ let test_inbox_max_number_of_messages_per_commitment_period () =
   in
   let* _incr = Incremental.add_operation ~expect_apply_failure incr op in
   return_unit
+
+let add_op block op =
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr op in
+  Incremental.finalize_block incr
+
+let add_publish ~rollup block account commitment =
+  let* publish = Op.sc_rollup_publish (B block) account rollup commitment in
+  add_op block publish
+
+(** [test_timeout] test multiple cases of the timeout logic.
+    - Test to timeout a player before it's allowed and fails.
+    - Test that the timeout left by player decreases as expected.
+    - Test another account can timeout a late player.
+*)
+let test_timeout () =
+  let* block, (account1, account2, account3) = context_init Context.T3 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let* constants = Context.get_constants (B block) in
+  let Constants.Parametric.{timeout_period_in_blocks; _} =
+    constants.parametric.sc_rollup
+  in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let* dummy_commitment = dummy_commitment (B block) rollup in
+  let commitment1 =
+    {
+      dummy_commitment with
+      number_of_ticks = number_of_ticks_exn 4L;
+      compressed_state =
+        Sc_rollup.State_hash.context_hash_to_state_hash
+          (Context_hash.hash_string ["first"]);
+    }
+  in
+  let commitment2 =
+    {
+      dummy_commitment with
+      number_of_ticks = number_of_ticks_exn 4L;
+      compressed_state =
+        Sc_rollup.State_hash.context_hash_to_state_hash
+          (Context_hash.hash_string ["second"]);
+    }
+  in
+
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  let* block = Block.bake_n (timeout_period_in_blocks - 1) block in
+  let game_index = Sc_rollup.Game.Index.make pkh1 pkh2 in
+  (* Testing to send a timeout before it's allowed. There is one block left
+     before timeout is allowed, that is, the current block. *)
+  let* _incr =
+    let expected_block_left = 0l in
+    let expect_apply_failure = function
+      | Environment.Ecoproto_error
+          (Sc_rollup_errors.Sc_rollup_timeout_level_not_reached
+             (blocks_left, staker) as e)
+        :: _ ->
+          Assert.test_error_encodings e ;
+          if blocks_left = expected_block_left && pkh1 = staker then return_unit
+          else
+            failwith
+              "It should have failed with [Sc_rollup_timeout_level_not_reached \
+               (%ld, %a)] but got [Sc_rollup_timeout_level_not_reached (%ld, \
+               %a)]"
+              expected_block_left
+              Signature.Public_key_hash.pp
+              pkh1
+              blocks_left
+              Signature.Public_key_hash.pp
+              staker
+      | _ ->
+          failwith
+            "It should have failed with [Sc_rollup_timeout_level_not_reached \
+             (%ld, %a)]"
+            expected_block_left
+            Signature.Public_key_hash.pp
+            pkh1
+    in
+    let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation ~expect_apply_failure incr timeout
+  in
+  let* refute =
+    let tick =
+      WithExceptions.Option.get ~loc:__LOC__ (Sc_rollup.Tick.of_int 0)
+    in
+    let* {compressed_state; _} =
+      Context.Sc_rollup.commitment (B block) rollup genesis_info.commitment_hash
+    in
+    let first_chunk =
+      Sc_rollup.Game.{state_hash = Some compressed_state; tick}
+    in
+    let* rest =
+      List.init_es ~when_negative_length:[] 4 (fun i ->
+          let state_hash = None in
+          let tick =
+            WithExceptions.Option.get
+              ~loc:__LOC__
+              (Sc_rollup.Tick.of_int (i + 1))
+          in
+          return Sc_rollup.Game.{state_hash; tick})
+    in
+    let step = Sc_rollup.Game.Dissection (first_chunk :: rest) in
+    let move = Sc_rollup.Game.{choice = tick; step} in
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some move)
+  in
+  let* block = add_op block refute in
+  let* pkh1_timeout, pkh2_timeout =
+    let+ timeout = Context.Sc_rollup.timeout (B block) rollup (pkh1, pkh2) in
+    let timeout = WithExceptions.Option.get ~loc:__LOC__ timeout in
+    if game_index.alice = pkh1 then (timeout.alice, timeout.bob)
+    else (timeout.bob, timeout.alice)
+  in
+  let* () = Assert.equal_int ~loc:__LOC__ pkh1_timeout 0 in
+  let* () =
+    Assert.equal_int ~loc:__LOC__ pkh2_timeout timeout_period_in_blocks
+  in
+  let* block = Block.bake_n timeout_period_in_blocks block in
+  let* timeout = Op.sc_rollup_timeout (B block) account3 rollup game_index in
+  let* incr = Incremental.begin_construction block in
+  let* incr = Incremental.add_operation incr timeout in
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended (Loser {reason = Timeout; loser = pkh2})
+  in
+  assert_timeout_result ~game_status:expected_game_status incr
+
+let init_with_conflict () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["first"])
+  in
+  let* commitment1 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let compressed_state =
+    Sc_rollup.State_hash.context_hash_to_state_hash
+      (Context_hash.hash_string ["second"])
+  in
+  let* commitment2 =
+    dummy_commitment ~compressed_state ~number_of_ticks:1L (B block) rollup
+  in
+  let* block = add_publish ~rollup block account1 commitment1 in
+  let* block = add_publish ~rollup block account2 commitment2 in
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  return (block, (account1, pkh1), (account2, pkh2), rollup)
+
+module Arith_pvm = Sc_rollup_helpers.Arith_pvm
+
+let dumb_proof ~choice =
+  let open Lwt_result_syntax in
+  let context_arith_pvm = Tezos_context_memory.make_empty_context () in
+  let*! arith_state = Arith_pvm.initial_state context_arith_pvm in
+  let*! arith_state = Arith_pvm.install_boot_sector arith_state "" in
+  let input = Sc_rollup_helpers.make_input "c4c4" in
+  let* proof =
+    Arith_pvm.produce_proof context_arith_pvm (Some input) arith_state
+    >|= Environment.wrap_tzresult
+  in
+  let pvm_step =
+    Sc_rollup.Arith_pvm_with_proof
+      (module struct
+        include Arith_pvm
+
+        let proof = proof
+      end)
+  in
+  let inbox_proof =
+    Sc_rollup.Proof.Inbox_proof
+      {
+        level = Raw_level.root;
+        message_counter = Z.zero;
+        proof =
+          Sc_rollup.Inbox.Internal_for_tests.serialized_proof_of_string "c4c4";
+      }
+  in
+  let proof = Sc_rollup.Proof.{pvm_step; input_proof = Some inbox_proof} in
+  return Sc_rollup.Game.{choice; step = Proof proof}
+
+(** Test that two invalid proofs from the two players lead to a draw
+    in the refutation game. *)
+let test_draw_with_two_invalid_moves () =
+  let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Get the frozen bonds for the two players before the draw. *)
+  let* frozen_bonds_p1 = Context.Contract.frozen_bonds (B block) p1 in
+  let* frozen_bonds_p2 = Context.Contract.frozen_bonds (B block) p2 in
+
+  (* Player2 will also send an invalid final move. *)
+  let* incr =
+    let* p2_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+    let* p2_final_move_op =
+      Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some p2_refutation)
+    in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr p2_final_move_op
+  in
+
+  (* As both players played invalid moves, the game ends in a draw. *)
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  let* () = assert_refute_result ~game_status:expected_game_status incr in
+
+  (* The two players should have been slashed. *)
+  let* constants = Context.get_constants (I incr) in
+  let stake_amount = constants.parametric.sc_rollup.stake_amount in
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (I incr)
+      p1
+      frozen_bonds_p1
+      stake_amount
+  in
+  let* () =
+    Assert.frozen_bonds_was_debited
+      ~loc:__LOC__
+      (I incr)
+      p2
+      frozen_bonds_p2
+      stake_amount
+  in
+  return_unit
+
+(** Test that timeout a player during the final move ends the game if
+    the other player played. *)
+let test_timeout_during_final_move () =
+  let* block, (p1, p1_pkh), (_p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Player2 will not play and it will be timeout. *)
+  let* incr =
+    let* constants = Context.get_constants (B block) in
+    let Constants.Parametric.{timeout_period_in_blocks; _} =
+      constants.parametric.sc_rollup
+    in
+    let* block = Block.bake_n timeout_period_in_blocks block in
+    let game_index = Sc_rollup.Game.Index.make p1_pkh p2_pkh in
+    let* timeout = Op.sc_rollup_timeout (B block) p1 rollup game_index in
+    let* incr = Incremental.begin_construction block in
+    Incremental.add_operation incr timeout
+  in
+
+  (* As the player1 played an invalid move, the timeout is counted
+     as an invalid one too. The game ends in a draw. *)
+  let expected_game_status : Sc_rollup.Game.status = Ended Draw in
+  assert_timeout_result ~game_status:expected_game_status incr
+
+(** Test that playing a dissection during a final move is rejected. *)
+let test_dissection_during_final_move () =
+  let* block, (p1, p1_pkh), (p2, p2_pkh), rollup = init_with_conflict () in
+
+  (* Player1 will play an invalid final move. *)
+  let* block =
+    let* p1_refutation =
+      let choice = Sc_rollup.Tick.initial in
+      dumb_proof ~choice
+    in
+
+    let* p1_final_move_op =
+      Op.sc_rollup_refute (B block) p1 rollup p2_pkh (Some p1_refutation)
+    in
+    add_op block p1_final_move_op
+  in
+
+  (* Player2 will play a dissection. *)
+  let dumb_dissection =
+    let choice = Sc_rollup.Tick.initial in
+    Sc_rollup.Game.{choice; step = Dissection []}
+  in
+  let* p2_op =
+    Op.sc_rollup_refute (B block) p2 rollup p1_pkh (Some dumb_dissection)
+  in
+  (* Dissecting is no longer accepted. *)
+  let* incr = Incremental.begin_construction block in
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error
+        (Sc_rollup_game_repr.Dissecting_during_final_move as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return_unit
+    | _ -> failwith "It should have failed with [Dissecting_during_final_move]"
+  in
+  let* _incr = Incremental.add_operation ~expect_apply_failure incr p2_op in
+  return_unit
+
+let init_arith_state ~boot_sector =
+  let open Lwt_syntax in
+  let context = Tezos_context_memory.make_empty_context () in
+  let* state = Arith_pvm.initial_state context in
+  let* state = Arith_pvm.install_boot_sector state boot_sector in
+  return (context, state)
+
+let make_arith_state ?(boot_sector = "") metadata =
+  let open Lwt_syntax in
+  let* _context, state = init_arith_state ~boot_sector in
+  let* state_hash1 = Arith_pvm.state_hash state in
+
+  (* 1. We evaluate the boot sector. *)
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.No_input_required) ;
+  let* state = Arith_pvm.eval state in
+  let* state_hash2 = Arith_pvm.state_hash state in
+  (* 2. The state now needs the metadata. *)
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.Needs_reveal Reveal_metadata) ;
+  (* 3. We feed the state with the metadata. *)
+  let input = Sc_rollup.(Reveal (Metadata metadata)) in
+  let* state = Arith_pvm.set_input input state in
+  let* state_hash3 = Arith_pvm.state_hash state in
+  let* input_required = Arith_pvm.is_input_state state in
+  assert (input_required = Sc_rollup.Initial) ;
+
+  return (state_hash1, state_hash2, state_hash3)
+
+let make_refutation_metadata ?(boot_sector = "") metadata =
+  let open Lwt_syntax in
+  let* context, state = init_arith_state ~boot_sector in
+  (* We will prove the tick after the evaluation of the boot sector. *)
+  let* state = Arith_pvm.eval state in
+  let input = Sc_rollup.(Reveal (Metadata metadata)) in
+  let* proof = Arith_pvm.produce_proof context (Some input) state in
+  let proof = WithExceptions.Result.get_ok ~loc:__LOC__ proof in
+  let wrapped_proof =
+    Sc_rollup.Arith_pvm_with_proof
+      (module struct
+        include Arith_pvm
+
+        let proof = proof
+      end)
+  in
+  let choice = Sc_rollup.Tick.(next initial) in
+  let step : Sc_rollup.Game.step =
+    let pvm_step = wrapped_proof in
+    let input_proof = Some Sc_rollup.Proof.(Reveal_proof Metadata_proof) in
+    Proof {pvm_step; input_proof}
+  in
+  return Sc_rollup.Game.{choice; step}
+
+(** Test that during a refutation game when one malicious player lied on the
+    metadata, he can not win the game. *)
+let test_refute_invalid_metadata () =
+  let open Lwt_result_syntax in
+  let* block, (account1, account2) = context_init Context.T2 in
+  let pkh1 = Account.pkh_of_contract_exn account1 in
+  let pkh2 = Account.pkh_of_contract_exn account2 in
+  let* block, rollup = sc_originate block account1 "unit" in
+  let* genesis_info = Context.Sc_rollup.genesis_info (B block) rollup in
+  let predecessor = genesis_info.commitment_hash in
+
+  let post_commitment_from_metadata block account metadata =
+    let*! state1, state2, state3 = make_arith_state metadata in
+    let commitment : Sc_rollup.Commitment.t =
+      {
+        predecessor;
+        inbox_level = Raw_level.of_int32_exn 31l;
+        number_of_ticks = number_of_ticks_exn 2L;
+        compressed_state = state3;
+      }
+    in
+    let* block = add_publish ~rollup block account commitment in
+    return (block, state1, state2, state3)
+  in
+
+  (* [account1] will play a valid commitment with the correct evaluation of
+     the [metadata]. *)
+  let valid_metadata =
+    Sc_rollup.Metadata.
+      {address = rollup; origination_level = Raw_level.(succ root)}
+  in
+  let* block, state1, state2, state3 =
+    post_commitment_from_metadata block account1 valid_metadata
+  in
+
+  (* [account2] will play an invalid commitment with an invalid metadata. *)
+  let invalid_metadata =
+    {valid_metadata with origination_level = Raw_level.of_int32_exn 42l}
+  in
+  let* block, _, _, _ =
+    post_commitment_from_metadata block account2 invalid_metadata
+  in
+
+  (* [account1] starts a refutation game. It will provide a dissection
+     that will directly allow a final move. It's a bit hack-ish, but we
+     know which tick we want to refute.
+  *)
+  let* start_game_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 None
+  in
+  let* block = add_op block start_game_op in
+  let dissection : Sc_rollup.Game.refutation =
+    let choice = Sc_rollup.Tick.initial in
+    let step : Sc_rollup.Game.step =
+      let zero = Sc_rollup.Tick.initial in
+      let one = Sc_rollup.Tick.next zero in
+      let two = Sc_rollup.Tick.next one in
+      Dissection
+        [
+          {tick = zero; state_hash = Some state1};
+          {tick = one; state_hash = Some state2};
+          {tick = two; state_hash = Some state3};
+        ]
+    in
+    {choice; step}
+  in
+  let* dissection_op =
+    Op.sc_rollup_refute (B block) account1 rollup pkh2 (Some dissection)
+  in
+  let* block = add_op block dissection_op in
+
+  (* [account2] will play an invalid proof about the invalid metadata. *)
+  let*! proof = make_refutation_metadata invalid_metadata in
+  let* proof1_op =
+    Op.sc_rollup_refute (B block) account2 rollup pkh1 (Some proof)
+  in
+  let* block = add_op block proof1_op in
+
+  (* We can implicitely check that [proof1_op] was invalid if
+     [account1] wins the game. *)
+  let*! proof = make_refutation_metadata valid_metadata in
+  let* incr = Incremental.begin_construction block in
+  let* proof2_op =
+    Op.sc_rollup_refute (I incr) account1 rollup pkh2 (Some proof)
+  in
+  let* incr = Incremental.add_operation incr proof2_op in
+  let expected_game_status : Sc_rollup.Game.status =
+    Ended (Loser {reason = Conflict_resolved; loser = pkh2})
+  in
+  assert_refute_result ~game_status:expected_game_status incr
 
 let tests =
   [
@@ -1455,6 +2053,10 @@ let tests =
       `Quick
       test_originating_with_invalid_kind_proof;
     Tztest.tztest
+      "originating with random proof"
+      `Quick
+      test_originating_with_random_proof;
+    Tztest.tztest
       "originating with valid type"
       `Quick
       test_originating_with_valid_type;
@@ -1488,4 +2090,25 @@ let tests =
       "inbox max number of messages during commitment period"
       `Quick
       test_inbox_max_number_of_messages_per_commitment_period;
+    Tztest.tztest
+      "Test that a player can't timeout another player before timeout period \
+       and related timeout value."
+      `Quick
+      test_timeout;
+    Tztest.tztest
+      "Two invalid final moves end the game in a draw situation"
+      `Quick
+      test_draw_with_two_invalid_moves;
+    Tztest.tztest
+      "Timeout during the final move can end the game in a draw situation"
+      `Quick
+      test_timeout_during_final_move;
+    Tztest.tztest
+      "Cannot play a dissection when the final move has started"
+      `Quick
+      test_dissection_during_final_move;
+    Tztest.tztest
+      "Invalid metadata initialization can be refuted"
+      `Quick
+      test_refute_invalid_metadata;
   ]

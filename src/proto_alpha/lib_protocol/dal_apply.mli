@@ -43,16 +43,16 @@ val apply_data_availability :
   endorser:Signature.Public_key_hash.t ->
   t tzresult Lwt.t
 
-(** [validate_publish_slot_header ctxt slot] ensures that [slot] is
-   valid and cannot prevent an operation containing [slot] to be
-   refused on top of [ctxt]. If an [Error _] is returned, the [slot]
+(** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
+   valid and cannot prevent an operation containing [slot_header] to be
+   refused on top of [ctxt]. If an [Error _] is returned, the [slot_header]
    is not valid. *)
-val validate_publish_slot_header : t -> Dal.Slot.t -> unit tzresult
+val validate_publish_slot_header : t -> Dal.Slot.Header.t -> unit tzresult
 
-(** [apply_publish_slot_header ctxt slot] applies the publication of
-   slot header [slot] on top of [ctxt]. Fails if the slot contains
+(** [apply_publish_slot_header ctxt slot_header] applies the publication of
+   slot header [slot_header] on top of [ctxt]. Fails if the slot contains
    already a slot header. *)
-val apply_publish_slot_header : t -> Dal.Slot.t -> t tzresult
+val apply_publish_slot_header : t -> Dal.Slot.Header.t -> t tzresult
 
 (** [dal_finalisation ctxt] should be executed at block finalisation
    time. A set of slots available at level [ctxt.current_level - lag]

@@ -36,7 +36,7 @@ open Lib_test.Qcheck2_helpers
 (* Interface implemented by the synchronisation heuristic. *)
 
 module type S = sig
-  type status = Chain_validator_worker_state.Event.synchronisation_status =
+  type status = Chain_validator_worker_state.synchronisation_status =
     | Synchronised of {is_chain_stuck : bool}
     | Not_synchronised
 
@@ -55,7 +55,7 @@ end
    QCheck2, we check that both implementations have the same
    behavior. *)
 module Reference : S = struct
-  type status = Chain_validator_worker_state.Event.synchronisation_status =
+  type status = Chain_validator_worker_state.synchronisation_status =
     | Synchronised of {is_chain_stuck : bool}
     | Not_synchronised
 

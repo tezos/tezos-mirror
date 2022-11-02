@@ -98,6 +98,15 @@ module Events = struct
       ~pp1:Block_header.pp
       ("block", Block_header.encoding)
 
+  let context_gc_request =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"context_gc_request"
+      ~msg:"garbage collecting context below {context_hash}"
+      ~pp1:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
+
   let termination_request =
     declare_0
       ~section
@@ -460,6 +469,16 @@ let run ~readonly input output =
                 (Result_syntax.tzfail
                    (Block_validator_errors.Failed_to_checkout_context
                       context_hash))
+        in
+        loop cache None
+    | External_validation.Context_garbage_collection {context_hash} ->
+        let*! () = Events.(emit context_gc_request context_hash) in
+        let*! () = Context.gc context_index context_hash in
+        let*! () =
+          External_validation.send
+            output
+            (Error_monad.result_encoding Data_encoding.empty)
+            (Ok ())
         in
         loop cache None
     | External_validation.Terminate ->

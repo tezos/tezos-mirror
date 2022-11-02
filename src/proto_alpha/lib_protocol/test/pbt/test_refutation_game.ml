@@ -35,66 +35,240 @@ open Protocol
 
 open Alpha_context
 open Sc_rollup
-open Lwt_syntax
 open Lib_test.Qcheck2_helpers
 
-(**
+(** {2 Utils} *)
 
-   Helpers
+let qcheck_make_lwt = qcheck_make_lwt ~extract:Lwt_main.run
 
+let qcheck_make_lwt_res ?print ?count ~name ~gen f =
+  qcheck_make_result
+    ~pp_error:Error_monad.pp_print_trace
+    ?print
+    ?count
+    ~name
+    ~gen
+    (fun a -> Lwt_main.run (f a))
+
+(** Lift a computation using environment errors to use shell errors. *)
+let lift k = Lwt.map Environment.wrap_tzresult k
+
+let tick_to_int_exn ?(__LOC__ = __LOC__) t =
+  WithExceptions.Option.get ~loc:__LOC__ (Tick.to_int t)
+
+let tick_of_int_exn ?(__LOC__ = __LOC__) n =
+  WithExceptions.Option.get ~loc:__LOC__ (Tick.of_int n)
+
+let number_of_ticks_of_int64_exn ?(__LOC__ = __LOC__) n =
+  WithExceptions.Option.get ~loc:__LOC__ (Number_of_ticks.of_value n)
+
+let make_external_inbox_message str =
+  WithExceptions.Result.get_ok
+    ~loc:__LOC__
+    Inbox_message.(External str |> serialize)
+
+let game_status_of_refute_op_result = function
+  | [
+      Apply_results.Operation_metadata
+        {
+          contents =
+            Single_result
+              (Manager_operation_result
+                {
+                  operation_result =
+                    Applied (Sc_rollup_refute_result {game_status; _});
+                  _;
+                });
+        };
+    ] ->
+      game_status
+  | _ -> assert false
+
+let list_assoc (key : Tick.t) list = List.assoc ~equal:( = ) key list
+
+let print_dissection_chunk = Format.asprintf "%a" Game.pp_dissection_chunk
+
+let print_dissection = Format.asprintf "%a" Game.pp_dissection
+
+let print_our_states _ = "<our states>"
+
+(** Assert that the computation fails with the given message. *)
+let assert_fails_with ~__LOC__ (res : unit Environment.Error_monad.tzresult)
+    expected_err =
+  match res with
+  | Error trace ->
+      let expected_trace =
+        Environment.Error_monad.trace_of_error expected_err
+      in
+      if expected_trace = trace then Lwt.return true
+      else
+        let pp = Environment.Error_monad.pp_trace in
+        QCheck2.Test.fail_reportf
+          "@[Expected reason: %a@;Actual reason: %a@]"
+          pp
+          expected_trace
+          pp
+          trace
+  | Ok () -> Lwt.return false
+
+let initial_of_dissection dissection =
+  List.hd dissection |> WithExceptions.Option.get ~loc:__LOC__
+
+(** Modify the last section of a dissection. *)
+let rec modify_stop f dissection =
+  match dissection with
+  | [] -> assert false
+  | [chunk] -> [f chunk]
+  | x :: xs ->
+      let xs = modify_stop f xs in
+      x :: xs
+
+(** Modify the first section of a dissection. *)
+let modify_start f dissection =
+  match dissection with
+  | chunk :: xs -> f chunk :: xs
+  | [] -> (* The dissection can not be empty. *) assert false
+
+(** Checks that the [dissection] is valid regarding the function
+    {!Sc_rollup_game_repr.check_dissection}. *)
+let valid_dissection ~default_number_of_sections ~start_chunk ~stop_chunk
+    dissection =
+  Game.Internal_for_tests.check_dissection
+    ~default_number_of_sections
+    ~start_chunk
+    ~stop_chunk
+    dissection
+  |> Result.is_ok
+
+(** [disputed_sections ~our_states dissection] returns the list of sections
+    in the [dissection] on which the player dissecting disagree with.
+    It uses [our_states], an assoc list between tick and state hashes to
+    compare opponent's claims against our point of view. *)
+let disputed_sections ~our_states dissection =
+  let open Game in
+  let agree_on_state tick their_state =
+    let our_state = list_assoc tick our_states in
+    Option.equal State_hash.equal our_state their_state
+  in
+  let rec traverse acc = function
+    | ({state_hash = their_start_state; tick = start_tick} as a)
+      :: ({state_hash = their_stop_state; tick = stop_tick} as b)
+      :: dissection ->
+        let rst = b :: dissection in
+        if agree_on_state start_tick their_start_state then
+          (* It's a disputed section if we agree on the start state but disagree
+             on the stop. *)
+          if agree_on_state stop_tick their_stop_state then traverse acc rst
+          else
+            let disputed_section = (a, b) in
+            traverse (disputed_section :: acc) rst
+        else traverse acc rst
+    | _ -> acc
+  in
+  traverse [] dissection
+
+let pick_disputed_sections disputed_sections =
+  QCheck2.Gen.oneofl disputed_sections
+
+let single_tick_disputed_sections disputed_sections =
+  List.filter_map
+    (fun disputed_section ->
+      let Game.({tick = a_tick; _}, {tick = b_tick; _}) = disputed_section in
+      let distance = Tick.distance a_tick b_tick in
+      if Z.Compare.(distance = Z.one) then Some disputed_section else None)
+    disputed_sections
+
+let final_dissection ~our_states dissection =
+  let disputed_sections = disputed_sections ~our_states dissection in
+  let single_tick_disputed_sections =
+    single_tick_disputed_sections disputed_sections
+  in
+  Compare.List_length_with.(single_tick_disputed_sections > 0)
+
+(** Build a non-random dissection from [start_chunk] to [stop_chunk] using
+    [our_states] as the state hashes for each tick. *)
+let build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states =
+  let open Lwt_result_syntax in
+  let state_hash_from_tick tick = return @@ list_assoc tick our_states in
+  let our_stop_chunk =
+    Game.{stop_chunk with state_hash = list_assoc stop_chunk.tick our_states}
+  in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3491
+
+     This dissection's building does not check the number of sections. Checks should
+     be added to verify that we don't generate invalid dissection and test the
+     incorrect cases. *)
+  Lwt_main.run
+  @@ let*! r =
+       Game_helpers.new_dissection
+         ~start_chunk
+         ~our_stop_chunk
+         ~default_number_of_sections:number_of_sections
+         ~state_hash_from_tick
+     in
+     Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
+
+let originate_rollup originator messager ~first_inputs block =
+  let open Lwt_result_syntax in
+  let* origination_operation, sc_rollup =
+    Op.sc_rollup_origination
+      (B block)
+      originator
+      Kind.Example_arith
+      ~boot_sector:""
+      ~parameters_ty:(Script.lazy_expr @@ Expr.from_string "unit")
+  in
+  let* add_message_operation =
+    Op.sc_rollup_add_messages (B block) messager sc_rollup first_inputs
+  in
+  let* block =
+    Block.bake ~operations:[origination_operation; add_message_operation] block
+  in
+  let+ genesis_info = Context.Sc_rollup.genesis_info (B block) sc_rollup in
+  (block, sc_rollup, genesis_info)
+
+(** [create_ctxt account1 account2] creates a context where
+    an arith rollup was originated, and both [account1] and [account2] owns
+    enough tez to stake on a commitment. *)
+let create_ctxt ~first_inputs =
+  WithExceptions.Result.get_ok ~loc:__LOC__
+  @@ Lwt_main.run
+  @@
+  let open Lwt_result_syntax in
+  let* block, (account1, account2, account3) =
+    Context.init3
+      ~sc_rollup_enable:true
+      ~consensus_threshold:0
+      ~initial_balances:[100_000_000_000L; 100_000_000_000L; 100_000_000_000L]
+      ()
+  in
+  let* block, sc_rollup, genesis_info =
+    originate_rollup account3 account1 ~first_inputs block
+  in
+  return (block, sc_rollup, genesis_info, (account1, account2, account3))
+
+(** {2 Context free generators} *)
+
+(** Generate a {!State_hash.t}.
+
+    We use a dirty hack {!QCheck2.Gen.make_primitive} to remove the
+    automatic shrinking. Shrinking on the states in a dissection can
+    be confusing, it can leads to a shrunk list with the same states in
+    each cell.
 *)
-
-let hash_state state number =
-  Digest.bytes @@ Bytes.of_string @@ state ^ string_of_int number
-
-type dummy_proof = {
-  start : State_hash.t;
-  stop : State_hash.t option;
-  valid : bool;
-}
-
-module Tick_map = Map.Make (Sc_rollup_tick_repr)
-
-let dummy_proof_encoding : dummy_proof Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {start; stop; valid} -> (start, stop, valid))
-    (fun (start, stop, valid) -> {start; stop; valid})
-    (obj3
-       (req "start" State_hash.encoding)
-       (req "stop" (option State_hash.encoding))
-       (req "valid" bool))
-
-let proof_start_state proof = proof.start
-
-let proof_stop_state proof = proof.stop
-
-let number_of_ticks_exn n =
-  match Number_of_ticks.of_int32 n with
-  | Some x -> x
-  | None -> Stdlib.failwith "Bad Number_of_ticks"
-
-let get_comm pred inbox_level ticks state =
-  Commitment.
-    {
-      predecessor = pred;
-      inbox_level = Raw_level.of_int32_exn inbox_level;
-      number_of_ticks = number_of_ticks_exn ticks;
-      compressed_state = state;
-    }
-
 let gen_random_hash =
   let open QCheck2.Gen in
-  let* x = bytes_fixed_gen 32 in
-  return @@ State_hash.of_bytes_exn x
+  let gen =
+    let* x = bytes_fixed_gen 32 in
+    return @@ State_hash.of_bytes_exn x
+  in
+  (* This is not beautiful, but there is currently no other way to
+     remove the shrinker. *)
+  make_primitive
+    ~gen:(fun rand -> generate1 ~rand gen)
+    ~shrink:(fun _ -> Seq.empty)
 
-let tick_of_int_exn n =
-  match Tick.of_int n with None -> assert false | Some t -> t
-
-let tick_to_int_exn t =
-  match Tick.to_int t with None -> assert false | Some n -> n
-
-(* Default number of sections in a dissection *)
+(** Generate the number of sections in the dissection. *)
 let gen_num_sections =
   let open Tezos_protocol_alpha_parameters.Default_parameters in
   let testnet = constants_test.sc_rollup.number_of_sections_in_dissection in
@@ -102,1059 +276,1473 @@ let gen_num_sections =
   let sandbox = constants_sandbox.sc_rollup.number_of_sections_in_dissection in
   QCheck2.Gen.(
     frequency
-      [
-        (5, pure mainnet);
-        (4, pure testnet);
-        (2, pure sandbox);
-        (1, int_range 4 100);
-      ])
+      [(5, pure mainnet); (4, pure testnet); (2, pure sandbox); (1, 4 -- 100)])
 
-let mk_dissection_chunk (state_hash, tick) = Game.{state_hash; tick}
-
-let random_dissection ~default_number_of_sections start_at start_hash stop_at
-    stop_hash =
+(** Generate a tick. *)
+let gen_tick ?(lower_bound = 0) ?(upper_bound = 10_000) () =
   let open QCheck2.Gen in
-  let start_int = tick_to_int_exn start_at in
-  let stop_int = tick_to_int_exn stop_at in
-  let dist = stop_int - start_int in
-  let branch = min (dist + 1) default_number_of_sections in
-  let size = (dist + 1) / (branch - 1) in
+  let+ tick = lower_bound -- upper_bound in
+  tick_of_int_exn ~__LOC__ tick
 
-  if dist = 1 then return None
-  else
-    let* random_hash = gen_random_hash in
-    return
-    @@ Result.to_option
-         (List.init branch ~when_negative_length:"error" (fun i ->
-              mk_dissection_chunk
-              @@
-              if i = 0 then (Some start_hash, start_at)
-              else if i = branch - 1 then (stop_hash, stop_at)
-              else (Some random_hash, tick_of_int_exn (start_int + (i * size)))))
-
-(**
- `genlist` is a `correct list` generator. It generates a list of strings that
-  are either integers or `+` to be consumed by the arithmetic PVM.
-  If a `+` is found then the previous two element of the stack are poped
-   then added and the result is pushed to the stack.
-   In particular, lists like `[1 +]` are incorrect.
-
-  To preserve the correctness invariant, genlist is a recursive generator that
-  produce a pair `(stack_size, state_list)` where  state_list is a correct list
-  of integers and `+` and consuming it will produce a `stack` of length
-  `stack_size`.
-  For example a result can be `(3, [1; 2; +; 3; +; 2; 2; +; 1;]).
-  Consuming the list will produce the stack`[6; 4; 2]` which has length 3.
-  The generator has two branches.
-  1. with frequency 1 adds integers to state_list and increases the
-  corresponding stack_size.
-  2. With frequency 2, at each step, it looks at the inductive result
-  `(self (n - 1))=(stack_size, state_list)`.
-  If the stack_size is smaller than 2 then it adds an integer to the state_list
-   and increases the stack_size
-  Otherwise it adds a plus to the state_list and decreases the stack_size.
-  Remark: The algorithm is linear in the size of the generated list and
-  generates all kinds of inputs not only those that produce a stack of size 1.
-*)
-let gen_list ~size =
-  QCheck2.Gen.(
-    map (fun (_, l) -> List.rev l)
-    @@ sized_size size
-    @@ fix (fun self n ->
-           match n with
-           | 0 -> map (fun x -> (1, [string_of_int x])) small_nat
-           | n ->
-               frequency
-                 [
-                   ( 2,
-                     map2
-                       (fun x (stack_size, state_list) ->
-                         if stack_size >= 2 then
-                           (stack_size - 1, "+" :: state_list)
-                         else (stack_size + 1, string_of_int x :: state_list))
-                       small_nat
-                       (self (n - 1)) );
-                   ( 1,
-                     map2
-                       (fun x (i, y) -> (i + 1, string_of_int x :: y))
-                       small_nat
-                       (self (n - 1)) );
-                 ]))
-
-(** This uses the above generator to produce a correct program with at
-    least 3 elements.  *)
-
-let correct_program =
+(** [gen_arith_pvm_inputs ~gen_size] is a `correct list` generator.
+    It generates a list of strings that are either integers or `+` to be
+    consumed by the arithmetic PVM.
+    If a `+` is found then the previous two element of the stack are poped
+    then added and the result is pushed to the stack. In particular,
+    lists like `[1 +]` are incorrect. *)
+let gen_arith_pvm_inputs ~gen_size =
   let open QCheck2.Gen in
-  gen_list ~size:(3 -- 1000)
+  (* To preserve the correctness invariant, genlist is a recursive generator
+     that produce a pair `(stack_size, state_list)` where  state_list is a
+     correct list of integers and `+` and consuming it will produce a `stack`
+     of length `stack_size`.
+     For example a result can be `(3, [1; 2; +; 3; +; 2; 2; +; 1;]).
+     Consuming the list will produce the stack`[6; 4; 1]` which has length 3. *)
+  let produce_inputs self fuel =
+    match fuel with
+    | 0 -> map (fun x -> (1, [string_of_int x])) small_nat
+    | n ->
+        (* The generator has two branches.
+           1. with frequency 1 adds integers to state_list and increases the
+              corresponding stack_size.
+           2. With frequency 2, at each step, it looks at the inductive result
+              [(self (n - 1)) = (stack_size, state_list)].
 
-module type TestPVM = sig
-  include PVM.S with type hash = State_hash.t
+           If the stack_size is smaller than 2 then it adds an integer to the
+           state_list and increases the stack_size. Otherwise, it adds a plus
+           to the state_list and decreases the stack_size. *)
+        frequency
+          [
+            ( 2,
+              map2
+                (fun x (stack_size, state_list) ->
+                  if stack_size >= 2 then (stack_size - 1, "+" :: state_list)
+                  else (stack_size + 1, string_of_int x :: state_list))
+                small_nat
+                (self (n / 2)) );
+            ( 1,
+              map2
+                (fun x (i, y) -> (i + 1, string_of_int x :: y))
+                small_nat
+                (self (n / 2)) );
+          ]
+  in
+  let+ inputs = sized_size gen_size @@ fix produce_inputs in
+  snd inputs |> List.rev |> String.concat " "
 
-  module Utils : sig
-    (** This a post-boot state. It is used as default in many functions. *)
-    val default_state : state
+(** Generate a list of arith pvm inputs for a level *)
+let gen_arith_pvm_inputs_for_level ?(level_min = 0) ?(level_max = 1_000) () =
+  let open QCheck2.Gen in
+  let* level = level_min -- level_max in
+  let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
+  let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
+  return (level, input :: inputs)
 
-    (*TODO: These are not used in the current state. They are, however to be
-      used in the incoming more sophisticated set of tests from Thomas Athorne
-    *)
+(** Generate a list of level and associated arith pvm inputs. *)
+let gen_arith_pvm_inputs_for_levels ?(nonempty_inputs = false) ?level_min
+    ?level_max () =
+  let open QCheck2.Gen in
+  let rec aux () =
+    let* res =
+      let+ inputs_per_level =
+        small_list (gen_arith_pvm_inputs_for_level ?level_min ?level_max ())
+      in
+      List.sort_uniq
+        (fun (l, _) (l', _) -> Compare.Int.compare l l')
+        inputs_per_level
+    in
+    if nonempty_inputs && Compare.List_length_with.(res = 0) then aux ()
+    else return res
+  in
+  aux ()
 
-    (** [random_state n state] generates a random state. The integer n is
-        used as a seed in the generation. *)
-    val random_state : int -> state -> state QCheck2.Gen.t
+(** Dissection helpers and tests *)
+module Dissection = struct
+  (** Generate an initial *valid* dissection. The validity comes from a
+      mirrored implementation of {!Sc_rollup_game_repr.initial}. *)
+  let gen_initial_dissection ?ticks () =
+    let open QCheck2.Gen in
+    let* child_state = gen_random_hash and* parent_state = gen_random_hash in
+    let* ticks =
+      let+ ticks =
+        match ticks with
+        | None -> frequency [(1, pure 0); (9, 1 -- 1_000)]
+        | Some distance -> pure distance
+      in
+      Z.of_int ticks
+    in
+    let* initial_tick = gen_tick () in
+    if Z.Compare.(ticks = Z.zero) then
+      pure
+        [
+          Game.{state_hash = Some child_state; tick = initial_tick};
+          Game.{state_hash = None; tick = Tick.next initial_tick};
+        ]
+    else
+      let tick = Tick.jump initial_tick ticks in
+      pure
+        [
+          Game.{state_hash = Some parent_state; tick = initial_tick};
+          Game.{state_hash = Some child_state; tick};
+          Game.{state_hash = None; tick = Tick.next tick};
+        ]
 
-    (** [make_proof start_state stop_state] produces a proof that the eval of
-        [start_state] is the [stop_state].
-        It will be used by the `verify_proof`. In the arithPVM we use
-        `produce_tree_proof` which only requires a starting state (tree)
-        and the transition function. *)
-    val make_proof : state -> hash option -> proof Lwt.t
+  (** Generate a *valid* dissection.
+      It returns the dissection alongside the dissected start_chunk and
+      stop_chunk, but also the number of sections used to generate the
+      dissection. *)
+  let gen_dissection ~number_of_sections ~our_states dissection =
+    let open QCheck2.Gen in
+    let disputed_sections = disputed_sections ~our_states dissection in
+    assert (Compare.List_length_with.(disputed_sections > 0)) ;
+    let+ start_chunk, stop_chunk = pick_disputed_sections disputed_sections in
+    let dissection =
+      build_dissection ~number_of_sections ~start_chunk ~stop_chunk ~our_states
+    in
+    (dissection, start_chunk, stop_chunk)
 
-    (** Like [make_proof] but produces an invalid proof starting from
-        any hash. *)
-    val make_invalid_proof : hash -> hash option -> proof Lwt.t
-  end
+  let gen_initial_dissection_ticks = QCheck2.Gen.(0 -- 1_000)
+
+  let gen_nonfinal_initial_dissection_ticks = QCheck2.Gen.(3 -- 1_000)
+
+  (** Given an initial tick and state_hash: generates random state hashes for
+      every others [ticks].
+      Having [our_states] provide the state hashes you believe to
+      be true. You can then generate a dissection from another one when
+      you disagree with some sections. *)
+  let gen_our_states start_chunk ticks =
+    let open QCheck2.Gen in
+    let Game.{tick = initial_tick; state_hash = initial_state_hash} =
+      start_chunk
+    in
+    let initial_state_hash =
+      WithExceptions.Option.get ~loc:__LOC__ initial_state_hash
+    in
+    let initial_tick_int = tick_to_int_exn initial_tick in
+    let rec aux acc i =
+      if i < 0 then return acc
+      else if i = 0 then return ((initial_tick, initial_state_hash) :: acc)
+      else
+        let* state_hash = gen_random_hash in
+        let tick = tick_of_int_exn (i + initial_tick_int) in
+        aux ((tick, state_hash) :: acc) (i - 1)
+    in
+    aux [] ticks
+
+  (** {3 Dissection tests} *)
+
+  let count = 300
+
+  (** Test the validity of dissection generated by {!gen_dissection} on
+      an initial dissection generated by {!gen_initial_dissection}.
+      It is a self test that'll help detect issues in subsequent tests;
+      in case the generator does not produce valid dissections. *)
+  let test_valid_gen_dissection =
+    let open QCheck2 in
+    let gen =
+      let open Gen in
+      let* number_of_sections = gen_num_sections in
+      let* ticks = gen_initial_dissection_ticks in
+      let* dissection = gen_initial_dissection ~ticks () in
+      let* our_states =
+        gen_our_states (initial_of_dissection dissection) (succ ticks)
+      in
+      if final_dissection ~our_states dissection then
+        (* The initial dissection could not be dissected. *)
+        return (dissection, None, number_of_sections, our_states)
+      else
+        let* new_dissection, start_hash, stop_hash =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return
+          ( dissection,
+            Some (new_dissection, start_hash, stop_hash),
+            number_of_sections,
+            our_states )
+    in
+    let print =
+      Print.(
+        quad
+          print_dissection
+          (option
+             (triple
+                print_dissection
+                print_dissection_chunk
+                print_dissection_chunk))
+          int
+          print_our_states)
+    in
+    qcheck_make_lwt
+      ~count
+      ~name:"gen_dissection produces a valid dissection"
+      ~print
+      ~gen
+      (fun (dissection, new_dissection, default_number_of_sections, our_states)
+      ->
+        let open Lwt_syntax in
+        match new_dissection with
+        | None -> return (final_dissection ~our_states dissection)
+        | Some (new_dissection, start_chunk, stop_chunk) ->
+            return
+            @@ valid_dissection
+                 ~default_number_of_sections
+                 ~start_chunk
+                 ~stop_chunk
+                 new_dissection)
+
+  (** Truncate a [dissection] and expect the
+      {!Sc_rollup_game_repr.check_dissection} to fail with an invalid
+      number of sections, where [expected_number_of_sections] is expected. *)
+  let truncate_and_check_error dissection start_chunk stop_chunk
+      default_number_of_sections expected_number_of_sections =
+    let truncated_dissection =
+      match dissection with
+      | x :: _ :: z :: rst -> x :: z :: rst
+      | _ ->
+          (* If the dissection is valid, this case can not be reached. *)
+          assert false
+    in
+    let expected_len = Z.of_int expected_number_of_sections in
+    let expected_reason =
+      Game.Dissection_number_of_sections_mismatch
+        {expected = expected_len; given = Z.pred expected_len}
+    in
+    assert_fails_with
+      ~__LOC__
+      (Game.Internal_for_tests.check_dissection
+         ~default_number_of_sections
+         ~start_chunk
+         ~stop_chunk
+         truncated_dissection)
+      expected_reason
+
+  (** Test that if a dissection is smaller than the default number of
+      sections, the length is equal to (distance + 1) of the dissected
+      section. *)
+  let test_truncated_small_dissection =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:
+        "distance < nb_of_sections => (len dissection = succ (dist dissection))"
+      ~gen:
+        (let open Gen in
+        let* number_of_sections = gen_num_sections in
+        let* ticks = 3 -- (number_of_sections - 1) in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_hash, stop_hash =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return (new_dissection, start_hash, stop_hash, number_of_sections, ticks))
+      (fun ( dissection,
+             start_chunk,
+             stop_chunk,
+             default_number_of_sections,
+             distance ) ->
+        let expected_len = succ distance in
+        truncate_and_check_error
+          dissection
+          start_chunk
+          stop_chunk
+          default_number_of_sections
+          expected_len)
+
+  (** Test that if the distance in the dissected section is larger than
+      the default number of sections, the dissection length is exactly the
+      default number of sections. *)
+  let test_truncated_large_dissection =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:"distance >= nb_of_sections => (len dissection = nb_of_sections"
+      ~gen:
+        (let open Gen in
+        let* number_of_sections = gen_num_sections in
+        let* ticks = number_of_sections -- 1_000 in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_chunk, stop_chunk =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+      (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
+        truncate_and_check_error
+          dissection
+          start_chunk
+          stop_chunk
+          default_number_of_sections
+          default_number_of_sections)
+
+  (** Test that we can not change the start chunk of a section when we produce
+      a dissection. *)
+  let test_immutable_start_chunk =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:"dissection.start_chunk can not change"
+      ~gen:
+        (let open Gen in
+        let* number_of_sections = gen_num_sections in
+        let* ticks = gen_nonfinal_initial_dissection_ticks in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_chunk, stop_chunk =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        let* new_state_hash = gen_random_hash in
+        return
+          ( new_dissection,
+            start_chunk,
+            stop_chunk,
+            number_of_sections,
+            new_state_hash ))
+      (fun ( dissection,
+             start_chunk,
+             stop_chunk,
+             default_number_of_sections,
+             new_state_hash ) ->
+        (* Check that we can not change the start hash. *)
+        let dissection_with_different_start =
+          modify_start
+            (fun chunk -> Game.{chunk with state_hash = Some new_state_hash})
+            dissection
+        in
+        assert_fails_with
+          ~__LOC__
+          (Game.Internal_for_tests.check_dissection
+             ~default_number_of_sections
+             ~start_chunk
+             ~stop_chunk
+             dissection_with_different_start)
+          (Game.Dissection_start_hash_mismatch
+             {expected = start_chunk.state_hash; given = Some new_state_hash}))
+
+  (** Test that we can not produce a dissection that agrees with the stop hash.
+      Otherwise, there would be nothing to dispute. *)
+  let test_stop_hash_must_change =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:"dissection.stop_chunk must change"
+      ~gen:
+        (let open Gen in
+        let* number_of_sections = gen_num_sections in
+        let* ticks = gen_nonfinal_initial_dissection_ticks in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_chunk, stop_chunk =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+      (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
+        let open Lwt_syntax in
+        let check_failure_on_same_stop_hash stop_hash =
+          let invalid_dissection =
+            modify_stop
+              (fun chunk -> Game.{chunk with state_hash = stop_hash})
+              dissection
+          in
+          let stop_chunk = Game.{stop_chunk with state_hash = stop_hash} in
+          assert_fails_with
+            ~__LOC__
+            (Game.Internal_for_tests.check_dissection
+               ~default_number_of_sections
+               ~start_chunk
+               ~stop_chunk
+               invalid_dissection)
+            (Game.Dissection_stop_hash_mismatch stop_hash)
+        in
+        let* b1 = check_failure_on_same_stop_hash None in
+        let* b2 = check_failure_on_same_stop_hash stop_chunk.state_hash in
+        return (b1 && b2))
+
+  (** Test that we can not produce a dissection modifying the starting
+      end last point of a section. *)
+  let test_immutable_start_and_stop_ticks =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:
+        "start_chunk.tick and stop_chunk.tick can not change in the dissection"
+      ~gen:
+        (let open Gen in
+        let* number_of_sections = gen_num_sections in
+        let* ticks = gen_nonfinal_initial_dissection_ticks in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_chunk, stop_chunk =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return (new_dissection, start_chunk, stop_chunk, number_of_sections))
+      (fun (dissection, start_chunk, stop_chunk, default_number_of_sections) ->
+        let open Lwt_syntax in
+        let expected_error dissection =
+          match (List.hd dissection, List.last_opt dissection) with
+          | Some Game.{tick = a_tick; _}, Some {tick = b_tick; _} ->
+              Game.Dissection_edge_ticks_mismatch
+                {
+                  dissection_start_tick = a_tick;
+                  dissection_stop_tick = b_tick;
+                  chunk_start_tick = start_chunk.tick;
+                  chunk_stop_tick = stop_chunk.tick;
+                }
+          | _ -> assert false
+        in
+        let modify_tick modify_X dissection =
+          let invalid_dissection =
+            modify_X
+              (fun chunk -> Game.{chunk with tick = Tick.next chunk.tick})
+              dissection
+          in
+          let expected_error = expected_error invalid_dissection in
+          assert_fails_with
+            ~__LOC__
+            (Game.Internal_for_tests.check_dissection
+               ~default_number_of_sections
+               ~start_chunk
+               ~stop_chunk
+               invalid_dissection)
+            expected_error
+        in
+        (* We modify the start tick and expect the failure. *)
+        let* b1 = modify_tick modify_start dissection in
+        (* We modify the stop tick and expect the failure. *)
+        let* b2 = modify_tick modify_stop dissection in
+        return (b1 && b2))
+
+  (** Test that a valid dissection must have a proper distribution of the
+      sections. That is, a section should not be geq than half of the
+      dissected section's distance. *)
+  let test_badly_distributed_dissection =
+    let open QCheck2 in
+    qcheck_make_lwt
+      ~count
+      ~name:"dissection must be well distributed"
+      ~gen:
+        (let open Gen in
+        (* The test is not general enough to support all kind of number of
+           sections. *)
+        let number_of_sections =
+          Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+            .sc_rollup
+            .number_of_sections_in_dissection
+        in
+        let* picked_section = 0 -- (number_of_sections - 2) in
+        let* ticks = 100 -- 1_000 in
+        let* dissection = gen_initial_dissection ~ticks () in
+        let* our_states =
+          gen_our_states (initial_of_dissection dissection) (succ ticks)
+        in
+        let* new_dissection, start_chunk, stop_chunk =
+          gen_dissection ~number_of_sections ~our_states dissection
+        in
+        return
+          ( new_dissection,
+            start_chunk,
+            stop_chunk,
+            number_of_sections,
+            picked_section ))
+      (fun ( dissection,
+             start_chunk,
+             stop_chunk,
+             default_number_of_sections,
+             picked_section ) ->
+        (* We put a distance of [1] in every section. Then, we put the
+           distance's left in the [picked_section], it will create
+           an invalid section. *)
+        let distance =
+          Z.succ @@ Tick.distance start_chunk.tick stop_chunk.tick
+        in
+        let max_section_length =
+          Z.(succ @@ (distance - of_int default_number_of_sections))
+        in
+        let section_length = Z.one in
+
+        (* Replace the distance of the first [k] sections by [section_length].
+           In practice, when [k = 0], we're at the last section of the
+           dissection. *)
+        let rec replace_distances tick k = function
+          | a :: b :: xs ->
+              let b, tick =
+                if k = 0 then
+                  let tick = Tick.jump tick max_section_length in
+                  (Game.{b with tick}, tick)
+                else
+                  let tick = Tick.jump tick section_length in
+                  (Game.{b with tick}, tick)
+              in
+              a :: replace_distances tick (k - 1) (b :: xs)
+          | xs -> xs
+        in
+        let invalid_dissection =
+          replace_distances start_chunk.tick picked_section dissection
+        in
+        assert_fails_with
+          ~__LOC__
+          (Game.Internal_for_tests.check_dissection
+             ~default_number_of_sections
+             ~start_chunk
+             ~stop_chunk
+             invalid_dissection)
+          Game.Dissection_invalid_distribution)
+
+  let tests =
+    ( "Dissection",
+      qcheck_wrap
+        [
+          test_valid_gen_dissection;
+          test_truncated_small_dissection;
+          test_truncated_large_dissection;
+          test_immutable_start_chunk;
+          test_stop_hash_must_change;
+          test_immutable_start_and_stop_ticks;
+          test_badly_distributed_dissection;
+        ] )
 end
 
-(**
+(** {2. ArithPVM utils} *)
 
-   [MakeCountingPVM (P)] is a PVM whose state is an integer and that
-   can count up to a certain [P.target].
+module ArithPVM = Sc_rollup_helpers.Arith_pvm
 
-   This PVM has no input states.
-
-*)
-module MakeCountingPVM (P : sig
-  val target : int
-end) : TestPVM with type state = int = struct
-  let name = "countingPVM"
-
-  let parse_boot_sector x = Some x
-
-  let pp_boot_sector fmt x = Format.fprintf fmt "%s" x
-
-  type state = int
-
-  let pp x = Lwt.return @@ fun fmt _ -> Format.pp_print_int fmt x
-
-  type hash = State_hash.t
-
-  type context = unit
-
-  type proof = dummy_proof
-
-  let proof_start_state = proof_start_state
-
-  let proof_stop_state = proof_stop_state
-
-  let proof_input_given _ = None
-
-  let proof_input_requested _ = No_input_required
-
-  let state_hash_ (x : state) =
-    State_hash.context_hash_to_state_hash
-    @@ Context_hash.hash_string [Int.to_string x]
-
-  let state_hash (x : state) = return (state_hash_ x)
-
-  let is_input_state x =
-    if x >= P.target then return Initial else return No_input_required
-
-  let initial_state _ = return 0
-
-  let install_boot_sector _ _ = return P.target
-
-  let set_input _ s = return s
-
-  module Utils = struct
-    let default_state = P.target
-
-    let random_state _ _ = QCheck2.Gen.int
-
-    let make_proof s1 s2 =
-      let* s1 = state_hash s1 in
-      return {start = s1; stop = s2; valid = true}
-
-    let make_invalid_proof s1 s2 = return {start = s1; stop = s2; valid = false}
-  end
-
-  let proof_encoding = dummy_proof_encoding
-
-  let eval state = if state >= P.target then return state else return (state + 1)
-
-  let verify_proof proof = return proof.valid
-
-  let produce_proof _ _ _ = Stdlib.failwith "Dummy PVM can't produce proof"
-
-  let verify_origination_proof proof _ = return proof.valid
-
-  let produce_origination_proof _ _ =
-    Stdlib.failwith "Dummy PVM can't produce proof"
-
-  type output_proof = unit
-
-  let output_proof_encoding = Data_encoding.unit
-
-  let state_of_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let output_of_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let verify_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let produce_output_proof _ _ _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  module Internal_for_tests = struct
-    let insert_failure _ = Stdlib.failwith "Dummy PVM does not insert failures"
-  end
-end
-
-(** This is a random PVM. Its state is a pair of a string and a
-    list of integers. An evaluation step consumes the next integer
-    of the list and concatenates its representation to the string. *)
-module MakeRandomPVM (P : sig
-  val initial_prog : int list
-end) : TestPVM with type state = string * int list = struct
-  let name = "randomPVM"
-
-  let parse_boot_sector x = Some x
-
-  let pp_boot_sector fmt x = Format.fprintf fmt "%s" x
-
-  type state = string * int list
-
-  let pp (s, xs) =
-    Lwt.return @@ fun fmt _ ->
-    Format.fprintf
-      fmt
-      "%s / %s"
-      s
-      (String.concat ":" @@ List.map string_of_int xs)
-
-  type context = unit
-
-  type proof = dummy_proof
-
-  type hash = State_hash.t
-
-  let to_string (a, b) =
-    Format.sprintf "(%s, [%s])" a (String.concat ";" @@ List.map Int.to_string b)
-
-  let proof_start_state = proof_start_state
-
-  let proof_stop_state = proof_stop_state
-
-  let proof_input_given _ = None
-
-  let proof_input_requested _ = No_input_required
-
-  let state_hash_ x =
-    State_hash.context_hash_to_state_hash
-    @@ Context_hash.hash_string [to_string x]
-
-  let state_hash (x : state) = return @@ state_hash_ x
-
-  let initial_state _ = return ("", [])
-
-  let install_boot_sector _ _ = return ("hello", P.initial_prog)
-
-  let is_input_state (_, c) =
-    match c with [] -> return Initial | _ -> return No_input_required
-
-  let set_input _ state = return state
-
-  module Utils = struct
-    let default_state = ("hello", P.initial_prog)
-
-    let random_state length ((_, program) : state) =
-      let open QCheck2.Gen in
-      let remaining_program = TzList.drop_n length program in
-      let+ stop_state = int in
-      (hash_state "" stop_state, remaining_program)
-
-    let make_proof s1 s2 =
-      let* s1 = state_hash s1 in
-      return {start = s1; stop = s2; valid = true}
-
-    let make_invalid_proof s1 s2 = return {start = s1; stop = s2; valid = false}
-  end
-
-  let proof_encoding = dummy_proof_encoding
-
-  let eval (hash, continuation) =
-    match continuation with
-    | [] -> return (hash, continuation)
-    | h :: tl -> return (hash_state hash h, tl)
-
-  let verify_proof proof = return proof.valid
-
-  let produce_proof _ _ _ = Stdlib.failwith "Dummy PVM can't produce proof"
-
-  let verify_origination_proof proof _ = return proof.valid
-
-  let produce_origination_proof _ _ =
-    Stdlib.failwith "Dummy PVM can't produce proof"
-
-  type output_proof = unit
-
-  let output_proof_encoding = Data_encoding.unit
-
-  let state_of_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let output_of_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let verify_output_proof _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  let produce_output_proof _ _ _ =
-    Stdlib.failwith "Dummy PVM can't handle output proof"
-
-  module Internal_for_tests = struct
-    let insert_failure _ = Stdlib.failwith "Dummy PVM does not insert failures"
-  end
-end
-
-module ContextPVM = ArithPVM.Make (struct
-  open Tezos_context_memory.Context
+module Tree_inbox = struct
+  open Inbox
+  module Store = Tezos_context_memory.Context
 
   module Tree = struct
-    include Tezos_context_memory.Context.Tree
+    include Store.Tree
 
-    type tree = Tezos_context_memory.Context.tree
+    type tree = Store.tree
 
-    type t = Tezos_context_memory.Context.t
+    type t = Store.t
 
     type key = string list
 
     type value = bytes
   end
 
+  type t = Store.t
+
   type tree = Tree.tree
 
-  let hash_tree tree =
-    Sc_rollup.State_hash.context_hash_to_state_hash (Tree.hash tree)
+  let commit_tree store key tree =
+    let open Lwt_syntax in
+    let* store = Store.add_tree store key tree in
+    let* _ = Store.commit ~time:Time.Protocol.epoch store in
+    return ()
 
-  type proof = Proof.tree Proof.t
+  let lookup_tree store hash =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* _, tree =
+      Store.produce_tree_proof
+        index
+        (`Node (Hash.to_context_hash hash))
+        (fun x -> Lwt.return (x, x))
+    in
+    return (Some tree)
+
+  type proof = Store.Proof.tree Store.Proof.t
 
   let verify_proof proof f =
-    Lwt.map Result.to_option (verify_tree_proof proof f)
+    Lwt.map Result.to_option (Store.verify_tree_proof proof f)
 
-  let produce_proof context state f =
-    let* proof =
-      produce_tree_proof (index context) (`Value (Tree.hash state)) f
-    in
+  let produce_proof store tree f =
+    let open Lwt_syntax in
+    let index = Store.index store in
+    let* proof = Store.produce_tree_proof index (`Node (Tree.hash tree)) f in
     return (Some proof)
 
-  let kinded_hash_to_state_hash = function
-    | `Value hash | `Node hash -> State_hash.context_hash_to_state_hash hash
+  let kinded_hash_to_inbox_hash = function
+    | `Value hash | `Node hash -> Hash.of_context_hash hash
 
-  let proof_before proof = kinded_hash_to_state_hash proof.Proof.before
-
-  let proof_after proof = kinded_hash_to_state_hash proof.Proof.after
+  let proof_before proof = kinded_hash_to_inbox_hash proof.Store.Proof.before
 
   let proof_encoding =
-    let open Data_encoding in
-    conv (fun _ -> ()) (fun _ -> assert false) unit
-end)
-
-module TestArith (P : sig
-  val inputs : string
-
-  val evals : int
-end) : TestPVM = struct
-  include ContextPVM
-
-  let init_context = Tezos_context_memory.make_empty_context ()
-
-  module Utils = struct
-    let make_external_inbox_message str =
-      WithExceptions.Result.get_ok
-        ~loc:__LOC__
-        Inbox.Message.(External str |> serialize)
-
-    let default_state =
-      let promise =
-        let* boot = initial_state init_context in
-        let* boot = install_boot_sector boot "" in
-        let* boot = eval boot in
-        Format.printf "%s\n\n\n" P.inputs ;
-        let input =
-          {
-            inbox_level = Raw_level.root;
-            message_counter = Z.zero;
-            payload = make_external_inbox_message P.inputs;
-          }
-        in
-        let prelim = set_input input boot in
-        List.fold_left (fun acc _ -> acc >>= fun acc -> eval acc) prelim
-        @@ List.repeat P.evals ()
-      in
-      Lwt_main.run promise
-
-    let random_state i state =
-      let open QCheck2.Gen in
-      let+ program = correct_program in
-      let input =
-        {
-          inbox_level = Raw_level.root;
-          message_counter = Z.zero;
-          payload = make_external_inbox_message @@ String.concat " " program;
-        }
-      in
-      let prelim = set_input input state in
-      let open Lwt in
-      Lwt_main.run
-      @@ List.fold_left (fun acc _ -> acc >>= fun acc -> eval acc) prelim
-      @@ List.repeat (min i (List.length program - 2) + 1) ()
-
-    let make_proof s1 _s2 =
-      let* proof_opt = produce_proof init_context None s1 in
-      match proof_opt with Ok proof -> return proof | Error _ -> assert false
-
-    let make_invalid_proof _ _ =
-      let* state = initial_state init_context in
-      let* state = install_boot_sector state "foooobaaar" in
-      let* proof_opt = produce_proof init_context None state in
-      match proof_opt with Ok proof -> return proof | Error _ -> assert false
-  end
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V1.Tree32
+    .tree_proof_encoding
 end
 
-(**
-   This module introduces some testing strategies for a game created
-   from a PVM.
+module Store_inbox = struct
+  include Inbox.Make_hashing_scheme (Tree_inbox)
+end
+
+module Arith_test_pvm = struct
+  include ArithPVM
+
+  let init_context () = Tezos_context_memory.make_empty_context ()
+
+  let initial_state ctxt =
+    let open Lwt_syntax in
+    let* state = initial_state ctxt in
+    let* state = install_boot_sector state "" in
+    return state
+
+  let initial_hash =
+    let open Lwt_syntax in
+    let* state = initial_state (init_context ()) in
+    state_hash state
+
+  let mk_input level message_counter msg =
+    let payload = make_external_inbox_message msg in
+    let level = Int32.of_int level in
+    Sc_rollup.Inbox_message
+      {payload; message_counter; inbox_level = Raw_level.of_int32_exn level}
+
+  let consume_fuel = Option.map pred
+
+  let continue_with_fuel ~our_states ~(tick : int) fuel state f =
+    let open Lwt_syntax in
+    match fuel with
+    | Some 0 -> return (state, fuel, tick, our_states)
+    | _ -> f tick our_states (consume_fuel fuel) state
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3498
+
+     the following is almost the same code as in the rollup node, expect that it
+     creates the association list (tick, state_hash). *)
+  let eval_until_input ~fuel ~our_states start_tick state =
+    let open Lwt_syntax in
+    let rec go ~our_states fuel (tick : int) state =
+      let* input_request = is_input_state state in
+      match fuel with
+      | Some 0 -> return (state, fuel, tick, our_states)
+      | None | Some _ -> (
+          match input_request with
+          | No_input_required ->
+              let* state = eval state in
+              let* state_hash = state_hash state in
+              let our_states = (tick, state_hash) :: our_states in
+              go ~our_states (consume_fuel fuel) (tick + 1) state
+          | _ -> return (state, fuel, tick, our_states))
+    in
+    go ~our_states fuel start_tick state
+
+  let eval_metadata ~fuel ~our_states tick state ~metadata =
+    let open Lwt_syntax in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let input = Sc_rollup.(Reveal (Metadata metadata)) in
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = succ tick in
+    return (state, fuel, tick, our_states)
+
+  let feed_input ~fuel ~our_states ~tick state input =
+    let open Lwt_syntax in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    continue_with_fuel ~our_states ~tick fuel state
+    @@ fun tick our_states fuel state ->
+    let* state = set_input input state in
+    let* state_hash = state_hash state in
+    let our_states = (tick, state_hash) :: our_states in
+    let tick = tick + 1 in
+    let* state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    return (state, fuel, tick, our_states)
+
+  let eval_inbox ?fuel ~level ~inputs ~tick state =
+    let open Lwt_result_syntax in
+    List.fold_left_i_es
+      (fun message_counter (state, fuel, tick, our_states) input ->
+        let input = mk_input level (Z.of_int message_counter) input in
+        let*! state, fuel, tick, our_states =
+          feed_input ~fuel ~our_states ~tick state input
+        in
+        return (state, fuel, tick, our_states))
+      (state, fuel, tick, [])
+      inputs
+
+  let eval_levels_and_inputs ~metadata ?fuel ctxt levels_and_inputs =
+    let open Lwt_result_syntax in
+    let*! state = initial_state ctxt in
+    let*! state_hash = state_hash state in
+    let tick = 0 in
+    let our_states = [(tick, state_hash)] in
+    let tick = succ tick in
+    (* 1. We evaluate the boot sector. *)
+    let*! state, fuel, tick, our_states =
+      eval_until_input ~fuel ~our_states tick state
+    in
+    (* 2. We evaluate the metadata. *)
+    let*! state, fuel, tick, our_states =
+      eval_metadata ~fuel ~our_states tick state ~metadata
+    in
+    (* 3. We evaluate the inbox. *)
+    let* state, _fuel, tick, our_states =
+      List.fold_left_es
+        (fun (state, fuel, tick, our_states) (level, inputs) ->
+          let* state, fuel, tick, our_states' =
+            eval_inbox ?fuel ~level ~inputs ~tick state
+          in
+          return (state, fuel, tick, our_states @ our_states'))
+        (state, fuel, tick, our_states)
+        levels_and_inputs
+    in
+    let our_states =
+      List.sort (fun (x, _) (y, _) -> Compare.Int.compare x y) our_states
+    in
+    let our_states =
+      List.map
+        (fun (tick_int, state) -> (tick_of_int_exn tick_int, state))
+        our_states
+    in
+    let tick = tick_of_int_exn tick in
+    return (state, tick, our_states)
+end
+
+(** Construct the inbox for the protocol side. *)
+let construct_inbox_proto block rollup levels_and_inputs contract =
+  let open Lwt_result_syntax in
+  List.fold_left_es
+    (fun block (level, payloads) ->
+      let*? current_level = Context.get_level (B block) in
+      let diff_with_level =
+        Raw_level.(diff (of_int32_exn (Int32.of_int level)) current_level)
+        |> Int32.to_int
+      in
+      let* block = Block.bake_n (diff_with_level - 1) block in
+      let* operation_add_message =
+        Op.sc_rollup_add_messages (B block) contract rollup payloads
+      in
+      Block.bake ~operation:operation_add_message block)
+    block
+    levels_and_inputs
+
+(** Kind of strategy a player can play
+
+    The cheaters will have their own version of inputs. This way, they
+    can produce valid proofs regarding their inboxes, but discarded by
+    the protocol.
 *)
-module Strategies (PVM : TestPVM with type hash = State_hash.t) = struct
-  (** [exec_all state tick] runs eval until the state machine reaches a
-      state where it requires an input. It returns the new state and the
-      final tick.
-      *)
-  let exec_all state tick =
-    let rec loop state tick =
-      let* isinp = PVM.is_input_state state in
-      match isinp with
-      | No_input_required ->
-          let* s = PVM.eval state in
-          let* hash1 = PVM.state_hash state in
-          let* hash2 = PVM.state_hash s in
+type strategy =
+  | Random  (** A random player will execute its own random vision of inputs. *)
+  | Perfect
+      (** A perfect player, never lies, always win.
+          GSW 73-9 2014-2015 mindset. *)
+  | Lazy  (** A lazy player will not execute all messages. *)
+  | Eager  (** A eager player will not cheat until a certain point. *)
+  | Keen  (** A keen player will execute more messages. *)
 
-          if State_hash.equal hash1 hash2 then assert false
-          else loop s (Tick.next tick)
-      | _ -> return (state, tick)
-    in
-    loop state tick
+let pp_strategy fmt = function
+  | Random -> Format.pp_print_string fmt "Random"
+  | Perfect -> Format.pp_print_string fmt "Perfect"
+  | Lazy -> Format.pp_print_string fmt "Lazy"
+  | Eager -> Format.pp_print_string fmt "Eager"
+  | Keen -> Format.pp_print_string fmt "Keen"
 
-  (** [state_at to_tick from_state from_tick] returns the state at tick
-      [to_tick], or [None] if that's past the point at which the machine
-      has stopped. *)
-  let state_at to_tick from_state from_tick =
-    let rec loop state tick =
-      let* isinp = PVM.is_input_state state in
-      if Tick.equal to_tick tick then return (Some state, tick)
-      else
-        match isinp with
-        | No_input_required ->
-            let* s = PVM.eval state in
-            let* hash1 = PVM.state_hash state in
-            let* hash2 = PVM.state_hash s in
+type player = {
+  pkh : Signature.Public_key_hash.t;
+  contract : Contract.t;
+  strategy : strategy;
+  game_player : Game.player;
+}
 
-            if State_hash.equal hash1 hash2 then assert false
-            else loop s (Tick.next tick)
-        | _ -> return (None, to_tick)
-    in
-    loop from_state from_tick
+let pp_player ppf {pkh; contract = _; strategy; game_player} =
+  Format.fprintf
+    ppf
+    "pkh: %a@,strategy: %a@,game_player: %s"
+    Signature.Public_key_hash.pp_short
+    pkh
+    pp_strategy
+    strategy
+    (if Game.player_equal game_player Alice then "Alice" else "Bob")
 
-  (** [dissection_of_section start_tick start_state stop_tick] creates
-     a dissection with at most {!default_number_of_sections} pieces
-     that are (roughly) equal
-     spaced and whose states are computed by running the eval function
-     until the correct tick. Note that the last piece can be as much
-     as {!default_number_of_sections} - 1 ticks longer than the others. *)
-  let dissection_of_section ~default_number_of_sections start_tick start_state
-      stop_tick =
-    let start_int = tick_to_int_exn start_tick in
-    let stop_int = tick_to_int_exn stop_tick in
-    let dist = stop_int - start_int in
-    if dist = 1 then return None
-    else
-      let branch = min (dist + 1) default_number_of_sections in
-      let size = (dist + 1) / (branch - 1) in
-      let tick_list =
-        Result.to_option
-        @@ List.init branch ~when_negative_length:"error" (fun i ->
-               if i = branch - 1 then stop_tick
-               else tick_of_int_exn (start_int + (i * size)))
-      in
-      let a =
-        Option.map
-          (fun a ->
-            List.map
-              (fun tick ->
-                let hash =
-                  Lwt_main.run
-                  @@ let* state, (_ : Tick.t) =
-                       state_at tick start_state start_tick
-                     in
-                     match state with
-                     | None -> return None
-                     | Some s ->
-                         let* h = PVM.state_hash s in
-                         return (Some h)
-                in
-                mk_dissection_chunk (hash, tick))
-              a)
-          tick_list
-      in
-      return a
+type player_client = {
+  player : player;
+  states : (Tick.t * State_hash.t) list;
+  final_tick : Tick.t;
+  inbox :
+    Store_inbox.inbox_context
+    * Store_inbox.tree option
+    * Inbox.History.t
+    * Inbox.t;
+  levels_and_inputs : (int * string list) list;
+  metadata : Metadata.t;
+}
 
-  type client = {
-    initial : (Tick.t * PVM.hash) option Lwt.t;
-    gen_next_move : Game.t -> Game.refutation option Lwt.t QCheck2.Gen.t;
-  }
+let pp_levels_and_inputs ppf levels_and_inputs =
+  Format.(
+    (pp_print_list
+       (fun ppf (level, inputs) ->
+         fprintf
+           ppf
+           "level %d, inputs %a"
+           level
+           (pp_print_list pp_print_string)
+           inputs)
+       ppf)
+      levels_and_inputs)
 
-  type outcome_for_tests = Defender_wins | Refuter_wins
+let pp_player_client ppf
+    {player; states; final_tick; inbox = _; levels_and_inputs; metadata} =
+  Format.fprintf
+    ppf
+    "@[<v 2>player:@,\
+     %a@]@,\
+     @[<v 2>states:@,\
+     %a@]@,\
+     final tick: %a@,\
+     @[<v 2>levels and inputs:@,\
+     %a@]@,\
+     metadata: %a@,"
+    pp_player
+    player
+    (Format.pp_print_list (fun ppf (tick, hash) ->
+         Format.fprintf
+           ppf
+           "tick %a, state hash %a"
+           Tick.pp
+           tick
+           State_hash.pp_short
+           hash))
+    states
+    Tick.pp
+    final_tick
+    (* inbox *)
+    pp_levels_and_inputs
+    levels_and_inputs
+    Sc_rollup.Metadata.pp
+    metadata
 
-  let equal_outcome a b =
-    match (a, b) with
-    | Defender_wins, Defender_wins -> true
-    | Refuter_wins, Refuter_wins -> true
-    | _ -> false
+module Player_client = struct
+  (** Transform inputs to payloads. *)
+  let levels_and_payloads levels_and_inputs =
+    List.map
+      (fun (level, inputs) ->
+        (level, List.map make_external_inbox_message inputs))
+      levels_and_inputs
 
-  let loser_to_outcome_for_tests loser alice_is_refuter =
-    match loser with
-    | Game.Bob -> if alice_is_refuter then Refuter_wins else Defender_wins
-    | Game.Alice -> if alice_is_refuter then Defender_wins else Refuter_wins
+  let empty_memory_ctxt id =
+    let open Lwt_syntax in
+    Lwt_main.run
+    @@ let+ index = Tezos_context_memory.Context.init id in
+       Tezos_context_memory.Context.empty index
 
-  let run ~default_number_of_sections ~inbox ~refuter_client ~defender_client =
-    let refuter, (_ : public_key), (_ : Signature.secret_key) =
-      Signature.generate_key ()
-    in
-    let defender, (_ : public_key), (_ : Signature.secret_key) =
-      Signature.generate_key ()
-    in
-    let alice_is_refuter = Staker.(refuter < defender) in
-    let initial_game =
-      let* start_hash = PVM.state_hash PVM.Utils.default_state in
-      let* initial_data = defender_client.initial in
-      let tick, initial_hash =
-        match initial_data with None -> assert false | Some s -> s
-      in
-      let int_tick = tick_to_int_exn tick in
-      let number_of_ticks = Int32.of_int int_tick in
-      let parent = get_comm Commitment.Hash.zero 0l 1l start_hash in
-      let child =
-        get_comm Commitment.Hash.zero 0l number_of_ticks initial_hash
-      in
-      Lwt.return
-      @@ Game.initial
-           inbox
-           ~pvm_name:PVM.name
-           ~parent
-           ~child
-           ~refuter
-           ~defender
-           ~default_number_of_sections
-    in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/3529
 
-    let outcome =
-      let rec loop game refuter_move =
-        let open QCheck2.Gen in
-        let* move =
-          if refuter_move then refuter_client.gen_next_move game
-          else defender_client.gen_next_move game
-        in
-        let move = Lwt_main.run move in
-        match move with
-        | None ->
-            return
-            @@ Lwt.return (if refuter_move then Defender_wins else Refuter_wins)
-        | Some move -> (
-            let game_result = Lwt_main.run @@ Game.play game move in
-            match game_result with
-            | Either.Left outcome ->
-                return
-                @@ Lwt.return
-                     (loser_to_outcome_for_tests outcome.loser alice_is_refuter)
-            | Either.Right game -> loop game (not refuter_move))
-      in
-      loop (Lwt_main.run initial_game) true
-    in
-    outcome
-
-  let random_tick ?(from = 0) ~into () =
-    let open QCheck2.Gen in
-    let* x = from -- into in
-    return @@ Option.value ~default:Tick.initial (Tick.of_int x)
-
-  (**
-  checks that the stop state of a section conflicts with the one computed by the
-   evaluation.
-  *)
-  let conflicting_section tick state =
-    let* new_state, (_ : Tick.t) =
-      state_at tick PVM.Utils.default_state Tick.initial
-    in
-    let* new_hash =
-      match new_state with
-      | None -> return None
-      | Some state ->
-          let* state = PVM.state_hash state in
-          return (Some state)
-    in
-
-    return @@ not (Option.equal ( = ) state new_hash)
-
-  (** This function assembles a random decision from a given dissection.
-    It first picks a random section from the dissection and modifies randomly
-     its states.
-    If the length of this section is one tick the returns a conclusion with
-    the given modified states.
-    If the length is longer it creates a random decision and outputs a Refine
-     decision with this dissection.*)
-  let random_decision ~default_number_of_sections d =
-    let open QCheck2.Gen in
-    let number_of_somes =
-      List.length
-        (List.filter (fun {Game.state_hash; _} -> Option.is_some state_hash) d)
-    in
-    let* x = int_range 0 (number_of_somes - 1) in
-    let x = if x = number_of_somes - 1 then max 0 (x - 1) else x in
-    let start_hash, start =
-      match List.nth d x with
-      | Some Game.{state_hash = Some s; tick = t} -> (s, t)
-      | _ -> assert false
-    in
-    let (_ : State_hash.t option), stop =
-      match List.nth d (x + 1) with
-      | Some Game.{state_hash; tick} -> (state_hash, tick)
-      | None -> assert false
-    in
-    let* stop_hash = gen_random_hash in
-
-    let random_dissection =
-      random_dissection
-        ~default_number_of_sections
-        start
-        start_hash
-        stop
-        (Some stop_hash)
-    in
-    let* random_dissection = random_dissection and* hash = gen_random_hash in
-
-    let game =
-      match random_dissection with
-      | None ->
-          let open Lwt.Syntax in
-          let* pvm_proof =
-            PVM.Utils.make_invalid_proof start_hash (Some hash)
+     Factor code for the unit test.
+     this and {!Store_inbox} is highly copy-pasted from
+     test/unit/test_sc_rollup_inbox. The main difference is: we use
+     [Alpha_context.Sc_rollup.Inbox] instead of [Sc_rollup_repr_inbox] in the
+     former. *)
+  let construct_inbox ctxt levels_and_payloads ~rollup ~origination_level =
+    let open Lwt_syntax in
+    let open Store_inbox in
+    let* inbox = empty ctxt rollup origination_level in
+    let history = Inbox.History.empty ~capacity:10000L in
+    let rec aux history inbox level_tree = function
+      | [] -> return (ctxt, level_tree, history, inbox)
+      | (level, payloads) :: rst ->
+          let level = Int32.of_int level |> Raw_level.of_int32_exn in
+          let () = assert (Raw_level.(origination_level <= level)) in
+          let* res =
+            lift @@ add_messages ctxt history inbox level payloads level_tree
           in
-          let wrapped =
-            let module P = struct
-              include PVM
-
-              let proof = pvm_proof
-            end in
-            Unencodable (module P)
+          let level_tree, history, inbox =
+            WithExceptions.Result.get_ok ~loc:__LOC__ res
           in
-          let proof = Proof.{pvm_step = wrapped; inbox = None} in
-          Lwt.return (Some Game.{choice = start; step = Proof proof})
-      | Some dissection ->
-          Lwt.return (Some Game.{choice = start; step = Dissection dissection})
+          aux history inbox (Some level_tree) rst
     in
+    aux history inbox None levels_and_payloads
 
-    return game
+  (** Construct an inbox based on [levels_and_inputs] in the player context. *)
+  let construct_inbox ~origination_level ctxt rollup levels_and_inputs =
+    Lwt_main.run
+    @@ construct_inbox
+         ~origination_level
+         ctxt
+         ~rollup
+         (levels_and_payloads levels_and_inputs)
 
-  (** There are two kinds of strategies, random and machine-directed. *)
-  type strategy = Random | MachineDirected
-
-  (**
-  [find_conflict dissection] finds the section (if it exists) in a dissection that
-    conflicts  with the actual computation. *)
-  let find_conflict dissection =
-    let rec aux states =
-      match states with
-      | start :: next :: rest ->
-          let Game.{state_hash = start_state; tick = start_tick} = start in
-          let Game.{state_hash = next_state; tick = next_tick} = next in
-          let* c0 = conflicting_section start_tick start_state in
-          let* c = conflicting_section next_tick next_state in
-          if c0 then assert false
-          else if c then
-            if next_state = None then return None
-            else
-              return (Some ((start_state, start_tick), (next_state, next_tick)))
-          else aux (next :: rest)
-      | _ -> return None
-    in
-    aux dissection
-
-  (** [next_move  branching dissection] finds the next move based on a
-  dissection.
-  It finds the first section of dissection that conflicts with the evaluation.
-  If the section has length one tick it returns a move with a Conclude
-  conflict_resolution_step.
-  If the section is longer it creates a new dissection with branching
-  many pieces and returns
-   a move with a Refine type conflict_resolution_step.
-   *)
-  let next_move ~default_number_of_sections dissection =
-    let* conflict = find_conflict dissection in
-    match conflict with
-    | Some ((_, start_tick), (_, next_tick)) ->
-        let* start_state, (_ : Tick.t) =
-          state_at start_tick PVM.Utils.default_state Tick.initial
-        in
-        let* next_dissection =
-          match start_state with
-          | None -> return None
-          | Some s ->
-              dissection_of_section
-                ~default_number_of_sections
-                start_tick
-                s
-                next_tick
-        in
-        let* stop_state, (_ : Tick.t) =
-          match start_state with
-          | None -> return (None, next_tick)
-          | Some s -> state_at next_tick s start_tick
-        in
-        let* refutation =
-          match next_dissection with
-          | None ->
-              let* stop_hash =
-                match stop_state with
-                | None -> return None
-                | Some state ->
-                    let* s = PVM.state_hash state in
-                    return (Some s)
-              in
-              let* pvm_proof =
-                match start_state with
-                | Some s -> PVM.Utils.make_proof s stop_hash
-                | None -> assert false
-              in
-              let wrapped =
-                let module P = struct
-                  include PVM
-
-                  let proof = pvm_proof
-                end in
-                Unencodable (module P)
-              in
-              let proof = Proof.{pvm_step = wrapped; inbox = None} in
-              return Game.{choice = start_tick; step = Proof proof}
-          | Some next_dissection ->
-              return
-                Game.{choice = start_tick; step = Dissection next_dissection}
-        in
-
-        return (Some refutation)
-    | None -> return None
-
-  (** This is an automatic client. It generates a "perfect" client. *)
-  let machine_directed =
-    let start_state = PVM.Utils.default_state in
-    let initial =
-      let* stop_state, stop_at = exec_all start_state Tick.initial in
-      let* stop_hash = PVM.state_hash stop_state in
-      return (Some (stop_at, stop_hash))
-    in
-
-    let gen_next_move (game : Game.t) =
-      let dissection = game.dissection in
-      let new_move =
-        let* mv =
-          next_move
-            ~default_number_of_sections:game.default_number_of_sections
-            dissection
-        in
-        match mv with Some move -> return (Some move) | None -> return None
+  (** Generate [our_states] for [levels_and_inputs] based on the strategy.
+      It needs [level_min] and [level_max] in case it will need to generate
+      new inputs. *)
+  let gen_our_states ~metadata ctxt strategy ?level_min ?level_max
+      levels_and_inputs =
+    let open QCheck2.Gen in
+    let eval_inputs levels_and_inputs =
+      Lwt_main.run
+      @@
+      let open Lwt_result_syntax in
+      let*! r =
+        Arith_test_pvm.eval_levels_and_inputs ~metadata ctxt levels_and_inputs
       in
-      QCheck2.Gen.return new_move
+      Lwt.return @@ WithExceptions.Result.get_ok ~loc:__LOC__ r
     in
-
-    {initial; gen_next_move}
-
-  (** This builds a client from a strategy. If the strategy is
-     MachineDirected it uses the above constructions.  If the strategy
-     is random then it uses a random section for the initial
-     commitments and the random decision for the next move. *)
-  let player_from_strategy ~default_number_of_sections = function
+    match strategy with
+    | Perfect ->
+        (* The perfect player does not lie, evaluates correctly the inputs. *)
+        let _state, tick, our_states = eval_inputs levels_and_inputs in
+        return (tick, our_states, levels_and_inputs)
     | Random ->
-        let open QCheck2.Gen in
-        let* random_tick =
-          random_tick ~from:1 ~into:(default_number_of_sections - 1) ()
+        (* Random player generates its own list of inputs. *)
+        let* new_levels_and_inputs =
+          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
         in
-        let initial =
-          Lwt.Syntax.(
-            let random_state = PVM.Utils.default_state in
-            let* stop_hash = PVM.state_hash random_state in
-            Lwt.return (Some (random_tick, stop_hash)))
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Lazy ->
+        (* Lazy player removes inputs from [levels_and_inputs]. *)
+        let n = List.length levels_and_inputs in
+        let* remove_k = 1 -- n in
+        let new_levels_and_inputs =
+          List.take_n (n - remove_k) levels_and_inputs
         in
-        return
-          {
-            initial;
-            gen_next_move =
-              (fun game ->
-                random_decision
-                  ~default_number_of_sections:game.default_number_of_sections
-                  game.dissection);
-          }
-    | MachineDirected -> QCheck2.Gen.return machine_directed
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Eager ->
+        (* Eager player executes correctly the inbox until a certain point. *)
+        let nb_of_input =
+          List.fold_left
+            (fun acc (_level, inputs) -> acc + List.length inputs)
+            0
+            levels_and_inputs
+        in
+        let* corrupt_at_k = 0 -- (nb_of_input - 1) in
+        let new_input = "42 7 +" in
+        (* Once an input is corrupted, everything after will be corrupted
+           as well. *)
+        let new_levels_and_inputs =
+          let idx = ref (-1) in
+          List.map
+            (fun (level, inputs) ->
+              ( level,
+                List.map
+                  (fun input ->
+                    incr idx ;
+                    if !idx = corrupt_at_k then new_input else input)
+                  inputs ))
+            levels_and_inputs
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
+    | Keen ->
+        (* Keen player will add more messages. *)
+        let* new_levels_and_inputs =
+          gen_arith_pvm_inputs_for_levels ?level_min ?level_max ()
+        in
+        let new_levels_and_inputs = new_levels_and_inputs @ levels_and_inputs in
+        let new_levels_and_inputs =
+          List.sort_uniq
+            (fun (l, _) (l', _) -> Compare.Int.compare l l')
+            new_levels_and_inputs
+        in
+        let _state, tick, our_states = eval_inputs new_levels_and_inputs in
+        return (tick, our_states, new_levels_and_inputs)
 
-  (** [test_strategies defender_strategy refuter_strategy expectation inbox]
-      runs a game based oin the two given strategies and checks that the
-      resulting outcome fits the expectations. *)
-  let test_strategies ~default_number_of_sections defender_strategy
-      refuter_strategy expectation inbox =
+  let gen_raw_level =
     let open QCheck2.Gen in
-    let* defender_client =
-      player_from_strategy ~default_number_of_sections defender_strategy
-    in
-    let* refuter_client =
-      player_from_strategy ~default_number_of_sections refuter_strategy
-    in
+    let* level = map Int32.abs int32 in
+    return (Raw_level.of_int32_exn level)
 
-    let* outcome =
-      run ~default_number_of_sections ~inbox ~defender_client ~refuter_client
+  let gen_rollup =
+    let open QCheck2.Gen in
+    let* bytes = bytes_fixed_gen Sc_rollup_repr.Address.size in
+    return (Sc_rollup_repr.Address.hash_bytes [bytes])
+
+  let gen_metadata =
+    let open QCheck2.Gen in
+    let* address = gen_rollup in
+    let* origination_level = gen_raw_level in
+    return Metadata.{address; origination_level}
+
+  (** [gen ~rollup ~level_min ~level_max player levels_and_inputs] generates
+      a {!player_client} based on {!player.strategy}. *)
+  let gen ~rollup ~origination_level ~level_min ~level_max player
+      levels_and_inputs =
+    let open QCheck2.Gen in
+    let ctxt = empty_memory_ctxt "foo" in
+    let* metadata =
+      match player.strategy with
+      | Perfect | Lazy | Eager | Keen ->
+          return Sc_rollup.Metadata.{address = rollup; origination_level}
+      | Random -> gen_metadata
+    in
+    let* tick, our_states, levels_and_inputs =
+      gen_our_states
+        ~metadata
+        ctxt
+        player.strategy
+        ~level_min
+        ~level_max
+        levels_and_inputs
+    in
+    let inbox =
+      construct_inbox ~origination_level ctxt rollup levels_and_inputs
     in
     return
-      Lwt.Syntax.(
-        let* outcome = outcome in
-        expectation outcome)
-
-  (** the possible expectation functions *)
-  let defender_wins x = Lwt.return @@ equal_outcome Defender_wins x
-
-  let refuter_wins x = Lwt.return @@ equal_outcome Refuter_wins x
-
-  let all_win _ = Lwt.return_true
+      {
+        player;
+        final_tick = tick;
+        states = our_states;
+        inbox;
+        levels_and_inputs;
+        metadata;
+      }
 end
 
-(* just the snapshot of an empty inbox to start.*)
-let empty_snapshot =
-  let rollup = Address.hash_string [""] in
-  let level = Raw_level.root in
-  let context = Tezos_protocol_environment.Memory_context.empty in
-  let inbox = Lwt_main.run @@ Inbox.empty context rollup level in
-  Inbox.take_snapshot inbox
-
-(** The following are the possible combinations of strategy generators. *)
-let perfect_perfect (module P : TestPVM) default_number_of_sections :
-    bool Lwt.t QCheck2.Gen.t =
-  let module R = Strategies (P) in
-  R.test_strategies
-    ~default_number_of_sections
-    MachineDirected
-    MachineDirected
-    R.defender_wins
-    empty_snapshot
-
-let random_random (module P : TestPVM) default_number_of_sections =
-  let module R = Strategies (P) in
-  R.test_strategies
-    ~default_number_of_sections
-    Random
-    Random
-    R.all_win
-    empty_snapshot
-
-let random_perfect (module P : TestPVM) default_number_of_sections =
-  let module S = Strategies (P) in
-  S.test_strategies
-    Random
-    MachineDirected
-    S.refuter_wins
-    empty_snapshot
-    ~default_number_of_sections
-
-let perfect_random (module P : TestPVM) default_number_of_sections =
-  let module S = Strategies (P) in
-  S.test_strategies
-    MachineDirected
-    Random
-    S.defender_wins
-    empty_snapshot
-    ~default_number_of_sections
-
-(* a generator for a randomPVM.*)
-let gen_randomPVM =
-  let open QCheck2.Gen in
-  let* initial_prog = list_size small_int (int_range 1 100) in
-  return
-    (module MakeRandomPVM (struct
-      let initial_prog = initial_prog
-    end) : TestPVM)
-
-(* a generator for a countPVM.*)
-let gen_countPVM =
-  let open QCheck2.Gen in
-  let* target = small_int in
-  return
-    (module MakeCountingPVM (struct
-      let target = target
-    end) : TestPVM)
-
-(* TODO: 3382 in the case that the inputs are generated with a large enough size
-   (say 10000) the limits on encoding/decoding make the test fail.*)
-(* a generator for an arithPVM.*)
-let gen_arithPVM =
-  let open QCheck2.Gen in
-  let* inputs = gen_list ~size:(3 -- 100) in
-  let* evals = small_int in
-  return
-    (module TestArith (struct
-      let inputs = String.concat " " inputs
-
-      let evals = evals
-    end) : TestPVM)
-
-(* [generate_strategy_response strategy_gen pvm_gen] generate the boolean
-   response that you get by applying strategy_gen to pvm_gen. The strategy_gen
-   is one of [perfect_perfect, perfect_random, random_perfect, random_random]
-   and the pvm_gen is one of [gen_randomPVM, gen_countPVM, gen_arithPVM] *)
-let generate_strategy_response func gen : bool Lwt.t QCheck2.Gen.t =
-  let open QCheck2.Gen in
-  let result1 = map func gen in
-  let result = result1 <*> gen_num_sections in
-  join result
-
-(** This assembles a test from a RandomPVM generator and a strategy generator. *)
-let testing_PVM func mod_gen name =
-  let open QCheck2 in
-  Test.make ~name (generate_strategy_response func mod_gen) (fun x ->
-      Lwt_main.run x)
-
-(* generator for a dissection produced from of a fixed section*)
-let generate_dissection_of_section (module P : TestPVM) =
-  let open P in
-  let module S = Strategies (P) in
-  let open QCheck2.Gen in
-  let* start_at = int_range 1 10000
-  and* length = int_range 5 100
-  and* stop_hash = gen_random_hash
-  and* default_number_of_sections = gen_num_sections in
-  let section_start_state = Utils.default_state in
-  let section_stop_at = tick_of_int_exn (start_at + length) in
-  let section_start_at = tick_of_int_exn start_at in
-  let result =
-    let open Lwt.Syntax in
-    let* option_dissection =
-      S.dissection_of_section
-        ~default_number_of_sections
-        section_start_at
-        section_start_state
-        section_stop_at
-    in
-    let dissection =
-      match option_dissection with
-      | None -> raise (Invalid_argument "no dissection")
-      | Some x -> x
-    in
-
-    let* start = state_hash section_start_state in
-
-    let* check =
-      Game.Internal_for_tests.check_dissection
-        ~default_number_of_sections
-        ~start_chunk:{state_hash = Some start; tick = section_start_at}
-        ~stop_chunk:{state_hash = Some stop_hash; tick = section_stop_at}
-        dissection
-    in
-    Lwt.return (Result.to_option check = Some ())
+(** [create_commitment ~predecessor ~inbox_level ~our_states] creates
+    a commitment using [our_states] as the vision of ticks. *)
+let create_commitment ~predecessor ~inbox_level ~our_states =
+  let open Lwt_syntax in
+  let inbox_level = Int32.of_int inbox_level |> Raw_level.of_int32_exn in
+  let+ compressed_state =
+    match List.last_opt our_states with
+    | None ->
+        (* No tick evaluated. *)
+        Arith_test_pvm.initial_hash
+    | Some (_, state) -> return state
   in
-  return result
 
-let test_dissection_of_section =
-  let open QCheck2 in
-  let open Gen in
-  [
-    Test.make
-      ~name:"randomVPN"
-      (let* x = gen_randomPVM in
-       generate_dissection_of_section x)
-      (fun r -> Lwt_main.run r);
-    Test.make
-      ~name:"count"
-      (let* x = gen_countPVM in
-       generate_dissection_of_section x)
-      (fun r -> Lwt_main.run r);
-  ]
+  let number_of_ticks =
+    match our_states with
+    | [] -> Number_of_ticks.zero
+    | _ ->
+        List.length our_states - 1
+        |> Int64.of_int |> number_of_ticks_of_int64_exn
+  in
+  Commitment.{compressed_state; inbox_level; predecessor; number_of_ticks}
 
-(* generator for a randomly produced dissection*)
-let generate_random_dissection =
+(** [operation_publish_commitment block rollup lcc inbox_level p1_client]
+    creates a commitment and stake on it. *)
+let operation_publish_commitment ctxt rollup predecessor inbox_level
+    player_client =
+  let open Lwt_result_syntax in
+  let*! commitment =
+    create_commitment ~predecessor ~inbox_level ~our_states:player_client.states
+  in
+  Op.sc_rollup_publish ctxt player_client.player.contract rollup commitment
+
+(** [build_proof ~player_client start_tick game] builds a valid proof
+    regarding the vision [player_client] has. The proof refutes the
+    [start_tick]. *)
+let build_proof ~player_client start_tick (game : Game.t) =
+  let open Lwt_result_syntax in
+  (* No messages are added between [game.start_level] and the current level
+     so we can take the existing inbox of players. Otherwise, we should find the
+     inbox of [start_level]. *)
+  let inbox_context, messages_tree, history, inbox = player_client.inbox in
+  let* history, history_proof =
+    Lwt.map Environment.wrap_tzresult
+    @@ Store_inbox.form_history_proof inbox_context history inbox messages_tree
+  in
+  (* We start a game on a commitment that starts at [Tick.initial], the fuel
+     is necessarily [start_tick]. *)
+  let fuel = tick_to_int_exn start_tick in
+  let metadata = player_client.metadata in
+  let*! r =
+    Arith_test_pvm.eval_levels_and_inputs
+      ~metadata
+      ~fuel
+      (Arith_test_pvm.init_context ())
+      player_client.levels_and_inputs
+  in
+  let state, _, _ = WithExceptions.Result.get_ok ~loc:__LOC__ r in
+  let module P = struct
+    include Arith_test_pvm
+
+    let context = inbox_context
+
+    let state = state
+
+    let reveal _ = assert false
+
+    module Inbox_with_history = struct
+      include Store_inbox
+
+      let history = history
+
+      let inbox = history_proof
+    end
+  end in
+  let*! proof = Sc_rollup.Proof.produce ~metadata (module P) game.inbox_level in
+  return (WithExceptions.Result.get_ok ~loc:__LOC__ proof)
+
+(** [next_move ~number_of_sections ~player_client game] produces
+    the next move in the refutation game.
+
+    If there is a disputed section where the distance is one tick, it
+    produces a proof. Otherwise, provides another dissection.
+*)
+let next_move ~player_client (game : Game.t) =
+  let open Lwt_result_syntax in
+  match game.game_state with
+  | Dissecting {dissection; default_number_of_sections} -> (
+      let disputed_sections =
+        disputed_sections ~our_states:player_client.states dissection
+      in
+      assert (Compare.List_length_with.(disputed_sections > 0)) ;
+      let single_tick_disputed_sections =
+        single_tick_disputed_sections disputed_sections
+      in
+      match single_tick_disputed_sections with
+      | (start_chunk, _stop_chunk) :: _ ->
+          let tick = start_chunk.tick in
+          let+ proof = build_proof ~player_client tick game in
+          Game.{choice = tick; step = Proof proof}
+      | [] ->
+          (* If we reach this case, there is necessarily a disputed section. *)
+          let start_chunk, stop_chunk = Stdlib.List.hd disputed_sections in
+          let dissection =
+            build_dissection
+              ~number_of_sections:default_number_of_sections
+              ~start_chunk
+              ~stop_chunk
+              ~our_states:player_client.states
+          in
+          return Game.{choice = start_chunk.tick; step = Dissection dissection})
+  | Final_move {agreed_start_chunk; refuted_stop_chunk = _} ->
+      let tick = agreed_start_chunk.tick in
+      let+ proof = build_proof ~player_client tick game in
+      Game.{choice = tick; step = Proof proof}
+
+type game_result_for_tests = Defender_wins | Refuter_wins
+
+(** Play until there is an {!game_result_for_tests}.
+
+    A game result can happen if:
+    - A valid refutation was provided to the protocol and it succeeded to
+      win the game.
+    - A player played an invalid refutation and was rejected by the
+      protocol.
+*)
+let play_until_game_result ~refuter_client ~defender_client ~rollup block =
+  let rec play ~player_turn ~opponent block =
+    let open Lwt_result_syntax in
+    let* game_opt =
+      Context.Sc_rollup.ongoing_game_for_staker
+        (B block)
+        rollup
+        player_turn.player.pkh
+    in
+    let game, _, _ = WithExceptions.Option.get ~loc:__LOC__ game_opt in
+    let* refutation = next_move ~player_client:player_turn game in
+    let* incr = Incremental.begin_construction block in
+    let* operation_refutation =
+      Op.sc_rollup_refute
+        (I incr)
+        player_turn.player.contract
+        rollup
+        opponent.player.pkh
+        (Some refutation)
+    in
+    let* incr = Incremental.add_operation incr operation_refutation in
+    match game_status_of_refute_op_result (Incremental.rev_tickets incr) with
+    | Ongoing ->
+        let* block = Incremental.finalize_block incr in
+        play ~player_turn:opponent ~opponent:player_turn block
+    | Ended (Loser {reason = _; loser}) as game_result ->
+        let () =
+          Format.printf "@,ending result: %a@," Game.pp_status game_result
+        in
+        if loser = Account.pkh_of_contract_exn refuter_client.player.contract
+        then return Defender_wins
+        else return Refuter_wins
+    | Ended Draw ->
+        QCheck2.Test.fail_reportf "Game ended in a draw, which is unexpected"
+  in
+  play ~player_turn:refuter_client ~opponent:defender_client block
+
+(** Generate two {!player}s with a given strategy. *)
+let make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 =
+  let pkh1 = Account.pkh_of_contract_exn contract1 in
+  let pkh2 = Account.pkh_of_contract_exn contract2 in
+  let ({alice; bob = _} : Game.Index.t) = Game.Index.make pkh1 pkh2 in
+  let player1, player2 =
+    if Signature.Public_key_hash.equal alice pkh1 then Game.(Alice, Bob)
+    else Game.(Bob, Alice)
+  in
+  ( {
+      pkh = pkh1;
+      contract = contract1;
+      strategy = p1_strategy;
+      game_player = player1;
+    },
+    {
+      pkh = pkh2;
+      contract = contract2;
+      strategy = p2_strategy;
+      game_player = player2;
+    } )
+
+(** [gen_game ~p1_strategy ~p2_strategy] generates a context where a rollup
+    was originated.
+    It generates inputs for the rollup, and creates the players' interpretation
+    of these inputs in a {!player_client} for [p1_strategy] and [p2_strategy].
+*)
+let gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
   let open QCheck2.Gen in
-  let* start_at = int_range 1 10000
-  and* length = int_range 5 100
-  and* stop_hash = gen_random_hash
-  and* default_number_of_sections = gen_num_sections in
-  let* start_hash = gen_random_hash in
-  let* new_stop_hash = gen_random_hash in
-  let section_stop_at = tick_of_int_exn (start_at + length) in
-  let section_start_at = tick_of_int_exn start_at in
-  let* option_dissection =
-    random_dissection
-      ~default_number_of_sections
-      section_start_at
-      start_hash
-      section_stop_at
-      (Some stop_hash)
+  (* If there is no good player, we do not care about the result. *)
+  assert (p1_strategy = Perfect || p2_strategy = Perfect) ;
+  let* first_inputs =
+    let* input = gen_arith_pvm_inputs ~gen_size:(pure 0) in
+    let* inputs = small_list (gen_arith_pvm_inputs ~gen_size:(pure 0)) in
+    return (input :: inputs)
   in
-  let result =
-    let open Lwt.Syntax in
-    let dissection =
-      match option_dissection with
-      | None -> raise (Invalid_argument "no dissection")
-      | Some x -> x
-    in
-    let* check =
-      Game.Internal_for_tests.check_dissection
-        ~default_number_of_sections
-        ~start_chunk:{state_hash = Some start_hash; tick = section_start_at}
-        ~stop_chunk:{state_hash = Some new_stop_hash; tick = section_stop_at}
-        dissection
-    in
-    Lwt.return (Result.to_option check = Some ())
+  let block, rollup, genesis_info, (contract1, contract2, contract3) =
+    create_ctxt ~first_inputs
   in
-  return result
+  let p1, p2 = make_players ~p1_strategy ~contract1 ~p2_strategy ~contract2 in
 
-let test_random_dissection =
-  let open QCheck2 in
-  [Test.make ~name:"random_dissection" generate_random_dissection Lwt_main.run]
+  (* Create a context with a rollup originated. *)
+  let commitment_period =
+    Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+      .sc_rollup
+      .commitment_period_in_blocks
+  in
+  let origination_level =
+    Raw_level.to_int32 genesis_info.level |> Int32.to_int
+  in
+  let level_min = origination_level + 1 in
+  let level_max = origination_level + commitment_period - 1 in
+  let* levels_and_inputs =
+    gen_arith_pvm_inputs_for_levels ?nonempty_inputs ~level_min ~level_max ()
+  in
+  let* p1_client =
+    Player_client.gen
+      ~origination_level:genesis_info.level
+      ~level_min
+      ~level_max
+      ~rollup
+      p1
+      ((origination_level, first_inputs) :: levels_and_inputs)
+  in
+  let* p2_client =
+    Player_client.gen
+      ~origination_level:genesis_info.level
+      ~level_min
+      ~level_max
+      ~rollup
+      p2
+      ((origination_level, first_inputs) :: levels_and_inputs)
+  in
+  let* p1_start = bool in
+  let commitment_level = origination_level + commitment_period in
+  let* additional_payloads = small_list (string_size (1 -- 15)) in
+  return
+    ( block,
+      rollup,
+      commitment_level,
+      genesis_info.commitment_hash,
+      p1_client,
+      p2_client,
+      contract3,
+      p1_start,
+      levels_and_inputs,
+      additional_payloads )
 
-let () =
-  Alcotest.run
-    "Refutation Game"
-    [
-      ("Dissection tests", qcheck_wrap test_dissection_of_section);
-      ("Random dissection", qcheck_wrap test_random_dissection);
-      ( "RandomPVM",
-        qcheck_wrap
-          [
-            testing_PVM perfect_perfect gen_randomPVM "perfect-perfect";
-            testing_PVM random_random gen_randomPVM "random-random";
-            testing_PVM random_perfect gen_randomPVM "random-perfect";
-            testing_PVM perfect_random gen_randomPVM "perfect-random";
-          ] );
-      ( "CountingPVM",
-        qcheck_wrap
-          [
-            testing_PVM perfect_perfect gen_countPVM "perfect-perfect";
-            testing_PVM random_random gen_countPVM "random-random";
-            testing_PVM random_perfect gen_countPVM "random-perfect";
-            testing_PVM perfect_random gen_countPVM "perfect-random";
-          ] );
-      ( "ArithPVM",
-        qcheck_wrap
-          [
-            testing_PVM perfect_perfect gen_arithPVM "perfect-perfect";
-            testing_PVM random_random gen_arithPVM "random-random";
-            testing_PVM random_perfect gen_arithPVM "random-perfect";
-            testing_PVM perfect_random gen_arithPVM "perfect-random";
-          ] );
-    ]
+(** [prepare_game block lcc originated_level p1_client p2_client
+    inputs_and_levels] prepares a context where [p1_client] and [p2_client]
+    are in conflict for one commitment.
+    It creates the protocol inbox using [inputs_and_levels]. *)
+let prepare_game block rollup lcc commitment_level p1_client p2_client contract
+    levels_and_inputs =
+  let open Lwt_result_syntax in
+  let* block = construct_inbox_proto block rollup levels_and_inputs contract in
+  let* operation_publish_commitment_p1 =
+    operation_publish_commitment (B block) rollup lcc commitment_level p1_client
+  in
+  let* operation_publish_commitment_p2 =
+    operation_publish_commitment (B block) rollup lcc commitment_level p2_client
+  in
+  Block.bake
+    ~operations:
+      [operation_publish_commitment_p1; operation_publish_commitment_p2]
+    block
+
+(** Create a test of [p1_strategy] against [p2_strategy]. One of them
+    must be a {!Perfect} player, otherwise, we do not care about which
+    cheater wins. *)
+let test_game ?nonempty_inputs ~p1_strategy ~p2_strategy () =
+  let name =
+    Format.asprintf
+      "%a against %a"
+      pp_strategy
+      p1_strategy
+      pp_strategy
+      p2_strategy
+  in
+  qcheck_make_lwt_res
+    ~print:
+      (fun ( block,
+             rollup,
+             commitment_level,
+             lcc,
+             p1_client,
+             p2_client,
+             _contract3,
+             p1_start,
+             levels_and_inputs,
+             _additional_payloads ) ->
+      let level =
+        WithExceptions.Result.get_ok ~loc:__LOC__ @@ Context.get_level (B block)
+      in
+      Format.asprintf
+        "@[<v>@,\
+         current level: %a@,\
+         rollup: %a@,\
+         commitment_level: %d@,\
+         last cemented commitment: %a@,\
+         @[<v 2>p1:@,\
+         %a@]@,\
+         @[<v 2>p2:@,\
+         %a@]@,\
+         who start: %s@,\
+         @[<v 2>levels and inputs:@,\
+         %a@]@,\
+         @]"
+        Raw_level.pp
+        level
+        Sc_rollup.Address.pp_short
+        rollup
+        commitment_level
+        Sc_rollup.Commitment.Hash.pp_short
+        lcc
+        pp_player_client
+        p1_client
+        pp_player_client
+        p2_client
+        (if p1_start then "p1" else "p2")
+        pp_levels_and_inputs
+        levels_and_inputs)
+    ~count:200
+    ~name
+    ~gen:(gen_game ?nonempty_inputs ~p1_strategy ~p2_strategy ())
+    (fun ( block,
+           rollup,
+           commitment_level,
+           lcc,
+           p1_client,
+           p2_client,
+           contract3,
+           p1_start,
+           levels_and_inputs,
+           additional_payloads ) ->
+      let open Lwt_result_syntax in
+      (* Otherwise, there is no conflict. *)
+      QCheck2.assume
+        (not
+           (let p1_head = List.last_opt p1_client.states in
+            let p2_head = List.last_opt p2_client.states in
+            Option.equal
+              (fun (t1, state_hash1) (t2, state_hash2) ->
+                Tick.equal t1 t2 && State_hash.equal state_hash1 state_hash2)
+              p1_head
+              p2_head)) ;
+      let* block =
+        prepare_game
+          block
+          rollup
+          lcc
+          commitment_level
+          p1_client
+          p2_client
+          contract3
+          levels_and_inputs
+      in
+      let refuter, defender =
+        if p1_start then (p1_client, p2_client) else (p2_client, p1_client)
+      in
+      let* operation_start_game =
+        Op.sc_rollup_refute
+          (B block)
+          refuter.player.contract
+          rollup
+          defender.player.pkh
+          None
+      in
+      let* block =
+        match additional_payloads with
+        | [] -> Block.bake ~operation:operation_start_game block
+        | payloads ->
+            (* Add messages before starting the game. *)
+            let* operation_add_messages1 =
+              Op.sc_rollup_add_messages
+                (B block)
+                defender.player.contract
+                rollup
+                payloads
+            in
+            (* Start the game in between adding messages so the latest protocol
+               inbox is no longer equal to the player's view on inbox. *)
+            let* operation_add_messages2 =
+              Op.sc_rollup_add_messages (B block) contract3 rollup payloads
+            in
+            Block.bake
+              ~operations:
+                [
+                  operation_add_messages1;
+                  operation_start_game;
+                  operation_add_messages2;
+                ]
+              block
+      in
+      let* game_result =
+        play_until_game_result
+          ~rollup
+          ~refuter_client:refuter
+          ~defender_client:defender
+          block
+      in
+      match game_result with
+      | Defender_wins -> return (defender.player.strategy = Perfect)
+      | Refuter_wins -> return (refuter.player.strategy = Perfect))
+
+let test_perfect_against_random =
+  test_game ~p1_strategy:Perfect ~p2_strategy:Random ()
+
+let test_random_against_perfect =
+  test_game ~p1_strategy:Random ~p2_strategy:Perfect ()
+
+let test_perfect_against_lazy =
+  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Lazy ()
+
+let test_lazy_against_perfect =
+  test_game ~nonempty_inputs:true ~p1_strategy:Lazy ~p2_strategy:Perfect ()
+
+let test_perfect_against_eager =
+  test_game ~nonempty_inputs:true ~p1_strategy:Perfect ~p2_strategy:Eager ()
+
+let test_eager_against_perfect =
+  test_game ~nonempty_inputs:true ~p1_strategy:Eager ~p2_strategy:Perfect ()
+
+let test_perfect_against_keen =
+  test_game ~p1_strategy:Perfect ~p2_strategy:Keen ()
+
+let test_keen_against_perfect =
+  test_game ~p1_strategy:Keen ~p2_strategy:Perfect ()
+
+let tests =
+  ( "Refutation",
+    qcheck_wrap
+      [
+        test_perfect_against_random;
+        test_random_against_perfect;
+        test_perfect_against_lazy;
+        test_lazy_against_perfect;
+        test_perfect_against_eager;
+        test_eager_against_perfect;
+        test_perfect_against_keen;
+        test_keen_against_perfect;
+      ] )
+
+(** {2 Entry point} *)
+
+let tests = [tests; Dissection.tests]
+
+let () = Alcotest.run "Refutation_game" tests

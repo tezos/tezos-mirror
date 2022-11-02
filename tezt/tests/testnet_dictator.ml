@@ -32,8 +32,7 @@
 *)
 
 let bake node client =
-  let* level_json = RPC.get_current_level client in
-  let level = JSON.(level_json |-> "level" |> as_int) in
+  let level = Node.get_level node in
   let* () =
     Client.bake_for
       ~keys:
@@ -101,10 +100,10 @@ let init_with_dictator ~chain_id ~protocol =
     Protocol.write_parameter_file
       ~base:(Right (protocol, None))
       [
-        (["blocks_per_cycle"], Some "4");
-        (["cycles_per_voting_period"], Some "1");
-        (["nonce_revelation_threshold"], Some "3");
-        (["testnet_dictator"], Some ("\"" ^ dictator.public_key_hash ^ "\""));
+        (["blocks_per_cycle"], `Int 4);
+        (["cycles_per_voting_period"], `Int 1);
+        (["nonce_revelation_threshold"], `Int 3);
+        (["testnet_dictator"], `String dictator.public_key_hash);
       ]
   in
   let* () =
@@ -174,11 +173,11 @@ let register_test chain_id period =
         "Checking that %s migration occurred..."
         (if chain_id = Chain_id_mainnet then "no" else "a forced") ;
       let expected_protocol =
-        if chain_id = Chain_id_mainnet then Protocol.hash Alpha
+        if chain_id = Chain_id_mainnet then Protocol.hash protocol
         else Protocol.demo_counter_hash
       in
       let* () =
-        Voting.check_protocols client (Protocol.hash Alpha, expected_protocol)
+        Voting.check_protocols client (Protocol.hash protocol, expected_protocol)
       in
       return ())
   in
@@ -188,8 +187,8 @@ let register_test chain_id period =
     Log.info "- submitting proposals %s for %s" proto_hash key.Account.alias ;
     Client.submit_proposals ~key:key.alias ~proto_hash client
   in
-  let* () = submit_proposal ~key:Constant.bootstrap2 (Protocol.hash Alpha) in
-  let* () = submit_proposal ~key:Constant.bootstrap3 (Protocol.hash Alpha) in
+  let* () = submit_proposal ~key:Constant.bootstrap2 (Protocol.hash protocol) in
+  let* () = submit_proposal ~key:Constant.bootstrap3 (Protocol.hash protocol) in
   let* () = bake_until_next_period node client in
   let* () =
     Voting.check_current_period
@@ -208,7 +207,7 @@ let register_test chain_id period =
     Log.info "- submitting ballot for %s" key.Account.alias ;
     Client.submit_ballot
       ~key:key.alias
-      ~proto_hash:(Protocol.hash Alpha)
+      ~proto_hash:(Protocol.hash protocol)
       ballot
       client
   in

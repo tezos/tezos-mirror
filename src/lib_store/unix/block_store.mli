@@ -226,16 +226,14 @@ val read_block_metadata :
 val store_block : block_store -> Block_repr.t -> unit tzresult Lwt.t
 
 (** [cement_blocks ?check_consistency ~write_metadata block_store
-    chunk]
+    chunk_iterator]
 
-    Wrapper of {!Cemented_block_store.cement_blocks}. If the flag
-    [check_consistency] is set, it verifies that all blocks in
-    [chunk] are in a consecutive order. *)
+    Wrapper of {!Cemented_block_store.cement_blocks}. *)
 val cement_blocks :
   ?check_consistency:bool ->
   write_metadata:bool ->
   block_store ->
-  Block_repr.t list ->
+  Cemented_block_store.chunk_iterator ->
   unit tzresult Lwt.t
 
 (** [move_floating_store block_store ~src ~dst_kind] closes the
@@ -336,6 +334,12 @@ val load :
   genesis_block:Block_repr.t ->
   readonly:bool ->
   block_store tzresult Lwt.t
+
+(** [register_gc_callback block_store callback] installs a [callback]
+   that may be triggered during a block store merge in order to
+   garbage-collect old contexts. *)
+val register_gc_callback :
+  block_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
 
 (** [close block_store] closes the [block_store] and every underlying
     opened stores.

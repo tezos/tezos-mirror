@@ -31,11 +31,11 @@
    include the hash of the block that precedes the block where these operations
    should be included. *)
 
-(** [hash ~predecessor:block_hash round oplh] creates a payload hash given a
-    [block_hash], the first [round] at which the payload was proposed
-    and the hash [oplh] of the non-consensus operations. *)
+(** Create a payload hash from the predecessor block hash, the first
+    round at which the payload was proposed, and the hashes of
+    non-consensus operations. *)
 val hash :
-  predecessor:Block_hash.t ->
-  Round_repr.t ->
-  Operation_list_hash.t ->
+  predecessor_hash:Block_hash.t ->
+  payload_round:Round_repr.t ->
+  Operation_list_hash.elt list ->
   Block_payload_hash.t

@@ -1,6 +1,7 @@
 Missing config file prints
   $ ./main_snoop.exe benchmark N_IBlake2b_alpha and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
   Model N_IOpt_map_alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda_alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Model N_ISapling_verify_update_alpha already registered for code generation! (overloaded instruction?) Ignoring.
@@ -11,7 +12,6 @@ Missing config file prints
   { options = { seed=self-init;
                 bench #=1;
                 nsamples/bench=3000;
-                determinizer=percentile 50;
                 minor_heap_size=262144 words;
                 config directory=__nosuchdir };
      save_file = output.json;

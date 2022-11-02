@@ -96,14 +96,8 @@ let dispatch_withdrawals_signer_arg =
 let rollup_id_param =
   let open Client_proto_rollups in
   Clic.parameter ~autocomplete:TxRollupAlias.autocomplete (fun cctxt s ->
-      let open Lwt_result_syntax in
       let from_alias s = TxRollupAlias.find cctxt s in
-      let from_key s =
-        match Protocol.Alpha_context.Tx_rollup.of_b58check s with
-        | Ok x -> return x
-        | Error _ ->
-            failwith "Cannot parse %s as a transaction rollup address" s
-      in
+      let from_key s = TxRollupAlias.of_source s in
       Client_aliases.parse_alternatives
         [("alias", from_alias); ("key", from_key)]
         s)
@@ -121,11 +115,10 @@ let origination_level_arg =
 let rpc_addr_arg =
   let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
   let doc = rpc_addr_doc default in
-  Clic.default_arg
+  Clic.arg
     ~long:"rpc-addr"
     ~placeholder:"address:port"
     ~doc
-    ~default
     (Clic.parameter (fun _ s ->
          P2p_point.Id.of_string s
          |> Result.map_error (fun e -> [Exn (Failure e)])
@@ -165,17 +158,6 @@ let cors_headers_arg =
 let reconnection_delay_arg =
   let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
-  Clic.default_arg
-    ~long:"reconnection-delay"
-    ~placeholder:"delay"
-    ~doc
-    ~default:(string_of_float default)
-    (Clic.parameter (fun _ p ->
-         try return (float_of_string p) with _ -> failwith "Cannot read float"))
-
-let reconnection_delay_opt_arg =
-  let default = Node_config.default_reconnection_delay in
-  let doc = reconnection_delay_doc default in
   Clic.arg
     ~long:"reconnection-delay"
     ~placeholder:"delay"
@@ -212,14 +194,26 @@ let group =
       title = "Commands related to the transaction rollup node";
     }
 
-let config_from_args data_dir rollup_id mode operator batch_signer
-    finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
-    cors_headers allow_deposit reconnection_delay =
-  let data_dir =
+let config_from_args data_dir (rollup_id : Client_proto_rollups.TxRollupAlias.t)
+    mode operator batch_signer finalize_commitment_signer
+    remove_commitment_signer rejection_signer dispatch_withdrawals_signer
+    origination_level rpc_addr cors_origins cors_headers allow_deposit
+    reconnection_delay =
+  let open Lwt_syntax in
+  let origination_level =
+    Option.either rollup_id.origination_level origination_level
+  in
+  let rollup_id = rollup_id.rollup in
+  let+ data_dir =
     match data_dir with
-    | Some d -> d
+    | Some d -> return d
     | None -> Node_config.default_data_dir rollup_id
+  in
+  let rpc_addr = Option.value rpc_addr ~default:Node_config.default_rpc_addr in
+  let reconnection_delay =
+    Option.value
+      reconnection_delay
+      ~default:Node_config.default_reconnection_delay
   in
   Node_config.
     {
@@ -246,10 +240,15 @@ let config_from_args data_dir rollup_id mode operator batch_signer
       batch_burn_limit = None;
     }
 
-let patch_config_from_args config rollup_id mode operator batch_signer
-    finalize_commitment_signer remove_commitment_signer rejection_signer
-    dispatch_withdrawals_signer origination_level rpc_addr cors_origins
-    cors_headers allow_deposit reconnection_delay =
+let patch_config_from_args config
+    (rollup_id : Client_proto_rollups.TxRollupAlias.t) mode operator
+    batch_signer finalize_commitment_signer remove_commitment_signer
+    rejection_signer dispatch_withdrawals_signer origination_level rpc_addr
+    cors_origins cors_headers allow_deposit reconnection_delay =
+  let origination_level =
+    Option.either rollup_id.origination_level origination_level
+  in
+  let rollup_id = rollup_id.rollup in
   if
     Protocol.Alpha_context.Tx_rollup.(rollup_id <> config.Node_config.rollup_id)
   then
@@ -357,7 +356,7 @@ let configuration_init_command =
          cctxt ->
       let open Lwt_result_syntax in
       let*! () = Event.(emit preamble_warning) () in
-      let config =
+      let*! config =
         config_from_args
           data_dir
           rollup_id
@@ -380,7 +379,7 @@ let configuration_init_command =
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       let*! () = cctxt#message "Configuration written in %s" file in
-      let*! () = Event.(emit configuration_was_written) (file, config) in
+      let*! () = Event.(emit configuration_was_written) file in
       return_unit)
 
 let run_command =
@@ -402,7 +401,7 @@ let run_command =
        cors_origins_arg
        cors_headers_arg
        allow_deposit_arg
-       reconnection_delay_opt_arg)
+       reconnection_delay_arg)
     (prefix "run" @@ mode_param @@ prefix "for"
     @@ Clic.param
          ~name:"rollup-id"
@@ -426,15 +425,7 @@ let run_command =
          rollup_id
          cctxt ->
       let*! () = Event.(emit preamble_warning) () in
-      let config_from_args =
-        let rpc_addr =
-          Option.value rpc_addr ~default:Node_config.default_rpc_addr
-        in
-        let reconnection_delay =
-          Option.value
-            reconnection_delay
-            ~default:Node_config.default_reconnection_delay
-        in
+      let*! config_from_args =
         config_from_args
           data_dir
           rollup_id

@@ -76,10 +76,14 @@ let tx_rollup_address = "txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi"
 
 (* The following address has been extracted like this:
      - turn [sc_rollup_enable] to [true] in [src/proto_alpha/parameters/test-parameters.json]
-     - [./tezos-client -M mockup create mockup --protocol-constants src/proto_alpha/parameters/test-parameters.json]
-     - [./tezos-client -M mockup originate sc rollup from bootstrap1 of kind arith booting with '' --burn-cap 2]
+     - [./octez-client -M mockup create mockup --protocol-constants src/proto_alpha/parameters/test-parameters.json]
+     - [./octez-client -M mockup originate sc rollup from bootstrap1 of kind arith booting with '' --burn-cap 2]
 *)
 let sc_rollup_address = "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3731
+   Explain how this address was computed *)
+let zk_rollup_address = "zkr1RePaz42fAmoGVGPhRvoVH5zwr3Sz6ZS93"
 
 let assert_compat contract destination =
   match destination with
@@ -180,11 +184,13 @@ let test_compare_destination () =
   let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
   let txr1 = !!(Destination_repr.of_b58check tx_rollup_address) in
   let scr1 = !!(Destination_repr.of_b58check sc_rollup_address) in
+  let zkr1 = !!(Destination_repr.of_b58check zk_rollup_address) in
 
   assert (Destination_repr.(tz1 < kt1)) ;
   assert (Destination_repr.(kt1 < txr1)) ;
   assert (Destination_repr.(tz1 < txr1)) ;
   assert (Destination_repr.(txr1 < scr1)) ;
+  assert (Destination_repr.(scr1 < zkr1)) ;
 
   return_unit
 

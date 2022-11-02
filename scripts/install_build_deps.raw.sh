@@ -1,18 +1,14 @@
 #!/bin/sh
 
+set -e
+
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
 #shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
-if [ "$1" = "--tps" ]; then
-    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print)
-else
-    # The TPS evaluation tool requires some extra dependencies that we want to hide from the end user that
-    # builds Octez. As such we're not building it by default.
-    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -not -name tezos-tps-evaluation.opam -print)
-fi
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print)
 
 
 export OPAMYES="${OPAMYES:=true}"
@@ -37,6 +33,10 @@ esac
 ## of a command:
 $opam_depext_command
 
+# Follow up of the previous explanation: We make opam acknowledge
+# that we have a rust compiler we installed by our own.
+OPAMASSUMEDEPEXTS=true opam install conf-rust
+
 ## In an ideal world, `--with-test` should be present only when using
 ## `--dev`. But this would probably break the CI, so we postponed this
 ## change until someone have some spare time. (@pirbo, @hnrgrgr)
@@ -46,3 +46,7 @@ $opam_depext_command
 # an error.
 # shellcheck disable=SC2086
 opam install $opams --deps-only --with-test --criteria="-notuptodate,-changed,-removed"
+
+if [ "$1" = "--tps" ]; then
+    opam install caqti-driver-postgresql
+fi

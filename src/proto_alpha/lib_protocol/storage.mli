@@ -69,15 +69,26 @@ module Contract : sig
 
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
+  (** see {!Raw_context_intf.T.local_context} *)
+  type local_context
+
+  (** see {!Raw_context_intf.T.with_local_context} *)
+  val with_local_context :
+    Raw_context.t ->
+    Contract_repr.t ->
+    (local_context -> (local_context * 'a) tzresult Lwt.t) ->
+    (Raw_context.t * 'a) tzresult Lwt.t
+
   (** The tez possessed by a contract and that can be used. A contract
      may also possess tez in frozen deposits. Empty balances (of zero
      tez) are only allowed for originated contracts, not for implicit
      ones. *)
   module Spendable_balance :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t
+       and type local_context := local_context
 
   (** If the value is not set, the delegate didn't miss any endorsing
      opportunity.  If it is set, this value is a record of type
@@ -99,10 +110,25 @@ module Contract : sig
 
   (** The manager of a contract *)
   module Manager :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Manager_repr.t
        and type t := Raw_context.t
+       and type local_context := local_context
+
+  (** The active consensus key of a delegate *)
+  module Consensus_key :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t
+
+  (** The pending consensus key of a delegate *)
+  module Pending_consensus_keys :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t * Contract_repr.t
 
   (** The delegate of a contract, if any. *)
   module Delegate :
@@ -148,10 +174,11 @@ module Contract : sig
        and type t := Raw_context.t
 
   module Counter :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = Contract_repr.t
        and type value = Z.t
        and type t := Raw_context.t
+       and type local_context := local_context
 
   module Code :
     Non_iterable_indexed_carbonated_data_storage
@@ -237,16 +264,16 @@ module Big_map : sig
          and type value = Script_repr.expr
          and type t := key
 
-    (** HACK *)
-    val list_values :
+    val list_key_values :
       ?offset:int ->
       ?length:int ->
       Raw_context.t * id ->
-      (Raw_context.t * Script_repr.expr list) tzresult Lwt.t
+      (Raw_context.t * (Script_expr_hash.t * Script_repr.expr) list) tzresult
+      Lwt.t
   end
 
   module Total_bytes :
-    Indexed_data_storage
+    Indexed_data_storage_with_local_context
       with type key = id
        and type value = Z.t
        and type t := Raw_context.t
@@ -345,6 +372,12 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
+(** Set of all active consensus keys in cycle `current + preserved_cycles + 1` *)
+module Consensus_keys :
+  Data_set_storage
+    with type t := Raw_context.t
+     and type elt = Signature.Public_key_hash.t
+
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
 
 (** Set used to avoid slashing multiple times the same event *)
@@ -356,7 +389,8 @@ module Slashed_deposits :
 
 module Stake : sig
   (** The map of all the staking balances of all delegates, including
-     those with less than one roll. It might be large *)
+     those with less than
+     {!Constants_parametric_repr.minimal_stake}. It might be large *)
   module Staking_balance :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
@@ -366,7 +400,7 @@ module Stake : sig
 
   (** This is a set, encoded in a map with value unit. This should be
      fairly small compared to staking balance *)
-  module Active_delegate_with_one_roll :
+  module Active_delegates_with_minimal_stake :
     Indexed_data_snapshotable_storage
       with type key = Signature.Public_key_hash.t
        and type value = unit
@@ -383,22 +417,22 @@ module Stake : sig
       with type key = Cycle_repr.t
        and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
        and type t := Raw_context.t
-end
 
-(** Sum of the active stakes of all the delegates with rolls *)
-module Total_active_stake :
-  Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = Tez_repr.t
-     and type t := Raw_context.t
+  (** Sum of the active stakes of all the delegates with
+      {!Constants_parametric_repr.minimal_stake} *)
+  module Total_active_stake :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Tez_repr.t
+       and type t := Raw_context.t
+end
 
 (** State of the sampler used to select delegates. Managed synchronously
     with [Stake.Selected_distribution_for_cycle]. *)
 module Delegate_sampler_state :
   Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value =
-      (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+     and type value = Raw_context.consensus_pk Sampler.t
      and type t := Raw_context.t
 
 (** Votes *)
@@ -682,6 +716,7 @@ module Sc_rollup : sig
       Each smart contract rollup is associated to:
 
       - a PVM kind (provided at creation time, read-only)
+      - a metadata (generated at creation time, read-only)
       - a boot sector (provided at creation time, read-only)
       - a parameters type specifying the types of parameters the rollup accepts
       - the L1 block level at which the rollup was created
@@ -716,7 +751,7 @@ module Sc_rollup : sig
        and type t := Raw_context.t
 
   module Genesis_info :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_commitment_repr.genesis_info
        and type t := Raw_context.t
@@ -817,7 +852,7 @@ module Sc_rollup : sig
   module Game_timeout :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_game_repr.Index.t
-       and type value = Raw_level_repr.t
+       and type value = Sc_rollup_game_repr.timeout
        and type t = Raw_context.t * Sc_rollup_repr.t
 
   (** [Opponent] stores the current opponent of the staker. This is
@@ -867,9 +902,57 @@ module Sc_rollup : sig
 end
 
 module Dal : sig
-  module Slot_headers :
-    Non_iterable_indexed_data_storage
-      with type t = Raw_context.t
-       and type key = Raw_level_repr.t
-       and type value = Dal_slot_repr.slot list
+  module Slot : sig
+    (** This is a temporary storage for slot headers proposed onto the L1. *)
+    module Headers :
+      Non_iterable_indexed_data_storage
+        with type t = Raw_context.t
+         and type key = Raw_level_repr.t
+         and type value = Dal_slot_repr.Header.t list
+
+    (** This is a permanent storage for slot headers confirmed by the L1. *)
+    module History :
+      Single_data_storage
+        with type t := Raw_context.t
+         and type value = Dal_slot_repr.History.t
+  end
+end
+
+module Zk_rollup : sig
+  (** ZK rollup.
+
+      Each ZK rollup is associated to:
+
+      - an Account, as described in [Zk_rollup_repr]
+      - a pending list description, consisting of its head's index and
+        a counter
+      - a map from integer indeces to L2 operations, to store the actual
+        pending list
+  *)
+  module Account :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_account_repr.t
+
+  module Pending_list :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Zk_rollup_repr.t
+       and type value = Zk_rollup_repr.pending_list
+
+  module Pending_operation :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Zk_rollup_repr.t
+       and type key = int64
+       and type value = Zk_rollup_operation_repr.t * Ticket_hash_repr.t option
+end
+
+module Migration_from_Kathmandu : sig
+  module Delegate_sampler_state :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value =
+        (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+       and type t := Raw_context.t
 end

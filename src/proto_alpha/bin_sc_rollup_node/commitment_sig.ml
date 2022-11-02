@@ -42,23 +42,20 @@
 module type S = sig
   module PVM : Pvm.S
 
-  (** [process_head node_ctxt store head] checks whether a new commitment needs
-      to be computed and stored, by looking at the level of [head] and checking
-      whether it is a multiple of  `Commitment.sc_rollup_commitment_period`
-      levels away from [node_ctxt.initial_level]. It uses the functionalities
-      of [PVM] to compute the hash of to be included in the commitment.
-  *)
-  val process_head :
-    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+  (** [process_head node_ctxt head] checks whether a new commitment needs to be
+      computed and stored, by looking at the level of [head] and checking
+      whether it is a multiple of `Commitment.sc_rollup_commitment_period`
+      levels away from [node_ctxt.initial_level]. It uses the functionalities of
+      [PVM] to compute the hash of to be included in the commitment.  *)
+  val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t
 
-  (** [sync_last_cemented_commitment_hash_with_level node_ctxt store]
-      fetches and stores information about the last cemeneted commitment
-      in the layer1 chain.
-    *)
+  (** [sync_last_cemented_commitment_hash_with_level node_ctxt] fetches and
+      stores information about the last cemeneted commitment in the layer1
+      chain.  *)
   val sync_last_cemented_commitment_hash_with_level :
-    Node_context.t -> Store.t -> unit tzresult Lwt.t
+    Node_context.t -> unit tzresult Lwt.t
 
-  (** [publish_commitment node_ctxt store] publishes the earliest commitment
+  (** [publish_commitment node_ctxt] publishes the earliest commitment
       stored in [store] that has not been published yet, unless its inbox level
       is below or equal to the inbox level of the last cemented commitment in
       the layer1 chain. In this case, the rollup node checks whether it has
@@ -75,19 +72,18 @@ module type S = sig
         in particular, no commitment is published.}
     }
   *)
-  val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
+  val publish_commitment : Node_context.t -> unit tzresult Lwt.t
 
-  (** [cement_commitment_if_possible node_ctxt store head] checks whether the
-      next commitment to be cemented (i.e. whose inbox level is
+  (** [cement_commitment_if_possible node_ctxt head] checks whether the next
+      commitment to be cemented (i.e. whose inbox level is
       [sc_rollup_commitment_period] levels after
       [Store.Last_cemented_commitment_level store]) can be cemented. In
       particular, the request to cement the commitment happens only if the
       commitment is stored in [Store.Commitments store], and if
-      [sc_rollup_challenge_period] levels have passed since when the
-      commitment was originally published.
-  *)
+      [sc_rollup_challenge_period] levels have passed since when the commitment
+      was originally published.  *)
   val cement_commitment_if_possible :
-    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+    Node_context.t -> Layer1.head -> unit tzresult Lwt.t
 
   (** [start ()] only emits the event that the commitment manager
       for the rollup node has started. *)

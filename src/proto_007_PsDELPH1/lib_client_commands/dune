@@ -6,6 +6,7 @@
  (public_name tezos-client-007-PsDELPH1.commands)
  (libraries
   tezos-base
+  tezos-clic
   tezos-protocol-007-PsDELPH1
   tezos-stdlib-unix
   tezos-protocol-environment
@@ -19,6 +20,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_clic
   -open Tezos_protocol_007_PsDELPH1
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
@@ -33,6 +35,7 @@
  (public_name tezos-client-007-PsDELPH1.commands-registration)
  (libraries
   tezos-base
+  tezos-clic
   tezos-protocol-007-PsDELPH1
   tezos-protocol-environment
   tezos-shell-services
@@ -46,6 +49,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+  -open Tezos_clic
   -open Tezos_protocol_007_PsDELPH1
   -open Tezos_shell_services
   -open Tezos_client_base

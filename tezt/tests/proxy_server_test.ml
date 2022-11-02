@@ -33,7 +33,7 @@
    Dependencies: tezt/tests/proxy.ml
 *)
 
-(** Creates a client that uses a [tezos-proxy-server] as its endpoint. Also
+(** Creates a client that uses a [octez-proxy-server] as its endpoint. Also
     returns the node backing the proxy server, and the proxy server itself. *)
 let init ?nodes_args ?parameter_file ~protocol () =
   let* node, client =
@@ -99,7 +99,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.right (protocol, None))
-      [(["hard_storage_limit_per_operation"], Some "\"99999999\"")]
+      [(["hard_storage_limit_per_operation"], `String_of_int 99999999)]
   in
   let* node, client =
     Client.init_with_protocol ~parameter_file ~protocol `Client ()
@@ -149,8 +149,14 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let* () = Client.bake_for_and_wait client in
   let* mockup_client = Client.init_mockup ~protocol () in
-  let*! _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
-  let*! _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_contract_script ~id:contract_id ()
+  in
+  let* _ =
+    RPC.Client.call ?endpoint client
+    @@ RPC.get_chain_block_context_contract_storage ~id:contract_id ()
+  in
   let* indices_exprs =
     let compute_index_expr index =
       let* key_value_list =
@@ -175,15 +181,15 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let get_one_value key_hash =
     let* _ =
-      RPC.Big_maps.get
-        ?endpoint
-        ~id:
-          (* This big_map id can be found in origination response
-             e.g. "New map(4) of type (big_map string nat)".
-             In this dumb test we know it is always 4. *)
-          "4"
-        ~key_hash
-        client
+      RPC.Client.call ?endpoint client
+      @@ RPC.get_chain_block_context_big_map
+           ~id:
+             (* This big_map id can be found in origination response
+                e.g. "New map(4) of type (big_map string nat)".
+                In this dumb test we know it is always 4. *)
+             "4"
+           ~key_hash
+           ()
     in
     Lwt.return_unit
   in

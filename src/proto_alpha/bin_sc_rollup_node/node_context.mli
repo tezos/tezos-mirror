@@ -31,46 +31,67 @@ open Alpha_context
 type t = {
   cctxt : Protocol_client_context.full;
       (** Client context used by the rollup node. *)
+  dal_cctxt : Dal_node_client.cctxt;
+      (** Client context to query the dal node. *)
+  data_dir : string;  (** Node data dir. *)
   l1_ctxt : Layer1.t;
       (** Layer 1 context to fetch blocks and monitor heads, etc.*)
   rollup_address : Sc_rollup.t;
       (** Smart contract rollup tracked by the rollup node. *)
-  operator : Signature.Public_key_hash.t;
-      (** Address of the rollup node operator. *)
+  operators : Configuration.operators;
+      (** Addresses of the rollup node operators by purposes. *)
   genesis_info : Sc_rollup.Commitment.genesis_info;
       (** Origination information of the smart contract rollup. *)
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)
-  fee_parameter : Injection.fee_parameter;
-      (** Fee parameter to use when injecting operations in layer 1. *)
+  fee_parameters : Configuration.fee_parameters;
+      (** Fee parameters to use when injecting operations in layer 1. *)
   protocol_constants : Constants.t;
       (** Protocol constants retrieved from the Tezos node. *)
   loser_mode : Loser_mode.t;
       (** If different from [Loser_mode.no_failures], the rollup node
           issues wrong commitments (for tests). *)
+  store : Store.t;  (** The store for the persistent storage. *)
+  context : Context.index;  (** The persistent context for the rollup node. *)
 }
 
-(** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding
-    to the address, public key, and secret key URI of the rollup node operator.
+(** [get_operator cctxt purpose] returns the public key hash for the operator
+    who has purpose [purpose], if any.
 *)
-val get_operator_keys :
-  t ->
-  (Signature.Public_key_hash.t * Signature.Public_key.t * Client_keys.sk_uri)
-  tzresult
-  Lwt.t
+val get_operator :
+  t -> Configuration.purpose -> Signature.Public_key_hash.t option
 
-(** [init cctxt l1_ctxt sc_rollup operator_pkh] initialises the rollup
-    representation.  The rollup origination level and kind are fetched via an
-    RPC call to the layer1 node that [cctxt] uses for RPC requests.
+(** [is_operator cctxt pkh] returns [true] if the public key hash [pkh] is an
+    operator for the node (for any purpose). *)
+val is_operator : t -> Signature.Public_key_hash.t -> bool
+
+(** [get_fee_parameter cctxt purpose] returns the fee parameter to inject an
+    operation for a given [purpose]. If no specific fee parameters were
+    configured for this purpose, returns the default fee parameter for this
+    purpose.
+*)
+val get_fee_parameter : t -> Configuration.purpose -> Injection.fee_parameter
+
+(** [init cctxt dal_cctxt ~data_dir l1_ctxt sc_rollup genesis_info kind operators fees
+    ~loser_mode store context] initialises the rollup representation. The rollup
+    origination level and kind are fetched via an RPC call to the layer1 node
+    that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
+  Dal_node_client.cctxt ->
+  data_dir:string ->
   Layer1.t ->
   Sc_rollup.t ->
-  Protocol.Alpha_context.Sc_rollup.Commitment.genesis_info ->
   Protocol.Alpha_context.Sc_rollup.Kind.t ->
-  Signature.Public_key_hash.t ->
-  Injection.fee_parameter ->
+  Configuration.operators ->
+  Configuration.fee_parameters ->
   loser_mode:Loser_mode.t ->
+  Store.t ->
+  Context.index ->
   t tzresult Lwt.t
+
+(** [checkout_context node_ctxt block_hash] returns the context at block
+    [block_hash]. *)
+val checkout_context : t -> Block_hash.t -> Context.t tzresult Lwt.t

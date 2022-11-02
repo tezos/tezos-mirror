@@ -4,6 +4,7 @@ code {
        CAR;
        UNPAIR 4;
        TICKET;
+       ASSERT_SOME;
        PAIR;
        SWAP;
        CONTRACT %deposit (pair (ticket string) tx_rollup_l2_address);

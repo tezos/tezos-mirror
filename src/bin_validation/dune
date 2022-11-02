@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_validator)
- (public_name tezos-validator)
+ (name octez_validator)
+ (public_name octez-validator)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base

@@ -77,7 +77,7 @@ val default_limits : limits
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->
-  (module Prevalidator_filters.FILTER) ->
+  (module Shell_plugin.FILTER) ->
   Distributed_db.chain_db ->
   t tzresult Lwt.t
 
@@ -97,7 +97,7 @@ val inject_operation : t -> force:bool -> Operation.t -> unit tzresult Lwt.t
     previously classified require to be prevalidated again. *)
 val flush :
   t ->
-  Chain_validator_worker_state.Event.update ->
+  Chain_validator_worker_state.update ->
   Block_hash.t ->
   Block_hash.Set.t ->
   Operation_hash.Set.t ->
@@ -169,7 +169,7 @@ module Internal_for_tests : sig
     ('protocol_data, 'prevalidation_t) types_state_shell
 
   module Make
-      (Filter : Prevalidator_filters.FILTER)
+      (Filter : Shell_plugin.FILTER)
       (Prevalidation_t : Prevalidation.T
                            with type validation_state =
                              Filter.Proto.validation_state

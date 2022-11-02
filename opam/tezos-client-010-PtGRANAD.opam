@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "ppx_expect"
   "tezos-base"
+  "tezos-clic"
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-protocol-010-PtGRANAD"

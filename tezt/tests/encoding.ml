@@ -37,17 +37,17 @@
                [tezt/_regressions/encoding] first to remove unused files in case
                some paths change.
    Subject: Encoding regression tests capture the output of encoding/decoding
-            using the [tezos-codec] and compare it with the output from the
+            using the [octez-codec] and compare it with the output from the
             previous run. The test passes only if the outputs match exactly.
 
-            The other test checks that the [tezos-codec] can successfully dump
+            The other test checks that the [octez-codec] can successfully dump
             the list of encodings.
 *)
 
 let check_dump_encodings () =
   Test.register
     ~__FILE__
-    ~title:"tezos-codec dump encodings"
+    ~title:"octez-codec dump encodings"
     ~tags:["codec"; "dump"]
   @@ fun () ->
   let* (_ : JSON.t) = Codec.dump_encodings () in
@@ -92,7 +92,7 @@ let iter_sample_s base_path func =
   |> Lwt_list.iter_s (fun file -> func (base_path // file))
 
 (** The given sample must be included in registered encodings. These can be
-    found with [tezos-codec list encodings]. *)
+    found with [octez-codec list encodings]. *)
 let check_protocol_sample_encoding ?supports sample =
   Protocol.register_regression_test
     ~__FILE__
@@ -107,7 +107,7 @@ let check_protocol_sample_encoding ?supports sample =
   check_sample ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample) ~file
 
 (** The given sample must be included in registered encodings. These can be
-    found with [tezos-codec list encodings]. *)
+    found with [octez-codec list encodings]. *)
 let check_shell_sample_encoding sample =
   Regression.register
     ~__FILE__

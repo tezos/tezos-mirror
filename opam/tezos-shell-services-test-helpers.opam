@@ -13,8 +13,9 @@ depends: [
   "tezos-shell-services"
   "tezos-test-helpers"
   "qcheck-core"
+  "tezos-context"
+  "alcotest-lwt" { >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.18" }
-  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors"]

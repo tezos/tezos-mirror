@@ -49,7 +49,8 @@ module T () = struct
       (fun (Input x as workload) ->
         (* This 'noise' is crappy but you get the idea *)
         let noise = Random.State.float rng_state 2.0 -. 1. in
-        Measure.{workload; qty = noise +. truth x})
+        Measure.
+          {workload; measures = Maths.vector_of_array [|noise +. truth x|]})
       input
     |> Array.to_list
 
@@ -91,7 +92,7 @@ module T () = struct
   let {Inference.mapping; weights = _} =
     Inference.solve_problem
       problem
-      (Inference.Lasso {alpha = 1.0; normalize = false; positive = false})
+      (Inference.Lasso {alpha = 1.0; positive = false})
 
   let const =
     List.assoc ~equal:Free_variable.equal fv_const mapping

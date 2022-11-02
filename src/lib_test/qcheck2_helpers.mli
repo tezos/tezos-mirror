@@ -46,6 +46,19 @@ val qcheck_make_result :
   ('a -> (bool, 'b) result) ->
   QCheck2.Test.t
 
+(** [qcheck_make_lwt ?print ?count ~extract ~name ~gen f] is a wrapper
+    around {!QCheck2.Test.make} where [f] returns a [bool Lwt.t].
+    [extract] needs to be provided to extract the [bool] from [Lwt], e.g.
+    [Lwt_main.run]. *)
+val qcheck_make_lwt :
+  ?count:int ->
+  ?print:'a QCheck2.Print.t ->
+  extract:(bool Lwt.t -> bool) ->
+  name:string ->
+  gen:'a QCheck2.Gen.t ->
+  ('a -> bool Lwt.t) ->
+  QCheck2.Test.t
+
 (** [qcheck_eq_tests ~eq ~gen ~eq_name] returns
     three tests of [eq]: reflexivity, symmetry, and transitivity.
 
@@ -151,11 +164,14 @@ val string_fixed : int -> string QCheck2.Gen.t
 (** [bytes_gen] is a [QCheck2.Gen.t] for [bytes]. *)
 val bytes_gen : bytes QCheck2.Gen.t
 
+(** [small_bytes_gen] is a [QCheck2.Gen.t] for [bytes] of small size. *)
+val small_bytes_gen : bytes QCheck2.Gen.t
+
 (** [bytes_fixed_gen n] is a [QCheck2.Gen.t] for [bytes] of length [n]. *)
 val bytes_fixed_gen : int -> bytes QCheck2.Gen.t
 
 (** [endpoint_gen] is a [QCheck2.Gen.t] for endpoints (such as
-    [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
+    [octez-client]'s [--endpoint] flag). It returns URLs of the form:
     [(http|https)://(string\.)+(:port)?]. It is by no means the most
     general [Uri.t] generator. Generalize it if needed. *)
 val endpoint_gen : Uri.t QCheck2.Gen.t

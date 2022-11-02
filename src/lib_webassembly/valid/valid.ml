@@ -26,6 +26,7 @@ type context = {
   results : value_type list;
   labels : result_type list;
   refs : Free.t;
+  blocks : Ast.instr list list;
 }
 
 let empty_context =
@@ -41,6 +42,7 @@ let empty_context =
     results = [];
     labels = [];
     refs = Free.empty;
+    blocks = [];
   }
 
 let lookup category list x =
@@ -131,7 +133,7 @@ let push (ell1, ts1) (ell2, ts2) =
   ( (if ell1 = Ellipses || ell2 = Ellipses then Ellipses else NoEllipses),
     ts2 @ ts1 )
 
-let peek i (ell, ts) = try List.nth (List.rev ts) i with Failure _ -> None
+let peek i (_, ts) = try List.nth (List.rev ts) i with Failure _ -> None
 
 let vec_to_list v =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/3378 Ensure `Valid` is never
@@ -139,7 +141,7 @@ let vec_to_list v =
 
      The validation is never used in the rollup (in a context were values can be
      shallow), hence the vectors will be fully loaded. *)
-  Stdlib.List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings v)
+  Stdlib.List.map snd (Lazy_vector.Int32Vector.loaded_bindings v)
 
 (* Type Synthesis *)
 
@@ -269,8 +271,9 @@ let check_memop (c : context) (memop : ('t, 's) memop) ty_size get_sz at =
 let check_block_type (c : context) (bt : block_type) : func_type =
   match bt with
   | VarBlockType x -> type_ c x
-  | ValBlockType None -> FuncType (Vector.empty (), Vector.empty ())
-  | ValBlockType (Some t) -> FuncType (Vector.empty (), Vector.singleton t)
+  | ValBlockType None -> FuncType (Ast.Vector.empty (), Ast.Vector.empty ())
+  | ValBlockType (Some t) ->
+      FuncType (Ast.Vector.empty (), Ast.Vector.singleton t)
 
 let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
     =
@@ -318,7 +321,7 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
   | BrTable (xs, x) ->
       let lx = label c x in
       let lx_l = vec_to_list lx in
-      let n = Lazy_vector.LwtInt32Vector.num_elements lx |> Int32.to_int in
+      let n = Lazy_vector.Int32Vector.num_elements lx |> Int32.to_int in
       let ts = Lib.List.table n (fun i -> peek (n - i) s) in
       check_stack ts (known lx_l) x.at ;
       List.iter
@@ -335,7 +338,7 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
       let ts2_l = vec_to_list ts2 in
       ts1_l --> ts2_l
   | CallIndirect (x, y) ->
-      let (TableType (lim, t)) = table c x in
+      let (TableType (_, t)) = table c x in
       let (FuncType (ts1, ts2)) = type_ c y in
       let ts1_l = vec_to_list ts1 in
       let ts2_l = vec_to_list ts2 in
@@ -526,21 +529,28 @@ let rec check_instr (c : context) (e : instr) (s : infer_result_type) : op_type
         "invalid lane index" ;
       [t; NumType t2] --> [t]
 
-and check_seq (c : context) (s : infer_result_type) (es : instr list) :
-    infer_result_type =
-  match es with
-  | [] -> s
-  | _ ->
-      let es', e = Lib.List.split_last es in
-      let s' = check_seq c s es' in
-      let {ins; outs} = check_instr c e s' in
-      push outs (pop ins s' e.at)
+and check_seq (c : context) (s : infer_result_type) (es : instr list)
+    (pos : int32) : infer_result_type =
+  if pos < 0l then s
+  else
+    let e = List.nth es (Int32.to_int pos) in
+    let s' = check_seq c s es (Int32.pred pos) in
+    let {ins; outs} = check_instr c e s' in
+    push outs (pop ins s' e.at)
 
-and check_block (c : context) (es : instr list) (ft : func_type) at =
+and check_block (c : context) (Block_label es : block_label) (ft : func_type) at
+    =
   let (FuncType (ts1, ts2)) = ft in
+  let block = List.nth c.blocks (Int32.to_int es) in
   let ts1_l = vec_to_list ts1 in
   let ts2_l = vec_to_list ts2 in
-  let s = check_seq c (stack ts1_l) es in
+  let s =
+    check_seq
+      c
+      (stack ts1_l)
+      block
+      (Int32.pred (List.length block |> Int32.of_int))
+  in
   let s' = pop (stack ts2_l) s at in
   require
     (snd s' = [])
@@ -562,39 +572,39 @@ let check_limits {min; max} range at msg =
         at
         "size minimum must not be greater than maximum"
 
-let check_num_type (t : num_type) at = ()
+let check_num_type (_ : num_type) = ()
 
-let check_vec_type (t : vec_type) at = ()
+let check_vec_type (_ : vec_type) = ()
 
-let check_ref_type (t : ref_type) at = ()
+let check_ref_type (_ : ref_type) = ()
 
-let check_value_type (t : value_type) at =
+let check_value_type (t : value_type) =
   match t with
-  | NumType t' -> check_num_type t' at
-  | VecType t' -> check_vec_type t' at
-  | RefType t' -> check_ref_type t' at
+  | NumType t' -> check_num_type t'
+  | VecType t' -> check_vec_type t'
+  | RefType t' -> check_ref_type t'
 
-let check_func_type (ft : func_type) at =
+let check_func_type (ft : func_type) =
   let (FuncType (ts1, ts2)) = ft in
   let ts1_l = vec_to_list ts1 in
   let ts2_l = vec_to_list ts2 in
-  List.iter (fun t -> check_value_type t at) ts1_l ;
-  List.iter (fun t -> check_value_type t at) ts2_l
+  List.iter check_value_type ts1_l ;
+  List.iter check_value_type ts2_l
 
 let check_table_type (tt : table_type) at =
   let (TableType (lim, t)) = tt in
   check_limits lim 0xffff_ffffl at "table size must be at most 2^32-1" ;
-  check_ref_type t at
+  check_ref_type t
 
 let check_memory_type (mt : memory_type) at =
   let (MemoryType lim) = mt in
   check_limits lim 0x1_0000l at "memory size must be at most 65536 pages (4GiB)"
 
-let check_global_type (gt : global_type) at =
-  let (GlobalType (t, mut)) = gt in
-  check_value_type t at
+let check_global_type (gt : global_type) =
+  let (GlobalType (t, _mut)) = gt in
+  check_value_type t
 
-let check_type (t : type_) = check_func_type t.it t.at
+let check_type (t : type_) = check_func_type t.it
 
 (* Functions & Constants *)
 
@@ -616,12 +626,12 @@ let check_func (c : context) (f : func) =
   let c' =
     {
       c with
-      locals = Lazy_vector.LwtInt32Vector.concat ts1 locals |> vec_to_list;
+      locals = vec_to_list ts1 @ vec_to_list locals;
       results = vec_to_list ts2;
       labels = [ts2];
     }
   in
-  check_block c' body (FuncType (Vector.empty (), ts2)) f.at
+  check_block c' body (FuncType (Ast.Vector.empty (), ts2)) f.at
 
 let is_const (c : context) (e : instr) =
   match e.it with
@@ -632,23 +642,25 @@ let is_const (c : context) (e : instr) =
   | _ -> false
 
 let check_const (c : context) (const : const) (t : value_type) =
+  let (Block_label b) = const.it in
+  let block = List.nth c.blocks (Int32.to_int b) in
   require
-    (List.for_all (is_const c) const.it)
+    (List.for_all (is_const c) block)
     const.at
     "constant expression required" ;
   check_block
     c
     const.it
-    (FuncType (Vector.empty (), Vector.singleton t))
+    (FuncType (Ast.Vector.empty (), Ast.Vector.singleton t))
     const.at
 
 (* Tables, Memories, & Globals *)
 
-let check_table (c : context) (tab : table) =
+let check_table (tab : table) =
   let {ttype} = tab.it in
   check_table_type ttype tab.at
 
-let check_memory (c : context) (mem : memory) =
+let check_memory (mem : memory) =
   let {mtype} = mem.it in
   check_memory_type mtype mem.at
 
@@ -680,12 +692,12 @@ let check_data_mode (c : context) (mode : segment_mode) =
   | Declarative -> assert false
 
 let check_data (c : context) (seg : data_segment) =
-  let {dinit; dmode} = seg.it in
+  let {dmode; _} = seg.it in
   check_data_mode c dmode
 
 let check_global (c : context) (glob : global) =
   let {gtype; ginit} = glob.it in
-  let (GlobalType (t, mut)) = gtype in
+  let (GlobalType (t, _)) = gtype in
   check_const c ginit t
 
 (* Modules *)
@@ -708,7 +720,7 @@ let check_import (im : import) (c : context) : context =
       check_memory_type mt idesc.at ;
       {c with memories = mt :: c.memories}
   | GlobalImport gt ->
-      check_global_type gt idesc.at ;
+      check_global_type gt ;
       {c with globals = gt :: c.globals}
 
 module NameSet = Set.Make (struct
@@ -740,9 +752,16 @@ let check_module (m : module_) =
     elems;
     datas;
     exports;
+    allocations = {blocks; _};
   } =
     m.it
   in
+  let build_blocks bl =
+    let* bls = Ast.Vector.to_list bl in
+    TzStdLib.List.map_s Ast.Vector.to_list bls
+  in
+
+  let* blocks = build_blocks blocks in
   let types = vec_to_list types in
   let imports = vec_to_list imports in
   let tables = vec_to_list tables in
@@ -754,14 +773,19 @@ let check_module (m : module_) =
   let exports = vec_to_list exports in
   let+ refs =
     Free.module_
-      ({m.it with funcs = Lazy_vector.LwtInt32Vector.create 0l; start = None}
+      ({m.it with funcs = Lazy_vector.Int32Vector.create 0l; start = None}
       @@ m.at)
   in
   let c0 =
     List.fold_right
       check_import
       imports
-      {empty_context with refs; types = List.map (fun ty -> ty.it) types}
+      {
+        empty_context with
+        refs;
+        types = List.map (fun ty -> ty.it) types;
+        blocks;
+      }
   in
   let c1 =
     {
@@ -778,8 +802,8 @@ let check_module (m : module_) =
   in
   List.iter check_type types ;
   List.iter (check_global c1) globals ;
-  List.iter (check_table c1) tables ;
-  List.iter (check_memory c1) memories ;
+  List.iter check_table tables ;
+  List.iter check_memory memories ;
   List.iter (check_elem c1) elems ;
   List.iter (check_data c1) datas ;
   List.iter (check_func c) funcs ;

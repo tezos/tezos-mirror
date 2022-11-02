@@ -54,7 +54,7 @@ let default_http_port =
   | None -> "6732"
   | Some port -> port
 
-open Clic
+open Tezos_clic
 
 let group =
   {Clic.name = "signer"; title = "Commands specific to the signing daemon"}
@@ -89,12 +89,12 @@ let high_watermark_switch =
     ()
 
 let pidfile_arg =
-  arg
+  Clic.arg
     ~doc:"write process id in file"
     ~short:'P'
     ~long:"pidfile"
     ~placeholder:"filename"
-    (parameter (fun _ s -> Lwt.return_ok s))
+    (Clic.parameter (fun _ s -> Lwt.return_ok s))
 
 let may_setup_pidfile pidfile_opt f =
   match pidfile_opt with
@@ -106,7 +106,8 @@ let may_setup_pidfile pidfile_opt f =
         ~filename:pidfile
         f
 
-let commands base_dir require_auth : Client_context.full command list =
+let commands base_dir require_auth : Client_context.full Clic.command list =
+  let open Clic in
   let open Lwt_result_syntax in
   Tezos_signer_backends_unix.Ledger.commands ()
   @ Client_keys_commands.commands None
@@ -306,11 +307,11 @@ let home = try Sys.getenv "HOME" with Not_found -> "/root"
 
 let default_base_dir = Filename.concat home ".tezos-signer"
 
-let string_parameter () : (string, _) parameter =
-  parameter (fun _ x -> Lwt.return_ok x)
+let string_parameter () : (string, _) Clic.parameter =
+  Clic.parameter (fun _ x -> Lwt.return_ok x)
 
 let base_dir_arg () =
-  arg
+  Clic.arg
     ~long:"base-dir"
     ~short:'d'
     ~placeholder:"path"
@@ -321,14 +322,14 @@ let base_dir_arg () =
     (string_parameter ())
 
 let require_auth_arg () =
-  switch
+  Clic.switch
     ~long:"require-authentication"
     ~short:'A'
     ~doc:"Require a signature from the caller to sign."
     ()
 
 let password_filename_arg () =
-  arg
+  Clic.arg
     ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
@@ -336,7 +337,7 @@ let password_filename_arg () =
     (string_parameter ())
 
 let global_options () =
-  args3 (base_dir_arg ()) (require_auth_arg ()) (password_filename_arg ())
+  Clic.args3 (base_dir_arg ()) (require_auth_arg ()) (password_filename_arg ())
 
 module Signer_config = struct
   type t = string option * bool * string option

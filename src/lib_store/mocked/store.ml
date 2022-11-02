@@ -1911,6 +1911,10 @@ module Chain = struct
       protocol_hash
       (Protocol_hash.Map.add next_protocol_hash dir map) ;
     Lwt.return_unit
+
+  (* Not implemented as both the store and context garbage collection
+     are disabled in the mockup mode.*)
+  let register_gc_callback _ _ = ()
 end
 
 module Protocol = struct

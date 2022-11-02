@@ -7,10 +7,9 @@ tezos-client.html
 /api/tezos-admin-client.html
 /api/tezos-signer.html
 
-/jakarta/rpc.rst
-/kathmandu/rpc.rst
 /alpha/rpc.rst
 /shell/rpc.rst
+/kathmandu/rpc.rst
 
 /api/errors.rst
 /shell/p2p_api.rst

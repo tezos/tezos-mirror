@@ -383,7 +383,7 @@ module type S = sig
 
       The function stops early if it encounters elements [xn], [yn] such that [f
       xn yn] is [false]. (This is consistent with the short-circuit, lazy
-      evaluation strategy of [&&] in the descritpion above.)
+      evaluation strategy of [&&] in the description above.)
 
       Also note that, if such an element is found in the common prefix of [xs]
       and [ys], then the function returns [Ok false] even if [xs] and [ys] are
@@ -421,7 +421,7 @@ module type S = sig
 
       The function stops early if it encounters elements [xn], [yn] such that [f
       xn yn] is [true]. (This is consistent with the short-circuit, lazy
-      evaluation strategy of [||] in the descritpion above.)
+      evaluation strategy of [||] in the description above.)
 
       Also note that, if such an element is found in the common prefix of [xs]
       and [ys], then the function returns [Ok true] even if [xs] and [ys] are of

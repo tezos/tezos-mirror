@@ -30,6 +30,7 @@ type error +=
   | Missing_shards
   | Illformed_shard
   | Slot_not_found
+  | Illformed_pages
 
 let () =
   register_error_kind
@@ -86,55 +87,24 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Illformed shard found in the store")
     Data_encoding.(unit)
     (function Illformed_shard -> Some () | _ -> None)
-    (fun () -> Illformed_shard)
+    (fun () -> Illformed_shard) ;
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.illformed_pages"
+    ~title:"Illformed pages"
+    ~description:"Illformed pages found in the store"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Illformed pages found in the store")
+    Data_encoding.(unit)
+    (function Illformed_pages -> Some () | _ -> None)
+    (fun () -> Illformed_pages)
+
+type slot = bytes
 
 let wrap_encoding_error =
   Result.map_error (fun e ->
       [Tezos_base.Data_encoding_wrapper.Encoding_error e])
 
 let encode enc v = Data_encoding.Binary.to_string enc v |> wrap_encoding_error
-
-module Slot_header = struct
-  type t = Cryptobox.commitment
-
-  type Base58.data += Data of t
-
-  let to_string commitment =
-    Cryptobox.commitment_to_bytes commitment |> Bytes.to_string
-
-  let of_string_opt str =
-    Cryptobox.commitment_of_bytes_opt (String.to_bytes str)
-
-  let b58check_encoding =
-    Base58.register_encoding
-      ~prefix:Base58.Prefix.slot_header
-      ~length:Cryptobox.commitment_size
-      ~to_raw:to_string
-      ~of_raw:of_string_opt
-      ~wrap:(fun x -> Data x)
-
-  let name = "slot_header_encoding"
-
-  let to_b58check c = Base58.simple_encode b58check_encoding c
-
-  let of_b58check_opt b = Base58.simple_decode b58check_encoding b
-
-  let rpc_arg =
-    RPC_arg.make
-      ~name
-      ~descr:(Format.asprintf "%s (Base58Check-encoded)" name)
-      ~destruct:(fun s ->
-        match of_b58check_opt s with
-        | None ->
-            Error
-              (Format.asprintf
-                 "failed to decode Base58Check-encoded data (%s): %S"
-                 name
-                 s)
-        | Some v -> Ok v)
-      ~construct:to_b58check
-      ()
-end
 
 let share_path slot_header shard_id = [slot_header; string_of_int shard_id]
 
@@ -145,7 +115,7 @@ let decode_share s =
 
 let save store slot_header shards =
   let open Lwt_result_syntax in
-  let slot_header = Slot_header.to_b58check slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   Cryptobox.IntMap.iter_es
     (fun i share ->
       let path = share_path slot_header i in
@@ -154,29 +124,28 @@ let save store slot_header shards =
       return metadata)
     shards
 
-let split_and_store cryptobox_setup store slot =
+let split_and_store cb_constants store slot =
   let r =
     let open Result_syntax in
-    let* polynomial = Cryptobox.polynomial_from_slot slot in
-    let* commitment = Cryptobox.commit cryptobox_setup polynomial in
+    let* polynomial = Cryptobox.polynomial_from_slot cb_constants slot in
+    let commitment = Cryptobox.commit cb_constants polynomial in
     return (polynomial, commitment)
   in
   let open Lwt_result_syntax in
   match r with
   | Ok (polynomial, commitment) ->
-      let shards = Cryptobox.shards_from_polynomial polynomial in
+      let shards = Cryptobox.shards_from_polynomial cb_constants polynomial in
       let* () = save store commitment shards in
       let*! () =
         Event.(
           emit stored_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
       in
       Lwt.return_ok commitment
-  | Error (`Degree_exceeds_srs_length msg) | Error (`Slot_wrong_size msg) ->
-      Lwt.return_error [Splitting_failed msg]
+  | Error (`Slot_wrong_size msg) -> Lwt.return_error [Splitting_failed msg]
 
 let get_shard store slot_header shard_id =
   let open Lwt_result_syntax in
-  let*? slot_header = encode Dal_types.slot_header_encoding slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let* share =
     Lwt.catch
       (fun () ->
@@ -188,18 +157,20 @@ let get_shard store slot_header shard_id =
   let*? share = decode_share share in
   return Cryptobox.{index = shard_id; share}
 
-let check_shards shards =
+let check_shards initial_constants shards =
   let open Result_syntax in
   if shards = [] then fail [Slot_not_found]
-  else if Compare.List_length_with.(shards = Cryptobox.Constants.shards_amount)
+  else if
+    Compare.List_length_with.(
+      shards = initial_constants.Cryptobox.number_of_shards)
   then Ok ()
   else fail [Missing_shards]
 
-let get_slot store slot_header =
+let get_slot initial_constants dal_constants store slot_header =
   let open Lwt_result_syntax in
-  let slot_header = Slot_header.to_b58check slot_header in
+  let slot_header = Cryptobox.Commitment.to_b58check slot_header in
   let*! shards = Store.list store [slot_header] in
-  let*? () = check_shards shards in
+  let*? () = check_shards initial_constants shards in
   let* shards =
     List.fold_left_es
       (fun shards (i, tree) ->
@@ -218,19 +189,36 @@ let get_slot store slot_header =
       shards
   in
   let*? polynomial =
-    match Cryptobox.polynomial_from_shards shards with
+    match Cryptobox.polynomial_from_shards dal_constants shards with
     | Ok p -> Ok p
     | Error (`Invert_zero msg | `Not_enough_shards msg) ->
         Error [Merging_failed msg]
   in
-  let slot = Cryptobox.polynomial_to_bytes polynomial in
+  let slot = Cryptobox.polynomial_to_bytes dal_constants polynomial in
   let*! () =
     Event.(
       emit fetched_slot (Bytes.length slot, Cryptobox.IntMap.cardinal shards))
   in
   return slot
 
-(* FIXME https://gitlab.com/tezos/tezos/-/issues/3405
+let get_slot_pages ({Cryptobox.page_size; _} as initial_constants) dal_constants
+    store slot_header =
+  let open Lwt_result_syntax in
+  let* slot = get_slot initial_constants dal_constants store slot_header in
+  (* The slot size `Bytes.length slot` should be an exact multiple of `page_size`.
+     If this is not the case, we throw an `Illformed_pages` error.
+  *)
+  (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3900
+     Implement `Bytes.chunk_bytes` which returns a list of bytes directly. *)
+  let*? pages =
+    String.chunk_bytes
+      page_size
+      slot
+      ~error_on_partial_chunk:(TzTrace.make Illformed_pages)
+  in
+  return @@ List.map (fun page -> String.to_bytes page) pages
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3405
 
    This can work only if a slot never ends with a `\000`. But I am not
    sure in general such thing is required. *)
@@ -247,7 +235,9 @@ module Utils = struct
     in
     Bytes.sub b 0 (Bytes.length b - !len)
 
-  let fill_x00 b =
+  let fill_x00 slot_size b =
     let len = Bytes.length b in
-    Bytes.extend b 0 (Cryptobox.Constants.slot_size - len)
+    let extended = Bytes.extend b 0 (slot_size - len) in
+    let () = Bytes.fill extended len (slot_size - len) '\000' in
+    extended
 end

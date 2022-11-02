@@ -465,11 +465,12 @@ let store_chunk cemented_store chunk =
       (* Overwrite the existing cycle to restore the blocks and
          operations metadata hash and store the associated
          metadata. *)
-      Cemented_block_store.cement_blocks
-        ~check_consistency:false
-        cemented_store
-        ~write_metadata:true
-        block_chunk
+      Cemented_block_store.(
+        cement_blocks
+          ~check_consistency:false
+          cemented_store
+          ~write_metadata:true
+          (make_chunk_iterator block_chunk))
 
 let gather_available_metadata chain_store ~start_level ~end_level =
   let open Lwt_result_syntax in
@@ -875,6 +876,28 @@ let locked chain_dir f =
   let*! () = Lwt_unix.unlink reconstruct_lockfile_path in
   return res
 
+(* We must ensure that the context of the genesis is committed in the
+   context before starting the reconstruction. It could have been
+   removed by a context's GC. *)
+let may_commit_genesis chain_store context_index genesis =
+  let open Lwt_result_syntax in
+  let chain_id = Store.Chain.chain_id chain_store in
+  let* genesis_block =
+    Store.Block.read_block chain_store genesis.Genesis.block
+  in
+  let*! genesis_context = Store.Block.context_opt chain_store genesis_block in
+  match genesis_context with
+  | Some _ctxt -> return_unit
+  | None ->
+      let* _ctxt_hash =
+        Context_ops.commit_genesis
+          context_index
+          ~chain_id
+          ~time:genesis.time
+          ~protocol:genesis.protocol
+      in
+      return_unit
+
 let reconstruct ?patch_context ~store_dir ~context_dir genesis
     ~user_activated_upgrades ~user_activated_protocol_overrides
     ~operation_metadata_size_limit ~progress_display_mode =
@@ -897,6 +920,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
     (fun () ->
       let context_index = Store.context_index store in
       let chain_store = Store.main_chain_store store in
+      let* () = may_commit_genesis chain_store context_index genesis in
       let*! genesis_block = Store.Chain.genesis_block chain_store in
       let*! savepoint = Store.Chain.savepoint chain_store in
       let* () =

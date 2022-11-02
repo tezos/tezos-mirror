@@ -288,7 +288,7 @@ val list_keys : 'value t -> cache_index:index -> (key * size) list option
    cache. *)
 val key_rank : 'value t -> key -> int option
 
-(** [pp fmt cache] is a pretty printter for a [cache]. *)
+(** [pp fmt cache] is a pretty printer for a [cache]. *)
 val pp : Format.formatter -> 'value t -> unit
 
 (**/**)

@@ -27,11 +27,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 (* Errors *)
 
 type error +=
   | Cannot_create_file of string
   | Cannot_open_file of string
+  | Cannot_retrieve_commit_info of Context_hash.t
   | Cannot_find_protocol
   | Suspicious_file of int
 
@@ -64,6 +67,20 @@ let () =
     (fun e -> Cannot_open_file e) ;
   register_error_kind
     `Permanent
+    ~id:"cannot_retrieve_commit_info"
+    ~title:"Cannot retrieve commit info"
+    ~description:""
+    ~pp:(fun ppf hash ->
+      Format.fprintf
+        ppf
+        "@[Cannot retrieve commit info associated to context hash %a@]"
+        Context_hash.pp
+        hash)
+    Data_encoding.(obj1 (req "context_hash" Context_hash.encoding))
+    (function Cannot_retrieve_commit_info e -> Some e | _ -> None)
+    (fun e -> Cannot_retrieve_commit_info e) ;
+  register_error_kind
+    `Permanent
     ~id:"context_dump.cannot_find_protocol"
     ~title:"Cannot find protocol"
     ~description:""
@@ -89,6 +106,7 @@ module type TEZOS_CONTEXT_UNIX = sig
   type error +=
     | Cannot_create_file of string
     | Cannot_open_file of string
+    | Cannot_retrieve_commit_info of Context_hash.t
     | Cannot_find_protocol
     | Suspicious_file of int
 
@@ -153,104 +171,65 @@ let reporter () =
   in
   {Logs.report}
 
-(* Caps the number of entries stored in the Irmin's index. As a
-   trade-off, increasing this value will delay index merges, and thus,
-   make them more expensive in terms of disk usage, memory usage and
-   computation time.*)
-let index_log_size = ref 2_500_000
-
-(* Caps the number of entries stored in the Irmin's LRU cache. As a
-   trade-off, increasing this value will increase the memory
-   consumption.*)
-let lru_size = ref 5_000
-
-(* This limit ensures that no trees with more than [auto_flush]
-   mutations can exist in memory, bounding the memory usage of a
-   single commit performed by a read-write process. As a trade-off,
-   the intermediate flushed trees to the store might be unused and
-   will have to be garbage collected later on to save space. *)
-let auto_flush = ref 10_000
-
-module Indexing_strategy : sig
-  (* Determines the policy used to determine whether to add new
-     objects to Irmin's index whenever they are exported to the
-     data file. *)
-  type t :=
-    [ `Minimal  (** only newly-exported commit objects are added to the index *)
-    | `Always  (** all newly-exported objects are added to the index *) ]
-
-  val parse : string -> (t, string) result
-
-  val set : t -> unit
-
-  val get : unit -> t
-
-  type irmin_t := Irmin_pack.Indexing_strategy.t
-
-  val to_irmin : t -> irmin_t
-end = struct
-  module I = Irmin_pack.Indexing_strategy
-
-  let singleton = ref `Minimal
-
-  let set x = singleton := x
-
-  let get () = !singleton
-
-  let parse = function
-    | "always" -> Ok `Always
-    | "minimal" -> Ok `Minimal
-    | x ->
-        Error
-          (Fmt.str
-             "Unable to parse indexing strategy '%s'. Expected one of { \
-              'always', 'minimal' }."
-             x)
-
-  let to_irmin = function `Always -> I.always | `Minimal -> I.minimal
-end
-
 let () =
-  let verbose_info () =
-    Logs.set_level (Some Logs.Info) ;
-    Logs.set_reporter (reporter ())
-  in
-  let verbose_debug () =
-    Logs.set_level (Some Logs.Debug) ;
-    Logs.set_reporter (reporter ())
-  in
-  let index_log_size n = index_log_size := int_of_string n in
-  let auto_flush n = auto_flush := int_of_string n in
-  let lru_size n = lru_size := int_of_string n in
-  let indexing_strategy x =
-    match Indexing_strategy.parse x with
-    | Ok x -> Indexing_strategy.set x
-    | Error msg ->
-        Fmt.failwith
-          "Invalid value for TEZOS_CONTEXT environment variable: %s"
-          msg
-  in
-  match Unix.getenv "TEZOS_CONTEXT" with
-  | exception Not_found -> ()
-  | v ->
-      let args = String.split_no_empty ',' v in
-      List.iter
-        (function
-          | "v" | "verbose" -> verbose_info ()
-          | "vv" -> verbose_debug ()
-          | v -> (
-              match String.split_no_empty '=' v with
-              | ["index-log-size"; n] -> index_log_size n
-              | ["auto-flush"; n] -> auto_flush n
-              | ["lru-size"; n] -> lru_size n
-              | ["indexing-strategy"; x] -> indexing_strategy x
-              | _ -> ()))
-        args
+  match Tezos_context_helpers.Env.(v.verbosity) with
+  | `Info ->
+      Logs.set_level (Some Logs.Info) ;
+      Logs.set_reporter (reporter ())
+  | `Debug ->
+      Logs.set_level (Some Logs.Debug) ;
+      Logs.set_reporter (reporter ())
+  | `Default -> ()
+
+module Events = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "context"; "disk"]
+
+  let starting_gc =
+    declare_1
+      ~section
+      ~level:Info
+      ~name:"starting_gc"
+      ~msg:"starting context garbage collection for commit {context_hash}"
+      ~pp1:Context_hash.pp
+      ("context_hash", Context_hash.encoding)
+
+  let ending_gc =
+    declare_2
+      ~section
+      ~level:Info
+      ~name:"ending_gc"
+      ~msg:
+        "context garbage collection finished in {duration} (finalised in \
+         {finalisation})"
+      ~pp1:Time.System.Span.pp_hum
+      ("duration", Time.System.Span.encoding)
+      ~pp2:Time.System.Span.pp_hum
+      ("finalisation", Time.System.Span.encoding)
+
+  let gc_failure =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"gc_failure"
+      ~msg:"context garbage collection failed: {error}"
+      ("error", Data_encoding.string)
+
+  let gc_launch_failure =
+    declare_1
+      ~section
+      ~level:Warning
+      ~name:"gc_launch_failure"
+      ~msg:"context garbage collection launch failed: {error}"
+      ("error", Data_encoding.string)
+end
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type error +=
     | Cannot_create_file = Cannot_create_file
     | Cannot_open_file = Cannot_open_file
+    | Cannot_retrieve_commit_info = Cannot_retrieve_commit_info
     | Cannot_find_protocol = Cannot_find_protocol
     | Suspicious_file = Suspicious_file
 
@@ -299,8 +278,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type t = context
 
   let index {index; _} = index
-
-  module type S = Tezos_context_sigs.Context.S
 
   (*-- Version Access and Update -----------------------------------------------*)
 
@@ -395,9 +372,39 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let+ commit = raw_commit ~time ?message context in
     Hash.to_context_hash (Store.Commit.hash commit)
 
+  let gc index context_hash =
+    let open Lwt_syntax in
+    let repo = index.repo in
+    let* commit_opt =
+      Store.Commit.of_hash index.repo (Hash.of_context_hash context_hash)
+    in
+    match commit_opt with
+    | None ->
+        Fmt.failwith "%a: unknown context hash" Context_hash.pp context_hash
+    | Some commit -> (
+        let* () = Events.(emit starting_gc) context_hash in
+        Logs.info (fun m ->
+            m "Launch GC for commit %a@." Context_hash.pp context_hash) ;
+        let finished = function
+          | Ok (stats : Store.Gc.stats) ->
+              Events.(emit ending_gc)
+                ( Time.System.Span.of_seconds_exn stats.duration,
+                  Time.System.Span.of_seconds_exn stats.finalisation_duration )
+          | Error (`Msg err) -> Events.(emit gc_failure) err
+        in
+        let commit_key = Store.Commit.key commit in
+        let* launch_result = Store.Gc.run ~finished repo commit_key in
+        match launch_result with
+        | Ok _ -> return_unit
+        | Error (`Msg err) ->
+            let* () = Events.(emit gc_launch_failure) err in
+            return_unit)
+
+  let is_gc_allowed index = Store.Gc.is_allowed index.repo
+
   (*-- Generic Store Primitives ------------------------------------------------*)
 
-  let data_key key = current_data_key @ key
+  let data_key = Tezos_context_sigs.Context.data_key
 
   type key = string list
 
@@ -455,8 +462,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     {context with ops = 0}
 
   let may_flush context =
-    if (not context.index.readonly) && context.ops >= !auto_flush then
-      flush context
+    if
+      (not context.index.readonly)
+      && context.ops >= Tezos_context_helpers.Env.(v.auto_flush)
+    then flush context
     else Lwt.return context
 
   let add_tree ctxt key tree =
@@ -479,7 +488,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     match Store.Tree.destruct tree with
     | `Contents (v, _) ->
         let+ v = Store.Tree.Contents.force_exn v in
-        Block_services.Key v
+        Proof.Key v
     | `Node _ ->
         let* kvs = Store.Tree.list tree [] in
         let f acc (key, _) =
@@ -489,7 +498,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           String.Map.add key sub_raw_context acc
         in
         let+ res = List.fold_left_s f String.Map.empty kvs in
-        Block_services.Dir res
+        Proof.Dir res
 
   let tree_to_memory_tree (tree : tree) :
       Tezos_context_memory.Context.tree Lwt.t =
@@ -515,11 +524,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let merkle_hash tree =
     let merkle_hash_kind =
       match Store.Tree.destruct tree with
-      | `Contents _ -> Block_services.Contents
-      | `Node _ -> Block_services.Node
+      | `Contents _ -> Proof.Contents
+      | `Node _ -> Proof.Node
     in
     let hash_str = Store.Tree.hash tree |> merkle_hash_to_string in
-    Block_services.Hash (merkle_hash_kind, hash_str)
+    Proof.Hash (merkle_hash_kind, hash_str)
 
   let merkle_tree t leaf_kind key =
     let open Lwt_syntax in
@@ -545,10 +554,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = hd then
                   (* on the target path: the final leaf *)
                   match leaf_kind with
-                  | Block_services.Hole -> Lwt.return @@ merkle_hash tree
-                  | Block_services.Raw_context ->
+                  | Proof.Hole -> Lwt.return @@ merkle_hash tree
+                  | Proof.Raw_context ->
                       let+ raw_context = tree_to_raw_context tree in
-                      Block_services.Data raw_context
+                      Proof.Data raw_context
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree
@@ -567,7 +576,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = target_hd then
                   (* on the target path: recurse *)
                   let+ sub = key_to_merkle_tree tree target_tl in
-                  Block_services.Continue sub
+                  Proof.Continue sub
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree
@@ -594,6 +603,36 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let produce_tree_proof index = produce_tree_proof index.repo
 
   let produce_stream_proof index = produce_stream_proof index.repo
+
+  module Storelike = struct
+    type key = string list
+
+    type tree = Store.tree
+
+    type value = bytes
+
+    let find = Tree.find
+
+    let find_tree = Tree.find_tree
+
+    let unshallow = Tree.unshallow
+  end
+
+  module Get_data = Tezos_context_sigs.Context.With_get_data ((
+    Storelike : Tezos_context_sigs.Context.Storelike))
+
+  let merkle_tree_v2 ctx leaf_kind key =
+    let open Lwt_syntax in
+    match Tree.kinded_key ctx.tree with
+    | None -> raise (Invalid_argument "On-disk context.tree has no kinded_key")
+    | Some kinded_key ->
+        let* proof, _ =
+          produce_tree_proof
+            ctx.index
+            kinded_key
+            (Get_data.get_data leaf_kind [key])
+        in
+        return proof
 
   (*-- Predefined Fields -------------------------------------------------------*)
 
@@ -714,26 +753,39 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false) ?indexing_strategy
+  let init ?patch_context ?(readonly = false)
+      ?(indexing_strategy : Tezos_context_helpers.Env.indexing_strategy option)
       ?index_log_size:tbl_log_size root =
     let open Lwt_syntax in
+    let module I = Irmin_pack.Indexing_strategy in
+    let indexing_strategy : I.t =
+      Option.value
+        indexing_strategy
+        ~default:Tezos_context_helpers.Env.(v.indexing_strategy)
+      |> function
+      | `Always -> I.always
+      | `Minimal -> I.minimal
+    in
     let+ repo =
-      let indexing_strategy =
-        Option.value_f indexing_strategy ~default:Indexing_strategy.get
-        |> Indexing_strategy.to_irmin
+      let index_log_size =
+        Option.value
+          tbl_log_size
+          ~default:Tezos_context_helpers.Env.(v.index_log_size)
       in
-      let index_log_size = Option.value tbl_log_size ~default:!index_log_size in
+      let lru_size = Tezos_context_helpers.Env.lru_size in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
            ~indexing_strategy
            ~index_log_size
-           ~lru_size:!lru_size
+           ~lru_size
            root)
     in
     {path = root; repo; patch_context; readonly}
 
-  let close index = Store.Repo.close index.repo
+  let close index =
+    let _interrupted_gc = Store.Gc.cancel index.repo in
+    Store.Repo.close index.repo
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
@@ -892,7 +944,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         (* All commit objects in the context are indexed, so it's safe to build a
            hash-only key referencing them. *)
         List.map
-          (fun h -> Hash.of_context_hash h |> Irmin_pack.Pack_key.v_indexed)
+          (fun h ->
+            Hash.of_context_hash h |> Irmin_pack_unix.Pack_key.v_indexed)
           parents
       in
       let+ c = Store.Commit.v ctxt.index.repo ~info ~parents ctxt.tree in
@@ -994,7 +1047,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     type import = Snapshot.Import.process
 
     let v_import ?(in_memory = false) idx =
-      let indexing_strategy = Indexing_strategy.get () in
+      let indexing_strategy = Tezos_context_helpers.Env.v.indexing_strategy in
       let on_disk =
         match indexing_strategy with
         | `Always ->
@@ -1067,23 +1120,29 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     Hash.to_context_hash (Store.Tree.hash tree)
 
   let retrieve_commit_info index block_header =
-    let open Lwt_syntax in
-    let* context = checkout_exn index block_header.Block_header.shell.context in
+    let open Lwt_result_syntax in
+    let context_hash = block_header.Block_header.shell.context in
+    let* context =
+      let*! r = checkout index context_hash in
+      match r with
+      | Some c -> return c
+      | None -> tzfail (Cannot_retrieve_commit_info context_hash)
+    in
     let irmin_info = Dumpable_context.context_info context in
     let author = Info.author irmin_info in
     let message = Info.message irmin_info in
     let timestamp = Time.Protocol.of_seconds (Info.date irmin_info) in
-    let* protocol_hash = get_protocol context in
-    let* test_chain_status = get_test_chain context in
-    let* predecessor_block_metadata_hash =
+    let*! protocol_hash = get_protocol context in
+    let*! test_chain_status = get_test_chain context in
+    let*! predecessor_block_metadata_hash =
       find_predecessor_block_metadata_hash context
     in
-    let* predecessor_ops_metadata_hash =
+    let*! predecessor_ops_metadata_hash =
       find_predecessor_ops_metadata_hash context
     in
-    let* data_key = data_node_hash context in
+    let*! data_key = data_node_hash context in
     let parents_contexts = Dumpable_context.context_parents context in
-    return_ok
+    return
       ( protocol_hash,
         author,
         message,

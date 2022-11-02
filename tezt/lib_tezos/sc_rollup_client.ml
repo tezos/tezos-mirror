@@ -38,6 +38,8 @@ type commitment = {
   number_of_ticks : int;
 }
 
+type slot_header = {level : int; commitment : string; index : int}
+
 let commitment_from_json json =
   if JSON.is_null json then None
   else
@@ -106,6 +108,69 @@ let state_value ?hooks sc_client ~key =
   in
   return (Scanf.sscanf (String.trim out) "%S" (fun s -> s) |> String.to_bytes)
 
+type transaction = {
+  destination : string;
+  entrypoint : string option;
+  parameters : string;
+}
+
+let string_of_transaction {destination; entrypoint; parameters} =
+  Format.asprintf
+    {| { "destination" : "%s", %s"parameters" : "%s" } |}
+    destination
+    (match entrypoint with
+    | None -> ""
+    | Some entrypoint -> Format.asprintf {| "entrypoint" : "%s", |} entrypoint)
+    parameters
+
+let string_of_batch ts =
+  "[ " ^ String.concat "," (List.map string_of_transaction ts) ^ " ]"
+
+type outbox_proof = {commitment_hash : string; proof : string}
+
+let outbox_proof_batch ?hooks ?expected_error sc_client ~message_index
+    ~outbox_level batch =
+  let process =
+    spawn_command
+      ?hooks
+      sc_client
+      [
+        "get";
+        "proof";
+        "for";
+        "message";
+        string_of_int message_index;
+        "of";
+        "outbox";
+        "at";
+        "level";
+        string_of_int outbox_level;
+        "transferring";
+        string_of_batch batch;
+      ]
+  in
+  match expected_error with
+  | None ->
+      let* answer = Process.check_and_read_stdout process in
+      let open JSON in
+      let json = parse ~origin:"outbox_proof" answer in
+      let commitment_hash = json |-> "commitment_hash" |> as_string in
+      let proof = json |-> "proof" |> as_string in
+      return (Some {commitment_hash; proof})
+  | Some msg ->
+      let* () = Process.check_error ~msg process in
+      return None
+
+let outbox_proof_single ?hooks ?expected_error ?entrypoint sc_client
+    ~message_index ~outbox_level ~destination ~parameters =
+  outbox_proof_batch
+    ?hooks
+    ?expected_error
+    sc_client
+    ~message_index
+    ~outbox_level
+    [{destination; entrypoint; parameters}]
+
 let rpc_get ?hooks sc_client path =
   let process =
     spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
@@ -133,6 +198,11 @@ let status ?hooks sc_client =
   let+ res = rpc_get ?hooks sc_client ["global"; "status"] in
   JSON.as_string res
 
+let outbox ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["global"; "outbox"] in
+  JSON.encode res
+
 let last_stored_commitment ?hooks sc_client =
   let open Lwt.Syntax in
   let+ json = rpc_get ?hooks sc_client ["global"; "last_stored_commitment"] in
@@ -145,8 +215,38 @@ let last_published_commitment ?hooks sc_client =
 
 let dal_slot_subscriptions ?hooks sc_client =
   let open Lwt.Syntax in
-  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slots"] in
+  let+ json =
+    rpc_get ?hooks sc_client ["global"; "dal"; "slot_subscriptions"]
+  in
   JSON.as_list json |> List.map JSON.as_int
+
+let dal_slot_headers ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slot_headers"] in
+  JSON.(
+    as_list json
+    |> List.map (fun obj ->
+           {
+             level = obj |> get "level" |> as_int;
+             commitment = obj |> get "commitment" |> as_string;
+             index = obj |> get "index" |> as_int;
+           }))
+
+let dal_downloaded_slots ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ json = rpc_get ?hooks sc_client ["global"; "dal"; "slot_pages"] in
+  JSON.as_list json
+  |> List.map (fun obj ->
+         let index = obj |> JSON.get "index" |> JSON.as_int in
+         let contents =
+           obj |> JSON.get "contents" |> JSON.as_list
+           |> List.map (fun pages ->
+                  pages |> JSON.as_opt
+                  |> Option.map (fun page ->
+                         page |> JSON.as_string |> fun s ->
+                         Hex.to_string (`Hex s)))
+         in
+         (index, contents))
 
 let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
   spawn_command

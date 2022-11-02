@@ -1171,6 +1171,7 @@ module Mempool = struct
       nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
+        * validation_state
         * [`No_replace | `Replace of Operation_hash.t * error_classification]
       | error_classification
       | `Undecided ]
@@ -1209,7 +1210,7 @@ module Mempool = struct
               let filter_state =
                 add_manager_restriction filter_state oph info source replacement
               in
-              `Passed_precheck (filter_state, replacement)
+              `Passed_precheck (filter_state, validation_state, replacement)
           | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _)
             as errs ->
               errs)

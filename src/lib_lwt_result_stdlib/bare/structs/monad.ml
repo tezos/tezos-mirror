@@ -160,7 +160,7 @@ module Lwt_result_syntax = struct
 
   let ( let+ ) v f = Lwt_result.map f v
 
-  let lwt_map_error = Lwt_result.map_err
+  let lwt_map_error = Lwt_result.map_error
 
   let ( let*! ) = Lwt.bind
 

@@ -83,7 +83,7 @@ val prepare :
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Jakarta_013
+type previous_protocol = Genesis of Parameters_repr.t | Kathmandu_014
 
 val prepare_first_block :
   level:int32 ->
@@ -108,6 +108,8 @@ val constants : t -> Constants_parametric_repr.t
 val tx_rollup : t -> Constants_parametric_repr.tx_rollup
 
 val sc_rollup : t -> Constants_parametric_repr.sc_rollup
+
+val zk_rollup : t -> Constants_parametric_repr.zk_rollup
 
 val patch_constants :
   t -> (Constants_parametric_repr.t -> Constants_parametric_repr.t) -> t Lwt.t
@@ -181,6 +183,8 @@ type value = bytes
 
 type tree
 
+type local_context
+
 module type T =
   Raw_context_intf.T
     with type root := root
@@ -188,7 +192,7 @@ module type T =
      and type value := value
      and type tree := tree
 
-include T with type t := t
+include T with type t := t and type local_context := local_context
 
 (** Initialize the local nonce used for preventing a script to
     duplicate an internal operation to replay it. *)
@@ -213,14 +217,18 @@ val map_temporary_lazy_storage_ids_s :
   (Lazy_storage_kind.Temp_ids.t -> (t * Lazy_storage_kind.Temp_ids.t) Lwt.t) ->
   t Lwt.t
 
-module Cache :
-  Context.CACHE
-    with type t := t
-     and type size := int
-     and type index := int
-     and type identifier := string
-     and type key = Context.Cache.key
-     and type value = Context.Cache.value
+module Cache : sig
+  include
+    Context.CACHE
+      with type t := t
+       and type size := int
+       and type index := int
+       and type identifier := string
+       and type key = Context.Cache.key
+       and type value = Context.Cache.value
+
+  val sync : t -> bytes -> t Lwt.t
+end
 
 (* Hashes of non-consensus operations are stored so that, when
    finalizing the block, we can compute the block's payload hash. *)
@@ -228,14 +236,24 @@ val record_non_consensus_operation_hash : t -> Operation_hash.t -> t
 
 val non_consensus_operations : t -> Operation_hash.t list
 
+type consensus_pk = {
+  delegate : Signature.Public_key_hash.t;
+  consensus_pk : Signature.Public_key.t;
+  consensus_pkh : Signature.Public_key_hash.t;
+}
+
+val consensus_pk_encoding : consensus_pk Data_encoding.t
+
+(** Record that the dictator already voted in this block. *)
+val record_dictator_proposal_seen : t -> t
+
+(** Checks whether the dictator voted in this block. *)
+val dictator_proposal_seen : t -> bool
+
 (** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
     sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
 val init_sampler_for_cycle :
-  t ->
-  Cycle_repr.t ->
-  Seed_repr.seed ->
-  (Signature.public_key * Signature.public_key_hash) Sampler.t ->
-  t tzresult
+  t -> Cycle_repr.t -> Seed_repr.seed -> consensus_pk Sampler.t -> t tzresult
 
 (** [sampler_for_cycle ~read ctxt cycle] returns the seeded stake
     sampler for [cycle]. The sampler is read in memory if
@@ -244,19 +262,10 @@ val init_sampler_for_cycle :
     the [read] function and then cached in [ctxt] like
     [init_sampler_for_cycle]. *)
 val sampler_for_cycle :
-  read:
-    (t ->
-    (Seed_repr.seed
-    * (Signature.public_key * Signature.public_key_hash) Sampler.t)
-    tzresult
-    Lwt.t) ->
+  read:(t -> (Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t) ->
   t ->
   Cycle_repr.t ->
-  (t
-  * Seed_repr.seed
-  * (Signature.public_key * Signature.public_key_hash) Sampler.t)
-  tzresult
-  Lwt.t
+  (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
@@ -268,6 +277,8 @@ val init_stake_distribution_for_current_cycle :
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t
+
+  val add_cycles : t -> int -> t
 end
 
 module type CONSENSUS = sig
@@ -281,17 +292,17 @@ module type CONSENSUS = sig
 
   type round
 
-  (** Returns a map where each endorser's pkh is associated to the
-     list of its endorsing slots (in decreasing order) for a given
-     level. *)
-  val allowed_endorsements :
-    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+  type consensus_pk
 
   (** Returns a map where each endorser's pkh is associated to the
      list of its endorsing slots (in decreasing order) for a given
      level. *)
-  val allowed_preendorsements :
-    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+  val allowed_endorsements : t -> (consensus_pk * int) slot_map
+
+  (** Returns a map where each endorser's pkh is associated to the
+     list of its endorsing slots (in decreasing order) for a given
+     level. *)
+  val allowed_preendorsements : t -> (consensus_pk * int) slot_map
 
   (** [endorsement power ctx] returns the endorsement power of the
      current block. *)
@@ -302,10 +313,8 @@ module type CONSENSUS = sig
      any consensus operation.  *)
   val initialize_consensus_operation :
     t ->
-    allowed_endorsements:
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
-    allowed_preendorsements:
-      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    allowed_endorsements:(consensus_pk * int) slot_map ->
+    allowed_preendorsements:(consensus_pk * int) slot_map ->
     t
 
   (** [record_grand_parent_endorsement ctx pkh] records an
@@ -367,6 +376,7 @@ module Consensus :
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
+     and type consensus_pk := consensus_pk
 
 module Tx_rollup : sig
   val add_message :
@@ -391,25 +401,29 @@ module Dal : sig
      no-op. *)
   val record_available_shards : t -> Dal_endorsement_repr.t -> int list -> t
 
-  (** [register_slot ctxt slot] returns a new context where the new
-     candidate [slot] have been taken into account. Returns [Some
-     (ctxt,updated)] where [updated=true] if the candidate is
-     registered. [Some (ctxt,false)] if another candidate was already
-     registered previously. Returns an error if the slot is
-     invalid. *)
-  val register_slot : t -> Dal_slot_repr.t -> (t * bool) tzresult
+  (** [register_slot_header ctxt slot_header] returns a new context
+     where the new candidate [slot] have been taken into
+     account. Returns [Some (ctxt,updated)] where [updated=true] if
+     the candidate is registered. [Some (ctxt,false)] if another
+     candidate was already registered previously. Returns an error if
+     the slot is invalid. *)
+  val register_slot_header : t -> Dal_slot_repr.Header.t -> (t * bool) tzresult
 
   (** [candidates ctxt] returns the current list of slot for which
      there is at least one candidate. *)
-  val candidates : t -> Dal_slot_repr.t list
+  val candidates : t -> Dal_slot_repr.Header.t list
 
-  (** [is_slot_available ctxt slot_index] returns [true] if the
+  (** [is_slot_index_available ctxt slot_index] returns [true] if the
      [slot_index] is declared available by the protocol. [false]
      otherwise. If the [index] is out of the interval
      [0;number_of_slots - 1], returns [false]. *)
-  val is_slot_available : t -> Dal_slot_repr.Index.t -> bool
+  val is_slot_index_available : t -> Dal_slot_repr.Index.t -> bool
 
   (** [shards ctxt ~endorser] returns the shard assignment for the
      [endorser] for the current level. *)
   val shards : t -> endorser:Signature.Public_key_hash.t -> int list
+end
+
+module Migration_from_Kathmandu : sig
+  val reset_samplers : t -> t tzresult
 end

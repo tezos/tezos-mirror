@@ -65,7 +65,8 @@ open Protocol
 *)
 
 (** The signature of Mikhailsky terms. *)
-module Mikhailsky_signature : Signature.S with type t = Mikhailsky_prim.prim
+module Mikhailsky_signature :
+  Algebraic_signature.S with type t = Mikhailsky_prim.prim
 
 (** Elements of type [Path.t] allow to index subterms of Mikhailsky terms. *)
 module Path : Path.S
@@ -308,9 +309,9 @@ module Data : sig
 
   val mutez : Alpha_context.Tez.t -> node
 
-  val key_hash : Tezos_crypto.Signature.Public_key_hash.t -> node
+  val key_hash : Signature.Public_key_hash.t -> node
 
-  val key : Tezos_crypto.Signature.Public_key.t -> node
+  val key : Signature.Public_key.t -> node
 
   val integer : int -> node
 

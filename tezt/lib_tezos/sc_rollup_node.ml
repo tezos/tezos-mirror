@@ -25,12 +25,17 @@
 
 type 'a known = Unknown | Known of 'a
 
+type mode = Batcher | Custom | Maintenance | Observer | Operator
+
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
-    operator_pkh : string;
+    operators : (string * string) list;
+    default_operator : string option;
     rpc_host : string;
     rpc_port : int;
+    mode : mode;
+    dal_node : Dal_node.t option;
     client : Client.t;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
@@ -46,6 +51,13 @@ end
 
 open Parameters
 include Daemon.Make (Parameters)
+
+let string_of_mode = function
+  | Observer -> "observer"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
 
 let check_error ?exit_code ?msg sc_node =
   match sc_node.status with
@@ -77,34 +89,58 @@ let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let base_dir sc_node = Client.base_dir sc_node.persistent_state.client
 
-let operator_pkh sc_node = sc_node.persistent_state.operator_pkh
+let operators_params sc_node =
+  let acc =
+    match sc_node.persistent_state.default_operator with
+    | None -> []
+    | Some operator -> [operator]
+  in
+  List.fold_left
+    (fun acc (purpose, operator) ->
+      String.concat ":" [purpose; operator] :: acc)
+    acc
+    sc_node.persistent_state.operators
 
 let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
 
 let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
 
-let spawn_command sc_node =
+let spawn_command sc_node args =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
+  @@ ["--base-dir"; base_dir sc_node]
+  @ args
 
 let spawn_config_init sc_node ?loser_mode rollup_address =
-  spawn_command
-    sc_node
-    ([
-       "config";
+  spawn_command sc_node
+  @@ [
        "init";
-       "on";
+       string_of_mode sc_node.persistent_state.mode;
+       "config";
+       "for";
        rollup_address;
        "with";
-       "operator";
-       operator_pkh sc_node;
-       "--data-dir";
-       data_dir sc_node;
-       "--rpc-addr";
-       rpc_host sc_node;
-       "--rpc-port";
-       string_of_int @@ rpc_port sc_node;
+       "operators";
      ]
-    @ match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+  @ operators_params sc_node
+  @ [
+      "--data-dir";
+      data_dir sc_node;
+      "--rpc-addr";
+      rpc_host sc_node;
+      "--rpc-port";
+      string_of_int @@ rpc_port sc_node;
+    ]
+  @ (match loser_mode with None -> [] | Some mode -> ["--loser-mode"; mode])
+  @
+  match sc_node.persistent_state.dal_node with
+  | None -> []
+  | Some dal_node ->
+      [
+        "--dal-node-addr";
+        Dal_node.rpc_host dal_node;
+        "--dal-node-port";
+        Int.to_string @@ Dal_node.rpc_port dal_node;
+      ]
 
 let config_init sc_node ?loser_mode rollup_address =
   let process = spawn_config_init sc_node ?loser_mode rollup_address in
@@ -126,6 +162,22 @@ module Config_file = struct
 
   let update sc_node update = read sc_node |> update |> write sc_node
 end
+
+let spawn_import sc_node ~pvm_name ~filename =
+  spawn_command sc_node
+  @@ [
+       "import";
+       "--data-dir";
+       data_dir sc_node;
+       "--pvm-name";
+       pvm_name;
+       "--filename";
+       filename;
+     ]
+
+let import sc_node ~pvm_name ~filename =
+  let process = spawn_import sc_node ~pvm_name ~filename in
+  Process.check_and_read_stdout process
 
 let trigger_ready sc_node value =
   let pending = sc_node.persistent_state.pending_ready in
@@ -209,8 +261,8 @@ let handle_event sc_node {name; value} =
   | _ -> ()
 
 let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port ~operator_pkh (node : Node.t)
-    (client : Client.t) =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ?(operators = []) ?default_operator
+    ?(dal_node : Dal_node.t option) mode (node : Node.t) (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -228,9 +280,12 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
         data_dir;
         rpc_host;
         rpc_port;
-        operator_pkh;
+        operators;
+        default_operator;
+        mode;
         node;
         client;
+        dal_node;
         pending_ready = [];
         pending_level = [];
       }
@@ -239,12 +294,14 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
   sc_node
 
 let make_arguments node =
-  [
-    "--endpoint";
-    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
-    "--base-dir";
-    base_dir node;
-  ]
+  List.filter_map Fun.id
+  @@ [
+       Some "--endpoint";
+       Some
+         (Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node));
+       Some "--base-dir";
+       Some (base_dir node);
+     ]
 
 let do_runlike_command node arguments =
   if node.status <> Not_running then

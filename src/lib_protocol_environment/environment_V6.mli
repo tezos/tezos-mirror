@@ -76,12 +76,6 @@ module type T = sig
        and type Signature.public_key = Signature.public_key
        and type Signature.t = Signature.t
        and type Signature.watermark = Signature.watermark
-       and type Pvss_secp256k1.Commitment.t = Pvss_secp256k1.Commitment.t
-       and type Pvss_secp256k1.Encrypted_share.t =
-        Pvss_secp256k1.Encrypted_share.t
-       and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
-       and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
-       and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -97,14 +91,15 @@ module type T = sig
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
-       and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
-       and type Bls_signature.signature = Bls12_381.Signature.MinPk.signature
+       and type Bls_signature.pk = Bls12_381_signature.MinPk.pk
+       and type Bls_signature.signature = Bls12_381_signature.MinPk.signature
        and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
        and type Bls12_381.Fr.t = Bls12_381.Fr.t
-       and type Plonk.transcript = Plonk.Main_protocol.transcript
-       and type Plonk.proof = Plonk.Main_protocol.proof
+       and type Plonk.transcript =
+        Tezos_protocol_environment_structs.V6.Plonk.transcript
+       and type Plonk.proof = Tezos_protocol_environment_structs.V6.Plonk.proof
        and type Plonk.verifier_public_parameters =
-        Plonk.Main_protocol.verifier_public_parameters
+        Tezos_protocol_environment_structs.V6.Plonk.verifier_public_parameters
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 
@@ -147,6 +142,7 @@ module type T = sig
        and type operation_receipt = P.operation_receipt
        and type operation = P.operation
        and type validation_state = P.validation_state
+       and type application_state = P.validation_state
 
   class ['chain, 'block] proto_rpc_context :
     Tezos_rpc.RPC_context.t

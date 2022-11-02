@@ -56,14 +56,20 @@ module Sc_rollup_repr = Sc_rollup_repr
 module Sc_rollup = struct
   module Tick = Sc_rollup_tick_repr
   include Sc_rollup_repr
-  include Sc_rollup_PVM_sem
+  module Metadata = Sc_rollup_metadata_repr
+  include Sc_rollup_PVM_sig
   module ArithPVM = Sc_rollup_arith
   module Wasm_2_0_0PVM = Sc_rollup_wasm.V2_0_0
+  module Inbox_message = Sc_rollup_inbox_message_repr
 
   module Inbox = struct
     include Sc_rollup_inbox_repr
     include Sc_rollup_inbox_storage
-    module Message = Sc_rollup_inbox_message_repr
+
+    module Internal_for_tests = struct
+      include Sc_rollup_inbox_repr.Internal_for_tests
+      include Sc_rollup_inbox_storage.Internal_for_tests
+    end
   end
 
   module Proof = Sc_rollup_proof_repr
@@ -100,14 +106,32 @@ module Dal = struct
     include Raw_context.Dal
   end
 
+  module Page = struct
+    include Dal_slot_repr.Page
+  end
+
   module Slot = struct
     include Dal_slot_repr
     include Dal_slot_storage
     include Raw_context.Dal
   end
+
+  module Slots_history = Dal_slot_repr.History
+  module Slots_storage = Dal_slot_storage
 end
 
 module Dal_errors = Dal_errors_repr
+
+module Zk_rollup = struct
+  include Zk_rollup_repr
+  module State = Zk_rollup_state_repr
+  module Account = Zk_rollup_account_repr
+  module Operation = Zk_rollup_operation_repr
+  module Ticket = Zk_rollup_ticket_repr
+  module Errors = Zk_rollup_errors
+  include Zk_rollup_storage
+end
+
 module Entrypoint = Entrypoint_repr
 include Operation_repr
 
@@ -202,19 +226,6 @@ module Gas = struct
     | Some remaining_gas -> ok remaining_gas
     | None -> error Operation_quota_exceeded
 
-  let check_limit_and_consume_from_block_gas
-      ~(hard_gas_limit_per_operation : Arith.integral)
-      ~(remaining_block_gas : Arith.fp) ~(gas_limit : Arith.integral) =
-    let open Result_syntax in
-    let* () = check_gas_limit ~hard_gas_limit_per_operation ~gas_limit in
-    let gas_limit_fp = Arith.fp gas_limit in
-    let* () =
-      error_unless
-        Arith.(gas_limit_fp <= remaining_block_gas)
-        Block_quota_exceeded
-    in
-    return (Arith.sub remaining_block_gas gas_limit_fp)
-
   let remaining_operation_gas = Raw_context.remaining_operation_gas
 
   let update_remaining_operation_gas =
@@ -291,6 +302,12 @@ module Contract = struct
   let reveal_manager_key = Contract_manager_storage.reveal_manager_key
 
   let get_manager_key = Contract_manager_storage.get_manager_key
+
+  module Delegate = struct
+    let find = Contract_delegate_storage.find
+
+    include Delegate_storage.Contract
+  end
 
   module Internal_for_tests = struct
     include Contract_repr
@@ -375,8 +392,8 @@ module Big_map = struct
 
   let get_opt c m k = Storage.Big_map.Contents.find (c, m) k
 
-  let list_values ?offset ?length c m =
-    Storage.Big_map.Contents.list_values ?offset ?length (c, m)
+  let list_key_values ?offset ?length c m =
+    Storage.Big_map.Contents.list_key_values ?offset ?length (c, m)
 
   let exists c id =
     Raw_context.consume_gas c (Gas_limit_repr.read_bytes_cost 0) >>?= fun c ->
@@ -449,9 +466,13 @@ module Bond_id = struct
 end
 
 module Receipt = Receipt_repr
+module Consensus_key = Delegate_consensus_key
 
 module Delegate = struct
   include Delegate_storage
+  include Delegate_missed_endorsements_storage
+  include Delegate_slashed_deposits_storage
+  include Delegate_cycles
 
   type deposits = Storage.deposits = {
     initial_amount : Tez.t;
@@ -463,25 +484,21 @@ module Delegate = struct
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
-  let registered = Contract_delegate_storage.registered
-
-  let find = Contract_delegate_storage.find
-
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
+
+  let deactivated = Delegate_activation_storage.is_inactive
+
+  module Consensus_key = Delegate_consensus_key
 end
 
 module Stake_distribution = struct
   let snapshot = Stake_storage.snapshot
 
-  let compute_snapshot_index = Delegate_storage.compute_snapshot_index
+  let compute_snapshot_index = Delegate_sampler.compute_snapshot_index
 
-  let baking_rights_owner = Delegate.baking_rights_owner
+  let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
-  let slot_owner = Delegate.slot_owner
-
-  let delegate_pubkey = Delegate.pubkey
-
-  let get_staking_balance = Delegate.staking_balance
+  let slot_owner = Delegate_sampler.slot_owner
 end
 
 module Nonce = Nonce_storage
@@ -559,6 +576,10 @@ let record_non_consensus_operation_hash =
 
 let non_consensus_operations = Raw_context.non_consensus_operations
 
+let record_dictator_proposal_seen = Raw_context.record_dictator_proposal_seen
+
+let dictator_proposal_seen = Raw_context.dictator_proposal_seen
+
 let activate = Raw_context.activate
 
 let reset_internal_nonce = Raw_context.reset_internal_nonce
@@ -586,6 +607,10 @@ end
 
 module Ticket_balance = struct
   include Ticket_storage
+end
+
+module Ticket_receipt = struct
+  include Ticket_receipt_repr
 end
 
 module Token = Token

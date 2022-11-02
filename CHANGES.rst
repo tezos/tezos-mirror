@@ -25,86 +25,150 @@ be documented here either.
 Node
 ----
 
-- Added Kathmandu, a protocol proposal for Mainnet featuring, among others,
-  pipelining of manager operations, improved randomness generation, event
-  logging and support for permanent testnets.
+- Added Lima, a protocol proposal for Mainnet featuring, among others,
+  Pipelining, Consensus Key, improvements to Tickets, and Ghostnet fixes.
 
-- Fix a bug that leads to forgetting the trusted status of peers when connection
-  is lost
+- Add a `/chains/<chain>/blocks/<block>/merkle_tree_v2` RPC. This is an
+  evolution of the `../merkle_tree` RPC, using a simpler implementation of the
+  Merkle tree/proof features that works with Irmin trees and proofs underneath
+  instead of proof code internal to Octez, and is planned to eventually replace
+  the old one in a future release.
 
-- Added store metrics to expose the amount of data written while
-  storing the last block and the completion time of the last merge.
+- Add a field ``dal`` in the node's configuration file. This field is
+  for a feature which is being developed and should not be
+  modified. It should be used only for testing.
 
-- Added a block validator metric to expose the number of operation per
-  pass for each new block validated.
+- Fixed a bug in the p2p layer that prevented a fast regulation of the
+  number of connections (when having too few or too many connections)
 
-- Added a protocol specific metrics, head_cycle, head_consumed_gas and
-  head_round.
+- Improved the octez store merging mechanism performed on each new
+  cycle. The node's memory consumption should not differ from a normal
+  usage where, in the past, it could take up to several gigabytes of
+  memory to perform a store merge. It also takes less time to perform
+  a merge and shouldn't impact normal node operations as much as it
+  previously did; especially on light architectures.
 
-- Added a store metric to expose the number of blocks considered as invalid.
+- Added support for ``level..level`` range parameters in the replay command.
 
-- Fixed the `tezos-node config reset` command which did not actually reset
-  the configuration file to its default values.
+- Breaking change: Node events using a legacy logging system and are migrated to
+  the actual one. Impacted events are in the following sections:
+  ``validator.chain``, ``validator.peer``, ``prevalidator`` and
+  ``validator.block``. Section ``node.chain_validator`` is merged into
+  ``validator.chain`` for consistency reasons. Those events see their JSON
+  reprensentation shorter, with no duplicated information. e.g.
+  ``validator.peer`` events were named ``validator.peer.v0`` at top-level and
+  had an ``event`` field with a ``name`` field containing the actual event name,
+  for example ``validating_new_branch``. Now, the event is called
+  ``validating_new_branch.v0`` at top-level and contains a ``section`` field
+  with ``validator`` and ``peer``.
 
-- Added metrics to observe the bootstrapped and synchronisation
-  status.
+*  Added support for ``--strict`` mode in the replay command: it causes the
+   command to be less permissive.
 
-- Added metrics to track the peer validator requests.
-
-- Added an optional query parameter ``metadata`` to the GET
-  /chains/<chain>/blocks/<block>/ and GET
-  /chains/<chain>/blocks/<block>/operations/ RPCs. Passing this
-  parameter with value ``always`` overrides the metadata size limit
-  configuration, and forces the re-computation of operation metadata
-  whose size was beyond the limit, and therefore not stored. The
-  re-computed metadata are not stored on disk after this call, but
-  rather just returned by the RPC call. Passing this parameters with
-  value ``never`` prevents the request to return metadata, to allow
-  lighter requests. If the query string is not used, the configured
-  metadata size limit policy is used.
-
-- Deprecated the ``force_metadata`` query paramater for the the GET
-  /chains/<chain>/blocks/<block>/ and GET
-  /chains/<chain>/blocks/<block>/operations/ RPCs. To get a similar
-  behaviour, use the ``metadata`` query string with the value
-  ``always``.
-
-- Deprecated the CLI argument `--enable-testchain` and the corresponding
-  configuration-file option `p2p.enable_testchain`.
-
-- Added metrics to track the pending requests of chain validator, block
-  validator and prevalidator workers.
+- Added garbage collection for the context part of the storage
+  backend.  It is activated by default for all nodes running with a
+  full or rolling history mode.
 
 - **Breaking change**: The node context storage format was
-  upgraded. To this end, a new storage version was introduced: 1.0
-  (previously 0.8). Backward compatibility is preserved: upgrading
-  from 0.6, 0.7 (Octez 12.x) or 0.8 (Octez 13.0) is done through the
-  ``tezos-node upgrade storage`` command. This upgrade is
-  instantaneous. However, be careful that there is no forward
-  compatibility: previous versions of Octez will refuse to run on an
-  upgraded data directory.
+  upgraded. To this end, a new storage version was introduced: 2.0
+  (previously 1.0). Backward compatibility is preserved: upgrading
+  from 1.0 to 2.0 is done automatically by the node the first time you
+  run it. This upgrade is instantaneous. However, be careful that
+  there is no forward compatibility: previous versions of Octez will
+  refuse to run on a data directory which was running with this
+  storage version.
 
-- **Breaking change**: the built-in network alias for Ithacanet
-  (``--network ithacanet``) has been removed.
+- The ``config`` and ``identity`` node commands no longer try to
+  update the data directory version (``version.json``).
 
-- Added the built-in network alias for Ghostnet (``--network ghostnet``).
+- Fixed a bug in the store that was generating an incorrect protocol
+  table during a branch switch containing a user activated protocol
+  upgrade.
 
-- Updated the encoding of worker events json messages.
+- Decreased, from 5 to 1, the default number of additional cycles to
+  keep in both ``Full`` and ``Rolling`` history modes. As a
+  consequence, the storage footprint will be lowered and only the last
+  6 cycles will be available (10 previously).
 
-- Fix a bug preventing the ``replay`` command to run in readonly
-  mode. As a side effect, the ``replay`` command was actually writing
-  data to the context store.
+- Removed Giganode from the list of bootstrap peers for Mainnet.
+
+- Removed the ``--network hangzhounet`` and ``--network jakartanet``
+  built-in network aliases.
+
+- Add third user-activated upgrade to the ``--network ghostnet`` built-in
+  network alias (at level 1191936 for Kathmandu).
+
+- Added the built-in network alias for Limanet (``--network limanet``).
+
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number
+  additional cycles.
 
 Client
 ------
 
-- Client allows to simulate failing operations with ``--simulation
-  --force``, and report errors without specifying limits.
+- The light client (`tezos-client --mode light`) now uses the
+  `../block/<block_id>/merkle_tree_v2` RPC introduced in this version, removing
+  a lot of delicate verification code and relying on Irmin instead. The client
+  for this version will thus not work with older node versions that do not have
+  this RPC.
 
-- Added `--ignore-case` option to the `tezos-client gen vanity keys` command
-  to allow case-insensitive search for the given pattern.
+- Simulation returns correct errors on batches of operations where some are
+  backtracked, failed and/or skipped.
 
-- Disabled origination of contracts with timelock instructions.
+- External operations pool specified by the ``--operations-pool`` option are
+  guaranteed to be included in the order they are received from the operations
+  source.
+
+- Added commands to get the used and paid storage spaces of contracts:
+  ``tezos-client get used storage space for <contract>`` and
+  ``tezos-client get paid storage space for <contract>``.
+
+- Added RPCs to get the used and paid storage spaces of contracts:
+  ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/used_space``
+  and ``GET /chains/<chain_id>/blocks/<block_id>/context/contracts/<contract_id>/storage/paid_space``.
+
+- Added commands related to the "consensus key" feature:
+
+	Update the consensus key of a baker:
+
+```shell
+tezos-client set consensus key for <mgr> to <key>
+```
+
+  It is also possible to register as a delegate and immediately set the consensus key:
+
+```shell
+tezos-client register key <mgr> as delegate with consensus key <key>
+```
+
+  (The current registration command still works.)
+
+
+  Drain a baker's account:
+
+```shell
+tezos-client drain delegate <mgr> to <key>
+```
+
+  or, if the destination account is different from the consensus key
+
+```shell
+tezos-client drain delegate <mgr> to <dest_key> with <consensus_key>
+```
+
+
+Baker
+-----
+
+- External operations pool specified by the ``--operations-pool`` option are
+  guaranteed to be included in the order they are received from the operations
+  source.
+
+- The logs now display both the delegate and its consensus key.
+
+- Improved performance by 50% of Ledger's signing requests by caching
+  redundant requests.
 
 Accuser
 -------
@@ -112,11 +176,8 @@ Accuser
 Signer
 ------
 
-Proxy server
+Proxy Server
 ------------
-- Changed the proxy server's handling of requests it doesn't know how to serve:
-  it now forwards the client to the full node at the given `--endpoint`, by
-  responding with a ``301 Moved Permanently`` redirect.
 
 Protocol Compiler And Environment
 ---------------------------------
@@ -127,24 +188,15 @@ Codec
 Docker Images
 -------------
 
-- **Breaking change**: script ``tezos-docker-manager.sh``, also known as
-  ``alphanet.sh`` or ``mainnet.sh``, has been removed. It was deprecated
-  since version 13.0. It is recommended to write your own docker-compose file instead.
-  ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
+-  Bump up base image to ``alpine:3.16``. In particular, it changes Rust
+   and Python versions to 1.60.0 and 3.10.5 respectively.
 
-- ``tezos-codec`` is now included in Docker images.
-
-Rollup Binaries
----------------
-
-- Included the Transaction Rollups (TORU) and Smart-contract Rollups
-  (SCORU) binaries in the Docker images of Octez.  These binaries are
-  **experimental**.  They are provided solely for testing-purposes,
-  and should not be used in production.  Besides, they should not be
-  considered as being part of Octez, and as a consequence will not be
-  provided with the same degree of maintenance.  However, developers
-  interested in implementing their own rollup nodes and clients are
-  more than welcome to leverage them.
+Rollups
+-------
 
 Miscellaneous
 -------------
+
+-  Recommend rust version 1.60.0 instead of 1.52.1.
+
+-  Removed delegates for protocols Ithaca and Jakarta.

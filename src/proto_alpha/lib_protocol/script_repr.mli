@@ -73,8 +73,6 @@ val deserialization_cost_estimated_from_bytes : int -> Gas_limit_repr.cost
 
 val deserialized_cost : expr -> Gas_limit_repr.cost
 
-val serialized_cost : bytes -> Gas_limit_repr.cost
-
 val bytes_node_cost : bytes -> Gas_limit_repr.cost
 
 (** Returns (a lower bound on) the cost to deserialize a
@@ -113,6 +111,9 @@ val strip_locations_cost : _ michelson_node -> Gas_limit_repr.cost
 
 val strip_annotations_cost : node -> Gas_limit_repr.cost
 
+(** Computes the cost of serializing a given term. *)
+val micheline_serialization_cost : expr -> Gas_limit_repr.cost
+
 module Micheline_size : sig
   type t = {
     nodes : Saturation_repr.may_saturate Saturation_repr.t;
@@ -129,4 +130,8 @@ val micheline_nodes : node -> int
 
 (** [fold node i f] traverses [node] applying [f] on an
     accumulator initialized by [i]. *)
-val fold : node -> 'c -> ('c -> node -> 'c) -> 'c
+val fold :
+  ('loc, 'prim) Micheline.node ->
+  'acc ->
+  ('acc -> ('loc, 'prim) Micheline.node -> 'acc) ->
+  'acc

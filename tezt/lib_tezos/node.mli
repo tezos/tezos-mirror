@@ -27,16 +27,16 @@
 
 (** Convention: in this module, some functions implement node commands;
     those functions are named after those commands.
-    For instance, [Node.config_init] corresponds to [tezos-node config init],
-    and [Node.run] corresponds to [tezos-node run].
+    For instance, [Node.config_init] corresponds to [octez-node config init],
+    and [Node.run] corresponds to [octez-node run].
 
     The arguments of those functions are also named after the actual arguments.
     For instance, [?network] is named after [--network], to make
     [Node.config_init ~network:"carthagenet"] look as close as possible
-    to [tezos-node config init --network carthagenet].
+    to [octez-node config init --network carthagenet].
 
     Most options have default values which are not necessarily the default values
-    of [tezos-node]. Indeed, the latter are tailored for Mainnet, but here we
+    of [octez-node]. Indeed, the latter are tailored for Mainnet, but here we
     use defaults which are tailored for the sandbox. In particular, the default
     value for [?network] is ["sandbox"].
     However, if you specify an option such as [~network] or [~history_mode],
@@ -71,6 +71,7 @@ type argument =
   | Singleprocess  (** [--singleprocess] *)
   | Bootstrap_threshold of int  (** [--bootstrap-threshold] (deprecated) *)
   | Synchronisation_threshold of int  (** [--synchronisation-threshold] *)
+  | Sync_latency of int  (** [--sync-latency] *)
   | Connections of int  (** [--connections] *)
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
@@ -106,9 +107,9 @@ type t
     through some other means, your node will not listen.
 
     The argument list is a list of configuration options that the node
-    should run with. It is passed to the first run of [tezos-node config init].
-    It is also passed to all runs of [tezos-node run] that occur before
-    [tezos-node config init]. If [Expected_pow] is given, it is also used as
+    should run with. It is passed to the first run of [octez-node config init].
+    It is also passed to all runs of [octez-node run] that occur before
+    [octez-node config init]. If [Expected_pow] is given, it is also used as
     the default value for {!identity_generate}.
 
     If [runner] is specified, the node will be spawned on this
@@ -129,9 +130,9 @@ val create :
 
 (** Add an argument to a node as if it was passed to {!create}.
 
-    The argument is passed to the next run of [tezos-node config init].
-    It is also passed to all runs of [tezos-node run] that occur before
-    the next [tezos-node config init]. *)
+    The argument is passed to the next run of [octez-node config init].
+    It is also passed to all runs of [octez-node run] that occur before
+    the next [octez-node config init]. *)
 val add_argument : t -> argument -> unit
 
 (** Add a [--peer] argument to a node.
@@ -215,7 +216,7 @@ val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
 
-(** Run [tezos-node identity generate]. *)
+(** Run [octez-node identity generate]. *)
 val identity_generate : ?expected_pow:int -> t -> unit Lwt.t
 
 (** Same as [identity_generate], but do not wait for the process to exit. *)
@@ -226,8 +227,17 @@ val spawn_identity_generate : ?expected_pow:int -> t -> Process.t
     The result is suitable to be passed to the node on the command-line. *)
 val show_history_mode : history_mode -> string
 
-(** Run [tezos-node config init]. *)
+(** Run [octez-node config init]. *)
 val config_init : t -> argument list -> unit Lwt.t
+
+(** Run [octez-node config reset].
+
+    Contrary to [config_init], this does not automatically adds
+    arguments that were passed to [create], only the [--data-dir]. *)
+val config_reset : t -> string list -> unit Lwt.t
+
+(** Run [octez-node config show]. Returns the node configuration. *)
+val config_show : t -> JSON.t Lwt.t
 
 module Config_file : sig
   (** Node configuration files. *)
@@ -279,7 +289,7 @@ val spawn_config_init : t -> argument list -> Process.t
 (** A snapshot history mode for exports *)
 type snapshot_history_mode = Rolling_history | Full_history
 
-(** Run [tezos-node snapshot export]. *)
+(** Run [octez-node snapshot export]. *)
 val snapshot_export :
   ?history_mode:snapshot_history_mode ->
   ?export_level:int ->
@@ -295,13 +305,13 @@ val spawn_snapshot_export :
   string ->
   Process.t
 
-(** Run [tezos-node snapshot import]. *)
+(** Run [octez-node snapshot import]. *)
 val snapshot_import : ?reconstruct:bool -> t -> string -> unit Lwt.t
 
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
 val spawn_snapshot_import : ?reconstruct:bool -> t -> string -> Process.t
 
-(** Spawn [tezos-node run].
+(** Spawn [octez-node run].
 
     The resulting promise is fulfilled as soon as the node has been spawned.
     It continues running in the background.
@@ -329,7 +339,7 @@ val run :
   argument list ->
   unit Lwt.t
 
-(** Spawn [tezos-node replay].
+(** Spawn [octez-node replay].
 
     Same as {!run} but for the [replay] command.
     In particular it also supports events.
@@ -340,6 +350,7 @@ val replay :
   ?on_terminate:(Unix.process_status -> unit) ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?strict:bool ->
   ?blocks:string list ->
   t ->
   argument list ->
@@ -362,16 +373,17 @@ val wait_for_ready : t -> unit Lwt.t
 
 (** Wait for a given chain level.
 
-    More precisely, wait until a [node_chain_validator] with a [level]
-    greater or equal to the requested level occurs.
-    If such an event already occurred, return immediately. *)
+    More precisely, wait until a [head_increment] or [branch_switch] with a
+    [level] greater or equal to the requested level occurs. If such an event
+    already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
 (** Get the current known level of a node.
 
-    Returns [0] if the node is not running or if no [node_chain_validator] event
-    was received yet. This makes this function equivalent to [wait_for_level node 0]
-    except that it does not actually wait for the level to be known. *)
+    Returns [0] if the node is not running or if no [head_increment] or
+    [branch_switch] event was received yet. This makes this function equivalent
+    to [wait_for_level node 0] except that it does not actually wait for the
+    level to be known. *)
 val get_level : t -> int
 
 (** Wait for the node to read its identity.
@@ -451,3 +463,6 @@ val init :
 (** [send_raw_data node ~data] writes [~data] using an IP socket on the net
     port of [node]. *)
 val send_raw_data : t -> data:string -> unit Lwt.t
+
+(** [upgrade_storage node] upprades the given [node] storage. *)
+val upgrade_storage : t -> unit Lwt.t

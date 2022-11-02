@@ -96,18 +96,21 @@ end
  *  - (0.)0.6 : store upgrade (switching from LMDB)
  *  - (0.)0.7 : new store metadata representation
  *  - (0.)0.8 : context upgrade (upgrade to irmin.3.0)
- *  - 1.0     : context upgrade (upgrade to irmin.3.3) *)
+ *  - 1.0     : context upgrade (upgrade to irmin.3.3)
+ *  - 2.0     : introduce context GC (upgrade to irmin.3.4) *)
 
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
    hardcoded rules.*)
-let current_version = Version.make ~major:1 ~minor:0
+let current_version = Version.make ~major:2 ~minor:0
 
 let v_0_6 = Version.make ~major:0 ~minor:6
 
 let v_0_7 = Version.make ~major:0 ~minor:7
 
 let v_0_8 = Version.make ~major:0 ~minor:8
+
+let v_1_0 = Version.make ~major:1 ~minor:0
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -134,6 +137,7 @@ let upgradable_data_version =
     ( v_0_8,
       fun ~data_dir _ ~chain_name:_ ~sandbox_parameters:_ ->
         v_1_0_upgrade ~data_dir );
+    (v_1_0, fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit);
   ]
 
 type error += Invalid_data_dir_version of Version.t * Version.t
@@ -244,7 +248,7 @@ let () =
 module Events = struct
   open Internal_event.Simple
 
-  let section = ["node_data_version"]
+  let section = ["node"; "data_version"]
 
   let dir_is_up_to_date =
     declare_0
@@ -260,6 +264,19 @@ module Events = struct
       ~level:Notice
       ~name:"upgrading_node"
       ~msg:"upgrading data directory from {old_version} to {new_version}"
+      ~pp1:Version.pp
+      ("old_version", Version.encoding)
+      ~pp2:Version.pp
+      ("new_version", Version.encoding)
+
+  let finished_upgrading_node =
+    declare_2
+      ~section
+      ~level:Notice
+      ~name:"finished_upgrading_node"
+      ~msg:
+        "the node's data directory was automatically upgraded from \
+         {old_version} to {new_version} and is now up-to-date"
       ~pp1:Version.pp
       ("old_version", Version.encoding)
       ~pp2:Version.pp
@@ -295,7 +312,7 @@ module Events = struct
       ~pp2:Version.pp
       ("available_version", Version.encoding)
 
-  let emit = Internal_event.Simple.emit
+  let emit = emit
 end
 
 let version_file data_dir = Filename.concat data_dir version_file_name
@@ -349,7 +366,9 @@ let check_data_dir_version files data_dir =
       | Some f -> return_some f
       | None -> tzfail (Invalid_data_dir_version (current_version, version))
 
-let ensure_data_dir bare data_dir =
+type ensure_mode = Exists | Is_bare | Is_compatible
+
+let ensure_data_dir ~mode data_dir =
   let open Lwt_result_syntax in
   let write_version () =
     let* () = write_version_file data_dir in
@@ -371,12 +390,13 @@ let ensure_data_dir bare data_dir =
               && s <> default_peers_file_name)
             files
         in
-        match files with
-        | [] -> write_version ()
-        | files when bare ->
+        match (files, mode) with
+        | [], _ -> write_version ()
+        | files, Is_bare ->
             let msg = Some (clean_directory files) in
             tzfail (Invalid_data_dir {data_dir; msg})
-        | files -> check_data_dir_version files data_dir
+        | files, Is_compatible -> check_data_dir_version files data_dir
+        | _files, Exists -> return_none
       else
         let*! () = Lwt_utils_unix.create_dir ~perm:0o700 data_dir in
         write_version ())
@@ -386,7 +406,7 @@ let ensure_data_dir bare data_dir =
 
 let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
   let open Lwt_result_syntax in
-  let* o = ensure_data_dir false data_dir in
+  let* o = ensure_data_dir ~mode:Is_compatible data_dir in
   match o with
   | None ->
       let*! () = Events.(emit dir_is_up_to_date ()) in
@@ -403,11 +423,24 @@ let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
           let*! () = Events.(emit aborting_upgrade e) in
           Lwt.return (Error e))
 
-let ensure_data_dir ?(bare = false) data_dir =
+let ensure_data_dir ?(mode = Is_compatible) data_dir =
   let open Lwt_result_syntax in
-  let* o = ensure_data_dir bare data_dir in
+  let* o = ensure_data_dir ~mode data_dir in
   match o with
-  | None -> return_unit
+  | None ->
+      return_unit
+      (* Enable automatic upgrade to avoid users to manually upgrade. *)
+  | Some (version, _)
+    when Version.(
+           equal version v_1_0 || equal version v_0_6 || equal version v_0_7
+           || equal version v_0_8) ->
+      let* () =
+        upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
+      in
+      let*! () =
+        Events.(emit finished_upgrading_node (version, current_version))
+      in
+      return_unit
   | Some (version, _) ->
       tzfail
         (Data_dir_needs_upgrade {expected = current_version; actual = version})

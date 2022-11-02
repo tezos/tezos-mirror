@@ -34,6 +34,10 @@ val branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
+(** Either retrieve the alpha context (in the [Incremental] case) or
+    build one (in the [Block] case). *)
+val to_alpha_ctxt : t -> Alpha_context.t tzresult Lwt.t
+
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
 val get_first_different_endorsers :
@@ -54,6 +58,7 @@ val get_total_voting_power :
 
 val get_bakers :
   ?filter:(Plugin.RPC.Baking_rights.t -> bool) ->
+  ?cycle:Cycle.t ->
   t ->
   public_key_hash list tzresult Lwt.t
 
@@ -119,6 +124,12 @@ module Vote : sig
     current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
+
+  (** See {!Vote_storage.get_delegate_proposal_count}.
+
+      Note that unlike most functions in the current module, this one
+      does not call an RPC. *)
+  val get_delegate_proposal_count : t -> public_key_hash -> int tzresult Lwt.t
 end
 
 module Contract : sig
@@ -166,6 +177,8 @@ module Delegate : sig
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
@@ -186,6 +199,11 @@ module Delegate : sig
   val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
 
   val voting_info : t -> public_key_hash -> Vote.delegate_info tzresult Lwt.t
+
+  val consensus_key :
+    t ->
+    public_key_hash ->
+    (public_key_hash * (Cycle.t * public_key_hash) list) tzresult Lwt.t
 
   val participation :
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
@@ -221,6 +239,24 @@ module Sc_rollup : sig
     Sc_rollup.t ->
     Sc_rollup.Commitment.Hash.t ->
     Sc_rollup.Commitment.t tzresult Lwt.t
+
+  val genesis_info :
+    t -> Sc_rollup.t -> Sc_rollup.Commitment.genesis_info tzresult Lwt.t
+
+  val timeout :
+    t ->
+    Sc_rollup.t ->
+    Signature.Public_key_hash.t * Signature.Public_key_hash.t ->
+    Sc_rollup.Game.timeout option tzresult Lwt.t
+
+  val ongoing_game_for_staker :
+    t ->
+    Sc_rollup.t ->
+    Signature.public_key_hash ->
+    (Sc_rollup.Game.t * Signature.public_key_hash * Signature.public_key_hash)
+    option
+    tzresult
+    Lwt.t
 end
 
 type (_, _) tup =
@@ -253,11 +289,19 @@ type 'accounts init :=
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
+  ?sc_rollup_max_number_of_messages_per_commitment_period:int ->
   ?dal_enable:bool ->
+  ?zk_rollup_enable:bool ->
   ?hard_gas_limit_per_block:Gas.Arith.integral ->
   ?nonce_revelation_threshold:int32 ->
   unit ->
   (Block.t * 'accounts) tzresult Lwt.t
+
+(** Returns an initial block and the implicit contracts corresponding
+    to its bootstrap accounts. The number of bootstrap accounts, and
+    the structure of the returned contracts, are specified by the [tup]
+    argument. *)
+val init_gen : (Alpha_context.Contract.t, 'accounts) tup -> 'accounts init
 
 (** [init_n n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)

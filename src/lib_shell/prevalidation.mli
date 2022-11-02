@@ -87,11 +87,9 @@ module type T = sig
     protocol_operation operation -> protocol_operation operation
 
   (** Creates a new prevalidation context w.r.t. the protocol associated with
-      the predecessor block. When [?protocol_data] is passed to this function,
-      it will be used to create the new block. *)
+      the predecessor block. *)
   val create :
     chain_store ->
-    ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
     live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
@@ -115,6 +113,10 @@ module type T = sig
   (** [validation_state t] returns the subset of [t] corresponding
       to the type {!validation_state} of the protocol. *)
   val validation_state : t -> validation_state
+
+  (** Updates the subset of [t] corresponding to the type
+      {!validation_state} of the protocol. *)
+  val set_validation_state : t -> validation_state -> t
 
   val pp_result : Format.formatter -> result -> unit
 

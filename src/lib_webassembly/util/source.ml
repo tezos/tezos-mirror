@@ -1,8 +1,8 @@
-type pos = {file : string; line : int; column : int}
+type pos = {file : string; line : int; column : int} [@@deriving show]
 
-type region = {left : pos; right : pos}
+type region = {left : pos; right : pos} [@@deriving show]
 
-type 'a phrase = {at : region; it : 'a}
+type 'a phrase = {at : region; it : 'a} [@@deriving show]
 
 let ( @@ ) x region = {it = x; at = region}
 

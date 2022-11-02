@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 open Sc_rollup_repr
-module PS = Sc_rollup_PVM_sem
+module PS = Sc_rollup_PVM_sig
 
 (*
   This is the state hash of reference that both the prover of the node
-  and the verifier of the protocol {!ProtocolImplementation} have to
+  and the verifier of the protocol {!Protocol_implementation} have to
   agree on (if they do, it means they are using the same tree
   structure).
 
@@ -40,7 +40,7 @@ module PS = Sc_rollup_PVM_sem
 
   Utlimately, the value of this constant is decided by the prover of
   reference (the only need is for it to be compatible with
-  {!ProtocolImplementation}.)
+  {!Protocol_implementation}.)
 
   Its value is the result of the following snippet
 
@@ -52,6 +52,44 @@ module PS = Sc_rollup_PVM_sem
 let reference_initial_state_hash =
   State_hash.of_b58check_exn
     "scs11cXwQJJ5dkpEQGq3x2MJm3cM73cbEkHJqo5eDSoRpHUPyEQLB4"
+
+type error +=
+  | Arith_proof_production_failed
+  | Arith_output_proof_production_failed
+  | Arith_invalid_claim_about_outbox
+
+let () =
+  let open Data_encoding in
+  let msg = "Invalid claim about outbox" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_invalid_claim_about_outbox"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.pp_print_string fmt msg)
+    ~description:msg
+    unit
+    (function Arith_invalid_claim_about_outbox -> Some () | _ -> None)
+    (fun () -> Arith_invalid_claim_about_outbox) ;
+  let msg = "Output proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_output_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_output_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_output_proof_production_failed) ;
+  let msg = "Proof production failed" in
+  register_error_kind
+    `Permanent
+    ~id:"sc_rollup_arith_proof_production_failed"
+    ~title:msg
+    ~pp:(fun fmt () -> Format.fprintf fmt "%s" msg)
+    ~description:msg
+    unit
+    (function Arith_proof_production_failed -> Some () | _ -> None)
+    (fun () -> Arith_proof_production_failed)
 
 module type P = sig
   module Tree : Context.TREE with type key = string list and type value = bytes
@@ -88,9 +126,17 @@ module type S = sig
 
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status =
+    | Halted
+    | Waiting_for_input_message
+    | Waiting_for_reveal
+    | Waiting_for_metadata
+    | Parsing
+    | Evaluating
 
   val get_status : state -> status Lwt.t
+
+  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   type instruction =
     | IPush : int -> instruction
@@ -114,49 +160,24 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {
-  tree_proof : 'a;
-  given : Sc_rollup_PVM_sem.input option;
-  requested : Sc_rollup_PVM_sem.input_request;
-}
-
-let proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t =
- fun encoding ->
-  let open Data_encoding in
-  conv
-    (fun {tree_proof; given; requested} -> (tree_proof, given, requested))
-    (fun (tree_proof, given, requested) -> {tree_proof; given; requested})
-    (obj3
-       (req "tree_proof" encoding)
-       (req "given" (option PS.input_encoding))
-       (req "requested" PS.input_request_encoding))
-
 module Make (Context : P) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
-     and type proof = Context.proof proof = struct
+     and type proof = Context.proof = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
 
   type hash = State_hash.t
 
-  type nonrec proof = Context.proof proof
+  type proof = Context.proof
 
-  let proof_encoding = proof_encoding Context.proof_encoding
+  let proof_encoding = Context.proof_encoding
 
-  let proof_start_state p = Context.proof_before p.tree_proof
+  let proof_start_state proof = Context.proof_before proof
 
-  let proof_stop_state p =
-    match (p.given, p.requested) with
-    | None, PS.No_input_required -> Some (Context.proof_after p.tree_proof)
-    | None, _ -> None
-    | _ -> Some (Context.proof_after p.tree_proof)
-
-  let proof_input_given p = p.given
-
-  let proof_input_requested p = p.requested
+  let proof_stop_state proof = Context.proof_after proof
 
   let name = "arith"
 
@@ -166,7 +187,13 @@ module Make (Context : P) :
 
   type tree = Tree.tree
 
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  type status =
+    | Halted
+    | Waiting_for_input_message
+    | Waiting_for_reveal
+    | Waiting_for_metadata
+    | Parsing
+    | Evaluating
 
   type instruction =
     | IPush : int -> instruction
@@ -323,7 +350,7 @@ module Make (Context : P) :
 
     open Monad
 
-    module MakeVar (P : sig
+    module Make_var (P : sig
       type t
 
       val name : string
@@ -356,7 +383,7 @@ module Make (Context : P) :
         return @@ fun fmt () -> Format.fprintf fmt "@[%s : %a@]" P.name P.pp v
     end
 
-    module MakeDict (P : sig
+    module Make_dict (P : sig
       type t
 
       val name : string
@@ -372,6 +399,8 @@ module Make (Context : P) :
 
       let set k v = set_value (key k) P.encoding v
 
+      let entries = children [P.name] P.encoding
+
       let mapped_to k v state =
         let open Lwt_syntax in
         let* state', _ = Monad.(run (set k v) state) in
@@ -381,14 +410,14 @@ module Make (Context : P) :
 
       let pp =
         let open Monad.Syntax in
-        let* l = children [P.name] P.encoding in
+        let* l = entries in
         let pp_elem fmt (key, value) =
           Format.fprintf fmt "@[%s : %a@]" key P.pp value
         in
         return @@ fun fmt () -> Format.pp_print_list pp_elem fmt l
     end
 
-    module MakeDeque (P : sig
+    module Make_deque (P : sig
       type t
 
       val name : string
@@ -477,13 +506,13 @@ module Make (Context : P) :
       let clear = remove [P.name]
     end
 
-    module CurrentTick = MakeVar (struct
+    module Current_tick = Make_var (struct
       include Sc_rollup_tick_repr
 
       let name = "tick"
     end)
 
-    module Vars = MakeDict (struct
+    module Vars = Make_dict (struct
       type t = int
 
       let name = "vars"
@@ -493,7 +522,7 @@ module Make (Context : P) :
       let pp fmt x = Format.fprintf fmt "%d" x
     end)
 
-    module Stack = MakeDeque (struct
+    module Stack = Make_deque (struct
       type t = int
 
       let name = "stack"
@@ -501,7 +530,7 @@ module Make (Context : P) :
       let encoding = Data_encoding.int31
     end)
 
-    module Code = MakeDeque (struct
+    module Code = Make_deque (struct
       type t = instruction
 
       let name = "code"
@@ -531,7 +560,7 @@ module Make (Context : P) :
             ])
     end)
 
-    module Boot_sector = MakeVar (struct
+    module Boot_sector = Make_var (struct
       type t = string
 
       let name = "boot_sector"
@@ -543,7 +572,7 @@ module Make (Context : P) :
       let pp fmt s = Format.fprintf fmt "%s" s
     end)
 
-    module Status = MakeVar (struct
+    module Status = Make_var (struct
       type t = status
 
       let initial = Halted
@@ -552,7 +581,9 @@ module Make (Context : P) :
         Data_encoding.string_enum
           [
             ("Halted", Halted);
-            ("WaitingForInput", WaitingForInputMessage);
+            ("Waiting_for_input_message", Waiting_for_input_message);
+            ("Waiting_for_reveal", Waiting_for_reveal);
+            ("Waiting_for_metadata", Waiting_for_metadata);
             ("Parsing", Parsing);
             ("Evaluating", Evaluating);
           ]
@@ -561,14 +592,46 @@ module Make (Context : P) :
 
       let string_of_status = function
         | Halted -> "Halted"
-        | WaitingForInputMessage -> "WaitingForInputMessage"
+        | Waiting_for_input_message -> "Waiting for input message"
+        | Waiting_for_reveal -> "Waiting for reveal"
+        | Waiting_for_metadata -> "Waiting for metadata"
         | Parsing -> "Parsing"
         | Evaluating -> "Evaluating"
 
       let pp fmt status = Format.fprintf fmt "%s" (string_of_status status)
     end)
 
-    module CurrentLevel = MakeVar (struct
+    module Required_reveal = Make_var (struct
+      type t = PS.Input_hash.t option
+
+      let initial = None
+
+      let encoding = Data_encoding.option PS.Input_hash.encoding
+
+      let name = "required_pre_image_hash"
+
+      let pp fmt v =
+        match v with
+        | None -> Format.fprintf fmt "<none>"
+        | Some h -> PS.Input_hash.pp fmt h
+    end)
+
+    module Metadata = Make_var (struct
+      type t = Sc_rollup_metadata_repr.t option
+
+      let initial = None
+
+      let encoding = Data_encoding.option Sc_rollup_metadata_repr.encoding
+
+      let name = "metadata"
+
+      let pp fmt v =
+        match v with
+        | None -> Format.fprintf fmt "<none>"
+        | Some v -> Sc_rollup_metadata_repr.pp fmt v
+    end)
+
+    module Current_level = Make_var (struct
       type t = Raw_level_repr.t
 
       let initial = Raw_level_repr.root
@@ -580,7 +643,7 @@ module Make (Context : P) :
       let pp = Raw_level_repr.pp
     end)
 
-    module MessageCounter = MakeVar (struct
+    module Message_counter = Make_var (struct
       type t = Z.t option
 
       let initial = None
@@ -594,7 +657,7 @@ module Make (Context : P) :
         | Some c -> Format.fprintf fmt "Some %a" Z.pp_print c
     end)
 
-    module NextMessage = MakeVar (struct
+    module Next_message = Make_var (struct
       type t = string option
 
       let initial = None
@@ -610,7 +673,7 @@ module Make (Context : P) :
 
     type parser_state = ParseInt | ParseVar | SkipLayout
 
-    module LexerState = MakeVar (struct
+    module Lexer_state = Make_var (struct
       type t = int * int
 
       let name = "lexer_buffer"
@@ -623,7 +686,7 @@ module Make (Context : P) :
         Format.fprintf fmt "lexer.(start = %d, len = %d)" start len
     end)
 
-    module ParserState = MakeVar (struct
+    module Parser_state = Make_var (struct
       type t = parser_state
 
       let name = "parser_state"
@@ -644,7 +707,7 @@ module Make (Context : P) :
         | SkipLayout -> Format.fprintf fmt "Skipping layout"
     end)
 
-    module ParsingResult = MakeVar (struct
+    module Parsing_result = Make_var (struct
       type t = bool option
 
       let name = "parsing_result"
@@ -659,7 +722,7 @@ module Make (Context : P) :
         | Some false -> Format.fprintf fmt "parsing fails"
     end)
 
-    module EvaluationResult = MakeVar (struct
+    module Evaluation_result = Make_var (struct
       type t = bool option
 
       let name = "evaluation_result"
@@ -674,41 +737,41 @@ module Make (Context : P) :
         | Some false -> Format.fprintf fmt "evaluation fails"
     end)
 
-    module OutputCounter = MakeVar (struct
+    module Output_counter = Make_var (struct
       type t = Z.t
 
       let initial = Z.zero
 
       let name = "output_counter"
 
-      let encoding = Data_encoding.z
+      let encoding = Data_encoding.n
 
       let pp = Z.pp_print
     end)
 
-    module Output = MakeDict (struct
-      type t = Sc_rollup_PVM_sem.output
+    module Output = Make_dict (struct
+      type t = Sc_rollup_PVM_sig.output
 
       let name = "output"
 
-      let encoding = Sc_rollup_PVM_sem.output_encoding
+      let encoding = Sc_rollup_PVM_sig.output_encoding
 
-      let pp = Sc_rollup_PVM_sem.pp_output
+      let pp = Sc_rollup_PVM_sig.pp_output
     end)
 
     let pp =
       let open Monad.Syntax in
       let* status_pp = Status.pp in
-      let* message_counter_pp = MessageCounter.pp in
-      let* next_message_pp = NextMessage.pp in
-      let* parsing_result_pp = ParsingResult.pp in
-      let* parser_state_pp = ParserState.pp in
-      let* lexer_state_pp = LexerState.pp in
-      let* evaluation_result_pp = EvaluationResult.pp in
+      let* message_counter_pp = Message_counter.pp in
+      let* next_message_pp = Next_message.pp in
+      let* parsing_result_pp = Parsing_result.pp in
+      let* parser_state_pp = Parser_state.pp in
+      let* lexer_state_pp = Lexer_state.pp in
+      let* evaluation_result_pp = Evaluation_result.pp in
       let* vars_pp = Vars.pp in
       let* output_pp = Output.pp in
       let* stack = Stack.to_list in
-      let* current_tick_pp = CurrentTick.pp in
+      let* current_tick_pp = Current_tick.pp in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
@@ -793,8 +856,8 @@ module Make (Context : P) :
   let boot =
     let open Monad.Syntax in
     let* () = Status.create in
-    let* () = NextMessage.create in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Next_message.create in
+    let* () = Status.set Waiting_for_metadata in
     return ()
 
   let result_of ~default m state =
@@ -807,47 +870,58 @@ module Make (Context : P) :
     let* s, _ = run m state in
     return s
 
-  let get_tick = result_of ~default:Sc_rollup_tick_repr.initial CurrentTick.get
+  let get_tick = result_of ~default:Sc_rollup_tick_repr.initial Current_tick.get
 
   let is_input_state_monadic =
     let open Monad.Syntax in
     let* status = Status.get in
     match status with
-    | WaitingForInputMessage -> (
-        let* level = CurrentLevel.get in
-        let* counter = MessageCounter.get in
+    | Waiting_for_input_message -> (
+        let* level = Current_level.get in
+        let* counter = Message_counter.get in
         match counter with
         | Some n -> return (PS.First_after (level, n))
         | None -> return PS.Initial)
-    | _ -> return PS.No_input_required
+    | Waiting_for_reveal -> (
+        let* h = Required_reveal.get in
+        match h with
+        | None -> internal_error "Internal error: Reveal invariant broken"
+        | Some h -> return (PS.Needs_reveal (Reveal_raw_data h)))
+    | Waiting_for_metadata -> return PS.(Needs_reveal Reveal_metadata)
+    | Halted | Parsing | Evaluating -> return PS.No_input_required
 
   let is_input_state =
     result_of ~default:PS.No_input_required @@ is_input_state_monadic
 
-  let get_status = result_of ~default:WaitingForInputMessage @@ Status.get
+  let get_status = result_of ~default:Waiting_for_input_message @@ Status.get
+
+  let get_outbox state =
+    let open Lwt_syntax in
+    let+ entries = result_of ~default:[] Output.entries state in
+    List.map snd entries
 
   let get_code = result_of ~default:[] @@ Code.to_list
 
-  let get_parsing_result = result_of ~default:None @@ ParsingResult.get
+  let get_parsing_result = result_of ~default:None @@ Parsing_result.get
 
   let get_stack = result_of ~default:[] @@ Stack.to_list
 
   let get_var state k = (result_of ~default:None @@ Vars.get k) state
 
-  let get_evaluation_result = result_of ~default:None @@ EvaluationResult.get
+  let get_evaluation_result = result_of ~default:None @@ Evaluation_result.get
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
   let start_parsing : unit t =
     let open Monad.Syntax in
     let* () = Status.set Parsing in
-    let* () = ParsingResult.set None in
-    let* () = ParserState.set SkipLayout in
-    let* () = LexerState.set (0, 0) in
+    let* () = Parsing_result.set None in
+    let* () = Parser_state.set SkipLayout in
+    let* () = Lexer_state.set (0, 0) in
     let* () = Code.clear in
     return ()
 
-  let set_input_monadic {PS.inbox_level; message_counter; payload} =
+  let set_inbox_message_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
     let payload =
       match Sc_rollup_inbox_message_repr.deserialize payload with
@@ -862,22 +936,59 @@ module Make (Context : P) :
     | Some payload ->
         let* boot_sector = Boot_sector.get in
         let msg = boot_sector ^ payload in
-        let* () = CurrentLevel.set inbox_level in
-        let* () = MessageCounter.set (Some message_counter) in
-        let* () = NextMessage.set (Some msg) in
+        let* () = Current_level.set inbox_level in
+        let* () = Message_counter.set (Some message_counter) in
+        let* () = Next_message.set (Some msg) in
         let* () = start_parsing in
         return ()
     | None ->
-        let* () = CurrentLevel.set inbox_level in
-        let* () = MessageCounter.set (Some message_counter) in
-        let* () = Status.set WaitingForInputMessage in
+        let* () = Current_level.set inbox_level in
+        let* () = Message_counter.set (Some message_counter) in
+        let* () = Status.set Waiting_for_input_message in
         return ()
 
-  let set_input input = state_of @@ set_input_monadic input
+  let reveal_monadic reveal_data =
+    (*
+
+       The inbox cursor is unchanged as the message comes from the
+       outer world.
+
+       We don't have to check that the data is the one we
+       expected as we decided to trust the initial witness.
+
+       It is the responsibility of the rollup node to check the validity
+       of the [reveal_data] if it does not want to publish a wrong commitment.
+
+    *)
+    let open Monad.Syntax in
+    match reveal_data with
+    | PS.Raw_data data ->
+        (* Notice that a multi-page transmission is possible by embedding
+           a continuation encoded as an optional hash in [data]. *)
+        let* () = Next_message.set (Some data) in
+        let* () = start_parsing in
+        return ()
+    | PS.Metadata metadata ->
+        let* () = Metadata.set (Some metadata) in
+        let* () = Status.set Waiting_for_input_message in
+        return ()
+
+  let ticked m =
+    let open Monad.Syntax in
+    let* tick = Current_tick.get in
+    let* () = Current_tick.set (Sc_rollup_tick_repr.next tick) in
+    m
+
+  let set_input_monadic input =
+    match input with
+    | PS.Inbox_message m -> set_inbox_message_monadic m
+    | PS.Reveal s -> reveal_monadic s
+
+  let set_input input = set_input_monadic input |> ticked |> state_of
 
   let next_char =
     let open Monad.Syntax in
-    LexerState.(
+    Lexer_state.(
       let* start, len = get in
       set (start, len + 1))
 
@@ -886,8 +997,8 @@ module Make (Context : P) :
 
   let current_char =
     let open Monad.Syntax in
-    let* start, len = LexerState.get in
-    let* msg = NextMessage.get in
+    let* start, len = Lexer_state.get in
+    let* msg = Next_message.get in
     match msg with
     | None -> no_message_to_lex ()
     | Some s ->
@@ -897,12 +1008,12 @@ module Make (Context : P) :
 
   let lexeme =
     let open Monad.Syntax in
-    let* start, len = LexerState.get in
-    let* msg = NextMessage.get in
+    let* start, len = Lexer_state.get in
+    let* msg = Next_message.get in
     match msg with
     | None -> no_message_to_lex ()
     | Some s ->
-        let* () = LexerState.set (start + len, 0) in
+        let* () = Lexer_state.set (start + len, 0) in
         return (String.sub s start len)
 
   let push_int_literal =
@@ -920,19 +1031,18 @@ module Make (Context : P) :
   let start_evaluating : unit t =
     let open Monad.Syntax in
     let* () = Status.set Evaluating in
-    let* () = EvaluationResult.set None in
-    let* () = Stack.clear in
+    let* () = Evaluation_result.set None in
     return ()
 
   let stop_parsing outcome =
     let open Monad.Syntax in
-    let* () = ParsingResult.set (Some outcome) in
+    let* () = Parsing_result.set (Some outcome) in
     start_evaluating
 
   let stop_evaluating outcome =
     let open Monad.Syntax in
-    let* () = EvaluationResult.set (Some outcome) in
-    Status.set WaitingForInputMessage
+    let* () = Evaluation_result.set (Some outcome) in
+    Status.set Waiting_for_input_message
 
   let parse : unit t =
     let open Monad.Syntax in
@@ -944,17 +1054,24 @@ module Make (Context : P) :
     in
     let produce_int =
       let* () = push_int_literal in
-      let* () = ParserState.set SkipLayout in
+      let* () = Parser_state.set SkipLayout in
       return ()
     in
     let produce_var =
       let* () = push_var in
-      let* () = ParserState.set SkipLayout in
+      let* () = Parser_state.set SkipLayout in
       return ()
     in
     let is_digit d = Compare.Char.(d >= '0' && d <= '9') in
-    let is_letter d = Compare.Char.(d >= 'a' && d <= 'z') in
-    let* parser_state = ParserState.get in
+    let is_letter d =
+      Compare.Char.((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z'))
+    in
+    let is_identifier_char d =
+      is_letter d || is_digit d
+      || Compare.Char.(d = ':')
+      || Compare.Char.(d = '%')
+    in
+    let* parser_state = Parser_state.get in
     match parser_state with
     | ParseInt -> (
         let* char = current_char in
@@ -964,7 +1081,7 @@ module Make (Context : P) :
             let* () = produce_int in
             let* () = produce_add in
             return ()
-        | Some ' ' ->
+        | Some (' ' | '\n') ->
             let* () = produce_int in
             let* () = next_char in
             return ()
@@ -975,12 +1092,12 @@ module Make (Context : P) :
     | ParseVar -> (
         let* char = current_char in
         match char with
-        | Some d when is_letter d -> next_char
+        | Some d when is_identifier_char d -> next_char
         | Some '+' ->
             let* () = produce_var in
             let* () = produce_add in
             return ()
-        | Some ' ' ->
+        | Some (' ' | '\n') ->
             let* () = produce_var in
             let* () = next_char in
             return ()
@@ -991,38 +1108,61 @@ module Make (Context : P) :
     | SkipLayout -> (
         let* char = current_char in
         match char with
-        | Some ' ' -> next_char
+        | Some (' ' | '\n') -> next_char
         | Some '+' -> produce_add
         | Some d when is_digit d ->
             let* _ = lexeme in
             let* () = next_char in
-            let* () = ParserState.set ParseInt in
+            let* () = Parser_state.set ParseInt in
             return ()
         | Some d when is_letter d ->
             let* _ = lexeme in
             let* () = next_char in
-            let* () = ParserState.set ParseVar in
+            let* () = Parser_state.set ParseVar in
             return ()
         | None -> stop_parsing true
         | _ -> stop_parsing false)
 
-  let output v =
+  let output (destination, entrypoint) v =
     let open Monad.Syntax in
     let open Sc_rollup_outbox_message_repr in
-    let* counter = OutputCounter.get in
-    let* () = OutputCounter.set (Z.succ counter) in
+    let* counter = Output_counter.get in
+    let* () = Output_counter.set (Z.succ counter) in
     let unparsed_parameters =
       Micheline.(Int ((), Z.of_int v) |> strip_locations)
     in
-    let destination = Contract_hash.zero in
-    let entrypoint = Entrypoint_repr.default in
     let transaction = {unparsed_parameters; destination; entrypoint} in
     let message = Atomic_transaction_batch {transactions = [transaction]} in
-    let* outbox_level = CurrentLevel.get in
+    let* outbox_level = Current_level.get in
     let output =
-      Sc_rollup_PVM_sem.{outbox_level; message_index = counter; message}
+      Sc_rollup_PVM_sig.{outbox_level; message_index = counter; message}
     in
     Output.set (Z.to_string counter) output
+
+  let identifies_target_contract x =
+    let open Option_syntax in
+    match String.split_on_char '%' x with
+    | destination :: entrypoint -> (
+        match Contract_hash.of_b58check_opt destination with
+        | None ->
+            if Compare.String.(x = "out") then
+              return (Contract_hash.zero, Entrypoint_repr.default)
+            else fail
+        | Some destination ->
+            let* entrypoint =
+              match entrypoint with
+              | [] -> return Entrypoint_repr.default
+              | _ ->
+                  let* entrypoint =
+                    Non_empty_string.of_string (String.concat "" entrypoint)
+                  in
+                  let* entrypoint =
+                    Entrypoint_repr.of_annot_lax_opt entrypoint
+                  in
+                  return entrypoint
+            in
+            return (destination, entrypoint))
+    | [] -> fail
 
   let evaluate =
     let open Monad.Syntax in
@@ -1031,11 +1171,24 @@ module Make (Context : P) :
     | None -> stop_evaluating true
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
-        let* v = Stack.top in
-        match v with
-        | None -> stop_evaluating false
-        | Some v ->
-            if Compare.String.(x = "out") then output v else Vars.set x v)
+        let len = String.length x in
+        if Compare.Int.(len > 5) && Compare.String.(String.sub x 0 5 = "hash:")
+        then
+          let hash = String.sub x 5 (len - 5) in
+          match PS.Input_hash.of_b58check_opt hash with
+          | None -> stop_evaluating false
+          | Some hash ->
+              let* () = Required_reveal.set (Some hash) in
+              let* () = Status.set Waiting_for_reveal in
+              return ()
+        else
+          let* v = Stack.top in
+          match v with
+          | None -> stop_evaluating false
+          | Some v -> (
+              match identifies_target_contract x with
+              | Some contract_entrypoint -> output contract_entrypoint v
+              | None -> Vars.set x v))
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
@@ -1048,7 +1201,7 @@ module Make (Context : P) :
 
   let reboot =
     let open Monad.Syntax in
-    let* () = Status.set WaitingForInputMessage in
+    let* () = Status.set Waiting_for_input_message in
     let* () = Stack.clear in
     let* () = Code.clear in
     return ()
@@ -1062,21 +1215,14 @@ module Make (Context : P) :
         let* status = Status.get in
         match status with
         | Halted -> boot
-        | WaitingForInputMessage -> (
-            let* msg = NextMessage.get in
+        | Waiting_for_input_message | Waiting_for_reveal | Waiting_for_metadata
+          -> (
+            let* msg = Next_message.get in
             match msg with
-            | None ->
-                internal_error
-                  "An input state was not provided an input message."
+            | None -> internal_error "An input state was not provided an input."
             | Some _ -> start_parsing)
         | Parsing -> parse
         | Evaluating -> evaluate)
-
-  let ticked m =
-    let open Monad.Syntax in
-    let* tick = CurrentTick.get in
-    let* () = CurrentTick.set (Sc_rollup_tick_repr.next tick) in
-    m
 
   let eval state = state_of (ticked eval_step) state
 
@@ -1086,49 +1232,70 @@ module Make (Context : P) :
     let* state =
       match request with
       | PS.No_input_required -> eval state
-      | _ -> (
+      | PS.Initial | PS.First_after _ -> (
           match input_given with
-          | Some input -> set_input input state
-          | None -> return state)
+          | Some (PS.Inbox_message _ as input_given) ->
+              set_input input_given state
+          | None | Some (PS.Reveal _) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting inbox message, got a reveal.")
+                state)
+      | PS.Needs_reveal (Reveal_raw_data _hash) -> (
+          match input_given with
+          | Some (PS.Reveal (Raw_data _) as input_given) ->
+              set_input input_given state
+          | None | Some (PS.Inbox_message _) | Some (PS.Reveal (Metadata _)) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting a raw data reveal, got an \
+                    inbox message or a reveal metadata.")
+                state)
+      | PS.Needs_reveal Reveal_metadata -> (
+          match input_given with
+          | Some (PS.Reveal (Metadata _) as metadata) ->
+              set_input metadata state
+          | None | Some (PS.Reveal (Raw_data _)) | Some (PS.Inbox_message _) ->
+              state_of
+                (internal_error
+                   "Invalid set_input: expecting a metadata reveal, got an \
+                    inbox message or a raw data reveal.")
+                state)
     in
     return (state, request)
 
-  let verify_proof proof =
-    let open Lwt_syntax in
-    let* result =
-      Context.verify_proof proof.tree_proof (step_transition proof.given)
-    in
-    match result with
-    | None -> return false
-    | Some (_, request) ->
-        return (PS.input_request_equal request proof.requested)
+  type error += Arith_proof_verification_failed
 
-  type error += Arith_proof_production_failed
+  let verify_proof input_given proof =
+    let open Lwt_tzresult_syntax in
+    let*! result = Context.verify_proof proof (step_transition input_given) in
+    match result with
+    | None -> fail Arith_proof_verification_failed
+    | Some (_state, request) -> return request
 
   let produce_proof context input_given state =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let*! result =
       Context.produce_proof context state (step_transition input_given)
     in
     match result with
-    | Some (tree_proof, requested) ->
-        return {tree_proof; given = input_given; requested}
+    | Some (tree_proof, _requested) -> return tree_proof
     | None -> fail Arith_proof_production_failed
 
   let verify_origination_proof proof boot_sector =
     let open Lwt_syntax in
-    let before = Context.proof_before proof.tree_proof in
+    let before = Context.proof_before proof in
     if State_hash.(before <> reference_initial_state_hash) then return false
     else
       let* result =
-        Context.verify_proof proof.tree_proof (fun state ->
+        Context.verify_proof proof (fun state ->
             let* state = install_boot_sector state boot_sector in
             return (state, ()))
       in
       match result with None -> return false | Some (_, ()) -> return true
 
   let produce_origination_proof context boot_sector =
-    let open Lwt_result_syntax in
+    let open Lwt_tzresult_syntax in
     let*! state = initial_state context in
     let*! result =
       Context.produce_proof context state (fun state ->
@@ -1137,8 +1304,7 @@ module Make (Context : P) :
           return (state, ()))
     in
     match result with
-    | Some (tree_proof, ()) ->
-        return {tree_proof; given = None; requested = No_input_required}
+    | Some (proof, ()) -> return proof
     | None -> fail Arith_proof_production_failed
 
   (* TEMPORARY: The following definitions will be extended in a future commit. *)
@@ -1178,10 +1344,6 @@ module Make (Context : P) :
     let* result = Context.verify_proof p.output_proof transition in
     match result with None -> return false | Some _ -> return true
 
-  type error += Arith_output_proof_production_failed
-
-  type error += Arith_invalid_claim_about_outbox
-
   let produce_output_proof context state output_proof_output =
     let open Lwt_result_syntax in
     let*! output_proof_state = state_hash state in
@@ -1203,7 +1365,7 @@ module Make (Context : P) :
   end
 end
 
-module ProtocolImplementation = Make (struct
+module Protocol_implementation = Make (struct
   module Tree = struct
     include Context.Tree
 
@@ -1236,5 +1398,5 @@ module ProtocolImplementation = Make (struct
 
   let proof_after proof = kinded_hash_to_state_hash proof.Context.Proof.after
 
-  let proof_encoding = Context.Proof_encoding.V1.Tree32.tree_proof_encoding
+  let proof_encoding = Context.Proof_encoding.V2.Tree32.tree_proof_encoding
 end)

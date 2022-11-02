@@ -29,7 +29,7 @@ module V2_0_0 : sig
     WebAssembly (version 2.0.0). *)
 
   module type S = sig
-    include Sc_rollup_PVM_sem.S
+    include Sc_rollup_PVM_sig.S
 
     (** [name] is "wasm_2_0_0".
 
@@ -53,10 +53,16 @@ module V2_0_0 : sig
     val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
     (** PVM status *)
-    type status = Computing | WaitingForInputMessage
+    type status =
+      | Computing
+      | Waiting_for_input_message
+      | Waiting_for_reveal of Sc_rollup_PVM_sig.reveal
 
     (** [get_status state] gives you the current execution status for the PVM. *)
     val get_status : state -> status Lwt.t
+
+    (** [get_outbox state] returns the outbox in [state]. *)
+    val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
   end
 
   module type P = sig
@@ -80,30 +86,24 @@ module V2_0_0 : sig
       Tree.t -> tree -> (tree -> (tree * 'a) Lwt.t) -> (proof * 'a) option Lwt.t
   end
 
-  type 'a proof = {
-    tree_proof : 'a;
-    given : Sc_rollup_PVM_sem.input option;
-    requested : Sc_rollup_PVM_sem.input_request;
-  }
-
-  val proof_encoding : 'a Data_encoding.t -> 'a proof Data_encoding.t
+  module type Make_wasm = module type of Wasm_2_0_0.Make
 
   (** Build a WebAssembly PVM using the given proof-supporting context. *)
-  module Make (Context : P) :
+  module Make (Lib_scoru_Wasm : Make_wasm) (Context : P) :
     S
       with type context = Context.Tree.t
        and type state = Context.tree
-       and type proof = Context.proof proof
+       and type proof = Context.proof
 
   (** This PVM is used for verification in the Protocol. [produce_proof] always returns [None]. *)
-  module ProtocolImplementation :
+  module Protocol_implementation :
     S
       with type context = Context.t
        and type state = Context.tree
-       and type proof = Context.Proof.tree Context.Proof.t proof
+       and type proof = Context.Proof.tree Context.Proof.t
 
   (** This is the state hash of reference that both the prover of the
-      node and the verifier of the protocol {!ProtocolImplementation}
+      node and the verifier of the protocol {!Protocol_implementation}
       have to agree on (if they do, it means they are using the same
       tree structure). *)
   val reference_initial_state_hash : Sc_rollup_repr.State_hash.t

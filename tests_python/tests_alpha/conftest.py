@@ -112,7 +112,7 @@ def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
     a mockup using custom arguments; you MUST do the same
     as this method.
     """
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+    with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
         unmanaged_client = sandbox.create_client(base_dir=base_dir)
         res = unmanaged_client.create_mockup(
             protocol=protocol.HASH

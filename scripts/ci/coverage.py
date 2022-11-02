@@ -2,6 +2,11 @@
 master. It fetches the coverage information from the most recently
 merged branch with coverage.
 
+It can also be used locally to fetch coverage from the tezos
+CI. Simply run `poetry run python scripts/ci/coverage.py` and the
+folders `_coverage_output` and `_coverage_report` should be populated
+with the most recent coverage traces and, respectively, the
+corresponding coverage report.
 """
 
 import sys
@@ -158,7 +163,12 @@ def coverage_job_of_commit(
 
 
 def is_merge_commit(commit: ProjectCommit) -> bool:
-    return re.match(r"Merge branch '.*' into '.*'", commit.title) is not None
+    # This script assumes that the start commit is part of a branch
+    # following a semi-linear history and that merged branches are
+    # linear (this should be the case for master on tezos/tezos).
+
+    # In that setting, only merge commits have two parents.
+    return len(commit.parent_ids) == 2
 
 
 def get_ref_coverage_job(
@@ -255,9 +265,11 @@ def main() -> None:
         print(f"Coverage: {coverage_job.coverage}%")
         download_artifacts_from_job(project, coverage_job.id)
         print("Successfully retrieved and extracted artifacts")
+        exit(0)
 
     else:
         print("Coverage: None")
+        exit(1)
 
 
 if __name__ == "__main__":
@@ -328,6 +340,17 @@ class Test:
         coverage_job = get_ref_coverage_job(config, project, "cd20c132")
         assert coverage_job is not None
         assert coverage_job.coverage == 66.29
+
+
+    def test_get_branch_coverage_new_title_format_success(
+        self, config: Config, project: Project
+    ) -> None:
+        # A commit after the new commit message format.
+        # https://gitlab.com/tezos/tezos/-/commit/3e5085b4
+        coverage_job = get_ref_coverage_job(config, project, "3e5085b4")
+        assert coverage_job is not None
+        assert coverage_job.coverage == 60.53
+
 
     def test_get_branch_coverage_no_coverage_job(
         self, config: Config, project: Project

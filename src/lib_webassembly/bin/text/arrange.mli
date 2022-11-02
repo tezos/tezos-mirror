@@ -1,8 +1,10 @@
 open Sexpr
 
-val instr : Ast.instr -> sexpr
+type block_table = Ast.instr list list
 
-val func : Ast.func -> sexpr
+val instr : block_table -> Ast.instr -> sexpr
+
+val func : block_table -> Ast.func -> sexpr
 
 val module_ : Ast.module_ -> sexpr Lwt.t
 

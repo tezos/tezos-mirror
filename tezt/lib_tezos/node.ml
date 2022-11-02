@@ -41,6 +41,7 @@ type argument =
   | Singleprocess
   | Bootstrap_threshold of int
   | Synchronisation_threshold of int
+  | Sync_latency of int
   | Connections of int
   | Private_mode
   | Peer of string
@@ -64,6 +65,7 @@ let make_argument = function
   | Bootstrap_threshold x -> ["--bootstrap-threshold"; string_of_int x]
   | Synchronisation_threshold x ->
       ["--synchronisation-threshold"; string_of_int x]
+  | Sync_latency x -> ["--sync-latency"; string_of_int x]
   | Connections x -> ["--connections"; string_of_int x]
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]
@@ -183,6 +185,22 @@ let spawn_config_init node arguments =
 
 let config_init node arguments =
   spawn_config_init node arguments |> Process.check
+
+let config_reset node arguments =
+  spawn_command
+    node
+    ("config" :: "reset" :: "--data-dir" :: node.persistent_state.data_dir
+   :: arguments)
+  |> Process.check
+
+let config_show node =
+  let* output =
+    spawn_command
+      node
+      ["config"; "show"; "--data-dir"; node.persistent_state.data_dir]
+    |> Process.check_and_read_stdout
+  in
+  return (JSON.parse ~origin:"config" output)
 
 module Config_file = struct
   let filename node = sf "%s/config.json" @@ data_dir node
@@ -412,23 +430,27 @@ let update_identity node identity =
 let handle_event node {name; value} =
   match name with
   | "node_is_ready.v0" -> set_ready node
-  | "node_chain_validator.v0" -> (
-      match JSON.as_list_opt value with
-      | Some [_timestamp; details] -> (
-          match
-            JSON.(
-              details |-> "event" |-> "processed_block" |-> "level"
-              |> as_int_opt)
-          with
-          | None ->
-              (* There are several kinds of [node_chain_validator.v0] events
-                 and maybe this one is not the one with the level: ignore it. *)
-              ()
-          | Some level -> update_level node level)
-      | _ ->
-          (* Other kind of node_chain_validator event that we don't care about. *)
-          ())
+  | "head_increment.v0" | "branch_switch.v0" -> (
+      match JSON.(value |-> "level" |> as_int_opt) with
+      | None ->
+          (* There are several kinds of events and maybe
+             this one is not the one with the level: ignore it. *)
+          ()
+      | Some level -> update_level node level)
   | "read_identity.v0" -> update_identity node (JSON.as_string value)
+  | "compilation_error.v0" -> (
+      match JSON.as_string_opt value with
+      | Some fname ->
+          if Sys.file_exists fname then (
+            let content = read_file fname in
+            Log.error "Protocol compilation failed:" ;
+            Log.error "%s" (String.trim content))
+          else
+            Log.error
+              "Protocol compilation failed but log file %S was not found"
+              fname
+      | None ->
+          Log.error "Protocol compilation failed but cannot read the payload")
   | _ -> ()
 
 let check_event ?where node name promise =
@@ -458,7 +480,7 @@ let wait_for_level node level =
         (level, resolver) :: node.persistent_state.pending_level ;
       check_event
         node
-        "node_chain_validator.v0"
+        "head_increment.v0 / branch_switch.v0"
         ~where:("level >= " ^ string_of_int level)
         promise
 
@@ -644,9 +666,12 @@ let run ?on_terminate ?event_level ?event_sections_levels node arguments =
     node
     arguments
 
-let replay ?on_terminate ?event_level ?event_sections_levels
+let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     ?(blocks = ["head"]) node arguments =
-  let arguments = runlike_command_arguments node "replay" arguments @ blocks in
+  let strict = if strict then ["--strict"] else [] in
+  let arguments =
+    runlike_command_arguments node "replay" arguments @ strict @ blocks
+  in
   do_runlike_command
     ?on_terminate
     ?event_level
@@ -708,3 +733,9 @@ let send_raw_data node ~data =
   let uaddr = Lwt_unix.ADDR_INET (Unix.inet_addr_loopback, net_port node) in
   let* () = Lwt_unix.connect socket uaddr in
   write_string socket data
+
+let upgrade_storage node =
+  spawn_command
+    node
+    ["upgrade"; "storage"; "--data-dir"; node.persistent_state.data_dir]
+  |> Process.check

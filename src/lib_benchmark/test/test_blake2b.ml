@@ -43,8 +43,6 @@ let bench_opts =
   {
     seed = Some 1337;
     nsamples = 3000;
-    (* Percentile 50 = Median *)
-    determinizer = Percentile 50;
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
     config_dir = None;
@@ -74,9 +72,7 @@ let solution =
         Inference.make_problem ~data:workload_data ~model ~overrides:(fun _ ->
             None)
       in
-      let solver =
-        Inference.Lasso {alpha = 1.0; normalize = false; positive = true}
-      in
+      let solver = Inference.Lasso {alpha = 1.0; positive = true} in
       (* Initialize Python to have access to Scikit's Lasso solver *)
       Pyinit.pyinit () ;
       Inference.solve_problem problem solver

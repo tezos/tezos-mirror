@@ -59,7 +59,17 @@ val list_unaccounted : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 val genesis_info :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Sc_rollup_commitment_repr.genesis_info tzresult Lwt.t
+  (Raw_context.t * Sc_rollup_commitment_repr.genesis_info) tzresult Lwt.t
+
+(** [get_metadata ctxt rollup] retrieves the origination level of the [rollup]
+    using {!Sc_rollup_commitment_repr.genesis_info} and creates a
+    {!Sc_rollup_metadata_repr.t}.
+    Fails with [Sc_rollup_does_not_exist {rollup}] if the genesis info is
+    missing. *)
+val get_metadata :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Raw_context.t * Sc_rollup_metadata_repr.t) tzresult Lwt.t
 
 (** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
 val get_boot_sector :

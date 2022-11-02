@@ -12,6 +12,7 @@ depends: [
   "tezos-base"
   "tezos-p2p-services"
   "tezos-version"
+  "tezos-context"
   "alcotest" { with-test & >= "1.5.0" }
 ]
 build: [

@@ -28,7 +28,7 @@ module Request = struct
   type ('a, 'b) t =
     | Flush :
         Block_hash.t
-        * Chain_validator_worker_state.Event.update
+        * Chain_validator_worker_state.update
         * Block_hash.Set.t
         * Operation_hash.Set.t
         -> (unit, error trace) t
@@ -53,7 +53,7 @@ module Request = struct
           (obj3
              (req "request" (constant "flush"))
              (req "block" Block_hash.encoding)
-             (req "event" Chain_validator_worker_state.Event.update_encoding))
+             (req "event" Chain_validator_worker_state.update_encoding))
           (function
             | View (Flush (hash, event, _, _)) -> Some ((), hash, event)
             | _ -> None)

@@ -103,3 +103,95 @@ let pread_block_exn fd ~file_offset =
 
 let pread_block fd ~file_offset =
   Option.catch_s (fun () -> pread_block_exn fd ~file_offset)
+
+let raw_pruned_block_length bytes =
+  (* Hypothesis: (Int32.to_int total_len + 4 <= Bytes.length bytes) *)
+  let offset = 4 in
+  let offset = offset + Block_hash.size (* hash *) in
+  let header_length = Bytes.get_int32_be bytes offset in
+  let offset = offset + 4 + Int32.to_int header_length in
+  let operations_length = Bytes.get_int32_be bytes offset in
+  let offset = offset + 4 + Int32.to_int operations_length in
+  let offset =
+    (* block metadata hash *)
+    if Bytes.get_uint8 bytes offset = 0xff then
+      offset + 1 + Block_metadata_hash.size
+    else offset + 1
+  in
+  let offset =
+    (* operation metadata hashes *)
+    if Bytes.get_uint8 bytes offset = 0xff then
+      let offset = offset + 1 in
+      let operation_metadata_hashes_length = Bytes.get_int32_be bytes offset in
+      offset + 4 + Int32.to_int operation_metadata_hashes_length
+    else offset + 1
+  in
+  (* metadata are 'varopt' which means there is no option tag *)
+  offset
+
+let prune_raw_block_bytes bytes =
+  let pruned_block_length = raw_pruned_block_length bytes in
+  (* rewrite total block length *)
+  Bytes.set_int32_be bytes 0 (Int32.of_int (pruned_block_length - 4)) ;
+  pruned_block_length
+
+let hash_offset = 4
+
+let header_length_offset = hash_offset + Block_hash.size
+
+let level_offset = header_length_offset + 4
+
+let predecessor_offset = level_offset + 4 (* level *) + 1 (* proto_level *)
+
+let raw_get_block_hash block_bytes =
+  Block_hash.of_bytes_exn (Bytes.sub block_bytes hash_offset Block_hash.size)
+
+let raw_get_block_level block_bytes =
+  Bytes.get_int32_be block_bytes level_offset
+
+let raw_get_block_predecessor block_bytes =
+  Block_hash.of_bytes_exn
+    (Bytes.sub block_bytes predecessor_offset Block_hash.size)
+
+let raw_get_last_allowed_fork_level block_bytes total_block_length =
+  let header_length = Bytes.get_int32_be block_bytes header_length_offset in
+  let operations_length_offset =
+    header_length_offset + 4 + Int32.to_int header_length
+  in
+  let operations_length =
+    Bytes.get_int32_be block_bytes operations_length_offset
+  in
+  let block_metadata_hash_offset =
+    operations_length_offset + 4 + Int32.to_int operations_length
+  in
+  let operation_metadata_hashes_offset =
+    (* block metadata hash *)
+    if Bytes.get_uint8 block_bytes block_metadata_hash_offset = 0xff then
+      block_metadata_hash_offset + 1 + Block_metadata_hash.size
+    else block_metadata_hash_offset + 1
+  in
+  let metadata_offset =
+    (* operation metadata hashes *)
+    if Bytes.get_uint8 block_bytes operation_metadata_hashes_offset = 0xff then
+      let operation_metadata_hashes_length =
+        Bytes.get_int32_be block_bytes (operation_metadata_hashes_offset + 1)
+      in
+      operation_metadata_hashes_offset + 1 + 4
+      + Int32.to_int operation_metadata_hashes_length
+    else operation_metadata_hashes_offset + 1
+  in
+  if metadata_offset = total_block_length then (* Pruned *) None
+  else
+    let lafl_offset =
+      (* max op ttl *)
+      2
+      +
+      (* message *)
+      if Bytes.get_uint8 block_bytes metadata_offset = 0xff then
+        let message_length =
+          Bytes.get_int32_be block_bytes (metadata_offset + 1)
+        in
+        metadata_offset + 1 + 4 + Int32.to_int message_length
+      else metadata_offset + 1
+    in
+    Some (Bytes.get_int32_be block_bytes lafl_offset)

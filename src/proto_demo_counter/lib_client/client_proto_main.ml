@@ -26,8 +26,8 @@
 open Protocol
 module Commands = Client_proto_commands
 
-let commands : Protocol_client_context.full Clic.command list =
-  let open Clic in
+let commands : Protocol_client_context.full Tezos_clic.Clic.command list =
+  let open Tezos_clic.Clic in
   let open Client_proto_args in
   let group =
     {name = "Demo_counter"; title = "Commands for protocol Demo_counter"}
@@ -79,6 +79,6 @@ let commands : Protocol_client_context.full Clic.command list =
   ]
 
 let () =
-  let f = Clic.map_command (new Protocol_client_context.wrap_full) in
+  let f = Tezos_clic.Clic.map_command (new Protocol_client_context.wrap_full) in
   let command_list = List.map f commands in
   Client_commands.register Protocol.hash (fun _network -> command_list)

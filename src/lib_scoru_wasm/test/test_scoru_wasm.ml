@@ -33,5 +33,20 @@
 let () =
   Alcotest_lwt.run
     "test lib scoru wasm"
-    [("Input", Test_input.tests); ("Encodings", Test_encoding.tests)]
+    [
+      ("Input", Test_input.tests);
+      ("Output", Test_output.tests);
+      ("Set/get", Test_get_set.tests);
+      ("Durable storage", Test_durable_storage.tests);
+      ("AST Generators", Test_ast_generators.tests);
+      ("WASM Encodings", Test_wasm_encoding.tests);
+      ("WASM PVM Encodings", Test_wasm_pvm_encodings.tests);
+      ("Parser Encodings", Test_parser_encoding.tests);
+      ("WASM PVM", Test_wasm_pvm.tests);
+      ("Module Initialisation", Test_init.tests);
+      ("Max nb of ticks", Test_fixed_nb_ticks.tests);
+      ("Hash correspondence", Test_hash_consistency.tests);
+      ("Reveal", Test_reveal.tests);
+      ("Gather floppies", Test_gather_floppies.tests);
+    ]
   |> Lwt_main.run

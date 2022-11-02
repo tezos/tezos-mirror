@@ -1,16 +1,22 @@
 open Types
-module Vector = Lazy_vector.LwtInt32Vector
 
-module NameMap =
-  Lazy_map.Make
-    (Lazy_map.Effect.Lwt)
-    (struct
-      type t = Ast.name_list
+module ModuleMap = Lazy_map.Mutable.Make (struct
+  include String
 
-      let compare = List.compare Int.compare
+  let to_string = Fun.id
+end)
 
-      let to_string = Utf8.encode_list
-    end)
+module Vector = Lazy_vector.Int32Vector
+
+module NameMap = Lazy_map.Make (struct
+  type t = Ast.name
+
+  let compare = String.compare
+
+  let to_string = Ast.string_of_name
+end)
+
+type module_key = Module_key of string [@@deriving show]
 
 type module_inst = {
   types : func_type Vector.t;
@@ -21,9 +27,10 @@ type module_inst = {
   exports : extern NameMap.t;
   elems : elem_inst Vector.t;
   datas : data_inst Vector.t;
+  allocations : Ast.allocations;
 }
 
-and func_inst = (input_inst, module_inst ref) Func.t
+and func_inst = module_key Func.t
 
 and table_inst = Table.t
 
@@ -33,17 +40,21 @@ and global_inst = Global.t
 
 and input_inst = Input_buffer.t
 
+and output_inst = Output_buffer.t
+
 and export_inst = Ast.name * extern
 
 and elem_inst = Values.ref_ Vector.t ref
 
-and data_inst = Chunked_byte_vector.Lwt.t ref
+and data_inst = Ast.data_label ref
 
 and extern =
   | ExternFunc of func_inst
   | ExternTable of table_inst
   | ExternMemory of memory_inst
   | ExternGlobal of global_inst
+
+and module_reg = module_inst ModuleMap.t
 
 (* Reference types *)
 
@@ -79,7 +90,13 @@ let empty_module_inst =
     exports = NameMap.create ~produce_value:(fun _ -> Lwt.fail Not_found) ();
     elems = Vector.create 0l;
     datas = Vector.create 0l;
+    allocations = Ast.empty_allocations ();
   }
+
+let update_module_ref registry (Module_key key) module_inst =
+  ModuleMap.set key module_inst registry
+
+let resolve_module_ref registry (Module_key key) = ModuleMap.get key registry
 
 let extern_type_of = function
   | ExternFunc func -> ExternFuncType (Func.type_of func)

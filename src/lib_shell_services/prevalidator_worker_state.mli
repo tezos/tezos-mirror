@@ -28,7 +28,7 @@ module Request : sig
   type ('a, 'b) t =
     | Flush :
         Block_hash.t
-        * Chain_validator_worker_state.Event.update
+        * Chain_validator_worker_state.update
         * Block_hash.Set.t
         * Operation_hash.Set.t
         -> (unit, error trace) t

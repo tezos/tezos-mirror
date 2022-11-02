@@ -90,3 +90,8 @@ let parse_floating tez_string =
     | _ -> fail ()
   in
   of_int integral + of_mutez_int decimal
+
+let typ =
+  Check.comparable
+    (fun fmt t -> Format.fprintf fmt "%s" (to_string t))
+    (fun a b -> Int.compare (to_mutez a) (to_mutez b))

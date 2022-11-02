@@ -894,10 +894,10 @@ module Chain : sig
     unit tzresult Lwt.t
 
   (** [may_update_ancestor_protocol_level chain_store ~head] tries to
-      find the activation block of the [head]'s protocol, checks that
-      its an ancestor and tries to update it if that's not the case. If
-      the registered activation block is not reachable (already
-      pruned), this function does nothing. *)
+     find the activation block of the [head]'s protocol, checks that
+     its an ancestor and tries to update it if that's not the case. If
+     the registered activation block is not reachable (already
+     pruned), this function does nothing. *)
   val may_update_ancestor_protocol_level :
     chain_store -> head:Block.block -> unit tzresult Lwt.t
 
@@ -921,6 +921,12 @@ module Chain : sig
     next_protocol_hash:Protocol_hash.t ->
     (chain_store * Block.t) RPC_directory.t ->
     unit Lwt.t
+
+  (** [register_gc_callback chain_store callback] installs a
+      [callback] that may be triggered during a block store merge in
+      order to garbage-collect old contexts. *)
+  val register_gc_callback :
+    chain_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
 end
 
 (** [global_block_watcher global_store] instantiates a new block

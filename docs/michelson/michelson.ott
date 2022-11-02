@@ -1099,7 +1099,7 @@ Typing :: 't_' ::=
 
 
        ------------------------------------------------ :: TICKET
-       ctx :- TICKET :: cty : nat : A => ticket cty : A
+       ctx :- TICKET :: cty : nat : A => option ( ticket cty ) : A
 
        ------------------------------------------------ :: READ_TICKET
        ctx :- READ_TICKET :: ticket cty : A => pair address cty nat : ticket cty : A
@@ -2259,8 +2259,13 @@ UNPACK ty / byt : S => unpack ty byt : S
 
 % tickets:
 
-------------------------------------------------- :: TICKET
-TICKET / x : n : S => Pair (address self) x n : S
+n = 0
+------------------------------------------------- :: TICKET_zero
+TICKET / x : n : S => None : S
+
+n <> 0
+------------------------------------------------- :: TICKET_nonzero
+TICKET / x : n : S => Some (Pair (address self) x n) : S
 
 ----------------------------------------------------------- :: READ_TICKET
 READ_TICKET / Pair s x n : S => Pair s x n : Pair s x n : S

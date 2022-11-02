@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 (* Tezos Command line interface - Local Storage for Configuration *)
 
 let rec try_alternatives input = function
@@ -38,8 +40,6 @@ let parse_alternatives alts input =
       | None -> try_alternatives input alts)
   | _ -> assert false
 (* cannot happen due to String.split's implementation. *)
-
-open Clic
 
 module type Entity = sig
   type t
@@ -113,7 +113,7 @@ module type Alias = sig
     ('a, (< .. > as 'obj)) Clic.params ->
     (fresh_param -> 'a, 'obj) Clic.params
 
-  val force_switch : unit -> (bool, _) arg
+  val force_switch : unit -> (bool, _) Clic.arg
 
   val of_fresh :
     #Client_context.wallet -> bool -> fresh_param -> string tzresult Lwt.t
@@ -335,17 +335,17 @@ module Alias (Entity : Entity) = struct
 
   let alias_parameter () =
     let open Lwt_result_syntax in
-    parameter ~autocomplete (fun cctxt s ->
+    Clic.parameter ~autocomplete (fun cctxt s ->
         let* v = find cctxt s in
         return (s, v))
 
   let alias_param ?(name = "name")
       ?(desc = "existing " ^ Entity.name ^ " alias") next =
-    param ~name ~desc (alias_parameter ()) next
+    Clic.param ~name ~desc (alias_parameter ()) next
 
   let aliases_parameter () =
     let open Lwt_result_syntax in
-    parameter ~autocomplete (fun cctxt s ->
+    Clic.parameter ~autocomplete (fun cctxt s ->
         String.split_no_empty ',' s
         |> List.map_es (fun s ->
                let* pkh = find cctxt s in
@@ -353,7 +353,7 @@ module Alias (Entity : Entity) = struct
 
   let aliases_param ?(name = "name")
       ?(desc = "existing " ^ Entity.name ^ " aliases") next =
-    param ~name ~desc (aliases_parameter ()) next
+    Clic.param ~name ~desc (aliases_parameter ()) next
 
   type fresh_param = Fresh of string
 
@@ -381,10 +381,10 @@ module Alias (Entity : Entity) = struct
 
   let fresh_alias_param ?(name = "new")
       ?(desc = "new " ^ Entity.name ^ " alias") next =
-    param
+    Clic.param
       ~name
       ~desc
-      (parameter (fun (_ : < .. >) s -> Lwt.return_ok (Fresh s)))
+      (Clic.parameter (fun (_ : < .. >) s -> Lwt.return_ok (Fresh s)))
       next
 
   let parse_source_string cctxt s =
@@ -416,7 +416,7 @@ module Alias (Entity : Entity) = struct
         Entity.name
         Entity.name
     in
-    param ~name ~desc (parameter parse_source_string) next
+    Clic.param ~name ~desc (Clic.parameter parse_source_string) next
 
   let source_arg ?(long = "source " ^ Entity.name) ?(placeholder = "src")
       ?(doc = "") () =
@@ -435,7 +435,7 @@ module Alias (Entity : Entity) = struct
         Entity.name
         Entity.name
     in
-    arg ~long ~placeholder ~doc (parameter parse_source_string)
+    Clic.arg ~long ~placeholder ~doc (Clic.parameter parse_source_string)
 
   let force_switch () =
     Clic.switch

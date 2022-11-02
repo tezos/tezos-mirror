@@ -64,12 +64,15 @@ type t = {
 }
 
 let default_data_dir rollup_id =
+  let open Lwt_syntax in
   let home = Sys.getenv "HOME" in
   let dir =
     ".tezos-tx-rollup-node-"
     ^ Protocol.Alpha_context.Tx_rollup.to_b58check rollup_id
   in
-  Filename.concat home dir
+  let dir = Filename.concat home dir in
+  let+ () = Lwt_utils_unix.create_dir dir in
+  dir
 
 let default_rpc_addr = (Ipaddr.V6.localhost, 9999)
 
@@ -264,11 +267,11 @@ let caps_encoding =
           cost_caps_encoding
           default_dispatch_withdrawals_caps)
 
-let encoding =
+let encoding data_dir =
   let open Data_encoding in
   conv
     (fun {
-           data_dir;
+           data_dir = _;
            rollup_id;
            origination_level;
            rpc_addr;
@@ -282,7 +285,7 @@ let encoding =
            caps;
            batch_burn_limit;
          } ->
-      ( ( Some data_dir,
+      ( ( (),
           rollup_id,
           origination_level,
           rpc_addr,
@@ -293,7 +296,7 @@ let encoding =
           l2_blocks_cache_size,
           caps ),
         (batch_burn_limit, cors_origins, cors_headers) ))
-    (fun ( ( data_dir_opt,
+    (fun ( ( (),
              rollup_id,
              origination_level,
              rpc_addr,
@@ -304,11 +307,6 @@ let encoding =
              l2_blocks_cache_size,
              caps ),
            (batch_burn_limit, cors_origins, cors_headers) ) ->
-      let data_dir =
-        match data_dir_opt with
-        | Some dir -> dir
-        | None -> default_data_dir rollup_id
-      in
       {
         data_dir;
         rollup_id;
@@ -326,12 +324,13 @@ let encoding =
       })
   @@ merge_objs
        (obj10
-          (opt
+          (dft
              ~description:
                "Location where the rollup node data (store, context, etc.) is \
                 stored"
              "data_dir"
-             string)
+             (constant data_dir)
+             ())
           (req
              ~description:"Rollup id of the rollup to target"
              "rollup_id"
@@ -489,7 +488,9 @@ let check_mode config =
 
 let save ~force configuration =
   let open Lwt_result_syntax in
-  let json = Data_encoding.Json.construct encoding configuration in
+  let json =
+    Data_encoding.Json.construct (encoding configuration.data_dir) configuration
+  in
   let*! () = Lwt_utils_unix.create_dir configuration.data_dir in
   let file = get_configuration_filename configuration.data_dir in
   let*! exists = Lwt_unix.file_exists file in
@@ -519,5 +520,5 @@ let load ~data_dir =
     fail_unless exists (Error.Tx_rollup_configuration_file_does_not_exists file)
   in
   let* json = Lwt_utils_unix.Json.read_file file in
-  let config = Data_encoding.Json.destruct encoding json in
+  let config = Data_encoding.Json.destruct (encoding data_dir) json in
   return config

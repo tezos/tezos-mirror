@@ -18,14 +18,16 @@
 
 open Types
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 type void = Lib.void
+
+let pp_void _ _ = Stdlib.failwith "You are not supposed to be able to call this"
 
 (* Operators *)
 
 module IntOp = struct
-  type unop = Clz | Ctz | Popcnt | ExtendS of pack_size
+  type unop = Clz | Ctz | Popcnt | ExtendS of pack_size [@@deriving show]
 
   type binop =
     | Add
@@ -43,10 +45,12 @@ module IntOp = struct
     | ShrU
     | Rotl
     | Rotr
+  [@@deriving show]
 
-  type testop = Eqz
+  type testop = Eqz [@@deriving show]
 
   type relop = Eq | Ne | LtS | LtU | GtS | GtU | LeS | LeU | GeS | GeU
+  [@@deriving show]
 
   type cvtop =
     | ExtendSI32
@@ -61,16 +65,18 @@ module IntOp = struct
     | TruncSatSF64
     | TruncSatUF64
     | ReinterpretFloat
+  [@@deriving show]
 end
 
 module FloatOp = struct
   type unop = Neg | Abs | Ceil | Floor | Trunc | Nearest | Sqrt
+  [@@deriving show]
 
-  type binop = Add | Sub | Mul | Div | Min | Max | CopySign
+  type binop = Add | Sub | Mul | Div | Min | Max | CopySign [@@deriving show]
 
-  type testop = |
+  type testop = | [@@deriving show]
 
-  type relop = Eq | Ne | Lt | Gt | Le | Ge
+  type relop = Eq | Ne | Lt | Gt | Le | Ge [@@deriving show]
 
   type cvtop =
     | ConvertSI32
@@ -80,6 +86,7 @@ module FloatOp = struct
     | PromoteF32
     | DemoteF64
     | ReinterpretInt
+  [@@deriving show]
 end
 
 module I32Op = IntOp
@@ -88,11 +95,12 @@ module F32Op = FloatOp
 module F64Op = FloatOp
 
 module V128Op = struct
-  type itestop = AllTrue
+  type itestop = AllTrue [@@deriving show]
 
-  type iunop = Abs | Neg | Popcnt
+  type iunop = Abs | Neg | Popcnt [@@deriving show]
 
   type funop = Abs | Neg | Sqrt | Ceil | Floor | Trunc | Nearest
+  [@@deriving show]
 
   type ibinop =
     | Add
@@ -117,12 +125,15 @@ module V128Op = struct
     | Shuffle of int list
     | NarrowS
     | NarrowU
+  [@@deriving show]
 
   type fbinop = Add | Sub | Mul | Div | Min | Max | Pmin | Pmax
+  [@@deriving show]
 
   type irelop = Eq | Ne | LtS | LtU | LeS | LeU | GtS | GtU | GeS | GeU
+  [@@deriving show]
 
-  type frelop = Eq | Ne | Lt | Le | Gt | Ge
+  type frelop = Eq | Ne | Lt | Le | Gt | Ge [@@deriving show]
 
   type icvtop =
     | ExtendLowS
@@ -135,49 +146,59 @@ module V128Op = struct
     | TruncSatUF32x4
     | TruncSatSZeroF64x2
     | TruncSatUZeroF64x2
+  [@@deriving show]
 
   type fcvtop =
     | DemoteZeroF64x2
     | PromoteLowF32x4
     | ConvertSI32x4
     | ConvertUI32x4
+  [@@deriving show]
 
-  type ishiftop = Shl | ShrS | ShrU
+  type ishiftop = Shl | ShrS | ShrU [@@deriving show]
 
-  type ibitmaskop = Bitmask
+  type ibitmaskop = Bitmask [@@deriving show]
 
-  type vtestop = AnyTrue
+  type vtestop = AnyTrue [@@deriving show]
 
-  type vunop = Not
+  type vunop = Not [@@deriving show]
 
-  type vbinop = And | Or | Xor | AndNot
+  type vbinop = And | Or | Xor | AndNot [@@deriving show]
 
-  type vternop = Bitselect
+  type vternop = Bitselect [@@deriving show]
 
   type testop = (itestop, itestop, itestop, itestop, void, void) V128.laneop
+  [@@deriving show]
 
   type unop = (iunop, iunop, iunop, iunop, funop, funop) V128.laneop
+  [@@deriving show]
 
   type binop = (ibinop, ibinop, ibinop, ibinop, fbinop, fbinop) V128.laneop
+  [@@deriving show]
 
   type relop = (irelop, irelop, irelop, irelop, frelop, frelop) V128.laneop
+  [@@deriving show]
 
   type cvtop = (icvtop, icvtop, icvtop, icvtop, fcvtop, fcvtop) V128.laneop
+  [@@deriving show]
 
   type shiftop =
     (ishiftop, ishiftop, ishiftop, ishiftop, void, void) V128.laneop
+  [@@deriving show]
 
   type bitmaskop =
     (ibitmaskop, ibitmaskop, ibitmaskop, ibitmaskop, void, void) V128.laneop
+  [@@deriving show]
 
-  type nsplatop = Splat
+  type nsplatop = Splat [@@deriving show]
 
-  type 'a nextractop = Extract of int * 'a
+  type 'a nextractop = Extract of int * 'a [@@deriving show]
 
-  type nreplaceop = Replace of int
+  type nreplaceop = Replace of int [@@deriving show]
 
   type splatop =
     (nsplatop, nsplatop, nsplatop, nsplatop, nsplatop, nsplatop) V128.laneop
+  [@@deriving show]
 
   type extractop =
     ( extension nextractop,
@@ -187,6 +208,7 @@ module V128Op = struct
       unit nextractop,
       unit nextractop )
     V128.laneop
+  [@@deriving show]
 
   type replaceop =
     ( nreplaceop,
@@ -196,82 +218,91 @@ module V128Op = struct
       nreplaceop,
       nreplaceop )
     V128.laneop
+  [@@deriving show]
 end
 
 type testop = (I32Op.testop, I64Op.testop, F32Op.testop, F64Op.testop) Values.op
+[@@deriving show]
 
 type unop = (I32Op.unop, I64Op.unop, F32Op.unop, F64Op.unop) Values.op
+[@@deriving show]
 
 type binop = (I32Op.binop, I64Op.binop, F32Op.binop, F64Op.binop) Values.op
+[@@deriving show]
 
 type relop = (I32Op.relop, I64Op.relop, F32Op.relop, F64Op.relop) Values.op
+[@@deriving show]
 
 type cvtop = (I32Op.cvtop, I64Op.cvtop, F32Op.cvtop, F64Op.cvtop) Values.op
+[@@deriving show]
 
-type vec_testop = V128Op.testop Values.vecop
+type vec_testop = V128Op.testop Values.vecop [@@deriving show]
 
-type vec_relop = V128Op.relop Values.vecop
+type vec_relop = V128Op.relop Values.vecop [@@deriving show]
 
-type vec_unop = V128Op.unop Values.vecop
+type vec_unop = V128Op.unop Values.vecop [@@deriving show]
 
-type vec_binop = V128Op.binop Values.vecop
+type vec_binop = V128Op.binop Values.vecop [@@deriving show]
 
-type vec_cvtop = V128Op.cvtop Values.vecop
+type vec_cvtop = V128Op.cvtop Values.vecop [@@deriving show]
 
-type vec_shiftop = V128Op.shiftop Values.vecop
+type vec_shiftop = V128Op.shiftop Values.vecop [@@deriving show]
 
-type vec_bitmaskop = V128Op.bitmaskop Values.vecop
+type vec_bitmaskop = V128Op.bitmaskop Values.vecop [@@deriving show]
 
-type vec_vtestop = V128Op.vtestop Values.vecop
+type vec_vtestop = V128Op.vtestop Values.vecop [@@deriving show]
 
-type vec_vunop = V128Op.vunop Values.vecop
+type vec_vunop = V128Op.vunop Values.vecop [@@deriving show]
 
-type vec_vbinop = V128Op.vbinop Values.vecop
+type vec_vbinop = V128Op.vbinop Values.vecop [@@deriving show]
 
-type vec_vternop = V128Op.vternop Values.vecop
+type vec_vternop = V128Op.vternop Values.vecop [@@deriving show]
 
-type vec_splatop = V128Op.splatop Values.vecop
+type vec_splatop = V128Op.splatop Values.vecop [@@deriving show]
 
-type vec_extractop = V128Op.extractop Values.vecop
+type vec_extractop = V128Op.extractop Values.vecop [@@deriving show]
 
-type vec_replaceop = V128Op.replaceop Values.vecop
+type vec_replaceop = V128Op.replaceop Values.vecop [@@deriving show]
 
 type ('t, 'p) memop = {ty : 't; align : int; offset : int32; pack : 'p}
+[@@deriving show]
 
-type loadop = (num_type, (pack_size * extension) option) memop
+type loadop = (num_type, (pack_size * extension) option) memop [@@deriving show]
 
-type storeop = (num_type, pack_size option) memop
+type storeop = (num_type, pack_size option) memop [@@deriving show]
 
 type vec_loadop = (vec_type, (pack_size * vec_extension) option) memop
+[@@deriving show]
 
-type vec_storeop = (vec_type, unit) memop
+type vec_storeop = (vec_type, unit) memop [@@deriving show]
 
-type vec_laneop = (vec_type, pack_size) memop * int
+type vec_laneop = (vec_type, pack_size) memop * int [@@deriving show]
 
 (* Expressions *)
 
-type var = int32 Source.phrase
+type var = int32 Source.phrase [@@deriving show]
 
-type num = Values.num Source.phrase
+type num = Values.num Source.phrase [@@deriving show]
 
-type vec = Values.vec Source.phrase
+type vec = Values.vec Source.phrase [@@deriving show]
 
-type name = int Vector.t
+type name = string
 
 type name_list = int list
 
 type block_type = VarBlockType of var | ValBlockType of value_type option
+[@@deriving show]
 
-type instr = instr' Source.phrase
+type block_label = Block_label of int32 [@@deriving show]
 
-and instr' =
+type instr' =
   | Unreachable (* trap unconditionally *)
   | Nop (* do nothing *)
   | Drop (* forget a value *)
   | Select of value_type list option (* branchless conditional *)
-  | Block of block_type * instr list (* execute in sequence *)
-  | Loop of block_type * instr list (* loop header *)
-  | If of block_type * instr list * instr list (* conditional *)
+  | Block of block_type * block_label (* execute in sequence *)
+  | Loop of block_type * block_label (* loop header *)
+  | If of block_type * block_label * block_label (* conditional *)
   | Br of var (* break to n-th surrounding label *)
   | BrIf of var (* conditional break *)
   | BrTable of var list * var (* indexed break *)
@@ -327,10 +358,13 @@ and instr' =
   | VecSplat of vec_splatop (* number to vector conversion *)
   | VecExtract of vec_extractop (* extract lane from vector *)
   | VecReplace of vec_replaceop (* replace lane in vector *)
+[@@deriving show]
+
+type instr = instr' Source.phrase [@@deriving show]
 
 (* Globals & Functions *)
 
-type const = instr list Source.phrase
+type const = block_label Source.phrase
 
 type global = global' Source.phrase
 
@@ -338,7 +372,7 @@ and global' = {gtype : global_type; ginit : const}
 
 type func = func' Source.phrase
 
-and func' = {ftype : var; locals : value_type Vector.t; body : instr list}
+and func' = {ftype : var; locals : value_type Vector.t; body : block_label}
 
 (* Tables & Memories *)
 
@@ -365,12 +399,11 @@ and elem_segment' = {
   emode : segment_mode;
 }
 
+type data_label = Data_label of int32 [@@deriving show]
+
 type data_segment = data_segment' Source.phrase
 
-and data_segment' = {
-  dinit : Chunked_byte_vector.Lwt.Buffer.t;
-  dmode : segment_mode;
-}
+and data_segment' = {dinit : data_label; dmode : segment_mode}
 
 (* Modules *)
 
@@ -404,6 +437,12 @@ type start = start' Source.phrase
 
 and start' = {sfunc : var}
 
+type block_table = instr Vector.t Vector.t
+
+type datas_table = Chunked_byte_vector.t Vector.t
+
+type allocations = {mutable blocks : block_table; mutable datas : datas_table}
+
 type module_ = module_' Source.phrase
 
 and module_' = {
@@ -417,11 +456,43 @@ and module_' = {
   datas : data_segment Vector.t;
   imports : import Vector.t;
   exports : export Vector.t;
+  allocations : allocations;
 }
 
 (* Auxiliary functions *)
 
-let empty_module =
+let empty_allocations () =
+  {
+    blocks = Vector.(singleton (empty ()));
+    datas = Vector.(singleton (Chunked_byte_vector.create 0L));
+  }
+
+let make_allocation_state blocks datas = {blocks; datas}
+
+let alloc_block allocs =
+  let blocks, b = Vector.(append (empty ()) allocs.blocks) in
+  allocs.blocks <- blocks ;
+  Block_label b
+
+let add_to_block allocs (Block_label b) instr =
+  let open Lwt.Syntax in
+  let+ block = Vector.get b allocs.blocks in
+  let block, _ = Vector.(append instr block) in
+  allocs.blocks <- Vector.set b block allocs.blocks
+
+let alloc_data (allocs : allocations) len =
+  let datas, d =
+    Vector.append (Chunked_byte_vector.allocate len) allocs.datas
+  in
+  allocs.datas <- datas ;
+  Data_label d
+
+let add_to_data (allocs : allocations) (Data_label d) index byte =
+  let open Lwt.Syntax in
+  let* data = Vector.get d allocs.datas in
+  Chunked_byte_vector.store_byte data index byte
+
+let empty_module () =
   {
     types = Vector.create 0l;
     globals = Vector.create 0l;
@@ -433,9 +504,12 @@ let empty_module =
     datas = Vector.create 0l;
     imports = Vector.create 0l;
     exports = Vector.create 0l;
+    allocations = empty_allocations ();
   }
 
 open Source
+
+let get_data (Data_label d) datas = Vector.get d datas
 
 let func_type_for (m : module_) (x : var) : func_type Lwt.t =
   let open Lwt.Syntax in
@@ -499,9 +573,9 @@ let export_type (m : module_) (ex : export) : extern_type Lwt.t =
       ExternGlobalType (nth gts x.it)
 
 let string_of_name n =
-  let n = Vector.loaded_bindings n in
   let b = Buffer.create 16 in
-  let escape (_, uc) =
+  let escape uc =
+    let uc = Char.code uc in
     if uc < 0x20 || uc >= 0x7f then
       Buffer.add_string b (Printf.sprintf "\\u{%02x}" uc)
     else
@@ -509,5 +583,5 @@ let string_of_name n =
       if c = '\"' || c = '\\' then Buffer.add_char b '\\' ;
       Buffer.add_char b c
   in
-  List.iter escape n ;
+  String.iter escape n ;
   Buffer.contents b

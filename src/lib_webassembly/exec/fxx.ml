@@ -102,6 +102,8 @@ module type S = sig
   val ge : t -> t -> bool
 
   val zero : t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 module Make (Rep : RepType) : S with type bits = Rep.t = struct
@@ -148,7 +150,8 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
    *)
   let determine_binary_nan x y =
     (*
-     * TODO: There are two nondeterministic things we could do here. When both
+     * Reference-interpreter-todo:
+     * There are two nondeterministic things we could do here. When both
      * x and y are NaN, we can nondeterministically pick which to return. And
      * when neither is NaN, we can nondeterministically pick whether to return
      * pos_nan or neg_nan.
@@ -163,7 +166,8 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
    *)
   let determine_unary_nan x =
     (*
-     * TODO: There is one nondeterministic thing we could do here. When the
+     * Reference Interpreter-todo:
+     * There is one nondeterministic thing we could do here. When the
      * operand is not NaN, we can nondeterministically pick whether to return
      * pos_nan or neg_nan.
      *)
@@ -430,4 +434,6 @@ module Make (Rep : RepType) : S with type bits = Rep.t = struct
   let to_hex_string x =
     if is_inf x then to_string x
     else to_string' (Printf.sprintf "%h") is_hex_digit 4 x
+
+  let pp fmt x = Format.fprintf fmt "%s" @@ to_string x
 end

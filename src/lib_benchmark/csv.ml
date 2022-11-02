@@ -31,20 +31,33 @@ let all_equal (l : int list) =
   in
   match l with [] -> true | hd :: tl -> loop tl hd
 
+module String_set = Set.Make (String)
+
+let disjoint_headers (csv1 : csv) (csv2 : csv) =
+  match (csv1, csv2) with
+  | [], _ | _, [] -> true
+  | header1 :: _, header2 :: _ ->
+      let header1 = String_set.of_list header1 in
+      let header2 = String_set.of_list header2 in
+      String_set.disjoint header1 header2
+
 (* Horizontally concat CSVs *)
-let concat (csv1 : csv) (csv2 : csv) : csv =
+let concat ?(check_disjoint_headers = true) (csv1 : csv) (csv2 : csv) : csv =
   (* Check that both CSVs have the same number of lines. *)
   if Compare.List_lengths.(csv1 <> csv2) then
     Stdlib.failwith "Csv.concat: CSVs have different length"
   else
-    (* Check that each CSV has the same number of *)
+    (* Check that each line has the same number of columns *)
     let lengths1 = List.map List.length csv1 in
-    let lengths2 = List.map List.length csv1 in
+    let lengths2 = List.map List.length csv2 in
     if not (all_equal lengths1) then
       let msg = "Csv.concat: first argument has uneven # of lines" in
       Stdlib.failwith msg
     else if not (all_equal lengths2) then
-      let msg = "Csv.concat: first argument has uneven # of lines" in
+      let msg = "Csv.concat: second argument has uneven # of lines" in
+      Stdlib.failwith msg
+    else if check_disjoint_headers && not (disjoint_headers csv1 csv2) then
+      let msg = "Csv.concat: headers are not disjoint" in
       Stdlib.failwith msg
     else
       (* see top if condition *)
@@ -57,7 +70,7 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
 let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   Format.eprintf "Exporting to %s@." filename ;
   let sep_str = String.make 1 separator in
-  let outfile = open_out filename in
+  Out_channel.with_open_text filename @@ fun outfile ->
   let fmtr = Format.formatter_of_out_channel outfile in
   List.iter
     (fun line ->
@@ -66,20 +79,14 @@ let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
       | _ ->
           let s = String.concat sep_str line in
           Format.fprintf fmtr "%s%c@?" s linebreak)
-    data ;
-  close_out outfile
+    data
 
-(* shamelessly stolen from
-   https://stackoverflow.com/questions/5774934/how-do-i-read-in-lines-from-a-text-file-in-ocaml *)
 let read_lines name : string list =
-  let ic = open_in name in
-  let try_read () = try Some (input_line ic) with End_of_file -> None in
+  In_channel.with_open_text name @@ fun ic ->
   let rec loop acc =
-    match try_read () with
+    match In_channel.input_line ic with
     | Some s -> loop (s :: acc)
-    | None ->
-        close_in ic ;
-        List.rev acc
+    | None -> List.rev acc
   in
   loop []
 

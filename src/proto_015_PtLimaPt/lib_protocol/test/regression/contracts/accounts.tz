@@ -1,0 +1,67 @@
+{ parameter
+    (or (key_hash %Initialize)
+        (pair %Withdraw (key %from) (pair (mutez %withdraw_amount) (signature %sig)))) ;
+  storage (map :stored_balance key_hash mutez) ;
+  code { DUP ;
+         CAR ;
+         IF_LEFT
+           { DUP ;
+             DIP 2 { CDR %stored_balance ; DUP } ;
+             DIP { SWAP } ;
+             GET @opt_prev_balance ;
+             { IF_NONE
+                 { DIP { AMOUNT ; SOME } ; UPDATE ; NIL operation ; PAIR }
+                 { RENAME @previous_balance ;
+                   AMOUNT ;
+                   ADD ;
+                   SOME ;
+                   SWAP ;
+                   UPDATE ;
+                   NIL operation ;
+                   PAIR } } }
+           { DUP ;
+             DUP ;
+             DUP ;
+             DUP ;
+             CAR %from ;
+             DIP 2
+                 { { CDR ; CAR %withdraw_amount } ; PACK ; BLAKE2B @signed_amount } ;
+             DIP { { CDR ; CDR %sig } } ;
+             CHECK_SIGNATURE ;
+             IF {} { PUSH string "Bad signature" ; FAILWITH } ;
+             DIP 2 { CDR %stored_balance ; DUP } ;
+             CAR %from ;
+             HASH_KEY @from_hash ;
+             DUP ;
+             DIP { DIP { SWAP } ; SWAP } ;
+             GET ;
+             IF_NONE
+               { PUSH string "Account does not exist" ; PAIR ; FAILWITH }
+               { RENAME @previous_balance ;
+                 DIP { DROP } ;
+                 DUP ;
+                 DIP 2 { DUP ; { CDR ; CAR %withdraw_amount } ; DUP } ;
+                 DIP { { COMPARE ; LT @not_enough } } ;
+                 SWAP ;
+                 IF { PUSH string "Not enough funds" ; FAILWITH }
+                    { SUB_MUTEZ @new_balance ;
+                      { IF_NONE { { UNIT ; FAILWITH } } {} } ;
+                      DIP { DUP ; DIP { SWAP } } ;
+                      DUP ;
+                      PUSH @zero mutez 0 ;
+                      { COMPARE ; EQ @null_balance } ;
+                      IF { DROP ; NONE @new_balance mutez } { SOME @new_balance } ;
+                      SWAP ;
+                      CAR %from ;
+                      HASH_KEY @from_hash ;
+                      UPDATE ;
+                      SWAP ;
+                      DUP ;
+                      { CDR ; CAR %withdraw_amount } ;
+                      DIP { CAR %from ; HASH_KEY @from_hash ; IMPLICIT_ACCOUNT @from_account } ;
+                      UNIT ;
+                      TRANSFER_TOKENS @withdraw_transfer_op ;
+                      NIL operation ;
+                      SWAP ;
+                      CONS ;
+                      PAIR } } } } }

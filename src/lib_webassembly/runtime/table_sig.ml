@@ -42,7 +42,7 @@ module type S = sig
       raise [Lazy_map.UnexpectedAccess]. *)
   val alloc_shallow : table_type -> t
 
-  module Vector = Lazy_vector.Mutable.LwtInt32Vector
+  module Vector = Lazy_vector.Mutable.Int32Vector
 
   val of_lazy_vector : table_type -> ref_ Vector.Vector.t -> t
 end

@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Store/protocol activation
-   Invocation:   dune exec tezt/tests/main.exe -- protocol table update
+   Invocation:   dune exec tezt/tests/main.exe -- --file protocol_table_update.ml
    Subject:      Checks if a protocol activation is well handled in the store
 *)
 
@@ -174,5 +174,44 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
     Test.fail "Activation block must be equal." ;
   Lwt.return_unit
 
+(** Checks that a protocol table is correctly updated after a branch
+   switch where the new branch has a protocol activation through an
+   user activated upgrade. *)
+let test_branch_switch ~migrate_from ~migrate_to =
+  Test.register
+    ~__FILE__
+    ~title:"protocol table"
+    ~tags:["protocol"; "table"; "branch"]
+  @@ fun () ->
+  let migration_level = 2 in
+  let uau =
+    Node.Config_file.set_sandbox_network_with_user_activated_upgrades
+      [(migration_level, migrate_to)]
+  in
+  let* node1 = Node.init ~patch_config:uau [Synchronisation_threshold 0] in
+  let* client1 = Client.(init ~endpoint:(Node node1) ()) in
+  let* () = Client.activate_protocol ~protocol:migrate_from client1 in
+  let* node2 = Node.init [Synchronisation_threshold 0] in
+  let* client2 = Client.(init ~endpoint:(Node node2) ()) in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client1) in
+  let* _ = Node.wait_for_level node1 3 in
+  let* () = Client.bake_for_and_wait client2 in
+  let* _ = Node.wait_for_level node2 2 in
+  let* () = Node.terminate node2 in
+  let () = Node.Config_file.update node2 uau in
+  let* () = Node.run node2 [Synchronisation_threshold 0] in
+  let* () = Node.wait_for_ready node2 in
+  (* The block is invalid but is still accepted. *)
+  let* () = Client.Admin.trust_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* _ = Node.wait_for_level node2 3 in
+  let path = ["chains"; "main"; "blocks"; "head"; "protocols"] in
+  let* _ = Client.rpc GET path client1 in
+  let path = ["chains"; "main"; "blocks"; "head"; "protocols"] in
+  let* _ = Client.rpc GET path client2 in
+  unit
+
 let register ~migrate_from ~migrate_to =
-  test_protocol_table_update ~migrate_from ~migrate_to
+  test_protocol_table_update ~migrate_from ~migrate_to ;
+  test_branch_switch ~migrate_from ~migrate_to

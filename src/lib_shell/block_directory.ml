@@ -24,11 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 let read_partial_context =
   let open Lwt_syntax in
-  let init = Block_services.Dir String.Map.empty in
+  let init = Proof.Dir String.Map.empty in
   fun context path depth ->
-    if depth = 0 then Lwt.return Block_services.Cut
+    if depth = 0 then Lwt.return Proof.Cut
     else
       (* According to the documentation of Context.fold,
          "[f] is never called with an empty key for values; i.e.,
@@ -37,7 +39,7 @@ let read_partial_context =
       *)
       let* o = Context_ops.find context path in
       match o with
-      | Some v -> Lwt.return (Block_services.Key v)
+      | Some v -> Lwt.return (Proof.Key v)
       | None ->
           (* try to read as directory *)
           Context_ops.fold_value
@@ -518,24 +520,42 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       let depth = Option.value ~default:max_int q#depth in
       (* [depth] is defined as a [uint] not an [int] *)
       assert (depth >= 0) ;
-      let* context = Store.Block.context chain_store block in
-      let*! mem = Context_ops.mem context path in
-      let*! dir_mem = Context_ops.mem_tree context path in
-      if not (mem || dir_mem) then Lwt.fail Not_found
-      else
-        let*! v = read_partial_context context path depth in
-        Lwt.return_ok v) ;
+      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+      if Store.Block.level block >= savepoint_level then
+        let* context = Store.Block.context chain_store block in
+        let*! mem = Context_ops.mem context path in
+        let*! dir_mem = Context_ops.mem_tree context path in
+        if not (mem || dir_mem) then Lwt.fail Not_found
+        else
+          let*! v = read_partial_context context path depth in
+          Lwt.return_ok v
+      else Lwt.fail Not_found) ;
   register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
+      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+      if Store.Block.level block >= savepoint_level then
+        let*! o = Store.Block.context_opt chain_store block in
+        match o with
+        | None -> return None
+        | Some context ->
+            let holey = Option.value ~default:false query#holey in
+            let leaf_kind =
+              let open Proof in
+              if holey then Hole else Raw_context
+            in
+            let*! v = Context_ops.merkle_tree context leaf_kind path in
+            return_some v
+      else Lwt.fail Not_found) ;
+  register1 S.Context.merkle_tree_v2 (fun (chain_store, block) path query () ->
       let*! o = Store.Block.context_opt chain_store block in
       match o with
-      | None -> return None
+      | None -> return_none
       | Some context ->
           let holey = Option.value ~default:false query#holey in
           let leaf_kind =
-            let open Tezos_shell_services.Block_services in
+            let open Proof in
             if holey then Hole else Raw_context
           in
-          let*! v = Context_ops.merkle_tree context leaf_kind path in
+          let*! v = Context_ops.merkle_tree_v2 context leaf_kind path in
           return_some v) ;
   (* info *)
   register0 S.info (fun (chain_store, block) q () ->
@@ -614,19 +634,26 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         List.map
           (fun operations ->
             let operations =
+              List.map
+                (fun op ->
+                  let proto =
+                    Data_encoding.Binary.to_bytes_exn
+                      Next_proto.operation_data_encoding
+                      op.Next_proto.protocol_data
+                  in
+                  (op, {Operation.shell = op.shell; proto}))
+                operations
+            in
+            let operations =
               if q#sort_operations then
-                List.sort Next_proto.relative_position_within_block operations
+                List.sort
+                  (fun (op, ops) (op', ops') ->
+                    let oph, oph' = (Operation.hash ops, Operation.hash ops') in
+                    Next_proto.compare_operations (oph, op) (oph', op'))
+                  operations
               else operations
             in
-            List.map
-              (fun op ->
-                let proto =
-                  Data_encoding.Binary.to_bytes_exn
-                    Next_proto.operation_data_encoding
-                    op.Next_proto.protocol_data
-                in
-                {Operation.shell = op.shell; proto})
-              operations)
+            List.map snd operations)
           p.operations
       in
       let* bv =
@@ -642,32 +669,55 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         operations) ;
   register0 S.Helpers.Preapply.operations (fun (chain_store, block) () ops ->
       let* ctxt = Store.Block.context chain_store block in
-      let predecessor = Store.Block.hash block in
-      let header = Store.Block.shell_header block in
-      let predecessor_context = ctxt in
-      let* state =
-        Next_proto.begin_construction
-          ~chain_id:(Store.Chain.chain_id chain_store)
-          ~predecessor_context
-          ~predecessor_timestamp:header.timestamp
-          ~predecessor_level:header.level
-          ~predecessor_fitness:header.fitness
-          ~predecessor
-          ~timestamp:(Time.System.to_protocol (Time.System.now ()))
-          ~cache:`Lazy
-          ()
+      let chain_id = Store.Chain.chain_id chain_store in
+      let mode =
+        let predecessor_hash = Store.Block.hash block in
+        let timestamp = Time.System.to_protocol (Time.System.now ()) in
+        Next_proto.Partial_construction {predecessor_hash; timestamp}
       in
-      let* state, acc =
-        List.fold_left_es
-          (fun (state, acc) op ->
-            let* state, result = Next_proto.apply_operation state op in
-            return (state, (op.protocol_data, result) :: acc))
-          (state, [])
+      let predecessor = Store.Block.shell_header block in
+      let* validation_state =
+        Next_proto.begin_validation ctxt chain_id mode ~predecessor ~cache:`Lazy
+      in
+      let* application_state =
+        Next_proto.begin_application
+          ctxt
+          chain_id
+          mode
+          ~predecessor
+          ~cache:`Lazy
+      in
+      let* hashed_ops =
+        List.map_es
+          (fun op ->
+            match
+              Data_encoding.Binary.to_bytes
+                Next_proto.operation_data_encoding
+                op.Next_proto.protocol_data
+            with
+            | Error _ ->
+                failwith "preapply_operations: cannot deserialize operation"
+            | Ok proto ->
+                let op_t = {Operation.shell = op.shell; proto} in
+                Lwt_result.return (Operation.hash op_t, op))
           ops
       in
-      (* A pre application must not commit into the protocol caches.
-         Hence, we set [cache_nonce] to None. *)
-      let* _ = Next_proto.finalize_block state None in
+      let* _validation_state, _application_state, acc =
+        List.fold_left_es
+          (fun (validation_state, application_state, acc) (oph, op) ->
+            let* validation_state =
+              Next_proto.validate_operation validation_state oph op
+            in
+            let* application_state, result =
+              Next_proto.apply_operation application_state oph op
+            in
+            return
+              ( validation_state,
+                application_state,
+                (op.protocol_data, result) :: acc ))
+          (validation_state, application_state, [])
+          hashed_ops
+      in
       return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
       let* ctxt = Store.Block.context chain_store block in
@@ -683,8 +733,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
          Lwt.return (chain_store, hash, header))
        (build_raw_header_rpc_directory (module Proto))) ;
   let proto_services =
-    match Prevalidator_filters.find Next_proto.hash with
-    | Some (module Filters) -> Filters.RPC.rpc_services
+    match Shell_plugin.find_rpc Next_proto.hash with
+    | Some (module RPC) -> RPC.rpc_services
     | None -> Next_proto.rpc_services
   in
   merge

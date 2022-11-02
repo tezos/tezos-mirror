@@ -32,10 +32,15 @@
     The state of subscribed slots per block is persistent.
 *)
 
-(** [process_head node_ctxt store head] fetches the slot indices to which the rollup is
-    subscribed to, and stores them.  *)
-val process_head :
-  Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+type error += Cannot_read_block_metadata of Block_hash.t
 
-(** [start ()] initializes the Dal_slot_tracker to track the dal slot subscriptions. *)
-val start : unit -> unit Lwt.t
+(** [process_head node_ctxt head] performs the following operations:
+    {ul
+      {li it fetches the slot indices to which the rollup is subscribed to,
+       and stores them in [Store.Dal_slot_subbscriptions] }
+      {li it reads the endorsements for headers published endorsement_lag
+      levels preceding [head] from the block metadata, determines which
+      ones the rollup node will download, and stores the results in
+      [Store.Dal_confirmed_slots].}
+    }  *)
+val process_head : Node_context.t -> Layer1.head -> unit tzresult Lwt.t

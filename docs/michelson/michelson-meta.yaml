@@ -1725,7 +1725,9 @@ instructions:
     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
     documentation_short: Create a ticket
     documentation: |
-      Create a ticket with the given content and amount. The ticketer is the address of ``SELF``.
+      Creates a value ``Some t`` where ``t`` is a ticket with the given content and amount.
+      The ticketer is the address of ``SELF``.
+      Returns ``None`` iff the amount is zero.
 
   READ_TICKET:
     category: tickets

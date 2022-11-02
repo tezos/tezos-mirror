@@ -28,24 +28,31 @@
     game.
 
     This proof is basically a combination of a PVM proof (provided by
-    each implementation of the PVM signature) and an inbox proof. To
+    each implementation of the PVM signature) and an input proof. To
     check the proof we must check each part separately and then also
     check that they match on the two points where they touch:
 
       - the [input_requested] of the PVM proof should match the starting
-      point of the inbox proof ;
+      point of the input proof ;
 
       - the [input_given] of the PVM proof should match the output
-      message of the inbox proof.
+      message of the input proof.
 
     It is also often the case that the PVM proof has [No_input_required]
     for its [input_requested] and [None] for its [input_given]. If this
-    is the case, we don't need the inbox proof at all and the [inbox]
+    is the case, we don't need the input proof at all and the [input_proof]
     parameter in our proof should be [None]. *)
 
 open Sc_rollup_repr
 
-(** A PVM proof [pvm_step] is combined with an [inbox] proof to provide
+(** The proof that a reveal is valid. *)
+type reveal_proof =
+  | Raw_data_proof of string
+      (** The existence of reveal for a given hash when the
+          [input_requested] is the [Needs_for_reveal]. *)
+  | Metadata_proof
+
+(** A PVM proof [pvm_step] is combined with an [input_proof] to provide
     the proof necessary to validate a single step in the refutation
     game.
 
@@ -54,15 +61,28 @@ open Sc_rollup_repr
     [No_input_required] and [None] respectively, and in this case
     [inbox] should also be [None].
 
-    In the case that input is involved, [inbox] is a proof of the next
-    message available from the inbox after a given location; this must
-    match up with [pvm_step] to give a valid refutation proof. *)
-type t = {
-  pvm_step : Sc_rollups.wrapped_proof;
-  inbox : Sc_rollup_inbox_repr.serialized_proof option;
-}
+    In the case that input is involved, [input_proof] is either:
+
+    - a proof of the next inbox message available from the inbox
+      after a given location; this must match up with [pvm_step]
+      to give a valid refutation proof ; or
+
+    - a proof of a reveal satisfiability.
+*)
+
+type input_proof =
+  | Inbox_proof of {
+      level : Raw_level_repr.t;
+      message_counter : Z.t;
+      proof : Sc_rollup_inbox_repr.serialized_proof;
+    }
+  | Reveal_proof of reveal_proof
+
+type t = {pvm_step : Sc_rollups.wrapped_proof; input_proof : input_proof option}
 
 type error += Sc_rollup_proof_check of string
+
+type error += Sc_rollup_invalid_serialized_inbox_proof
 
 val encoding : t Data_encoding.t
 
@@ -76,27 +96,33 @@ val start : t -> State_hash.t
 (** The state hash of the machine after the step. This must be checked
     against the value in the refutation game as well as checking the
     proof is valid. *)
-val stop : t -> State_hash.t option
+val stop : t -> State_hash.t
 
 (** Check the validity of a proof.
 
     This function requires a few bits of data (available from the
     refutation game record in the storage):
 
-      - a snapshot of the inbox, used by the [inbox] proof ;
+      - a snapshot of the inbox, that may be used by the [input] proof ;
 
       - the inbox level of the commitment, used to determine if an
-      output from the [inbox] proof is too recent to be allowed into the
-      PVM proof ;
+        output from the [input] proof is too recent to be allowed into
+        the PVM proof ;
 
       - the [pvm_name], used to check that the proof given has the right
-      PVM kind. *)
+        PVM kind.
+
+    It also returns the optional input executed during the proof and the
+    input_request for the state at the beginning of the proof.
+*)
 val valid :
+  metadata:Sc_rollup_metadata_repr.t ->
   Sc_rollup_inbox_repr.history_proof ->
   Raw_level_repr.t ->
   pvm_name:string ->
   t ->
-  bool tzresult Lwt.t
+  (Sc_rollup_PVM_sig.input option * Sc_rollup_PVM_sig.input_request) tzresult
+  Lwt.t
 
 module type PVM_with_context_and_state = sig
   include Sc_rollups.PVM.S
@@ -107,22 +133,26 @@ module type PVM_with_context_and_state = sig
 
   val proof_encoding : proof Data_encoding.t
 
+  val reveal : Sc_rollup_PVM_sig.Input_hash.t -> string option
+
   module Inbox_with_history : sig
     include
-      Sc_rollup_inbox_repr.MerkelizedOperations
+      Sc_rollup_inbox_repr.Merkelized_operations
         with type inbox_context = context
 
     val inbox : Sc_rollup_inbox_repr.history_proof
 
-    val history : history
+    val history : Sc_rollup_inbox_repr.History.t
   end
 end
 
-(** [produce pvm_and_state inbox_context inbox_history commit_level]
+(** [produce ~metadata pvm_and_state inbox_context inbox_history commit_level]
     will construct a full refutation game proof out of the [state] given
     in [pvm_and_state].  It uses the [inbox] if necessary to provide
     input in the proof. If the input is above or at [commit_level] it
-    will block it, and produce a proof that the PVM is blocked.
+    will block it, and produce a proof that the PVM is blocked. If
+    the input requested is a reveal the proof production will also
+    fail.
 
     This will fail if any of the [context], [inbox_context] or
     [inbox_history] given don't have enough data to make the proof. For
@@ -132,6 +162,13 @@ end
 
     This uses the [name] in the [pvm_and_state] module to produce an
     encodable [wrapped_proof] if possible. See the [wrap_proof] function
-    in [Sc_rollups]. *)
+    in [Sc_rollups].
+
+    It also need the [metadata] if it produces a proof for the [Needs_metadata]
+    state.
+*)
 val produce :
-  (module PVM_with_context_and_state) -> Raw_level_repr.t -> t tzresult Lwt.t
+  metadata:Sc_rollup_metadata_repr.t ->
+  (module PVM_with_context_and_state) ->
+  Raw_level_repr.t ->
+  t tzresult Lwt.t

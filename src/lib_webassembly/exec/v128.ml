@@ -11,6 +11,7 @@ type ('i8x16, 'i16x8, 'i32x4, 'i64x2, 'f32x4, 'f64x2) laneop =
   | I64x2 of 'i64x2
   | F32x4 of 'f32x4
   | F64x2 of 'f64x2
+[@@deriving show]
 
 type shape = (unit, unit, unit, unit, unit, unit) laneop
 
@@ -159,7 +160,7 @@ module MakeIntShape (IXX : Ixx.S) (Cvt : Convert(IXX).S) :
 
   let cmp f x y = if f x y then IXX.of_int_s (-1) else IXX.zero
 
-  let splat x = of_lanes (List.init num_lanes (fun i -> x))
+  let splat x = of_lanes (List.init num_lanes (fun _ -> x))
 
   let extract_lane_s i s = List.nth (to_lanes s) i
 
@@ -330,7 +331,7 @@ module MakeFloatShape (FXX : Fxx.S) (Cvt : Convert(FXX).S) :
 
   let cmp f x y = if f x y then all_ones else FXX.zero
 
-  let splat x = of_lanes (List.init num_lanes (fun i -> x))
+  let splat x = of_lanes (List.init num_lanes (fun _ -> x))
 
   let extract_lane i s = List.nth (to_lanes s) i
 
@@ -706,6 +707,8 @@ let of_strings shape ss =
         (fun i s -> set_int64_le b (i * 8) (F64.to_bits (F64.of_string s)))
         ss) ;
   to_string b
+
+let pp fmt v128 = Format.pp_print_string fmt v128
 
 let string_of_shape = function
   | I8x16 _ -> "i8x16"

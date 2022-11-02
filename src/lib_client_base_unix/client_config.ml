@@ -100,7 +100,8 @@ let () =
     ~pp:(fun ppf (args, by) ->
       Format.fprintf
         ppf
-        (if List.length args == 1 then "Option %s is in conflict with %s"
+        (if List.compare_length_with args 1 = 0 then
+         "Option %s is in conflict with %s"
         else "Options %s are in conflict with %s")
         (String.concat " and " args)
         by)
@@ -323,7 +324,7 @@ let default_cli_args =
     client_mode = `Mode_client;
   }
 
-open Clic
+open Tezos_clic.Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> Lwt.return_ok x)
@@ -464,7 +465,7 @@ let block_arg () =
     ~doc:
       "block on which to apply contextual commands (commands dependent on the \
        context associated with the specified block). Possible tags include \
-       'head' and 'genesis' +/- an optional offset (e.g. \"tezos-client -b \
+       'head' and 'genesis' +/- an optional offset (e.g. \"octez-client -b \
        head-1 get timestamp\"). Note that block queried must exist in node's \
        storage."
     ~default:(Block_services.to_string default_cli_args.block)
@@ -641,7 +642,7 @@ let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
       failwith
         "base directory at %s should be a mockup directory for this operation \
          to be allowed (it may contain sensitive data otherwise). What you \
-         likely want is calling `tezos-client --mode mockup --base-dir \
+         likely want is calling `octez-client --mode mockup --base-dir \
          /some/dir create mockup` where `/some/dir` is **fresh** and **empty** \
          and redo this operation, specifying `--base-dir /some/dir` this time."
         base_dir
@@ -768,10 +769,10 @@ let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
 
 let commands config_file cfg (client_mode : client_mode)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
-  let open Clic in
+  let open Tezos_clic.Clic in
   let group =
     {
-      Clic.name = "config";
+      name = "config";
       title = "Commands for editing and viewing the client's config file";
     }
   in
@@ -936,7 +937,7 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
       let show_cmd ppf () =
         Format.fprintf
           ppf
-          "./tezos-client --mode mockup --base-dir %s create mockup"
+          "./octez-client --mode mockup --base-dir %s create mockup"
           base_dir
       in
       match base_dir_class with

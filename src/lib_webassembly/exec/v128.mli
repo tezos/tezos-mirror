@@ -11,6 +11,7 @@ type ('i8x16, 'i16x8, 'i32x4, 'i64x2, 'f32x4, 'f64x2) laneop =
   | I64x2 of 'i64x2
   | F32x4 of 'f32x4
   | F64x2 of 'f64x2
+[@@deriving show]
 
 type shape = (unit, unit, unit, unit, unit, unit) laneop
 
@@ -37,6 +38,8 @@ val to_string : t -> string
 val to_hex_string : t -> string
 
 val of_strings : shape -> string list -> t
+
+val pp : Format.formatter -> t -> unit
 
 (* Shape-based operations *)
 

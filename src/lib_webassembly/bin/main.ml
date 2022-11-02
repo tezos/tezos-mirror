@@ -3,12 +3,11 @@ let name = "wasm"
 let version = "2.0"
 
 let configure () =
-  let open Lwt.Syntax in
-  let* () =
-    Import.register (Utf8.decode "spectest") (fun name type_ ->
-        Spectest.lookup name type_)
-  in
-  Import.register (Utf8.decode "env") (fun name type_ -> Env.lookup name type_)
+  let lift lookup name = Lwt.return (lookup name) in
+  Import.register ~module_name:"spectest" @@ lift Spectest.lookup ;
+  Import.register ~module_name:"env" @@ lift Env.lookup ;
+  Spectest.register_host_funcs Run.host_funcs_registry ;
+  Env.register_host_funcs Run.host_funcs_registry
 
 let banner () = print_endline (name ^ " " ^ version ^ " reference interpreter")
 
@@ -23,9 +22,6 @@ let quote s = "\"" ^ String.escaped s ^ "\""
 let argspec =
   Arg.align
     [
-      ( "-",
-        Arg.Set Flags.interactive,
-        " run interactively (default if no files given)" );
       ("-e", Arg.String add_arg, " evaluate string");
       ( "-i",
         Arg.String (fun file -> add_arg ("(input " ^ quote file ^ ")")),
@@ -48,24 +44,16 @@ let run () =
   let open Lwt.Syntax in
   Lwt.catch
     (fun () ->
-      let* () = configure () in
+      configure () ;
       Arg.parse
         argspec
         (fun file -> add_arg ("(input " ^ quote file ^ ")"))
         usage ;
-      let* () =
-        Lwt_list.iter_s
-          (fun arg ->
-            let+ res = Run.run_string arg in
-            if not res then exit 1)
-          !args
-      in
-      if !args = [] then Flags.interactive := true ;
-      if !Flags.interactive then (
-        Flags.print_sig := true ;
-        banner () ;
-        Run.run_stdin ())
-      else Lwt.return_unit)
+      Lwt_list.iter_s
+        (fun arg ->
+          let+ res = Run.run_string arg in
+          if not res then exit 1)
+        !args)
     (fun exn ->
       flush_all () ;
       prerr_endline

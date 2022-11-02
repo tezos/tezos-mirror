@@ -131,12 +131,132 @@ module Global = struct
       ~output:Data_encoding.string
       (prefix / "status")
 
+  let current_outbox () =
+    RPC_service.get_service
+      ~description:"Current outbox"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(list Sc_rollup.output_encoding)
+      (prefix / "outbox")
+
   let dal_slot_subscriptions () =
     RPC_service.get_service
       ~description:"Current data availability layer slot subscriptions"
       ~query:RPC_query.empty
       ~output:(Data_encoding.list Dal.Slot_index.encoding)
-      (prefix / "dal" / "slots")
+      (prefix / "dal" / "slot_subscriptions")
+
+  let dal_slots () =
+    RPC_service.get_service
+      ~description:"Data availability slots for a given block hash"
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list Dal.Slot.Header.encoding)
+      (prefix / "dal" / "slot_headers")
+
+  let outbox_proof_query =
+    let open RPC_query in
+    let open Sc_rollup in
+    let invalid_message e =
+      raise
+        (Invalid
+           (Format.asprintf
+              "Invalid message (%a)"
+              Environment.Error_monad.pp_trace
+              e))
+    in
+    query (fun outbox_level message_index serialized_outbox_message ->
+        let req name f = function
+          | None ->
+              raise
+                (Invalid (Format.sprintf "Query parameter %s is required" name))
+          | Some arg -> f arg
+        in
+        let outbox_level =
+          req "outbox_level" Raw_level.of_int32_exn outbox_level
+        in
+        let message_index = req "message_index" Z.of_int64 message_index in
+        let message =
+          req
+            "serialized_outbox_message"
+            (fun s -> Outbox.Message.(unsafe_of_string s |> deserialize))
+            serialized_outbox_message
+        in
+        match message with
+        | Error e -> invalid_message e
+        | Ok message -> {outbox_level; message_index; message})
+    |+ opt_field "outbox_level" RPC_arg.int32 (fun o ->
+           Some (Raw_level.to_int32 o.outbox_level))
+    |+ opt_field "message_index" RPC_arg.int64 (fun o ->
+           Some (Z.to_int64 o.message_index))
+    |+ opt_field "serialized_outbox_message" RPC_arg.string (fun o ->
+           match Outbox.Message.serialize o.message with
+           | Ok message -> Some (Outbox.Message.unsafe_to_string message)
+           | Error e -> invalid_message e)
+    |> seal
+
+  let hex_string =
+    let open Data_encoding in
+    conv Bytes.of_string Bytes.to_string bytes
+
+  let outbox_proof () =
+    RPC_service.get_service
+      ~description:"Generate serialized output proof for some outbox message"
+      ~query:outbox_proof_query
+      ~output:
+        Data_encoding.(
+          obj2
+            (req "commitment" Sc_rollup.Commitment.Hash.encoding)
+            (req "proof" hex_string))
+      (prefix / "proofs" / "outbox")
+
+  let dal_slot_pages () =
+    RPC_service.get_service
+      ~description:
+        "Data availability downloaded slot pages for a given block hash"
+      ~query:RPC_query.empty
+      ~output:
+        (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3873
+             Estimate size of binary encoding and add a check_size to the
+           encoding. *)
+        Data_encoding.(
+          list
+          @@ obj2
+               (req "index" Dal.Slot_index.encoding)
+               (req "contents" (list @@ option Dal.Page.content_encoding)))
+      (prefix / "dal" / "slot_pages")
+
+  type dal_slot_page_query = {index : Dal.Slot_index.t; page : int}
+
+  let dal_slot_page_query =
+    let open RPC_query in
+    let req name f = function
+      | None ->
+          raise (Invalid (Format.sprintf "Query parameter %s is required" name))
+      | Some arg -> f arg
+    in
+    let invalid_parameter i =
+      raise (Invalid (Format.asprintf "Invalid parameter (%d)" i))
+    in
+    query (fun raw_index raw_page ->
+        let index = req "index" Dal.Slot_index.of_int raw_index in
+        let page = req "page" (fun p -> p) raw_page in
+        match index with
+        | None -> invalid_parameter @@ Option.value ~default:0 raw_index
+        | Some index ->
+            if page < 0 then invalid_parameter page else {index; page})
+    |+ opt_field "index" RPC_arg.int (fun q ->
+           Some (Dal.Slot_index.to_int q.index))
+    |+ opt_field "slot_page" RPC_arg.int (fun q -> Some q.page)
+    |> seal
+
+  let dal_slot_page () =
+    RPC_service.get_service
+      ~description:
+        "Data availability downloaded slot pages for a given block hash"
+      ~query:dal_slot_page_query
+      ~output:
+        Data_encoding.(
+          obj2 (req "result" string) (opt "contents" Dal.Page.content_encoding))
+      (prefix / "dal" / "slot_page")
 end
 
 module Local = struct

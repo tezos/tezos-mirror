@@ -81,7 +81,7 @@ include
 
 (* Other syntax module *)
 module Option_syntax = TzLwtreslib.Monad.Option_syntax
-module Lwt_option_syntax = TzLwtreslib.Monad.Option_syntax
+module Lwt_option_syntax = TzLwtreslib.Monad.Lwt_option_syntax
 
 (** {1 Exception-Error bridge}
 

@@ -28,9 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  number_of_shards : int;
   endorsement_lag : int;
   availability_threshold : int;
+  cryptobox_parameters : Dal.parameters;
 }
 
 val dal_encoding : dal Data_encoding.t
@@ -102,8 +102,37 @@ type sc_rollup = {
   max_outbox_messages_per_level : int;
   (* The default number of required sections in a dissection *)
   number_of_sections_in_dissection : int;
-  (* The timeout period for a player in a refutation game. *)
+  (* The timeout period for a player in a refutation game.
+
+     Timeout logic is similar to a chess clock. Each player starts with the same
+     timeout = [timeout_period_in_blocks]. Each game move updates the timeout of
+     the current player by decreasing it by the amount of time she took to play,
+     i.e. number of blocks since the opponent last move. See
+     {!Sc_rollup_game_repr.timeout} and
+     {!Sc_rollup_refutation_storage.game_move} to see the implementation.
+
+     Because of that [timeout_period_in_blocks] must be at least half the upper
+     bound number of blocks needed for a game to finish. This bound is
+     correlated to the maximum distance allowed between the first and last tick
+     of a dissection. For example, when the maximum distance allowed is half the
+     total distance [(last_tick - last_tick) / 2] then bound is [Log^2
+     (Int64.max_int) + 2 = 65]. See {!Sc_rollup_game_repr.check_dissection} for
+     more information on the dissection logic. *)
   timeout_period_in_blocks : int;
+  (* The maximum number of cemented commitments stored for a sc rollup. *)
+  max_number_of_stored_cemented_commitments : int;
+}
+
+type zk_rollup = {
+  enable : bool;
+  origination_size : int;
+  (* Minimum number of pending operations that can be processed by a ZKRU
+     update, if available.
+     If the length of the pending list is less than [min_pending_to_process],
+     then an update needs to process all pending operations to be valid.
+     That is, every update must process at least
+     [min(length pending_list, min_pending_to_process)] pending operations. *)
+  min_pending_to_process : int;
 }
 
 type t = {
@@ -116,7 +145,7 @@ type t = {
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
-  tokens_per_roll : Tez_repr.t;
+  minimal_stake : Tez_repr.t;
   vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
@@ -130,7 +159,6 @@ type t = {
   quorum_max : int32;
   min_proposal_quorum : int32;
   liquidity_baking_subsidy : Tez_repr.t;
-  liquidity_baking_sunset_level : int32;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -157,6 +185,7 @@ type t = {
   tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
+  zk_rollup : zk_rollup;
 }
 
 val encoding : t Data_encoding.encoding

@@ -114,15 +114,12 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     protocol
     context ;
   Log.info "Copying context into a temporary directory" ;
-  let data_dir = Temp.dir "tezos-node-test" in
+  let data_dir = Temp.dir "octez-node-test" in
   let* () = Process.run "cp" ["-R"; context ^ "/."; data_dir] in
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
-  let endpoint = Client.(Node node) in
-  let* client = Client.init ~endpoint () in
-  let* json = RPC.get_current_level ~endpoint client in
-  let level = JSON.(json |-> "level" |> as_int) in
+  let level = Node.get_level node in
   let* () = Node.terminate node in
   Log.info "Updating node config with user_activated_upgrade" ;
   let migration_level = level + 1 in
@@ -149,12 +146,16 @@ let migration ?yes_node_path ?yes_wallet context protocol =
   Log.info "Bake and wait until migration is finished" ;
   let* () = bake_with_foundation client in
   let* _until_mig = Node.wait_for_level node migration_level in
-  let* levels_in_current_cycle = RPC.get_levels_in_current_cycle client in
+  let* levels_in_current_cycle =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_helper_levels_in_current_cycle ()
+  in
   let last_block_of_cycle =
     JSON.(levels_in_current_cycle |-> "last" |> as_int)
   in
-  let* prev_level = RPC.get_current_level client in
-  let prev_cycle = JSON.(prev_level |-> "cycle" |> as_int) in
+  let* {cycle = prev_cycle; _} =
+    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
   Log.info "Bake until new cycle" ;
   let* () =
     repeat
@@ -162,8 +163,9 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       (fun () -> bake_with_foundation client)
   in
   let* _until_end_of_cycle = Node.wait_for_level node last_block_of_cycle in
-  let* after_level = RPC.get_current_level client in
-  let after_cycle = JSON.(after_level |-> "cycle" |> as_int) in
+  let* {cycle = after_cycle; _} =
+    RPC.Client.call client @@ RPC.get_chain_block_helper_current_level ()
+  in
   if prev_cycle + 1 <> after_cycle then
     Test.fail
       "The cycle of current level is %d where it was expected to be %d "
@@ -178,7 +180,7 @@ let protocol =
 let context =
   let default =
     let home = Sys.getenv "HOME" in
-    home ^ "/tezos-node-test"
+    home ^ "/octez-node-test"
   in
   Option.value ~default (Sys.getenv_opt "TEZT_MIGRATION_TEST_CONTEXT")
 

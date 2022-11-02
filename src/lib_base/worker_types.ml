@@ -151,7 +151,7 @@ let full_status_encoding req_encoding error_encoding =
 let pp_status ppf {pushed; treated; completed} =
   Format.fprintf
     ppf
-    "Request pushed on %a, treated in %a, completed in %a "
+    "Request pushed on %a, treated in %a, completed in %a"
     Time.System.pp_hum
     pushed
     Ptime.Span.pp

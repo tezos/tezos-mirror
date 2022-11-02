@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Jakarta for jakartanet), the protocol
+network is activated (such as Kathmandu for kathmandunet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -28,13 +28,25 @@ faster than with a long-lived network.
 Faucets
 =======
 
-Test networks have a list of built-in accounts with some funds. You
-can obtain the key to these accounts from a faucet to claim the funds.
 Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
-below, have independent faucets.
+below, have independent faucets. Enter the public key hash of any test
+account on the website to receive test tokens.
 
-See :ref:`using_faucet` for detailed instructions on using a faucet.
+Limanet
+=======
+
+- Built-in network alias: ``limanet`` (see :ref:`builtin_networks`)
+
+  * Available from version 15.0.
+
+Limanet is a test network which runs the Lima protocol.
+Limanet will run until Lima is refused through the amendment process
+or (accepted and then) replaced by another protocol on Mainnet.
+
+On Limanet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Kathmandunet
 ============
@@ -48,21 +60,6 @@ Kathmandunet will run until Kathmandu is refused through the amendment process
 or (accepted and then) replaced by another protocol on Mainnet.
 
 On Kathmandunet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
-
-Jakartanet
-==========
-
-- Built-in network alias: ``jakartanet`` (see :ref:`builtin_networks`)
-
-  * Available from version 13.0.
-
-Jakartanet is a test network which runs the Jakarta 2 protocol.
-Jakartanet will run until Jakarta is refused through the amendment process
-or replaced by another protocol on Mainnet.
-
-On Jakartanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
@@ -82,7 +79,7 @@ Ghostnet
 ========
 
 Ghostnet is a long running, centrally managed test network designed to follow (in fact, anticipate!) Tezos Mainnet protocol upgrades.
-Indeed, Ghostnet generally updates to the same protocol as Mainnet a few hours or days before the Mainnet itself.
+Indeed, Ghostnet generally updates to the same protocol as Mainnet a few days before the Mainnet itself.
 
 Ghostnet was previously known as :ref:`ithacanet`, the testchain for the Ithaca protocol.
 
@@ -95,6 +92,14 @@ Old Networks
 ============
 
 .. _ithacanet:
+
+Jakartanet
+----------
+
+Jakartanet was a test network running the Jakarta protocol.
+Following the activation of the Kathmandu protocol replacing Jakarta on Mainnet,
+Jakartanet stopped being maintained in October 2022 (the bootstrap baker
+is no longer producing blocks).
 
 Ithacanet
 ---------

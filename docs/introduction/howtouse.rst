@@ -23,14 +23,15 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
+- ``tezos-proxy-server``: a readonly frontend to ``tezos-node`` designed to lower the load of full nodes (see :doc:`../user/proxy-server`)
 - ``tezos-codec``: a utility for documenting the data encodings and for performing data encoding/decoding (see `Codec`_)
 - ``tezos-protocol-compiler``: a domain-specific compiler for Tezos protocols (see `Protocol compiler`_)
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``tezos-baker-013-PtJakart`` is the baker
-for the Jakarta protocol, and ``tezos-baker-alpha`` is the baker
+For instance, ``tezos-baker-014-PtKathma`` is the baker
+for the Kathmandu protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
@@ -262,37 +263,19 @@ protocol run by the node. For instance, ``get timestamp`` isn't available when
 the node runs the genesis protocol, which may happen for a few minutes when
 launching a node for the first time.
 
-.. _using_faucet:
-
-Get Free Tez
-~~~~~~~~~~~~
-
-To test the networks and help users get familiar with the system, on
-:doc:`test networks<test_networks>` you can obtain free tez from
-:ref:`a faucet <faucet>`.
-
-This will provide a faucet account in the form of a JSON file
-``tz1__xxxxxxxxx__.json``, that can be activated with the following
-command::
-
-    tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
-
-Let's check the balance of the new account with::
-
-    tezos-client get balance for alice
-
-Please preserve the JSON file. It will be necessary in order to
-reactivate the faucet account when migrating between test networks, e.g., from
-one protocol to the next, or in the event the test network is reset.
-
-Please drink carefully and don't abuse the faucet: it only contains
-30,000 faucet accounts for a total amount of ꜩ760,000,000.
-
 A Simple Wallet
 ~~~~~~~~~~~~~~~
 
-The client is also a basic wallet and after the activation above you
-will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
+The client is also a basic wallet. We can, for example, generate a new pair of keys, which can be used locally
+with the alias *alice*::
+
+      $ tezos-client gen keys alice
+
+To check the account (also called a contract) for Alice has been created::
+
+      $ tezos-client list known contracts
+
+You will notice that the client data directory (by default, ``~/.tezos-client``) has been populated with
 3 files ``public_key_hashs``, ``public_keys`` and ``secret_keys``.
 The content of each file is in JSON and keeps the mapping between
 aliases (e.g., ``alice``) and the kind of keys indicated by the name
@@ -302,19 +285,11 @@ using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
-We can, for example, generate a new pair of keys, which can be used locally
-with the alias *bob*::
-
-      $ tezos-client gen keys bob
-
-To check the account (also called a contract) for Bob has been created::
-
-      $ tezos-client list known contracts
 
 Notice that by default, the keys were stored unencrypted, which is fine in our test example.
 In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
 
-      $ tezos-client gen keys tom --encrypted
+      $ tezos-client gen keys bob --encrypted
 
 Tezos support three different ECC (`Elliptic-Curve Cryptography <https://en.wikipedia.org/wiki/Elliptic-curve_cryptography>`_) schemes: *Ed25519*, *secp256k1* (the
 one used in Bitcoin), and *P-256* (also called *secp256r1*). The two
@@ -330,6 +305,14 @@ protecting your secret keys is properly managed (if you stored them encrypted).
 For more advanced key management we offer :ref:`ledger support
 <ledger>` and a :ref:`remote signer<signer>`.
 
+.. _using_faucet:
+
+Get Free Test Tokens
+~~~~~~~~~~~~~~~~~~~~
+
+To test the networks and help users get familiar with the system, on
+:doc:`test networks<test_networks>` you can obtain free tokens from
+:ref:`a faucet <faucet>`. Transfer some to Alice's address.
 
 Transfers and Receipts
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -612,56 +595,7 @@ For example to check the value of important
    {
      "proof_of_work_nonce_size": 8,
      "nonce_length": 32,
-     "max_anon_ops_per_block": 132,
-     "max_operation_data_length": 32768,
-     "max_proposals_per_delegate": 20,
-     "max_micheline_node_count": 50000,
-     "max_micheline_bytes_limit": 50000,
-     "max_allowed_global_constants_depth": 10000,
-     "cache_layout": [
-       "100000000",
-       "240000",
-       "2560"
-     ],
-     "michelson_maximum_type_size": 2001,
-     "preserved_cycles": 5,
-     "blocks_per_cycle": 8192,
-     "blocks_per_commitment": 64,
-     "blocks_per_stake_snapshot": 512,
-     "blocks_per_voting_period": 40960,
-     "hard_gas_limit_per_operation": "1040000",
-     "hard_gas_limit_per_block": "5200000",
-     "proof_of_work_threshold": "70368744177663",
-     "tokens_per_roll": "6000000000",
-     "seed_nonce_revelation_tip": "125000",
-     "origination_size": 257,
-     "baking_reward_fixed_portion": "10000000",
-     "baking_reward_bonus_per_slot": "4286",
-     "endorsing_reward_per_slot": "2857",
-     "cost_per_byte": "250",
-     "hard_storage_limit_per_operation": "60000",
-     "quorum_min": 2000,
-     "quorum_max": 7000,
-     "min_proposal_quorum": 500,
-     "liquidity_baking_subsidy": "2500000",
-     "liquidity_baking_sunset_level": 3063809,
-     "liquidity_baking_escape_ema_threshold": 666667,
-     "max_operations_time_to_live": 120,
-     "minimal_block_delay": "30",
-     "delay_increment_per_round": "15",
-     "consensus_committee_size": 7000,
-     "consensus_threshold": 4667,
-     "minimal_participation_ratio": {
-       "numerator": 2,
-       "denominator": 3
-     },
-     "max_slashing_period": 2,
-     "frozen_deposits_percentage": 10,
-     "double_baking_punishment": "640000000",
-     "ratio_of_frozen_deposits_slashed_per_double_endorsement": {
-       "numerator": 1,
-       "denominator": 2
-     }
+     ...
    }
 
 Another interesting use of RPCs is to inspect the receipts of the

@@ -47,7 +47,9 @@ let () =
       uid = "longtezts";
       title = "Long Tezts";
       description = "Measurements from tests in tezt/long_tests.";
-      panels = Prt_client.grafana_panels @ Block_validation.grafana_panels;
+      panels =
+        Prt_client.grafana_panels @ Block_validation.grafana_panels
+        @ Tenderbake.grafana_panels;
     }
 
 (* Executor for tests that don't take that long to run.
@@ -57,9 +59,14 @@ let default_executors = Long_test.[x86_executor1]
 let () =
   (* Register your tests here. *)
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
-  Qcheck_rpc.register ~executors:default_executors () ;
-  Prt_client.register ~executors:default_executors () ;
-  Script_cache.register ~executors:default_executors () ;
+  Qcheck_rpc.register_for_alpha ~executors:default_executors () ;
+  Prt_client.register ~executors:default_executors ~protocols:[Alpha] ;
+  Sc_rollup.register ~executors:default_executors ~protocols:[Alpha] ;
+  Script_cache.register ~executors:default_executors ~protocols:[Alpha] ;
   Block_validation.register ~executors:default_executors () ;
+  Block_validation.register_semantic_regression_test
+    ~executors:[Long_test.block_replay_executor]
+    () ;
+  Tenderbake.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()

@@ -33,6 +33,8 @@ module type T = sig
 
   type rpc_context
 
+  type tztrace
+
   type 'a tzresult
 
   val max_block_length : int

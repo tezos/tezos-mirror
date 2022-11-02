@@ -25,38 +25,33 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Ithaca | Jakarta | Kathmandu | Alpha
+type t = Kathmandu | Lima | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Ithaca -> "Ithaca"
-  | Jakarta -> "Jakarta"
   | Kathmandu -> "Kathmandu"
+  | Lima -> "Lima"
 
-let number = function
-  | Ithaca -> 012
-  | Jakarta -> 013
-  | Kathmandu -> 014
-  | Alpha -> 015
+let number = function Kathmandu -> 014 | Lima -> 015 | Alpha -> 016
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Ithaca -> "proto_012_Psithaca"
-  | Jakarta -> "proto_013_PtJakart"
   | Kathmandu -> "proto_014_PtKathma"
+  | Lima -> "proto_015_PtLimaPt"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
-  | Jakarta -> "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
   | Kathmandu -> "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
+  | Lima -> "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+
+let demo_noops_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
 
 let demo_counter_hash = "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT"
 
@@ -71,19 +66,18 @@ let parameter_file ?(constants = default_constants) protocol =
   in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function
+let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
+
+let accuser proto = "./octez-accuser-" ^ daemon_name proto
+
+let baker proto = "./octez-baker-" ^ daemon_name proto
+
+let encoding_prefix = function
   | Alpha -> "alpha"
-  | Ithaca -> "012-Psithaca"
-  | Jakarta -> "013-PtJakart"
-  | Kathmandu -> "014-PtKathma"
+  | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
 
-let accuser proto = "./tezos-accuser-" ^ daemon_name proto
-
-let baker proto = "./tezos-baker-" ^ daemon_name proto
-
-let encoding_prefix = daemon_name
-
-type parameter_overrides = (string list * string option) list
+type parameter_overrides =
+  (string list * [`None | `Int of int | `String_of_int of int | JSON.u]) list
 
 let write_parameter_file :
     ?additional_bootstrap_accounts:(Account.key * int option) list ->
@@ -105,8 +99,14 @@ let write_parameter_file :
   let parameters =
     List.fold_left
       (fun acc (path, value) ->
-        let parsed_value = Option.map Ezjsonm.value_from_string value in
-        Ezjsonm.update acc path parsed_value)
+        let value =
+          match value with
+          | `None -> None
+          | `Int i -> Some (`Float (float i))
+          | `String_of_int i -> Some (`String (string_of_int i))
+          | #JSON.u as value -> Some value
+        in
+        Ezjsonm.update acc path value)
       original_parameters
       parameter_overrides
   in
@@ -136,18 +136,16 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Ithaca -> Some Jakarta
-  | Jakarta -> Some Kathmandu
-  | Kathmandu -> None (* To update once the migration starts from Kathmandu. *)
+  | Kathmandu -> Some Alpha
+  | Lima -> Some Alpha
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Jakarta (* To update once the migration starts from K. *)
-  | Jakarta -> Some Ithaca
-  | Kathmandu -> Some Jakarta
-  | Ithaca -> None
+  | Alpha -> Some Kathmandu
+  | Lima -> Some Kathmandu
+  | Kathmandu -> None
 
-let all = [Alpha; Ithaca; Jakarta; Kathmandu]
+let all = [Alpha; Kathmandu; Lima]
 
 type supported_protocols =
   | Any_protocol

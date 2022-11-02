@@ -43,6 +43,7 @@ let () =
          Test_cemented_store.tests;
          Test_block_store.tests;
          Test_store.tests;
+         Test_consistency.tests;
          Test_protocol_store.tests;
          Test_testchain.tests;
          Test_snapshots.tests speed;

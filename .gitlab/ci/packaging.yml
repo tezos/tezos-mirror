@@ -3,13 +3,10 @@ opam:prepare:
     - .default_settings_template
     - .image_template__runtime_prebuild_dependencies_template
     - .rules_template__trigger_opam_batch_1
+    - .needs_template__wait_for_trigger_job
   stage: packaging
-  needs: []
   script:
-    - git init _opam-repo-for-release
-    - ./scripts/opam-prepare-repo.sh dev ./ ./_opam-repo-for-release
-    - git -C _opam-repo-for-release add packages
-    - git -C _opam-repo-for-release commit -m "tezos packages"
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci opam-prepare
   artifacts:
     paths:
       - _opam-repo-for-release/

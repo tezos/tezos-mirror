@@ -21,7 +21,9 @@ is the same as the default client. To turn proxy mode ON,
 pass ``--mode proxy`` to ``tezos-client``.
 
 Because computations done locally are protocol dependent, the proxy mode does not support all protocols.
-It is expected than, at any given time, the proxy mode supports ``Alpha`` and the three protocols before that.
+It is expected that, at any given time, the proxy mode supports ``Alpha``,
+the current protocol of Mainnet and the current protocol proposal on Mainnet
+at the time of release.
 In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the proxy client, it

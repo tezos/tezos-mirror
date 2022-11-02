@@ -7,4 +7,8 @@
  (libraries
   re
   lwt.unix
-  ezjsonm))
+  ezjsonm
+  tezt.core)
+ (flags
+  (:standard)
+  -open Tezt_core))

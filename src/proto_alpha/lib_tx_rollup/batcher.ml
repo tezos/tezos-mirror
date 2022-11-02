@@ -248,8 +248,7 @@ module Types = struct
   }
 end
 
-module Worker =
-  Worker.MakeSingle (Name) (Dummy_event) (Request) (Types) (Logger)
+module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

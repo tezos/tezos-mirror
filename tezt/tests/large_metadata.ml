@@ -30,6 +30,11 @@
    Subject: Test that large operations metadata are not stored.
 *)
 
+(* Some contract calls require a hard-coded gas limit because the simulation is
+   bypassed (because it fails). We pass the maximum gas limit for operations. *)
+
+let gas_limit = 1_040_000
+
 (* Stands for the different values of the metadata query
    string. Not_provided represents the fact that the argument is not
    provided. *)
@@ -92,11 +97,12 @@ let metadata_is_too_large client =
    recomputation of the operations metadata.*)
 let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
   let* first_manager_operation =
-    RPC.get_operations_of_validation_pass
-      ~force_metadata
-      ~validation_pass:3
-      ~operation_offset:0
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~force_metadata
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
   in
   let first_operation_result =
     JSON.(
@@ -114,10 +120,11 @@ let metadata_is_available_deprecated ?(force_metadata = false) client exponent =
 
 let get_endorsement client =
   let* _ =
-    RPC.get_operations_of_validation_pass
-      ~validation_pass:0
-      ~operation_offset:0
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:0
+         ~operation_offset:0
+         ()
   in
   unit
 
@@ -127,8 +134,7 @@ let setup_node ~limit protocol =
     Node.init ([Node.Synchronisation_threshold 0; Connections 0] @ limit)
   in
   let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = Node.wait_for_level node 1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   (* Originate the contract allowing the large metadata generation
      when failing. This contract always fails with a byte sequence
      full of zeros. If the parameter n is less than 2 then the length
@@ -161,7 +167,7 @@ let check_default_limit_metadata =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -181,7 +187,7 @@ let check_default_limit_metadata =
   let big_exponent = 24 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -213,7 +219,7 @@ let check_limit_metadata =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -232,7 +238,7 @@ let check_limit_metadata =
   let big_exponent = 14 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -262,7 +268,7 @@ let check_unlimited_metadata =
   let big_exponent = 24 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -294,7 +300,7 @@ let check_metadata_query_string =
      be stored. *)
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero
@@ -315,7 +321,7 @@ let check_metadata_query_string =
   let big_exponent = 14 in
   let* () =
     Client.transfer
-      ~gas_limit:100_000
+      ~gas_limit
       ~fee:Tez.one
       ~amount:Tez.zero
       ~burn_cap:Tez.zero

@@ -27,7 +27,7 @@ Octez is an implementation of Tezos software, including a node, a client, a bake
 This implementation is available at https://gitlab.com/tezos/tezos.
 The source code is placed under the MIT Open Source License.
 
-The current release of Octez is :doc:`../releases/version-13`.
+The current release of Octez is :doc:`../releases/version-14`.
 
 This website
 ------------
@@ -49,7 +49,6 @@ The Community
 - Several community-built block explorers are available:
 
     - https://tzstats.com
-    - https://tezblock.io
     - https://tzkt.io (Baking focused explorer)
     - https://arronax.io (Analytics-oriented explorer)
     - https://mininax.io
@@ -117,6 +116,7 @@ in the :ref:`introduction <howtoget>`.
 
    user/key-management
    user/node-configuration
+   user/node-monitoring
    user/versioning
    user/snapshots
    user/history_modes
@@ -149,7 +149,7 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Jakarta Protocol doc:
+   :caption: Kathmandu Protocol doc:
 
    active/protocol
    active/glossary
@@ -158,12 +158,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Kathmandu Protocol doc:
+   :caption: Lima Protocol doc:
 
-   kathmandu/protocol
-   kathmandu/glossary
-   kathmandu/cli-commands
-   kathmandu/rpc
+   lima/protocol
+   lima/glossary
+   lima/cli-commands
+   lima/rpc
 
 .. toctree::
    :maxdepth: 2
@@ -220,6 +220,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/012_ithaca
    protocols/013_jakarta
    protocols/014_kathmandu
+   protocols/015_lima
    protocols/alpha
 
 .. toctree::
@@ -240,6 +241,7 @@ in the :ref:`introduction <howtoget>`.
    releases/version-11
    releases/version-12
    releases/version-13
+   releases/version-14
 
 .. toctree::
    :maxdepth: 2

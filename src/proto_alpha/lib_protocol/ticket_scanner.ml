@@ -29,7 +29,6 @@ open Alpha_context
 type error +=
   | (* Permanent *) Unsupported_non_empty_overlay
   | (* Permanent *) Unsupported_type_operation
-  | (* Permanent *) Forbidden_zero_ticket_quantity
 
 let () =
   register_error_kind
@@ -51,16 +50,7 @@ let () =
       Format.fprintf ppf "Types embedding operations are not supported")
     Data_encoding.empty
     (function Unsupported_type_operation -> Some () | _ -> None)
-    (fun () -> Unsupported_type_operation) ;
-  register_error_kind
-    `Permanent
-    ~id:"forbidden_zero_amount_ticket"
-    ~title:"Zero ticket amount is not allowed"
-    ~description:
-      "It is not allowed to use a zero amount ticket in this operation."
-    Data_encoding.empty
-    (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
-    (fun () -> Forbidden_zero_ticket_quantity)
+    (fun () -> Unsupported_type_operation)
 
 type ex_ticket =
   | Ex_ticket :
@@ -322,7 +312,6 @@ module Ticket_collection = struct
   let rec tickets_of_value :
       type a ac ret.
       include_lazy:bool ->
-      allow_zero_amount_tickets:bool ->
       context ->
       a Ticket_inspection.has_tickets ->
       (a, ac) Script_typed_ir.ty ->
@@ -330,7 +319,7 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ~allow_zero_amount_tickets ctxt hty ty x acc k ->
+   fun ~include_lazy ctxt hty ty x acc k ->
     let open Script_typed_ir in
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match (hty, ty) with
@@ -339,7 +328,6 @@ module Ticket_collection = struct
         let l, r = x in
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy
-          ~allow_zero_amount_tickets
           ctxt
           hty1
           ty1
@@ -348,7 +336,6 @@ module Ticket_collection = struct
           (fun ctxt acc ->
             (tickets_of_value [@ocaml.tailcall])
               ~include_lazy
-              ~allow_zero_amount_tickets
               ctxt
               hty2
               ty2
@@ -360,7 +347,6 @@ module Ticket_collection = struct
         | L v ->
             (tickets_of_value [@ocaml.tailcall])
               ~include_lazy
-              ~allow_zero_amount_tickets
               ctxt
               htyl
               tyl
@@ -370,7 +356,6 @@ module Ticket_collection = struct
         | R v ->
             (tickets_of_value [@ocaml.tailcall])
               ~include_lazy
-              ~allow_zero_amount_tickets
               ctxt
               htyr
               tyr
@@ -382,7 +367,6 @@ module Ticket_collection = struct
         | Some x ->
             (tickets_of_value [@ocaml.tailcall])
               ~include_lazy
-              ~allow_zero_amount_tickets
               ctxt
               el_hty
               el_ty
@@ -395,7 +379,6 @@ module Ticket_collection = struct
         (tickets_of_list [@ocaml.tailcall])
           ctxt
           ~include_lazy
-          ~allow_zero_amount_tickets
           el_hty
           el_ty
           elements
@@ -412,7 +395,6 @@ module Ticket_collection = struct
             (tickets_of_map [@ocaml.tailcall])
               ctxt
               ~include_lazy
-              ~allow_zero_amount_tickets
               val_hty
               val_ty
               x
@@ -420,41 +402,27 @@ module Ticket_collection = struct
               k)
     | Big_map_ht (_, val_hty), Big_map_t (key_ty, _, _) ->
         if include_lazy then
-          (tickets_of_big_map [@ocaml.tailcall])
-            ctxt
-            ~allow_zero_amount_tickets
-            val_hty
-            key_ty
-            x
-            acc
-            k
+          (tickets_of_big_map [@ocaml.tailcall]) ctxt val_hty key_ty x acc k
         else (k [@ocaml.tailcall]) ctxt acc
     | True_ht, Ticket_t (comp_ty, _) ->
-        let Script_typed_ir.{ticketer = _; contents = _; amount} = x in
-        fail_when
-          ((not allow_zero_amount_tickets)
-          && Compare.Int.(Script_int.compare amount Script_int.zero_n = 0))
-          Forbidden_zero_ticket_quantity
-        >>=? fun () -> (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
+        (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
 
   and tickets_of_list :
       type a ac ret.
       context ->
       include_lazy:bool ->
-      allow_zero_amount_tickets:bool ->
       a Ticket_inspection.has_tickets ->
       (a, ac) Script_typed_ir.ty ->
       a list ->
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ctxt ~include_lazy ~allow_zero_amount_tickets el_hty el_ty elements acc k ->
+   fun ctxt ~include_lazy el_hty el_ty elements acc k ->
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match elements with
     | elem :: elems ->
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy
-          ~allow_zero_amount_tickets
           ctxt
           el_hty
           el_ty
@@ -463,7 +431,6 @@ module Ticket_collection = struct
           (fun ctxt acc ->
             (tickets_of_list [@ocaml.tailcall])
               ~include_lazy
-              ~allow_zero_amount_tickets
               ctxt
               el_hty
               el_ty
@@ -475,7 +442,6 @@ module Ticket_collection = struct
   and tickets_of_map :
       type k v vc ret.
       include_lazy:bool ->
-      allow_zero_amount_tickets:bool ->
       context ->
       v Ticket_inspection.has_tickets ->
       (v, vc) Script_typed_ir.ty ->
@@ -483,7 +449,7 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ~allow_zero_amount_tickets ctxt val_hty val_ty map acc k ->
+   fun ~include_lazy ctxt val_hty val_ty map acc k ->
     let (module M) = Script_map.get_module map in
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     (* Pay gas for folding over the values *)
@@ -491,7 +457,6 @@ module Ticket_collection = struct
     let values = M.OPS.fold (fun _ v vs -> v :: vs) M.boxed [] in
     (tickets_of_list [@ocaml.tailcall])
       ~include_lazy
-      ~allow_zero_amount_tickets
       ctxt
       val_hty
       val_ty
@@ -502,7 +467,6 @@ module Ticket_collection = struct
   and tickets_of_big_map :
       type k v ret.
       context ->
-      allow_zero_amount_tickets:bool ->
       v Ticket_inspection.has_tickets ->
       k Script_typed_ir.comparable_ty ->
       (k, v) Script_typed_ir.big_map ->
@@ -510,7 +474,6 @@ module Ticket_collection = struct
       ret continuation ->
       ret tzresult Lwt.t =
    fun ctxt
-       ~allow_zero_amount_tickets
        val_hty
        key_ty
        (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
@@ -526,20 +489,19 @@ module Ticket_collection = struct
           (* Accumulate tickets from values of the big-map stored in the context *)
           match id with
           | Some id ->
-              let accum (values, ctxt) exp =
+              let accum (values, ctxt) (_key_hash, exp) =
                 Script_ir_translator.parse_data
-                  ~legacy:true
+                  ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
                   ctxt
                   ~allow_forged:true
                   value_type
                   (Micheline.root exp)
                 >|=? fun (v, ctxt) -> (v :: values, ctxt)
               in
-              Big_map.list_values ctxt id >>=? fun (ctxt, exps) ->
+              Big_map.list_key_values ctxt id >>=? fun (ctxt, exps) ->
               List.fold_left_es accum ([], ctxt) exps >>=? fun (values, ctxt) ->
               (tickets_of_list [@ocaml.tailcall])
                 ~include_lazy:true
-                ~allow_zero_amount_tickets
                 ctxt
                 val_hty
                 value_type
@@ -562,34 +524,36 @@ let type_has_tickets ctxt ty =
   Ticket_inspection.has_tickets_of_ty ctxt ty >|? fun (has_tickets, ctxt) ->
   (Has_tickets (has_tickets, ty), ctxt)
 
-let tickets_of_value ctxt ~include_lazy ~allow_zero_amount_tickets
-    (Has_tickets (ht, ty)) =
-  Ticket_collection.tickets_of_value
-    ctxt
-    ~include_lazy
-    ~allow_zero_amount_tickets
-    ht
-    ty
+let tickets_of_value ctxt ~include_lazy (Has_tickets (ht, ty)) =
+  Ticket_collection.tickets_of_value ctxt ~include_lazy ht ty
 
 let has_tickets (Has_tickets (ht, _)) =
   match ht with Ticket_inspection.False_ht -> false | _ -> true
 
-let tickets_of_node ctxt ~include_lazy ~allow_zero_amount_tickets has_tickets
-    expr =
+let tickets_of_node ctxt ~include_lazy has_tickets expr =
   let (Has_tickets (ht, ty)) = has_tickets in
   match ht with
   | Ticket_inspection.False_ht -> return ([], ctxt)
   | _ ->
       Script_ir_translator.parse_data
         ctxt
-        ~legacy:true
+        ~elab_conf:Script_ir_translator_config.(make ~legacy:true ())
         ~allow_forged:true
         ty
         expr
       >>=? fun (value, ctxt) ->
-      tickets_of_value
-        ctxt
-        ~include_lazy
-        ~allow_zero_amount_tickets
-        has_tickets
-        value
+      tickets_of_value ctxt ~include_lazy has_tickets value
+
+let ex_ticket_size ctxt (Ex_ticket (ty, ticket)) =
+  (* type *)
+  Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+  Script_ir_unparser.unparse_ty ~loc:() ctxt ty >>?= fun (ty', ctxt) ->
+  let ty_nodes, ty_size = Script_typed_ir_size.node_size ty' in
+  let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
+  Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
+  (* contents *)
+  let val_nodes, val_size = Script_typed_ir_size.value_size ty ticket in
+  let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
+  Gas.consume ctxt val_size_cost >>?= fun ctxt ->
+  (* gas *)
+  return (Saturation_repr.add ty_size val_size, ctxt)

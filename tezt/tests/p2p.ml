@@ -120,7 +120,7 @@ let check_peer_option =
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node_1) () in
-  let* () = Client.activate_protocol ~protocol client in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   let node_2 = Node.create [] in
   let wait = wait_for_accepted_peer_ids node_2 in
   let* () = Node.identity_generate node_2 in
@@ -129,7 +129,7 @@ let check_peer_option =
   let* () = Node.run node_2 [] in
   let* () = Node.wait_for_ready node_2 in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_2 1 in
   unit
 
 (* Test.
@@ -149,7 +149,7 @@ let test_one_connection =
   @@ fun protocol ->
   let* node_1 = Node.init [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node_1) () in
-  let* () = Client.activate_protocol ~protocol client in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   let node_2 = Node.create [Connections nb_connection] in
   let wait = wait_for_accepted_peer_ids node_2 in
   let* () = Node.identity_generate node_2 in
@@ -158,7 +158,7 @@ let test_one_connection =
   let* () = Node.run node_2 [] in
   let* () = Node.wait_for_ready node_2 in
   let* () = wait in
-  let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
+  let* _ = Node.wait_for_level node_2 1 in
   unit
 
 (* [wait_pred] waits until [pred arg] is true. An active wait with Lwt

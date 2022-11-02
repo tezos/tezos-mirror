@@ -191,7 +191,50 @@ module type HASH_VERSION = sig
   val set_hash_version : t -> Context_hash.Version.t -> t Lwt.t
 end
 
+(** Tezos-specific proof types, as opposed to proofs provided by Irmin.
+    These types are used only by the light mode and it is recommended
+    to avoid extending their usage: only the light mode should use them. *)
 module Proof_types = struct
+  (** Whether an RPC caller requests an entirely shallow Merkle tree ([Hole])
+    or whether the returned tree should contain data at the given key
+    ([Raw_context]) *)
+  type merkle_leaf_kind = Hole | Raw_context
+
+  (** The low-level storage exposed as a tree *)
+  type raw_context =
+    | Key of Bytes.t  (** A leaf, containing a value *)
+    | Dir of raw_context String.Map.t
+        (** A directory, mapping keys to nested [raw_context]s *)
+    | Cut
+        (** An omitted piece, because it is too deep compared to the maximum
+            depth requested in the
+            /chains/<chain_id>/blocks/<block_id/context/raw/bytes RPC *)
+
+  (** The kind of a [merkle_node] *)
+  type merkle_hash_kind =
+    | Contents  (** The kind associated to leaves *)
+    | Node  (** The kind associated to directories *)
+
+  (** A node in a [merkle_tree] *)
+  type merkle_node =
+    | Hash of (merkle_hash_kind * string)  (** A shallow node: just a hash *)
+    | Data of raw_context  (** A full-fledged node containing actual data *)
+    | Continue of merkle_tree  (** An edge to a more nested tree *)
+
+  (** The type of Merkle tree used by the light mode *)
+  and merkle_tree = merkle_node String.Map.t
+
+  let rec pp_raw_context ppf = function
+    | Cut -> Format.fprintf ppf "..."
+    | Key v -> Hex.pp ppf (Hex.of_bytes v)
+    | Dir l ->
+        Format.fprintf
+          ppf
+          "{@[<v 1>@,%a@]@,}"
+          (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
+               Format.fprintf ppf "%s : %a" s pp_raw_context t))
+          (String.Map.bindings l)
+
   (** Proofs are compact representations of trees which can be shared
       between peers.
 
@@ -299,7 +342,7 @@ module Proof_types = struct
 
       [Blinded_inode h] proves that an inode with hash [h] exists in the store.
 
-      [Inode_values ls] is simliar to trees' [Node].
+      [Inode_values ls] is similar to trees' [Node].
 
       [Inode_tree i] is similar to tree's [Inode].
 
@@ -354,7 +397,7 @@ module Proof_types = struct
 
     (** The type for stream proofs.
 
-        The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
+        The sequence [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
         read in the store in sequence. *)
     type t = unit -> elt Seq.node
   end
@@ -386,6 +429,53 @@ module Proof_types = struct
     after : kinded_hash;
     state : 'a;
   }
+
+  module Internal_for_tests = struct
+    let rec tree_eq t1 t2 =
+      let rec inode_tree_eq it1 it2 =
+        match (it1, it2) with
+        | Blinded_inode h1, Blinded_inode h2 -> h1 = h2
+        | Inode_values l1, Inode_values l2 ->
+            List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+        | Inode_tree i1, Inode_tree i2 ->
+            i1.length = i2.length
+            && List.equal
+                 (fun (idx1, itree1) (idx2, itree2) ->
+                   idx1 = idx2 && inode_tree_eq itree1 itree2)
+                 i1.proofs
+                 i2.proofs
+        | Inode_extender i1, Inode_extender i2 ->
+            i1.length = i2.length
+            && List.equal ( = ) i1.segment i2.segment
+            && inode_tree_eq i1.proof i2.proof
+        | _ -> false
+      in
+      match (t1, t2) with
+      | Value v1, Value v2 -> v1 = v2
+      | Blinded_value h1, Blinded_value h2 -> h1 = h2
+      | Node l1, Node l2 ->
+          List.equal (fun (s1, t1) (s2, t2) -> s1 = s2 && tree_eq t1 t2) l1 l2
+      | Blinded_node h1, Blinded_node h2 -> h1 = h2
+      | Inode i1, Inode i2 ->
+          i1.length = i2.length
+          && List.equal
+               (fun (idx1, itree1) (idx2, itree2) ->
+                 idx1 = idx2 && inode_tree_eq itree1 itree2)
+               i1.proofs
+               i2.proofs
+      | Extender i1, Extender i2 ->
+          i1.length = i2.length
+          && List.equal ( = ) i1.segment i2.segment
+          && inode_tree_eq i1.proof i2.proof
+      | _ -> false
+
+    let tree_proof_eq p1 p2 =
+      p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
+      && tree_eq p1.state p2.state
+  end
+
+  let proof_hash_eq p1 p2 =
+    p1.version = p2.version && p1.before = p2.before && p1.after = p2.before
 end
 
 module type PROOF = sig
@@ -402,23 +492,26 @@ module type PROOF_ENCODING = sig
   val stream_proof_encoding : stream t Data_encoding.t
 end
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2967
+(** [TEZOS_CONTEXT] is the module type implemented by all storage
+    implementations. This is the module type that the {e shell} expects for its
+    operation. As such, it should be a strict superset of the interface exposed
+    to the protocol (see module type {!S} above and
+    {!Tezos_protocol_environment.Environment_context_intf.S}).
 
-   What is the purpose of module type [S]?
-
-   [S] is morally the interface to the low-level storage visible to the
-   protocol. "Morally" because the exact module type expected by the protocol
-   is now defined to be {!Tezos_protocol_environment.Environment_context_intf.S}.
+    The main purpose of this module type is to keep the on-disk and in-memory
+    implementations in sync.
 *)
-module type S = sig
+module type TEZOS_CONTEXT = sig
+  (** {2 Generic interface} *)
+
+  (** A block-indexed (key x value) store directory.  *)
+  type index
+
   val equal_config : Config.t -> Config.t -> bool
 
   include VIEW with type key = string list and type value = bytes
 
   module Proof : PROOF
-
-  (** The type for context repositories. *)
-  type index
 
   type node_key
 
@@ -454,6 +547,12 @@ module type S = sig
 
     (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
     val of_raw : raw -> tree
+
+    (** [unshallow t] is the tree equivalent to [t] but with all subtrees evaluated,
+        i.e. without "reference" nodes.
+        Concretely, it means that no node in [t] contains just an in-memory hash,
+        but the actual value instead. *)
+    val unshallow : tree -> tree Lwt.t
 
     type repo
 
@@ -554,29 +653,6 @@ module type S = sig
 
   (** [verify_stream] is the verifier of stream proofs. *)
   val verify_stream_proof : (stream_proof, 'a) verifier
-end
-
-(** [TEZOS_CONTEXT] is the module type implemented by all storage
-    implementations. This is the module type that the {e shell} expects for its
-    operation. As such, it should be a strict superset of the interface exposed
-    to the protocol (see module type {!S} above and
-    {!Tezos_protocol_environment.Environment_context_intf.S}).
-
-    The main purpose of this module type is to keep the on-disk and in-memory
-    implementations in sync.
-*)
-module type TEZOS_CONTEXT = sig
-  (** {2 Generic interface} *)
-
-  module type S = sig
-    (** @inline *)
-    include S
-  end
-
-  (** A block-indexed (key x value) store directory.  *)
-  type index
-
-  include S with type index := index
 
   type context = t
 
@@ -638,10 +714,18 @@ module type TEZOS_CONTEXT = sig
     in the returned tree are hashes of the siblings on the path to
     reach [key]. *)
   val merkle_tree :
-    t ->
-    Block_services.merkle_leaf_kind ->
-    key ->
-    Block_services.merkle_tree Lwt.t
+    t -> Proof_types.merkle_leaf_kind -> key -> Proof_types.merkle_tree Lwt.t
+
+  (** [merkle_tree_v2 t leaf_kind key] returns an Irmin Merkle proof for [key] (i.e.
+    a proof that *something* is in the context at [key]).
+    The proof is supposed to be produced by Irmin's [produce_proof], and consumed
+    by Irmin's [verify_proof]. The value embedded in the proof depends on [leaf_kind].
+    If [leaf_kind] is [Block_services.Raw_context], the embeded value is the complete
+    subtree in the context at [key].
+    If [leaf_kind] is [Block_services.Hole], the embedded value is the hash of the
+    subtree described above. *)
+  val merkle_tree_v2 :
+    t -> Proof_types.merkle_leaf_kind -> key -> Proof.tree Proof.t Lwt.t
 
   (** {2 Accessing and Updating Versions} *)
 
@@ -655,6 +739,22 @@ module type TEZOS_CONTEXT = sig
 
   val commit :
     time:Time.Protocol.t -> ?message:string -> context -> Context_hash.t Lwt.t
+
+  (** [gc t h] removes from disk all the data older than the commit
+    [hash]. Every operations working on checkouts greater or equal to
+    [h] will continue to work. Calling [checkout h'] on GC-ed commits
+    will return [None]. *)
+  val gc : index -> Context_hash.t -> unit Lwt.t
+
+  (** Sync the context with disk. Only useful for read-only instances.
+      Does not fail when the context is not in read-only mode. *)
+  val sync : index -> unit Lwt.t
+
+  (** [is_gc_allowed index] returns whether or not it is possible to
+     run a GC on the given context tree. If false is returned, it
+     means that the context was run, at least once, with the indexing
+     strategy mode "always", which is not suitable for GC.*)
+  val is_gc_allowed : index -> bool
 
   val set_head : index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 
@@ -730,4 +830,62 @@ module type TEZOS_CONTEXT = sig
     data_merkle_root:Context_hash.t ->
     parents_contexts:Context_hash.t list ->
     bool Lwt.t
+end
+
+(** Functor `With_get_data` adds a `get_data` function to modules of signature `S`.
+    Note that the partially applied `get_data kind key` function has the correct
+    type to be provided to {produce,verify}_tree_proof, which is its intended goal. *)
+module type Storelike = sig
+  (* The type of keys in the store *)
+  type key = string list
+
+  (* The type of internal nodes in the store *)
+  type tree
+
+  (* The type of values in the store *)
+  type value
+
+  (* [find t k] is [Some v] if [k] is associated with value [v] in [t], and
+     [None] otherwise. *)
+  val find : tree -> key -> value option Lwt.t
+
+  (* [find_tree t k] is [Some subtree] if [k] is associated with the internal
+     node [subtree] in [t], and [None] otherwise. *)
+  val find_tree : tree -> key -> tree option Lwt.t
+
+  (* Evaluate all nodes in the tree, i.e. resolve all pointers. *)
+  val unshallow : tree -> tree Lwt.t
+end
+
+let current_data_key = ["data"]
+
+(* Data in stores is prefixed by key "data".
+    It seems that the correctness of the protocol assumes that the prefix key
+    is the same in the client store and the server store, so we define it
+    centrally here for use in disk/context.ml and memory/context.ml. *)
+let data_key k = current_data_key @ k
+
+module With_get_data (Store : Storelike) = struct
+  let get_data (leaf_kind : Proof_types.merkle_leaf_kind)
+      (keys : Store.key list) (tree : Store.tree) :
+      (Store.tree
+      * (Store.key * (Store.tree, Store.value) Either.t Option.t) list)
+      Lwt.t =
+    let open Lwt_syntax in
+    let find k =
+      match leaf_kind with
+      | Proof_types.Hole -> return [(k, None)]
+      | Proof_types.Raw_context -> (
+          let key = data_key k in
+          let* val_o = Store.find tree key
+          and* tree_o = Store.find_tree tree key in
+          match (val_o, tree_o) with
+          | Some value, _ -> return [(k, Some (Either.Right value))]
+          | _, Some tree ->
+              let* tree = Store.unshallow tree in
+              return [(k, Some (Either.Left tree))]
+          | _ -> return [])
+    in
+    let* values = Lwt_list.map_p find keys in
+    return (tree, List.concat values)
 end

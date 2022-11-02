@@ -207,18 +207,12 @@ let benchmark_options_table (bench_opts : Measure.options) =
     let s = string_of_int bench_opts.nsamples in
     normal_text s
   in
-  let determinizer =
-    match bench_opts.determinizer with
-    | Percentile i -> normal_text (Printf.sprintf "percentile@%d" i)
-    | Mean -> normal_text "mean"
-  in
   let open Latex_syntax in
   let rows =
     [
       Hline;
       Row [[normal_text "seed"]; [seed]];
       Row [[normal_text "nsamples"]; [nsamples]];
-      Row [[normal_text "determinizer"]; [determinizer]];
       Hline;
     ]
   in
@@ -284,18 +278,19 @@ let workloads_table (type c t) ((module Bench) : (c, t) Benchmark.poly)
   let open Latex_syntax in
   let table = Hashtbl.create 41 in
   List.iter
-    (fun {Measure.workload; qty} ->
+    (fun {Measure.workload; measures} ->
       let qties = Hashtbl.find_opt table workload |> Option.value ~default:[] in
-      Hashtbl.replace table workload (qty :: qties))
+      Hashtbl.replace table workload (Maths.vector_to_array measures :: qties))
     workload_data ;
   let compute_avg s qtyies =
-    let average = string_of_float (average_qty qtyies) in
-    Row [[normal_text s]; [normal_text average]]
+    let average = Stats.Emp.Float.empirical_mean qtyies in
+    Row [[normal_text s]; [normal_text @@ string_of_float average]]
   in
   let list = List.of_seq (Hashtbl.to_seq table) in
   let row_of_table =
     List.map
       (fun (workload, timings) ->
+        let timings = Array.concat timings in
         let vec = Bench.workload_to_vector workload in
         let s = Format.asprintf "@[<h> %a@]" pp_vec vec in
         compute_avg s timings)

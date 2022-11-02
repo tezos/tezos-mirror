@@ -485,6 +485,29 @@ module Flags : sig
   val disabled_warnings_to_string : int list -> string
 end
 
+module Ctypes : sig
+  type description = {instance : string; functor_ : string}
+
+  (** Dune Ctypes stanza description *)
+  type t = {
+    external_library_name : string;
+        (** Base name of the shared object or library archive that you want to
+            link against *)
+    include_header : string;  (** Header file to include *)
+    extra_search_dir : string;
+        (** The C compiler and linker will look in this directory to find header
+            files and libraries. *)
+    type_description : description;
+        (** Module information for the type stub descriptions *)
+    function_description : description;
+        (** Module information for the function stub descriptions *)
+    generated_types : string;
+        (** Module in which the generated stub types are placed *)
+    generated_entry_point : string;
+        (* Output module name of the final generated stub module *)
+  }
+end
+
 (** Preprocessors. *)
 type preprocessor
 
@@ -493,6 +516,12 @@ type preprocessor
     [pps ?args target] becomes a [(preprocess (pps target args))] stanza in the [dune] file.
     The target's package is also added as a dependency in the [.opam] file. *)
 val pps : ?args:string list -> target -> preprocessor
+
+(** Make a staged preprocessor.
+
+    [staged_pps targets] becomes a [(preprocess (staged_pps target1 target2 ..))] stanza in the [dune] file.
+    The target's package is also added as a dependency in the [.opam] file. *)
+val staged_pps : target list -> preprocessor
 
 (** Inline_tests backend.
 
@@ -592,6 +621,13 @@ type with_test = Always | Never | Only_on_64_arch
       For private libraries, private executables and tests, you must specify
       this argument (you can explicitely set it to [""] to generate no [.opam] file).
 
+    - [opam_bug_reports], [opam_doc] and [opam_homepage]: URLs to put in the [.opam] file
+      in the [bug-reports], [doc] and [homepage] clauses respectively.
+      Clauses are omitted for empty strings.
+      You usually do not want to specify those and keep default values,
+      but there can be some exceptions for packages that are particularly useful
+      on their own outside of Octez.
+
     - [opam_with_test]: whether to add the [dune runtest] command.
       Note that for a given package all targets must have the same value of [opam_with_test].
 
@@ -609,9 +645,15 @@ type with_test = Always | Never | Only_on_64_arch
       Typical use cases are runtime dependencies and build dependencies for users
       of the target (but not the target itself).
 
-    - [release]: defines whether this should be released. Note: it is not always the case that
-      public_exes should be released. They are often public because they are needed by other
-      opam packages, such as in tests. Releasable [public_exe] values should be marked explicitly.
+    - [optional]: if [true], do not build this target if some of its dependencies
+      are not available. The dependencies of this target themselves become optional
+      dependencies in the [.opam] file (unless they are required by other targets).
+      Default is [false].
+
+    - [release]: defines whether this should be released.
+      Note: it is not always the case that public_exes should be released.
+      They are often public because they are needed by other opam packages, such as in tests.
+      Releasable [public_exe] values should be marked explicitly.
       Default is [false].
 
     - [static]: whether to incluce [ %{workspace_root}/static-link-flags.sexp ] to the link
@@ -647,6 +689,7 @@ type 'a maker =
   ?dune:Dune.s_expr ->
   ?flags:Flags.t ->
   ?foreign_stubs:Dune.foreign_stubs ->
+  ?ctypes:Ctypes.t ->
   ?implements:target ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
@@ -659,7 +702,11 @@ type 'a maker =
   ?npm_deps:Npm.t list ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
+  ?opam_bug_reports:string ->
+  ?opam_doc:string ->
+  ?opam_homepage:string ->
   ?opam_with_test:with_test ->
+  ?optional:bool ->
   ?preprocess:preprocessor list ->
   ?preprocessor_deps:preprocessor_dep list ->
   ?private_modules:string list ->
@@ -807,8 +854,13 @@ val tests :
 val tezt :
   opam:string ->
   path:string ->
-  ?deps:target list ->
+  ?js_compatible:bool ->
+  ?modes:Dune.mode list ->
+  ?lib_deps:target list ->
+  ?exe_deps:target list ->
+  ?js_deps:target list ->
   ?dep_globs:string list ->
+  ?synopsis:string ->
   string list ->
   unit
 
@@ -1020,3 +1072,8 @@ val generate_workspace : Env.t -> Dune.s_expr -> unit
 
     The callback [f] is reponsible for feeding the content of the file by using the formmater. *)
 val write : string -> (Format.formatter -> unit) -> unit
+
+(** [file_content filename] reads the contents of the file identified by [filename].
+    Note that the manifest is assumed to be running in the project root directory,
+    so all paths should be relative to it. *)
+val file_content : string -> string

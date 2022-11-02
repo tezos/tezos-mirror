@@ -100,7 +100,10 @@ echo 'opam-version: "2.0"' > $dummy_opam
 # - Sometime installing mirage-no-xen + mirage-no-solo5
 # - Sometime installing mirage-runtime
 # According to mirage devs, mirage-runtime is the correct dependency to install.
-echo 'depends: [ "mirage-runtime" { >= "4.0.0" } ]' >> $dummy_opam
+# In addition "inotify" is a "{os = linux}" dependency that has to be
+# in the repo for irmin to be installable on linux but is not selected
+# by the solver.
+echo 'depends: [ "mirage-runtime" { >= "4.0.0" } "inotify" ]' >> $dummy_opam
 echo 'conflicts:[' >> $dummy_opam
 grep -r "^flags: *\[ *avoid-version *\]" -l ./ | LC_COLLATE=C sort -u | while read -r f;
 do
@@ -120,8 +123,16 @@ case $(opam --version) in
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed,$dummy_pkg
-
+  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}ledgerwallet-tezos,caqti-driver-postgresql,js_of_ocaml-lwt,$dummy_pkg
+## - ocaml-base-compiler has to be explicitely listed for the solver
+##   to not prefer the "variant" `system` of the compiler
+## - odoc is used by the CI to generate the doc
+## - ledgerwallet-tezos is an optional dependency of signer-services
+##   we want to have when building released binaries
+## - caqti-driver-postgresq is needed by tps measurement software to
+##   read tezos-indexer databases
+## - js_of_ocaml-lwt is an optional dependency of tezt which is needed
+##   to build tezt.js, and we do want to run some tests using nodejs
 
 ## Adding useful compiler variants
 for variant in afl flambda fp ; do

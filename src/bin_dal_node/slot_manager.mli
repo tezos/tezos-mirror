@@ -30,40 +30,49 @@
    - reading a slot means rebuild it from the shards
    *)
 
-(** [split_and_store ts store slot] splits [slot] in shards, stores it onto the
-    disk and returns the corresponding [slot_header], using trusted setup [ts] *)
+type slot = bytes
+
+(** [split_and_store dal_constants ts store slot] splits [slot] in shards, stores
+    it onto the disk and returns the corresponding [slot_header], using
+    [dal_constants] and trusted setup [ts] *)
 val split_and_store :
-  Cryptobox.srs ->
-  Store.t ->
-  Dal_types.slot ->
-  Dal_types.slot_header tzresult Lwt.t
+  Cryptobox.t -> Store.t -> slot -> Cryptobox.Commitment.t tzresult Lwt.t
 
 (** [get_shard store slot_header shard_id] gets the shard associated to
     [slot_header] at the range [shard_id] *)
 val get_shard :
-  Store.t -> Dal_types.slot_header -> int -> Cryptobox.shard tzresult Lwt.t
+  Store.t -> Cryptobox.commitment -> int -> Cryptobox.shard tzresult Lwt.t
 
-(** [get_slot store slot_header] fetches from disk the shards associated to
-    [slot_header], gathers them, rebuilds and returns the [slot]. *)
-val get_slot : Store.t -> Dal_types.slot_header -> Dal_types.slot tzresult Lwt.t
+(** [get_slot dal_parameters dal_constants store slot_header] fetches from
+    disk the shards associated to [slot_header], gathers them, rebuilds and
+    returns the [slot]. *)
+val get_slot :
+  Cryptobox.parameters ->
+  Cryptobox.t ->
+  Store.t ->
+  Cryptobox.commitment ->
+  slot tzresult Lwt.t
 
-module Slot_header : sig
-  type t = Cryptobox.commitment
+(** [get_slot_pages] behaves as [get_slot], except that it also
+    splits the slot into pages before returning them.
 
-  val to_b58check : t -> string
-
-  val of_b58check_opt : string -> t option
-
-  val rpc_arg : t RPC_arg.t
-end
+    Returns an [Error _] if the length of the slot associated to the
+    [Cryptobox.commitment] is ill-formed. Specifically, when its
+    length is not a multiple of the page-size specified in the
+    [Cryptobox.parameters] argument. *)
+val get_slot_pages :
+  Cryptobox.parameters ->
+  Cryptobox.t ->
+  Store.t ->
+  Cryptobox.commitment ->
+  bytes list tzresult Lwt.t
 
 module Utils : sig
-  (** [trim_x00 b] removes trailing '\000' at the end of a [b] and returns a new
-      [bytes]. This function in needed to debug the fetching a slot and remove
-      spurious uneeded data form it. *)
-  val trim_x00 : bytes -> bytes
+  (** [trim_x00 s] removes trailing '\000' at the end of [s] and returns
+      a new [slot]. This function is needed to debug the fetched slot and
+      remove spurious uneeded data form it. *)
+  val trim_x00 : slot -> slot
 
-  (** [fill_x00 b] fills a bytes with '\000' to match
-      [Cryptobox.Constants.slot_size] *)
-  val fill_x00 : bytes -> bytes
+  (** [fill_x00 slot_size s] fills [s] with '\000' to match [slot_size] *)
+  val fill_x00 : int -> slot -> slot
 end

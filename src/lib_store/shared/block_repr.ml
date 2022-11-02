@@ -101,114 +101,125 @@ let create_genesis_block ~genesis context =
 
 let contents_encoding =
   let open Data_encoding in
-  conv
-    (fun {header; operations; block_metadata_hash; operations_metadata_hashes} ->
-      (header, operations, block_metadata_hash, operations_metadata_hashes))
-    (fun (header, operations, block_metadata_hash, operations_metadata_hashes) ->
-      {header; operations; block_metadata_hash; operations_metadata_hashes})
-    (obj4
-       (req "header" (dynamic_size Block_header.encoding))
-       (req "operations" (list (list (dynamic_size Operation.encoding))))
-       (opt "block_metadata_hash" Block_metadata_hash.encoding)
-       (opt
-          "operations_metadata_hashes"
-          (list (list Operation_metadata_hash.encoding))))
+  def "store.block_repr.contents"
+  @@ conv
+       (fun {
+              header;
+              operations;
+              block_metadata_hash;
+              operations_metadata_hashes;
+            } ->
+         (header, operations, block_metadata_hash, operations_metadata_hashes))
+       (fun (header, operations, block_metadata_hash, operations_metadata_hashes)
+            ->
+         {header; operations; block_metadata_hash; operations_metadata_hashes})
+       (obj4
+          (req "header" (dynamic_size Block_header.encoding))
+          (req "operations" (list (list (dynamic_size Operation.encoding))))
+          (opt "block_metadata_hash" Block_metadata_hash.encoding)
+          (opt
+             "operations_metadata_hashes"
+             (list (list Operation_metadata_hash.encoding))))
 
 let metadata_encoding : metadata Data_encoding.t =
   let open Data_encoding in
-  conv
-    (fun {
+  def "store.block_repr.metadata"
+  @@ conv
+       (fun {
+              message;
+              max_operations_ttl;
+              last_allowed_fork_level;
+              block_metadata;
+              operations_metadata;
+            } ->
+         ( message,
+           max_operations_ttl,
+           last_allowed_fork_level,
+           block_metadata,
+           operations_metadata ))
+       (fun ( message,
+              max_operations_ttl,
+              last_allowed_fork_level,
+              block_metadata,
+              operations_metadata ) ->
+         {
            message;
            max_operations_ttl;
            last_allowed_fork_level;
            block_metadata;
            operations_metadata;
-         } ->
-      ( message,
-        max_operations_ttl,
-        last_allowed_fork_level,
-        block_metadata,
-        operations_metadata ))
-    (fun ( message,
-           max_operations_ttl,
-           last_allowed_fork_level,
-           block_metadata,
-           operations_metadata ) ->
-      {
-        message;
-        max_operations_ttl;
-        last_allowed_fork_level;
-        block_metadata;
-        operations_metadata;
-      })
-    (obj5
-       (opt "message" string)
-       (req "max_operations_ttl" uint16)
-       (req "last_allowed_fork_level" int32)
-       (req "block_metadata" bytes)
-       (req
-          "operations_metadata"
-          (list (list Block_validation.operation_metadata_encoding))))
+         })
+       (obj5
+          (opt "message" string)
+          (req "max_operations_ttl" uint16)
+          (req "last_allowed_fork_level" int32)
+          (req "block_metadata" bytes)
+          (req
+             "operations_metadata"
+             (list (list Block_validation.operation_metadata_encoding))))
 
 let legacy_metadata_encoding : legacy_metadata Data_encoding.t =
   let open Data_encoding in
-  conv
-    (fun {
+  def "store.block_repr.legacy_metadata"
+  @@ conv
+       (fun {
+              legacy_message;
+              legacy_max_operations_ttl;
+              legacy_last_allowed_fork_level;
+              legacy_block_metadata;
+              legacy_operations_metadata;
+            } ->
+         ( legacy_message,
+           legacy_max_operations_ttl,
+           legacy_last_allowed_fork_level,
+           legacy_block_metadata,
+           legacy_operations_metadata ))
+       (fun ( legacy_message,
+              legacy_max_operations_ttl,
+              legacy_last_allowed_fork_level,
+              legacy_block_metadata,
+              legacy_operations_metadata ) ->
+         {
            legacy_message;
            legacy_max_operations_ttl;
            legacy_last_allowed_fork_level;
            legacy_block_metadata;
            legacy_operations_metadata;
-         } ->
-      ( legacy_message,
-        legacy_max_operations_ttl,
-        legacy_last_allowed_fork_level,
-        legacy_block_metadata,
-        legacy_operations_metadata ))
-    (fun ( legacy_message,
-           legacy_max_operations_ttl,
-           legacy_last_allowed_fork_level,
-           legacy_block_metadata,
-           legacy_operations_metadata ) ->
-      {
-        legacy_message;
-        legacy_max_operations_ttl;
-        legacy_last_allowed_fork_level;
-        legacy_block_metadata;
-        legacy_operations_metadata;
-      })
-    (obj5
-       (opt "legacy_message" string)
-       (req "legacy_max_operations_ttl" uint16)
-       (req "legacy_last_allowed_fork_level" int32)
-       (req "legacy_block_metadata" bytes)
-       (req "legacy_operations_metadata" (list (list bytes))))
+         })
+       (obj5
+          (opt "legacy_message" string)
+          (req "legacy_max_operations_ttl" uint16)
+          (req "legacy_last_allowed_fork_level" int32)
+          (req "legacy_block_metadata" bytes)
+          (req "legacy_operations_metadata" (list (list bytes))))
 
 let encoding =
   let open Data_encoding in
-  conv
-    (fun {hash; contents; metadata} -> (hash, contents, metadata))
-    (fun (hash, contents, metadata) -> {hash; contents; metadata})
-    (dynamic_size
-       ~kind:`Uint30
-       (obj3
-          (req "hash" Block_hash.encoding)
-          (req "contents" contents_encoding)
-          (varopt "metadata" metadata_encoding)))
+  def "store.block_repr"
+  @@ conv
+       (fun {hash; contents; metadata} -> (hash, contents, metadata))
+       (fun (hash, contents, metadata) -> {hash; contents; metadata})
+       (dynamic_size
+          ~kind:`Uint30
+          (obj3
+             (req "hash" Block_hash.encoding)
+             (req "contents" contents_encoding)
+             (varopt "metadata" metadata_encoding)))
 
 let legacy_encoding =
   let open Data_encoding in
-  conv
-    (fun {legacy_hash; legacy_contents; legacy_metadata} ->
-      (legacy_hash, legacy_contents, legacy_metadata))
-    (fun (legacy_hash, legacy_contents, legacy_metadata) ->
-      {legacy_hash; legacy_contents; legacy_metadata})
-    (dynamic_size
-       ~kind:`Uint30
-       (obj3
-          (req "legacy_hash" Block_hash.encoding)
-          (req "legacy_contents" contents_encoding)
-          (varopt "legacy_metadata" legacy_metadata_encoding)))
+  def "store.legacy_block_repr"
+  @@ conv
+       (fun {legacy_hash; legacy_contents; legacy_metadata} ->
+         (legacy_hash, legacy_contents, legacy_metadata))
+       (fun (legacy_hash, legacy_contents, legacy_metadata) ->
+         {legacy_hash; legacy_contents; legacy_metadata})
+       (dynamic_size
+          ~kind:`Uint30
+          (obj3
+             (req "legacy_hash" Block_hash.encoding)
+             (req "legacy_contents" contents_encoding)
+             (varopt "legacy_metadata" legacy_metadata_encoding)))
 
 let pp_json fmt b =
   let json = Data_encoding.Json.construct encoding b in

@@ -55,13 +55,6 @@ module Crypto : sig
     (int32 * Tezos_crypto.Block_hash.t) Lib_test.Assert.check2
 end
 
-module Shell_services : sig
-  (** [equal_history_mode msg hm0 hm1] checks that the history modes [hm0] and [hm1] are
-        equal. Will fail with the message [msg] otherwise *)
-  val equal_history_mode :
-    Tezos_shell_services.History_mode.t Lib_test.Assert.check2
-end
-
 (** Module concerning assertions about raw trees i.e. values of type
     [[< `Tree of 'a Tezos_base.TzPervasives.String.Map.t | `Value of bytes] as 'a] *)
 module Raw_Tree : sig

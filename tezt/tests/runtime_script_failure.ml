@@ -39,8 +39,7 @@ let check_client_force =
   @@ fun protocol ->
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = Node.wait_for_level node 1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   let* contract_id =
     Client.originate_contract
       ~alias:"always_fails"
@@ -67,10 +66,11 @@ let check_client_force =
   in
   let* () = Client.bake_for_and_wait client in
   let* first_manager_operation =
-    RPC.get_operations_of_validation_pass
-      ~validation_pass:3
-      ~operation_offset:0
-      client
+    RPC.Client.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~validation_pass:3
+         ~operation_offset:0
+         ()
   in
   let first_operation_result =
     JSON.(

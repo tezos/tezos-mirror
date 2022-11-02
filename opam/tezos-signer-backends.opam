@@ -22,11 +22,15 @@ depends: [
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "ocplib-endian"
   "fmt" { >= "0.8.7" }
+  "tezos-clic"
   "tezos-stdlib-unix"
   "tezos-rpc-http-client-unix"
 ]
 depopts: [
   "ledgerwallet-tezos"
+]
+conflicts: [
+  "ledgerwallet-tezos" { < "0.2.1" }
 ]
 build: [
   ["rm" "-r" "vendors"]

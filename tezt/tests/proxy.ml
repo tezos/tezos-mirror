@@ -61,7 +61,7 @@ let test_cache_at_most_once ?query_string path =
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")]
+    [("TEZOS_LOG", Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")]
     |> List.to_seq |> String_map.of_seq
   in
   let* stderr =
@@ -179,7 +179,7 @@ let test_context_suffix_no_rpc ?query_string path =
   let env =
     String_map.singleton
       "TEZOS_LOG"
-      (Protocol.daemon_name protocol ^ ".proxy_rpc->debug")
+      (Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
@@ -245,7 +245,7 @@ let test_context_suffix_no_rpc ~protocols =
     [protocol]
 
 (** Test.
-    Test that [tezos-client --mode proxy --protocol P] fails
+    Test that [octez-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
 let wrong_proto protocol client =
@@ -273,7 +273,7 @@ let wrong_proto protocol client =
   else Test.fail "Did not fail as expected: %s" stderr
 
 (** Test.
-    Test that [tezos-client --mode proxy --protocol P] fails
+    Test that [octez-client --mode proxy --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
 let test_wrong_proto =
@@ -354,7 +354,7 @@ module Location = struct
   type alt_mode =
     | Vanilla_proxy_server
         (** A vanilla client ([--mode client]) but whose [--endpoint] is
-        a [tezos-proxy-server] *)
+        a [octez-proxy-server] *)
     | Light  (** A light client ([--mode light]) *)
     | Proxy  (** A proxy client ([--mode proxy]) *)
 
@@ -630,53 +630,8 @@ let test_supported_protocols_like_mockup (mode : [< `Proxy | `Light]) =
   Check.((mockup_protocols = mode_protocols) string_set ~error_msg) ;
   unit
 
-(** Test that, at any point in time, the proxy mode and the light mode
-    support Alpha and at least three other protocols (genesis being ignored).
-    This is stated in the public documentation. *)
-let test_support_four_protocols (mode : [< `Proxy | `Light]) =
-  let mode_str = show_mode mode in
-  Test.register
-    ~__FILE__
-    ~title:(sf "%s supports alpha and at least 3 immutable protocols" mode_str)
-    ~tags:["client"; mode_str; "list"; "protocols"]
-  @@ fun () ->
-  let client = Client.create () in
-  let* mode_protocols =
-    Client.list_protocols mode client
-    >|= (* Filter out Genesis. We are interested in other protocols. *)
-    List.filter (fun str -> str =~! rex "Genesis.*")
-    >|= String_set.of_list
-  in
-  let non_alpha_protocols =
-    String_set.filter (fun str -> str =~! rex "^ProtoALpha.*") mode_protocols
-  in
-  let alpha_error_msg =
-    Format.asprintf
-      "Alpha should be supported, but it's not found in the list of protocols: \
-       %a"
-      Equalable_String_set.pp
-      mode_protocols
-  in
-  Check.(
-    (String_set.cardinal non_alpha_protocols
-    = String_set.cardinal mode_protocols - 1)
-      int
-      ~error_msg:alpha_error_msg) ;
-  let error_msg =
-    Format.asprintf
-      "%s should support at least three non-alpha protocols, but non-alpha \
-       supported protocols are %a"
-      mode_str
-      Equalable_String_set.pp
-      non_alpha_protocols
-  in
-  let nb_non_alpha_protocols = String_set.cardinal non_alpha_protocols in
-  Check.((nb_non_alpha_protocols >= 3) int ~error_msg) ;
-  unit
-
 let register_protocol_independent () =
-  test_supported_protocols_like_mockup `Proxy ;
-  test_support_four_protocols `Proxy
+  test_supported_protocols_like_mockup `Proxy
 
 let normalize = function
   | "big_maps" :: "index" :: i :: "contents" :: _ ->

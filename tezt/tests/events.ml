@@ -33,8 +33,7 @@
 let test_emit_event protocol =
   let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let* () = Client.activate_protocol ~protocol client in
-  let* _ = Node.wait_for_level node 1 in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
   let* contract_id =
     Client.originate_contract
       ~alias:"emit_events.tz"

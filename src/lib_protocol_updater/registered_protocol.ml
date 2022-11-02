@@ -24,15 +24,9 @@
 (*****************************************************************************)
 
 module type T = sig
-  module P : sig
-    val hash : Protocol_hash.t
+  val hash : Protocol_hash.t
 
-    include Tezos_protocol_environment.PROTOCOL
-  end
-
-  include module type of struct
-    include P
-  end
+  include Tezos_protocol_environment.PROTOCOL
 
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
@@ -41,7 +35,7 @@ end
 type t = (module T)
 
 let build hash =
-  match Tezos_protocol_registerer.Registerer.get hash with
+  match Tezos_protocol_registerer.get hash with
   | None -> None
   | Some (V0 protocol) ->
       let (module F) = protocol in
@@ -183,6 +177,46 @@ let build hash =
 
           let complete_b58prefix = Env.Context.complete
         end : T)
+  | Some (V7 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.V7.Make (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
+  | Some (V8 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.V8.Make (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
 
 module VersionTable = Protocol_hash.Table
 
@@ -191,16 +225,23 @@ let versions : (module T) VersionTable.t = VersionTable.create 20
 let sources : Protocol.t VersionTable.t = VersionTable.create 20
 
 let mem hash =
-  VersionTable.mem versions hash
-  || Tezos_protocol_registerer.Registerer.mem hash
+  VersionTable.mem versions hash || Tezos_protocol_registerer.mem hash
 
 let get hash =
+  let set_logger proto =
+    let consumer = Protocol_logging.make_log_message_consumer () in
+    let (module Proto : T) = proto in
+    Proto.set_log_message_consumer consumer
+  in
   match VersionTable.find versions hash with
-  | Some proto -> Some proto
+  | Some proto ->
+      set_logger proto ;
+      Some proto
   | None -> (
       match build hash with
       | Some proto ->
           VersionTable.add versions hash proto ;
+          set_logger proto ;
           Some proto
       | None -> None)
 
@@ -225,7 +266,7 @@ let () =
 let get_result hash =
   let open Lwt_result_syntax in
   match get hash with
-  | Some hash -> return hash
+  | Some t -> return t
   | None -> tzfail (Unregistered_protocol hash)
 
 let seq () = VersionTable.to_seq_values versions
@@ -416,6 +457,64 @@ end
 
 module Register_embedded_V6
     (Env : Tezos_protocol_environment.V6.T)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V7
+    (Env : Tezos_protocol_environment.V7.T)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V8
+    (Env : Tezos_protocol_environment.V8.T)
     (Proto : Env.Updater.PROTOCOL)
     (Source : Source_sig) =
 struct

@@ -63,7 +63,8 @@ module Arith_Context = struct
   type proof = Context_binary.Proof.tree Context_binary.Proof.t
 
   let proof_encoding =
-    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree2.tree_proof_encoding
+    Tezos_context_merkle_proof_encoding.Merkle_proof_encoding.V2.Tree2
+    .tree_proof_encoding
 
   let kinded_hash_to_state_hash = function
     | `Value hash | `Node hash ->
@@ -124,35 +125,44 @@ let boot boot_sector f =
   pre_boot boot_sector @@ fun ctxt state -> eval state >>= f ctxt
 
 let test_boot () =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
   is_input_state state >>= function
-  | Initial -> return ()
-  | First_after _ ->
-      failwith
-        "After booting, the machine should be waiting for the initial input."
+  | Needs_reveal Reveal_metadata -> return ()
+  | Initial | Needs_reveal _ | First_after _ ->
+      failwith "After booting, the machine should be waiting for the metadata."
   | No_input_required ->
       failwith "After booting, the machine must be waiting for input."
 
-let make_external_inbox_message str =
-  WithExceptions.Result.get_ok
-    ~loc:__LOC__
-    Sc_rollup_inbox_message_repr.(External str |> serialize)
+let test_metadata () =
+  let open Sc_rollup_PVM_sig in
+  let open Lwt_result_syntax in
+  boot "" @@ fun _ctxt state ->
+  let metadata =
+    Sc_rollup_metadata_repr.
+      {
+        address = Sc_rollup_repr.Address.zero;
+        origination_level = Raw_level_repr.root;
+      }
+  in
+  let input = Reveal (Metadata metadata) in
+  let*! state = set_input input state in
+  let*! input_request = is_input_state state in
+  match input_request with
+  | Initial -> return ()
+  | Needs_reveal _ | First_after _ | No_input_required ->
+      failwith
+        "After evaluating the metadata, the machine must be in the [Initial] \
+         state."
 
 let test_input_message () =
-  let open Sc_rollup_PVM_sem in
+  let open Sc_rollup_PVM_sig in
   boot "" @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message "MESSAGE";
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr "MESSAGE" in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   is_input_state state >>= function
-  | Initial | First_after _ ->
+  | Initial | Needs_reveal _ | First_after _ ->
       failwith
         "After receiving a message, the rollup must not be waiting for input."
   | No_input_required -> return ()
@@ -171,15 +181,8 @@ let go ~max_steps target_status state =
   aux 0 state
 
 let test_parsing_message ~valid (source, expected_code) =
-  let open Sc_rollup_PVM_sem in
   boot "" @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr source in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
   go ~max_steps:10000 Evaluating state >>=? fun state ->
@@ -187,7 +190,7 @@ let test_parsing_message ~valid (source, expected_code) =
   Assert.equal
     ~loc:__LOC__
     (Option.equal Bool.equal)
-    "Unexpected parsing resutlt"
+    "Unexpected parsing result"
     (fun fmt r ->
       Format.fprintf
         fmt
@@ -228,7 +231,7 @@ let syntactically_valid_messages =
 let syntactically_invalid_messages =
   List.map
     (fun s -> (s, []))
-    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a1"]
+    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a$"]
 
 let test_parsing_messages () =
   List.iter_es (test_parsing_message ~valid:true) syntactically_valid_messages
@@ -239,18 +242,11 @@ let test_parsing_messages () =
 
 let test_evaluation_message ~valid
     (boot_sector, source, expected_stack, expected_vars) =
-  let open Sc_rollup_PVM_sem in
   boot boot_sector @@ fun _ctxt state ->
-  let input =
-    {
-      inbox_level = Raw_level_repr.root;
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
-  in
+  let input = Sc_rollup_helpers.make_input_repr source in
   set_input input state >>= fun state ->
   eval state >>= fun state ->
-  go ~max_steps:10000 WaitingForInputMessage state >>=? fun state ->
+  go ~max_steps:10000 Waiting_for_input_message state >>=? fun state ->
   if valid then
     get_stack state >>= fun stack ->
     Assert.equal
@@ -314,18 +310,15 @@ let test_evaluation_messages () =
 
 let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
   let open Lwt_result_syntax in
-  let open Sc_rollup_PVM_sem in
   boot "" @@ fun ctxt state ->
   let input =
-    {
-      inbox_level = Raw_level_repr.of_int32_exn (Int32.of_int inbox_level);
-      message_counter = Z.zero;
-      payload = make_external_inbox_message source;
-    }
+    Sc_rollup_helpers.make_input_repr
+      ~inbox_level:(Raw_level_repr.of_int32_exn (Int32.of_int inbox_level))
+      source
   in
   let*! state = set_input input state in
   let*! state = eval state in
-  let* state = go ~max_steps:10000 WaitingForInputMessage state in
+  let* state = go ~max_steps:10000 Waiting_for_input_message state in
   let check_output output =
     let*! result = produce_output_proof ctxt state output in
     if valid then
@@ -345,7 +338,7 @@ let test_output_messages_proofs ~valid ~inbox_level (source, expected_outputs) =
                   (Format.asprintf
                      "A wrong output proof is valid: %s -> %a"
                      source
-                     Sc_rollup_PVM_sem.pp_output
+                     Sc_rollup_PVM_sig.pp_output
                      output)))
       | Error _ -> return ()
   in
@@ -363,7 +356,7 @@ let make_output ~outbox_level ~message_index n =
   let message_index = Z.of_int message_index in
   let outbox_level = Raw_level_repr.of_int32_exn (Int32.of_int outbox_level) in
   let message = Atomic_transaction_batch {transactions} in
-  Sc_rollup_PVM_sem.{outbox_level; message_index; message}
+  Sc_rollup_PVM_sig.{outbox_level; message_index; message}
 
 let test_valid_output_messages () =
   let test inbox_level =
@@ -447,6 +440,7 @@ let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
     Tztest.tztest "Boot" `Quick test_boot;
+    Tztest.tztest "Metadata" `Quick test_metadata;
     Tztest.tztest "Input message" `Quick test_input_message;
     Tztest.tztest "Parsing message" `Quick test_parsing_messages;
     Tztest.tztest "Evaluating message" `Quick test_evaluation_messages;

@@ -23,6 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
+let () =
+  (* warn_if_argv0_name_not_octez *)
+  let executable_name = Filename.basename Sys.argv.(0) in
+  let prefix = "tezos-" in
+  if TzString.has_prefix executable_name ~prefix then
+    let expected_name =
+      let len_prefix = String.length prefix in
+      "octez-"
+      ^ String.sub
+          executable_name
+          len_prefix
+          (String.length executable_name - len_prefix)
+    in
+    Format.eprintf
+      "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+       The executable with name @{<kwd>%s@} has been renamed to @{<kwd>%s@}. \
+       The name @{<kwd>%s@} is now@,\
+       deprecated, and it will be removed in a future release. Please update@,\
+       your scripts to use the new name.@]@\n\
+       @."
+      executable_name
+      expected_name
+      executable_name
+  else ()
+
 module Hashtbl = Stdlib.Hashtbl
 
 (* ------------------------------------------------------------------------- *)
@@ -266,15 +293,10 @@ and infer_cmd_full_auto model_name workload_data solver
 and solver_of_string (solver : string)
     (infer_opts : Cmdline.infer_parameters_options) =
   match solver with
-  | "ridge" ->
-      Inference.Ridge {alpha = infer_opts.ridge_alpha; normalize = false}
+  | "ridge" -> Inference.Ridge {alpha = infer_opts.ridge_alpha}
   | "lasso" ->
       Inference.Lasso
-        {
-          alpha = infer_opts.lasso_alpha;
-          normalize = false;
-          positive = infer_opts.lasso_positive;
-        }
+        {alpha = infer_opts.lasso_alpha; positive = infer_opts.lasso_positive}
   | "nnls" -> Inference.NNLS
   | _ ->
       Format.eprintf "Unknown solver name.@." ;
@@ -334,13 +356,6 @@ and get_all_workload_data_files directory =
         acc
   in
   loop []
-
-let cull_outliers_cmd workload_data nsigmas save_file =
-  let measure = Measure.load ~filename:workload_data in
-  match measure with
-  | Measure.Measurement (bench, {bench_opts; workload_data; date = _}) ->
-      let workload_data = Measure.cull_outliers ~nsigmas workload_data in
-      Measure.save ~filename:save_file ~options:bench_opts ~bench ~workload_data
 
 let codegen_cmd solution model_name codegen_options =
   let sol = Codegen.load_solution solution in
@@ -416,8 +431,6 @@ let () =
   | Some outcome -> (
       match outcome with
       | Cmdline.No_command -> exit 0
-      | Cmdline.Cull_outliers {workload_data; nsigmas; save_file} ->
-          cull_outliers_cmd workload_data nsigmas save_file
       | Cmdline.Benchmark {bench_name; bench_opts} ->
           benchmark_cmd bench_name bench_opts
       | Cmdline.Infer {model_name; workload_data; solver; infer_opts} ->

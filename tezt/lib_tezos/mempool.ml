@@ -105,17 +105,16 @@ let get_mempool ?endpoint ?hooks ?chain ?(applied = true)
     ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
     ?(outdated = true) client =
   let* mempool_json =
-    RPC.get_mempool_pending_operations
-      ?endpoint
-      ?hooks
-      ?chain
-      ~version:"1"
-      ~applied
-      ~branch_delayed
-      ~branch_refused
-      ~refused
-      ~outdated
-      client
+    RPC.Client.call client ?hooks ?endpoint
+    @@ RPC.get_chain_mempool_pending_operations
+         ?chain
+         ~version:"1"
+         ~applied
+         ~branch_delayed
+         ~branch_refused
+         ~refused
+         ~outdated
+         ()
   in
   return (of_json mempool_json)
 

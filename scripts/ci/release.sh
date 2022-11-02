@@ -36,10 +36,12 @@ then
   # Yes, release name: X.Y~rcZ
   # shellcheck disable=SC2034
   gitlab_release_name="${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"
+  opam_release_tag="${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"
 else
   # No, release name: Release X.Y
   # shellcheck disable=SC2034
   gitlab_release_name="Release ${gitlab_release_major_version}.${gitlab_release_minor_version}"
+  opam_release_tag="${gitlab_release_major_version}.${gitlab_release_minor_version}"
 fi
 
 ### Compute GitLab generic package names

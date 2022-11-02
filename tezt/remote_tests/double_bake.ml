@@ -61,7 +61,9 @@ let wait_for_denunciation_injection node client oph_promise =
   in
   let* _ = Node.wait_for node "request_completed_notice.v0" filter in
   let* oph = oph_promise in
-  let* mempool = RPC.get_mempool_pending_operations client in
+  let* mempool =
+    RPC.Client.call client @@ RPC.get_chain_mempool_pending_operations ()
+  in
   if is_operation_in_applied_mempool mempool oph then some oph else none
 
 let double_bake =
@@ -139,7 +141,7 @@ let double_bake =
   in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in
-  let* ops = RPC.get_operations client_1 in
+  let* ops = RPC.Client.call client_1 @@ RPC.get_chain_block_operations () in
   let* () = Accuser.terminate accuser_3 in
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"

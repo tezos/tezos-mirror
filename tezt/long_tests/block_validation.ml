@@ -56,57 +56,8 @@
     will first uncompress the archive before running the benchmarks. *)
 
 let apply_or_raise lazy_res f () =
-  match Lazy.force lazy_res with Ok v -> f v | Error e -> failwith e
-
-(** Provides an access to the set of data that will be used
-    as input by this benchmarks. Providing the same data for several
-    executions is mandatory to get reliable and consistent results. *)
-module Fixture = struct
-  (** The name of the datadir folder that must be found on the filesystem. *)
-  let datadir_name = "mainnet-1479022-hist-10000-datadir"
-
-  let untar src dst =
-    let error msg =
-      Error
-        (Format.sprintf
-           "Couldn't untar the source archive %s in the destination %s: %s"
-           src
-           dst
-           msg)
-    in
-    try
-      Log.debug
-        "Running tar -xzf %s -C %s\n\
-         Please, wait. This could take a few minutes..."
-        src
-        dst ;
-      let status = Sys.command @@ Format.sprintf "tar -xzf %s -C %s" src dst in
-      if status = 0 then Ok ()
-      else
-        error
-          ("Process execution failed with status code " ^ string_of_int status)
-    with Sys_error msg -> error msg
-
-  (** Localises the datadir on the file system, uncompress it if needed and
-      then, evaluates in a result of either the path of the datadir or
-      the cause of the error if the datadir could not be found or uncompressed. *)
-  let datadir () =
-    let dst = Long_test.test_data_path () in
-    let output = dst // datadir_name in
-    let src = output ^ ".tar.gz" in
-    try
-      if Sys.file_exists output then (
-        Log.debug "Found file %s. No need to untar." output ;
-        Ok output)
-      else Result.map (fun () -> output) (untar src dst)
-    with Sys_error msg ->
-      Error
-        (Format.sprintf
-           "Couldn't untar the source archive %s in the destination %s: %s"
-           src
-           dst
-           msg)
-end
+  let* x = Lazy.force lazy_res in
+  match x with Ok v -> f v | Error e -> failwith e
 
 (** Extends the Tezos_time_measurement_runtime.Measurement
     module to add some helpers for measurement exploitation. *)
@@ -245,7 +196,7 @@ module Node = struct
   (** [replay_and_wait_for_termination blocks node] launches the [replay]
       command to start the validation of the given [blocks] on the given
       [node]. It then waits for the [node] to stop properly. *)
-  let replay_and_wait_for_termination blocks node =
+  let replay_and_wait_for_termination ?strict blocks node =
     let callback, resolver = Lwt.wait () in
     let on_terminate status =
       match Process.validate_status status with
@@ -253,7 +204,7 @@ module Node = struct
       | Error (`Invalid_status reason) ->
           failwith @@ Format.sprintf "Node %s" reason
     in
-    let* () = Node.replay ~on_terminate ~blocks node [] in
+    let* () = Node.replay ~on_terminate ~blocks ?strict node [] in
     callback
 end
 
@@ -293,6 +244,13 @@ module Validation = struct
     let size = List.length blocks in
     let* _ = Node.wait_for_validation_start node in
     Node.wait_for_validation_subparts ~repeat:size node
+
+  let replay blocks datadir =
+    let node = Node.create datadir in
+    Lwt_seq.iter_s
+      (fun range ->
+        Node.replay_and_wait_for_termination ~strict:true range node)
+      (Lwt_seq.of_seq blocks)
 end
 
 (** Regroups the different benchmarks of the validation of blocks.
@@ -398,6 +356,115 @@ module Benchmark = struct
     Measurement.register_map_as_datapoints influxDB_measurement measurements
 end
 
+(** Provides an access to the set of data that will be used
+    as input by this benchmarks. Providing the same data for several
+    executions is mandatory to get reliable and consistent results. *)
+module Fixture = struct
+  (** The name of the datadir folder that must be found on the filesystem. *)
+  let datadir_name = "mainnet-1479022-hist-10000-datadir"
+
+  let error src dst msg =
+    Error
+      (Format.sprintf
+         "Couldn't untar the source archive %s in the destination %s: %s"
+         src
+         dst
+         msg)
+
+  let untar src dst =
+    let error = error src dst in
+    try
+      Log.debug
+        "Running tar -xzf %s -C %s\n\
+         Please, wait. This could take a few minutes..."
+        src
+        dst ;
+      let status = Sys.command @@ Format.sprintf "tar -xzf %s -C %s" src dst in
+      if status = 0 then Ok ()
+      else
+        error
+          ("Process execution failed with status code " ^ string_of_int status)
+    with Sys_error msg -> error msg
+
+  (** Localises the datadir on the file system, uncompress it if needed and
+      ensures it is up to date with last version of the store.
+      Then, evaluates in a result of either the path of the datadir or
+      the cause of the error if the datadir could not be found or uncompressed. *)
+  let datadir () =
+    let ( let*! ) = Lwt_result.bind in
+    let dst = Long_test.test_data_path () in
+    let output = dst // datadir_name in
+    let src = output ^ ".tar.gz" in
+    let*! file_exist =
+      try Lwt_result.return @@ Sys.file_exists output
+      with Sys_error msg -> Lwt.return @@ error src dst msg
+    in
+    let*! () =
+      if file_exist then
+        Lwt_result.return @@ Log.debug "Found file %s. No need to untar." output
+      else Lwt.return @@ untar src dst
+    in
+    let node = Node.create output in
+    let* () = Tezt_tezos.Node.upgrade_storage node in
+    Lwt_result.return output
+end
+
+(** For tests focused on the semantic of replay, checking that blocks continue
+    to be valid even when changing the underlying libraries and such. *)
+module Semantic = struct
+  let max_level_available_in_data_dir = 2_500_000
+
+  (** [stitching_blocks] contains the block levels blocks in which stitching
+      between two protocols happen. *)
+  let stitching_blocks =
+    [
+      "2244608";
+      "1916928";
+      "1589247";
+      "1466367";
+      "1343488";
+      "1212416";
+      "851968";
+      "655360";
+      "458752";
+    ]
+
+  let replay ~seed ~chunk_size ~runtime () =
+    if chunk_size < 0 then invalid_arg "replay: chunk_size must be >= 0" ;
+    let datadir = Long_test.test_data_path () in
+    Log.debug "Using seed: %d" seed ;
+    let prng = Random.State.make [|seed|] in
+    let test_start = Mtime_clock.now () in
+    let blocks =
+      Seq.unfold
+        (fun () ->
+          let step_start = Mtime_clock.now () in
+          if Mtime.(Span.compare (span test_start step_start) runtime) >= 0 then (
+            Log.debug "Time limit reached: ending test" ;
+            None)
+          else
+            let starts =
+              Random.State.int
+                prng
+                (max_level_available_in_data_dir - chunk_size - 1)
+            in
+            let starts =
+              starts + 1 (* we can't replay Genesis so the min level is 1 *)
+            in
+            let ends = starts + chunk_size - 1 in
+            let range = string_of_int starts ^ ".." ^ string_of_int ends in
+            Log.debug "Blockrange: %s" range ;
+            Some ([range], ()))
+        ()
+    in
+    let blocks () =
+      Log.debug "Blockrange: stitching blocks for each protocol" ;
+      Seq.Cons (stitching_blocks, blocks)
+    in
+    let* () = Validation.replay blocks datadir in
+    return ()
+end
+
 let grafana_panels =
   let step_tag = "step" in
   let simple_graph ?interval title test tags =
@@ -470,3 +537,19 @@ let register ~executors () =
   @@ Benchmark.batch_of_same_block_subparts
        ~size:30
        Benchmark.block_with_highest_gas
+
+let register_semantic_regression_test ~executors () =
+  (* we randomly generate a seed that the tests can use, for full portability we
+     generate at most a 30-bit integer*)
+  let seed =
+    let seeder = Random.State.make_self_init () in
+    Random.State.int seeder ((1 lsl 30) - 1)
+  in
+
+  Long_test.register
+    ~__FILE__
+    ~title:"shell.validation.replay"
+    ~tags:["shell"; "validation"; "replay"]
+    ~timeout:(Long_test.Hours 7)
+    ~executors
+  @@ Semantic.replay ~seed ~chunk_size:500 ~runtime:Mtime.Span.(6 * hour)

@@ -23,7 +23,7 @@ def get_parameters(folder: str, network='test') -> dict:
 
 
 # The protocol compiler location
-COMPILER = f'{paths.TEZOS_HOME}/tezos-protocol-compiler'
+COMPILER = f'{paths.TEZOS_HOME}/octez-protocol-compiler'
 
 
 # This is the secret key used to activate a protocol from genesis in sandbox
@@ -89,20 +89,15 @@ ALPHA_DAEMON = "alpha"  # tezos-baker-alpha
 ALPHA_FOLDER = "proto_alpha"
 ALPHA_PARAMETERS = get_parameters(ALPHA_FOLDER)
 
-ITHACA = "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
-ITHACA_DAEMON = "012-Psithaca"
-ITHACA_FOLDER = "proto_012_Psithaca"
-ITHACA_PARAMETERS = get_parameters(ITHACA_FOLDER)
-
-JAKARTA = "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY"
-JAKARTA_DAEMON = "013-PtJakart"
-JAKARTA_FOLDER = "proto_013_PtJakart"
-JAKARTA_PARAMETERS = get_parameters(JAKARTA_FOLDER)
-
 KATHMANDU = "PtKathmankSpLLDALzWw7CGD2j2MtyveTwboEYokqUCP4a1LxMg"
-KATHMANDU_DAEMON = "014-PtKathma"
+KATHMANDU_DAEMON = "PtKathma"
 KATHMANDU_FOLDER = "proto_014_PtKathma"
 KATHMANDU_PARAMETERS = get_parameters(KATHMANDU_FOLDER)
+
+LIMA = "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW"
+LIMA_DAEMON = "PtLimaPt"
+LIMA_FOLDER = "proto_015_PtLimaPt"
+LIMA_PARAMETERS = get_parameters(LIMA_FOLDER)
 
 TEZOS_CRT = """
 Certificate:

@@ -181,7 +181,7 @@ master branch, the ``proto_alpha`` directory is reset to the newly activated
 protocol and its associated daemons, with the exception of vanity nonce and
 migration that should be reverted.
 
-Soon after the injection (during the following days), the documentation has to
+Soon after the injection (the same or next day), the documentation has to
 be shifted to reflect the new active protocol and to drop the documentation of
 the previous protocol, see meta-issue :gl:`#2170`. Also, part
 of the code related to the old protocol can now be dropped, see

@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Proof = Tezos_context_sigs.Context.Proof_types
+
 module type TEZOS_CONTEXT_MEMORY = sig
   type tree
 
@@ -103,8 +105,6 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   and t = context
 
-  module type S = Tezos_context_sigs.Context.S
-
   type tree = Store.tree
 
   type key = string list
@@ -119,7 +119,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let current_test_chain_key = ["test_chain"]
 
-  let current_data_key = ["data"]
+  let current_data_key = Tezos_context_sigs.Context.current_data_key
 
   let current_predecessor_block_metadata_hash_key =
     ["predecessor_block_metadata_hash"]
@@ -202,11 +202,15 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let+ commit = raw_commit ~time ?message context in
     Hash.to_context_hash (Store.Commit.hash commit)
 
+  let gc _ _ = (* not implemented for in-memory context *) Lwt.return_unit
+
+  let is_gc_allowed _ = (* not implemented for in-memory context *) false
+
+  let sync _ = (* not implemented for in-memory context *) Lwt.return_unit
+
   (*-- Generic Store Primitives ------------------------------------------------*)
 
-  let data_key key = current_data_key @ key
-
-  let current_data_key = data_key []
+  let data_key = Tezos_context_sigs.Context.data_key
 
   let mem : t -> key -> bool Lwt.t =
    fun ctxt key -> Tree.mem ctxt.tree (data_key key)
@@ -255,7 +259,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     match Store.Tree.destruct tree with
     | `Contents (v, _) ->
         let+ v = Store.Tree.Contents.force_exn v in
-        Block_services.Key v
+        Proof.Key v
     | `Node _ ->
         let* kvs = Store.Tree.list tree [] in
         let f acc (key, _) =
@@ -265,18 +269,18 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           String.Map.add key sub_raw_context acc
         in
         let+ res = List.fold_left_s f String.Map.empty kvs in
-        Block_services.Dir res
+        Proof.Dir res
 
   let to_memory_tree t key = find_tree t key
 
   let merkle_hash tree =
     let merkle_hash_kind =
       match Store.Tree.destruct tree with
-      | `Contents _ -> Block_services.Contents
-      | `Node _ -> Block_services.Node
+      | `Contents _ -> Proof.Contents
+      | `Node _ -> Proof.Node
     in
     let hash_str = Store.Tree.hash tree |> merkle_hash_to_string in
-    Block_services.Hash (merkle_hash_kind, hash_str)
+    Proof.Hash (merkle_hash_kind, hash_str)
 
   let merkle_tree t leaf_kind key =
     let open Lwt_syntax in
@@ -302,10 +306,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = hd then
                   (* on the target path: the final leaf *)
                   match leaf_kind with
-                  | Block_services.Hole -> Lwt.return @@ merkle_hash tree
-                  | Block_services.Raw_context ->
+                  | Proof.Hole -> Lwt.return @@ merkle_hash tree
+                  | Proof.Raw_context ->
                       let+ raw_context = tree_to_raw_context tree in
-                      Block_services.Data raw_context
+                      Proof.Data raw_context
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree
@@ -324,7 +328,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
                 if key = target_hd then
                   (* on the target path: recurse *)
                   let+ sub = key_to_merkle_tree tree target_tl in
-                  Block_services.Continue sub
+                  Proof.Continue sub
                 else
                   (* a sibling of the target path: return a hash *)
                   Lwt.return @@ merkle_hash tree
@@ -366,6 +370,37 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       (match key with
       | `Node hash -> `Node (Hash.of_context_hash hash)
       | `Value hash -> `Value (Hash.of_context_hash hash))
+
+  module Storelike = struct
+    type key = string list
+
+    type tree = Store.tree
+
+    type value = bytes
+
+    let find = Tree.find
+
+    let find_tree = Tree.find_tree
+
+    let unshallow = Tree.unshallow
+  end
+
+  module Get_data = Tezos_context_sigs.Context.With_get_data ((
+    Storelike : Tezos_context_sigs.Context.Storelike))
+
+  let merkle_tree_v2 ctx leaf_kind key =
+    let open Lwt_syntax in
+    match Tree.kinded_key ctx.tree with
+    | None ->
+        raise (Invalid_argument "In-memory context.tree has no kinded_key")
+    | Some kinded_key ->
+        let* proof, _ =
+          produce_tree_proof
+            ctx.index
+            kinded_key
+            (Get_data.get_data leaf_kind [key])
+        in
+        return proof
 
   (*-- Predefined Fields -------------------------------------------------------*)
 

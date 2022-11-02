@@ -35,33 +35,21 @@ open Lwt.Infix
 type state = Prechecked | Validated
 
 let on_validation_event state node Node.{name; value} =
-  if name = "node_block_validator.v0" then
-    match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-    | Some "prechecked" -> (
-        let hash = JSON.(value |=> 1 |-> "event" |-> "block" |> as_string) in
-        match Hashtbl.find_opt state (node, hash) with
-        | None -> Hashtbl.replace state (node, hash) Prechecked
-        | Some Prechecked -> Test.fail "A block should not be prechecked twice"
-        | Some Validated ->
-            Test.fail "A block should not be prechecked after being validated")
-    | Some _ -> ()
-    | None -> (
-        match
-          JSON.(value |=> 1 |-> "event" |-> "successful_validation" |> as_opt)
-        with
-        | None -> ()
-        | Some _ -> (
-            let hash =
-              JSON.(
-                value |=> 1 |-> "event" |-> "successful_validation" |-> "block"
-                |> as_string)
-            in
-            match Hashtbl.find_opt state (node, hash) with
-            | None ->
-                Test.fail "A block should be prechecked before being validated"
-            | Some Prechecked -> Hashtbl.replace state (node, hash) Validated
-            | Some Validated ->
-                Test.fail "A block should not be validated twice"))
+  match name with
+  | "prechecked_block.v0" -> (
+      let hash = JSON.(value |> as_string) in
+      match Hashtbl.find_opt state (node, hash) with
+      | None -> Hashtbl.replace state (node, hash) Prechecked
+      | Some Prechecked -> Test.fail "A block should not be prechecked twice"
+      | Some Validated ->
+          Test.fail "A block should not be prechecked after being validated")
+  | "validation_success.v0" -> (
+      let hash = JSON.(value |-> "block" |> as_string) in
+      match Hashtbl.find_opt state (node, hash) with
+      | None -> Test.fail "A block should be prechecked before being validated"
+      | Some Prechecked -> Hashtbl.replace state (node, hash) Validated
+      | Some Validated -> Test.fail "A block should not be validated twice")
+  | _ -> ()
 
 let wait_for_cluster_at_level cluster level =
   Lwt_list.iter_p
@@ -152,7 +140,9 @@ let forge_block ?client node ~key ~with_op =
     Client.shell_header client2 >>= fun shell ->
     JSON.parse ~origin:"forge_fake_block" shell |> return
   in
-  let* protocol_data = RPC.raw_protocol_data client2 in
+  let* protocol_data =
+    RPC.Client.call client2 @@ RPC.get_chain_block_header_protocol_data_raw ()
+  in
   Log.info
     "Sufficient information retrieved: shutting down second node, restarting \
      first node" ;
@@ -244,22 +234,18 @@ let propagate_precheckable_bad_block =
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
-    Node.wait_for node "node_block_validator.v0" (fun value ->
-        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-        | Some "prechecked" ->
-            got_prechecked := true ;
-            None
-        | Some _ -> None
-        | None -> (
-            match
-              JSON.(
-                value |=> 1 |-> "event" |-> "failed_validation_after_precheck"
-                |> as_opt)
-            with
-            | None -> None
-            | Some _ ->
-                if !got_prechecked then Some ()
-                else Test.fail "The block was not expected to be prechecked"))
+    Lwt.join
+      [
+        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
+         got_prechecked := true ;
+         Lwt.return ());
+        (let* () =
+           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
+               Some ())
+         in
+         if !got_prechecked then Lwt.return ()
+         else Test.fail "The block was not expected to be prechecked");
+      ]
   in
   (* Wait all nodes to precheck the block but fail on validation *)
   let precheck_waiter =
@@ -290,12 +276,12 @@ let propagate_precheckable_bad_block =
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
-let propagate_precheckable_bad_block_signature =
+let propagate_precheckable_bad_block_payload =
   let blocks_to_bake = 4 in
   Protocol.register_test
     ~__FILE__
-    ~title:"forge block with wrong signature"
-    ~tags:["precheck"; "fake_block"; "propagation"; "signature"]
+    ~title:"forge block with wrong payload"
+    ~tags:["precheck"; "fake_block"; "propagation"; "payload"]
   @@ fun protocol ->
   (* Expected topology is :
                N3
@@ -305,14 +291,14 @@ let propagate_precheckable_bad_block_signature =
                N4
   *)
   Log.info "Setting up the node topology" ;
-  let n1 = Node.create [] in
+  let node_client = Node.create [] in
   let ring =
     Cluster.create ~name:"ring" 4 [Private_mode; Synchronisation_threshold 0]
   in
   let n2 = List.hd ring in
   Cluster.ring ring ;
-  Cluster.connect [n1] [n2] ;
-  let cluster = n1 :: ring in
+  Cluster.connect [node_client] [n2] ;
+  let cluster = node_client :: ring in
   Log.info "Starting up cluster" ;
   let* () =
     Cluster.start
@@ -321,7 +307,7 @@ let propagate_precheckable_bad_block_signature =
       cluster
   in
   Log.info "Cluster initialized" ;
-  let* client = Client.(init ~endpoint:(Node n1) ()) in
+  let* client = Client.(init ~endpoint:(Node node_client) ()) in
   let* () = Client.activate_protocol ~protocol client in
   let bootstrap1 = Constant.bootstrap1.alias in
   let* () =
@@ -331,8 +317,12 @@ let propagate_precheckable_bad_block_signature =
            let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
-  let* op_block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:true in
-  let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
+  let* op_block_header =
+    forge_block ~client node_client ~key:bootstrap1 ~with_op:true
+  in
+  let* block_header =
+    forge_block ~client node_client ~key:bootstrap1 ~with_op:false
+  in
   (* Put a bad context *)
   Log.info "Crafting a block header with a bad context hash" ;
   let bad_block_header =
@@ -352,12 +342,12 @@ let propagate_precheckable_bad_block_signature =
   let unsigned_bad_block_header_hex =
     String.sub bad_block_header_hex 0 (String.length bad_block_header_hex - 128)
   in
-  let* bad_signature =
+  let* signature =
     Client.sign_block client unsigned_bad_block_header_hex ~delegate:bootstrap1
     >>= fun s -> String.trim s |> return
   in
   let signed_bad_block_header_hex =
-    String.concat "" [unsigned_bad_block_header_hex; bad_signature]
+    String.concat "" [unsigned_bad_block_header_hex; signature]
   in
   let injection_json =
     `O
@@ -368,26 +358,31 @@ let propagate_precheckable_bad_block_signature =
   in
   let wait_precheck_but_validation_fail node =
     let got_prechecked = ref false in
-    Node.wait_for node "node_block_validator.v0" (fun value ->
-        match JSON.(value |=> 1 |-> "event" |-> "kind" |> as_string_opt) with
-        | Some "prechecked" ->
-            got_prechecked := true ;
-            None
-        | Some _ -> None
-        | None -> (
-            match
-              JSON.(
-                value |=> 1 |-> "event" |-> "failed_validation_after_precheck"
-                |> as_opt)
-            with
-            | None -> None
-            | Some _ ->
-                if !got_prechecked then Some ()
-                else Test.fail "The block was not expected to be prechecked"))
+    Lwt.join
+      [
+        (let* () = Node.wait_for node "prechecked_block.v0" (fun _ -> Some ()) in
+         got_prechecked := true ;
+         Lwt.return ());
+        (let* () =
+           Node.wait_for node "validation_failure_after_precheck.v0" (fun _ ->
+               Some ())
+         in
+         if !got_prechecked then Lwt.return ()
+         else Test.fail "The block was not expected to be prechecked");
+      ]
   in
-  (* Wait all nodes to precheck the block but fail on validation *)
+  let expect_precheck_failure node =
+    Node.wait_for node "precheck_failure.v0" (fun _ -> Some ())
+  in
   let precheck_waiter =
-    Lwt_list.iter_p wait_precheck_but_validation_fail cluster
+    if Protocol.(protocol <= Kathmandu) then
+      (* On Kathmandu and below: wait all nodes to precheck the block
+         but fail on validation *)
+      Lwt_list.iter_p wait_precheck_but_validation_fail cluster
+    else
+      (* Post Kathmandu: the precheck is not an over-approximation
+         anymore and cannot even be considered precheckable. *)
+      expect_precheck_failure node_client
   in
   let p =
     Client.spawn_rpc ~data:injection_json POST ["injection"; "block"] client
@@ -396,7 +391,7 @@ let propagate_precheckable_bad_block_signature =
   let* () =
     Lwt.pick
       [
-        ( Lwt_unix.sleep 30. >>= fun () ->
+        ( Lwt_unix.sleep 10. >>= fun () ->
           Test.fail "timeout while waiting for precheck" );
         precheck_waiter;
       ]
@@ -418,4 +413,4 @@ let propagate_precheckable_bad_block_signature =
 let register ~protocols =
   precheck_block protocols ;
   propagate_precheckable_bad_block protocols ;
-  propagate_precheckable_bad_block_signature protocols
+  propagate_precheckable_bad_block_payload protocols

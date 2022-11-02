@@ -41,7 +41,9 @@ let decode_dictator json =
   Option.map JSON.as_string JSON.(json |-> "testnet_dictator" |> as_opt)
 
 let get_dictator client =
-  let* json = RPC.get_constants client in
+  let* json =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   return (decode_dictator json)
 
 let check_dictator client expected_dictator =
@@ -51,7 +53,7 @@ let check_dictator client expected_dictator =
   unit
 
 let init chain_id ~from_protocol ~to_protocol =
-  let user_activated_upgrades = [(3, to_protocol)] in
+  let user_activated_upgrades = [(11, to_protocol)] in
   let patch_config, timestamp =
     match chain_id with
     | Chain_id_mainnet ->
@@ -74,13 +76,16 @@ let init chain_id ~from_protocol ~to_protocol =
   in
   let* node = Node.init ?patch_config [Synchronisation_threshold 0] in
   let* client = Client.init ~endpoint:(Node node) () in
+  let parameters =
+    [(["blocks_per_cycle"], `Int 4); (["cycles_per_voting_period"], `Int 2)]
+  in
+  let parameters =
+    if Protocol.number from_protocol >= 014 then
+      parameters @ [(["nonce_revelation_threshold"], `Int 2)]
+    else parameters
+  in
   let* parameter_file =
-    Protocol.write_parameter_file
-      ~base:(Right (from_protocol, None))
-      [
-        (["blocks_per_cycle"], Some "4");
-        (["cycles_per_voting_period"], Some "2");
-      ]
+    Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
   let* () =
     Client.activate_protocol
@@ -102,33 +107,46 @@ let register_migration_test chain_id =
   @@ fun to_protocol ->
   may_apply (Protocol.previous_protocol to_protocol) @@ fun from_protocol ->
   let* node, client = init chain_id ~from_protocol ~to_protocol in
-  let* () = bake node client in
-  let* () = bake node client in
+  let* () = repeat 10 (fun () -> bake node client) in
   Log.info "Checking that migration occurred..." ;
   let* () =
     Voting.check_protocols
       client
       (Protocol.hash from_protocol, Protocol.hash to_protocol)
   in
-  let expected_dictator, expected_remaining =
+  let expected_dictator, expected_period =
     match chain_id with
+    | Chain_id_ghostnet when to_protocol = Kathmandu ->
+        ( Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8",
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 8;
+            position = 2;
+            remaining = 1;
+          } )
     | Chain_id_ghostnet when to_protocol = Alpha ->
-        (Some "tz1Xf8zdT3DbAX9cHw3c3CXh79rc4nK4gCe8", 1)
-    | _ -> (None, 5)
+        ( None,
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 3;
+            position = 7;
+            remaining = 0;
+          } )
+    | _ ->
+        ( None,
+          {
+            Voting.index = 1;
+            kind = Proposal;
+            start_position = 8;
+            position = 2;
+            remaining = 5;
+          } )
   in
 
   let* () = check_dictator client expected_dictator in
-  let* () =
-    Voting.check_current_period
-      client
-      {
-        Voting.index = 0;
-        kind = Proposal;
-        start_position = 0;
-        position = 2;
-        remaining = expected_remaining;
-      }
-  in
+  let* () = Voting.check_current_period client expected_period in
   return ()
 
 let register ~protocols =

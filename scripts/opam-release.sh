@@ -56,7 +56,7 @@ else
     git checkout master
 fi
 
-branch_name="octez-$version"
+branch_name="octez-$(echo "$version" | tr '~' -)"
 if git rev-parse "$branch_name" > /dev/null 2> /dev/null ; then
     log "Error: a branch named $branch_name already exists in $opam_dir."
     exit 1
@@ -68,8 +68,8 @@ cd "$current_dir"
 cd "$opam_dir"
 
 log "Creating commit..."
-branch="octez-""$(echo "$version" | tr '~' -)"
-git checkout -b "$branch"
+git checkout -b "$branch_name"
 git add packages
 git commit -am "Octez $version packages"
-log "A branch named $branch has been created in $opam_dir."
+
+log "A branch named $branch_name has been created in $opam_dir."

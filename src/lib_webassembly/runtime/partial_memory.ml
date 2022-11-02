@@ -12,19 +12,27 @@ type offset = int32
 type count = int32
 
 (* Expose exception types *)
-include Memory_exn
+exception Type
+
+exception SizeLimit
+
+exception OutOfMemory
+
+exception Bounds
+
+exception SizeOverflow
 
 (* Copied from [Memory] module *)
 let page_size = 0x10000L (* 64 KiB *)
 
 module Chunked = struct
-  module Backend = Chunked_byte_vector.Lwt
+  module Backend = Chunked_byte_vector
 
   type t = Backend.t
 
   let length_from_pages pages = Int64.(mul (of_int32 pages) page_size)
 
-  let create pages = Backend.create (length_from_pages pages)
+  let create pages = Backend.allocate (length_from_pages pages)
 
   let grow delta_pages pages =
     Backend.grow pages (length_from_pages delta_pages)
@@ -38,10 +46,18 @@ module Chunked = struct
   let store_byte = Backend.store_byte
 end
 
+let reraise = function
+  | Chunked_byte_vector.Bounds | Lazy_vector.Bounds -> raise Bounds
+  | Chunked_byte_vector.SizeOverflow | Lazy_vector.SizeOverflow ->
+      raise SizeOverflow
+  | exn -> raise exn
+
 type memory = {mutable ty : memory_type; content : Chunked.t}
 
 (* Copied from [Memory] module *)
 type t = memory
+
+let content {content; _} = content
 
 let max_pages = 0x10000l
 
@@ -85,11 +101,13 @@ let grow mem delta =
     raise SizeOverflow ;
   let lim' = {lim with min = new_size} in
   if not (valid_limits lim') then raise SizeLimit else mem.ty <- MemoryType lim' ;
-  Chunked.grow delta mem.content
+  try Chunked.grow delta mem.content with exn -> reraise exn
 
-let load_byte mem = Chunked.load_byte mem.content
+let load_byte mem i =
+  Lwt.catch (fun () -> Chunked.load_byte mem.content i) reraise
 
-let store_byte mem = Chunked.store_byte mem.content
+let store_byte mem i b =
+  Lwt.catch (fun () -> Chunked.store_byte mem.content i b) reraise
 
 (* Copied from [Memory] module *)
 let load_bytes mem a n =

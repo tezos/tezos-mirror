@@ -1,29 +1,30 @@
 (* Types *)
 
-type num_type = I32Type | I64Type | F32Type | F64Type
+type num_type = I32Type | I64Type | F32Type | F64Type [@@deriving show]
 
-type vec_type = V128Type
+type vec_type = V128Type [@@deriving show]
 
-type ref_type = FuncRefType | ExternRefType
+type ref_type = FuncRefType | ExternRefType [@@deriving show]
 
 type value_type =
   | NumType of num_type
   | VecType of vec_type
   | RefType of ref_type
+[@@deriving show]
 
-type result_type = value_type Lazy_vector.LwtInt32Vector.t
+type result_type = value_type Lazy_vector.Int32Vector.t
 
 type func_type = FuncType of result_type * result_type
 
-type 'a limits = {min : 'a; max : 'a option}
+type 'a limits = {min : 'a; max : 'a option} [@@deriving show]
 
-type mutability = Immutable | Mutable
+type mutability = Immutable | Mutable [@@deriving show]
 
-type table_type = TableType of Int32.t limits * ref_type
+type table_type = TableType of Int32.t limits * ref_type [@@deriving show]
 
-type memory_type = MemoryType of Int32.t limits
+type memory_type = MemoryType of Int32.t limits [@@deriving show]
 
-type global_type = GlobalType of value_type * mutability
+type global_type = GlobalType of value_type * mutability [@@deriving show]
 
 type extern_type =
   | ExternFuncType of func_type
@@ -31,14 +32,15 @@ type extern_type =
   | ExternMemoryType of memory_type
   | ExternGlobalType of global_type
 
-(* TODO: these types should move somewhere else *)
-type pack_size = Pack8 | Pack16 | Pack32 | Pack64
+(* Reference-interpreter-todo: these types should move somewhere else *)
+type pack_size = Pack8 | Pack16 | Pack32 | Pack64 [@@deriving show]
 
-type extension = SX | ZX
+type extension = SX | ZX [@@deriving show]
 
-type pack_shape = Pack8x8 | Pack16x4 | Pack32x2
+type pack_shape = Pack8x8 | Pack16x4 | Pack32x2 [@@deriving show]
 
 type vec_extension = ExtLane of pack_shape * extension | ExtSplat | ExtZero
+[@@deriving show]
 
 (* Attributes *)
 
@@ -85,8 +87,8 @@ let match_limits lim1 lim2 =
   | Some i, Some j -> I32.le_u i j
 
 let func_type_empty (FuncType (ins, out)) =
-  Lazy_vector.LwtInt32Vector.num_elements ins = 0l
-  && Lazy_vector.LwtInt32Vector.num_elements out = 0l
+  Lazy_vector.Int32Vector.num_elements ins = 0l
+  && Lazy_vector.Int32Vector.num_elements out = 0l
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3387
 
@@ -94,18 +96,18 @@ let func_type_empty (FuncType (ins, out)) =
    evaluation. *)
 let func_types_equal (FuncType (ins, out)) (FuncType (ins', out')) =
   let open Lwt.Syntax in
-  let ins_len = Lazy_vector.LwtInt32Vector.num_elements ins in
-  let out_len = Lazy_vector.LwtInt32Vector.num_elements out in
+  let ins_len = Lazy_vector.Int32Vector.num_elements ins in
+  let out_len = Lazy_vector.Int32Vector.num_elements out in
   if
-    ins_len <> Lazy_vector.LwtInt32Vector.num_elements ins'
-    || out_len <> Lazy_vector.LwtInt32Vector.num_elements out'
+    ins_len <> Lazy_vector.Int32Vector.num_elements ins'
+    || out_len <> Lazy_vector.Int32Vector.num_elements out'
   then Lwt.return_false
   else
     let rec for_all acc i len vec vec' =
       if i >= len || not acc then Lwt.return acc
       else
-        let* t = Lazy_vector.LwtInt32Vector.get i vec in
-        let* t' = Lazy_vector.LwtInt32Vector.get i vec' in
+        let* t = Lazy_vector.Int32Vector.get i vec in
+        let* t' = Lazy_vector.Int32Vector.get i vec' in
         for_all (t = t') (Int32.succ i) len vec vec'
     in
     let* ins_eq = for_all true 0l ins_len ins ins' in
@@ -179,7 +181,7 @@ let string_of_result_type ts =
      Ensure `string_of_*` functions are never used in the PVM, since it will be
      wrong on partial values. It can only be used during the execution of the
      testsuite. *)
-  let ts = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings ts) in
+  let ts = List.map snd (Lazy_vector.Int32Vector.loaded_bindings ts) in
   "[" ^ String.concat " " (List.map string_of_value_type ts) ^ "]"
 
 let string_of_func_type (FuncType (ins, out)) =

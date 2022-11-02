@@ -32,9 +32,11 @@
             other files.
 *)
 
-let protocols = Protocol.[Ithaca; Jakarta; Kathmandu; Alpha]
+let protocols = Protocol.[Kathmandu; Lima; Alpha]
 
 let migrate_to = Protocol.Alpha
+
+let alpha_can_stitch_from_its_predecessor = false
 
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
@@ -46,6 +48,7 @@ let register_protocol_independent_tests () =
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
   Client_keys.register_protocol_independent () ;
+  Injection.register_protocol_independent () ;
   Light.register_protocol_independent () ;
   Mockup.register_protocol_independent () ;
   P2p.register_protocol_independent () ;
@@ -60,16 +63,13 @@ let register_protocol_migration_tests () =
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
-  (* Alpha cannot stitch from Jakarta yet, but when it can, we can
-     add a voting test from Jakarta to Alpha. *)
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:(Known Jakarta)
-    ~loser_protocols:[migrate_to] ;
-  Voting.register
-    ~from_protocol:Ithaca
-    ~to_protocol:Injected_test
-    ~loser_protocols:[migrate_to; Ithaca] ;
+  (if alpha_can_stitch_from_its_predecessor then
+   Protocol.previous_protocol Alpha
+   |> Option.iter @@ fun from_protocol ->
+      Voting.register
+        ~from_protocol
+        ~to_protocol:(Known Alpha)
+        ~loser_protocols:[]) ;
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Injected_test
@@ -77,19 +77,25 @@ let register_protocol_migration_tests () =
   Voting.register
     ~from_protocol:migrate_to
     ~to_protocol:Demo
-    ~loser_protocols:[migrate_from]
+    ~loser_protocols:[migrate_from] ;
+  Iticket_migration.register ~migrate_from ~migrate_to
 
 let register_protocol_agnostic_tests () =
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
+  Bad_indentation.register ~protocols ;
   Baker_test.register ~protocols:[Alpha] ;
   Baking.register ~protocols ;
+  Baking.register_operations_pool ~protocols:[Kathmandu; Lima; Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Big_map_all.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
   Cache_cache.register protocols ;
   Client_config.register ~protocols:[Alpha] ;
   Client_commands.register ~protocols ;
+  Client_run_view.register ~protocols ;
+  Contract_hash_fun.register ~protocols ;
+  Create_contract.register ~protocols ;
   Dal.register ~protocols:[Alpha] ;
   Deposits_limit.register ~protocols ;
   Double_bake.register ~protocols:[Alpha] ;
@@ -97,11 +103,15 @@ let register_protocol_agnostic_tests () =
   Forge.register ~protocols:[Alpha] ;
   Global_constants.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
+  Large_metadata.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
+  Liquidity_baking_per_block_votes.register ~protocols ;
   Manager_operations.register ~protocols ;
   Mockup.register ~protocols ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
+  Multinode_snapshot.register ~protocols:[Alpha] ;
+  Consensus_key.register ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Normalize.register ~protocols:[Alpha] ;
   Precheck.register ~protocols ;
@@ -115,44 +125,49 @@ let register_protocol_agnostic_tests () =
   Rpc_config_logging.register ~protocols:[Alpha] ;
   RPC_test.register protocols ;
   Run_operation_RPC.register ~protocols ;
+  Run_script.register ~protocols:[Alpha] ;
   Runtime_script_failure.register ~protocols ;
+  Sapling.register ~protocols:[Alpha] ;
+  Self_address_transfer.register ~protocols ;
   Signer_test.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   Synchronisation_heuristic.register ~protocols:[Alpha] ;
-  Tenderbake.register ~protocols:[Alpha]
-
-let register_J_plus_tests () =
-  (* Relies on a feature only available since J.
-     Move these to [register_protocol_agnostic_tests] once J is the smallest
-     protocol. *)
-  let protocols = Protocol.[Jakarta; Kathmandu; Alpha] in
-  Client_run_view.register ~protocols ;
-  Large_metadata.register ~protocols:[Alpha] ;
-  Multinode_snapshot.register ~protocols:[Alpha] ;
-  Run_script.register ~protocols:[Alpha] ;
-  Sapling.register ~protocols:[Alpha] ;
+  Tenderbake.register ~protocols:[Alpha] ;
+  Test_contract_bls12_381.register ~protocols:[Alpha] ;
+  Ticket_updates_in_receipt.register ~protocols:[Alpha] ;
   Timelock.register ~protocols ;
+  Tickets.register ~protocols ;
   Tx_rollup.register ~protocols ;
-  Tx_rollup_node.register ~protocols ;
-  Views.register [Alpha]
+  Tx_rollup_l2_node.register ~protocols ;
+  Tzip4_view.register ~protocols ;
+  Views.register [Alpha] ;
+  Retro.register ~protocols
 
 let register_K_plus_tests () =
-  (* Relies on a feature only available since K. *)
+  (* Relies on a feature only available since K.
+     Move these to [register_protocol_agnostic_tests] once K is the smallest
+     protocol. *)
   let protocols = Protocol.[Kathmandu; Alpha] in
   Events.register ~protocols:[Alpha] ;
-  Ghostnet_dictator_migration.register ~protocols:[Alpha] ;
+  Ghostnet_dictator_migration.register ~protocols ;
   Increase_paid_storage.register ~protocols ;
   Operation_validation.register ~protocols ;
   Sc_rollup.register ~protocols:[Alpha] ;
-  Test_contract_bls12_381.register ~protocols:[Alpha] ;
-  Testnet_dictator.register ~protocols:[Alpha] ;
+  Testnet_dictator.register ~protocols ;
   Vdf_test.register ~protocols
+
+let register_L_plus_tests () =
+  (* Relies on a feature only available since L.
+     Move these to [register_protocol_agnostic_tests] once L is the smallest
+     protocol. *)
+  let protocols = Protocol.[Lima; Alpha] in
+  Used_paid_storage_spaces.register ~protocols
 
 let () =
   register_protocol_independent_tests () ;
   register_protocol_migration_tests () ;
   register_protocol_agnostic_tests () ;
-  register_J_plus_tests () ;
   register_K_plus_tests () ;
+  register_L_plus_tests () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

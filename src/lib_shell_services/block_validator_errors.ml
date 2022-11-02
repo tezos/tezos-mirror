@@ -47,7 +47,7 @@ type block_error =
   | Unallowed_pass of {
       operation : Operation_hash.t;
       pass : int;
-      allowed_pass : int list;
+      allowed_pass : int option;
     }
   | Cannot_parse_block_header
   | Economic_protocol_error
@@ -190,7 +190,7 @@ let block_error_encoding =
            (req "error" (constant "invalid_pass"))
            (req "operation" Operation_hash.encoding)
            (req "pass" uint8)
-           (req "allowed_pass" (list uint8)))
+           (req "allowed_pass" (option uint8)))
         (function
           | Unallowed_pass {operation; pass; allowed_pass} ->
               Some ((), operation, pass, allowed_pass)
@@ -303,7 +303,9 @@ let pp_block_error ppf = function
         Operation_hash.pp_short
         operation
         pass
-        Format.(pp_print_list pp_print_int)
+        (fun fmt -> function
+          | None -> Format.fprintf fmt "None"
+          | Some i -> Format.pp_print_int fmt i)
         allowed_pass
   | Cannot_parse_block_header ->
       Format.fprintf ppf "Failed to parse the block header."

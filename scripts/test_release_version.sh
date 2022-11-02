@@ -4,7 +4,7 @@ set -eu
 # test the version associated to a git tag. Here we use
 # a random version and we check if it is correctly parsed
 # The script tezos-version prints the
-# same version displayed by tezos-node --version
+# same version displayed by octez-node --version
 
 VERSION='10.94'
 RANDOMTAG='testtesttest'

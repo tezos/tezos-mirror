@@ -46,10 +46,19 @@ let new_context_with_stakers nb_stakers =
   let*? initial_balances =
     List.init ~when_negative_length:[] nb_stakers (fun _ -> initial_balance)
   in
-  let* b, contracts = Context.init_n ~initial_balances nb_stakers () in
+  let sc_rollup_max_number_of_messages_per_commitment_period =
+    (* The default value is too large for testing. *)
+    1000
+  in
+  let* b, contracts =
+    Context.init_n
+      ~initial_balances
+      nb_stakers
+      ~sc_rollup_max_number_of_messages_per_commitment_period
+      ()
+  in
   let+ inc = Incremental.begin_construction b in
-  let state = Incremental.validation_state inc in
-  let ctxt = state.ctxt in
+  let ctxt = Incremental.alpha_ctxt inc in
   (* Necessary to originate rollups. *)
   let ctxt = Alpha_context.Origination_nonce.init ctxt Operation_hash.zero in
   let ctxt = Alpha_context.Internal_for_tests.to_raw ctxt in
@@ -240,6 +249,52 @@ let assert_commitment_hash_equal ~loc _ctxt x y =
     x
     y
 
+let assert_commitment_equal ~loc x y =
+  Assert.equal
+    ~loc
+    (fun Commitment_repr.
+           {
+             compressed_state = c1;
+             inbox_level = l1;
+             predecessor = p1;
+             number_of_ticks = n1;
+           }
+         Commitment_repr.
+           {
+             compressed_state = c2;
+             inbox_level = l2;
+             predecessor = p2;
+             number_of_ticks = n2;
+           } ->
+      Sc_rollup_repr.State_hash.equal c1 c2
+      && Raw_level_repr.equal l1 l2
+      && Commitment_repr.Hash.equal p1 p2
+      && Sc_rollup_repr.Number_of_ticks.equal n1 n2)
+    "Compare commitment"
+    Commitment_repr.pp
+    x
+    y
+
+let assert_commitments_with_levels_equal ~loc cs1 cs2 =
+  let commitment_with_level_pp ppf (hash, level) =
+    Format.fprintf
+      ppf
+      "(%a, %a)"
+      Sc_rollup_commitment_repr.Hash.pp
+      hash
+      Raw_level_repr.pp
+      level
+  in
+  Assert.assert_equal_list
+    ~loc
+    (fun (commitment1, level1) (commitment2, level2) ->
+      Sc_rollup_commitment_repr.Hash.(commitment1 = commitment2)
+      && Raw_level_repr.(level1 = level2))
+    "Unexpected list of cemented commitments"
+    commitment_with_level_pp
+    cs1
+    cs2
+
 let assert_kinds_are_equal ~loc x y =
   Assert.equal
     ~loc
@@ -413,7 +468,7 @@ let test_withdrawing_twice () =
     Sc_rollup_errors.Sc_rollup_not_staked
 
 let number_of_ticks_exn n =
-  match Sc_rollup_repr.Number_of_ticks.of_int32 n with
+  match Sc_rollup_repr.Number_of_ticks.of_value n with
   | Some x -> x
   | None -> Stdlib.failwith "Bad Number_of_ticks"
 
@@ -431,6 +486,40 @@ let valid_inbox_level ctxt =
     Raw_level_repr.of_int32_exn
       (Int32.add root_level (Int32.mul (Int32.of_int commitment_freq) i))
 
+let produce_and_refine ctxt ~number_of_commitments ?(start_at_level = 1l)
+    ~predecessor staker rollup =
+  let rec aux ctxt n l predecessor result =
+    if n = 0 then return @@ (List.rev result, ctxt)
+    else
+      let commitment =
+        Commitment_repr.
+          {
+            predecessor;
+            inbox_level = valid_inbox_level ctxt l;
+            number_of_ticks = number_of_ticks_exn 1232909L;
+            compressed_state = Sc_rollup_repr.State_hash.zero;
+          }
+      in
+      let* c, _level, ctxt =
+        Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+          ctxt
+          rollup
+          staker
+          commitment
+      in
+      aux ctxt (n - 1) (Int32.succ l) c (c :: result)
+  in
+  aux ctxt number_of_commitments start_at_level predecessor []
+
+let rec cement_commitments ctxt commitments rollup =
+  match commitments with
+  | [] -> return ctxt
+  | c :: commitments ->
+      let* ctxt, _commitment =
+        Sc_rollup_stake_storage.cement_commitment ctxt rollup c
+      in
+      cement_commitments ctxt commitments rollup
+
 let test_deposit_then_refine () =
   let* ctxt = new_context () in
   let* rollup, genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
@@ -443,7 +532,7 @@ let test_deposit_then_refine () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state =
           Sc_rollup_repr.State_hash.zero (* genesis.compressed_state; *);
       }
@@ -470,7 +559,7 @@ let test_deposit_then_refine_bad_inbox () =
       {
         predecessor = genesis_hash;
         inbox_level = Raw_level_repr.of_int32_exn 22l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -496,7 +585,7 @@ let test_publish () =
          {
            predecessor = genesis_hash;
            inbox_level = valid_inbox_level ctxt 1l;
-           number_of_ticks = number_of_ticks_exn 152231l;
+           number_of_ticks = number_of_ticks_exn 152231L;
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
@@ -514,7 +603,7 @@ let test_publish_returns_oldest_publish_level () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 152231l;
+        number_of_ticks = number_of_ticks_exn 152231L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -553,7 +642,7 @@ let test_withdraw_and_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -582,7 +671,7 @@ let test_refine_commitment_different_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -599,7 +688,7 @@ let test_refine_commitment_different_stakers () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -623,7 +712,7 @@ let test_refine_stake_twice_different_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -654,7 +743,7 @@ let test_refine_stake_twice_same_staker () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -687,7 +776,7 @@ let test_deposit_then_publish () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 152231l;
+        number_of_ticks = number_of_ticks_exn 152231L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -706,7 +795,7 @@ let test_publish_missing_rollup () =
       {
         predecessor = Commitment_repr.Hash.zero;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -732,7 +821,7 @@ let test_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -765,60 +854,70 @@ let test_cement_three_commitments () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  lift
-  @@
-  let commitment =
+  let commitment1 =
     Commitment_repr.
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
   let* c1, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment1
   in
-  let commitment =
+  let commitment2 =
     Commitment_repr.
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
   let* c2, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment2
   in
-  let commitment =
+  let commitment3 =
     Commitment_repr.
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
   let* c3, _level, ctxt =
-    Sc_rollup_stake_storage.Internal_for_tests.refine_stake
-      ctxt
-      rollup
-      staker
-      commitment
+    lift
+    @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
+         ctxt
+         rollup
+         staker
+         commitment3
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
-  let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c3 in
+  let* ctxt, commitment1' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+  in
+  let* ctxt, commitment2' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c2
+  in
+  let* ctxt, commitment3' =
+    lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c3
+  in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment1' commitment1 in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment2' commitment2 in
+  let* () = assert_commitment_equal ~loc:__LOC__ commitment3' commitment3 in
   assert_true ctxt
 
 let test_cement_then_remove () =
@@ -836,7 +935,7 @@ let test_cement_then_remove () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -849,7 +948,7 @@ let test_cement_then_remove () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -891,7 +990,7 @@ let test_cement_with_zero_stakers_fails () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -926,11 +1025,11 @@ let test_cement_fail_too_recent () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
-  let* c1, _level, ctxt =
+  let* c1, level, ctxt =
     lift
     @@ Sc_rollup_stake_storage.Internal_for_tests.refine_stake
          ctxt
@@ -938,20 +1037,24 @@ let test_cement_fail_too_recent () =
          staker
          commitment
   in
+  let min_cementation_level = Raw_level_repr.add level challenge_window in
   let* () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      Sc_rollup_errors.Sc_rollup_too_recent
+      (Sc_rollup_errors.Sc_rollup_commitment_too_recent
+         {current_level = level; min_level = min_cementation_level})
   in
   let ctxt =
     Raw_context.Internal_for_tests.add_level ctxt (challenge_window - 1)
   in
+  let level = (Raw_context.current_level ctxt).level in
   let* () =
     assert_fails_with
       ~loc:__LOC__
       (Sc_rollup_stake_storage.cement_commitment ctxt rollup c1)
-      Sc_rollup_errors.Sc_rollup_too_recent
+      (Sc_rollup_errors.Sc_rollup_commitment_too_recent
+         {current_level = level; min_level = min_cementation_level})
   in
   assert_true ctxt
 
@@ -964,7 +1067,7 @@ let test_cement_deadline_uses_oldest_add_time () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1010,7 +1113,7 @@ let test_last_cemented_commitment_hash_with_level () =
       {
         predecessor = genesis_hash;
         inbox_level;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1023,7 +1126,7 @@ let test_last_cemented_commitment_hash_with_level () =
          commitment
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   let* c1', inbox_level', ctxt =
@@ -1050,7 +1153,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1072,7 +1175,9 @@ let test_genesis_info_of_rollup () =
   let level_before_rollup = (Raw_context.current_level ctxt).level in
   let* rollup, _genesis_hash, ctxt = lift @@ new_sc_rollup ctxt in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
-  let* genesis_info = lift @@ Sc_rollup_storage.genesis_info ctxt rollup in
+  let* _ctxt, genesis_info =
+    lift @@ Sc_rollup_storage.genesis_info ctxt rollup
+  in
   let initial_level = genesis_info.level in
   Assert.equal_int32
     ~loc:__LOC__
@@ -1088,7 +1193,7 @@ let test_stake_on_existing_node () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1119,7 +1224,7 @@ let test_cement_with_two_stakers () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1136,7 +1241,7 @@ let test_cement_with_two_stakers () =
          {
            predecessor = c1;
            inbox_level = level 2l;
-           number_of_ticks = number_of_ticks_exn 1232909l;
+           number_of_ticks = number_of_ticks_exn 1232909L;
            compressed_state = Sc_rollup_repr.State_hash.zero;
          }
      in
@@ -1167,7 +1272,7 @@ let test_can_remove_staker () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1184,7 +1289,7 @@ let test_can_remove_staker () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1216,7 +1321,7 @@ let test_can_remove_staker2 () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1233,7 +1338,7 @@ let test_can_remove_staker2 () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1265,7 +1370,7 @@ let test_removed_staker_can_not_withdraw () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1282,7 +1387,7 @@ let test_removed_staker_can_not_withdraw () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1312,7 +1417,7 @@ let test_no_cement_on_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1329,7 +1434,7 @@ let test_no_cement_on_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 44l;
+        number_of_ticks = number_of_ticks_exn 44L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1362,7 +1467,7 @@ let test_no_cement_with_one_staker_at_zero_commitment () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1393,7 +1498,7 @@ let test_non_cemented_parent () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1410,7 +1515,7 @@ let test_non_cemented_parent () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1441,7 +1546,7 @@ let test_finds_conflict_point_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1458,7 +1563,7 @@ let test_finds_conflict_point_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 55l;
+        number_of_ticks = number_of_ticks_exn 55L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1490,7 +1595,7 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1507,7 +1612,7 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1524,7 +1629,7 @@ let test_finds_conflict_point_beneath_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 7373l;
+        number_of_ticks = number_of_ticks_exn 7373L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1557,7 +1662,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1574,7 +1679,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1591,7 +1696,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 7373l;
+        number_of_ticks = number_of_ticks_exn 7373L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1608,7 +1713,7 @@ let test_conflict_point_is_first_point_of_disagreement () =
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1651,7 +1756,7 @@ let test_conflict_point_computation_fits_in_gas_limit () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1l;
+        number_of_ticks = number_of_ticks_exn 1L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1702,10 +1807,10 @@ let test_conflict_point_computation_fits_in_gas_limit () =
         (commitment_hash :: acc)
   in
   let* branch_1, ctxt =
-    branch ctxt 1l staker1 root_commitment_hash 2l max_commits []
+    branch ctxt 1L staker1 root_commitment_hash 2l max_commits []
   in
   let* branch_2, ctxt =
-    branch ctxt 2l staker2 root_commitment_hash 2l max_commits []
+    branch ctxt 2L staker2 root_commitment_hash 2l max_commits []
   in
   let ctxt =
     Raw_context.set_gas_limit
@@ -1734,7 +1839,7 @@ let test_no_conflict_point_one_staker_at_lcc_preboot () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1778,7 +1883,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1795,7 +1900,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1811,7 +1916,7 @@ let test_no_conflict_point_one_staker_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1832,7 +1937,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1856,7 +1961,7 @@ let test_no_conflict_point_both_stakers_at_lcc () =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
   let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
-  let* ctxt =
+  let* ctxt, _ =
     lift @@ Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
   in
   assert_fails_with
@@ -1881,7 +1986,7 @@ let test_staker_cannot_backtrack () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1898,7 +2003,7 @@ let test_staker_cannot_backtrack () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1929,7 +2034,7 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1946,7 +2051,7 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1963,7 +2068,7 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 7373l;
+        number_of_ticks = number_of_ticks_exn 7373L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -1981,7 +2086,7 @@ let test_staker_cannot_change_branch () =
       {
         predecessor = c2;
         inbox_level = level 3l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2028,7 +2133,7 @@ let test_refine_stake_of_missing_rollup () =
           {
             predecessor = Commitment_repr.Hash.zero;
             inbox_level = valid_inbox_level ctxt 1l;
-            number_of_ticks = number_of_ticks_exn 1232909l;
+            number_of_ticks = number_of_ticks_exn 1232909L;
             compressed_state = Sc_rollup_repr.State_hash.zero;
           })
 
@@ -2093,7 +2198,7 @@ let test_concurrent_refinement_point_of_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2102,7 +2207,7 @@ let test_concurrent_refinement_point_of_conflict () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 7373l;
+        number_of_ticks = number_of_ticks_exn 7373L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2162,7 +2267,7 @@ let test_concurrent_refinement_cement () =
       {
         predecessor = genesis_hash;
         inbox_level = valid_inbox_level before_ctxt 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2188,7 +2293,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c1 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c1
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   let* c2, ctxt =
@@ -2213,7 +2320,9 @@ let test_concurrent_refinement_cement () =
        let ctxt =
          Raw_context.Internal_for_tests.add_level ctxt challenge_window
        in
-       let* ctxt = Sc_rollup_stake_storage.cement_commitment ctxt rollup c2 in
+       let* ctxt, _ =
+         Sc_rollup_stake_storage.cement_commitment ctxt rollup c2
+       in
        Sc_rollup_commitment_storage.last_cemented_commitment ctxt rollup
   in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
@@ -2228,7 +2337,7 @@ let test_zero_tick_commitment_cannot_change_state () =
       {
         predecessor = genesis_hash;
         inbox_level = level 1l;
-        number_of_ticks = number_of_ticks_exn 1232909l;
+        number_of_ticks = number_of_ticks_exn 1232909L;
         compressed_state = Sc_rollup_repr.State_hash.zero;
       }
   in
@@ -2245,7 +2354,7 @@ let test_zero_tick_commitment_cannot_change_state () =
       {
         predecessor = c1;
         inbox_level = level 2l;
-        number_of_ticks = number_of_ticks_exn 0l;
+        number_of_ticks = number_of_ticks_exn 0L;
         compressed_state =
           Sc_rollup_repr.State_hash.context_hash_to_state_hash
             (Context_hash.hash_string ["wxyz"]);
@@ -2557,7 +2666,8 @@ let test_subscribe_slot_twice_at_same_level () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
-    (Dal_errors_repr.Dal_rollup_already_registered_to_slot (rollup, slot_index))
+    (Dal_errors_repr.Dal_rollup_already_registered_to_slot_index
+       (rollup, slot_index))
 
 let test_subscribe_slot_twice_at_different_levels () =
   let* ctxt = new_context () in
@@ -2570,7 +2680,8 @@ let test_subscribe_slot_twice_at_different_levels () =
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_storage.Dal_slot.subscribe ctxt rollup ~slot_index)
-    (Dal_errors_repr.Dal_rollup_already_registered_to_slot (rollup, slot_index))
+    (Dal_errors_repr.Dal_rollup_already_registered_to_slot_index
+       (rollup, slot_index))
 
 let test_subscribe_different_slots_at_same_level () =
   let* ctxt = new_context () in
@@ -2775,6 +2886,78 @@ let test_subscribed_slots_of_missing_rollup () =
         ctxt
         rollup
         (Raw_context.current_level ctxt).level)
+
+let test_get_cemented_commitments_with_levels_of_missing_rollup () =
+  assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
+      Sc_rollup_commitment_storage.Internal_for_tests
+      .get_cemented_commitments_with_levels
+        ctxt
+        rollup)
+
+let test_get_cemented_commitments_with_levels () =
+  let* ctxt, rollup, c0, staker =
+    originate_rollup_and_deposit_with_one_staker ()
+  in
+  let level = valid_inbox_level ctxt in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  (* Produce and stake on n commitments, each on top of the other. *)
+  (* Fetch number of stored commitments in context. *)
+  let max_num_stored_cemented_commitments =
+    (Raw_context.constants ctxt).sc_rollup
+      .max_number_of_stored_cemented_commitments
+  in
+  (* Produce and stake more commitments than the number of cemented
+     commitments that can be stored. *)
+  let number_of_commitments = max_num_stored_cemented_commitments + 5 in
+  let* commitments, ctxt =
+    lift
+    @@ produce_and_refine
+         ~number_of_commitments
+         ~predecessor:c0
+         ctxt
+         staker
+         rollup
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  (* Cement all commitments that have been produced. *)
+  let* ctxt = lift @@ cement_commitments ctxt commitments rollup in
+  (* Add genesis commitment to list of produced commitments. *)
+  let commitments = c0 :: commitments in
+  let number_of_cemented_commitments = List.length commitments in
+  (* Fetch cemented commitments that are kept in context. *)
+  let* cemented_commitments_with_levels, _ctxt =
+    lift
+    @@ Sc_rollup_commitment_storage.Internal_for_tests
+       .get_cemented_commitments_with_levels
+         ctxt
+         rollup
+  in
+  (* Check that only ctxt.sc_rollup.max_number_of_stored_cemented_commitments
+     are kept in context. *)
+  let* () =
+    Assert.equal_int
+      ~loc:__LOC__
+      (List.length cemented_commitments_with_levels)
+      max_num_stored_cemented_commitments
+  in
+  (* Check that the commitments that are kept in context are the
+     last [ctxt.sc_rollup.max_number_of_stored_cemented_commitments].
+     commitments that have been cemented. *)
+  let dropped_commitments =
+    number_of_cemented_commitments - max_num_stored_cemented_commitments
+  in
+  let expected_commitments_with_levels =
+    commitments
+    |> List.drop_n dropped_commitments
+    |> List.mapi (fun i c ->
+           (c, level @@ Int32.of_int (i + dropped_commitments)))
+  in
+  assert_commitments_with_levels_equal
+    ~loc:__LOC__
+    cemented_commitments_with_levels
+    expected_commitments_with_levels
 
 let tests =
   [
@@ -3069,6 +3252,14 @@ let tests =
       "Originating a rollup creates a genesis commitment"
       `Quick
       test_last_cemented_commitment_hash_with_level_when_genesis;
+    Tztest.tztest
+      "Getting cemented commitments with levels of missing rollups fails"
+      `Quick
+      test_get_cemented_commitments_with_levels_of_missing_rollup;
+    Tztest.tztest
+      "Getting cemented commitments returns multiple cemented commitments"
+      `Quick
+      test_get_cemented_commitments_with_levels;
   ]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2460

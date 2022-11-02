@@ -23,11 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
+module RPC = struct
   module Proto = Registerer.Registered
-  module Default_Filters = Prevalidator_filters.No_filter (Proto)
-  module Mempool = Default_Filters.Mempool
-  include Plugin
+  include Plugin.RPC
 end
 
-let () = Prevalidator_filters.register (module Plugin)
+let () = Shell_plugin.register_rpc (module RPC)

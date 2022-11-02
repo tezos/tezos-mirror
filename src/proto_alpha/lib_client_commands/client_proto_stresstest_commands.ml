@@ -71,6 +71,14 @@ type source = {
   sk : Signature.secret_key;
 }
 
+type source_with_uri = {
+  pkh : public_key_hash;
+  pk : public_key;
+  pk_uri : Client_keys.pk_uri;
+  sk : Signature.secret_key;
+  sk_uri : Client_keys.sk_uri;
+}
+
 type input_source =
   | Explicit of source
   | Wallet_alias of string
@@ -237,62 +245,74 @@ let parse_strategy s =
     Only unencrypted and encrypted sources from the wallet of [cctxt] are
     supported. *)
 let normalize_source cctxt =
+  let open Lwt_syntax in
   let sk_of_sk_uri sk_uri =
     match
       Signature.Secret_key.of_b58check
         (Uri.path (sk_uri : Client_keys.sk_uri :> Uri.t))
     with
     | Ok sk -> Lwt.return_some sk
-    | Error _ -> (
-        Tezos_signer_backends.Encrypted.decrypt cctxt sk_uri >>= function
-        | Error _ -> Lwt.return_none
-        | Ok sk -> Lwt.return_some sk)
+    | Error _ ->
+        let+ r = Tezos_signer_backends.Encrypted.decrypt cctxt sk_uri in
+        Option.of_result r
   in
   let key_from_alias alias =
     let warning msg alias =
-      cctxt#warning msg alias >>= fun () -> Lwt.return_none
+      let* () = cctxt#warning msg alias in
+      return_none
     in
-    (Client_keys.alias_keys cctxt alias >>= function
-     | Error _ | Ok None -> warning "Alias \"%s\" not found in the wallet" alias
-     | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
-         warning
-           "Alias \"%s\" does not contain public or secret key and could not \
-            be used for stresstest"
-           alias
-     | Ok (Some (pkh, Some pk, Some sk_uri)) -> (
-         sk_of_sk_uri sk_uri >>= function
-         | None ->
-             warning
-               "Cannot extract the secret key form the alias \"%s\" of the \
-                wallet"
-               alias
-         | Some sk ->
-             Lwt.return_some
-               {source = {pkh; pk; sk}; origin = Wallet_alias alias}))
-    >>= function
+    let* key =
+      let* r = Client_keys.alias_keys cctxt alias in
+      match r with
+      | Error _ | Ok None ->
+          warning "Alias \"%s\" not found in the wallet" alias
+      | Ok (Some (_, None, _)) | Ok (Some (_, _, None)) ->
+          warning
+            "Alias \"%s\" does not contain public or secret key and could not \
+             be used for stresstest"
+            alias
+      | Ok (Some (pkh, Some pk, Some sk_uri)) -> (
+          let* o = sk_of_sk_uri sk_uri in
+          match o with
+          | None ->
+              warning
+                "Cannot extract the secret key form the alias \"%s\" of the \
+                 wallet"
+                alias
+          | Some sk ->
+              Lwt.return_some
+                {source = {pkh; pk; sk}; origin = Wallet_alias alias})
+    in
+    match key with
     | None -> warning "Source given as alias \"%s\" ignored" alias
     | key -> Lwt.return key
   in
   let key_from_wallet pkh =
     let warning msg pkh =
-      cctxt#warning msg Signature.Public_key_hash.pp pkh >>= fun () ->
-      Lwt.return_none
+      let* () = cctxt#warning msg Signature.Public_key_hash.pp pkh in
+      return_none
     in
-    (Client_keys.get_key cctxt pkh >>= function
-     | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
-     | Ok (alias, pk, sk_uri) -> (
-         sk_of_sk_uri sk_uri >>= function
-         | None ->
-             cctxt#warning
-               "Cannot extract the secret key form the pkh \"%a\" (alias: \
-                \"%s\") of the wallet"
-               Signature.Public_key_hash.pp
-               pkh
-               alias
-             >>= fun () -> Lwt.return_none
-         | Some sk ->
-             Lwt.return_some {source = {pkh; pk; sk}; origin = Wallet_pkh}))
-    >>= function
+    let* key =
+      let* r = Client_keys.get_key cctxt pkh in
+      match r with
+      | Error _ -> warning "Pkh \"%a\" not found in the wallet" pkh
+      | Ok (alias, pk, sk_uri) -> (
+          let* o = sk_of_sk_uri sk_uri in
+          match o with
+          | None ->
+              let* () =
+                cctxt#warning
+                  "Cannot extract the secret key form the pkh \"%a\" (alias: \
+                   \"%s\") of the wallet"
+                  Signature.Public_key_hash.pp
+                  pkh
+                  alias
+              in
+              Lwt.return_none
+          | Some sk ->
+              Lwt.return_some {source = {pkh; pk; sk}; origin = Wallet_pkh})
+    in
+    match key with
     | None -> warning "Source given as pkh \"%a\" ignored" pkh
     | key -> Lwt.return key
   in
@@ -322,24 +342,28 @@ let sample_any_source_from_pool state =
     value (meaning that [--single-op-per-pkh-per-block] is active) then
     it is sampled from there, otherwise from [state.pool]. *)
 let rec sample_source_from_pool state (cctxt : Protocol_client_context.full) =
+  let open Lwt_syntax in
   match state.shuffled_pool with
   | None -> sample_any_source_from_pool state
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
-      log Debug (fun () ->
-          cctxt#message
-            "sample_transfer: %d unused sources for the block next to %a"
-            (List.length l)
-            Block_hash.pp
-            state.last_block)
-      >>= fun () -> Lwt.return source
+      let* () =
+        log Debug (fun () ->
+            cctxt#message
+              "sample_transfer: %d unused sources for the block next to %a"
+              (List.length l)
+              Block_hash.pp
+              state.last_block)
+      in
+      Lwt.return source
   | Some [] ->
-      cctxt#message
-        "all available sources have been used for block next to %a"
-        Block_hash.pp
-        state.last_block
-      >>= fun () ->
-      Lwt_condition.wait state.new_block_condition >>= fun () ->
+      let* () =
+        cctxt#message
+          "all available sources have been used for block next to %a"
+          Block_hash.pp
+          state.last_block
+      in
+      let* () = Lwt_condition.wait state.new_block_condition in
       sample_source_from_pool state cctxt
 
 let random_seed rng =
@@ -425,19 +449,22 @@ let sample_smart_contracts smart_contracts rng_state =
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     (parameters : parameters) (state : state) =
-  sample_source_from_pool state cctxt >>= fun src ->
-  Alpha_services.Contract.balance
-    cctxt
-    (chain, block)
-    (Contract.Implicit src.pkh)
-  >>=? fun tez ->
+  let open Lwt_result_syntax in
+  let*! src = sample_source_from_pool state cctxt in
+  let* tez =
+    Alpha_services.Contract.balance
+      cctxt
+      (chain, block)
+      (Contract.Implicit src.pkh)
+  in
   if Tez.(tez = zero) then
-    log Debug (fun () ->
-        cctxt#message
-          "sample_transfer: invalid balance %a"
-          Signature.Public_key_hash.pp
-          src.pkh)
-    >>= fun () ->
+    let*! () =
+      log Debug (fun () ->
+          cctxt#message
+            "sample_transfer: invalid balance %a"
+            Signature.Public_key_hash.pp
+            src.pkh)
+    in
     (* Sampled source has zero balance: the transfer that created that
        address was not included yet. Retry *)
     sample_transfer cctxt chain block parameters state
@@ -445,19 +472,21 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     let fresh =
       Random.State.float state.rng_state 1.0 < parameters.fresh_probability
     in
-    (match
-       sample_smart_contracts parameters.smart_contracts state.rng_state
-     with
-    | None ->
-        (if fresh then Lwt.return (generate_fresh_source state)
-        else sample_any_source_from_pool state)
-        >|= fun dest ->
-        Ok
-          ( Implicit dest.pkh,
-            parameters.regular_transfer_fee,
-            parameters.regular_transfer_gas_limit )
-    | Some v -> return v)
-    >>=? fun (dst, fee, gas_limit) ->
+    let* dst, fee, gas_limit =
+      match
+        sample_smart_contracts parameters.smart_contracts state.rng_state
+      with
+      | None ->
+          let*! dest =
+            if fresh then Lwt.return (generate_fresh_source state)
+            else sample_any_source_from_pool state
+          in
+          return
+            ( Implicit dest.pkh,
+              parameters.regular_transfer_fee,
+              parameters.regular_transfer_gas_limit )
+      | Some v -> return v
+    in
     let amount =
       match parameters.strategy with
       | Fixed_amount {mutez} -> mutez
@@ -526,9 +555,11 @@ let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
 
 let inject_transfer (cctxt : Protocol_client_context.full) parameters state
     transfer =
-  Shell_services.Blocks.hash cctxt () >>=? fun branch ->
-  Alpha_services.Contract.counter cctxt (`Main, `Head 0) transfer.src.pkh
-  >>=? fun pcounter ->
+  let open Lwt_result_syntax in
+  let* branch = Shell_services.Blocks.hash cctxt () in
+  let* pcounter =
+    Alpha_services.Contract.counter cctxt (`Main, `Head 0) transfer.src.pkh
+  in
   let freshest_counter =
     match
       Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
@@ -548,92 +579,103 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
              given by the RPC. *)
           pcounter
   in
-  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
-   return true
-  else (
-    (* Either the [manager_key] RPC tells us the key is already
-       revealed, or we immediately inject a reveal operation: in any
-       case the key is revealed in the end. *)
-    state.revealed <-
-      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
-    Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) transfer.src.pkh
-    >>=? fun pk_opt -> return (Option.is_some pk_opt)))
-  >>=? fun already_revealed ->
-  (if not already_revealed then (
-   let reveal_counter = Z.succ freshest_counter in
-   let transf_counter = Z.succ reveal_counter in
-   let reveal =
-     Manager_operation
-       {
-         source = transfer.src.pkh;
-         fee = Tez.zero;
-         counter = reveal_counter;
-         gas_limit = cost_of_manager_operation;
-         storage_limit = Z.zero;
-         operation = Reveal transfer.src.pk;
-       }
-   in
-   let manager_op =
-     manager_op_of_transfer
-       parameters
-       {transfer with counter = Some transf_counter}
-   in
-   let list = Cons (reveal, Single manager_op) in
-   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-   Signature.Public_key_hash.Table.add
-     state.counters
-     transfer.src.pkh
-     (branch, transf_counter) ;
-   log Info (fun () ->
-       cctxt#message
-         "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-         Signature.Public_key_hash.pp
-         transfer.src.pkh
-         Z.pp_print
-         reveal_counter
-         Z.pp_print
-         transf_counter
-         Contract.pp
-         (destination_to_contract transfer.dst))
-   >>= fun () ->
-   (* NB: regardless of our best efforts to keep track of counters, injection can fail with
-      "counter in the future" if a block switch happens in between the moment we
-      get the branch and the moment we inject, and the new block does not include
-      all the operations we injected. *)
-   inject_contents cctxt state.target_block transfer.src.sk list)
-  else
-    let transf_counter = Z.succ freshest_counter in
-    let manager_op =
-      manager_op_of_transfer
-        parameters
-        {transfer with counter = Some transf_counter}
-    in
-    let list = Single manager_op in
-    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-    Signature.Public_key_hash.Table.add
-      state.counters
-      transfer.src.pkh
-      (branch, transf_counter) ;
-    log Info (fun () ->
-        cctxt#message
-          "injecting transfer from %a (counter=%a) to %a"
-          Signature.Public_key_hash.pp
+  let* already_revealed =
+    if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
+      return true
+    else (
+      (* Either the [manager_key] RPC tells us the key is already
+         revealed, or we immediately inject a reveal operation: in any
+         case the key is revealed in the end. *)
+      state.revealed <-
+        Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+      let* pk_opt =
+        Alpha_services.Contract.manager_key
+          cctxt
+          (`Main, `Head 0)
           transfer.src.pkh
-          Z.pp_print
-          transf_counter
-          Contract.pp
-          (destination_to_contract transfer.dst))
-    >>= fun () ->
-    (* See comment above. *)
-    inject_contents cctxt state.target_block transfer.src.sk list)
-  >>= function
+      in
+      return (Option.is_some pk_opt))
+  in
+  let*! r =
+    if not already_revealed then (
+      let reveal_counter = Z.succ freshest_counter in
+      let transf_counter = Z.succ reveal_counter in
+      let reveal =
+        Manager_operation
+          {
+            source = transfer.src.pkh;
+            fee = Tez.zero;
+            counter = reveal_counter;
+            gas_limit = cost_of_manager_operation;
+            storage_limit = Z.zero;
+            operation = Reveal transfer.src.pk;
+          }
+      in
+      let manager_op =
+        manager_op_of_transfer
+          parameters
+          {transfer with counter = Some transf_counter}
+      in
+      let list = Cons (reveal, Single manager_op) in
+      Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+      Signature.Public_key_hash.Table.add
+        state.counters
+        transfer.src.pkh
+        (branch, transf_counter) ;
+      let*! () =
+        log Info (fun () ->
+            cctxt#message
+              "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+              Signature.Public_key_hash.pp
+              transfer.src.pkh
+              Z.pp_print
+              reveal_counter
+              Z.pp_print
+              transf_counter
+              Contract.pp
+              (destination_to_contract transfer.dst))
+      in
+      (* NB: regardless of our best efforts to keep track of counters, injection can fail with
+         "counter in the future" if a block switch happens in between the moment we
+         get the branch and the moment we inject, and the new block does not include
+         all the operations we injected. *)
+      inject_contents cctxt state.target_block transfer.src.sk list)
+    else
+      let transf_counter = Z.succ freshest_counter in
+      let manager_op =
+        manager_op_of_transfer
+          parameters
+          {transfer with counter = Some transf_counter}
+      in
+      let list = Single manager_op in
+      Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+      Signature.Public_key_hash.Table.add
+        state.counters
+        transfer.src.pkh
+        (branch, transf_counter) ;
+      let*! () =
+        log Info (fun () ->
+            cctxt#message
+              "injecting transfer from %a (counter=%a) to %a"
+              Signature.Public_key_hash.pp
+              transfer.src.pkh
+              Z.pp_print
+              transf_counter
+              Contract.pp
+              (destination_to_contract transfer.dst))
+      in
+      (* See comment above. *)
+      inject_contents cctxt state.target_block transfer.src.sk list
+  in
+  match r with
   | Ok op_hash ->
-      log Debug (fun () ->
-          cctxt#message
-            "inject_transfer: op injected %a"
-            Operation_hash.pp
-            op_hash)
-      >>= fun () ->
+      let*! () =
+        log Debug (fun () ->
+            cctxt#message
+              "inject_transfer: op injected %a"
+              Operation_hash.pp
+              op_hash)
+      in
       let ops =
         Option.value
           ~default:[]
@@ -642,14 +684,17 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
       return_unit
   | Error e ->
-      log Debug (fun () ->
-          cctxt#message
-            "inject_transfer: error, op not injected: %a"
-            Error_monad.pp_print_trace
-            e)
-      >>= fun () -> return_unit
+      let*! () =
+        log Debug (fun () ->
+            cctxt#message
+              "inject_transfer: error, op not injected: %a"
+              Error_monad.pp_print_trace
+              e)
+      in
+      return_unit
 
 let save_injected_operations (cctxt : Protocol_client_context.full) state =
+  let open Lwt_syntax in
   let json =
     Data_encoding.Json.construct
       injected_operations_encoding
@@ -661,8 +706,9 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   let path =
     Filename.temp_file "client-stresstest-injected_operations-" ".json"
   in
-  cctxt#message "writing injected operations in file %s" path >>= fun () ->
-  Lwt_utils_unix.Json.write_file path json >>= function
+  let* () = cctxt#message "writing injected operations in file %s" path in
+  let* r = Lwt_utils_unix.Json.write_file path json in
+  match r with
   | Error e ->
       cctxt#message
         "could not write injected operations json file: %a"
@@ -671,8 +717,9 @@ let save_injected_operations (cctxt : Protocol_client_context.full) state =
   | Ok _ -> Lwt.return_unit
 
 let stat_on_exit (cctxt : Protocol_client_context.full) state =
+  let open Lwt_result_syntax in
   let ratio_injected_included_op () =
-    Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_exit ->
+    let* current_head_on_exit = Shell_services.Blocks.hash cctxt () in
     let inter_cardinal s1 s2 =
       Operation_hash.Set.cardinal
         (Operation_hash.Set.inter
@@ -683,19 +730,23 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
       let rec get_included_ops block acc_included_ops =
         if block = older_block then return acc_included_ops
         else
-          Shell_services.Chain.Blocks.Operation_hashes.operation_hashes_in_pass
-            cctxt
-            ~chain:`Main
-            ~block:(`Hash (block, 0))
-            3
-          >>=? fun included_ops ->
-          Shell_services.Blocks.list
-            cctxt
-            ~chain:`Main
-            ~heads:[block]
-            ~length:2
-            ()
-          >>=? function
+          let* included_ops =
+            Shell_services.Chain.Blocks.Operation_hashes
+            .operation_hashes_in_pass
+              cctxt
+              ~chain:`Main
+              ~block:(`Hash (block, 0))
+              3
+          in
+          let* bs =
+            Shell_services.Blocks.list
+              cctxt
+              ~chain:`Main
+              ~heads:[block]
+              ~length:2
+              ()
+          in
+          match bs with
           | [[current; predecessor]] when current = block ->
               get_included_ops
                 predecessor
@@ -713,26 +764,30 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
         state.injected_operations
         []
     in
-    get_included_ops state.current_head_on_start >>=? fun included_ops ->
+    let* included_ops = get_included_ops state.current_head_on_start in
     let included_ops_count = inter_cardinal injected_ops included_ops in
-    log Debug (fun () ->
-        cctxt#message
-          "injected : [%a]@.included: [%a]"
-          (Format.pp_print_list ~pp_sep Operation_hash.pp)
-          injected_ops
-          (Format.pp_print_list ~pp_sep Operation_hash.pp)
-          included_ops)
-    >>= fun () ->
+    let*! () =
+      log Debug (fun () ->
+          cctxt#message
+            "injected : [%a]@.included: [%a]"
+            (Format.pp_print_list ~pp_sep Operation_hash.pp)
+            injected_ops
+            (Format.pp_print_list ~pp_sep Operation_hash.pp)
+            included_ops)
+    in
     let injected_ops_count = List.length injected_ops in
-    cctxt#message
-      "%s of the injected operations have been included (%d injected, %d \
-       included). Note that the operations injected during the last block are \
-       ignored because they should not be currently included."
-      (if Int.equal injected_ops_count 0 then "N/A"
-      else Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
-      injected_ops_count
-      included_ops_count
-    >>= fun () -> return_unit
+    let*! () =
+      cctxt#message
+        "%s of the injected operations have been included (%d injected, %d \
+         included). Note that the operations injected during the last block \
+         are ignored because they should not be currently included."
+        (if Int.equal injected_ops_count 0 then "N/A"
+        else
+          Format.sprintf "%d%%" (included_ops_count * 100 / injected_ops_count))
+        injected_ops_count
+        included_ops_count
+    in
+    return_unit
   in
   ratio_injected_included_op ()
 
@@ -747,64 +802,79 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   in
   let dt = 1. /. parameters.tps in
   let terminated () =
+    let open Lwt_syntax in
     if
       match parameters.total_transfers with
       | None -> false
       | Some bound -> bound <= !injected
     then
-      cctxt#message
-        "Stopping after %d injections (target %a)."
-        !injected
-        Format.(pp_print_option pp_print_int)
-        parameters.total_transfers
-      >>= fun () -> Lwt.return_true
+      let* () =
+        cctxt#message
+          "Stopping after %d injections (target %a)."
+          !injected
+          Format.(pp_print_option pp_print_int)
+          parameters.total_transfers
+      in
+      Lwt.return_true
     else
       match target_level with
       | None -> Lwt.return_false
       | Some target ->
           if target <= state.last_level then
-            cctxt#message
-              "Stopping at level %d (target level: %d)."
-              state.last_level
-              target
-            >>= fun () -> Lwt.return_true
+            let* () =
+              cctxt#message
+                "Stopping at level %d (target level: %d)."
+                state.last_level
+                target
+            in
+            Lwt.return_true
           else Lwt.return_false
   in
 
   let rec loop () =
-    terminated () >>= fun terminated ->
+    let open Lwt_result_syntax in
+    let*! terminated = terminated () in
     if terminated then
-      save_pool_callback () >>= fun () ->
-      save_injected_operations cctxt state >>= fun () ->
+      let*! () = save_pool_callback () in
+      let*! () = save_injected_operations cctxt state in
       stat_on_exit cctxt state
     else
       let start = Mtime_clock.elapsed () in
-      log Debug (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
-      >>= fun () ->
-      sample_transfer cctxt cctxt#chain cctxt#block parameters state
-      >>=? fun transfer ->
-      log Debug (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
-      >>= fun () ->
-      inject_transfer cctxt parameters state transfer >>=? fun () ->
+      let*! () =
+        log Debug (fun () ->
+            cctxt#message "launch.loop: invoke sample_transfer")
+      in
+      let* transfer =
+        sample_transfer cctxt cctxt#chain cctxt#block parameters state
+      in
+      let*! () =
+        log Debug (fun () ->
+            cctxt#message "launch.loop: invoke inject_transfer")
+      in
+      let* () = inject_transfer cctxt parameters state transfer in
       incr injected ;
       let stop = Mtime_clock.elapsed () in
       let elapsed = Mtime.Span.(to_s stop -. to_s start) in
       let remaining = dt -. elapsed in
-      (if remaining <= 0.0 then
-       cctxt#warning
-         "warning: tps target could not be reached, consider using a lower \
-          value for --tps"
-      else Lwt_unix.sleep remaining)
-      >>= loop
+      let*! () =
+        if remaining <= 0.0 then
+          cctxt#warning
+            "warning: tps target could not be reached, consider using a lower \
+             value for --tps"
+        else Lwt_unix.sleep remaining
+      in
+      loop ()
   in
   let on_new_head :
       Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t =
     (* Because of how Tenderbake works the target block should stay 2
        blocks in the past because this guarantees that we are targeting a
        block that is decided. *)
+    let open Lwt_result_syntax in
     let update_target_block () =
-      Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
-      >>=? fun target_block ->
+      let* target_block =
+        Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+      in
       state.target_block <- target_block ;
       return_unit
     in
@@ -812,7 +882,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     (* Some _ if and only if [single_op_per_pkh_per_block] is true. *)
     | Some _ ->
         fun (new_block_hash, new_block_header) ->
-          update_target_block () >>=? fun () ->
+          let* () = update_target_block () in
           if not (Block_hash.equal new_block_hash state.last_block) then (
             state.last_block <- new_block_hash ;
             state.last_level <- Int32.to_int new_block_header.shell.level ;
@@ -827,9 +897,10 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
         (* only wait for the end of the head stream; don't act on heads *)
         fun _ -> update_target_block ()
   in
-  heads_iter cctxt on_new_head >>=? fun (heads_iteration, stopper) ->
+  let open Lwt_result_syntax in
+  let* heads_iteration, stopper = heads_iter cctxt on_new_head in
   (* The head iteration stops at protocol change. *)
-  Lwt.pick [loop (); heads_iteration] >>=? fun () ->
+  let* () = Lwt.pick [loop (); heads_iteration] in
   (match Lwt.state heads_iteration with Lwt.Return _ -> () | _ -> stopper ()) ;
   return_unit
 
@@ -845,14 +916,15 @@ let json_of_pool_source = function
 
 let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
+      let open Lwt_result_syntax in
       match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
-          Lwt_utils_unix.Json.read_file path >|=? fun json ->
+          let+ json = Lwt_utils_unix.Json.read_file path in
           From_file {path; json}
       | _ -> (
           if Sys.file_exists p then
-            Lwt_utils_unix.Json.read_file p >|=? fun json ->
+            let+ json = Lwt_utils_unix.Json.read_file p in
             From_file {path = p; json}
           else
             try return (From_string {json = Ezjsonm.from_string p})
@@ -870,7 +942,7 @@ let seed_arg =
          | exception _ ->
              cctxt#error
                "While parsing --seed: could not convert argument to int"
-         | i -> return i))
+         | i -> Lwt_result_syntax.return i))
 
 let tps_arg =
   let open Clic in
@@ -885,7 +957,7 @@ let tps_arg =
                "While parsing --tps: could not convert argument to float"
          | f when f < 0.0 ->
              cctxt#error "While parsing --tps: negative argument"
-         | f -> return f))
+         | f -> Lwt_result_syntax.return f))
 
 let fresh_probability_arg =
   let open Clic in
@@ -909,7 +981,7 @@ let fresh_probability_arg =
                 to float"
          | f when f < 0.0 || f > 1.0 ->
              cctxt#error "While parsing --fresh-probability: invalid argument"
-         | f -> return f))
+         | f -> Lwt_result_syntax.return f))
 
 let smart_contract_parameters_arg =
   let open Clic in
@@ -924,7 +996,7 @@ let smart_contract_parameters_arg =
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
          match Data_encoding.Json.from_string s with
          | Ok json ->
-             return
+             Lwt_result_syntax.return
                (Data_encoding.Json.destruct
                   Smart_contracts.contract_parameters_collection_encoding
                   json)
@@ -942,7 +1014,7 @@ let strategy_arg =
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
          match parse_strategy s with
          | Error msg -> cctxt#error "While parsing --strategy: %s" msg
-         | Ok strategy -> return strategy))
+         | Ok strategy -> Lwt_result_syntax.return strategy))
 
 let gas_limit_arg =
   let open Clic in
@@ -950,7 +1022,7 @@ let gas_limit_arg =
     parameter (fun _ s ->
         try
           let v = Z.of_string s in
-          return (Gas.Arith.integral_exn v)
+          Lwt_result_syntax.return (Gas.Arith.integral_exn v)
         with _ -> failwith "invalid gas limit (must be a positive number)")
   in
   arg
@@ -972,7 +1044,7 @@ let storage_limit_arg =
         try
           let v = Z.of_string s in
           assert (Compare.Z.(v >= Z.zero)) ;
-          return v
+          Lwt_result_syntax.return v
         with _ ->
           failwith "invalid storage limit (must be a positive number of bytes)")
   in
@@ -1000,7 +1072,7 @@ let transfers_arg =
              cctxt#error "While parsing --transfers: invalid integer literal"
          | i when i <= 0 ->
              cctxt#error "While parsing --transfers: negative integer"
-         | i -> return i))
+         | i -> Lwt_result_syntax.return i))
 
 let single_op_per_pkh_per_block_arg =
   Clic.switch
@@ -1019,6 +1091,7 @@ let level_limit_arg =
       "Level at which the stresstest will stop (if prefixed by '+', the level \
        is relative to the current head)"
     (parameter (fun (cctxt : Protocol_client_context.full) s ->
+         let open Lwt_result_syntax in
          match int_of_string s with
          | exception _ ->
              cctxt#error "While parsing --levels: invalid integer literal"
@@ -1053,18 +1126,21 @@ let save_pool_callback (cctxt : Protocol_client_context.full) pool_source state
           e
     | Ok () -> Lwt.return_unit
   in
+  let open Lwt_syntax in
   match pool_source with
   | From_string _ ->
       (* If the initial pool was given directly as json, save pool to
          a temp file. *)
       let path = Filename.temp_file "client-stresstest-pool-" ".json" in
-      cctxt#message "writing back address pool in file %s" path >>= fun () ->
-      Lwt_utils_unix.Json.write_file path json >>= catch_write_error
+      let* () = cctxt#message "writing back address pool in file %s" path in
+      let* r = Lwt_utils_unix.Json.write_file path json in
+      catch_write_error r
   | From_file {path; _} ->
       (* If the pool specification was a json file, save pool to
          the same file. *)
-      cctxt#message "writing back address pool in file %s" path >>= fun () ->
-      Lwt_utils_unix.Json.write_file path json >>= catch_write_error
+      let* () = cctxt#message "writing back address pool in file %s" path in
+      let* r = Lwt_utils_unix.Json.write_file path json in
+      catch_write_error r
 
 let generate_random_transactions =
   let open Clic in
@@ -1107,15 +1183,17 @@ let generate_random_transactions =
            debug_flag )
          sources_json
          (cctxt : Protocol_client_context.full) ->
+      let open Lwt_result_syntax in
       (verbosity :=
          match (debug_flag, verbose_flag) with
          | true, _ -> Debug
          | false, true -> Info
          | false, false -> Notice) ;
-      Smart_contracts.init
-        cctxt
-        (Option.value ~default:[] smart_contract_parameters)
-      >>=? fun smart_contracts ->
+      let* smart_contracts =
+        Smart_contracts.init
+          cctxt
+          (Option.value ~default:[] smart_contract_parameters)
+      in
       let parameters =
         {default_parameters with smart_contracts}
         |> set_option seed (fun parameter seed -> {parameter with seed})
@@ -1145,11 +1223,14 @@ let generate_random_transactions =
       | exception _ -> cctxt#error "Could not decode list of sources"
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
-          log Info (fun () -> cctxt#message "starting to normalize sources")
-          >>= fun () ->
-          List.filter_map_s (normalize_source cctxt) sources >>= fun sources ->
-          log Info (fun () -> cctxt#message "all sources have been normalized")
-          >>= fun () ->
+          let*! () =
+            log Info (fun () -> cctxt#message "starting to normalize sources")
+          in
+          let*! sources = List.filter_map_s (normalize_source cctxt) sources in
+          let*! () =
+            log Info (fun () ->
+                cctxt#message "all sources have been normalized")
+          in
           let sources =
             List.sort_uniq
               (fun src1 src2 ->
@@ -1158,20 +1239,23 @@ let generate_random_transactions =
           in
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
-          Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
-          Shell_services.Blocks.Header.shell_header cctxt ()
-          >>=? fun header_on_start ->
-          (if header_on_start.level <= 2l then
-           cctxt#error
-             "The level of the head (%a) needs to be greater than 2 and is \
-              actually %ld."
-             Block_hash.pp
-             current_head_on_start
-             header_on_start.level
-          else return_unit)
-          >>=? fun () ->
-          Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
-          >>=? fun current_target_block ->
+          let* current_head_on_start = Shell_services.Blocks.hash cctxt () in
+          let* header_on_start =
+            Shell_services.Blocks.Header.shell_header cctxt ()
+          in
+          let* () =
+            if header_on_start.level <= 2l then
+              cctxt#error
+                "The level of the head (%a) needs to be greater than 2 and is \
+                 actually %ld."
+                Block_hash.pp
+                current_head_on_start
+                header_on_start.level
+            else return_unit
+          in
+          let* current_target_block =
+            Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+          in
           let state =
             {
               rng_state;
@@ -1196,7 +1280,8 @@ let generate_random_transactions =
           in
           let exit_callback_id =
             Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _retcode ->
-                stat_on_exit cctxt state >>= function
+                let*! r = stat_on_exit cctxt state in
+                match r with
                 | Ok () -> Lwt.return_unit
                 | Error e ->
                     cctxt#message "Error: %a" Error_monad.pp_print_trace e)
@@ -1222,14 +1307,17 @@ let generate_random_transactions =
 
 let estimate_transaction_cost ?smart_contracts
     (cctxt : Protocol_client_context.full) : Gas.Arith.integral tzresult Lwt.t =
-  normalize_source cctxt (Wallet_alias "bootstrap1") >>= fun src ->
-  normalize_source cctxt (Wallet_alias "bootstrap2") >>= fun dst ->
+  let open Lwt_result_syntax in
+  let*! src = normalize_source cctxt (Wallet_alias "bootstrap1") in
+  let*! dst = normalize_source cctxt (Wallet_alias "bootstrap2") in
   let rng_state = Random.State.make [|default_parameters.seed|] in
-  (match (src, dst) with
-  | Some src, Some dst -> return (src, dst)
-  | _ ->
-      cctxt#error "Cannot find bootstrap1 or bootstrap2 accounts in the wallet.")
-  >>=? fun (src, dst) ->
+  let* src, dst =
+    match (src, dst) with
+    | Some src, Some dst -> return (src, dst)
+    | _ ->
+        cctxt#error
+          "Cannot find bootstrap1 or bootstrap2 accounts in the wallet."
+  in
   let chain = cctxt#chain in
   let block = cctxt#block in
   let selected_smart_contract =
@@ -1244,8 +1332,9 @@ let estimate_transaction_cost ?smart_contracts
           default_parameters.regular_transfer_fee,
           default_parameters.regular_transfer_gas_limit )
   in
-  Alpha_services.Contract.counter cctxt (chain, block) src.source.pkh
-  >>=? fun current_counter ->
+  let* current_counter =
+    Alpha_services.Contract.counter cctxt (chain, block) src.source.pkh
+  in
   let transf_counter = Z.succ current_counter in
   let transfer =
     {
@@ -1267,8 +1356,9 @@ let estimate_transaction_cost ?smart_contracts
       }
       transfer
   in
-  Injection.simulate cctxt ~chain ~block (Single manager_op)
-  >>=? fun (_oph, op, result) ->
+  let* _oph, op, result =
+    Injection.simulate cctxt ~chain ~block (Single manager_op)
+  in
   match result.contents with
   | Single_result (Manager_operation_result {operation_result; _}) -> (
       match operation_result with
@@ -1296,12 +1386,14 @@ let estimate_transaction_costs : Protocol_client_context.full Clic.command =
     no_options
     (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
     (fun () cctxt ->
-      estimate_transaction_cost cctxt >>=? fun regular ->
-      Smart_contracts.with_every_known_smart_contract
-        cctxt
-        (fun smart_contracts ->
-          estimate_transaction_cost ~smart_contracts cctxt)
-      >>=? fun smart_contracts ->
+      let open Lwt_result_syntax in
+      let* regular = estimate_transaction_cost cctxt in
+      let* smart_contracts =
+        Smart_contracts.with_every_known_smart_contract
+          cctxt
+          (fun smart_contracts ->
+            estimate_transaction_cost ~smart_contracts cctxt)
+      in
       let transaction_costs : transaction_costs = {regular; smart_contracts} in
       let json =
         Data_encoding.Json.construct
@@ -1309,6 +1401,610 @@ let estimate_transaction_costs : Protocol_client_context.full Clic.command =
           transaction_costs
       in
       Format.printf "%a" Data_encoding.Json.pp json ;
+      return_unit)
+
+(* Returns a list of transfers from each element of [sources]. *)
+let generate_transfers ~sources ~amount ~parameters ~entrypoint ~fee ~gas_limit
+    ~storage_limit =
+  List.map
+    (fun dst ->
+      let destination = Contract.Implicit dst.pkh in
+      let transfer =
+        Client_proto_context.build_transaction_operation
+          ~amount
+          ~parameters
+          ~entrypoint
+          ~fee
+          ~gas_limit
+          ~storage_limit
+          destination
+      in
+      Annotated_manager_operation.Annotated_manager_operation transfer)
+    sources
+
+(* Returns a list of reveals from each element of [sources]. *)
+let generate_reveals ~sources ~fee ~gas_limit ~storage_limit =
+  List.map
+    (fun dst ->
+      let reveal =
+        Client_proto_context.build_reveal_operation
+          ~fee
+          ~gas_limit
+          ~storage_limit
+          dst.pk
+      in
+      (dst, Annotated_manager_operation.Annotated_manager_operation reveal))
+    sources
+
+(* Given a list of [sources], it returns
+   - a list of batches of transfers where each batch has a maximum of
+     [batch_size] operation, for each element of [sources],
+   - a list of reveals, for each element of [sources].
+
+    [sources] is the list of "starter" accounts, used to fund all
+    accounts in a exponential way.
+*)
+let generate_starter_ops ~sources ~amount ~batch_size =
+  let fee = Tez.of_mutez_exn 1_000L in
+  let gas_limit = Gas.Arith.integral_of_int_exn 1_040 in
+  let storage_limit = Z.of_int 257 in
+  let parameters =
+    let open Tezos_micheline in
+    Script.lazy_expr
+      (Micheline.strip_locations
+         (Prim (0, Michelson_v1_primitives.D_Unit, [], [])))
+  in
+  let entrypoint = Entrypoint.default in
+  let txs_ops =
+    generate_transfers
+      ~sources
+      ~amount
+      ~parameters
+      ~entrypoint
+      ~fee
+      ~gas_limit
+      ~storage_limit
+  in
+  let reveal_ops = generate_reveals ~sources ~fee ~gas_limit ~storage_limit in
+  let rec split n acc = function
+    | [] -> acc
+    | l ->
+        let current, next = List.rev_split_n n l in
+        let batch = Annotated_manager_operation.manager_of_list current in
+        split n (batch :: acc) next
+  in
+  (* Split the list of transfers into N batches containing a maximum
+     of [batch_size] operations. *)
+  let txs_batch_l = split batch_size [] txs_ops in
+  (txs_batch_l, reveal_ops)
+
+(* Returns a list of list of batch. A list of batch consists of N
+   batches, depending on the number of [starter_sources]. The top
+   level list can be seen a block partition, so that the 1M
+   restriction is ensured. *)
+let generate_account_funding_batches (starter_sources : source_with_uri list)
+    (empty_accounts : source_with_uri list) ~batch_size ~amount =
+  let open Lwt_result_syntax in
+  let nb_sources = List.length starter_sources in
+  let fee = Tez.of_mutez_exn 1_000L in
+  let gas_limit = Gas.Arith.integral_of_int_exn 1_040 in
+  let storage_limit = Z.of_int 257 in
+  let parameters =
+    let open Tezos_micheline in
+    Script.lazy_expr
+      (Micheline.strip_locations
+         (Prim (0, Michelson_v1_primitives.D_Unit, [], [])))
+  in
+  let entrypoint = Entrypoint.default in
+  let to_batch candidates emiters =
+    (* For each [emiters], it generates [batch_size] transactions from
+       it, and to [batch_size] candidates.*)
+    let rec aux acc (candidates : source_with_uri list)
+        (emiters : source_with_uri list) =
+      match emiters with
+      | [] -> return acc
+      | source :: next_sources ->
+          let current, next_candidates =
+            List.rev_split_n batch_size candidates
+          in
+          let txs =
+            generate_transfers
+              ~sources:current
+              ~amount
+              ~parameters
+              ~entrypoint
+              ~fee
+              ~gas_limit
+              ~storage_limit
+          in
+          let batch = Annotated_manager_operation.manager_of_list txs in
+          (*Avoid the generation of empty batches*)
+          if next_candidates = [] then return ((source, batch) :: acc)
+          else aux ((source, batch) :: acc) next_candidates next_sources
+    in
+    aux [] candidates emiters
+  in
+  let rec aux acc = function
+    | [] -> return acc
+    | empty_accounts ->
+        let candidates, rest =
+          List.rev_split_n (batch_size * nb_sources) empty_accounts
+        in
+        let* batch = to_batch candidates starter_sources in
+        aux (batch :: acc) rest
+  in
+  let* res = aux [] empty_accounts in
+  return res
+
+(* Loads a wallet by reading directly the files to speed up things. *)
+let load_wallet cctxt ~source_pkh =
+  let open Lwt_result_syntax in
+  let* keys = Client_keys.get_keys cctxt in
+  (* Convert loaded and filter identities. We want to ban activator
+     and bootstrap<1-5> in sandbox, as well as the "faucet source" on
+     test networks. *)
+  let to_ban =
+    ["activator"; "bootstrap"]
+    @ WithExceptions.Result.get_ok
+        ~loc:__LOC__
+        (List.init ~when_negative_length:"error" 5 (fun i ->
+             Format.sprintf "bootstrap%d" (i + 1)))
+  in
+  let rec aux acc = function
+    | [] -> return acc
+    | (alias, pkh, _, _) :: tl
+      when List.exists (String.equal alias) to_ban
+           || Signature.Public_key_hash.equal pkh source_pkh ->
+        aux acc tl
+    | (_, pkh, pk, sk_uri) :: tl ->
+        let* pk_uri = Client_keys.neuterize sk_uri in
+        let payload =
+          Uri.path (sk_uri : Tezos_signer_backends.Unencrypted.sk_uri :> Uri.t)
+        in
+        let sk = Signature.Secret_key.of_b58check_exn payload in
+        aux ({pkh; pk; pk_uri; sk; sk_uri} :: acc) tl
+  in
+  aux [] keys
+
+let source_key_arg =
+  let open Clic in
+  param
+    ~name:"source_key_arg"
+    ~desc:
+      "Source key public key hash from which the tokens will be transferred to \
+       start the funding."
+    (parameter (fun _ s ->
+         let r = Signature.Public_key_hash.of_b58check s in
+         match r with
+         | Ok pkh -> Lwt_result_syntax.return pkh
+         | Error e ->
+             failwith
+               "Cannot read public key hash: %a"
+               Error_monad.pp_print_trace
+               e))
+
+let batch_size_arg =
+  let open Clic in
+  default_arg
+    ~long:"batch-size"
+    ~placeholder:"integer"
+    ~doc:
+      "Maximum number of operations that can be put into a single batch (250 \
+       by default)"
+    ~default:"250"
+    (parameter (fun _ s ->
+         match int_of_string_opt s with
+         | Some i when i > 0 -> Lwt_result_syntax.return i
+         | Some _ -> failwith "Integer must be positive."
+         | None -> failwith "Cannot read integer"))
+
+let batches_per_block_arg =
+  let open Clic in
+  default_arg
+    ~long:"batches-per-block"
+    ~placeholder:"integer"
+    ~doc:
+      "Maximum number of batches that can be put into a single block (100 by \
+       default)"
+    ~default:"100"
+    (parameter (fun _ s ->
+         match int_of_string_opt s with
+         | Some i when i > 0 -> Lwt_result_syntax.return i
+         | Some _ -> failwith "Integer must be positive."
+         | None -> failwith "Cannot read integer"))
+
+let initial_amount_arg =
+  let open Clic in
+  default_arg
+    ~long:"initial-amount"
+    ~placeholder:"integer"
+    ~doc:
+      "Number of token, in μtz, that will be funded on each of the accounts to \
+       fund (1 by default)"
+    ~default:"1_000_000"
+    (parameter (fun _ s ->
+         match Int64.of_string_opt s with
+         | Some i when i > 0L -> (
+             try Lwt_result_syntax.return (Tez.of_mutez_exn i)
+             with e ->
+               failwith "Cannot convert to Tez.t:%s" (Printexc.to_string e))
+         | Some _ -> failwith "Integer must be positive."
+         | None -> failwith "Cannot read integer"))
+
+(* Monitors the node's head to inject transaction batches. *)
+let inject_batched_txs cctxt (source_pkh, source_pk, source_sk)
+    ~(starter_batch : Annotated_manager_operation.packed_annotated_list list)
+    ~fee ~gas_limit ~storage_limit ~fee_parameter batches_per_block =
+  let open Lwt_result_syntax in
+  let chain = cctxt#chain in
+  let* heads_stream, stop = Shell_services.Monitor.heads cctxt chain in
+  let rec aux stream
+      (sources_ops : Annotated_manager_operation.packed_annotated_list list) =
+    let*! v = Lwt_stream.get stream in
+    match v with
+    | Some (_block_hash, _) -> (
+        match sources_ops with
+        | [] ->
+            stop () ;
+            return []
+        | sources_ops ->
+            let now, next = List.rev_split_n batches_per_block sources_ops in
+            let* () =
+              List.iter_ep
+                (fun batch ->
+                  let (Annotated_manager_operation.Manager_list contents) =
+                    batch
+                  in
+                  let* _results =
+                    Injection.inject_manager_operation
+                      cctxt
+                      ~chain:cctxt#chain
+                      ~block:cctxt#block
+                      ?confirmations:cctxt#confirmations
+                      ~dry_run:false
+                      ~verbose_signing:false
+                      ~simulation:false
+                      ~force:false
+                      ~source:source_pkh
+                      ~fee:(Limit.of_option fee)
+                      ~gas_limit:(Limit.of_option gas_limit)
+                      ~storage_limit:(Limit.of_option storage_limit)
+                      ~src_pk:source_pk
+                      ~src_sk:source_sk
+                      ~replace_by_fees:false
+                      ~fee_parameter
+                      contents
+                  in
+                  return_unit)
+                now
+            in
+            aux stream next)
+    | None ->
+        let*! () = Lwt_unix.sleep 0.5 in
+        aux stream sources_ops
+  in
+  let* _ = aux heads_stream starter_batch in
+  return_unit
+
+(* Monitors the node's head to inject reveal batches. *)
+let inject_batched_reveals cctxt
+    ~(starter_reveals :
+       (source_with_uri * Annotated_manager_operation.packed) list) ~fee
+    ~gas_limit ~storage_limit ~fee_parameter batches_per_block =
+  let open Lwt_result_syntax in
+  let chain = cctxt#chain in
+  let* heads_stream, stop = Shell_services.Monitor.heads cctxt chain in
+  let rec aux stream
+      (sources_ops :
+        (source_with_uri * Annotated_manager_operation.packed) list) =
+    let*! v = Lwt_stream.get stream in
+    match v with
+    | Some (_block_hash, _) -> (
+        match sources_ops with
+        | [] ->
+            stop () ;
+            return []
+        | sources_ops ->
+            let now, next = List.rev_split_n batches_per_block sources_ops in
+            let* () =
+              List.iter_ep
+                (fun (source, op) ->
+                  let (Annotated_manager_operation.Manager_list contents) =
+                    Annotated_manager_operation.manager_of_list [op]
+                  in
+                  let* _ =
+                    Injection.inject_manager_operation
+                      cctxt
+                      ~chain:cctxt#chain
+                      ~block:cctxt#block
+                      ?confirmations:cctxt#confirmations
+                      ~dry_run:false
+                      ~verbose_signing:false
+                      ~simulation:false
+                      ~force:false
+                      ~source:source.pkh
+                      ~fee:(Limit.of_option fee)
+                      ~gas_limit:(Limit.of_option gas_limit)
+                      ~storage_limit:(Limit.of_option storage_limit)
+                      ~src_pk:source.pk
+                      ~src_sk:source.sk_uri
+                      ~replace_by_fees:false
+                      ~fee_parameter
+                      contents
+                  in
+                  return_unit)
+                now
+            in
+            aux stream next)
+    | None ->
+        let*! () = Lwt_unix.sleep 0.5 in
+        aux stream sources_ops
+  in
+  let* _ = aux heads_stream starter_reveals in
+  return_unit
+
+(* Monitors the node's head to inject transaction batches. *)
+let inject_funding_batches cctxt
+    ~(funding_batches :
+       (source_with_uri * Annotated_manager_operation.packed_annotated_list)
+       list
+       list) ~fee ~gas_limit ~storage_limit ~fee_parameter batches_per_block =
+  let open Lwt_result_syntax in
+  let chain = cctxt#chain in
+  let* heads_stream, stop = Shell_services.Monitor.heads cctxt chain in
+  let rec aux stream
+      (sources_ops :
+        (source_with_uri * Annotated_manager_operation.packed_annotated_list)
+        list
+        list) =
+    let*! v = Lwt_stream.get stream in
+    match v with
+    | Some (_block_hash, _) -> (
+        match sources_ops with
+        | [] ->
+            stop () ;
+            return []
+        | block_ops :: tl ->
+            let now, next = List.rev_split_n batches_per_block block_ops in
+            let* () =
+              List.iter_ep
+                (fun (source, batch) ->
+                  let (Annotated_manager_operation.Manager_list contents) =
+                    batch
+                  in
+                  let* _results =
+                    Injection.inject_manager_operation
+                      cctxt
+                      ~chain:cctxt#chain
+                      ~block:cctxt#block
+                      ?confirmations:cctxt#confirmations
+                      ~dry_run:false
+                      ~verbose_signing:false
+                      ~simulation:false
+                      ~force:false
+                      ~source:source.pkh
+                      ~fee:(Limit.of_option fee)
+                      ~gas_limit:(Limit.of_option gas_limit)
+                      ~storage_limit:(Limit.of_option storage_limit)
+                      ~src_pk:source.pk
+                      ~src_sk:source.sk_uri
+                      ~replace_by_fees:false
+                      ~fee_parameter
+                      contents
+                  in
+                  return_unit)
+                now
+            in
+            if next = [] then aux stream tl else aux stream (next :: tl))
+    | None ->
+        let*! () = Lwt_unix.sleep 0.5 in
+        aux stream sources_ops
+  in
+  let* _ = aux heads_stream funding_batches in
+  return_unit
+
+(* This command aims to fund accounts to be used in pair with the
+   stresstest transfer command. To do so, it will proceed in the
+   following steps:
+   - takes all the identities found in a given wallet,
+   - chooses [batch_size] identities as starters ,
+   - funds the starters with some funds (using source account),
+   - reveal the starters (using source account),
+   - makes and injects batches so that the starters uses their funds to
+     fund the [nb_identities - nb_starters] remaining accounts.
+
+   These steps allows to minimize the number of
+   transfers/operations/blocks to fund many accounts.
+
+   As parameters, it is possible to chose:
+   - batch_size: number of operations into a single batch,
+   - batches_per_block: number of batches/operations per block,
+   - initial_amount: number of token distributed to each accounts.
+   It also allows to define additional parameters, such as fee, gas
+   and storage limit.
+*)
+let fund_accounts_from_source : Protocol_client_context.full Clic.command =
+  let open Clic in
+  command
+    ~group
+    ~desc:"Funds all the given accounts"
+    (args7
+       batch_size_arg
+       batches_per_block_arg
+       initial_amount_arg
+       Client_proto_args.default_fee_arg
+       Client_proto_args.default_gas_limit_arg
+       Client_proto_args.default_storage_limit_arg
+       Client_proto_args.fee_parameter_args)
+    (prefixes ["stresstest"; "fund"; "accounts"; "from"]
+    @@ source_key_arg @@ stop)
+    (fun ( batch_size,
+           batches_per_block,
+           initial_amount,
+           fee,
+           gas_limit,
+           storage_limit,
+           fee_parameter )
+         source_pkh
+         (cctxt : Protocol_client_context.full) ->
+      let open Lwt_result_syntax in
+      let* source_pk, source_sk =
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt source_pkh in
+        return (src_pk, src_sk)
+      in
+      let*! () = log Notice (fun () -> cctxt#message "@.") in
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message
+              "Starting funding from %a with parameters:@.- batch_size %d@.- \
+               batches_per_block %d@.- initial_amount %a@."
+              Signature.Public_key_hash.pp
+              source_pkh
+              batch_size
+              batches_per_block
+              Tez.pp
+              initial_amount)
+      in
+      (* All generated sources *)
+      let* new_sources = load_wallet cctxt ~source_pkh in
+      (* Starter sources used to initiate the "exponential"
+         funding. *)
+      let nb_starters =
+        let l = List.length new_sources in
+        (l / batch_size) + if l mod batch_size = 0 then 0 else 1
+      in
+      let starter_sources, empty_accounts =
+        List.rev_split_n nb_starters new_sources
+      in
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message
+              "Funding %d accounts using %d starters@."
+              (List.length new_sources)
+              nb_starters)
+      in
+      (* Initial amount that is sent to starters to allow them to fund
+         other accounts. This is an over approximation. *)
+      let starter_initial_amount =
+        (* over approximation of the max number of operation that a
+           starter may inject. We add one to leave the starter account
+           with it's own initial amount. *)
+        let max_nb_transfers = batch_size + 1 in
+        (* Fees are: reveal + max_nb_transfers * manager_fees
+                   = reveal + max_nb_transfers * (storage_fees + tx fees)
+                   = 0.001tz + max_nb_transfers * (0.06425tz + 0.001tz)
+                   =~ max_nb_transfers * 0.1 tz *)
+        let fees_approx = Tez.of_mutez_exn 100_000L in
+        let amount =
+          WithExceptions.Result.get_ok
+            ~loc:__LOC__
+            Tez.(initial_amount +? fees_approx)
+        in
+        Tez.mul_exn amount max_nb_transfers
+      in
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message
+              "Sending %a tz to starter accounts@."
+              Tez.pp
+              starter_initial_amount)
+      in
+      let* source_balance =
+        Alpha_services.Contract.balance
+          cctxt
+          (cctxt#chain, cctxt#block)
+          (Contract.Implicit source_pkh)
+      in
+      let* () =
+        let req_balance = Tez.mul_exn starter_initial_amount nb_starters in
+        if Tez.(source_balance < req_balance) then
+          failwith
+            "Not enough funds to init starter accounts: %a are needed, only %a \
+             is available on %a@."
+            Tez.pp
+            source_balance
+            Tez.pp
+            req_balance
+            Signature.Public_key_hash.pp
+            source_pkh
+        else
+          let*! () =
+            log Notice (fun () ->
+                cctxt#message
+                  "Transfering %a tz from %a (out of %a)@."
+                  Tez.pp
+                  req_balance
+                  Signature.Public_key_hash.pp
+                  source_pkh
+                  Tez.pp
+                  source_balance)
+          in
+          return_unit
+      in
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message "Generating starter transactions and reveals@.")
+      in
+      let starter_batch, starter_reveals =
+        generate_starter_ops
+          ~sources:starter_sources
+          ~amount:starter_initial_amount
+          ~batch_size
+      in
+      (* Inject generated batches and reveals for the starters. *)
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message "Injecting starter transfer batches@.")
+      in
+      let* () =
+        inject_batched_txs
+          cctxt
+          (source_pkh, source_pk, source_sk)
+          ~starter_batch
+          ~fee
+          ~gas_limit
+          ~storage_limit
+          ~fee_parameter
+          batches_per_block
+      in
+      let*! () =
+        log Notice (fun () ->
+            cctxt#message "Injecting starter reveal batches@.")
+      in
+      let* () =
+        inject_batched_reveals
+          cctxt
+          ~starter_reveals
+          ~fee
+          ~gas_limit
+          ~storage_limit
+          ~fee_parameter
+          batches_per_block
+      in
+      let*! () =
+        log Notice (fun () -> cctxt#message "Generating funding batches@.")
+      in
+      let* funding_batches =
+        generate_account_funding_batches
+          starter_sources
+          empty_accounts
+          ~batch_size
+          ~amount:initial_amount
+      in
+      let*! () =
+        log Notice (fun () -> cctxt#message "Injecting funding batches@.")
+      in
+      let* () =
+        inject_funding_batches
+          cctxt
+          ~funding_batches
+          ~fee
+          ~gas_limit
+          ~storage_limit
+          ~fee_parameter
+          batches_per_block
+      in
+      let*! () = log Notice (fun () -> cctxt#message "Done.@.") in
       return_unit)
 
 let commands network () =
@@ -1319,4 +2015,5 @@ let commands network () =
         generate_random_transactions;
         estimate_transaction_costs;
         Smart_contracts.originate_command;
+        fund_accounts_from_source;
       ]

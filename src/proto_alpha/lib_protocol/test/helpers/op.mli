@@ -29,6 +29,21 @@ open Alpha_context
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3181
    Improve documentation of the operation helpers *)
 
+(** Assemble the given signature and [contents_list] into a
+    [packed_operation].
+
+    The context argument is used to retrieve the branch.
+
+    If the [signature option] argument is [None], then the resulting
+    operation is unsigned.
+
+    This function is mainly useful to craft an operation with a
+    missing or invalid signatue. Otherwise, it is often better to use
+    one of the helpers below: they handle the signature internally to
+    directly return well-signed operations. *)
+val pack_operation :
+  Context.t -> signature option -> 'a contents_list -> packed_operation
+
 val endorsement :
   ?delegate:public_key_hash * Slot.t list ->
   ?slot:Slot.t ->
@@ -284,17 +299,56 @@ val seed_nonce_revelation :
 (** Reveals a VDF with a proof of correctness *)
 val vdf_revelation : Context.t -> Seed.vdf_solution -> Operation.packed
 
-(** Propose a list of protocol hashes during the approval voting *)
+(** Craft the [contents_list] for a Proposals operation.
+
+    Invocation: [proposals_contents ctxt source ?period proposals].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
+val proposals_contents :
+  Context.t ->
+  Contract.t ->
+  ?period:int32 ->
+  Protocol_hash.t list ->
+  Kind.proposals contents_list tzresult Lwt.t
+
+(** Craft a Proposals operation.
+
+    Invocation: [proposals ctxt source ?period proposals].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
 val proposals :
   Context.t ->
   Contract.t ->
+  ?period:int32 ->
   Protocol_hash.t list ->
   Operation.packed tzresult Lwt.t
 
-(** Cast a vote yay, nay or pass *)
+(** Craft the [contents_list] for a Ballot operation.
+
+    Invocation: [ballot_contents ctxt source ?period proposal ballot].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
+val ballot_contents :
+  Context.t ->
+  Contract.t ->
+  ?period:int32 ->
+  Protocol_hash.t ->
+  Vote.ballot ->
+  Kind.ballot contents_list tzresult Lwt.t
+
+(** Craft a Ballot operation.
+
+    Invocation: [ballot ctxt source ?period proposal ballot].
+
+    @param period defaults to the index of the current voting period
+    in [ctxt]. *)
 val ballot :
   Context.t ->
   Contract.t ->
+  ?period:int32 ->
   Protocol_hash.t ->
   Vote.ballot ->
   Operation.packed tzresult Lwt.t
@@ -474,10 +528,35 @@ val transfer_ticket :
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
   ticketer:Contract.t ->
-  Z.t ->
+  amount:Ticket_amount.t ->
   destination:Contract.t ->
-  Entrypoint_repr.t ->
+  entrypoint:Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
+
+(** [tx_rollup_raw_reject] is a low-level helpers to reject a
+    commitment by providing a serialized proofs (which can be
+    invalid). See {!tx_rollup_reject} if you are interested in a
+    helper that guarantees the submitted proof to be decodable by the
+    protocol. *)
+val tx_rollup_raw_reject :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Tx_rollup_level.t ->
+  Tx_rollup_message.t ->
+  message_position:int ->
+  message_path:Tx_rollup_inbox.Merkle.path ->
+  message_result_hash:Tx_rollup_message_result_hash.t ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
+  proof:Tx_rollup_l2_proof.serialized ->
+  previous_message_result:Tx_rollup_message_result.t ->
+  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
+  Operation.packed tzresult Lwt.t
 
 (** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
     index proof] Rejects a tx rollup commitment.
@@ -523,12 +602,12 @@ val sc_rollup_origination :
   ?fee:Tez.t ->
   ?gas_limit:gas_limit ->
   ?storage_limit:counter ->
-  ?origination_proof:Sc_rollup.wrapped_proof ->
+  ?origination_proof:string ->
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->
-  string ->
-  Script.lazy_expr ->
+  boot_sector:string ->
+  parameters_ty:Script.lazy_expr ->
   (packed_operation * Sc_rollup.t) tzresult Lwt.t
 
 (** [sc_rollup_publish ctxt source rollup commitment] tries to publish
@@ -642,5 +721,55 @@ val dal_publish_slot_header :
   ?storage_limit:counter ->
   Context.t ->
   Contract.t ->
-  Dal.Slot.t ->
+  Dal.Slot.Header.t ->
   (packed_operation, tztrace) result Lwt.t
+
+(** [zk_rollup_origination ctxt source ~public_parameters ~circuits_info
+    ~init_state ~nb_ops] tries to originate a ZK Rollup. *)
+val zk_rollup_origination :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  public_parameters:
+    Plonk.Main_protocol.verifier_public_parameters
+    * Plonk.Main_protocol.transcript ->
+  circuits_info:bool Zk_rollup.Account.SMap.t ->
+  init_state:Zk_rollup.State.t ->
+  nb_ops:int ->
+  (Operation.packed * Zk_rollup.t) tzresult Lwt.t
+
+val update_consensus_key :
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  public_key ->
+  (packed_operation, tztrace) result Lwt.t
+
+val drain_delegate :
+  Context.t ->
+  consensus_key:Signature.Public_key_hash.t ->
+  delegate:Signature.Public_key_hash.t ->
+  destination:Signature.Public_key_hash.t ->
+  packed_operation tzresult Lwt.t
+
+(** [zk_rollup_publish ctxt source ~zk_rollup ~op] tries to add an operation
+    to the pending list of a ZK Rollup. *)
+val zk_rollup_publish :
+  ?force_reveal:bool ->
+  ?counter:Z.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  zk_rollup:Zk_rollup.t ->
+  ops:(Zk_rollup.Operation.t * Zk_rollup.Ticket.t option) list ->
+  Operation.packed tzresult Lwt.t

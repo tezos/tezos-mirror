@@ -1,4 +1,4 @@
-""" This file tests the mockup mode (tezos-client --mode mockup).
+""" This file tests the mockup mode (octez-client --mode mockup).
     In this mode the client does not need a node running.
 
     Make sure to either use the fixture mockup_client or
@@ -10,146 +10,19 @@
 import json
 import os
 import re
-import shutil
 import tempfile
-from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Iterator, Dict
+from pprint import pformat
 import pytest
 from launchers.sandbox import Sandbox
 from client.client import Client
 from client.client_output import CreateMockupResult
+import tools
 
 from . import protocol
 
 _BA_FLAG = "bootstrap-accounts"
 _PC_FLAG = "protocol-constants"
-
-
-@pytest.mark.client
-def test_list_mockup_protocols(sandbox: Sandbox):
-    """Executes `tezos-client list mockup protocols`
-    The call must succeed and return a non empty list.
-    """
-    try:
-        client = sandbox.create_client()
-        protocols = client.list_mockup_protocols().mockup_protocols
-        assert protocols
-    finally:
-        shutil.rmtree(client.base_dir)
-
-
-@pytest.mark.client
-def test_create_mockup_dir_exists_nonempty(sandbox: Sandbox):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir is a non empty directory which is NOT a mockup
-    directory. The call must fail.
-    """
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        # Make the directory not empty
-        with open(os.path.join(base_dir, "whatever"), "w") as handle:
-            handle.write("")
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, check=False
-        ).create_mockup_result
-        assert res == CreateMockupResult.DIR_NOT_EMPTY
-
-
-@pytest.mark.client
-def test_retrieve_addresses(mockup_client: Client):
-    """Retrieves known addresses of a fresh mockup.
-    The call must succeed.
-    """
-    addresses = mockup_client.get_known_addresses().wallet
-    assert addresses == {
-        'bootstrap1': 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx',
-        'bootstrap2': 'tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN',
-        'bootstrap3': 'tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU',
-        'bootstrap4': 'tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv',
-        'bootstrap5': 'tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv',
-    }
-
-
-@pytest.mark.client
-def test_create_mockup_already_initialized(mockup_client: Client):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir is not fresh.
-    The call must fail.
-    """
-    # mockup was created already by fixture, try to create it second time:
-    res = mockup_client.create_mockup(
-        protocol=protocol.HASH, check=False
-    ).create_mockup_result
-    # it should fail:
-    assert res == CreateMockupResult.ALREADY_INITIALIZED
-
-
-@pytest.mark.client
-def test_transfer(mockup_client: Client):
-    """Executes `tezos-client --base-dir /tmp/mdir -M mockup
-              transfer 1 from bootstrap1 to bootstrap2`
-    in a valid mockup environment.
-    The call must succeed and the balances must be updated correctly.
-    """
-    giver = "bootstrap1"
-    receiver = "bootstrap2"
-    transferred = 1.0
-
-    giver_balance_before = mockup_client.get_balance(giver)
-    receiver_balance_before = mockup_client.get_balance(receiver)
-    mockup_client.transfer(transferred, giver, receiver)
-    giver_balance_after = mockup_client.get_balance(giver)
-    receiver_balance_after = mockup_client.get_balance(receiver)
-
-    assert giver_balance_after < giver_balance_before - transferred
-    assert receiver_balance_after == receiver_balance_before + transferred
-
-
-# It's impossible to guess values of chain_id, these ones have been
-# obtained by looking at the output of `compute chain id from seed`
-@pytest.mark.parametrize(
-    'chain_id',
-    [
-        "NetXcqTGZX74DxG",
-        "NetXaFDF7xZQCpR",
-        "NetXkKbtqncJcAz",
-        "NetXjjE5cZUeWPy",
-        "NetXi7C1pyLhQNe",
-    ],
-)
-@pytest.mark.parametrize(
-    'initial_timestamp', ["2020-07-21T17:11:10+02:00", "1970-01-01T00:00:00Z"]
-)
-@pytest.mark.client
-def test_create_mockup_custom_constants(
-    sandbox: Sandbox, chain_id: str, initial_timestamp: str
-):
-    """Tests `tezos-client create mockup` --protocols-constants  argument
-    The call must succeed.
-
-    Args:
-        mockup_client: the client to use
-        chain_id (str): the string to pass for field `chain_id`
-        initial_timestamp(str): an ISO-8601 formatted date string
-    """
-    # Use another directory so that the constants change takes effect
-    with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
-    ) as base_dir, tempfile.NamedTemporaryFile(
-        prefix='tezos-custom-constants', mode='w+t'
-    ) as json_file:
-        json_data = {
-            "hard_gas_limit_per_operation": "400000",
-            "chain_id": chain_id,
-            "initial_timestamp": initial_timestamp,
-        }
-        json.dump(json_data, json_file)
-        json_file.flush()
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, protocol_constants_file=json_file.name
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
 
 
 def _create_accounts_list():
@@ -182,168 +55,6 @@ def _create_accounts_list():
     )
 
     return accounts_list
-
-
-@pytest.mark.client
-def test_create_mockup_custom_bootstrap_accounts(sandbox: Sandbox):
-    """Tests `tezos-client create mockup` --bootstrap-accounts argument
-    The call must succeed.
-    """
-    accounts_list = _create_accounts_list()
-
-    # Use another directory so that the constants change takes effect
-    with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
-    ) as base_dir, tempfile.NamedTemporaryFile(
-        prefix='tezos-bootstrap-accounts', mode='w+t'
-    ) as json_file:
-        json.dump(accounts_list, json_file)
-        json_file.flush()
-        # Follow pattern of mockup_client fixture:
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH, bootstrap_accounts_file=json_file.name
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        addresses_result = mock_client.get_known_addresses()
-        names_sent = sorted([account["name"] for account in accounts_list])
-        names_witnessed = sorted(list(addresses_result.wallet.keys()))
-        assert names_sent == names_witnessed
-
-
-@pytest.mark.client
-def test_transfer_bad_base_dir(sandbox: Sandbox):
-    """Executes `tezos-client --base-dir /tmp/mdir create mockup`
-    when /tmp/mdir looks like a dubious base directory.
-    Checks that a warning is printed.
-    """
-    try:
-        unmanaged_client = sandbox.create_client()
-        res = unmanaged_client.create_mockup(
-            protocol=protocol.HASH
-        ).create_mockup_result
-        assert res == CreateMockupResult.OK
-        base_dir = unmanaged_client.base_dir
-        mockup_dir = os.path.join(base_dir, "mockup")
-
-        # A valid mockup has a directory named "mockup", in its directory:
-        assert os.path.isdir(mockup_dir)
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        # Delete this directory:
-        shutil.rmtree(mockup_dir)
-        # And put a file instead:
-        Path(os.path.join(mockup_dir)).touch()
-
-        # Now execute a command
-        cmd = ["transfer", "1", "from", "bootstrap1", "to", "bootstrap2"]
-        (_, err_output, _) = mock_client.run_generic(cmd, check=False)
-        # See
-        # https://gitlab.com/tezos/tezos/-/merge_requests/1760#note_329071488
-        # for the content being matched
-        searched = "Some commands .* might not work correctly."
-        # Witness that warning is printed:
-        assert re.search(
-            searched, err_output
-        ), f"'{searched}' not matched in error output"
-    finally:
-        shutil.rmtree(base_dir)
-
-
-@pytest.mark.client
-def test_config_show_mockup(mockup_client: Client):
-    """Executes `tezos-client --mode mockup config show` in
-    a state where it should succeed.
-    """
-    mockup_client.run_generic(["--protocol", protocol.HASH, "config", "show"])
-
-
-@pytest.mark.client
-def test_config_show_mockup_fail(mockup_client: Client):
-    """Executes `tezos-client --mode mockup config show` when
-    base dir is NOT a mockup. It should fail as this is dangerous
-    (the default base directory could contain sensitive data,
-     such as private keys)
-    """
-    shutil.rmtree(mockup_client.base_dir)  # See test_config_init_mockup_fail
-    # for a variant of how to make the base dir invalid for the mockup mode
-    _, _, return_code = mockup_client.run_generic(
-        ["config", "show"], check=False
-    )
-
-    # recreate directory: the cleanup later on expects its existence
-    os.mkdir(mockup_client.base_dir)
-    assert return_code != 0
-
-
-@pytest.mark.client
-def test_config_init_mockup(mockup_client: Client):
-    """Executes `tezos-client config init mockup` in
-    a state where it should succeed.
-    """
-    # We cannot use NamedTemporaryFile because `config init mockup`
-    # does not overwrite files. Because NamedTemporaryFile creates the file
-    # it would make the test fail.
-    ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
-    pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
-    # 1/ call `config init mockup`
-    mockup_client.run(
-        [
-            "--protocol",
-            protocol.HASH,
-            "config",
-            "init",
-            f"--{_BA_FLAG}",
-            ba_json_file,
-            f"--{_PC_FLAG}",
-            pc_json_file,
-        ]
-    )
-
-    # 2/ Try loading the files, to check they are valid json
-    with open(ba_json_file) as handle:
-        json.load(handle)
-    with open(pc_json_file) as handle:
-        json.load(handle)
-
-    # Cleanup
-    os.remove(ba_json_file)
-    os.remove(pc_json_file)
-
-
-@pytest.mark.client
-def test_config_init_mockup_fail(mockup_client: Client):
-    """Executes `tezos-client config init mockup` when
-    base dir is NOT a mockup. It should fail as this is dangerous
-    (the default base directory could contain sensitive data,
-     such as private keys)
-    """
-    ba_json_file = tempfile.mktemp(prefix='tezos-bootstrap-accounts')
-    pc_json_file = tempfile.mktemp(prefix='tezos-proto-consts')
-    cmd = [
-        "--protocol",
-        protocol.HASH,
-        "config",
-        "init",
-        f"--{_BA_FLAG}",
-        ba_json_file,
-        f"--{_PC_FLAG}",
-        pc_json_file,
-    ]
-
-    # A valid mockup has a directory named "mockup" in its base_dir:
-    mockup_dir = os.path.join(mockup_client.base_dir, "mockup")
-    assert os.path.isdir(mockup_dir)
-    # Delete this directory, so that the base_dir is not a valid mockup
-    # base dir anymore:
-    shutil.rmtree(mockup_dir)  # See test_config_show_mockup_fail above
-    # for a variant of how to make the base_dir invalid for the mockup mode
-
-    _, _, return_code = mockup_client.run_generic(cmd, check=False)
-    assert return_code != 0
-    # Check the test doesn't leak directories:
-    assert not os.path.exists(ba_json_file)
-    assert not os.path.exists(pc_json_file)
 
 
 def _try_json_loads(flag: str, string: str) -> Any:
@@ -506,7 +217,7 @@ def _test_create_mockup_init_show_roundtrip(
             with open(ba_file, 'w') as handle:
                 handle.write(bootstrap_json)
 
-        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
@@ -542,7 +253,16 @@ def _test_create_mockup_init_show_roundtrip(
         assert ba_sent == ba_input
 
     if protocol_constants_json:
-        pc_input = json.loads(protocol_constants_json)
+        # A hack? If the user-provided overrides contains a `null` for
+        # an optional field (corresponding to `None` in Python), then
+        # that field will simply be absent in the output
+        # `pc_sent`. Therefore, we filter such values from the
+        # comparison.
+        pc_input = {
+            k: v
+            for k, v in json.loads(protocol_constants_json).items()
+            if v is not None
+        }
         assert pc_sent == pc_input
 
     # 3/ Pass obtained json to a new mockup instance, to check json
@@ -550,19 +270,19 @@ def _test_create_mockup_init_show_roundtrip(
 
     # Use another directory so that the constants change takes effect
     with tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir, tempfile.NamedTemporaryFile(
         prefix='tezos-bootstrap-accounts', mode='w+t'
     ) as ba_json_file, tempfile.NamedTemporaryFile(
         prefix='tezos-proto-consts', mode='w+t'
     ) as pc_json_file, tempfile.TemporaryDirectory(
-        prefix='tezos-client.'
+        prefix='octez-client.'
     ) as base_dir:
 
         write_file(ba_json_file, ba_str)
         write_file(pc_json_file, pc_str)
 
-        with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
+        with tempfile.TemporaryDirectory(prefix='octez-client.') as base_dir:
             # Follow pattern of mockup_client fixture:
             unmanaged_client = sandbox.create_client(base_dir=base_dir)
             res = unmanaged_client.create_mockup(
@@ -597,102 +317,160 @@ def _test_create_mockup_init_show_roundtrip(
     )
 
 
+@pytest.fixture(scope="class")
+def protocol_constants_fixture_none() -> Iterator[Optional[str]]:
+    """A fixture that simply returns None"""
+    yield None
+
+
+def succ(obj: Optional[object], schema: dict) -> object:
+    """Given the [obj] of JSON schema [schema], attempt to return a value
+    of the same schema that is not equal to [obj].
+    """
+
+    # pylint: disable=R0911
+
+    def succ_numeric(
+        val: Optional[int],
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+    ) -> int:
+        """Returns an integer different from val. If minimum and/or maximum is
+        given, then a value greater or equal than minimum and/or
+        greater or equal than maximum is returned.
+        """
+        val = (
+            val
+            if val is not None
+            else minimum
+            if minimum is not None
+            else (maximum - 1)
+            if maximum is not None
+            else 0
+        )
+
+        if maximum is not None:
+            assert val <= maximum
+        if minimum is not None:
+            assert minimum <= val
+        if maximum is not None and minimum is not None:
+            assert abs(maximum - minimum) >= 0
+            assert minimum < maximum
+
+        if maximum is None:
+            return val + 1
+        if minimum is None:
+            return val - 1
+        return minimum + ((val - minimum + 1) % (maximum - minimum + 1))
+
+    def succ_list(val: Optional[Any], candidates: List[Any]) -> Any:
+        if val is not None:
+            candidates = [c for c in candidates if c != val]
+        return candidates[0]
+
+    typ = schema.get("type", schema.get("$ref"))
+    if typ == "object":
+        obj = obj if obj is not None else {}
+        assert isinstance(obj, dict)
+
+        obj_succ: Dict[str, Any] = {}
+        for key, key_schema in schema["properties"].items():
+            obj_succ[key] = succ(obj.get(key), key_schema)
+        return obj_succ
+    if typ == "integer":
+        minimum = schema.get('minimum')
+        maximum = schema.get('maximum')
+        assert obj is None or isinstance(obj, int)
+        int_succ = succ_numeric(obj, minimum, maximum)
+        return int_succ
+    if typ == "boolean":
+        obj = obj if obj is not None else False
+        assert isinstance(obj, bool)
+        return not obj
+    if typ == "#/definitions/bignum":
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj))
+    if typ == "#/definitions/int64":
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj, minimum=-(2**63) + 1, maximum=2**63))
+    if re.match(r"\#/definitions/(.*)\.mutez", typ):
+        if obj is not None:
+            assert isinstance(obj, str)
+            obj = int(obj)
+        return str(succ_numeric(obj, minimum=0))
+    if typ == "#/definitions/Signature.Public_key_hash":
+        bootstrap1 = tools.constants.IDENTITIES['bootstrap1']['identity']
+        bootstrap2 = tools.constants.IDENTITIES['bootstrap2']['identity']
+        return succ_list(obj, [bootstrap1, bootstrap2])
+    if typ == "#/definitions/random":
+        return succ_list(
+            obj,
+            [
+                "rngFtAUcm1EneHCCrxxSWAaxSukwEhSPvpTnFjVdKLEjgkapUy1pP",
+                "rngGPSm87ZqWxJmZu7rewiLiyKY72ffCQQvxDuWmFBw59dWAL5VTB",
+            ],
+        )
+
+    raise NotImplementedError(
+        f"'succ' is not implemented for types [{typ}] (value: {pformat(obj)})"
+    )
+
+
+@pytest.fixture(scope="function")
+def protocol_constants_fixture_from_rpc(
+    mockup_client: Client,
+) -> Iterator[Optional[str]]:
+    """A fixture that creates a protocol constant value adapted for
+    the mockup client initialization, while attempting to change each
+    parameter from the default in order to check loading of the
+    parameters."""
+
+    # Fetch default values
+    endpoint = '/chains/main/blocks/head/context/constants/parametric'
+    parametric_constants = mockup_client.rpc('get', endpoint)
+    # Fetch schema, used to move from default values
+    parametric_constants_schema = mockup_client.rpc_schema('get', endpoint)[
+        "output"
+    ]
+    # Move from default values
+    parametric_constants_succ = succ(
+        parametric_constants, parametric_constants_schema
+    )
+    assert isinstance(parametric_constants_succ, dict)
+    # Some constants are very constant.
+    constant_parametric_constants = {
+        # DO NOT EDIT the value consensus_threshold this is actually a
+        # constant, not a parameter
+        'consensus_threshold': 0,
+    }
+    # These are the mockup specific protocol parameters as per
+    # src/proto_alpha/lib_client/mockup.ml
+    mockup_constants = {
+        'initial_timestamp': '2021-02-03T12:34:56Z',
+        'chain_id': 'NetXaFDF7xZQCpR',
+    }
+    constants: Dict[str, Any] = {
+        **parametric_constants_succ,
+        **constant_parametric_constants,
+        **mockup_constants,
+    }
+    yield json.dumps(constants)
+
+
 @pytest.mark.client
 @pytest.mark.parametrize(
     'initial_bootstrap_accounts', [None, json.dumps(_create_accounts_list())]
 )
-# The following values should be different from the default ones in
-# order to check loading of the parameters.
 @pytest.mark.parametrize(
     'protocol_constants',
     [
-        None,
-        json.dumps(
-            {
-                "initial_timestamp": "2021-02-03T12:34:56Z",
-                "chain_id": "NetXaFDF7xZQCpR",
-                "min_proposal_quorum": 501,
-                "quorum_max": 7001,
-                "quorum_min": 2001,
-                "hard_storage_limit_per_operation": "60001",
-                "cost_per_byte": "251",
-                "baking_reward_fixed_portion": "20000000",
-                "baking_reward_bonus_per_slot": "2500",
-                "endorsing_reward_per_slot": "2857",
-                "origination_size": 258,
-                "vdf_difficulty": "1000000000",
-                "seed_nonce_revelation_tip": "125001",
-                "testnet_dictator": None,
-                "tokens_per_roll": "8000000001",
-                "proof_of_work_threshold": "-2",
-                "hard_gas_limit_per_block": "10400001",
-                "hard_gas_limit_per_operation": "1040001",
-                'consensus_committee_size': 12,
-                # DO NOT EDIT the value consensus_threshold this is actually a
-                # constant, not a parameter
-                'consensus_threshold': 0,
-                'initial_seed': None,
-                'minimal_participation_ratio': {
-                    'denominator': 5,
-                    'numerator': 1,
-                },
-                'minimal_block_delay': '1',
-                'delay_increment_per_round': '1',
-                'max_slashing_period': 12,
-                "cycles_per_voting_period": 7,
-                "blocks_per_stake_snapshot": 5,
-                "blocks_per_commitment": 5,
-                "nonce_revelation_threshold": 5,
-                "blocks_per_cycle": 9,
-                "preserved_cycles": 3,
-                "liquidity_baking_toggle_ema_threshold": 1000000000,
-                "liquidity_baking_subsidy": "2500000",
-                "liquidity_baking_sunset_level": 1024,
-                "max_operations_time_to_live": 120,
-                "frozen_deposits_percentage": 10,
-                'ratio_of_frozen_deposits_slashed_per_double_endorsement': {
-                    'numerator': 1,
-                    'denominator': 2,
-                },
-                "double_baking_punishment": "640000001",
-                "cache_script_size": 100000001,
-                "cache_stake_distribution_cycles": 10,
-                "cache_sampler_state_cycles": 10,
-                "tx_rollup_enable": False,
-                "tx_rollup_origination_size": 30_000,
-                "tx_rollup_hard_size_limit_per_inbox": 100_000,
-                "tx_rollup_hard_size_limit_per_message": 5_000,
-                "tx_rollup_commitment_bond": "10000000000",
-                "tx_rollup_finality_period": 2000,
-                "tx_rollup_withdraw_period": 123456,
-                "tx_rollup_max_inboxes_count": 2218,
-                "tx_rollup_max_messages_per_inbox": 1010,
-                'tx_rollup_max_withdrawals_per_batch': 255,
-                "tx_rollup_max_commitments_count": 666,
-                "tx_rollup_cost_per_byte_ema_factor": 321,
-                "tx_rollup_max_ticket_payload_size": 10_240,
-                "tx_rollup_rejection_max_proof_size": 30_000,
-                "tx_rollup_sunset_level": 3_473_409,
-                "dal_parametric": {
-                    "feature_enable": True,
-                    "number_of_slots": 64,
-                    "number_of_shards": 1024,
-                    "endorsement_lag": 1,
-                    "availability_threshold": 25,
-                },
-                "sc_rollup_enable": False,
-                "sc_rollup_origination_size": 6_314,
-                "sc_rollup_challenge_window_in_blocks": 20_160,
-                "sc_rollup_max_number_of_messages_per_commitment_period": 32765,
-                "sc_rollup_stake_amount": "42000000",
-                "sc_rollup_commitment_period_in_blocks": 40,
-                "sc_rollup_max_lookahead_in_blocks": 30_000,
-                "sc_rollup_max_active_outbox_levels": 20_160,
-                "sc_rollup_max_outbox_messages_per_level": 100,
-                "sc_rollup_number_of_sections_in_dissection": 32,
-                "sc_rollup_timeout_period_in_blocks": 20_160,
-            }
-        ),
+        # These are fixtures defined above loaded dynamically
+        'protocol_constants_fixture_none',
+        'protocol_constants_fixture_from_rpc',
     ],
 )
 @pytest.mark.parametrize(
@@ -709,6 +487,7 @@ def test_create_mockup_config_show_init_roundtrip(
     protocol_constants,
     read_initial_state,
     read_final_state,
+    request,
 ):
     """1/ Create a mockup, using possibly custom bootstrap_accounts
        (as specified by `initial_bootstrap_json`).
@@ -725,79 +504,5 @@ def test_create_mockup_config_show_init_roundtrip(
         read_initial_state,
         read_final_state,
         initial_bootstrap_accounts,
-        protocol_constants,
+        request.getfixturevalue(protocol_constants),
     )
-
-
-def test_transfer_rpc(mockup_client: Client):
-    """Variant of test_transfer that uses RPCs to get the balances."""
-    giver = "bootstrap1"
-    receiver = "bootstrap2"
-    transferred = 1.0
-    transferred_mutz = transferred * 1000000
-
-    def get_balance(tz1):
-        res = mockup_client.rpc(
-            'get',
-            f'chains/main/blocks/head/context/contracts/{tz1}/balance',
-        )
-        return float(res)
-
-    addresses = mockup_client.get_known_addresses()
-    giver_tz1 = addresses.wallet[giver]
-    recvr_tz1 = addresses.wallet[receiver]
-    giver_balance_before = get_balance(giver_tz1)
-    receiver_balance_before = get_balance(recvr_tz1)
-    mockup_client.transfer(transferred, giver, receiver)
-    giver_balance_after = get_balance(giver_tz1)
-    receiver_balance_after = get_balance(recvr_tz1)
-
-    assert giver_balance_after < giver_balance_before - transferred_mutz
-    assert receiver_balance_after == receiver_balance_before + transferred_mutz
-
-
-@pytest.mark.parametrize(
-    'protos',
-    [
-        (proto1, proto2)
-        for proto1 in [protocol.HASH, protocol.PREV_HASH]
-        for proto2 in [protocol.HASH, protocol.PREV_HASH, ""]
-    ],
-)
-@pytest.mark.parametrize(
-    'command',
-    [
-        ["config", "show"],
-        ["config", "init"],
-        ["list", "known", "addresses"],
-        ["get", "balance", "for", "bootstrap1"],
-    ],
-)
-def test_proto_mix(
-    sandbox: Sandbox, protos: Tuple[str, str], command: List[str]
-):
-    """
-    This test covers 3 cases:
-
-    1/ When proto's second element equals the first member:
-       it tests that the command works.
-    2/ When proto's second element is empty:
-       it tests that the correct mockup implementation is picked
-       (i.e. the one of the first element) and that the command works.
-    3/ When protos' second element is not empty and differs from
-       the first member: it tests
-       that creating a mockup with a protocol and using it with another
-       protocol fails.
-    """
-    proto1 = protos[0]
-    proto2 = protos[1]
-    with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
-        # Follow pattern of mockup_client fixture:
-        unmanaged_client = sandbox.create_client(base_dir=base_dir)
-        res = unmanaged_client.create_mockup(protocol=proto1)
-        assert res.create_mockup_result == CreateMockupResult.OK
-        mock_client = sandbox.create_client(base_dir=base_dir, mode="mockup")
-        cmd = (["--protocol", proto2] if proto2 else []) + command
-        success = (proto2 == proto1) or (not proto2)
-        (_, _, return_code) = mock_client.run_generic(cmd, check=False)
-        assert (return_code == 0) == success

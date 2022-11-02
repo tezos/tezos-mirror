@@ -23,7 +23,9 @@ Note that:
 
 - Old source files may contain on the first line `Open Source License` instead of `MIT License`. When touching such a file, please replace the former with the latter, correct form.
 
-For example, for a source file with multiple contributors spanning several years, the copyright lines may look as follows::
+For example, for a source file with multiple contributors spanning several years, the copyright lines may look as follows:
+
+.. code-block:: ocaml
 
   (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
   (* Copyright (c) 2019-2020 Nomadic Labs <contact@nomadic-labs.com>           *)
@@ -64,7 +66,9 @@ TODO/FIXME comments
 ~~~~~~~~~~~~~~~~~~~
 
 During the :ref:`code review process <code_review>`, follow-up issues may be created to improve some piece of code that already implement its specification (e.g., optimize, refactor, or bring a potentially useful generalization).
-When the place of the future evolution is known in advance (e.g. a given function), you should mark it with a ``TODO`` comment of the form::
+When the place of the future evolution is known in advance (e.g. a given function), you should mark it with a ``TODO`` comment of the form:
+
+.. code-block:: ocaml
 
     (* TODO: <reference to issue>
        <one-line explanation>
@@ -149,15 +153,18 @@ Also at the level of the library, you should include a ``README.md`` in `Markdow
 Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
 Because it is accessible only in the source tree, the file should contain information that might be of interest to the maintainers and contributors.
 
-You must instantiate the ``README.md`` file with the following template::
+You must instantiate the ``README.md`` file with the following template:
+
+.. code-block:: markdown
 
   # Component Name
   <!-- Summary line: One sentence about this component. -->
 
   ## API Documentation
-  <!--
-  - Link to the external API.
-  -->
+  <!-- Link to the external API. -->
+
+  ## Installation
+  <!-- Describe how this component can be installed (if applicable). -->
 
   ## Overview
   <!--
@@ -235,7 +242,7 @@ Code formatting
 
 To ensure that your OCaml code is well formatted, set up correctly your editor:
 
-+ automatically run `ocamlformat` when saving a file
++ automatically run ``ocamlformat`` when saving a file
 + no tabs, use whitespaces
 + no trailing whitespaces
 + indent correctly (e.g. use lisp-mode for dune files)
@@ -245,7 +252,7 @@ Many of these checks can be run with ``make check-python-linting``.
 Some of these checks can be executed with a `pre-commit <https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks>`_
 which is installed with
 ``ln -sr scripts/pre_commit/pre_commit.py .git/hooks/pre-commit``
-(see the header of `./scripts/pre_commit/pre_commit.py` and its `--help`
+(see the header of :src:`scripts/pre_commit/pre_commit.py` and its ``--help``
 for additional options).
 
 Exposing internals
@@ -589,7 +596,7 @@ Lwt-, Result-, and Lwt-Result-specific variants of all the traversal functions
 (``map``, ``iter``, ``for_all``, ``exists``, etc.)
 
 Check the
-`online documentation for a full list of the content of the ``List`` module <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/TzPervasives/List/index.html>`_.
+:package-api:`online documentation <tezos-base/Tezos_base/TzPervasives/List/index.html>` for a full list of the content of the ``List`` module.
 
 .. _chaining_concat_map:
 
@@ -607,7 +614,7 @@ Lwtreslib provides additional combinators ``List.concat_map_s``,
 ``List.concat_map_e``, and ``List.concat_map_es`` to replace the non-vanilla
 compositions.
 
-Check the `online documentation <https://tezos.gitlab.io/api/odoc/_html/tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`_.
+Check the :package-api:`online documentation <tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`.
 
 Coding conventions
 ------------------

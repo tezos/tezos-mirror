@@ -52,23 +52,28 @@ let sc_rollup_max_outbox_messages_per_level = 100
 
     It suffers from the same risk of censorship as
     {!sc_rollup_challenge_windows_in_blocks} so we use the same value.
-
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2902
-    This constant needs to be refined.
 *)
 let sc_rollup_timeout_period_in_blocks = 20_160
 
 (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3177
 
    Think harder about those values. *)
+let default_cryptobox_parameters =
+  {
+    Dal.Slots_history.page_size = 4096;
+    slot_size = 1 lsl 20;
+    redundancy_factor = 16;
+    number_of_shards = 2048;
+  }
+
 let default_dal =
   Constants.Parametric.
     {
       feature_enable = false;
       number_of_slots = 256;
-      number_of_shards = 2048;
       endorsement_lag = 1;
       availability_threshold = 50;
+      cryptobox_parameters = default_cryptobox_parameters;
     }
 
 let constants_mainnet =
@@ -80,6 +85,7 @@ let constants_mainnet =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           endorsing_reward_per_slot;
+          liquidity_baking_subsidy;
         } =
     Constants.Generated.generate
       ~consensus_committee_size
@@ -95,7 +101,7 @@ let constants_mainnet =
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
-    tokens_per_roll = Tez.(mul_exn one 6_000);
+    minimal_stake = Tez.(mul_exn one 6_000);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
           - 8000 ~= 256 * 30 that is nonce_revelation_threshold * block time
@@ -116,10 +122,7 @@ let constants_mainnet =
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
     (* liquidity_baking_subsidy is 1/16th of maximum total rewards for a block *)
-    liquidity_baking_subsidy = Tez.of_mutez_exn 2_500_000L;
-    (* level after protocol activation when liquidity baking shuts off:
-         about 6 months after first activation on mainnet *)
-    liquidity_baking_sunset_level = 3_063_809l;
+    liquidity_baking_subsidy (* 2_500_000 mutez *);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
@@ -198,32 +201,62 @@ let constants_mainnet =
            (minus overhead), since we need to limit our proofs to those
            that can fit in an operation. *)
         rejection_max_proof_size = 30000;
-        (* This is the first block of cycle 618, which is expected to be
-           about one year after the activation of protocol J.
-           See https://tzstats.com/cycle/618 *)
+        (* This is the first block of cycle 618, which is expected to
+           be about one year after the activation of protocol J.  See
+           https://tzstats.com/cycle/618 *)
         sunset_level = 3_473_409l;
       };
     dal = default_dal;
     sc_rollup =
+      (let commitment_period_in_blocks = 30 in
+       {
+         enable = false;
+         (* The following value is chosen to prevent spam. *)
+         origination_size = 6_314;
+         challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
+         commitment_period_in_blocks;
+         (*
+
+            The following value is chosen to limit the length of inbox
+            refutation proofs. In the worst case, the length of inbox
+            refutation proofs are logarithmic (in basis 2) in the
+            number of messages in the inboxes during the commitment
+            period.
+
+            With the following value, an inbox refutation proof is
+            made of at most 35 hashes, hence a payload bounded by
+            35 * 48 bytes, which far below than the 32kb of a Tezos
+            operations.
+
+         *)
+         max_number_of_messages_per_commitment_period =
+           commitment_period_in_blocks * 10_000_000;
+         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+            The following constants need to be refined. *)
+         stake_amount = Tez.of_mutez_exn 10_000_000_000L;
+         max_lookahead_in_blocks = 30_000l;
+         max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
+         max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
+         number_of_sections_in_dissection = 32;
+         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+         max_number_of_stored_cemented_commitments = 5;
+       });
+    zk_rollup =
       {
         enable = false;
-        (* The following value is chosen to prevent spam. *)
-        origination_size = 6_314;
-        challenge_window_in_blocks = sc_rollup_challenge_window_in_blocks;
-        (* The following value is chosen to limit the length of inbox refutation proofs. *)
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2373
-           check this is reasonable. *)
-        max_number_of_messages_per_commitment_period = 32_765;
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/3726
            The following constants need to be refined. *)
-        stake_amount = Tez.of_mutez_exn 10_000_000_000L;
-        commitment_period_in_blocks = 30;
-        max_lookahead_in_blocks = 30_000l;
-        max_active_outbox_levels = sc_rollup_max_active_outbox_levels;
-        max_outbox_messages_per_level = sc_rollup_max_outbox_messages_per_level;
-        number_of_sections_in_dissection = 32;
-        timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+        origination_size = 4_000;
+        min_pending_to_process = 10;
       };
+  }
+
+let default_cryptobox_parameters_sandbox =
+  {
+    Dal.Slots_history.page_size = 4096;
+    number_of_shards = 256;
+    slot_size = 1 lsl 16;
+    redundancy_factor = 4;
   }
 
 let default_dal_sandbox =
@@ -231,9 +264,9 @@ let default_dal_sandbox =
     {
       feature_enable = false;
       number_of_slots = 16;
-      number_of_shards = 256;
       endorsement_lag = 1;
       availability_threshold = 50;
+      cryptobox_parameters = default_cryptobox_parameters_sandbox;
     }
 
 let constants_sandbox =
@@ -245,6 +278,7 @@ let constants_sandbox =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           endorsing_reward_per_slot;
+          liquidity_baking_subsidy;
         } =
     Constants.Generated.generate
       ~consensus_committee_size
@@ -261,7 +295,7 @@ let constants_sandbox =
     cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.of_int (-1);
     vdf_difficulty = 50_000L;
-    liquidity_baking_sunset_level = 128l;
+    liquidity_baking_subsidy;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
     delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
@@ -281,6 +315,7 @@ let constants_test =
           baking_reward_fixed_portion;
           baking_reward_bonus_per_slot;
           endorsing_reward_per_slot;
+          liquidity_baking_subsidy;
         } =
     Constants.Generated.generate
       ~consensus_committee_size
@@ -296,7 +331,7 @@ let constants_test =
     cycles_per_voting_period = 2l;
     proof_of_work_threshold = Int64.of_int (-1);
     vdf_difficulty = 50_000L;
-    liquidity_baking_sunset_level = 4096l;
+    liquidity_baking_subsidy;
     consensus_committee_size;
     consensus_threshold (* 17 slots *);
     max_slashing_period = 2;
@@ -353,12 +388,20 @@ let compute_accounts =
           public_key = Some public_key;
           amount = bootstrap_balance;
           delegate_to = None;
+          consensus_key = None;
         })
 
 let bootstrap_accounts = compute_accounts bootstrap_accounts_strings
 
-let make_bootstrap_account (pkh, pk, amount, delegate_to) =
-  Parameters.{public_key_hash = pkh; public_key = Some pk; amount; delegate_to}
+let make_bootstrap_account (pkh, pk, amount, delegate_to, consensus_key) =
+  Parameters.
+    {
+      public_key_hash = pkh;
+      public_key = Some pk;
+      amount;
+      delegate_to;
+      consensus_key;
+    }
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(commitments = []) constants =

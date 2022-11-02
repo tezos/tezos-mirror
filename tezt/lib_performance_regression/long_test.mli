@@ -70,6 +70,9 @@ val x86_executor1 : executor
 (** AMD64 executor number 2. *)
 val x86_executor2 : executor
 
+(** Executor for the block-replay semantic regression tests *)
+val block_replay_executor : executor
+
 (** Wrapper over [Test.register] to register a performance regression test.
 
     Differences with [Test.register] are:

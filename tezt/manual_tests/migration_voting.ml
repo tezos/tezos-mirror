@@ -239,16 +239,13 @@ let create_yes_wallet () =
 let prepare_migration ?yes_node_path ?yes_wallet context protocol
     levels_till_migration =
   Log.info "Copying the context into a temporary directory" ;
-  let data_dir = Temp.dir "tezos-node-test" in
+  let data_dir = Temp.dir "octez-node-test" in
   let* () = Process.run "cp" ["-R"; context ^ "/."; data_dir] in
   let* () = Process.run "rm" [data_dir ^ "/config.json"] in
   let* node =
     Node.init ~rpc_port:19731 ~net_port:18731 ~data_dir [Connections 0]
   in
-  let endpoint = Client.(Node node) in
-  let* client = Client.init ~endpoint () in
-  let* json = RPC.get_current_level ~endpoint client in
-  let level = JSON.(json |-> "level" |> as_int) in
+  let level = Node.get_level node in
   Log.info "The node is at level %d" level ;
   let* () = Node.terminate node in
   let migration_level = level + levels_till_migration in
@@ -393,7 +390,7 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
 (* The following four variables need to be updated according to the user's setup. *)
 
 (* path to an existing mainnet context, which will be copied *)
-let context = "/tmp/tezos-node-2021-03-31.roll"
+let context = "/tmp/octez-node-2021-03-31.roll"
 
 (* the protocol to be activated *)
 let protocol = "PrxmwK1B8zS4Hh2z4XFcn29eAwuypLtibiWFoQLaKf2FR1rdoK5"

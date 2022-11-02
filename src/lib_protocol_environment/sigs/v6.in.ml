@@ -1,6 +1,8 @@
-open Tezos_protocol_environment_sigs_stdlib_compat.V_all
-
 module type T = sig
+  module CamlinternalFormatBasics : module type of struct
+    include Tezos_protocol_environment_sigs_internals.CamlinternalFormatBasics
+  end
+
   module Pervasives : [%sig "v6/pervasives.mli"]
 
   open Pervasives
@@ -102,8 +104,6 @@ module type T = sig
   module Protocol_hash : [%sig "v6/protocol_hash.mli"]
 
   module Context_hash : [%sig "v6/context_hash.mli"]
-
-  module Pvss_secp256k1 : [%sig "v6/pvss_secp256k1.mli"]
 
   module Sapling : [%sig "v6/sapling.mli"]
 

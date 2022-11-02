@@ -70,7 +70,9 @@ module M = struct
 end
 
 module Make (A : sig
-  include Tezos_context_sigs.Context.S
+  include
+    Tezos_context_sigs.Context.TEZOS_CONTEXT
+      with type memory_context_tree := Tezos_context_memory.Context.tree
 
   val make_context : unit -> t Lwt.t
 end) =

@@ -7,19 +7,38 @@ type index = int32
 
 type count = int32
 
-module Vector = Lazy_vector.Mutable.LwtInt32Vector
+module Vector = Lazy_vector.Mutable.Int32Vector
 
 type table = {mutable ty : table_type; content : ref_ Vector.t}
 
 type t = table
 
-include Memory_exn
+let content {content; _} = Vector.snapshot content
+
+exception Type
+
+exception SizeLimit
+
+exception OutOfMemory
+
+exception Bounds
+
+exception SizeOverflow
+
+let reraise = function
+  | Chunked_byte_vector.Bounds | Lazy_vector.Bounds -> raise Bounds
+  | Chunked_byte_vector.SizeOverflow | Lazy_vector.SizeOverflow ->
+      raise SizeOverflow
+  | exn -> raise exn
 
 let valid_limits {min; max} =
   match max with None -> true | Some m -> I32.le_u min m
 
 let create size r =
-  try Vector.create ~produce_value:(fun _ -> Lwt.return r) size
+  try
+    let vec = Vector.create 0l in
+    Vector.grow size ~default:(fun _ -> r) vec ;
+    vec
   with Out_of_memory | Invalid_argument _ -> raise OutOfMemory
 
 let create_shallow size =
@@ -51,16 +70,16 @@ let grow tab delta r =
   else
     let lim' = {lim with min = new_size} in
     if not (valid_limits lim') then raise SizeLimit
-    else Vector.grow delta ~produce_value:(fun _ -> Lwt.return r) tab.content ;
+    else Vector.grow delta ~default:(fun () -> r) tab.content ;
     tab.ty <- TableType (lim', t) ;
     ()
 
-let load tab i = Vector.get i tab.content
+let load tab i = try Vector.get i tab.content with exn -> reraise exn
 
 let store tab i r =
-  let (TableType (lim, t)) = tab.ty in
+  let (TableType (_, t)) = tab.ty in
   if type_of_ref r <> t then raise Type ;
-  Vector.set i r tab.content
+  try Vector.set i r tab.content with exn -> reraise exn
 
 let blit tab offset rs =
   List.iteri (fun i r -> store tab Int32.(of_int i |> add offset) r) rs

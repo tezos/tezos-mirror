@@ -27,6 +27,7 @@
 (* Tezos Command line interface - Main Program *)
 
 open Client_context_unix
+open Tezos_clic
 
 let builtin_commands =
   let open Lwt_syntax in
@@ -316,6 +317,78 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.printer)
           setup_non_mockup_rpc_client_config m
       | `Mode_mockup -> setup_mockup_rpc_client_config cctxt args base_dir)
 
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
+   Remove backwards compatible Tezos symlinks. *)
+let warn_if_argv0_name_not_octez () =
+  let executable_name =
+    (* example: tezos-tx-rollup-client-015-PtKathma *)
+    Filename.basename Sys.argv.(0)
+  in
+  let old_head = "tezos-" in
+  let new_head = "octez-" in
+  match TzString.has_prefix executable_name ~prefix:old_head with
+  | false -> ()
+  | true ->
+      let expected_name =
+        let len_prefix = String.length old_head in
+        let headless_name =
+          (* example: tx-rollup-client-015-PtKathma *)
+          String.sub
+            executable_name
+            len_prefix
+            (String.length executable_name - len_prefix)
+        in
+        let name_without_version name =
+          match headless_name |> String.starts_with ~prefix:name with
+          | false -> None
+          | true ->
+              let len_name = String.length name in
+              let version_proto =
+                (* example: -015-PtKathma *)
+                String.sub
+                  headless_name
+                  len_name
+                  (String.length headless_name - len_name)
+              in
+              let num_hyphens =
+                (* example: 2 *)
+                version_proto
+                |> String.fold_left
+                     (fun acc c -> match c with '-' -> acc + 1 | _ -> acc)
+                     0
+              in
+              let proto =
+                (* example: -PtKathma *)
+                if num_hyphens = 2 then
+                  String.sub version_proto 4 (String.length version_proto - 4)
+                else version_proto
+              in
+              Some (name ^ proto)
+        in
+        (* example: tx-rollup-client-PtKathma *)
+        let versionless_name =
+          ["accuser"; "baker"; "tx-rollup-client"; "tx-rollup-node"]
+          |> List.map name_without_version
+          |> List.find Option.is_some |> Option.join
+        in
+        (* example: octez-tx-rollup-client-PtKathma *)
+        new_head
+        ^
+        match versionless_name with
+        | None -> headless_name
+        | Some versionless_name -> versionless_name
+      in
+      Format.eprintf
+        "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
+         The executable with name @{<kwd>%s@} has been renamed to @{<kwd>%s@}. \
+         The name @{<kwd>%s@} is now@,\
+         deprecated, and it will be removed in a future release. Please update@,\
+         your scripts to use the new name.@]@\n\
+         @."
+        executable_name
+        expected_name
+        executable_name
+
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
   let open Lwt_result_syntax in
@@ -347,6 +420,7 @@ let main (module C : M) ~select_commands =
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
+  warn_if_argv0_name_not_octez () ;
   let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! retcode =
     Lwt.catch

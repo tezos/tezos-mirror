@@ -6,10 +6,15 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-webassembly-interpreter
-  lwt.unix)
+  tezos-webassembly-interpreter-extra
+  lwt.unix
+  tezos-tree-encoding
+  tezos-lazy-containers)
  (flags
   (:standard)
-  -w -27
-  -open Tezos_webassembly_interpreter))
+  -open Tezos_webassembly_interpreter
+  -open Tezos_webassembly_interpreter_extra
+  -open Tezos_tree_encoding
+  -open Tezos_lazy_containers))
 
 (include dune.inc)

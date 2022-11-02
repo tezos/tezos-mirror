@@ -71,7 +71,7 @@ Shell-protocol interaction
 - The shell does not accept a branch whose fork point is in a cycle more than ``PRESERVED_CYCLES`` in the past. More precisely, if ``n`` is the current cycle, :ref:`the last allowed fork point<lafl>` is the first level of cycle ``n-PRESERVED_CYCLES``. The parameter ``PRESERVED_CYCLES`` therefore plays a central role in Tezos: any block before the last allowed fork level is immutable.
 - The shell changes the head of the chain to this new block only if the block is :doc:`valid<../shell/validation>` and has a higher fitness than the current head; a block is valid if the operations it includes are valid.
 
-The support provided by the protocol for validating blocks can be modulated by different `validation modes <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_protocol_alpha/Protocol/index.html#type-validation_mode>`__.
+The support provided by the protocol for validating blocks can be modulated by different :package-api:`validation modes <tezos-protocol-alpha/Tezos_protocol_alpha/Protocol/index.html#type-validation_mode>`.
 They allow using this same support for quite different use cases, as follows:
 
 - being able to validate a block, typically used in the :doc:`validator <../shell/validation>`;
@@ -112,6 +112,34 @@ Manager operations can be grouped into batches forming a so-called group operati
 - usability: the batch only increments the counter of the signer account by one; for this reason it is easier for tools to provide sending several operations per block using operation batches than tracking counter changes.
 
 The list of operations can be obtained with :ref:`this rpc <GET_..--block_id--operations>`.
+
+.. _protocol_constants_alpha:
+
+Protocol constants
+~~~~~~~~~~~~~~~~~~
+
+Protocols are tuned by several *protocol constants*, such as the size of a nonce, or the number of blocks per cycle.
+One can distinguish two kinds of protocol constants:
+
+- *fixed* prototocol constants, such as the size of a nonce, are values wired in the code of a protocol, and can only be changed by protocol amendment (that is, by adopting a new protocol)
+- *parametric* protocol constants, such as the number of blocks per cycle, are values maintained in a read-only data structure that can be instantiated differently, for the same protocol, from one network to another (for instance, test networks move faster).
+
+The *list* of protocol constants can be found in the OCaml APIs:
+
+- fixed protocol constants are defined in the module :package-api:`Constants_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_repr/index.html>`
+- parametric constants are defined in the module :package-api:`Constants_parametric_repr <tezos-protocol-alpha/Tezos_raw_protocol_alpha/Constants_parametric_repr/index.html>`
+
+The *values* of protocol constants in any given protocol can be found using specific RPC calls:
+
+- one RPC for :ref:`all constants <GET_..--block_id--context--constants>`, as shown in :ref:`this example <get_protocol_constants>`
+- one RPC for :ref:`the parametric constants <GET_..--block_id--context--constants--parametric>`.
+
+Further documentation of various protocol constants can be found in the subsystems where they conceptually belong.
+See, for example:
+
+- :ref:`proof-of-stake parameters <ps_constants_alpha>`.
+- :ref:`consensus-related parameters <cs_constants_alpha>`
+- :ref:`randomness generation parameters <rg_constants_alpha>`.
 
 See also
 ~~~~~~~~

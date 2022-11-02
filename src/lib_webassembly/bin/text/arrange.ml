@@ -6,6 +6,8 @@ open Types
 open Sexpr
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
 
+type block_table = Ast.instr list list
+
 (* Generic formatting *)
 
 let nat n = I32.to_string_u (I32.of_int_u n)
@@ -22,7 +24,7 @@ let add_char buf = function
   | c when '\x20' <= c && c < '\x7f' -> Buffer.add_char buf c
   | c -> add_hex_char buf c
 
-let add_unicode_char buf = function
+let _add_unicode_char buf = function
   | (0x09 | 0x0a) as uc -> add_char buf (Char.chr uc)
   | uc when 0x20 <= uc && uc < 0x7f -> add_char buf (Char.chr uc)
   | uc -> Printf.bprintf buf "\\u{%02x}" uc
@@ -38,28 +40,34 @@ let bytes = string_with String.iter add_hex_char
 
 let string = string_with String.iter add_char
 
-let name n =
-  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
-  string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
+let name n = string_with String.iter (fun buf uc -> add_char buf uc) n
 
 let list_of_opt = function None -> [] | Some x -> [x]
+
+let list_of_block blocks f (Block_label b) =
+  let block = List.nth blocks (Int32.to_int b) in
+  let rec map acc pos =
+    if pos < 0l then acc
+    else map (f (List.nth block (Int32.to_int pos)) :: acc) (Int32.pred pos)
+  in
+  map [] (Int32.pred (List.length block |> Int32.of_int))
 
 let list f xs = List.map f xs
 
 let opt f xo = list f (list_of_opt xo)
 
 let lazy_vector f map =
-  List.map (fun (_, v) -> f v) (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+  List.map (fun (_, v) -> f v) (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori f map =
   List.map
     (fun (i32, v) -> f (Int32.to_int i32) v)
-    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+    (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let lazy_vectori_lwt f map =
   TzStdLib.List.map_s
     (fun (i32, v) -> f (Int32.to_int i32) v)
-    (Lazy_vector.LwtInt32Vector.loaded_bindings map)
+    (Lazy_vector.Int32Vector.loaded_bindings map)
 
 let tab head f xs = if xs = [] then [] else [Node (head, list f xs)]
 
@@ -123,9 +131,9 @@ let vec_extension sz = function
 module IntOp = struct
   open Ast.IntOp
 
-  let testop xx = function Eqz -> "eqz"
+  let testop _xx = function Eqz -> "eqz"
 
-  let relop xx = function
+  let relop _xx = function
     | Eq -> "eq"
     | Ne -> "ne"
     | LtS -> "lt_s"
@@ -137,13 +145,13 @@ module IntOp = struct
     | GeS -> "ge_s"
     | GeU -> "ge_u"
 
-  let unop xx = function
+  let unop _xx = function
     | Clz -> "clz"
     | Ctz -> "ctz"
     | Popcnt -> "popcnt"
     | ExtendS sz -> "extend" ^ pack_size sz ^ "_s"
 
-  let binop xx = function
+  let binop _xx = function
     | Add -> "add"
     | Sub -> "sub"
     | Mul -> "mul"
@@ -178,9 +186,9 @@ end
 module FloatOp = struct
   open Ast.FloatOp
 
-  let testop xx = function (_ : testop) -> .
+  let testop _xx = function (_ : testop) -> .
 
-  let relop xx = function
+  let relop _xx = function
     | Eq -> "eq"
     | Ne -> "ne"
     | Lt -> "lt"
@@ -188,7 +196,7 @@ module FloatOp = struct
     | Le -> "le"
     | Ge -> "ge"
 
-  let unop xx = function
+  let unop _xx = function
     | Neg -> "neg"
     | Abs -> "abs"
     | Ceil -> "ceil"
@@ -197,7 +205,7 @@ module FloatOp = struct
     | Nearest -> "nearest"
     | Sqrt -> "sqrt"
 
-  let binop xx = function
+  let binop _xx = function
     | Add -> "add"
     | Sub -> "sub"
     | Mul -> "mul"
@@ -231,14 +239,14 @@ module V128Op = struct
     | "32x4" -> "64x2"
     | _ -> assert false
 
-  let voidop xxxx = function (_ : void) -> .
+  let voidop _xxxx = function (_ : void) -> .
 
-  let itestop xxxx (op : itestop) = match op with AllTrue -> "all_true"
+  let itestop _xxxx (op : itestop) = match op with AllTrue -> "all_true"
 
-  let iunop xxxx (op : iunop) =
+  let iunop _xxxx (op : iunop) =
     match op with Neg -> "neg" | Abs -> "abs" | Popcnt -> "popcnt"
 
-  let funop xxxx (op : funop) =
+  let funop _xxxx (op : funop) =
     match op with
     | Neg -> "neg"
     | Abs -> "abs"
@@ -273,7 +281,7 @@ module V128Op = struct
     | Shuffle is -> "shuffle " ^ String.concat " " (List.map nat is)
     | Swizzle -> "swizzle"
 
-  let fbinop xxxx (op : fbinop) =
+  let fbinop _xxxx (op : fbinop) =
     match op with
     | Add -> "add"
     | Sub -> "sub"
@@ -284,7 +292,7 @@ module V128Op = struct
     | Pmin -> "pmin"
     | Pmax -> "pmax"
 
-  let irelop xxxx (op : irelop) =
+  let irelop _xxxx (op : irelop) =
     match op with
     | Eq -> "eq"
     | Ne -> "ne"
@@ -297,7 +305,7 @@ module V128Op = struct
     | GeS -> "ge_s"
     | GeU -> "ge_u"
 
-  let frelop xxxx (op : frelop) =
+  let frelop _xxxx (op : frelop) =
     match op with
     | Eq -> "eq"
     | Ne -> "ne"
@@ -328,10 +336,10 @@ module V128Op = struct
     | ConvertUI32x4 ->
         "convert_" ^ (if xxxx = "32x4" then "" else "low_") ^ "i32x4_u"
 
-  let ishiftop xxxx (op : ishiftop) =
+  let ishiftop _xxxx (op : ishiftop) =
     match op with Shl -> "shl" | ShrS -> "shr_s" | ShrU -> "shr_u"
 
-  let ibitmaskop xxxx (op : ibitmaskop) = match op with Bitmask -> "bitmask"
+  let ibitmaskop _xxxx (op : ibitmaskop) = match op with Bitmask -> "bitmask"
 
   let vtestop (op : vtestop) = match op with AnyTrue -> "any_true"
 
@@ -346,16 +354,16 @@ module V128Op = struct
 
   let vternop (op : vternop) = match op with Bitselect -> "bitselect"
 
-  let splatop xxxx (op : nsplatop) = match op with Splat -> "splat"
+  let splatop _xxxx (op : nsplatop) = match op with Splat -> "splat"
 
-  let pextractop xxxx (op : extension nextractop) =
+  let pextractop _xxxx (op : extension nextractop) =
     match op with
     | Extract (i, ext) -> "extract_lane" ^ extension ext ^ " " ^ nat i
 
-  let extractop xxxx (op : unit nextractop) =
+  let extractop _xxxx (op : unit nextractop) =
     match op with Extract (i, ()) -> "extract_lane " ^ nat i
 
-  let replaceop xxxx (op : nreplaceop) =
+  let replaceop _xxxx (op : nreplaceop) =
     match op with Replace i -> "replace_lane " ^ nat i
 
   let lane_oper (pop, iop, fop) op =
@@ -470,7 +478,7 @@ let block_type = function
   | VarBlockType x -> [Node ("type " ^ var x, [])]
   | ValBlockType ts -> decls "result" (list_of_opt ts)
 
-let rec instr e =
+let rec instr blocks e =
   let head, inner =
     match e.it with
     | Unreachable -> ("unreachable", [])
@@ -479,12 +487,17 @@ let rec instr e =
     | Select None -> ("select", [])
     | Select (Some []) -> ("select", [Node ("result", [])])
     | Select (Some ts) -> ("select", decls "result" ts)
-    | Block (bt, es) -> ("block", block_type bt @ list instr es)
-    | Loop (bt, es) -> ("loop", block_type bt @ list instr es)
+    | Block (bt, es) ->
+        ("block", block_type bt @ list_of_block blocks (instr blocks) es)
+    | Loop (bt, es) ->
+        ("loop", block_type bt @ list_of_block blocks (instr blocks) es)
     | If (bt, es1, es2) ->
         ( "if",
           block_type bt
-          @ [Node ("then", list instr es1); Node ("else", list instr es2)] )
+          @ [
+              Node ("then", list_of_block blocks (instr blocks) es1);
+              Node ("else", list_of_block blocks (instr blocks) es2);
+            ] )
     | Br x -> ("br " ^ var x, [])
     | BrIf x -> ("br_if " ^ var x, [])
     | BrTable (xs, x) ->
@@ -545,22 +558,27 @@ let rec instr e =
   in
   Node (head, inner)
 
-let const head c =
-  match c.it with [e] -> instr e | es -> Node (head, list instr c.it)
+let const blocks head c =
+  let (Block_label b) = c.it in
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then instr blocks (List.hd block)
+  else Node (head, list_of_block blocks (instr blocks) (Block_label b))
 
 (* Functions *)
 
-let func_with_name name f =
+let func_with_name blocks name f =
   let {ftype; locals; body} = f.it in
   let locals = lazy_vector Fun.id locals in
   Node
     ( "func" ^ name,
-      [Node ("type " ^ var ftype, [])] @ decls "local" locals @ list instr body
-    )
+      [Node ("type " ^ var ftype, [])]
+      @ decls "local" locals
+      @ list_of_block blocks (instr blocks) body )
 
-let func_with_index off i f = func_with_name (" $" ^ nat (off + i)) f
+let func_with_index blocks off i f =
+  func_with_name blocks (" $" ^ nat (off + i)) f
 
-let func f = func_with_name "" f
+let func blocks f = func_with_name blocks "" f
 
 (* Tables & memories *)
 
@@ -576,36 +594,47 @@ let is_elem_kind = function FuncRefType -> true | _ -> false
 
 let elem_kind = function FuncRefType -> "func" | _ -> assert false
 
-let is_elem_index e =
-  match e.it with [{it = RefFunc _; _}] -> true | _ -> false
+let is_elem_index blocks e =
+  let (Block_label b) = e.it in
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then
+    match List.hd block with {it = RefFunc _; _} -> true | _ -> false
+  else false
 
-let elem_index e =
-  match e.it with [{it = RefFunc x; _}] -> atom var x | _ -> assert false
+let elem_index blocks e =
+  let (Block_label b) = e.it in
+  let block = List.nth blocks (Int32.to_int b) in
+  if List.length block = 1 then
+    match List.hd block with
+    | {it = RefFunc x; _} -> atom var x
+    | _ -> assert false
+  else assert false
 
-let segment_mode category mode =
+let segment_mode blocks category mode =
   match mode.it with
   | Passive -> []
   | Active {index; offset} ->
       (if index.it = 0l then [] else [Node (category, [atom var index])])
-      @ [const "offset" offset]
+      @ [const blocks "offset" offset]
   | Declarative -> [Atom "declare"]
 
-let elem i seg =
+let elem blocks i seg =
   let {etype; einit; emode} = seg.it in
   let einit = lazy_vector Fun.id einit in
   Node
     ( "elem $" ^ nat i,
-      segment_mode "table" emode
+      segment_mode blocks "table" emode
       @
-      if is_elem_kind etype && List.for_all is_elem_index einit then
-        atom elem_kind etype :: list elem_index einit
-      else atom ref_type etype :: list (const "item") einit )
+      if is_elem_kind etype && List.for_all (is_elem_index blocks) einit then
+        atom elem_kind etype :: list (elem_index blocks) einit
+      else atom ref_type etype :: list (const blocks "item") einit )
 
-let data i seg =
+let data blocks datas i seg =
   let open Lwt.Syntax in
   let {dinit; dmode} = seg.it in
-  let+ dinit = Chunked_byte_vector.Lwt.Buffer.to_string_unstable dinit in
-  Node ("data $" ^ nat i, segment_mode "memory" dmode @ break_bytes dinit)
+  let* dinit = Ast.get_data dinit datas in
+  let+ dinit = Chunked_byte_vector.to_string dinit in
+  Node ("data $" ^ nat i, segment_mode blocks "memory" dmode @ break_bytes dinit)
 
 (* Modules *)
 
@@ -645,9 +674,11 @@ let export ex =
   let {name = n; edesc} = ex.it in
   Node ("export", [atom name n; export_desc edesc])
 
-let global off i g =
+let global blocks off i g =
   let {gtype; ginit} = g.it in
-  Node ("global $" ^ nat (off + i), global_type gtype :: list instr ginit.it)
+  Node
+    ( "global $" ^ nat (off + i),
+      global_type gtype :: list_of_block blocks (instr blocks) ginit.it )
 
 let start s = Node ("start " ^ var s.it.sfunc, [])
 
@@ -662,18 +693,24 @@ let module_with_var_opt x_opt m =
   let mx = ref 0 in
   let gx = ref 0 in
   let imports = lazy_vector (import fx tx mx gx) m.it.imports in
-  let+ datas = lazy_vectori_lwt data m.it.datas in
+  let* blocks =
+    let* bls = Ast.Vector.to_list m.it.allocations.blocks in
+    TzStdLib.List.map_s Ast.Vector.to_list bls
+  in
+  let+ datas =
+    lazy_vectori_lwt (data blocks m.it.allocations.datas) m.it.datas
+  in
   Node
     ( "module" ^ var_opt x_opt,
       lazy_vectori typedef m.it.types
       @ imports
       @ lazy_vectori (table !tx) m.it.tables
       @ lazy_vectori (memory !mx) m.it.memories
-      @ lazy_vectori (global !gx) m.it.globals
-      @ lazy_vectori (func_with_index !fx) m.it.funcs
+      @ lazy_vectori (global blocks !gx) m.it.globals
+      @ lazy_vectori (func_with_index blocks !fx) m.it.funcs
       @ lazy_vector export m.it.exports
       @ opt start m.it.start
-      @ lazy_vectori elem m.it.elems
+      @ lazy_vectori (elem blocks) m.it.elems
       @ datas )
 
 let binary_module_with_var_opt x_opt bs =
@@ -710,7 +747,10 @@ let definition mode x_opt def =
           let rec unquote def =
             match def.it with
             | Textual m -> Lwt.return m
-            | Encoded (_, bytes) -> Decode.decode ~name:"" ~bytes
+            | Encoded (_, bytes) ->
+                Decode.decode
+                  ~name:""
+                  ~bytes:(Chunked_byte_vector.of_string bytes)
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in
           let* unquoted = unquote def in
@@ -720,7 +760,11 @@ let definition mode x_opt def =
             match def.it with
             | Textual m -> Encode.encode m
             | Encoded (_, bytes) ->
-                let* m = Decode.decode ~name:"" ~bytes in
+                let* m =
+                  Decode.decode
+                    ~name:""
+                    ~bytes:(Chunked_byte_vector.of_string bytes)
+                in
                 Encode.encode m
             | Quoted (_, s) -> unquote (Parse.string_to_module s)
           in

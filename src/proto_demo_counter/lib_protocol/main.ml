@@ -29,7 +29,7 @@ let max_operation_data_length = 100
 
 let validation_passes = Updater.[{max_size = 1000; max_op = None}]
 
-let acceptable_passes _op = [0]
+let acceptable_pass _op = Some 0
 
 type block_header_data = Header.t
 
@@ -64,28 +64,46 @@ type operation = {
 
 type validation_state = {context : Context.t; fitness : Fitness.t}
 
-let begin_application ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_fitness (raw_block : block_header) =
-  let fitness = raw_block.shell.fitness in
-  Logging.log Notice
-    "begin_application: pred_fitness = %a  block_fitness = %a%!"
+type application_state = validation_state
+
+type mode =
+  | Application of block_header
+  | Partial_validation of block_header
+  | Construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+      block_header_data : block_header_data;
+    }
+  | Partial_construction of {
+      predecessor_hash : Block_hash.t;
+      timestamp : Time.t;
+    }
+
+let mode_str = function
+  | Application _ -> "application"
+  | Partial_validation _ -> "partial_validation"
+  | Construction _ -> "construction"
+  | Partial_construction _ -> "partial_construction"
+
+let validation_or_application_str = function
+  | `Validation -> "validation"
+  | `Application -> "application"
+
+let begin_any_application_mode validation_or_application mode context
+    ~(predecessor : Block_header.shell_header) (block_header : block_header) =
+  let fitness = block_header.shell.fitness in
+  Logging.log
+    Notice
+    "begin_%s (%s mode): pred_fitness = %a  block_fitness = %a%!"
+    (validation_or_application_str validation_or_application)
+    (mode_str mode)
     Fitness.pp
-    predecessor_fitness
+    predecessor.fitness
     Fitness.pp
     fitness ;
   (* Note: Logging is only available for debugging purposes and should
      not appear in a real protocol. *)
   return {context; fitness}
-
-let begin_partial_application ~chain_id ~ancestor_context
-    ~predecessor_timestamp ~predecessor_fitness block_header =
-  Logging.log Notice "begin_partial_application%!" ;
-  begin_application
-    ~chain_id
-    ~predecessor_context:ancestor_context
-    ~predecessor_timestamp
-    ~predecessor_fitness
-    block_header
 
 (* we use here the same fitness format than proto alpha,
    but with higher [version_number] to allow testing
@@ -98,49 +116,86 @@ let int64_to_bytes i =
   b
 
 let fitness_from_level level =
-  [Bytes.of_string version_number;
-   Bytes.of_string "\000";
-   Bytes.of_string "\000";
-   Bytes.of_string "\000";
-   int64_to_bytes level]
+  [
+    Bytes.of_string version_number;
+    Bytes.of_string "\000";
+    Bytes.of_string "\000";
+    Bytes.of_string "\000";
+    int64_to_bytes level;
+  ]
 
-let begin_construction ~chain_id:_ ~predecessor_context:context
-    ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness
-    ~predecessor:_ ~timestamp:_ ?protocol_data () =
-  let fitness = fitness_from_level Int64.(succ (of_int32 predecessor_level)) in
-  let mode =
-    match protocol_data with Some _ -> "block" | None -> "mempool"
-  in
-  Logging.log Notice
-    "begin_construction (%s): pred_fitness = %a  constructed fitness = %a%!"
-    mode
+let begin_any_construction_mode validation_or_application mode context
+    ~(predecessor : Block_header.shell_header) =
+  let fitness = fitness_from_level Int64.(succ (of_int32 predecessor.level)) in
+  Logging.log
+    Notice
+    "begin_%s (%s mode): pred_fitness = %a  constructed fitness = %a%!"
+    (validation_or_application_str validation_or_application)
+    (mode_str mode)
     Fitness.pp
-    predecessor_fitness
+    predecessor.fitness
     Fitness.pp
     fitness ;
   return {context; fitness}
 
-let apply_operation validation_state operation =
-  Logging.log Notice "apply_operation" ;
-  let {context; fitness} = validation_state in
-  State.get_state context
-  >>= fun state ->
-  match Apply.apply state operation.protocol_data with
-  | None ->
-      Error_monad.fail Error.Invalid_operation
-  | Some state ->
-      let receipt = Receipt.create "operation applied successfully" in
-      State.update_state context state
-      >>= fun context -> return ({context; fitness}, receipt)
+let begin_validation_or_application validation_or_application ctxt _chain_id
+    mode ~predecessor =
+  match mode with
+  | Application block_header | Partial_validation block_header ->
+      begin_any_application_mode
+        validation_or_application
+        mode
+        ctxt
+        ~predecessor
+        block_header
+  | Construction _ | Partial_construction _ ->
+      begin_any_construction_mode
+        validation_or_application
+        mode
+        ctxt
+        ~predecessor
 
-let finalize_block validation_state _header  =
-  let fitness = validation_state.fitness in
-  Logging.log Notice "finalize_block: fitness = %a%!" Fitness.pp fitness ;
-  let fitness = validation_state.fitness in
+let begin_validation = begin_validation_or_application `Validation
+
+let begin_application = begin_validation_or_application `Application
+
+let apply_operation_aux application_state operation =
+  let {context; fitness} = application_state in
+  State.get_state context >>= fun state ->
+  match Apply.apply state operation.protocol_data with
+  | None -> Error_monad.fail Error.Invalid_operation
+  | Some state ->
+      State.update_state context state >>= fun context ->
+      return {context; fitness}
+
+let validate_operation ?check_signature:_ validation_state _oph operation =
+  Logging.log Notice "validate_operation" ;
+  apply_operation_aux validation_state operation
+
+let apply_operation application_state _oph operation =
+  Logging.log Notice "apply_operation" ;
+  apply_operation_aux application_state operation >>=? fun application_state ->
+  let receipt = Receipt.create "operation applied successfully" in
+  return (application_state, receipt)
+
+let log_finalize validation_or_application validation_state =
+  Logging.log
+    Notice
+    "finalize_%s: fitness = %a%!"
+    (validation_or_application_str validation_or_application)
+    Fitness.pp
+    validation_state.fitness
+
+let finalize_validation validation_state =
+  log_finalize `Validation validation_state ;
+  return_unit
+
+let finalize_application application_state _shell_header =
+  log_finalize `Application application_state ;
+  let fitness = application_state.fitness in
   let message = Some (Format.asprintf "fitness <- %a" Fitness.pp fitness) in
-  let context = validation_state.context in
-  State.get_state context
-  >>= fun state ->
+  let context = application_state.context in
+  State.get_state context >>= fun state ->
   return
     ( {
         Updater.message;
@@ -154,28 +209,28 @@ let finalize_block validation_state _header  =
 let decode_json json =
   match Proto_params.from_json json with
   | exception _ ->
-      fail Error.Invalid_protocol_parameters
+    fail Error.Invalid_protocol_parameters
   | proto_params ->
-      return proto_params
+    return proto_params
 
 let get_init_state context : State.t tzresult Lwt.t =
   let protocol_params_key = ["protocol_parameters"] in
   Context.find context protocol_params_key
   >>= (function
-        | None ->
-            return Proto_params.default
-        | Some bytes -> (
+      | None ->
+        return Proto_params.default
+      | Some bytes -> (
           match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
           | None ->
-              fail (Error.Failed_to_parse_parameter bytes)
+            fail (Error.Failed_to_parse_parameter bytes)
           | Some json ->
-              decode_json json ))
+            decode_json json ))
   >>=? function
   | Proto_params.{init_a; init_b} -> (
-    match State.create init_a init_b with
-    | None ->
+      match State.create init_a init_b with
+      | None ->
         fail Error.Invalid_protocol_parameters
-    | Some state ->
+      | Some state ->
         return state )
 
 let init _chain_id context block_header =
@@ -195,7 +250,7 @@ let init _chain_id context block_header =
       last_allowed_fork_level = block_header.level;
     }
 
-let relative_position_within_block _ _ = 0
+let compare_operations _ _ = 0
 
 type Context.Cache.value += Demo of int
 
@@ -204,3 +259,47 @@ let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
   return (fun _ -> return (Demo 123))
 
 let rpc_services = Services.rpc_services
+
+(* Fake mempool *)
+module Mempool = struct
+  type t = unit
+
+  type validation_info = unit
+
+  type conflict_handler =
+    existing_operation:Operation_hash.t * operation ->
+    new_operation:Operation_hash.t * operation ->
+    [`Keep | `Replace]
+
+  type operation_conflict =
+    | Operation_conflict of {
+        existing : Operation_hash.t;
+        new_operation : Operation_hash.t;
+      }
+
+  type add_result =
+    | Added
+    | Replaced of {removed : Operation_hash.t}
+    | Unchanged
+
+  type add_error =
+    | Validation_error of error trace
+    | Add_conflict of operation_conflict
+
+  type merge_error =
+    | Incompatible_mempool
+    | Merge_conflict of operation_conflict
+
+  let init _ _ ~head_hash:_ ~head:_  = Lwt.return_ok ((), ())
+
+  let encoding = Data_encoding.unit
+
+  let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+    Lwt.return_ok ((), Unchanged)
+
+  let remove_operation () _ = ()
+
+  let merge ?conflict_handler:_ () () = Ok ()
+
+  let operations () = Operation_hash.Map.empty
+end

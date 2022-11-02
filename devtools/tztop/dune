@@ -7,7 +7,7 @@
  (package internal-devtools)
  (modes byte)
  (libraries
-  tezos-protocol-compiler
+  octez-protocol-compiler
   tezos-base
   compiler-libs.toplevel
   (select tztop.ml from (utop -> tztop.utop.ml) (-> tztop.vanilla.ml))))

@@ -27,7 +27,6 @@ runtest
     (module Test_ed25519);
     (module Test_merkle);
     (module Test_p256);
-    (module Test_pvss);
     (module Test_signature);
     (module Test_timelock);
     (module Test_context_hash);

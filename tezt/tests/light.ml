@@ -32,11 +32,6 @@
 *)
 
 let init_light ~protocol =
-  let get_current_level =
-    match protocol with
-    | Protocol.Alpha -> RPC.get_current_level
-    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
-  in
   (* Note that this code CANNOT be in tezt/lib_tezos/client.ml
      because it uses RPC.*.get_current_level, which depends on client.ml
      already. In other words, putting this code in client.ml would
@@ -58,8 +53,11 @@ let init_light ~protocol =
   let* () =
     Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
-  let* level_json = get_current_level ~endpoint client in
-  let level = JSON.(level_json |-> "level" |> as_int) in
+  let level =
+    match protocol with
+    | Protocol.Alpha -> Node.get_level node0
+    | _ -> Test.fail "Unsupported protocol: %s" @@ Protocol.name protocol
+  in
   let () =
     Log.info "Waiting for node %s to be at level %d" (Node.name node1) level
   in
@@ -86,7 +84,9 @@ let test_no_endpoint () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let*? process = RPC.Contracts.get_all (* ?endpoint omitted *) client in
+  let*? process =
+    RPC.Client.spawn client @@ RPC.get_chain_block_context_contracts ()
+  in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
@@ -119,7 +119,10 @@ let test_endpoint_not_in_sources () =
   in
   let client = Client.create_with_mode (Light (min_agreement, endpoints)) in
   let* () = Client.write_sources_file ~min_agreement ~uris client in
-  let*? process = RPC.Contracts.get_all ~endpoint client in
+  let*? process =
+    RPC.Client.spawn ~endpoint client
+    @@ RPC.get_chain_block_context_contracts ()
+  in
   let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
   let regexp =
     rex "Value of --endpoint is .*. If you did not specify --endpoint, .*"
@@ -247,7 +250,7 @@ module NoUselessRpc = struct
 end
 
 (** Test.
-    Test that [tezos-client --mode light --sources ... --protocol P] fails
+    Test that [octez-client --mode light --sources ... --protocol P] fails
     when the endpoint's protocol is not [P].
  *)
 let test_wrong_proto =
@@ -293,8 +296,7 @@ let test_compare_light =
 let register_protocol_independent () =
   test_no_endpoint () ;
   test_endpoint_not_in_sources () ;
-  Proxy.test_supported_protocols_like_mockup `Light ;
-  Proxy.test_support_four_protocols `Light
+  Proxy.test_supported_protocols_like_mockup `Light
 
 let register ~protocols =
   test_transfer protocols ;

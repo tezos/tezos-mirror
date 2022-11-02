@@ -3,7 +3,7 @@ open Ast
 open Script
 open Source
 module TzStdLib = Tezos_lwt_result_stdlib.Lwtreslib.Bare
-module Vector = Lazy_vector.LwtInt32Vector
+module Vector = Lazy_vector.Int32Vector
 
 (* Harness *)
 
@@ -208,7 +208,7 @@ let exports m : exports Lwt.t =
       let+ t = export_type m exp in
       NameMap.add exp.it.name t map)
     NameMap.empty
-    (Lazy_vector.LwtInt32Vector.loaded_bindings m.it.exports)
+    (Lazy_vector.Int32Vector.loaded_bindings m.it.exports)
 
 let modules () : modules = {env = Map.empty; current = 0}
 
@@ -238,9 +238,7 @@ let lookup (mods : modules) x_opt name at =
   in
   try NameMap.find name exports
   with Not_found ->
-    raise
-      (Eval.Crash
-         (at, "unknown export \"" ^ string_of_name name ^ "\" within module"))
+    raise (Eval.Crash (at, "unknown export \"" ^ name ^ "\" within module"))
 
 (* Vectors wrappers *)
 
@@ -307,9 +305,9 @@ let invoke ft vs at =
 
 let get t at = ([], GlobalImport t @@ at, [GlobalGet (subject_idx @@ at) @@ at])
 
-let run ts at = (Vector.empty (), [])
+let run (_ : result_type) (_ : region) = (Vector.empty (), [])
 
-let assert_return ress ts at =
+let assert_return ress (_ : result_type) at =
   let test res =
     let nan_bitmask_of = function
       | CanonicalNan ->
@@ -399,7 +397,7 @@ let assert_return ress ts at =
           Test (I32 I32Op.Eqz) @@ at;
           BrIf (0l @@ at) @@ at;
         ]
-    | RefResult (RefPat {it = Values.NullRef t; _}) ->
+    | RefResult (RefPat {it = Values.NullRef _; _}) ->
         [
           RefIsNull @@ at;
           Test (Values.I32 I32Op.Eqz) @@ at;
@@ -454,38 +452,38 @@ let wrap item_name wrap_action wrap_assertion at =
             Vector.singleton (NumType I32Type) )
        @@ at)
     :: itypes
-    |> Lazy_vector.LwtInt32Vector.of_list
+    |> Lazy_vector.Int32Vector.of_list
   in
   let imports_list =
     [
-      {module_name = Utf8.decode "module"; item_name; idesc} @@ at;
+      {module_name = "module"; item_name; idesc} @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "externref";
+        module_name = "spectest";
+        item_name = "externref";
         idesc = FuncImport (1l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "is_externref";
+        module_name = "spectest";
+        item_name = "is_externref";
         idesc = FuncImport (2l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "is_funcref";
+        module_name = "spectest";
+        item_name = "is_funcref";
         idesc = FuncImport (3l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "eq_externref";
+        module_name = "spectest";
+        item_name = "eq_externref";
         idesc = FuncImport (4l @@ at) @@ at;
       }
       @@ at;
       {
-        module_name = Utf8.decode "spectest";
-        item_name = Utf8.decode "eq_funcref";
+        module_name = "spectest";
+        item_name = "eq_funcref";
         idesc = FuncImport (5l @@ at) @@ at;
       }
       @@ at;
@@ -499,24 +497,29 @@ let wrap item_name wrap_action wrap_assertion at =
       imports_list
     @@ at
   in
-  let imports = imports_list |> Lazy_vector.LwtInt32Vector.of_list in
+  let imports = imports_list |> Lazy_vector.Int32Vector.of_list in
   let edesc = FuncExport item @@ at in
   let exports =
-    [{name = Utf8.decode "run"; edesc} @@ at]
-    |> Lazy_vector.LwtInt32Vector.of_list
+    [{name = "run"; edesc} @@ at] |> Lazy_vector.Int32Vector.of_list
   in
   let body =
-    [
-      Block (ValBlockType None, action @ assertion @ [Return @@ at]) @@ at;
-      Unreachable @@ at;
-    ]
+    [Block (ValBlockType None, Block_label 1l) @@ at; Unreachable @@ at]
   in
   let funcs =
-    [{ftype = 0l @@ at; locals; body} @@ at]
-    |> Lazy_vector.LwtInt32Vector.of_list
+    [{ftype = 0l @@ at; locals; body = Block_label 0l} @@ at]
+    |> Lazy_vector.Int32Vector.of_list
   in
-  let m = {empty_module with types; funcs; imports; exports} @@ at in
-  Encode.encode m
+  let blocks =
+    Vector.of_list
+      [
+        Vector.of_list body; Vector.of_list (action @ assertion @ [Return @@ at]);
+      ]
+  in
+  let allocations = {(Ast.empty_allocations ()) with blocks} in
+  let m =
+    {(empty_module ()) with types; funcs; imports; exports; allocations}
+  in
+  Encode.encode (m @@ at)
 
 let is_js_num_type = function
   | I32Type -> true
@@ -524,8 +527,8 @@ let is_js_num_type = function
 
 let is_js_value_type = function
   | NumType t -> is_js_num_type t
-  | VecType t -> false
-  | RefType t -> true
+  | VecType _ -> false
+  | RefType _ -> true
 
 let is_js_global_type = function
   | GlobalType (t, mut) -> is_js_value_type t && mut = Immutable
@@ -560,8 +563,10 @@ let of_string_with iter add_char s =
 let of_bytes = of_string_with String.iter add_hex_char
 
 let of_name n =
-  let n = Lazy_vector.LwtInt32Vector.loaded_bindings n in
-  of_string_with List.iter (fun buf (_, uc) -> add_unicode_char buf uc) n
+  of_string_with
+    String.iter
+    (fun buf uc -> add_unicode_char buf (Char.code uc))
+    n
 
 let of_float z =
   match string_of_float z with
@@ -606,7 +611,7 @@ let of_num_pat = function
       | Values.F32 n | Values.F64 n -> of_nan n)
 
 let of_vec_pat = function
-  | VecPat (Values.V128 (shape, pats)) ->
+  | VecPat (Values.V128 (_, pats)) ->
       Printf.sprintf
         "v128(\"%s\")"
         (String.concat " " (List.map of_num_pat pats))
@@ -710,7 +715,10 @@ let of_command mods cmd =
         let rec unquote def =
           match def.it with
           | Textual m -> Lwt.return m
-          | Encoded (_, bytes) -> Decode.decode ~name:"binary" ~bytes
+          | Encoded (_, bytes) ->
+              Decode.decode
+                ~name:"binary"
+                ~bytes:(Chunked_byte_vector.of_string bytes)
           | Quoted (_, s) -> unquote (Parse.string_to_module s)
         in
         let* unquoted = unquote def in

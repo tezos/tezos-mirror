@@ -23,68 +23,123 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ctxt = {config : Configuration.t; srs : Cryptobox.srs}
+let resolve_plugin cctxt =
+  let open Lwt_result_syntax in
+  let* protocols =
+    Tezos_shell_services.Chain_services.Blocks.protocols cctxt ()
+  in
+  return
+  @@ Option.either
+       (Dal_plugin.get protocols.current_protocol)
+       (Dal_plugin.get protocols.next_protocol)
 
-module RPC_server = struct
-  let register_split_slot ctxt store dir =
-    RPC_directory.register0
-      dir
-      (Services.split_slot ())
-      (Services.handle_split_slot ctxt store)
+type error += Cryptobox_initialisation_failed of string
 
-  let register_show_slot store dir =
-    RPC_directory.register dir (Services.slot ()) (Services.handle_slot store)
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"dal.node.cryptobox.initialisation_failed"
+    ~title:"Cryptobox initialisation failed"
+    ~description:"Unable to initialise the cryptobox parameters"
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "Unable to initialise the cryptobox parameters. Reason: %s"
+        msg)
+    Data_encoding.(obj1 (req "error" string))
+    (function Cryptobox_initialisation_failed str -> Some str | _ -> None)
+    (fun str -> Cryptobox_initialisation_failed str)
 
-  let register_shard store dir =
-    RPC_directory.register dir (Services.shard ()) (Services.handle_shard store)
+let init_cryptobox unsafe_srs cctxt (module Plugin : Dal_plugin.T) =
+  let open Cryptobox in
+  let open Lwt_result_syntax in
+  let* parameters = Plugin.get_constants cctxt#chain cctxt#block cctxt in
+  let* initialisation_parameters =
+    if unsafe_srs then
+      return
+      @@ Cryptobox.Internal_for_tests.initialisation_parameters_from_slot_size
+           ~slot_size:parameters.slot_size
+    else
+      let*? g1_path, g2_path = Tezos_base.Dal_srs.find_trusted_setup_files () in
+      Cryptobox.initialisation_parameters_from_files ~g1_path ~g2_path
+  in
+  let*? () = Cryptobox.load_parameters initialisation_parameters in
+  match Cryptobox.make parameters with
+  | Ok cryptobox -> return (cryptobox, parameters)
+  | Error (`Fail msg) -> fail [Cryptobox_initialisation_failed msg]
 
-  let register ctxt store =
-    RPC_directory.empty
-    |> register_split_slot ctxt.srs store
-    |> register_show_slot store |> register_shard store
+let daemonize cctxt handle =
+  let open Lwt_result_syntax in
+  let* t, stopper = Layer1.on_new_head cctxt handle in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    (* close the stream when an exit signal is received *)
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _exit_status ->
+        stopper () ;
+        Lwt.return_unit)
+  in
+  (* The no_cancel might not be necessary. Lwt_exit cancels the
+     main promise upon receiving a signal or other form of interruption. The
+     no_cancel renders this cancelation into a no-op.*)
+  Lwt.no_cancel t
 
-  let start configuration dir =
-    let open Lwt_syntax in
-    let Configuration.{rpc_addr; rpc_port; _} = configuration in
-    let rpc_addr = P2p_addr.of_string_exn rpc_addr in
-    let host = Ipaddr.V6.to_string rpc_addr in
-    let node = `TCP (`Port rpc_port) in
-    let acl = RPC_server.Acl.default rpc_addr in
-    Lwt.catch
-      (fun () ->
-        let* server =
-          RPC_server.launch
-            ~media_types:Media_type.all_media_types
-            ~host
-            ~acl
-            node
-            dir
-        in
-        return_ok server)
-      fail_with_exn
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 
-  let shutdown = RPC_server.shutdown
-
-  let install_finalizer rpc_server =
-    let open Lwt_syntax in
-    Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-    let* () = shutdown rpc_server in
-    let* () = Event.(emit shutdown_node exit_status) in
-    Tezos_base_unix.Internal_event_unix.close ()
-end
-
-let run ~data_dir ~no_trusted_setup:_ _ctxt =
+   Improve general architecture, handle L1 disconnection etc
+*)
+let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let* config = Configuration.load ~data_dir in
   let config = {config with data_dir} in
+  let ctxt = Node_context.init config in
   let*! store = Store.init config in
-  let*? srs = Cryptobox.load_srs () in
-  let ctxt = {config; srs} in
   let* rpc_server = RPC_server.(start config (register ctxt store)) in
   let _ = RPC_server.install_finalizer rpc_server in
   let*! () =
     Event.(emit rpc_server_is_ready (config.rpc_addr, config.rpc_port))
   in
-  let*! () = Event.(emit node_is_ready ()) in
-  Lwt_utils.never_ending ()
+  let*! () = Event.(emit layer1_node_tracking_started ()) in
+  let new_head_handler (block_hash, (_block_header : Tezos_base.Block_header.t))
+      =
+    (* Try to resolve the protocol plugin corresponding to the protocol of the
+       targeted node. *)
+    match Node_context.get_status ctxt with
+    | Starting -> (
+        let* plugin = resolve_plugin cctxt in
+        match plugin with
+        | Some plugin ->
+            let (module Plugin : Dal_plugin.T) = plugin in
+            let*! () = Event.emit_protocol_plugin_resolved Plugin.Proto.hash in
+            let* dal_constants, dal_parameters =
+              init_cryptobox config.use_unsafe_srs cctxt plugin
+            in
+            let*! slot_header_store =
+              Slot_headers_store.load
+                (Configuration.data_dir_path config "slot_header_store")
+            in
+            Node_context.set_ready
+              ctxt
+              slot_header_store
+              (module Plugin)
+              dal_constants
+              dal_parameters ;
+            let*! () = Event.(emit node_is_ready ()) in
+            return_unit
+        | None -> return_unit)
+    | Ready {plugin = (module Plugin); slot_header_store; _} ->
+        let* slot_headers =
+          Plugin.get_published_slot_headers (`Hash (block_hash, 0)) cctxt
+        in
+        let*! () =
+          List.iter_s
+            (fun (slot_index, slot_header) ->
+              Slot_headers_store.add
+                slot_header_store
+                ~primary_key:block_hash
+                ~secondary_key:slot_index
+                slot_header)
+            slot_headers
+        in
+        return_unit
+  in
+  daemonize cctxt new_head_handler

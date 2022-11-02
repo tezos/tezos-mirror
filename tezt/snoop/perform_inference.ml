@@ -67,6 +67,7 @@ let main () =
       "size_collect_tickets_step_model";
       "size_has_tickets_model";
       "compare_tickets";
+      "list_key_values";
     ]
   in
   Lwt_list.iter_s

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 (** {2 Cryptographic keys tables } *)
 
 type pk_uri = private Uri.t
@@ -32,8 +34,6 @@ module Pk_uri_hashtbl : Hashtbl.S with type key = pk_uri
 type sk_uri = private Uri.t
 
 type sapling_uri = private Uri.t
-
-type pvss_sk_uri = private Uri.t
 
 type aggregate_pk_uri = private Uri.t
 
@@ -84,11 +84,6 @@ type sapling_key = {
 }
 
 module Sapling_key : Client_aliases.Alias with type t = sapling_key
-
-module PVSS_public_key :
-  Client_aliases.Alias with type t = Pvss_secp256k1.Public_key.t
-
-module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
 
 (** [Aggregate_alias] contains the implementation needed for the wallet to have
     the correspondence between aliases and keys. It has three sub-module
@@ -393,8 +388,6 @@ val make_aggregate_pk_uri : Uri.t -> aggregate_pk_uri tzresult
 val make_aggregate_sk_uri : Uri.t -> aggregate_sk_uri tzresult
 
 val make_sapling_uri : Uri.t -> sapling_uri tzresult
-
-val make_pvss_sk_uri : Uri.t -> pvss_sk_uri tzresult
 
 (** Mnemonic of 24 common english words from which a key can be derived.
     The mnemonic follows the BIP-39 spec. *)

@@ -103,6 +103,7 @@ module Make (Param : sig
 end)
 () =
 struct
+  module CamlinternalFormatBasics = CamlinternalFormatBasics
   include Stdlib
 
   (* The modules provided in the [_struct.V0.M] pack are meant specifically to
@@ -699,6 +700,7 @@ struct
          and type quota := quota
          and type validation_result := validation_result
          and type rpc_context := rpc_context
+         and type tztrace := Error_monad.tztrace
          and type 'a tzresult := 'a Error_monad.tzresult
   end
 
@@ -822,7 +824,7 @@ struct
   end
 
   module Lift (P : Updater.PROTOCOL) = struct
-    include IgnoreCaches (Environment_protocol_T.V0toV6 (LiftV0 (P)))
+    include IgnoreCaches (Environment_protocol_T.V0toV7 (LiftV0 (P)))
 
     let set_log_message_consumer _ = ()
 

@@ -722,10 +722,6 @@ module Context = struct
     in
     return (Context {ctxt with cache})
 
-  let reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
-      () =
-    Cache_cache.clear cache_cache
-
   (* misc *)
 
   let set_protocol (Context ({ops = (module Ops); ctxt; _} as c)) protocol_hash

@@ -404,53 +404,49 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
-  let metric_middleware =
-    let transform_callback callback connection request body =
-      let do_call () = callback connection request body in
-      let cohttp_meth = Cohttp.Request.meth request in
-      let uri = Cohttp.Request.uri request in
-      let path = Uri.path uri in
-      let decoded = Resto.Utils.decode_split_path path in
-      let*! description =
-        let* resto_meth =
-          match cohttp_meth with
-          | #Resto.meth as meth -> Lwt.return_ok meth
-          | _ -> Lwt.return_error @@ `Method_not_allowed []
-        in
-        let* uri_desc =
-          RPC_directory.lookup_uri_desc dir () resto_meth decoded
-        in
-        Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
+  let transform_callback callback connection request body =
+    let open Lwt_result_syntax in
+    let do_call () = callback connection request body in
+    let cohttp_meth = Cohttp.Request.meth request in
+    let uri = Cohttp.Request.uri request in
+    let path = Uri.path uri in
+    let decoded = Resto.Utils.decode_split_path path in
+    let*! description =
+      let* resto_meth =
+        match cohttp_meth with
+        | #Resto.meth as meth -> Lwt.return_ok meth
+        | _ -> Lwt.return_error @@ `Method_not_allowed []
       in
-      match description with
-      | Ok (uri, meth) ->
-          (* We update the metric only if the URI can succesfully
-             be matched in the directory tree. *)
-          Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
-      | Error _ ->
-          (* Otherwise, the call must be done anyway. *)
-          do_call ()
+      let* uri_desc = RPC_directory.lookup_uri_desc dir () resto_meth decoded in
+      Lwt.return_ok (uri_desc, Resto.string_of_meth resto_meth)
     in
-    let is_metric_collection_enable = List.is_empty config.metrics_addr in
-    if is_metric_collection_enable then None
-    else Some Resto_cohttp_server.Server.{transform_callback}
+    match description with
+    | Ok (uri, meth) ->
+        (* We update the metric only if the URI can succesfully
+           be matched in the directory tree. *)
+        Prometheus.Summary.(time (labels metric [uri; meth]) Sys.time do_call)
+    | Error _ ->
+        (* Otherwise, the call must be done anyway. *)
+        do_call ()
   in
+  let cors =
+    RPC_server.
+      {
+        allowed_origins = rpc_config.cors_origins;
+        allowed_headers = cors_headers;
+      }
+  in
+  let server =
+    RPC_server.init_server
+      ~cors
+      ~acl
+      ~media_types:(Media_type.Command_line.of_command_line media_types)
+      dir
+  in
+  let callback = transform_callback (RPC_server.resto_callback server) in
   Lwt.catch
     (fun () ->
-      let*! server =
-        RPC_server.launch
-          ~host
-          mode
-          dir
-          ~acl
-          ?middleware:metric_middleware
-          ~media_types:(Media_type.Command_line.of_command_line media_types)
-          ~cors:
-            {
-              allowed_origins = rpc_config.cors_origins;
-              allowed_headers = cors_headers;
-            }
-      in
+      let*! () = RPC_server.launch ~host server ~callback mode in
       return server)
     (function
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
@@ -519,11 +515,12 @@ let init_zcash () =
          "Failed to initialize Zcash parameters: %s"
          (Printexc.to_string exn))
 
+let init_dal dal_config = Node_config_file.init_dal dal_config
+
 let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
     ?ignore_testchain_warning ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
-  let* () = Node_data_version.ensure_data_dir config.data_dir in
   (* Main loop *)
   let log_cfg =
     match verbosity with
@@ -539,6 +536,9 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
   let*! () =
     Lwt_list.iter_s (fun evt -> Internal_event.Simple.emit evt ()) cli_warnings
   in
+  let* () =
+    Node_data_version.ensure_data_dir ~mode:Is_compatible config.data_dir
+  in
   let* () = Node_config_validation.check ?ignore_testchain_warning config in
   let* identity = init_identity_file config in
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
@@ -549,6 +549,7 @@ let run ?verbosity ?sandbox ?target ?(cli_warnings = [])
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
   let*! () = init_zcash () in
+  let* () = init_dal config.dal in
   let*! node =
     init_node
       ?sandbox

@@ -32,9 +32,8 @@ module Mock_all_unit :
     with type block_header_data = unit
      and type operation_data = unit
      and type operation_receipt = unit
-     and type validation_state = unit = struct
-  type nonrec validation_state = unit
-
+     and type validation_state = unit
+     and type application_state = unit = struct
   type block_header_data = unit
 
   type operation = {
@@ -57,28 +56,40 @@ module Mock_all_unit :
 
   let init _ = assert false
 
-  let rpc_services = RPC_directory.empty
+  type nonrec validation_state = unit
 
-  let finalize_block _ = assert false
+  type nonrec application_state = unit
+
+  type mode =
+    | Application of block_header
+    | Partial_validation of block_header
+    | Construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+        block_header_data : block_header_data;
+      }
+    | Partial_construction of {
+        predecessor_hash : Block_hash.t;
+        timestamp : Time.Protocol.t;
+      }
+
+  let begin_validation _ = assert false
+
+  let validate_operation ?check_signature:_ = assert false
+
+  let finalize_validation _ = assert false
+
+  let begin_application _ = assert false
 
   let apply_operation _ = assert false
 
-  let begin_construction ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_level:_ ~predecessor_fitness:_
-      ~predecessor:_ ~timestamp:_ ?protocol_data:_ ~cache:_ _ =
-    assert false
+  let finalize_application _ = assert false
 
-  let begin_application ~chain_id:_ ~predecessor_context:_
-      ~predecessor_timestamp:_ ~predecessor_fitness:_ ~cache:_ _ =
-    assert false
+  let rpc_services = RPC_directory.empty
 
-  let begin_partial_application ~chain_id:_ ~ancestor_context:_ ~predecessor:_
-      ~predecessor_hash:_ ~cache:_ _ =
-    assert false
+  let compare_operations _ = assert false
 
-  let relative_position_within_block _ = assert false
-
-  let acceptable_passes _ = assert false
+  let acceptable_pass _ = assert false
 
   let operation_data_and_receipt_encoding =
     Data_encoding.conv (Fun.const ()) (Fun.const ((), ())) Data_encoding.unit
@@ -104,4 +115,48 @@ module Mock_all_unit :
     assert false
 
   let set_log_message_consumer _ = ()
+
+  (* Fake mempool *)
+  module Mempool = struct
+    type t = unit
+
+    type validation_info = unit
+
+    type conflict_handler =
+      existing_operation:Operation_hash.t * operation ->
+      new_operation:Operation_hash.t * operation ->
+      [`Keep | `Replace]
+
+    type operation_conflict =
+      | Operation_conflict of {
+          existing : Operation_hash.t;
+          new_operation : Operation_hash.t;
+        }
+
+    type add_result =
+      | Added
+      | Replaced of {removed : Operation_hash.t}
+      | Unchanged
+
+    type add_error =
+      | Validation_error of error trace
+      | Add_conflict of operation_conflict
+
+    type merge_error =
+      | Incompatible_mempool
+      | Merge_conflict of operation_conflict
+
+    let init _ _ ~head_hash:_ ~head:_ ~cache:_ = Lwt.return_ok ((), ())
+
+    let encoding = Data_encoding.unit
+
+    let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
+      Lwt.return_ok ((), Unchanged)
+
+    let remove_operation () _ = ()
+
+    let merge ?conflict_handler:_ () () = Ok ()
+
+    let operations () = Operation_hash.Map.empty
+  end
 end

@@ -122,43 +122,8 @@ let blockchain_network_mainnet =
         ( "PtHangzHogokSuiMHemCuowEavgYTP8J5qQ9fQS793MHYFpCY3r",
           "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
       ]
-    ~default_bootstrap_peers:["boot.tzbeta.net"]
-
-let blockchain_network_hangzhounet =
-  make_blockchain_network
-    ~alias:"hangzhounet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-11-04T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesis7e8c4d4snJW";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_HANGZHOUNET_2021-11-04T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(8191l, "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx")]
     ~default_bootstrap_peers:
-      [
-        "hangzhounet.teztnets.xyz";
-        "hangzhounet.kaml.fr";
-        "hangzhounet.smartpy.io";
-        "hangzhounet.tezos.co.il";
-        "hangzhounet.boot.tez.ie";
-      ]
+      ["boot.tzbeta.net"; "boot.mainnet.oxheadhosted.com"]
 
 let blockchain_network_ghostnet =
   make_blockchain_network
@@ -201,14 +166,14 @@ let blockchain_network_ghostnet =
         "ghostnet.visualtez.com";
       ]
 
-let blockchain_network_jakartanet =
+let blockchain_network_limanet =
   make_blockchain_network
-    ~alias:"jakartanet"
+    ~alias:"limanet"
     {
-      time = Time.Protocol.of_notation_exn "2022-04-27T15:00:00Z";
+      time = Time.Protocol.of_notation_exn "2022-10-13T15:00:00Z";
       block =
         Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisbd16dciJxo9";
+          "BL3LAGwnWoNFM2H5ZA3Mbd622CVWMe8Kzfkksws4roKDD9WwBmf";
       protocol =
         Protocol_hash.of_b58check_exn
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
@@ -224,16 +189,16 @@ let blockchain_network_jakartanet =
               );
             ];
       }
-    ~chain_name:"TEZOS_JAKARTANET_2022-04-27T15:00:00Z"
+    ~chain_name:"TEZOS_LIMANET_2022-10-13T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
-      [(8192l, "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY")]
+      [(8192l, "PtLimaPtLMwfNinJi9rCfDPWea8dFgTZ1MeJ9f1m2SRic6ayiwW")]
     ~default_bootstrap_peers:
       [
-        "jakartanet.teztnets.xyz";
-        "jakartanet.boot.ecadinfra.com";
-        "jakartanet.kaml.fr";
-        "jakartanet.visualtez.com";
+        "limanet.teztnets.xyz";
+        "limanet.boot.ecadinfra.com";
+        "limaboot.tzbeta.net";
+        "limanet.stakenow.de:9733";
       ]
 
 let blockchain_network_kathmandunet =
@@ -368,10 +333,9 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (16, blockchain_network_hangzhounet);
-    (18, blockchain_network_jakartanet);
     (19, blockchain_network_ghostnet);
     (20, blockchain_network_kathmandunet);
+    (21, blockchain_network_limanet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
@@ -415,6 +379,15 @@ let sugared_blockchain_network_encoding : blockchain_network Data_encoding.t =
           (fun x -> x);
       ])
 
+type dal = {activated : bool; srs_size : int option}
+
+let dal_encoding : dal Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {activated; srs_size} -> (activated, srs_size))
+    (fun (activated, srs_size) -> {activated; srs_size})
+    (obj2 (req "activated" bool) (req "srs_size" (option int31)))
+
 type t = {
   data_dir : string;
   disable_config_validation : bool;
@@ -425,6 +398,7 @@ type t = {
   shell : shell;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
+  dal : dal;
 }
 
 and p2p = {
@@ -525,6 +499,8 @@ let default_shell =
 
 let default_disable_config_validation = false
 
+let default_dal : dal = {activated = false; srs_size = None}
+
 let default_config =
   {
     data_dir = default_data_dir;
@@ -536,6 +512,7 @@ let default_config =
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
     metrics_addr = [];
+    dal = default_dal;
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -1193,6 +1170,7 @@ let encoding =
            shell;
            blockchain_network;
            metrics_addr;
+           dal;
          } ->
       ( data_dir,
         disable_config_validation,
@@ -1202,7 +1180,8 @@ let encoding =
         internal_events,
         shell,
         blockchain_network,
-        metrics_addr ))
+        metrics_addr,
+        dal ))
     (fun ( data_dir,
            disable_config_validation,
            rpc,
@@ -1211,7 +1190,8 @@ let encoding =
            internal_events,
            shell,
            blockchain_network,
-           metrics_addr ) ->
+           metrics_addr,
+           dal ) ->
       {
         disable_config_validation;
         data_dir;
@@ -1222,8 +1202,9 @@ let encoding =
         shell;
         blockchain_network;
         metrics_addr;
+        dal;
       })
-    (obj9
+    (obj10
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
@@ -1269,7 +1250,14 @@ let encoding =
           "metrics_addr"
           ~description:"Configuration of the Prometheus metrics endpoint"
           (list string)
-          default_config.metrics_addr))
+          default_config.metrics_addr)
+       (dft
+          "dal"
+          ~description:
+            "USE FOR TESTING PURPOSE ONLY. Configuration for the \
+             data-availibility layer"
+          dal_encoding
+          default_dal))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -1349,7 +1337,9 @@ let read fp =
 
 let write fp cfg =
   let open Lwt_result_syntax in
-  let* () = Node_data_version.ensure_data_dir (Filename.dirname fp) in
+  let* () =
+    Node_data_version.ensure_data_dir ~mode:Exists (Filename.dirname fp)
+  in
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
@@ -1377,7 +1367,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       Event.(emit all_rpc_allowed allow_all_rpc)
     else Lwt.return_unit
   in
-  let* () = Node_data_version.ensure_data_dir data_dir in
+  let* () = Node_data_version.ensure_data_dir ~mode:Exists data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =
@@ -1620,3 +1610,22 @@ let bootstrap_peers config =
   Option.value
     ~default:config.blockchain_network.default_bootstrap_peers
     config.p2p.bootstrap_peers
+
+let init_dal dal_config =
+  let open Lwt_result_syntax in
+  if dal_config.activated then
+    let open Tezos_crypto_dal.Cryptobox in
+    let* initialisation_parameters =
+      match dal_config.srs_size with
+      | None ->
+          let*? g1_path, g2_path =
+            Tezos_base.Dal_srs.find_trusted_setup_files ()
+          in
+          initialisation_parameters_from_files ~g1_path ~g2_path
+      | Some slot_size ->
+          return
+            (Internal_for_tests.initialisation_parameters_from_slot_size
+               ~slot_size)
+    in
+    Lwt.return (load_parameters initialisation_parameters)
+  else return_unit

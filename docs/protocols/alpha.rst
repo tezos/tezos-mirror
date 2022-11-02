@@ -1,36 +1,30 @@
 Protocol Alpha
 ==============
 
-This page contains all the relevant information for protocol Alpha
-(see :ref:`naming_convention`).
-
-The code can be found in the :src:`src/proto_alpha` directory of the
-``master`` branch of Tezos.
-
 This page documents the changes brought by protocol Alpha with respect
-to Kathmandu.
+to Lima (see :ref:`naming_convention`).
+
+The code can be found in directory :src:`src/proto_alpha` of the ``master``
+branch of Tezos.
 
 .. contents::
 
-New Environment Version (V7)
+New Environment Version (V8)
 ----------------------------
 
-This protocol requires a different protocol environment than Kathmandu.
-It requires protocol environment V7, compared to V6 for Kathmandu.
+This protocol requires a different protocol environment version than Lima.
+It requires protocol environment V8, compared to V7 for Lima. (MR :gl:`!6439`)
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
 
-Rollups supporting execution of smart contracts. (MRs :gl:`!5603`, :gl:`!5606`,
-:gl:`!5447`, :gl:`!5655`, :gl:`!5660`, :gl:`!5680`, :gl:`!5598`, :gl:`!5677`,
-:gl:`!5646`, :gl:`!5686`, :gl:`!5693`, :gl:`!5623`, :gl:`!5687`, :gl:`!5714`,
-:gl:`!5689`, :gl:`!5708`, :gl:`!5565`, :gl:`!5561`, :gl:`!5567`, :gl:`!5332`,
-:gl:`!5628`, :gl:`!5754`, :gl:`!5736`, :gl:`!5784`)
+Rollups supporting execution of smart contracts. (MRs :gl:`!6118`, :gl:`!6425`,
+:gl:`!6252`, :gl:`!6396`)
 
 Data Availability Layer (ongoing)
 ---------------------------------
 
-Distribution of rollup operations data off-chain. (MRs :gl:`!5711`)
+Distribution of rollup operations data off-chain. (MR :gl:`!6174`)
 
 Breaking Changes
 ----------------
@@ -47,16 +41,11 @@ Bug Fixes
 Minor Changes
 -------------
 
-- Split internal transactions. (MR :gl:`!5585`)
-
 Internal
 --------
 
-- Get rid of unparsing_mode. (MR :gl:`!5738`)
+- Introduce local context access APIs to the indexed subcontext for optimized accesses with locality. (MR :gl:`!5922`)
 
-- Rename internal operation definitions. (MR :gl:`!5737`)
+- Optimized cleaning of implicit contract with 0 balance using local context accesses (MR :gl:`!5922`)
 
-- Remove Coq attributes. (MR :gl:`!5735`)
-
-- Internal refactorings in Michelson typechecker and interpreter. (MRs
-  :gl:`!5586`, :gl:`!5587`)
+- Improve ex_ticket_size. (MR :gl:`!6209`)

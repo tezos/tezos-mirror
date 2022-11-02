@@ -5,8 +5,9 @@
  (name src_proto_alpha_lib_protocol_test_regression_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezt
+  tezt.core
   tezos-base
+  tezt-tezos
   tezos-protocol-alpha
   tezos-client-alpha
   tezos-protocol-plugin-alpha
@@ -15,9 +16,10 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -open Tezt
-  -open Tezt.Base
+  -open Tezt_core
+  -open Tezt_core.Base
   -open Tezos_base.TzPervasives
+  -open Tezt_tezos
   -open Tezos_protocol_alpha
   -open Tezos_client_alpha
   -open Tezos_protocol_plugin_alpha
@@ -28,7 +30,8 @@
 (executable
  (name main)
  (libraries
-  src_proto_alpha_lib_protocol_test_regression_tezt_lib)
+  src_proto_alpha_lib_protocol_test_regression_tezt_lib
+  tezt)
  (modules main))
 
 (rule

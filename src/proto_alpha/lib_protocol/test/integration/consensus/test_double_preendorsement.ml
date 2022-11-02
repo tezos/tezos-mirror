@@ -63,7 +63,11 @@ end = struct
     | _ -> assert false
 
   let invalid_denunciation loc res =
-    Assert.proto_error_with_info ~loc res "Invalid denunciation"
+    Assert.proto_error ~loc res (function
+        | Validate_errors.Anonymous.Invalid_denunciation kind
+          when kind = Validate_errors.Anonymous.Preendorsement ->
+            true
+        | _ -> false)
 
   let malformed_double_preendorsement_denunciation
       ?(include_endorsement = false) ?(block_round = 0)
@@ -87,14 +91,26 @@ end = struct
     >>=? fun {parametric = {max_slashing_period; blocks_per_cycle; _}; _} ->
     return (max_slashing_period * Int32.to_int blocks_per_cycle)
 
-  let unrequired_denunciation loc res =
-    Assert.proto_error_with_info ~loc res "Unrequired denunciation"
+  let already_denounced loc res =
+    Assert.proto_error ~loc res (function
+        | Validate_errors.Anonymous.Already_denounced {kind; _}
+          when kind = Validate_errors.Anonymous.Preendorsement ->
+            true
+        | _ -> false)
 
   let inconsistent_denunciation loc res =
-    Assert.proto_error_with_info ~loc res "Inconsistent denunciation"
+    Assert.proto_error ~loc res (function
+        | Validate_errors.Anonymous.Inconsistent_denunciation {kind; _}
+          when kind = Validate_errors.Anonymous.Preendorsement ->
+            true
+        | _ -> false)
 
   let outdated_denunciation loc res =
-    Assert.proto_error_with_info ~loc res "Outdated denunciation"
+    Assert.proto_error ~loc res (function
+        | Validate_errors.Anonymous.Outdated_denunciation {kind; _}
+          when kind = Validate_errors.Anonymous.Preendorsement ->
+            true
+        | _ -> false)
 
   let unexpected_failure loc res =
     (* no error is expected *)
@@ -205,7 +221,7 @@ end = struct
         let op : Operation.packed =
           Op.double_preendorsement (B new_head) op1 op2
         in
-        bake new_head ~operations:[op] >>= unrequired_denunciation loc
+        bake new_head ~operations:[op] >>= already_denounced loc
     | Error _ as res -> test_expected_ko loc res
 
   (****************************************************************)
@@ -283,6 +299,52 @@ end = struct
       ~loc:__LOC__
       ()
 
+  let double_preendorsement ctxt ?(correct_order = true) op1 op2 =
+    let e1, e2 = order_preendorsements ~correct_order op1 op2 in
+    Op.double_preendorsement ctxt e1 e2
+
+  let block_fork b =
+    Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
+    Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
+    Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
+
+  (** Injecting a valid double preendorsement multiple time raises an error. *)
+  let test_two_double_preendorsement_evidences_leads_to_duplicate_denunciation
+      () =
+    Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
+    block_fork genesis >>=? fun (blk_1, blk_2) ->
+    Block.bake blk_1 >>=? fun blk_a ->
+    Block.bake blk_2 >>=? fun blk_b ->
+    Context.get_endorser (B blk_a) >>=? fun (delegate, _) ->
+    Op.preendorsement ~endorsed_block:blk_a (B blk_1) ()
+    >>=? fun preendorsement_a ->
+    Op.preendorsement ~endorsed_block:blk_b (B blk_2) ()
+    >>=? fun preendorsement_b ->
+    let operation =
+      double_preendorsement (B genesis) preendorsement_a preendorsement_b
+    in
+    let operation2 =
+      double_preendorsement (B genesis) preendorsement_b preendorsement_a
+    in
+    Context.get_bakers (B blk_a) >>=? fun bakers ->
+    let baker = Context.get_first_different_baker delegate bakers in
+    Context.Delegate.full_balance (B blk_a) baker >>=? fun _full_balance ->
+    Block.bake
+      ~policy:(By_account baker)
+      ~operations:[operation; operation2]
+      blk_a
+    >>= fun e ->
+    Assert.proto_error ~loc:__LOC__ e (function
+        | Validate_errors.Anonymous.Conflicting_denunciation {kind; _}
+          when kind = Validate_errors.Anonymous.Preendorsement ->
+            true
+        | _ -> false)
+    >>=? fun () ->
+    Block.bake ~policy:(By_account baker) ~operation blk_a
+    >>=? fun blk_with_evidence1 ->
+    Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
+    >>= fun e -> already_denounced __LOC__ e
+
   let my_tztest title test =
     Tztest.tztest (Format.sprintf "%s: %s" name title) test
 
@@ -322,6 +384,10 @@ end = struct
         "double_preendorsement_denunciation_after_slashing_period"
         `Quick
         double_preendorsement_denunciation_after_slashing_period;
+      my_tztest
+        "valid double preendorsement injected multiple times"
+        `Quick
+        test_two_double_preendorsement_evidences_leads_to_duplicate_denunciation;
     ]
 end
 

@@ -1,4 +1,4 @@
-"""This file tests the tezos-client commands offering support for the
+"""This file tests the octez-client commands offering support for the
 FA1.2 standard. Several implementations of the standard are tested."""
 
 import json

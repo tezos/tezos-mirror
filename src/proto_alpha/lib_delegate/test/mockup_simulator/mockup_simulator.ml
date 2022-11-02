@@ -135,7 +135,7 @@ module type Hooks = sig
 
   val on_start_baker :
     baker_position:int ->
-    delegates:Baking_state.delegate list ->
+    delegates:Baking_state.consensus_key list ->
     cctxt:Protocol_client_context.full ->
     unit Lwt.t
 
@@ -481,24 +481,50 @@ let clear_mempool state =
   state.mempool <- mempool ;
   return_unit
 
+let begin_validation_and_application ctxt chain_id mode ~predecessor ~cache =
+  let open Lwt_result_syntax in
+  let* validation_state =
+    Mockup.M.Protocol.begin_validation ctxt chain_id mode ~predecessor ~cache
+  in
+  let* application_state =
+    Mockup.M.Protocol.begin_application ctxt chain_id mode ~predecessor ~cache
+  in
+  return (validation_state, application_state)
+
+let validate_and_apply_operation (validation_state, application_state) oph op =
+  let open Lwt_result_syntax in
+  let* validation_state =
+    Mockup.M.Protocol.validate_operation validation_state oph op
+  in
+  let* application_state, receipt =
+    Mockup.M.Protocol.apply_operation application_state oph op
+  in
+  return ((validation_state, application_state), receipt)
+
+let finalize_validation_and_application (validation_state, application_state)
+    shell_header =
+  let open Lwt_result_syntax in
+  let* () = Mockup.M.Protocol.finalize_validation validation_state in
+  Mockup.M.Protocol.finalize_application application_state shell_header
+
 (** Apply a block to the given [rpc_context]. *)
 let reconstruct_context (rpc_context : Tezos_protocol_environment.rpc_context)
     (operations : Operation.t list list) (block_header : Block_header.t) =
-  let header = rpc_context.block_header in
+  let predecessor = rpc_context.block_header in
   let predecessor_context = rpc_context.context in
   parse_protocol_data block_header.protocol_data >>=? fun protocol_data ->
-  Mockup.M.Protocol.begin_application
-    ~chain_id
-    ~predecessor_context
-    ~predecessor_timestamp:header.timestamp
-    ~predecessor_fitness:header.fitness
+  begin_validation_and_application
+    predecessor_context
+    chain_id
+    (Application {shell = block_header.shell; protocol_data})
+    ~predecessor
     ~cache:`Lazy
-    {shell = block_header.shell; protocol_data}
-  >>=? fun validation_state ->
+  >>=? fun state ->
   let i = ref 0 in
   List.fold_left_es
-    (List.fold_left_es (fun (validation_state, results) op ->
+    (List.fold_left_es (fun (state, results) op ->
          incr i ;
+         let oph = Operation.hash op in
          let operation_data =
            Data_encoding.Binary.of_bytes_exn
              Mockup.M.Protocol.operation_data_encoding
@@ -507,13 +533,11 @@ let reconstruct_context (rpc_context : Tezos_protocol_environment.rpc_context)
          let op =
            {Mockup.M.Protocol.shell = op.shell; protocol_data = operation_data}
          in
-         Mockup.M.Protocol.apply_operation validation_state op
-         >>=? fun (validation_state, receipt) ->
-         return (validation_state, receipt :: results)))
-    (validation_state, [])
+         validate_and_apply_operation state oph op >>=? fun (state, receipt) ->
+         return (state, receipt :: results)))
+    (state, [])
     operations
-  >>=? fun (validation_state, _) ->
-  Mockup.M.Protocol.finalize_block validation_state None
+  >>=? fun (state, _) -> finalize_validation_and_application state None
 
 (** Process an incoming block. If validation succeeds:
     - update the current head to this new block
@@ -738,7 +762,7 @@ let create_fake_node_state ~i ~live_depth
     }
 
 (** Start baker process. *)
-let baker_process ~(delegates : Baking_state.delegate list) ~base_dir
+let baker_process ~(delegates : Baking_state.consensus_key list) ~base_dir
     ~(genesis_block : Block_header.t * Tezos_protocol_environment.rpc_context)
     ~i ~global_chain_table ~broadcast_pipes ~(user_hooks : (module Hooks)) =
   let broadcast_pipe =
@@ -766,7 +790,7 @@ let baker_process ~(delegates : Baking_state.delegate list) ~base_dir
   User_hooks.on_start_baker ~baker_position:i ~delegates ~cctxt >>= fun () ->
   List.iter_es
     (fun ({alias; public_key; public_key_hash; secret_key_uri} :
-           Baking_state.delegate) ->
+           Baking_state.consensus_key) ->
       let open Tezos_client_base in
       let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
       Client_keys.neuterize secret_key_uri >>=? fun public_key_uri ->
@@ -804,17 +828,16 @@ let baker_process ~(delegates : Baking_state.delegate list) ~base_dir
   User_hooks.check_chain_on_success ~chain:state.chain
 
 let genesis_protocol_data (baker_sk : Signature.secret_key)
-    (predecessor_block_hash : Block_hash.t)
-    (block_header : Block_header.shell_header) : Bytes.t =
+    (predecessor_hash : Block_hash.t) (block_header : Block_header.shell_header)
+    : Bytes.t =
   let proof_of_work_nonce =
     Bytes.create Protocol.Alpha_context.Constants.proof_of_work_nonce_size
   in
-  let operation_list_hash = Operation_list_hash.compute [] in
   let payload_hash =
     Protocol.Alpha_context.Block_payload.hash
-      ~predecessor:predecessor_block_hash
-      Alpha_context.Round.zero
-      operation_list_hash
+      ~predecessor_hash
+      ~payload_round:Alpha_context.Round.zero
+      []
   in
   let contents =
     Protocol.Alpha_context.Block_header.
@@ -1064,7 +1087,7 @@ let default_config =
 let make_baking_delegate
     ( (account : Alpha_context.Parameters.bootstrap_account),
       (secret : Tezos_mockup_commands.Mockup_wallet.bootstrap_secret) ) :
-    Baking_state.delegate =
+    Baking_state.consensus_key =
   Baking_state.
     {
       alias = Some secret.name;

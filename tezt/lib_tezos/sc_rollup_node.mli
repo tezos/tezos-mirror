@@ -31,6 +31,8 @@
 (** Smart contract rollup node states. *)
 type t
 
+type mode = Batcher | Custom | Maintenance | Observer | Operator
+
 (** Create a smart contract rollup node.
 
     A smart contract rollup node is associated to a tezos node
@@ -41,6 +43,9 @@ type t
 
     Default [data_dir] is a temporary directory
     which is always the same for each [name].
+
+    [dal_node] is a node node from the data availability layer the rollup should
+    be connected to.
 
     Default [event_pipe] is a temporary file
     whose name is derived from [name]. It will be created
@@ -62,7 +67,10 @@ val create :
   ?event_pipe:string ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  operator_pkh:string ->
+  ?operators:(string * string) list ->
+  ?default_operator:string ->
+  ?dal_node:Dal_node.t ->
+  mode ->
   Node.t ->
   Client.t ->
   t
@@ -85,9 +93,6 @@ val data_dir : t -> string
 (** Get the base-dir of an sc node *)
 val base_dir : t -> string
 
-(** Get the public key hash of the sc node oeprator *)
-val operator_pkh : t -> string
-
 (** Wait until an sc node terminates and check its status.
 
     If the sc node is not running,
@@ -109,7 +114,7 @@ val wait : t -> Unix.process_status Lwt.t
     a SIGKILL is sent instead of a SIGTERM. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Run [tezos-sc-rollup-node-alpha config init ?loser_mode rollup_address].
+(** Run [octez-sc-rollup-node-alpha config init ?loser_mode rollup_address].
     Returns the name of the resulting configuration file. *)
 val config_init : t -> ?loser_mode:string -> string -> string Lwt.t
 
@@ -145,3 +150,10 @@ val wait_for_ready : t -> unit Lwt.t
    If [timeout] is provided, stop waiting if [timeout] seconds have
    passed. *)
 val wait_for_level : ?timeout:float -> t -> int -> int Lwt.t
+
+(** [import sc_node ~pvm_name ~filename] makes the contents of
+    [filename] available as raw data chunks to the rollup assuming
+    that it runs according to a given [pvm_name].
+    Returns the hash of the first of these chunks.
+    The implementation is PVM-dependent. *)
+val import : t -> pvm_name:string -> filename:string -> string Lwt.t

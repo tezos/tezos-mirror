@@ -27,6 +27,11 @@
 module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 
+let equal_history_mode ?loc ?msg hm1 hm2 =
+  let eq = ( = ) in
+  let pp = Tezos_shell_services.History_mode.pp in
+  Lib_test.Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
+
 let check_flags descr store expected_head =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -36,7 +41,7 @@ let check_flags descr store expected_head =
     (Store.Block.header expected_head)
     (Store.Block.header current_head) ;
   let history_mode = Store.Chain.history_mode chain_store in
-  Assert_lib.Shell_services.equal_history_mode
+  equal_history_mode
     ~msg:("history mode consistency: " ^ descr)
     history_mode
     History_mode.Archive ;
@@ -160,6 +165,7 @@ let make_tests_bootstrapped speed patch_context =
         ~patch_context
         ~history_mode
         ~keep_dir:false
+        ~with_gc:true
         ( descr,
           fun data_dir store ->
             test_from_bootstrapped
@@ -313,6 +319,7 @@ let make_tests_snapshoted speed patch_context =
         ~patch_context
         ~history_mode
         ~keep_dir:false
+        ~with_gc:true
         ( descr,
           fun data_dir store ->
             test_from_snapshot

@@ -13,7 +13,6 @@ depends: [
   "tezos-base"
   "tezos-crypto"
   "tezos-test-helpers"
-  "tezos-shell-services"
 ]
 build: [
   ["rm" "-r" "vendors"]

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_benchmark
-
 (* Input parameter parsing *)
 
 let verbose =

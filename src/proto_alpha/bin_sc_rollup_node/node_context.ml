@@ -28,21 +28,32 @@ open Alpha_context
 
 type t = {
   cctxt : Protocol_client_context.full;
+  dal_cctxt : Dal_node_client.cctxt;
+  data_dir : string;
   l1_ctxt : Layer1.t;
   rollup_address : Sc_rollup.t;
-  operator : Signature.Public_key_hash.t;
+  operators : Configuration.operators;
   genesis_info : Sc_rollup.Commitment.genesis_info;
   block_finality_time : int;
   kind : Sc_rollup.Kind.t;
-  fee_parameter : Injection.fee_parameter;
+  fee_parameters : Configuration.fee_parameters;
   protocol_constants : Constants.t;
   loser_mode : Loser_mode.t;
+  store : Store.t;
+  context : Context.index;
 }
 
-let get_operator_keys node_ctxt =
-  let open Lwt_result_syntax in
-  let+ _, pk, sk = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
-  (node_ctxt.operator, pk, sk)
+let get_operator node_ctxt purpose =
+  Configuration.Operator_purpose_map.find purpose node_ctxt.operators
+
+let is_operator node_ctxt pkh =
+  Configuration.Operator_purpose_map.exists
+    (fun _ operator -> Signature.Public_key_hash.(operator = pkh))
+    node_ctxt.operators
+
+let get_fee_parameter node_ctxt purpose =
+  Configuration.Operator_purpose_map.find purpose node_ctxt.fee_parameters
+  |> Option.value ~default:(Configuration.default_fee_parameter ~purpose ())
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2901
    The constants are retrieved from the latest tezos block. These constants can
@@ -53,19 +64,40 @@ let get_operator_keys node_ctxt =
 let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
-let init (cctxt : Protocol_client_context.full) l1_ctxt rollup_address
-    genesis_info kind operator fee_parameter ~loser_mode =
+let init (cctxt : Protocol_client_context.full) dal_cctxt ~data_dir l1_ctxt
+    rollup_address kind operators fee_parameters ~loser_mode store context =
   let open Lwt_result_syntax in
   let+ protocol_constants = retrieve_constants cctxt in
   {
     cctxt;
+    dal_cctxt;
+    data_dir;
     l1_ctxt;
     rollup_address;
-    operator;
-    genesis_info;
+    operators;
+    genesis_info = l1_ctxt.Layer1.genesis_info;
     kind;
     block_finality_time = 2;
-    fee_parameter;
+    fee_parameters;
     protocol_constants;
     loser_mode;
+    store;
+    context;
   }
+
+let checkout_context node_ctxt block_hash =
+  let open Lwt_result_syntax in
+  let*! context_hash = Store.Contexts.find node_ctxt.store block_hash in
+  let*? context_hash =
+    match context_hash with
+    | None ->
+        error (Sc_rollup_node_errors.Cannot_checkout_context (block_hash, None))
+    | Some context_hash -> ok context_hash
+  in
+  let*! ctxt = Context.checkout node_ctxt.context context_hash in
+  match ctxt with
+  | None ->
+      tzfail
+        (Sc_rollup_node_errors.Cannot_checkout_context
+           (block_hash, Some (Context.hash_to_raw_string context_hash)))
+  | Some ctxt -> return ctxt

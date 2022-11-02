@@ -1825,7 +1825,7 @@ class TestBadAnnotation:
         name = 'bad_annot.tz'
         contract = session[name]
 
-        # This was produced by running "tezos-client hash data '{ UNIT
+        # This was produced by running "octez-client hash data '{ UNIT
         # ; PAIR ; CAR %faa }' of type 'lambda unit unit'" and
         # replacing the two last bytes (that correspond to the two
         # 'a's at the end of the annotation) by the 0xff byte which is
@@ -1858,41 +1858,6 @@ class TestOrderInTopLevelDoesNotMatter:
         ):
             contract = ";\n".join(shuffled_list)
             client.typecheck(contract, file=False)
-
-
-@pytest.mark.incremental
-@pytest.mark.contract
-@pytest.mark.regression
-class TestSelfAddressTransfer:
-    def test_self_address_originate_sender(
-        self, client_regtest_scrubbed, session
-    ):
-        client = client_regtest_scrubbed
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'self_address_sender.tz'
-        )
-        originate(client, session, path, 'Unit', 0)
-
-    def test_self_address_originate_receiver(
-        self, client_regtest_scrubbed, session
-    ):
-        client = client_regtest_scrubbed
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'self_address_receiver.tz'
-        )
-        originate(client, session, path, 'Unit', 0)
-        session['receiver_address'] = session['contract']
-
-    def test_send_self_address(self, client_regtest_scrubbed, session):
-        client = client_regtest_scrubbed
-        receiver_address = session['receiver_address']
-        client.transfer(
-            0,
-            'bootstrap2',
-            'self_address_sender',
-            ['--arg', f'"{receiver_address}"', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
 
 
 @pytest.mark.slow
@@ -1940,7 +1905,7 @@ class TestScriptHashOrigination:
 
 @pytest.mark.contract
 class TestScriptHashMultiple:
-    """Test tezos-client hash script with diffent number and type of
+    """Test octez-client hash script with diffent number and type of
     arguments"""
 
     def test_contract_hashes_empty(self, client: Client):
@@ -2060,66 +2025,6 @@ class TestNormalize:
     def test_normalize_type(self, client_regtest_scrubbed, typ):
         client = client_regtest_scrubbed
         client.normalize_type(typ)
-
-
-@pytest.mark.contract
-class TestTZIP4View:
-    """Tests for the "run tzip4 view" command."""
-
-    def test_run_view(self, client: Client, session: dict):
-
-        path = os.path.join(CONTRACT_PATH, 'mini_scenarios', 'tzip4_view.tz')
-        originate(
-            client,
-            session,
-            contract=path,
-            init_storage='Unit',
-            amount=1000,
-            contract_name='view_contract',
-        )
-        utils.bake(client, bake_for='bootstrap5')
-
-        const_view_res = client.run_view(
-            "view_const", "view_contract", "Unit", []
-        )
-        add_view_res = client.run_view(
-            "view_add", "view_contract", "Pair 1 3", []
-        )
-
-        assert const_view_res.result == "5\n" and add_view_res.result == "4\n"
-
-
-@pytest.mark.contract
-@pytest.mark.incremental
-class TestBadIndentation:
-    """Tests for the "hash script" and "convert script" commands on
-    badly-indented scripts."""
-
-    BADLY_INDENTED = os.path.join(ILLTYPED_CONTRACT_PATH, 'badly_indented.tz')
-
-    SCRIPT_HASH = "exprv8K6ceBpFH5SFjQm4BRYSLJCHQBFeQU6BFTdvQSRPaPkzdLyAL"
-
-    def test_bad_indentation_ill_typed(self, client):
-        with utils.assert_run_failure('syntax error in program'):
-            client.typecheck(self.BADLY_INDENTED)
-
-    def test_bad_indentation_hash(self, client):
-        assert client.hash_script([self.BADLY_INDENTED]) == [
-            (self.SCRIPT_HASH, None)
-        ]
-
-    def test_formatting(self, client, session):
-        session['formatted_script'] = client.convert_script(
-            self.BADLY_INDENTED, 'Michelson', 'Michelson'
-        )
-
-    def test_formatted_hash(self, client, session):
-        assert client.hash_script([session['formatted_script']]) == [
-            (self.SCRIPT_HASH, None)
-        ]
-
-    def test_formatted_typechecks(self, client, session):
-        client.typecheck(session['formatted_script'], file=False)
 
 
 @pytest.mark.contract
@@ -2316,89 +2221,3 @@ code {{
         self.check_contract_ko(
             client, kt1, None, root_type, type_mismatch_error
         )
-
-
-@pytest.mark.incremental
-@pytest.mark.contract
-@pytest.mark.regression
-class TestOriginateContractFromContract:
-    def test_originate_contract_from_contract_origination(
-        self, client_regtest_scrubbed, session
-    ):
-        client = client_regtest_scrubbed
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'originate_contract.tz'
-        )
-        originate(client, session, path, 'Unit', 200)
-
-    def test_originate_contract_from_contract_transfer(
-        self, client_regtest_scrubbed
-    ):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'originate_contract',
-            ['--arg', 'Unit', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
-
-
-@pytest.mark.incremental
-@pytest.mark.contract
-@pytest.mark.regression
-class TestCreateRemoveTickets:
-    def test_add_clear_tickets_origination(
-        self, client_regtest_scrubbed, session
-    ):
-        client = client_regtest_scrubbed
-        path = os.path.join(
-            CONTRACT_PATH, 'mini_scenarios', 'add_clear_tickets.tz'
-        )
-        originate(client, session, path, '{}', 200)
-
-    def test_add_clear_tickets_add_first_transfer(
-        self, client_regtest_scrubbed
-    ):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'add_clear_tickets',
-            ['--entrypoint', 'add', '--arg', 'Pair 1 "A"', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
-
-    def test_add_clear_tickets_clear_transfer(self, client_regtest_scrubbed):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'add_clear_tickets',
-            ['--entrypoint', 'clear', '--arg', 'Unit', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
-
-    def test_add_clear_tickets_add_second_transfer(
-        self, client_regtest_scrubbed
-    ):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'add_clear_tickets',
-            ['--entrypoint', 'add', '--arg', 'Pair 1 "B"', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')
-
-    def test_add_clear_tickets_add_third_transfer(
-        self, client_regtest_scrubbed
-    ):
-        client = client_regtest_scrubbed
-        client.transfer(
-            0,
-            'bootstrap2',
-            'add_clear_tickets',
-            ['--entrypoint', 'add', '--arg', 'Pair 1 "C"', '--burn-cap', '2'],
-        )
-        utils.bake(client, 'bootstrap5')

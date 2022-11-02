@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name bench_signature_perf)
+ (libraries
+  tezos-error-monad
+  tezos-crypto
+  zarith
+  zarith_stubs_js
+  data-encoding
+  alcotest
+  alcotest-lwt
+  lwt.unix
+  qcheck-alcotest
+  tezos-test-helpers
+  ptime)
+ (flags
+  (:standard)
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_crypto
+  -open Data_encoding))

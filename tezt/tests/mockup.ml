@@ -35,7 +35,7 @@
 *)
 
 (* Test.
-   Call `tezos-client rpc list` and check that return code is 0.
+   Call `octez-client rpc list` and check that return code is 0.
 *)
 let test_rpc_list =
   Protocol.register_test
@@ -48,7 +48,7 @@ let test_rpc_list =
   Lwt.return_unit
 
 (* Test.
-   Call `tezos-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
+   Call `octez-client rpc /chains/<chain_id>/blocks/<block_id>/header/shell` and check that return code is 0.
 *)
 let test_rpc_header_shell =
   Protocol.register_test
@@ -63,7 +63,7 @@ let test_rpc_header_shell =
 let transfer_data =
   (Constant.bootstrap1.alias, Tez.one, Constant.bootstrap2.alias)
 
-let test_balances_after_transfer giver amount receiver =
+let check_balances_after_transfer giver amount receiver =
   let giver_balance_before, giver_balance_after = giver in
   let receiver_balance_before, receiver_balance_after = receiver in
   if not Tez.(giver_balance_after < giver_balance_before - amount) then
@@ -109,7 +109,7 @@ let test_transfer =
   let* receiver_balance_after =
     Client.get_balance_for ~account:receiver client
   in
-  test_balances_after_transfer
+  check_balances_after_transfer
     (giver_balance_before, giver_balance_after)
     amount
     (receiver_balance_before, receiver_balance_after) ;
@@ -455,7 +455,7 @@ let test_migration_transfer ?migration_spec () =
       let* receiver_balance_after =
         Client.get_balance_for ~account:receiver client
       in
-      test_balances_after_transfer
+      check_balances_after_transfer
         (giver_balance_before, giver_balance_after)
         amount
         (receiver_balance_before, receiver_balance_after) ;
@@ -569,7 +569,13 @@ let test_multiple_transfers =
   let oc = open_out file in
   Ezjsonm.to_channel oc (batch 200) ;
   close_out oc ;
-  Client.multiple_transfers ~giver:"bootstrap2" ~json_batch:file client
+  let*! () =
+    Client.multiple_transfers
+      ~giver:Constant.bootstrap2.alias
+      ~json_batch:file
+      client
+  in
+  unit
 
 let test_empty_block_baking =
   Protocol.register_test
@@ -603,6 +609,356 @@ let test_storage_from_file =
       in
       unit)
 
+(* Executes `octez-client list mockup protocols`. The call must
+   succeed and return a non empty list. *)
+let test_list_mockup_protocols () =
+  Test.register
+    ~__FILE__
+    ~title:"(Mockup) List mockup protocols."
+    ~tags:["mockup"; "client"; "protocols"]
+  @@ fun () ->
+  let client = Client.create_with_mode Client.Mockup in
+  let* protocols = Client.list_protocols `Mockup client in
+  if protocols = [] then Test.fail "List of mockup protocols must be non-empty" ;
+  unit
+
+(* Executes [octez-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is a non empty directory which is NOT a mockup
+   directory. The call must fail. *)
+let test_create_mockup_dir_exists_nonempty =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup in existing base dir"
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let base_dir = Temp.dir "mockup_dir" in
+  write_file ~contents:"" (base_dir // "whatever") ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is not empty, please specify a fresh base directory")
+  in
+  unit
+
+let test_retrieve_addresses =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Retrieve addresses"
+    ~tags:["mockup"; "client"; "wallet"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* addresses = Client.list_known_addresses client in
+  let expected_addresses =
+    Account.Bootstrap.keys |> Array.to_list |> List.rev
+    |> List.map @@ fun Account.{alias; public_key_hash; _} ->
+       (alias, public_key_hash)
+  in
+  Check.(
+    (addresses = expected_addresses)
+      ~__LOC__
+      (list (tuple2 string string))
+      ~error_msg:"Expected addresses %R, got %L") ;
+  unit
+
+(* Executes [octez-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] is not fresh. The call must fail. *)
+let test_create_mockup_already_initialized =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup when already initialized."
+    ~tags:["mockup"; "client"; "base_dir"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.spawn_create_mockup client ~protocol
+    |> Process.check_error
+         ~msg:(rex "is already initialized as a mockup directory")
+  in
+  unit
+
+(* Tests [tezos-client create mockup]s [--protocols-constants]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_constants =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom protocol constants."
+    ~tags:["mockup"; "client"; "mockup_protocol_constants"]
+  @@ fun protocol ->
+  let iter = Fun.flip Lwt_list.iter_s in
+  (* [chain_id] is the string to pass for field [chain_id]. It's
+     impossible to guess values of [chain_id], these ones have been *
+     obtained by looking at the output of [compute chain id from
+     seed]. *)
+  iter
+    [
+      "NetXcqTGZX74DxG";
+      "NetXaFDF7xZQCpR";
+      "NetXkKbtqncJcAz";
+      "NetXjjE5cZUeWPy";
+      "NetXi7C1pyLhQNe";
+    ]
+  @@ fun chain_id ->
+  (* initial_timestamp is an ISO-8601 formatted date string *)
+  iter ["2020-07-21T17:11:10+02:00"; "1970-01-01T00:00:00Z"]
+  @@ fun initial_timestamp ->
+  let parameter_file = Temp.file "tezos-custom-constants.json" in
+  let json_fields =
+    [
+      ("hard_gas_limit_per_operation", `String "400000");
+      ("chain_id", `String chain_id);
+      ("initial_timestamp", `String initial_timestamp);
+    ]
+  in
+  let json_data : JSON.u = `O json_fields in
+  JSON.encode_to_file_u parameter_file json_data ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~parameter_file client in
+  unit
+
+(* A [mockup_bootstrap_account] represents a bootstrap accounts as
+   taken by the [--bootstrap-accounts] option of mockup mode *)
+type mockup_bootstrap_account = {name : string; sk_uri : string; amount : Tez.t}
+
+let test_accounts : mockup_bootstrap_account list =
+  [
+    {
+      name = "bootstrap0";
+      sk_uri = "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3";
+      amount = Tez.of_int 2000000000000;
+    };
+    {
+      name = "bootstrap1";
+      sk_uri = "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
+      amount = Tez.of_int 1000000000000;
+    };
+  ]
+
+let mockup_bootstrap_account_to_json {name; sk_uri; amount} : JSON.u =
+  `O
+    [
+      ("name", `String name);
+      ("sk_uri", `String ("unencrypted:" ^ sk_uri));
+      ("amount", `String (Tez.to_string amount));
+    ]
+
+(* Tests [tezos-client create mockup --bootstrap-accounts]
+   argument. The call must succeed. *)
+let test_create_mockup_custom_bootstrap_accounts =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Create mockup with mockup-custom bootstrap accounts."
+    ~tags:["mockup"; "client"; "mockup_bootstrap_accounts"]
+  @@ fun protocol ->
+  let bootstrap_accounts_file = Temp.file "tezos-bootstrap-accounts.json" in
+  JSON.encode_to_file_u
+    bootstrap_accounts_file
+    (`A (List.map mockup_bootstrap_account_to_json test_accounts)) ;
+
+  let client = Client.create_with_mode Client.Mockup in
+  let* () = Client.create_mockup ~protocol ~bootstrap_accounts_file client in
+
+  let names_sent =
+    test_accounts |> List.map (fun {name; _} -> name) |> List.rev
+  in
+  let* accounts_witnessed = Client.list_known_addresses client in
+  let names_witnessed = List.map fst accounts_witnessed in
+  Check.(
+    (names_witnessed = names_sent)
+      ~__LOC__
+      (list string)
+      ~error_msg:"Expected names %R, got %L") ;
+  unit
+
+let rmdir dir = Process.spawn "rm" ["-rf"; dir] |> Process.check
+
+(* Executes [tezos-client --base-dir /tmp/mdir create mockup] when
+   [/tmp/mdir] looks like a dubious base directory. Checks that a warning
+   is printed. *)
+let test_transfer_bad_base_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Transfer bad base dir."
+    ~tags:["mockup"; "client"; "initialization"]
+  @@ fun protocol ->
+  Log.info "First create mockup with an empty base dir" ;
+  let base_dir = Temp.dir "mockup-dir" in
+  Sys.rmdir base_dir ;
+  let client = Client.create_with_mode ~base_dir Client.Mockup in
+  let* () = Client.create_mockup ~protocol client in
+  let base_dir = Client.base_dir client in
+  let mockup_dir = base_dir // "mockup" in
+  Log.info "A valid mockup has a directory named [mockup], in its directory" ;
+  Check.directory_exists ~__LOC__ mockup_dir ;
+
+  Log.info "Delete this directory:" ;
+  let* () = rmdir mockup_dir in
+  Log.info "And put a file instead:" ;
+  write_file mockup_dir ~contents:"" ;
+
+  Log.info "Now execute a command" ;
+  let* () =
+    Client.spawn_transfer
+      ~amount:Tez.one
+      ~giver:"bootstrap1"
+      ~receiver:"bootstrap2"
+      client
+    |> Process.check_error
+         ~msg:(rex "Some commands .* might not work correctly.")
+  in
+  unit
+
+(* Executes [tezos-client --mode mockup config show] in a state where
+   it should succeed. *)
+let test_config_show_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* _ = Client.config_show ~protocol client in
+  unit
+
+(* Executes [tezos-client --mode mockup config show] when base dir is
+   NOT a mockup. It should fail as this is dangerous (the default base
+   directory could contain sensitive data, such as private keys) *)
+let test_config_show_mockup_fail =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Show config failure."
+    ~tags:["mockup"; "client"; "config"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let* () = rmdir (Client.base_dir client) in
+  let* _ = Client.spawn_config_show ~protocol client |> Process.check_error in
+  unit
+
+(* Executes [tezos-client config init mockup] in a state where it
+   should succeed *)
+let test_config_init_mockup =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup config initialization."
+    ~tags:["mockup"; "client"; "config"; "initialization"]
+  @@ fun protocol ->
+  let protocol_constants = Temp.file "protocol-constants.json" in
+  let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
+  let* client = Client.init_mockup ~protocol () in
+  let* () =
+    Client.config_init ~protocol ~bootstrap_accounts ~protocol_constants client
+  in
+  let (_ : JSON.t) = JSON.parse_file protocol_constants in
+  let (_ : JSON.t) = JSON.parse_file bootstrap_accounts in
+  unit
+
+(* Executes [tezos-client config init mockup] when base dir is NOT a
+   mockup. It should fail as this is dangerous (the default base
+   directory could contain sensitive data, such as private keys) *)
+let test_config_init_mockup_fail =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup config initialization failure."
+    ~tags:["mockup"; "client"; "config"; "initialization"]
+  @@ fun protocol ->
+  let protocol_constants = Temp.file "protocol-constants.json" in
+  let bootstrap_accounts = Temp.file "bootstrap-accounts.json" in
+  let* client = Client.init_mockup ~protocol () in
+  Log.info "remove the mockup directory to invalidate the mockup state" ;
+  let* () = rmdir (Client.base_dir client // "mockup") in
+  let* () =
+    Client.spawn_config_init
+      ~protocol
+      ~bootstrap_accounts
+      ~protocol_constants
+      client
+    |> Process.check_error
+  in
+  Check.file_not_exists ~__LOC__ protocol_constants ;
+  Check.file_not_exists ~__LOC__ bootstrap_accounts ;
+  unit
+
+(* Variant of test_transfer that uses RPCs to get the balances. *)
+let test_transfer_rpc =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup transfer RPC."
+    ~tags:["mockup"; "client"; "transfer"; "rpc"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let get_balance (key : Account.key) =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_balance ~id:key.public_key_hash ()
+  in
+  let giver = Account.Bootstrap.keys.(0) in
+  let receiver = Account.Bootstrap.keys.(1) in
+  let amount = Tez.one in
+  let* giver_balance_before = get_balance giver in
+  let* receiver_balance_before = get_balance receiver in
+  let* () =
+    Client.transfer ~amount ~giver:giver.alias ~receiver:receiver.alias client
+  in
+  let* giver_balance_after = get_balance giver in
+  let* receiver_balance_after = get_balance receiver in
+  Check.(giver_balance_after < Tez.(giver_balance_before - amount))
+    Tez.typ
+    ~__LOC__
+    ~error_msg:"Expected giver balance < %R, got %L" ;
+  Check.(receiver_balance_after = Tez.(receiver_balance_before + amount))
+    Tez.typ
+    ~__LOC__
+    ~error_msg:"Expected receiver balance = %R, got %L" ;
+  unit
+
+let test_proto_mix =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Mockup mixed protocols."
+    ~tags:["mockup"; "client"; "transfer"; "rpc"]
+  @@ fun protocol ->
+  let protos1, protos2 =
+    match Protocol.previous_protocol protocol with
+    | Some previous_protocol ->
+        ( [protocol; previous_protocol],
+          [Some protocol; Some previous_protocol; None] )
+    | None -> ([protocol], [Some protocol; None])
+  in
+  Fun.flip Lwt_list.iter_s protos1 @@ fun proto1 ->
+  Fun.flip Lwt_list.iter_s protos2 @@ fun proto2 ->
+  (* This test covers 3 cases:
+
+     1/ When [proto2] equals [Some proto1]: it tests that the command works.
+
+     2/ When [proto2] is [None]: it tests that the correct
+       mockup implementation is picked (i.e. the one of [proto1])
+       and that the command works.
+
+     3/ When [proto2] is [Some proto] such that [proto <> proto1]:
+       it tests that creating a mockup with a protocol and
+       using it with another protocol fails. *)
+  let* client1 = Client.init_mockup ~protocol:proto1 () in
+  let client2 =
+    Client.create_with_mode ~base_dir:(Client.base_dir client1) Mockup
+  in
+  Fun.flip
+    Lwt_list.iter_s
+    [
+      ["config"; "show"];
+      ["config"; "init"];
+      ["list"; "known"; "addresses"];
+      ["get"; "balance"; "for"; "bootstrap1"];
+    ]
+  @@ fun cmd ->
+  match (proto1, proto2) with
+  | _, Some proto2 when proto1 = proto2 ->
+      Client.spawn_command ~protocol_hash:(Protocol.hash proto2) client2 cmd
+      |> Process.check
+  | _, None -> Client.spawn_command client2 cmd |> Process.check
+  | _, Some proto2 ->
+      Client.spawn_command ~protocol_hash:(Protocol.hash proto2) client2 cmd
+      |> Process.check_error
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -614,7 +970,19 @@ let register ~protocols =
   test_rpc_header_shell protocols ;
   test_origination_from_unrevealed_fees protocols ;
   test_multiple_transfers protocols ;
-  test_storage_from_file protocols
+  test_storage_from_file protocols ;
+  test_create_mockup_dir_exists_nonempty protocols ;
+  test_retrieve_addresses protocols ;
+  test_create_mockup_already_initialized protocols ;
+  test_create_mockup_custom_constants protocols ;
+  test_create_mockup_custom_bootstrap_accounts protocols ;
+  test_transfer_bad_base_dir protocols ;
+  test_config_show_mockup protocols ;
+  test_config_show_mockup_fail protocols ;
+  test_config_init_mockup protocols ;
+  test_config_init_mockup_fail protocols ;
+  test_transfer_rpc protocols ;
+  test_proto_mix protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
@@ -627,4 +995,6 @@ let register_global_constants ~protocols =
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
 
-let register_protocol_independent () = test_migration_transfer ()
+let register_protocol_independent () =
+  test_migration_transfer () ;
+  test_list_mockup_protocols ()

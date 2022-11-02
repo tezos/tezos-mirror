@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_clic
+
 (** Allows to parse an argument taking one of many forms. Accepts a
     list of alternative parsers and an input string. Each alternative
     consists of a string being the name of the format and a function

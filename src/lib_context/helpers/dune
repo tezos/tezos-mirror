@@ -10,6 +10,7 @@
   tezos-stdlib
   tezos-context.encoding
   tezos-context.sigs
+  tezos-context.merkle_proof_encoding
   irmin
   irmin-pack)
  (flags

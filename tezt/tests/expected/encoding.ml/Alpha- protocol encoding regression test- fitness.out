@@ -1,5 +1,5 @@
 
-./tezos-codec encode alpha.fitness from '{
+./octez-codec encode alpha.fitness from '{
   "level": 1,
   "locked_round": 1,
   "predecessor_round": 1,
@@ -7,5 +7,5 @@
 }'
 0000000101000000010000000100000002
 
-./tezos-codec decode alpha.fitness from 0000000101000000010000000100000002
+./octez-codec decode alpha.fitness from 0000000101000000010000000100000002
 { "level": 1, "locked_round": 1, "predecessor_round": 1, "round": 2 }

@@ -133,20 +133,10 @@ module Lift_then_print = Costlang.Let_lift (Codegen)
 type solution = float Free_variable.Map.t
 
 let load_solution (fn : string) : solution =
-  let infile = open_in fn in
-  try
-    let res = Marshal.from_channel infile in
-    close_in infile ;
-    res
-  with exn ->
-    close_in infile ;
-    Format.eprintf "Codegen.load_solution: could not load %s@." fn ;
-    raise exn
+  In_channel.with_open_bin fn Marshal.from_channel
 
 let save_solution (s : solution) (fn : string) =
-  let outfile = open_out fn in
-  Marshal.to_channel outfile s [] ;
-  close_out outfile
+  Out_channel.with_open_bin fn @@ fun outfile -> Marshal.to_channel outfile s []
 
 (* ------------------------------------------------------------------------- *)
 

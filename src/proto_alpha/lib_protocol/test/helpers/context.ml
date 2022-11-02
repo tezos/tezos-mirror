@@ -36,6 +36,10 @@ let level = function B b -> b.header.shell.level | I i -> Incremental.level i
 let get_level ctxt =
   level ctxt |> Raw_level.of_int32 |> Environment.wrap_tzresult
 
+let to_alpha_ctxt = function
+  | B b -> Block.to_alpha_ctxt b
+  | I i -> return (Incremental.alpha_ctxt i)
+
 let rpc_ctxt =
   object
     method call_proto_service0
@@ -149,9 +153,9 @@ let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 
-let get_bakers ?(filter = fun _x -> true) ctxt =
-  Plugin.RPC.Baking_rights.get rpc_ctxt ctxt >|=? fun bakers ->
-  List.filter filter bakers
+let get_bakers ?filter ?cycle ctxt =
+  Plugin.RPC.Baking_rights.get rpc_ctxt ?cycle ctxt >|=? fun bakers ->
+  (match filter with None -> bakers | Some f -> List.filter f bakers)
   |> List.map (fun p -> p.Plugin.RPC.Baking_rights.delegate)
 
 let get_baker ctxt ~round =
@@ -260,6 +264,11 @@ module Vote = struct
     current_proposals : Protocol_hash.t list;
     remaining_proposals : int;
   }
+
+  let get_delegate_proposal_count ctxt pkh =
+    to_alpha_ctxt ctxt >>=? fun alpha_ctxt ->
+    Vote.get_delegate_proposal_count alpha_ctxt pkh
+    >|= Environment.wrap_tzresult
 end
 
 module Contract = struct
@@ -331,6 +340,8 @@ module Delegate = struct
     deactivated : bool;
     grace_period : Cycle.t;
     voting_info : Alpha_context.Vote.delegate_info;
+    active_consensus_key : Signature.Public_key_hash.t;
+    pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
@@ -352,6 +363,8 @@ module Delegate = struct
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
 
   let voting_info ctxt d = Alpha_services.Delegate.voting_info rpc_ctxt ctxt d
+
+  let consensus_key ctxt pkh = Delegate_services.consensus_key rpc_ctxt ctxt pkh
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
@@ -383,6 +396,33 @@ module Sc_rollup = struct
       sc_rollup
       hash
       ()
+      ()
+
+  let genesis_info ctxt sc_rollup =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.genesis_info
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      ()
+      ()
+
+  let timeout ctxt sc_rollup stakers =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.timeout
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      stakers
+      ()
+
+  let ongoing_game_for_staker ctxt sc_rollup staker =
+    Environment.RPC_context.make_call1
+      Plugin.RPC.Sc_rollup.S.ongoing_refutation_game
+      rpc_ctxt
+      ctxt
+      sc_rollup
+      staker
       ()
 end
 
@@ -422,8 +462,9 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
     ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?tx_rollup_origination_size ?sc_rollup_enable ?dal_enable
-    ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
+    ?tx_rollup_origination_size ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period ?dal_enable
+    ?zk_rollup_enable ?hard_gas_limit_per_block ?nonce_revelation_threshold () =
   let n = tup_n tup in
   let accounts =
     Account.generate_accounts
@@ -455,7 +496,9 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?tx_rollup_sunset_level
     ?tx_rollup_origination_size
     ?sc_rollup_enable
+    ?sc_rollup_max_number_of_messages_per_commitment_period
     ?dal_enable
+    ?zk_rollup_enable
     ?hard_gas_limit_per_block
     ?nonce_revelation_threshold
     accounts
@@ -482,7 +525,7 @@ let init_with_constants_gen tup constants =
     List.map
       (fun (acc, tez, delegate_to) ->
         Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
+          (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
       accounts
   in
   let parameters =
@@ -505,7 +548,8 @@ let default_raw_context () =
   let bootstrap_accounts =
     List.map
       (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
+        Default_parameters.make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
       initial_accounts
   in
   Block.prepare_initial_context_params initial_accounts

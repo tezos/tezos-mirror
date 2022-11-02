@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Lwt.Infix
-open Runnable.Syntax
 
 (* For Smart contracts' script, initial storage and arguments, we offer
    several syntaxes, depending on the test context *)
@@ -84,17 +83,22 @@ let data_to_json =
 
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
-  let*! json =
-    RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
+  let* counter_json =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_counter
+         ~id:source.Account.public_key_hash
+         ()
   in
-  return (JSON.as_int json)
+  return (JSON.as_int counter_json)
 
 let get_next_counter ~source client = get_counter client ~source >|= succ
 
 let get_injection_branch ?branch client =
   match branch with
   | Some b -> Lwt.return b
-  | None -> RPC.get_branch client >|= JSON.as_string
+  | None ->
+      let block = sf "head~%d" 2 in
+      RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
 (* Smart constructors *)
 
@@ -229,9 +233,12 @@ let forge_operation ?protocol ~branch ~batch client =
   let op_json = op_to_json_string ~branch (`A json_batch) in
   let* hex =
     match protocol with
-    | None -> RPC.post_forge_operations ~data:op_json client >|= JSON.as_string
+    | None ->
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_forge_operations ~data:op_json ()
+        >|= JSON.as_string
     | Some p ->
-        let name = Protocol.daemon_name p ^ ".operation.unsigned" in
+        let name = Protocol.encoding_prefix p ^ ".operation.unsigned" in
         Codec.encode ~name op_json
   in
   return (`Hex hex)

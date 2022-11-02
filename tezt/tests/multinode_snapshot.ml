@@ -287,12 +287,15 @@ let test_storage_snapshot =
   let nodes_group1 = [node_archive; node_full; node_rolling] in
 
   let* () =
-    Client.activate_protocol ~endpoint:(Node node_archive) ~protocol client
+    Client.activate_protocol_and_wait
+      ~endpoint:(Node node_archive)
+      ~protocol
+      ~node:node_archive
+      client
   in
 
   (* Bake a few blocks *)
-  let* head_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
-  let snapshot_level = head_level in
+  let* snapshot_level = bake_batch 1 node_archive client nodes_group1 batch_1 in
 
   (* ########################################################################### *)
   Log.info "Export all kinds of snapshots" ;
@@ -359,18 +362,10 @@ let test_storage_snapshot =
     ]
   in
 
-  let connect_clique ns =
-    Lwt_list.iteri_s
-      (fun index peer ->
-        Lwt_list.iter_s
-          (fun peer' ->
-            Log.debug "Connecting %s to %s" (Node.name peer) (Node.name peer') ;
-            Client.Admin.connect_address
-              ~endpoint:(Node peer)
-              ~peer:peer'
-              client)
-          (drop (index + 1) ns))
-      ns
+  let connect_clique =
+    Cluster.meta_clique_lwt @@ fun peer peer' ->
+    Log.debug "Connecting %s to %s" (Node.name peer) (Node.name peer') ;
+    Client.Admin.connect_address ~endpoint:(Node peer) ~peer:peer' client
   in
 
   Log.info "Group 2: Connect nodes %s in clique" (show_node_group nodes_group2) ;

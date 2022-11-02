@@ -68,8 +68,11 @@ let decode_len_value key len =
   | Some len -> ok len
 
 module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
-  Raw_context.T with type t = C.t = struct
+  Raw_context.T with type t = C.t and type local_context = C.local_context =
+struct
   type t = C.t
+
+  type local_context = C.local_context
 
   let to_key k = N.name @ k
 
@@ -142,6 +145,10 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
     Storage_description.register_named_subcontext description N.name
 
   let length = C.length
+
+  let with_local_context ctxt k f = C.with_local_context ctxt (to_key k) f
+
+  module Local_context = C.Local_context
 end
 
 module Make_single_data_storage
@@ -357,7 +364,7 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     (C : Raw_context.T)
     (I : INDEX)
     (V : VALUE) :
-  Non_iterable_indexed_carbonated_data_storage_INTERNAL
+  Indexed_carbonated_data_storage_INTERNAL
     with type t = C.t
      and type key = I.t
      and type value = V.t = struct
@@ -463,18 +470,21 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let add_or_remove s i v =
     match v with None -> remove s i | Some v -> add s i v
 
-  (** Because big map values are not stored under some common key,
-      we have no choice but to fold over all nodes with a path of length
-      [I.path_length] to retrieve actual keys and then paginate.
-
-      While this is inefficient and will traverse the whole tree ([O(n)]), there
-      currently isn't a better decent alternative.
-
-      Once https://gitlab.com/tezos/tezos/-/merge_requests/2771 which flattens paths is done,
-      {!C.list} could be used instead here. *)
-  let list_values ?(offset = 0) ?(length = max_int) s =
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/3318
+     Switch implementation to use [C.list].
+     Given that MR !2771 which flattens paths is done, we should use
+     [C.list] to avoid having to iterate over all keys when [length] and/or
+     [offset] is passed.
+  *)
+  let list_key_values ?(offset = 0) ?(length = max_int) s =
     let root = [] in
     let depth = `Eq I.path_length in
+    C.length s root >>= fun size ->
+    (* Regardless of the [length] argument, all elements stored in the context
+       are traversed. We therefore pay a gas cost proportional to the number of
+       elements, given by [size], upfront. We also pay gas for decoding elements
+       whenever they are loaded in the body of the fold. *)
+    C.consume_gas s (Storage_costs.list_key_values_traverse ~size) >>?= fun s ->
     C.fold
       s
       root
@@ -496,9 +506,14 @@ module Make_indexed_carbonated_data_storage_INTERNAL
               match I.of_path file with
               | None -> assert false
               | Some key ->
+                  (* This also accounts for gas for loading the element. *)
                   get_unprojected s key >|=? fun (s, value) ->
                   (s, (key, value) :: rev_values, 0, pred length))
-        | _ -> Lwt.return acc)
+        | _ ->
+            (* Even if we run out of gas or fail in some other way, we still
+               traverse the whole tree. In this case there is no context to
+               update. *)
+            Lwt.return acc)
     >|=? fun (s, rev_values, _offset, _length) ->
     (C.project s, List.rev rev_values)
 
@@ -545,7 +560,7 @@ module Make_indexed_carbonated_data_storage : functor
   (I : INDEX)
   (V : VALUE)
   ->
-  Non_iterable_indexed_carbonated_data_storage_with_values
+  Indexed_carbonated_data_storage
     with type t = C.t
      and type key = I.t
      and type value = V.t =
@@ -654,7 +669,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   Indexed_raw_context
     with type t = C.t
      and type key = I.t
-     and type 'a ipath = 'a I.ipath = struct
+     and type 'a ipath = 'a I.ipath
+     and type local_context = C.local_context = struct
   type t = C.t
 
   type context = t
@@ -662,6 +678,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
   type key = I.t
 
   type 'a ipath = 'a I.ipath
+
+  type local_context = C.local_context
 
   let clear t = C.remove t [] >|= fun t -> C.project t
 
@@ -698,8 +716,13 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
   let pack = Storage_description.pack I.args
 
-  module Raw_context : Raw_context.T with type t = C.t I.ipath = struct
+  module Raw_context :
+    Raw_context.T
+      with type t = C.t I.ipath
+       and type local_context = C.local_context = struct
     type t = C.t I.ipath
+
+    type local_context = C.local_context
 
     let to_key i k = I.to_path i k
 
@@ -824,7 +847,18 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let length c =
       let t, _i = unpack c in
       C.length t
+
+    let with_local_context c k f =
+      let t, i = unpack c in
+      C.with_local_context t (to_key i k) f >|=? fun (t, res) -> (pack t i, res)
+
+    module Local_context = C.Local_context
   end
+
+  let with_local_context s i f =
+    Raw_context.with_local_context (pack s i) [] f >|=? fun (c, x) ->
+    let s, _ = unpack c in
+    (s, x)
 
   module Make_set (R : REGISTER) (N : NAME) :
     Data_set_storage with type t = t and type elt = key = struct
@@ -877,9 +911,12 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
         Data_encoding.bool
   end
 
-  module Make_map (N : NAME) (V : VALUE) :
-    Indexed_data_storage with type t = t and type key = key and type value = V.t =
-  struct
+  module Make_map (R : REGISTER) (N : NAME) (V : VALUE) :
+    Indexed_data_storage_with_local_context
+      with type t = t
+       and type key = key
+       and type value = V.t
+       and type local_context = local_context = struct
     type t = C.t
 
     type context = t
@@ -887,6 +924,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     type key = I.t
 
     type value = V.t
+
+    type nonrec local_context = local_context
 
     include Make_encoder (V)
 
@@ -961,15 +1000,56 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description =
+        if R.ghost then Storage_description.create ()
+        else Raw_context.description
+      in
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
           find c k)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         V.encoding
+
+    module Local = struct
+      type context = Raw_context.Local_context.t
+
+      let mem local = Raw_context.Local_context.mem local N.name
+
+      let get local =
+        Raw_context.Local_context.get local N.name >|= fun r ->
+        let key () = Raw_context.Local_context.absolute_key local N.name in
+        r >>? of_bytes ~key
+
+      let find local =
+        Raw_context.Local_context.find local N.name >|= function
+        | None -> Result.return_none
+        | Some b ->
+            let key () = Raw_context.Local_context.absolute_key local N.name in
+            of_bytes ~key b >|? fun v -> Some v
+
+      let init local v =
+        Raw_context.Local_context.init local N.name (to_bytes v)
+
+      let update local v =
+        Raw_context.Local_context.update local N.name (to_bytes v)
+
+      let add local v = Raw_context.Local_context.add local N.name (to_bytes v)
+
+      let add_or_remove local vo =
+        Raw_context.Local_context.add_or_remove
+          local
+          N.name
+          (Option.map to_bytes vo)
+
+      let remove_existing local =
+        Raw_context.Local_context.remove_existing local N.name
+
+      let remove local = Raw_context.Local_context.remove local N.name
+    end
   end
 
-  module Make_carbonated_map (N : NAME) (V : VALUE) :
+  module Make_carbonated_map (R : REGISTER) (N : NAME) (V : VALUE) :
     Non_iterable_indexed_carbonated_data_storage
       with type t = t
        and type key = key
@@ -1088,11 +1168,15 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
     let () =
       let open Storage_description in
       let unpack = unpack I.args in
+      let description =
+        if R.ghost then Storage_description.create ()
+        else Raw_context.description
+      in
       register_value
         ~get:(fun c ->
           let c, k = unpack c in
           find c k >|=? fun (_, v) -> v)
-        (register_named_subcontext Raw_context.description N.name)
+        (register_named_subcontext description N.name)
         V.encoding
   end
 end

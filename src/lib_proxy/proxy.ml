@@ -32,9 +32,9 @@
 
 module Local = Local_context
 
-(** Whether [tezos-client] or [tezos-proxy-server] is running. *)
+(** Whether [octez-client] or [tezos-proxy-server] is running. *)
 type mode =
-  | Client  (** Mode when [tezos-client] executes *)
+  | Client  (** Mode when [octez-client] executes *)
   | Server  (** Mode when [tezos-proxy-server] executes *)
 
 (** A dumb container, used to perform RPC calls concerning a specific
@@ -43,7 +43,7 @@ type mode =
     received the value of the corresponding field of this record. *)
 type proxy_getter_input = {
   rpc_context : RPC_context.simple;  (** How to perform RPC calls *)
-  mode : mode;  (** Whether [tezos-client] or [tezos-proxy-server] is running *)
+  mode : mode;  (** Whether [octez-client] or [tezos-proxy-server] is running *)
   chain : Tezos_shell_services.Block_services.chain;
       (** The chain involved in the RPC call *)
   block : Tezos_shell_services.Block_services.block;
@@ -60,7 +60,7 @@ type 'a update = Mutation | Value of 'a
     when it uses the [../raw/bytes] RPC to query its distant endpoint.
     It is ad-hoc because its [get] function has the concrete {!Proxy_context.M.tree}
     as a return type and because [add_leaf] has the concrete
-    {!Tezos_shell_services.Block_services.raw_context} as a parameter
+    {!Tezos_context_sigs.Context.Proof_types.raw_context} as a parameter
     (this type is inherited from the return type of the [../raw/bytes] RPC). *)
 module type TREE = sig
   (** The abstract type that implementors of this module type provide.
@@ -90,7 +90,7 @@ module type TREE = sig
   val add_leaf :
     t ->
     key ->
-    Tezos_shell_services.Block_services.raw_context ->
+    Tezos_context_sigs.Context.Proof_types.raw_context ->
     t update Lwt.t
 end
 

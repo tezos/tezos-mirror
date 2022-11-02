@@ -1,9 +1,8 @@
 PACKAGES_SUBPROJECT:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find opam -name \*.opam -print)))
 
-active_protocol_versions := $(shell cat script-inputs/active_protocol_versions)
-tx_rollup_protocol_versions := $(shell cat script-inputs/tx_rollup_protocol_versions)
-sc_rollup_protocol_versions := $(shell cat script-inputs/sc_rollup_protocol_versions)
+active_protocol_versions_without_number := $(shell cat script-inputs/active_protocol_versions_without_number)
+sc_rollup_protocol_versions_without_number := $(shell cat script-inputs/sc_rollup_protocol_versions_without_number)
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
@@ -34,18 +33,16 @@ CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
-TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signer tezos-codec tezos-protocol-compiler tezos-snoop tezos-proxy-server \
-    $(foreach p, $(active_protocol_versions), tezos-baker-$(p)) \
-    $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
-    $(foreach p, $(active_protocol_versions), \
-		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo tezos-endorser-$(p); fi)) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
-    $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
-    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
+OCTEZ_BIN=octez-node octez-validator octez-client octez-admin-client \
+    octez-signer octez-codec octez-protocol-compiler octez-snoop octez-proxy-server \
+    $(foreach p, $(active_protocol_versions_without_number), octez-baker-$(p)) \
+    $(foreach p, $(active_protocol_versions_without_number), octez-accuser-$(p)) \
+    $(foreach p, $(active_protocol_versions_without_number), octez-tx-rollup-node-$(p)) \
+    $(foreach p, $(active_protocol_versions_without_number), octez-tx-rollup-client-$(p)) \
+    $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-node-$(p)) \
+    $(foreach p, $(sc_rollup_protocol_versions_without_number), octez-sc-rollup-client-$(p))
 
-UNRELEASED_TEZOS_BIN=tezos-dal-node
+UNRELEASED_OCTEZ_BIN=octez-dal-node
 
 # See first mention of TEZOS_WITHOUT_OPAM.
 ifndef TEZOS_WITHOUT_OPAM
@@ -77,25 +74,100 @@ release:
 build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
-.PHONY: $(TEZOS_BIN)
-$(TEZOS_BIN):
+.PHONY: $(OCTEZ_BIN)
+$(OCTEZ_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
-.PHONY: $(UNRELEASED_TEZOS_BIN)
-$(UNRELEASED_TEZOS_BIN):
+.PHONY: $(UNRELEASED_OCTEZ_BIN)
+$(UNRELEASED_OCTEZ_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
 
+# Remove the old names of executables.
+# Depending on the commit you are updating from (v14.0, v15 or some version of master),
+# the exact list can vary. We just remove all of them.
+# Don't try to generate this list from OCTEZ_BIN: this list should not evolve as
+# we add new executables, and this list should contain executables that were built
+# before (e.g. old protocol daemons) but that are no longer built.
+.PHONY: clean-old-names
+clean-old-names:
+	@rm -f tezos-node
+	@rm -f tezos-validator
+	@rm -f tezos-client
+	@rm -f tezos-admin-client
+	@rm -f tezos-signer
+	@rm -f tezos-codec
+	@rm -f tezos-protocol-compiler
+	@rm -f tezos-proxy-server
+	@rm -f tezos-baker-012-Psithaca
+	@rm -f tezos-accuser-012-Psithaca
+	@rm -f tezos-baker-013-PtJakart
+	@rm -f tezos-accuser-013-PtJakart
+	@rm -f tezos-tx-rollup-node-013-PtJakart
+	@rm -f tezos-tx-rollup-client-013-PtJakart
+	@rm -f tezos-baker-014-PtKathma
+	@rm -f tezos-accuser-014-PtKathma
+	@rm -f tezos-tx-rollup-node-014-PtKathma
+	@rm -f tezos-tx-rollup-client-014-PtKathma
+	@rm -f tezos-baker-015-PtLimaPt
+	@rm -f tezos-accuser-015-PtLimaPt
+	@rm -f tezos-tx-rollup-node-015-PtLimaPt
+	@rm -f tezos-tx-rollup-client-015-PtLimaPt
+	@rm -f tezos-baker-alpha
+	@rm -f tezos-accuser-alpha
+	@rm -f tezos-tx-rollup-node-alpha
+	@rm -f tezos-tx-rollup-client-alpha
+	@rm -f tezos-sc-rollup-node-alpha
+	@rm -f tezos-sc-rollup-client-alpha
+	@rm -f tezos-snoop
+	@rm -f tezos-dal-node
+	@rm -f octez-baker-012-Psithaca
+	@rm -f octez-accuser-012-Psithaca
+	@rm -f octez-baker-013-PtJakart
+	@rm -f octez-accuser-013-PtJakart
+	@rm -f octez-tx-rollup-node-013-PtJakart
+	@rm -f octez-tx-rollup-client-013-PtJakart
+	@rm -f octez-baker-014-PtKathma
+	@rm -f octez-accuser-014-PtKathma
+	@rm -f octez-tx-rollup-node-014-PtKathma
+	@rm -f octez-tx-rollup-client-014-PtKathma
+	@rm -f octez-baker-015-PtLimaPt
+	@rm -f octez-accuser-015-PtLimaPt
+	@rm -f octez-tx-rollup-node-015-PtLimaPt
+	@rm -f octez-tx-rollup-client-015-PtLimaPt
+
+# See comment of clean-old-names for an explanation regarding why we do not try
+# to generate the symbolic links from OCTEZ_BIN.
 .PHONY: build
-build:
+build: clean-old-names
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN), _build/install/default/bin/${b}) ./
+	@ln -s octez-node tezos-node
+	@ln -s octez-validator tezos-validator
+	@ln -s octez-client tezos-client
+	@ln -s octez-admin-client tezos-admin-client
+	@ln -s octez-signer tezos-signer
+	@ln -s octez-codec tezos-codec
+	@ln -s octez-protocol-compiler tezos-protocol-compiler
+	@ln -s octez-proxy-server tezos-proxy-server
+	@ln -s octez-baker-PtKathma tezos-baker-014-PtKathma
+	@ln -s octez-accuser-PtKathma tezos-accuser-014-PtKathma
+	@ln -s octez-tx-rollup-node-PtKathma tezos-tx-rollup-node-014-PtKathma
+	@ln -s octez-tx-rollup-client-PtKathma tezos-tx-rollup-client-014-PtKathma
+	@ln -s octez-baker-PtLimaPt tezos-baker-015-PtLimaPt
+	@ln -s octez-accuser-PtLimaPt tezos-accuser-015-PtLimaPt
+	@ln -s octez-tx-rollup-node-PtLimaPt tezos-tx-rollup-node-015-PtLimaPt
+	@ln -s octez-tx-rollup-client-PtLimaPt tezos-tx-rollup-client-015-PtLimaPt
+	@ln -s octez-baker-alpha tezos-baker-alpha
+	@ln -s octez-accuser-alpha tezos-accuser-alpha
+	@ln -s octez-tx-rollup-node-alpha tezos-tx-rollup-node-alpha
+	@ln -s octez-tx-rollup-client-alpha tezos-tx-rollup-client-alpha
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
@@ -191,13 +263,19 @@ test-js:
 build-tezt:
 	@dune build tezt
 
-.PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
+.PHONY: test-tezt
 test-tezt:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
+
+.PHONY: test-tezt-i
 test-tezt-i:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --info
+
+.PHONY: test-tezt-c
 test-tezt-c:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --commands
+
+.PHONY: test-tezt-v
 test-tezt-v:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe -- --verbose
 
@@ -230,7 +308,6 @@ test-webassembly:
 .PHONY: lint-opam-dune
 lint-opam-dune:
 	@dune build --profile=$(PROFILE) @runtest_dune_template
-
 
 # Ensure that all unit tests are restricted to their opam package
 # (change 'tezos-test-helpers' to one the most elementary packages of
@@ -273,7 +350,7 @@ lint-ometrics-gitlab:
 .PHONY: test
 test: test-code
 
-.PHONY: check-linting check-python-linting
+.PHONY: check-linting check-python-linting check-ocaml-linting
 
 check-linting:
 	@scripts/lint.sh --check-scripts
@@ -331,9 +408,9 @@ ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) \
-		$(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) \
+		$(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
-	@cp -f $(foreach b, $(TEZOS_BIN) $(UNRELEASED_TEZOS_BIN), _build/install/default/bin/${b}) ./
+	@cp -f $(foreach b, $(OCTEZ_BIN) $(UNRELEASED_OCTEZ_BIN), _build/install/default/bin/${b}) ./
 
 .PHONY: docker-image-build
 docker-image-build:
@@ -395,9 +472,9 @@ coverage-clean:
 	@-rm -Rf ${COVERAGE_OUTPUT}/*.coverage ${COVERAGE_REPORT}
 
 .PHONY: clean
-clean: coverage-clean
+clean: coverage-clean clean-old-names
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN}
+	@-rm -f ${OCTEZ_BIN} ${UNRELEASED_OCTEZ_BIN}
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html

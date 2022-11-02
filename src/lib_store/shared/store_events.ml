@@ -211,6 +211,26 @@ let end_merging_stores =
     ~pp1:Time.System.Span.pp_hum
     ("time", Time.System.Span.encoding)
 
+let start_context_gc =
+  declare_1
+    ~section
+    ~level:Info
+    ~name:"start_context_gc"
+    ~msg:"removing old contexts below block {block}"
+    ~pp1:pp_block_descriptor
+    ("block", block_descriptor_encoding)
+
+let context_gc_is_not_allowed =
+  declare_0
+    ~section
+    ~level:Warning
+    ~name:"gc_is_not_allowed"
+    ~msg:
+      "garbage collection is not fully enable on this data directory: context \
+       cannot be garbage collected. Please read the documentation or import a \
+       snapshot to enable it"
+    ()
+
 let try_waiting_for_merge_termination =
   declare_0
     ~section
@@ -349,6 +369,14 @@ let recover_merge =
     ~msg:"recovering from an interrupted store merge"
     ()
 
+let restore_protocols_table =
+  declare_0
+    ~section
+    ~level:Internal_event.Notice
+    ~name:"restore_protocols_table"
+    ~msg:"restoring protocols table"
+    ()
+
 let restore_protocol_activation =
   declare_2
     ~section
@@ -401,17 +429,6 @@ let restore_inferred_history_mode =
     ~pp1:History_mode.pp
 
 (* Warning *)
-let warning_incomplete_storage =
-  declare_1
-    ~level:Internal_event.Warning
-    ~section
-    ~name:"incomplete_storage"
-    ~msg:
-      "the storage is missing the commit information for protocol \
-       {protocol_level} - operation receipt verification for this protocol \
-       will be unavailable"
-    ("protocol_level", Data_encoding.int31)
-
 let warning_missing_metadata =
   declare_2
     ~level:Internal_event.Warning

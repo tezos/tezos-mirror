@@ -25,5 +25,5 @@
 
 let () =
   Client_commands.register Protocol.hash @@ fun _network ->
-  List.map (Clic.map_command (new Protocol_client_context.wrap_full))
+  List.map (Tezos_clic.Clic.map_command (new Protocol_client_context.wrap_full))
   @@ Baking_commands.delegate_commands ()

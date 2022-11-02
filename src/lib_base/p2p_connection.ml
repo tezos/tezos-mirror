@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -172,6 +172,8 @@ module P2p_event = struct
   type t =
     | Too_few_connections
     | Too_many_connections
+    | Maintenance_started
+    | Maintenance_ended
     | New_point of P2p_point.Id.t
     | New_peer of P2p_peer_id.t
     | Gc_points
@@ -201,6 +203,8 @@ module P2p_event = struct
     match event with
     | Too_few_connections -> Format.pp_print_string ppf "Too_few_connections"
     | Too_many_connections -> Format.pp_print_string ppf "Too_many_connections"
+    | Maintenance_started -> Format.pp_print_string ppf "Maintenance_started"
+    | Maintenance_ended -> Format.pp_print_string ppf "Maintenance_ended"
     | New_point p ->
         Format.pp_print_string ppf "New_point " ;
         P2p_point.Id.pp ppf p

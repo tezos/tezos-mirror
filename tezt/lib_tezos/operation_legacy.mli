@@ -80,6 +80,10 @@ val mk_reveal :
   Client.t ->
   manager_operation_content Lwt.t
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/3683
+   This is covered by {!Operation_core.call}, remove when not used anymore.
+*)
+
 (** [mk_call] allows to construct a manager operation representing a call
     to a smart contract [entrypoint] with a given parameter [arg] from an
     implicit account [source].
@@ -149,7 +153,7 @@ val sign_manager_op_hex : signer:Account.key -> Hex.t -> Hex.t
 (** Forge an operation and returns the hexadecimal binary representation.
 
     If the [protocol] argument is supplied, the operation is forged locally
-    (using [tezos-codec]), otherwise we call an RPC
+    (using [octez-codec]), otherwise we call an RPC
     ([.../helpers/forge/operations]).
  *)
 val forge_operation :
@@ -185,7 +189,7 @@ val inject_operation :
     Default [branch] is the one returned by [RPC.get_branch client].
 
     If the [protocol] argument is supplied, the operation is forged locally
-    (using [tezos-codec]), otherwise we call an RPC
+    (using [octez-codec]), otherwise we call an RPC
     ([.../helpers/forge/operations]).
 
     If the [force] argument (by default [false]) is [true], then Tezt

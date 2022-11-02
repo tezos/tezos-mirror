@@ -488,12 +488,11 @@ let reconstruct_context (rpc_context : Tezos_protocol_environment.rpc_context)
   let predecessor_context = rpc_context.context in
   parse_protocol_data block_header.protocol_data >>=? fun protocol_data ->
   Mockup.M.Protocol.begin_application
-    ~chain_id
-    ~predecessor_context
-    ~predecessor_timestamp:header.timestamp
-    ~predecessor_fitness:header.fitness
+    predecessor_context
+    chain_id
+    (Application {shell = block_header.shell; protocol_data})
+    ~predecessor:header
     ~cache:`Lazy
-    {shell = block_header.shell; protocol_data}
   >>=? fun validation_state ->
   let i = ref 0 in
   List.fold_left_es
@@ -507,13 +506,18 @@ let reconstruct_context (rpc_context : Tezos_protocol_environment.rpc_context)
          let op =
            {Mockup.M.Protocol.shell = op.shell; protocol_data = operation_data}
          in
-         Mockup.M.Protocol.apply_operation validation_state op
+         Mockup.M.Protocol.apply_operation
+           validation_state
+           (* The operation hash argument is ignored in protocol
+              environment versions < V7. *)
+           Operation_hash.zero
+           op
          >>=? fun (validation_state, receipt) ->
          return (validation_state, receipt :: results)))
     (validation_state, [])
     operations
   >>=? fun (validation_state, _) ->
-  Mockup.M.Protocol.finalize_block validation_state None
+  Mockup.M.Protocol.finalize_application validation_state None
 
 (** Process an incoming block. If validation succeeds:
     - update the current head to this new block

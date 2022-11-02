@@ -213,10 +213,14 @@ let make_n_consecutive_cycles pred ~cycle_length ~nb_cycles =
   loop [] pred nb_cycles
 
 let make_n_initial_consecutive_cycles block_store ~cycle_length ~nb_cycles =
+  let open Lwt_syntax in
   let genesis_descr =
     Block_repr.descriptor (Block_store.genesis_block block_store)
   in
-  make_n_consecutive_cycles genesis_descr ~cycle_length ~nb_cycles
+  let* cycles, head =
+    make_n_consecutive_cycles genesis_descr ~cycle_length ~nb_cycles
+  in
+  return (cycles, head)
 
 let test_simple_merge block_store =
   let open Lwt_result_syntax in
@@ -250,7 +254,7 @@ let test_consecutive_concurrent_merges block_store =
   let open Lwt_result_syntax in
   (* Append 10 cycles of 10 blocks *)
   let*! cycles, head =
-    make_n_initial_consecutive_cycles block_store ~cycle_length:10 ~nb_cycles:10
+    make_n_initial_consecutive_cycles block_store ~cycle_length:10 ~nb_cycles:4
   in
   let head_metadata =
     Block_repr.metadata head |> WithExceptions.Option.get ~loc:__LOC__

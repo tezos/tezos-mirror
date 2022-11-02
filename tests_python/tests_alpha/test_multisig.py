@@ -1,4 +1,4 @@
-# tezos-client has builtin support for multisig smart contracts. See
+# octez-client has builtin support for multisig smart contracts. See
 # docs/user/multisig.rst for more details about it.
 
 # This file tests the client multisig support; more precisely it tests

@@ -52,7 +52,7 @@
    The machine has a boot sector which is a mere string used a prefix
    for each message.
 
-   The module implements the {!Sc_rollup_PVM_sem.S}Î interface to be
+   The module implements the {!Sc_rollup_PVM_sig.S}Î interface to be
    used in the smart contract rollup infrastructure.
 
    The machine exposes extra operations to be used in the rollup node.
@@ -60,7 +60,7 @@
 *)
 
 module type S = sig
-  include Sc_rollup_PVM_sem.S
+  include Sc_rollup_PVM_sig.S
 
   (** [name] is "arith". *)
   val name : string
@@ -79,11 +79,20 @@ module type S = sig
   (** [get_tick state] returns the current tick of [state]. *)
   val get_tick : state -> Sc_rollup_tick_repr.t Lwt.t
 
-  (** The machine has three possible statuses: *)
-  type status = Halted | WaitingForInputMessage | Parsing | Evaluating
+  (** The machine has five possible statuses: *)
+  type status =
+    | Halted
+    | Waiting_for_input_message
+    | Waiting_for_reveal
+    | Waiting_for_metadata
+    | Parsing
+    | Evaluating
 
   (** [get_status state] returns the machine status in [state]. *)
   val get_status : state -> status Lwt.t
+
+  (** [get_outbox state] returns the outbox in [state]. *)
+  val get_outbox : state -> Sc_rollup_PVM_sig.output list Lwt.t
 
   (** The machine has only three instructions. *)
   type instruction =
@@ -126,20 +135,14 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-type 'a proof = {
-  tree_proof : 'a;
-  given : Sc_rollup_PVM_sem.input option;
-  requested : Sc_rollup_PVM_sem.input_request;
-}
-
-module ProtocolImplementation :
+module Protocol_implementation :
   S
     with type context = Context.t
      and type state = Context.tree
-     and type proof = Context.Proof.tree Context.Proof.t proof
+     and type proof = Context.Proof.tree Context.Proof.t
 
 (** This is the state hash of reference that both the prover of the
-    node and the verifier of the protocol {!ProtocolImplementation}
+    node and the verifier of the protocol {!Protocol_implementation}
     have to agree on (if they do, it means they are using the same
     tree structure). *)
 val reference_initial_state_hash : Sc_rollup_repr.State_hash.t
@@ -170,4 +173,4 @@ module Make (Context : P) :
   S
     with type context = Context.Tree.t
      and type state = Context.tree
-     and type proof = Context.proof proof
+     and type proof = Context.proof

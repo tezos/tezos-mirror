@@ -63,6 +63,32 @@ module Simple = struct
       ~level:Notice
       ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
       ("kind", Data_encoding.string)
+
+  let connection_lost =
+    declare_0
+      ~section
+      ~name:"sc_rollup_daemon_connection_lost"
+      ~msg:"connection to the node has been lost"
+      ~level:Warning
+      ()
+
+  let cannot_connect =
+    declare_2
+      ~section
+      ~name:"sc_rollup_daemon_cannot_connect"
+      ~msg:"cannot connect to Tezos node ({count}) {error}"
+      ~level:Warning
+      ("count", Data_encoding.int31)
+      ("error", trace_encoding)
+      ~pp2:pp_print_trace
+
+  let wait_reconnect =
+    declare_1
+      ~section
+      ~name:"sc_rollup_daemon_wait_reconnect"
+      ~msg:"Retrying to connect in {delay}s"
+      ~level:Warning
+      ("delay", Data_encoding.float)
 end
 
 let starting_node = Simple.(emit starting_node)
@@ -75,3 +101,9 @@ let node_is_ready ~rpc_addr ~rpc_port =
 let rollup_exists ~addr ~kind =
   let kind = Protocol.Alpha_context.Sc_rollup.Kind.name_of kind in
   Simple.(emit rollup_exists (addr, kind))
+
+let connection_lost () = Simple.(emit connection_lost) ()
+
+let cannot_connect ~count error = Simple.(emit cannot_connect) (count, error)
+
+let wait_reconnect delay = Simple.(emit wait_reconnect) delay

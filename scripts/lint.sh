@@ -130,7 +130,7 @@ check_scripts () {
 check_redirects () {
     if [[ ! -f docs/_build/_redirects ]]; then
        say "check-redirects should be run after building the full documentation,"
-       say "i.e. by running 'make -C docs all'"
+       say "i.e. by running 'make all && make -C docs all'"
        exit 1
     fi
 

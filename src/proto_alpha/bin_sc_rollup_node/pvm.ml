@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,8 +31,7 @@ open Alpha_context
 module type S = sig
   include
     Sc_rollup.PVM.S
-      with type context = Store.t
-       and type state = Store.tree
+      with type context = Context.index
        and type hash = Sc_rollup.State_hash.t
 
   (** [get_tick state] gets the total tick counter for the given PVM state. *)
@@ -45,4 +45,23 @@ module type S = sig
 
   (** [string_of_status status] returns a string representation of [status]. *)
   val string_of_status : status -> string
+
+  (** [get_outbox state] returns a list of outputs available in the
+      outbox of [state]. *)
+  val get_outbox : state -> Sc_rollup.output list Lwt.t
+
+  (** State storage for this PVM. *)
+  module State : sig
+    (** [find context] returns the PVM state stored in the [context], if any. *)
+    val find : Context.t -> state option Lwt.t
+
+    (** [lookup state path] returns the data stored for the path [path] in the
+        PVM state [state].  *)
+    val lookup : state -> string list -> bytes option Lwt.t
+
+    (** [set context state] saves the PVM state [state] in the context and
+        returns the updated context. Note: [set] does not perform any write on
+        disk, this information must be committed using {!Context.commit}. *)
+    val set : Context.t -> state -> Context.t Lwt.t
+  end
 end

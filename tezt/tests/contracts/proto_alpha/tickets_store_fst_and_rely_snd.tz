@@ -1,0 +1,21 @@
+# Contract that:
+# - Takes pair of string ticket and an address as parameter.
+# - Stores first ticket in storage.
+# - Sends second ticket to the given address.
+{ parameter (pair (pair (ticket string) (ticket string)) address) ;
+  storage (option (ticket string)) ;
+  code { CAR ;
+         UNPAIR ;
+         UNPAIR ;
+         DIG 2 ;
+         CONTRACT (ticket string) ;
+         IF_NONE { PUSH string "option is None" ; FAILWITH } {} ;
+         PUSH mutez 0 ;
+         DIG 3 ;
+         TRANSFER_TOKENS ;
+         SWAP ;
+         SOME ;
+         NIL operation ;
+         DIG 2 ;
+         CONS ;
+         PAIR } }

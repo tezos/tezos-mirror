@@ -42,7 +42,7 @@
 open Protocol.Alpha_context
 
 module type Mutable_level_store =
-  Store.Mutable_value with type value = Raw_level.t
+  Store_utils.Mutable_value with type value = Raw_level.t
 
 (** [last_commitment_with_hash (module Last_level_module: Mutable_level_store) store]
       returns the last commitment and relative hash

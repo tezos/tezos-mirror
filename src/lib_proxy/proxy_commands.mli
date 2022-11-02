@@ -27,4 +27,5 @@
 val group : Tezos_clic.Clic.group
 
 (** All provided commands *)
-val commands : unit -> Tezos_client_base.Client_context.full Clic.command list
+val commands :
+  unit -> Tezos_client_base.Client_context.full Tezos_clic.Clic.command list

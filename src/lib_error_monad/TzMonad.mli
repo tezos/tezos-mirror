@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Option_syntax = TzLwtreslib.Monad.Option_syntax
-module Lwt_option_syntax = TzLwtreslib.Monad.Option_syntax
+module Lwt_option_syntax = TzLwtreslib.Monad.Lwt_option_syntax
 
 include
   Monad_maker.S

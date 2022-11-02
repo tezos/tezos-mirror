@@ -23,36 +23,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let find ctxt level = Storage.Dal.Slot_headers.find ctxt level
+let find_slot_headers ctxt level = Storage.Dal.Slot.Headers.find ctxt level
 
-let finalize_current_slots ctxt =
+let finalize_current_slot_headers ctxt =
   let current_level = Raw_context.current_level ctxt in
-  let slots = Raw_context.Dal.candidates ctxt in
-  match slots with
+  let slot_headers = Raw_context.Dal.candidates ctxt in
+  match slot_headers with
   | [] -> Lwt.return ctxt
-  | _ :: _ -> Storage.Dal.Slot_headers.add ctxt current_level.level slots
+  | _ :: _ -> Storage.Dal.Slot.Headers.add ctxt current_level.level slot_headers
 
-let compute_available_slots ctxt slots =
-  let fold_available_slots available_slots slot =
-    if Raw_context.Dal.is_slot_available ctxt slot.Dal_slot_repr.index then
-      Dal_endorsement_repr.commit available_slots slot.Dal_slot_repr.index
-    else available_slots
+let compute_available_slot_headers ctxt seen_slot_headers =
+  let open Dal_slot_repr in
+  let fold_available_slots (rev_slot_headers, available_slot_headers) slot =
+    if Raw_context.Dal.is_slot_index_available ctxt slot.Header.id.index then
+      ( slot :: rev_slot_headers,
+        Dal_endorsement_repr.commit available_slot_headers slot.Header.id.index
+      )
+    else (rev_slot_headers, available_slot_headers)
   in
-  List.fold_left fold_available_slots Dal_endorsement_repr.empty slots
+  List.fold_left
+    fold_available_slots
+    ([], Dal_endorsement_repr.empty)
+    seen_slot_headers
 
-let finalize_pending_slots ctxt =
-  let current_level = Raw_context.current_level ctxt in
+let get_slot_headers_history ctxt =
+  Storage.Dal.Slot.History.find ctxt >|=? function
+  | None -> Dal_slot_repr.History.genesis
+  | Some slots_history -> slots_history
+
+let update_skip_list ctxt ~confirmed_slot_headers =
+  get_slot_headers_history ctxt >>=? fun slots_history ->
+  Lwt.return
+  @@ Dal_slot_repr.History.add_confirmed_slot_headers_no_cache
+       slots_history
+       confirmed_slot_headers
+  >>=? fun slots_history ->
+  Storage.Dal.Slot.History.add ctxt slots_history >|= ok
+
+let finalize_pending_slot_headers ctxt =
+  let {Level_repr.level = raw_level; _} = Raw_context.current_level ctxt in
   let Constants_parametric_repr.{dal; _} = Raw_context.constants ctxt in
-  match Raw_level_repr.(sub current_level.level dal.endorsement_lag) with
+  match Raw_level_repr.(sub raw_level dal.endorsement_lag) with
   | None -> return (ctxt, Dal_endorsement_repr.empty)
   | Some level_endorsed -> (
-      Storage.Dal.Slot_headers.find ctxt level_endorsed >>=? function
+      Storage.Dal.Slot.Headers.find ctxt level_endorsed >>=? function
       | None -> return (ctxt, Dal_endorsement_repr.empty)
-      | Some slots ->
-          let available_slots = compute_available_slots ctxt slots in
-          (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3112
-
-             At this point, available slots can be integrated into
-             SCORU inboxes *)
-          Storage.Dal.Slot_headers.remove ctxt level_endorsed >>= fun ctxt ->
-          return (ctxt, available_slots))
+      | Some seen_slots ->
+          let rev_confirmed_slot_headers, available_slot_headers =
+            compute_available_slot_headers ctxt seen_slots
+          in
+          let confirmed_slot_headers = List.rev rev_confirmed_slot_headers in
+          update_skip_list ctxt ~confirmed_slot_headers >>=? fun ctxt ->
+          Storage.Dal.Slot.Headers.remove ctxt level_endorsed >>= fun ctxt ->
+          return (ctxt, available_slot_headers))

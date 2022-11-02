@@ -5,6 +5,8 @@ set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
+. scripts/ci/docker.env
+
 # shellcheck source=./scripts/ci/docker.sh
 . "${current_dir}/docker.sh"
 

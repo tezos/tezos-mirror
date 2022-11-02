@@ -45,10 +45,23 @@ let proto_error ~loc v f =
           f err
       | _ -> false)
 
-let proto_error_with_info ~loc res error_title =
-  proto_error ~loc res (function err ->
-      error_title
-      = (Error_monad.find_info_of_error (Environment.wrap_tzerror err)).title)
+let proto_error_with_info ?(error_info_field = `Title) ~loc v
+    expected_error_info =
+  let info err =
+    let i = Error_monad.find_info_of_error (Environment.wrap_tzerror err) in
+    match error_info_field with
+    | `Title -> i.title
+    | `Id -> i.id
+    | `Description -> i.description
+    | `Message -> Format.asprintf "%a" Environment.Error_monad.pp err
+  in
+  proto_error ~loc v (function err ->
+      Format.printf
+        "@[<v 4>THE ERROR IS: %s@,EXPECTED: %s@]@."
+        (info err)
+        expected_error_info ;
+      let info = info err in
+      String.equal info expected_error_info)
 
 let equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   if not (cmp a b) then
@@ -157,6 +170,25 @@ let not_equal_pkh ~loc (a : Signature.Public_key_hash.t)
   let module PKH = Signature.Public_key_hash in
   not_equal ~loc PKH.equal "Public key hashes are equal" PKH.pp a b
 
+(* protocol hash *)
+let equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
+  equal
+    ~loc
+    Protocol_hash.equal
+    "Protocol hashes aren't equal"
+    Protocol_hash.pp
+    a
+    b
+
+let not_equal_protocol_hash ~loc (a : Protocol_hash.t) (b : Protocol_hash.t) =
+  not_equal
+    ~loc
+    Protocol_hash.equal
+    "Protocol hashes are equal"
+    Protocol_hash.pp
+    a
+    b
+
 let get_some ~loc = function
   | Some x -> return x
   | None -> failwith "Unexpected None (%s)" loc
@@ -165,31 +197,82 @@ let is_none ~loc ~pp = function
   | Some x -> failwith "Unexpected (Some %a) (%s)" pp x loc
   | None -> return_unit
 
+let equal_result ~loc ~pp_ok ~pp_error eq_ok eq_error a b =
+  equal
+    ~loc
+    (Result.equal ~ok:eq_ok ~error:eq_error)
+    "Results are not equal"
+    (Format.pp_print_result ~ok:pp_ok ~error:pp_error)
+    a
+    b
+
+let is_error ~loc ~pp = function
+  | Ok x -> failwith "Unexpected (Ok %a) (%s)" pp x loc
+  | Error _ -> return_unit
+
+let get_ok ~__LOC__ = function
+  | Ok r -> return r
+  | Error err ->
+      failwith "@[Unexpected error (%s): %a@]" __LOC__ pp_print_trace err
+
 open Context
 
 (* Some asserts for account operations *)
 
-(** [balance_is b c amount] checks that the current balance of contract [c] is
-    [amount].
-    Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
-    [Rewards] for the others. *)
-let balance_is ~loc b contract expected =
-  Contract.balance b contract >>=? fun balance ->
-  equal_tez ~loc balance expected
+let contract_property_is property ~loc b contract expected =
+  property b contract >>=? fun balance -> equal_tez ~loc balance expected
 
-(** [balance_was_operated ~operand b c old_balance amount] checks that the
-    current balance of contract [c] is [operand old_balance amount] and
-    returns the current balance.
-    Default balance type is [Main], pass [~kind] with [Deposit], [Fees] or
-    [Rewards] for the others. *)
-let balance_was_operated ~operand ~loc b contract old_balance amount =
+(** [balance_is b c amount] checks that the current balance [b] of contract [c]
+    is [amount].
+*)
+let balance_is = contract_property_is Contract.balance
+
+(** [frozen_bonds_is b c amount] checks that the current frozen bonds of
+    contract [c] is [amount].
+*)
+let frozen_bonds_is = contract_property_is Contract.frozen_bonds
+
+let balance_or_frozen_bonds_was_operated ~is_balance ~operand ~loc b contract
+    old_balance amount =
   operand old_balance amount |> Environment.wrap_tzresult >>?= fun expected ->
-  balance_is ~loc b contract expected
+  let f = if is_balance then balance_is else frozen_bonds_is in
+  f ~loc b contract expected
 
+(** [balance_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s balance was credited [amount] tez in comparison to
+    [old_balance].
+*)
 let balance_was_credited =
-  balance_was_operated ~operand:Alpha_context.Tez.( +? )
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:true
+    ~operand:Alpha_context.Tez.( +? )
 
-let balance_was_debited = balance_was_operated ~operand:Alpha_context.Tez.( -? )
+(** [balance_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s balance was debited [amount] tez in comparison to
+    [old_balance].
+*)
+let balance_was_debited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:true
+    ~operand:Alpha_context.Tez.( -? )
+
+(** [frozen_bonds_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s frozen bonds was credited [amount] tez in comparison to
+    [old_balance].
+*)
+let frozen_bonds_was_credited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:false
+    ~operand:Alpha_context.Tez.( +? )
+
+(** [frozen_bonds_was_credited ~loc ctxt contract old_balance amount] checks
+    that [contract]'s frozen bonds was credited [amount] tez in comparison to
+    [old_balance].
+*)
+let frozen_bonds_was_debited =
+  balance_or_frozen_bonds_was_operated
+    ~is_balance:false
+    ~operand:Alpha_context.Tez.( -? )
 
 let pp_print_list pp out xs =
   let list_pp fmt =

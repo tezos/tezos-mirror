@@ -28,9 +28,9 @@
 type dal = {
   feature_enable : bool;
   number_of_slots : int;
-  number_of_shards : int;
   endorsement_lag : int;
   availability_threshold : int;
+  cryptobox_parameters : Dal.parameters;
 }
 
 let dal_encoding =
@@ -39,33 +39,34 @@ let dal_encoding =
     (fun {
            feature_enable;
            number_of_slots;
-           number_of_shards;
            endorsement_lag;
            availability_threshold;
+           cryptobox_parameters;
          } ->
-      ( feature_enable,
-        number_of_slots,
-        number_of_shards,
-        endorsement_lag,
-        availability_threshold ))
-    (fun ( feature_enable,
-           number_of_slots,
-           number_of_shards,
-           endorsement_lag,
-           availability_threshold ) ->
+      ( ( feature_enable,
+          number_of_slots,
+          endorsement_lag,
+          availability_threshold ),
+        cryptobox_parameters ))
+    (fun ( ( feature_enable,
+             number_of_slots,
+             endorsement_lag,
+             availability_threshold ),
+           cryptobox_parameters ) ->
       {
         feature_enable;
         number_of_slots;
-        number_of_shards;
         endorsement_lag;
         availability_threshold;
+        cryptobox_parameters;
       })
-    (obj5
-       (req "feature_enable" Data_encoding.bool)
-       (req "number_of_slots" Data_encoding.int16)
-       (req "number_of_shards" Data_encoding.int16)
-       (req "endorsement_lag" Data_encoding.int16)
-       (req "availability_threshold" Data_encoding.int16))
+    (merge_objs
+       (obj4
+          (req "feature_enable" bool)
+          (req "number_of_slots" int16)
+          (req "endorsement_lag" int16)
+          (req "availability_threshold" int16))
+       Dal.parameters_encoding)
 
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
@@ -106,6 +107,13 @@ type sc_rollup = {
   max_outbox_messages_per_level : int;
   number_of_sections_in_dissection : int;
   timeout_period_in_blocks : int;
+  max_number_of_stored_cemented_commitments : int;
+}
+
+type zk_rollup = {
+  enable : bool;
+  origination_size : int;
+  min_pending_to_process : int;
 }
 
 type t = {
@@ -118,7 +126,7 @@ type t = {
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
-  tokens_per_roll : Tez_repr.t;
+  minimal_stake : Tez_repr.t;
   vdf_difficulty : int64;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
@@ -131,7 +139,6 @@ type t = {
   quorum_max : int32;
   min_proposal_quorum : int32;
   liquidity_baking_subsidy : Tez_repr.t;
-  liquidity_baking_sunset_level : int32;
   liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
@@ -153,6 +160,7 @@ type t = {
   tx_rollup : tx_rollup;
   dal : dal;
   sc_rollup : sc_rollup;
+  zk_rollup : zk_rollup;
 }
 
 let tx_rollup_encoding =
@@ -239,7 +247,8 @@ let sc_rollup_encoding =
           c.max_active_outbox_levels,
           c.max_outbox_messages_per_level,
           c.number_of_sections_in_dissection ),
-        c.timeout_period_in_blocks ))
+        (c.timeout_period_in_blocks, c.max_number_of_stored_cemented_commitments)
+      ))
     (fun ( ( sc_rollup_enable,
              sc_rollup_origination_size,
              sc_rollup_challenge_window_in_blocks,
@@ -250,7 +259,8 @@ let sc_rollup_encoding =
              sc_rollup_max_active_outbox_levels,
              sc_rollup_max_outbox_messages_per_level,
              sc_rollup_number_of_sections_in_dissection ),
-           sc_rollup_timeout_period_in_blocks ) ->
+           ( sc_rollup_timeout_period_in_blocks,
+             sc_rollup_max_number_of_cemented_commitments ) ) ->
       {
         enable = sc_rollup_enable;
         origination_size = sc_rollup_origination_size;
@@ -265,6 +275,8 @@ let sc_rollup_encoding =
         number_of_sections_in_dissection =
           sc_rollup_number_of_sections_in_dissection;
         timeout_period_in_blocks = sc_rollup_timeout_period_in_blocks;
+        max_number_of_stored_cemented_commitments =
+          sc_rollup_max_number_of_cemented_commitments;
       })
     (merge_objs
        (obj10
@@ -278,7 +290,27 @@ let sc_rollup_encoding =
           (req "sc_rollup_max_active_outbox_levels" int32)
           (req "sc_rollup_max_outbox_messages_per_level" int31)
           (req "sc_rollup_number_of_sections_in_dissection" uint8))
-       (obj1 (req "sc_rollup_timeout_period_in_blocks" int31)))
+       (obj2
+          (req "sc_rollup_timeout_period_in_blocks" int31)
+          (req "sc_rollup_max_number_of_cemented_commitments" int31)))
+
+let zk_rollup_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({enable; origination_size; min_pending_to_process} : zk_rollup) ->
+      (enable, origination_size, min_pending_to_process))
+    (fun ( zk_rollup_enable,
+           zk_rollup_origination_size,
+           zk_rollup_min_pending_to_process ) ->
+      {
+        enable = zk_rollup_enable;
+        origination_size = zk_rollup_origination_size;
+        min_pending_to_process = zk_rollup_min_pending_to_process;
+      })
+    (obj3
+       (req "zk_rollup_enable" bool)
+       (req "zk_rollup_origination_size" int31)
+       (req "zk_rollup_min_pending_to_process" int31))
 
 let encoding =
   let open Data_encoding in
@@ -293,7 +325,7 @@ let encoding =
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
-          c.tokens_per_roll ),
+          c.minimal_stake ),
         ( ( c.vdf_difficulty,
             c.seed_nonce_revelation_tip,
             c.origination_size,
@@ -306,7 +338,6 @@ let encoding =
           ( ( c.quorum_max,
               c.min_proposal_quorum,
               c.liquidity_baking_subsidy,
-              c.liquidity_baking_sunset_level,
               c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
@@ -323,7 +354,7 @@ let encoding =
               ( ( c.cache_script_size,
                   c.cache_stake_distribution_cycles,
                   c.cache_sampler_state_cycles ),
-                (c.tx_rollup, (c.dal, c.sc_rollup)) ) ) ) ) ))
+                (c.tx_rollup, (c.dal, (c.sc_rollup, c.zk_rollup))) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -333,7 +364,7 @@ let encoding =
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
-             tokens_per_roll ),
+             minimal_stake ),
            ( ( vdf_difficulty,
                seed_nonce_revelation_tip,
                origination_size,
@@ -346,7 +377,6 @@ let encoding =
              ( ( quorum_max,
                  min_proposal_quorum,
                  liquidity_baking_subsidy,
-                 liquidity_baking_sunset_level,
                  liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
@@ -363,7 +393,7 @@ let encoding =
                  ( ( cache_script_size,
                      cache_stake_distribution_cycles,
                      cache_sampler_state_cycles ),
-                   (tx_rollup, (dal, sc_rollup)) ) ) ) ) ) ->
+                   (tx_rollup, (dal, (sc_rollup, zk_rollup))) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -374,7 +404,7 @@ let encoding =
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
-        tokens_per_roll;
+        minimal_stake;
         vdf_difficulty;
         seed_nonce_revelation_tip;
         origination_size;
@@ -387,7 +417,6 @@ let encoding =
         quorum_max;
         min_proposal_quorum;
         liquidity_baking_subsidy;
-        liquidity_baking_sunset_level;
         liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
@@ -407,6 +436,7 @@ let encoding =
         tx_rollup;
         dal;
         sc_rollup;
+        zk_rollup;
       })
     (merge_objs
        (obj10
@@ -423,7 +453,7 @@ let encoding =
              "hard_gas_limit_per_block"
              Gas_limit_repr.Arith.z_integral_encoding)
           (req "proof_of_work_threshold" int64)
-          (req "tokens_per_roll" Tez_repr.encoding))
+          (req "minimal_stake" Tez_repr.encoding))
        (merge_objs
           (obj9
              (req "vdf_difficulty" int64)
@@ -436,11 +466,10 @@ let encoding =
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj10
+             (obj9
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
                 (req "liquidity_baking_subsidy" Tez_repr.encoding)
-                (req "liquidity_baking_sunset_level" int32)
                 (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
@@ -467,4 +496,4 @@ let encoding =
                       tx_rollup_encoding
                       (merge_objs
                          (obj1 (req "dal_parametric" dal_encoding))
-                         sc_rollup_encoding)))))))
+                         (merge_objs sc_rollup_encoding zk_rollup_encoding))))))))

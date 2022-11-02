@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol
+open Alpha_context
+
 module Simple = struct
   include Internal_event.Simple
 
@@ -62,6 +65,57 @@ module Simple = struct
       ~level:Notice
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
+
+  let included_successful_operation =
+    declare_1
+      ~section
+      ~name:"sc_rollup_daemon_included_successful_operation"
+      ~msg:"Operation {operation} was included as successful"
+      ~level:Debug
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+
+  let included_failed_operation =
+    declare_3
+      ~section
+      ~name:"sc_rollup_daemon_included_failed_operation"
+      ~msg:"Operation {operation} was included as {status} with error {error}"
+      ~level:Warning
+      ("operation", L1_operation.encoding)
+      ( "status",
+        Data_encoding.(
+          string_enum
+            [
+              ("failed", `Failed);
+              ("backtracked", `Backtracked);
+              ("skipped", `Skipped);
+            ]) )
+      ("error", Data_encoding.option Environment.Error_monad.trace_encoding)
+      ~pp1:L1_operation.pp
+      ~pp3:
+        (fun ppf -> function
+          | None -> Format.pp_print_string ppf "none"
+          | Some e -> Environment.Error_monad.pp_trace ppf e)
+
+  let finalized_successful_operation =
+    declare_1
+      ~section
+      ~name:"sc_rollup_daemon_finalized_successful_operation"
+      ~msg:"Operation {operation} was finalized"
+      ~level:Debug
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+
+  let wrong_initial_pvm_state_hash =
+    declare_2
+      ~section
+      ~name:"sc_rollup_daemon_incorrect_initial_pvm_state_hash"
+      ~msg:
+        "The initial state hash produced by the PVM {actual} is not consistent\n\
+        \     with the expected hash {expected}"
+      ~level:Notice
+      ("actual", Sc_rollup.State_hash.encoding)
+      ("expected", Sc_rollup.State_hash.encoding)
 end
 
 let head_processing hash level finalized seen_before =
@@ -86,3 +140,27 @@ let processing_heads_iteration old_heads new_heads =
   | Some from_level, Some to_level ->
       Simple.(emit processing_heads_iteration (from_level, to_level))
   | _ -> Lwt.return_unit
+
+let included_operation (type kind) ~finalized
+    (operation : kind Protocol.Alpha_context.manager_operation)
+    (result : kind Protocol.Apply_results.manager_operation_result) =
+  let operation = L1_operation.make operation in
+  match result with
+  | Applied _ when finalized ->
+      Simple.(emit finalized_successful_operation) operation
+  | _ when finalized ->
+      (* No events for finalized non successful operations  *)
+      Lwt.return_unit
+  | Applied _ -> Simple.(emit included_successful_operation) operation
+  | result ->
+      let status, errors =
+        match result with
+        | Applied _ -> assert false
+        | Failed (_, e) -> (`Failed, Some e)
+        | Backtracked (_, e) -> (`Backtracked, e)
+        | Skipped _ -> (`Skipped, None)
+      in
+      Simple.(emit included_failed_operation) (operation, status, errors)
+
+let wrong_initial_pvm_state_hash actual_hash expected_hash =
+  Simple.(emit wrong_initial_pvm_state_hash (actual_hash, expected_hash))

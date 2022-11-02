@@ -26,7 +26,7 @@
 (** A proxy server instance *)
 type t
 
-(** Command-line arguments of [tezos-proxy-server].
+(** Command-line arguments of [octez-proxy-server].
 
     Not all arguments are available here, because it was not needed so far. *)
 type argument =
@@ -35,7 +35,7 @@ type argument =
           instead of using a RPC. This case doesn't need a parameter, because it is computed
           automatically from the {!Node.t} value in {!init}. Think
           of this argument as a Boolean flag (not an argument) whether to pass
-          [--data-dir] to [tezos-proxy-server]. *)
+          [--data-dir] to [octez-proxy-server]. *)
   | Symbolic_block_caching_time of int
       (** Time interval (in seconds) during which data for a symbolic block
           identifier (like HEAD) is kept. A symbolic identifier

@@ -44,6 +44,10 @@ let qcheck_make_result ?count ?print ?pp_error ?check ~name
   in
   QCheck2.Test.make ~name ?print ?count gen (fun x -> f x |> check)
 
+let qcheck_make_lwt ?count ?print ~extract ~name ~(gen : 'a QCheck2.Gen.t)
+    (f : 'a -> bool Lwt.t) =
+  QCheck2.Test.make ~name ?print ?count gen (fun x -> extract (f x))
+
 let qcheck_eq ?pp ?cmp ?eq expected actual =
   let pass =
     match (eq, cmp) with
@@ -185,6 +189,9 @@ let int8 = QCheck2.Gen.(-128 -- 127)
 let string_fixed n = QCheck2.Gen.(string_size (pure n))
 
 let bytes_gen = QCheck2.Gen.(map Bytes.of_string string)
+
+let small_bytes_gen =
+  QCheck2.Gen.(map Bytes.of_string @@ small_string ~gen:char)
 
 let bytes_fixed_gen size = QCheck2.Gen.map Bytes.of_string (string_fixed size)
 

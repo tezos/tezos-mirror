@@ -14,12 +14,20 @@ and "current protocol" refers to its successor, N+1. For instance, if
 The various pieces of code to be removed are within directory
 ``src/proto_<N>_<Hash>/``, unless indicated otherwise.
 
+Update Manifest
+---------------
+
+In :src:`manifest/main.ml`, look for ``let alpha = active Name.alpha``.
+In one of the lines above it is the declaration of the protocol you are freezing.
+Replace ``active`` by ``frozen`` for this protocol.
+Run the manifest with ``make -C manifest``.
+
 Remove Accuser, Baker
 ---------------------
 
 These daemons are no longer needed. Thus, the code in
-``bin_{accuser,baker}/`` can be safely removed and the files
-``script-inputs/active_protocol_versions`` and ``script-inputs/active_testing_protocol_versions`` should be
+``bin_{accuser,baker}/`` can be safely removed and
+``script-inputs/active_testing_protocol_versions`` should be
 modified accordingly.
 
 Remove Protocol Tests
@@ -52,7 +60,7 @@ In particular the file :src:`src/bin_node/node_config_file.ml` should be
 amended.
 
 The protocol plugin registration module should be removed from
-:src:`src/bin_node/dune` and :src:`opam/tezos-node.opam`.
+:src:`src/bin_node/dune` and :src:`opam/octez-node.opam`.
 
 Remove Protocol From Python Tests of Current Protocol
 -----------------------------------------------------
@@ -83,6 +91,12 @@ the plugin in the file ``proto_XXX/lib_plugin/plugin_registration.ml``.
 
 Other plugins should be evaluated case-by-case. At the moment of writing, the
 ``Mempool`` plugin is the only one that can be safely removed.
+
+Remove Old Docker-Compose Files
+-------------------------------
+
+The docker-compose file with the corresponding protocol name can be removed from the
+``scripts/docker`` directory.
 
 Add an Entry in ``CHANGES.rst``
 -------------------------------

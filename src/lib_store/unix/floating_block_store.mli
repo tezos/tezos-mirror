@@ -189,3 +189,49 @@ val all_files_exists :
     consistent state. *)
 val fix_integrity :
   [`Chain_dir] Naming.directory -> floating_kind -> unit tzresult Lwt.t
+
+(**/**)
+
+(** Unsafe set of functions intended for merging optimizations. *)
+
+(** [raw_append dst_store (hash, buffer, total_length, predecessors)]
+    appends a block with its [hash] in [dst_store] contained in the
+    [buffer]. *)
+val raw_append :
+  t -> Block_hash.t * bytes * int * Block_hash.t list -> unit tzresult Lwt.t
+
+(** [raw_copy_all src_stores block_hashes dst_store] retrieves
+    [block_hashes] from [src_stores] and copy them (without decoding)
+    to [dst_store] with a buffering mechanism. *)
+val raw_copy_all :
+  src_floating_stores:t list ->
+  block_hashes:Block_hash.t list ->
+  dst_floating_store:t ->
+  unit tzresult Lwt.t
+
+(** [raw_retrieve_blocks_seq src_stores block_hashes] retrieves
+    [block_hashes] from [src_stores] and provide a buffered lazy
+    sequence to access those blocks. Blocks are effectively read
+    when the sequence items are consumed. The sequence elements are:
+    a [block_hash], its [total_block_length] and a [buffer] such that
+    [(decode Block_repr.encoding (Bytes.sub buffer 0 total_block_length))]
+    is consistent.
+
+    {b Warning}: the reading sequence result must only be used once as
+    the given bytes are shared between elements and will be modified
+    during the iteration. *)
+val raw_retrieve_blocks_seq :
+  src_floating_stores:t list ->
+  block_hashes:Block_hash.t list ->
+  (Block_hash.t * int * bytes) tzresult Lwt.t Seq.t
+
+(** [raw_iterate f store] iterate over all blocks in a store and
+    calling [f] providing it with a [buffer] and the
+    [total_block_length] such that
+    [(decode Block_repr.encoding (Bytes.sub buffer 0 total_block_length))]
+    is consistent.
+
+    {b Warning}: the [buffer] is modified through the iteration and
+    therefore must not be used outside of the definition of [f]. *)
+val raw_iterate :
+  (bytes * int -> unit tzresult Lwt.t) -> t -> unit tzresult Lwt.t

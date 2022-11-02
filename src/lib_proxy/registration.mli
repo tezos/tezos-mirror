@@ -46,7 +46,7 @@ module type Proxy_sig = sig
 
       - A printer (for logging)
       - An instance of [RPC_context.generic], to perform RPCs
-      - Whether [tezos-client] or [tezos-proxy-server] is running
+      - Whether [octez-client] or [tezos-proxy-server] is running
       - The chain for which the context is required
       - The block for which the context is required
     *)

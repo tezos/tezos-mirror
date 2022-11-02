@@ -34,10 +34,10 @@ exception Rpc_dir_creation_failure of tztrace
 (** Whether using the light mode or the proxy mode (remember that
     the light mode is a different instance of the proxy mode
     (see srcs/lib_proxy/README_LIGHT.md for documentation)
-    and whether [tezos-client] or [tezos-proxy-server] is running. *)
+    and whether [octez-client] or [tezos-proxy-server] is running. *)
 type mode =
-  | Light_client of Light.sources  (** [tezos-client --mode light] is running *)
-  | Proxy_client  (** [tezos-client --mode proxy] is running *)
+  | Light_client of Light.sources  (** [octez-client --mode light] is running *)
+  | Proxy_client  (** [octez-client --mode proxy] is running *)
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : Ptime.span option;
@@ -61,7 +61,7 @@ type mode =
 
     - [printer] is used for logging.
     - [rpc_context] is used to perform RPCs to distant endpoints.
-    - [mode] specifies whether [tezos-client] (light or proxy mode)
+    - [mode] specifies whether [octez-client] (light or proxy mode)
       or [tezos-proxy-server] is running.
     - [env] is a protocol-specific module used to create the context passed when executing a RPC. *)
 val build_directory :

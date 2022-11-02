@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticketer.tz]
 
 Well typed
-Gas remaining: 1039988.950 units remaining
+Gas remaining: 1039986.744 units remaining
 { parameter address ;
   storage nat ;
   code { UNPAIR
@@ -15,7 +15,8 @@ Gas remaining: 1039988.950 units remaining
          SWAP
          /* [ nat : nat : address : nat ] */ ;
          TICKET
-         /* [ ticket nat : address : nat ] */ ;
+         /* [ option (ticket nat) : address : nat ] */ ;
+         ASSERT_SOME ;
          DIP { CONTRACT (ticket nat)
                /* [ option (contract (ticket nat)) : nat ] */ ;
                ASSERT_SOME ;

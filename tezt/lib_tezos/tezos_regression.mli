@@ -31,3 +31,8 @@
     They also remove command arguments: --base-dir, -d, --endpoint, -E, and
     --sources. *)
 val hooks : Process.hooks
+
+(** [replace_variables log] returns [log] with all occurrences of variables
+    such as contract addresses, hashes etc. that may change between different
+    runs replaced by constants. *)
+val replace_variables : string -> string

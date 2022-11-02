@@ -5,8 +5,6 @@
  (name main)
  (libraries
   tezos-webassembly-interpreter
-  qcheck-core
-  qcheck-alcotest
   alcotest)
  (flags
   (:standard)

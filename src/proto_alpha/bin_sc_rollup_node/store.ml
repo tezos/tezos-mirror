@@ -24,292 +24,10 @@
 (*****************************************************************************)
 
 open Protocol
-open Alpha_context
-module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
-
-module IStore = struct
-  include Maker.Make (Tezos_context_encoding.Context.Schema)
-  module Schema = Tezos_context_encoding.Context.Schema
-end
-
-type t = IStore.t
-
-type tree = IStore.tree
-
-type path = string list
-
-let load configuration =
-  let open Lwt_syntax in
-  let open Configuration in
-  let* repo =
-    IStore.Repo.v
-      (Irmin_pack.config (default_storage_dir configuration.data_dir))
-  in
-  IStore.main repo
-
-let flush store = IStore.flush (IStore.repo store)
-
-let close store = IStore.Repo.close (IStore.repo store)
-
-let info message =
-  let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
-  Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
-
-let commit ?(message = "") context =
-  let open Lwt_syntax in
-  let info = IStore.Info.v ~author:"Tezos" 0L ~message in
-  let* tree = IStore.tree context in
-  let* commit = IStore.Commit.v (IStore.repo context) ~info ~parents:[] tree in
-  return @@ IStore.Commit.key commit
-
-module type Mutable_value = sig
-  type value
-
-  val path_key : path
-
-  val decode_value : bytes -> value Lwt.t
-
-  val set : t -> value -> unit Lwt.t
-
-  val get : t -> value Lwt.t
-
-  val find : t -> value option Lwt.t
-end
-
-module type KeyValue = sig
-  val path : path
-
-  val keep_last_n_entries_in_memory : int
-
-  type key
-
-  val string_of_key : key -> string
-
-  type value
-
-  val value_encoding : value Data_encoding.t
-end
-
-module Make_map (P : KeyValue) = struct
-  (* Ignored for now. *)
-  let _ = P.keep_last_n_entries_in_memory
-
-  let path_key = P.path
-
-  let make_key key = path_key @ [P.string_of_key key]
-
-  let mem store key = IStore.mem store (make_key key)
-
-  let decode_value encoded_value =
-    Lwt.return
-    @@ Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
-
-  let get store key = IStore.get store (make_key key) >>= decode_value
-
-  let find store key =
-    let open Lwt_syntax in
-    let* exists = mem store key in
-    if exists then
-      let+ value = get store key in
-      Some value
-    else return_none
-
-  let find_with_default store key ~on_default =
-    let open Lwt_syntax in
-    let* exists = mem store key in
-    if exists then get store key else return (on_default ())
-end
-
-module Make_updatable_map (P : KeyValue) = struct
-  include Make_map (P)
-
-  let add store key value =
-    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
-    let encode v = Data_encoding.Binary.to_bytes_exn P.value_encoding v in
-    let encoded_value = encode value in
-    let info () = info full_path in
-    IStore.set_exn ~info store (make_key key) encoded_value
-end
-
-module Make_append_only_map (P : KeyValue) = struct
-  include Make_map (P)
-
-  let add store key value =
-    let open Lwt_syntax in
-    let* existing_value = find store key in
-    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
-    let encode v = Data_encoding.Binary.to_bytes_exn P.value_encoding v in
-    let encoded_value = encode value in
-    match existing_value with
-    | None ->
-        let info () = info full_path in
-        IStore.set_exn ~info store (make_key key) encoded_value
-    | Some existing_value ->
-        (* To be robust to interruption in the middle of processes,
-           we accept to redo some work when we restart the node.
-           Hence, it is fine to insert twice the same value for a
-           given value. *)
-        if not (Bytes.equal (encode existing_value) encoded_value) then
-          Stdlib.failwith
-            (Printf.sprintf
-               "Key %s already exists with a different value"
-               full_path)
-        else return_unit
-end
-
-module Make_mutable_value (P : sig
-  val path : path
-
-  type value
-
-  val value_encoding : value Data_encoding.t
-end) =
-struct
-  type value = P.value
-
-  let path_key = P.path
-
-  let decode_value encoded_value =
-    Lwt.return
-    @@ Data_encoding.Binary.of_bytes_exn P.value_encoding encoded_value
-
-  let set store value =
-    let encoded_value =
-      Data_encoding.Binary.to_bytes_exn P.value_encoding value
-    in
-    let info () = info (String.concat "/" P.path) in
-    IStore.set_exn ~info store path_key encoded_value
-
-  let get store = IStore.get store path_key >>= decode_value
-
-  let find store =
-    let open Lwt_syntax in
-    let* value = IStore.find store path_key in
-    Option.map_s decode_value value
-end
-
-module IStoreTree = struct
-  include
-    Tezos_context_helpers.Context.Make_tree
-      (Tezos_context_encoding.Context.Conf)
-      (IStore)
-
-  type t = IStore.t
-
-  type tree = IStore.tree
-
-  type key = path
-
-  type value = bytes
-end
-
-module IStoreProof =
-  Tezos_context_helpers.Context.Make_proof
-    (IStore)
-    (Tezos_context_encoding.Context.Conf)
-
-module Inbox = struct
-  include Sc_rollup.Inbox
-
-  include Sc_rollup.Inbox.MakeHashingScheme (struct
-    module Tree = IStoreTree
-
-    type t = IStore.t
-
-    type tree = Tree.tree
-
-    let commit_tree store key tree =
-      let open Lwt_syntax in
-      let info () = IStore.Info.v ~author:"Tezos" 0L ~message:"" in
-      let path = "inbox_internal_trees" :: key in
-      let* result = IStore.set_tree ~info store path tree in
-      match result with
-      | Ok () ->
-          let* (_ : IStore.commit) =
-            IStore.Commit.v (IStore.repo store) ~info:(info ()) ~parents:[] tree
-          in
-          return ()
-      | Error _ -> assert false
-
-    let to_inbox_hash kinded_hash =
-      match kinded_hash with `Value h | `Node h -> Hash.of_context_hash h
-
-    let from_inbox_hash inbox_hash =
-      let ctxt_hash = Hash.to_context_hash inbox_hash in
-      let store_hash =
-        IStore.Hash.unsafe_of_raw_string (Context_hash.to_string ctxt_hash)
-      in
-      `Node store_hash
-
-    let lookup_tree store hash =
-      IStore.Tree.of_hash (IStore.repo store) (from_inbox_hash hash)
-
-    type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
-
-    let verify_proof proof f =
-      Lwt.map Result.to_option (IStoreProof.verify_tree_proof proof f)
-
-    let produce_proof store tree f =
-      let open Lwt_syntax in
-      (* TODO: #3381
-         Since committing is required for proof production to work
-         properly, why isn't committing part of the process of proof
-         production? *)
-      let* _commit_key = commit store in
-      match IStoreTree.kinded_key tree with
-      | Some k ->
-          let* p = IStoreProof.produce_tree_proof (IStore.repo store) k f in
-          return (Some p)
-      | None -> return None
-
-    let proof_before proof = to_inbox_hash proof.IStoreProof.Proof.before
-
-    let proof_encoding =
-      Tezos_context_helpers.Merkle_proof_encoding.V1.Tree32.tree_proof_encoding
-  end)
-end
-
-(** State of the PVM that this rollup node deals with *)
-module PVMState = struct
-  let[@inline] key block_hash = ["pvm_state"; Block_hash.to_b58check block_hash]
-
-  let find store block_hash = IStore.find_tree store (key block_hash)
-
-  let exists store block_hash = IStore.mem store (key block_hash)
-
-  let set store block_hash state =
-    IStore.set_tree_exn
-      ~info:(fun () -> info "Update PVM state")
-      store
-      (key block_hash)
-      state
-
-  let init_s store block_hash make_state =
-    let open Lwt_syntax in
-    let* exists = exists store block_hash in
-    if exists then return_unit
-    else
-      let* state = make_state () in
-      set store block_hash state
-end
+include Store_utils
 
 (** Aggregated collection of messages from the L1 inbox *)
-module MessageTrees = struct
-  let[@inline] key block_hash =
-    ["message_tree"; Block_hash.to_b58check block_hash]
-
-  (** [get store block_hash] retrieves the message tree for [block_hash]. If it is not present, an empty
-      tree is returned. *)
-  let find store block_hash = IStore.find_tree store (key block_hash)
-
-  (** [set store block_hash message_tree] set the message tree for [block_hash]. *)
-  let set store block_hash message_tree =
-    IStore.set_tree_exn
-      ~info:(fun () -> info "Update messages tree")
-      store
-      (key block_hash)
-      message_tree
-end
+open Alpha_context
 
 type state_info = {
   num_messages : Z.t;
@@ -415,10 +133,10 @@ module Messages = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Inbox.Message.t list
+  type value = Sc_rollup.Inbox_message.t list
 
   let value_encoding =
-    Data_encoding.(list @@ dynamic_size Inbox.Message.encoding)
+    Data_encoding.(list @@ dynamic_size Sc_rollup.Inbox_message.encoding)
 end)
 
 (** Inbox state for each block *)
@@ -446,9 +164,9 @@ module Histories = Make_append_only_map (struct
 
   let string_of_key = Block_hash.to_b58check
 
-  type value = Inbox.history
+  type value = Sc_rollup.Inbox.History.t
 
-  let value_encoding = Inbox.history_encoding
+  let value_encoding = Sc_rollup.Inbox.History.encoding
 end)
 
 module Commitments = Make_append_only_map (struct
@@ -501,7 +219,7 @@ module Last_cemented_commitment_hash = Make_mutable_value (struct
   let value_encoding = Sc_rollup.Commitment.Hash.encoding
 end)
 
-module Commitments_published_at_level = Make_append_only_map (struct
+module Commitments_published_at_level = Make_updatable_map (struct
   let path = ["commitments"; "published_at_level"]
 
   let keep_last_n_entries_in_memory = 10
@@ -515,6 +233,9 @@ module Commitments_published_at_level = Make_append_only_map (struct
   let value_encoding = Raw_level.encoding
 end)
 
+(* Slot subscriptions per block hash, saved as a list of
+   `Dal.Slot_index.t`, which is a bounded integer between `0` and `255`
+   included. *)
 module Dal_slot_subscriptions = Make_append_only_map (struct
   let path = ["dal"; "slot_subscriptions"]
 
@@ -527,4 +248,115 @@ module Dal_slot_subscriptions = Make_append_only_map (struct
   type value = Dal.Slot_index.t list
 
   let value_encoding = Data_encoding.list Dal.Slot_index.encoding
+end)
+
+module Contexts = Make_append_only_map (struct
+  let path = ["contexts"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Context.hash
+
+  let value_encoding = Context.hash_encoding
+end)
+
+(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3715
+   Adding a new slot index requires reading up to 256 MB of data. *)
+(* Published slot headers per block hash,
+   stored as a list of bindings from `Dal_slot_index.t`
+   to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. *)
+module Dal_slot_pages = Make_nested_map (struct
+  let path = ["dal"; "slot_pages"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type secondary_key = Dal.Slot_index.t * Dal.Page.Index.t
+
+  let compare_secondary_keys (i1, p1) (i2, p2) =
+    Compare.or_else (Dal.Slot_index.compare i1 i2) (fun () ->
+        Dal.Page.Index.compare p1 p2)
+
+  type value = Dal.Page.content option
+
+  let secondary_key_encoding =
+    Data_encoding.(tup2 Dal.Slot_index.encoding Dal.Page.Index.encoding)
+
+  let secondary_key_name = "slot_index"
+
+  let value_encoding = Data_encoding.option Dal.Page.content_encoding
+
+  let value_name = "slot_pages"
+end)
+
+(* Published slot headers per block hash, stored as a list of bindings from
+   `Dal_slot_index.t` to `Dal.Slot.t`. The encoding function converts this
+   list into a `Dal.Slot_index.t`-indexed map. Note that the block_hash
+   refers to the block where slots headers have been confirmed, not
+   the block where they have been published.
+*)
+module Dal_slots_headers = Make_nested_map (struct
+  let path = ["dal"; "slot_headers"]
+
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
+     This value is currently not used, but required by the module type. *)
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type secondary_key = Dal.Slot_index.t
+
+  let compare_secondary_keys = Dal.Slot_index.compare
+
+  type value = Dal.Slot.Header.t
+
+  let secondary_key_encoding = Dal.Slot_index.encoding
+
+  let secondary_key_name = "slot_index"
+
+  let value_encoding = Dal.Slot.Header.encoding
+
+  let value_name = "slot_header"
+end)
+
+(** Confirmed DAL slots history. See documentation of
+    {Dal_slot_repr.Slots_history} for more details. *)
+module Dal_confirmed_slots_history = Make_append_only_map (struct
+  let path = ["dal"; "confirmed_slots_history"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Dal.Slots_history.t
+
+  let value_encoding = Dal.Slots_history.encoding
+end)
+
+(** Confirmed DAL slots histories cache. See documentation of
+    {Dal_slot_repr.Slots_history} for more details. *)
+module Dal_confirmed_slots_histories = Make_append_only_map (struct
+  let path = ["dal"; "confirmed_slots_histories_cache"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = Dal.Slots_history.History_cache.t
+
+  let value_encoding = Dal.Slots_history.History_cache.encoding
 end)

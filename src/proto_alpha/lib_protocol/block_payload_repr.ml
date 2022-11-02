@@ -31,10 +31,11 @@
     include the hash of the block that precedes the block where these operations
     should be included. *)
 
-let hash ~predecessor round operations_hash =
+let hash ~predecessor_hash ~payload_round operations =
+  let operations_hash = Operation_list_hash.compute operations in
   let open Data_encoding in
-  let predecessor = Binary.to_bytes_exn Block_hash.encoding predecessor in
-  let round = Binary.to_bytes_exn Round_repr.encoding round in
+  let predecessor = Binary.to_bytes_exn Block_hash.encoding predecessor_hash in
+  let round = Binary.to_bytes_exn Round_repr.encoding payload_round in
   let operations_hash =
     Binary.to_bytes_exn Operation_list_hash.encoding operations_hash
   in

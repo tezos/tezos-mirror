@@ -25,7 +25,7 @@
 
 open Runnable.Syntax
 
-type kind = Consensus of {chain_id : string} | Manager
+type kind = Consensus of {chain_id : string} | Voting | Manager
 
 type t = {
   branch : string;
@@ -36,9 +36,9 @@ type t = {
       (* This is mutable to avoid computing the raw representation several times. *)
 }
 
-let get_branch ?offset client =
-  let* json = RPC.get_branch ?offset client in
-  return (JSON.as_string json)
+let get_branch ?(offset = 2) client =
+  let block = sf "head~%d" offset in
+  RPC.Client.call client @@ RPC.get_chain_block_hash ~block ()
 
 let make ~branch ~signer ~kind contents =
   {branch; contents; kind; signer; raw = None}
@@ -49,7 +49,8 @@ let raw t client =
   match t.raw with
   | None ->
       let* raw =
-        RPC.post_forge_operations ~data:(json t) client
+        RPC.Client.call client
+        @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
         |> Lwt.map JSON.as_string
       in
       t.raw <- Some (`Hex raw) ;
@@ -70,7 +71,7 @@ let sign ({kind; signer; _} as t) client =
     | Consensus {chain_id} ->
         Tezos_crypto.Signature.Endorsement
           (Tezos_crypto.Chain_id.of_b58check_exn chain_id)
-    | Manager -> Tezos_crypto.Signature.Generic_operation
+    | Voting | Manager -> Tezos_crypto.Signature.Generic_operation
   in
   let* hex = hex t client in
   let bytes = Hex.to_bytes hex in
@@ -211,26 +212,166 @@ module Consensus = struct
     inject ?request ?force ?error op client
 end
 
+module Voting = struct
+  type t =
+    | Proposals of {
+        source : Account.key;
+        period : int;
+        proposals : string list;  (** Candidate protocol hashes *)
+      }
+
+  let proposals source period proposals = Proposals {source; period; proposals}
+
+  let get_source_and_make_contents = function
+    | Proposals {source; period; proposals} ->
+        let proposals_contents =
+          [
+            ("kind", `String "proposals");
+            ("source", `String source.Account.public_key_hash);
+            ("period", Ezjsonm.int period);
+            ("proposals", Ezjsonm.list Ezjsonm.string proposals);
+          ]
+        in
+        let contents = `A [`O proposals_contents] in
+        (source, contents)
+
+  let operation ?branch ?client ?signer t =
+    let* branch =
+      match branch with
+      | Some branch -> return branch
+      | None -> (
+          match client with
+          | Some client -> get_branch ~offset:0 client
+          | None ->
+              raise
+                (Invalid_argument
+                   "At least one of arguments [branch] and [client] must be \
+                    provided."))
+    in
+    let source, contents = get_source_and_make_contents t in
+    let signer = Option.value signer ~default:source in
+    return (make ~branch ~signer ~kind:Voting contents)
+
+  let inject ?request ?force ?signature ?error ?branch ?signer t client =
+    let* op = operation ?branch ?signer ~client t in
+    inject ?request ?force ?signature ?error op client
+end
+
 module Manager = struct
+  let json_of_account account = Ezjsonm.string account.Account.public_key_hash
+
+  let json_of_tez n = string_of_int n |> Ezjsonm.string
+
+  let json_of_int_as_string n = string_of_int n |> Ezjsonm.string
+
+  let json_of_int n = float_of_int n |> Ezjsonm.float
+
+  let json_of_commitment commitment =
+    Data_encoding.Json.construct
+      Tezos_crypto_dal.Cryptobox.Commitment.encoding
+      commitment
+
+  let get_next_counter ?(source = Constant.bootstrap1) client =
+    let* counter_json =
+      RPC.Client.call client
+      @@ RPC.get_chain_block_context_contract_counter
+           ~id:source.Account.public_key_hash
+           ()
+    in
+    return (1 + JSON.as_int counter_json)
+
+  let json_of_option f v = Option.fold ~none:`Null ~some:f v
+
+  let strip_null_fields l =
+    List.fold_left
+      (fun acc e -> match e with _, `Null -> acc | e -> e :: acc)
+      []
+      l
+    |> List.rev
+
+  type sc_rollup_dissection_chunk = {state_hash : string option; tick : int}
+
+  type sc_rollup_proof = Ezjsonm.value
+
+  type sc_rollup_game_refutation_step =
+    | Proof of sc_rollup_proof
+    | Dissection of sc_rollup_dissection_chunk list
+
+  type sc_rollup_refutation = {
+    choice_tick : int;
+    refutation_step : sc_rollup_game_refutation_step;
+  }
+
+  let json_of_sc_rollup_dissection ~dissection =
+    Ezjsonm.list
+      (fun {state_hash; tick} ->
+        let sh = json_of_option Ezjsonm.string state_hash in
+        `O
+          (strip_null_fields
+             [("state", sh); ("tick", json_of_int_as_string tick)]))
+      dissection
+
+  let json_payload_binding_of_sc_rollup_refutation sc_rollup opponent refutation
+      =
+    let json_of_refutation_step {choice_tick; refutation_step} =
+      let step =
+        match refutation_step with
+        | Proof proof -> proof
+        | Dissection dissection -> json_of_sc_rollup_dissection ~dissection
+      in
+      `O [("choice", json_of_int_as_string choice_tick); ("step", step)]
+    in
+    let refutation = json_of_option json_of_refutation_step refutation in
+    strip_null_fields
+      [
+        ("kind", `String "sc_rollup_refute");
+        ("rollup", `String sc_rollup);
+        ("opponent", `String opponent);
+        ("refutation", refutation);
+      ]
+
+  type transfer_parameters = {entrypoint : string; arg : JSON.u}
+
   type payload =
     | Reveal of Account.key
-    | Transfer of {amount : int; dest : Account.key}
-    | Dal_publish_slot_header of {level : int; index : int; header : int}
+    | Transfer of {
+        amount : int;
+        dest : string;
+        parameters : transfer_parameters option;
+      }
+    | Dal_publish_slot_header of {
+        level : int;
+        index : int;
+        commitment : Tezos_crypto_dal.Cryptobox.commitment;
+      }
     | Sc_rollup_dal_slot_subscribe of {rollup : string; slot_index : int}
     | Delegation of {delegate : Account.key}
+    | Sc_rollup_refute of {
+        (* See details in {!Operation_repr} module. *)
+        sc_rollup : string;
+        opponent : string;
+        refutation : sc_rollup_refutation option;
+      }
 
   let reveal account = Reveal account
 
   let transfer ?(dest = Constant.bootstrap2) ?(amount = 1_000_000) () =
-    Transfer {amount; dest}
+    Transfer {amount; dest = dest.public_key_hash; parameters = None}
 
-  let dal_publish_slot_header ~level ~index ~header =
-    Dal_publish_slot_header {level; index; header}
+  let call ?(dest = "KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN") ?(amount = 0)
+      ?(entrypoint = "default") ?(arg = `O [("prim", `String "Unit")]) () =
+    Transfer {amount; dest; parameters = Some {entrypoint; arg}}
+
+  let dal_publish_slot_header ~level ~index ~commitment =
+    Dal_publish_slot_header {level; index; commitment}
 
   let sc_rollup_dal_slot_subscribe ~rollup ~slot_index =
     Sc_rollup_dal_slot_subscribe {rollup; slot_index}
 
   let delegation ?(delegate = Constant.bootstrap2) () = Delegation {delegate}
+
+  let sc_rollup_refute ?refutation ~sc_rollup ~opponent () =
+    Sc_rollup_refute {sc_rollup; opponent; refutation}
 
   type t = {
     source : Account.key;
@@ -241,41 +382,38 @@ module Manager = struct
     payload : payload;
   }
 
-  let json_of_account account = Ezjsonm.string account.Account.public_key_hash
-
-  let json_of_tez n = string_of_int n |> Ezjsonm.string
-
-  let json_of_int_as_string n = string_of_int n |> Ezjsonm.string
-
-  let json_of_int n = float_of_int n |> Ezjsonm.float
-
-  let get_next_counter ?(source = Constant.bootstrap1) client =
-    let*! json =
-      RPC.Contracts.get_counter
-        ~contract_id:source.Account.public_key_hash
-        client
-    in
-    return (1 + JSON.as_int json)
-
   let json_payload_binding = function
     | Reveal account ->
         [("kind", `String "reveal"); ("public_key", `String account.public_key)]
-    | Transfer {amount; dest} ->
+    | Transfer {amount; dest; parameters} ->
+        let parameters =
+          match parameters with
+          | None -> []
+          | Some {entrypoint; arg} ->
+              [
+                ( "parameters",
+                  `O [("entrypoint", `String entrypoint); ("value", arg)] );
+              ]
+        in
         [
           ("kind", `String "transaction");
           ("amount", json_of_tez amount);
-          ("destination", json_of_account dest);
+          ("destination", `String dest);
         ]
-    | Dal_publish_slot_header {level; index; header} ->
-        let slot =
+        @ parameters
+    | Dal_publish_slot_header {level; index; commitment} ->
+        let slot_header =
           `O
             [
               ("index", json_of_int index);
               ("level", json_of_int level);
-              ("header", json_of_int header);
+              ("commitment", json_of_commitment commitment);
             ]
         in
-        [("kind", `String "dal_publish_slot_header"); ("slot", slot)]
+        [
+          ("kind", `String "dal_publish_slot_header");
+          ("slot_header", slot_header);
+        ]
     | Sc_rollup_dal_slot_subscribe {rollup; slot_index} ->
         [
           ("kind", `String "sc_rollup_dal_slot_subscribe");
@@ -284,6 +422,11 @@ module Manager = struct
         ]
     | Delegation {delegate} ->
         [("kind", `String "delegation"); ("delegate", json_of_account delegate)]
+    | Sc_rollup_refute {sc_rollup; opponent; refutation} ->
+        json_payload_binding_of_sc_rollup_refutation
+          sc_rollup
+          opponent
+          refutation
 
   let json client {source; counter; fee; gas_limit; storage_limit; payload} =
     let* counter =
@@ -337,9 +480,14 @@ module Manager = struct
         {source; counter; fee; gas_limit; storage_limit; payload}
     | Reveal _ | Dal_publish_slot_header _ | Delegation _
     | Sc_rollup_dal_slot_subscribe _ ->
-        let fee = Option.value fee ~default:1_000 in
-        let gas_limit = Option.value gas_limit ~default:1_040 in
+        let fee = Option.value fee ~default:1_450 in
+        let gas_limit = Option.value gas_limit ~default:1_490 in
         let storage_limit = Option.value storage_limit ~default:0 in
+        {source; counter; fee; gas_limit; storage_limit; payload}
+    | Sc_rollup_refute _ ->
+        let fee = Option.value fee ~default:12_000 in
+        let gas_limit = Option.value gas_limit ~default:12_000 in
+        let storage_limit = Option.value storage_limit ~default:1028 in
         {source; counter; fee; gas_limit; storage_limit; payload}
 
   let make_batch ?source ?fee ?gas_limit ?storage_limit ~counter payloads =
@@ -352,4 +500,8 @@ module Manager = struct
   let inject ?request ?force ?branch ?signer ?error managers client =
     let* op = operation ?branch ?signer managers client in
     inject ?request ?force ?error op client
+
+  let get_branch ?chain ?(offset = 2) client =
+    let block = sf "head~%d" offset in
+    RPC.Client.call client @@ RPC.get_chain_block_hash ?chain ~block ()
 end

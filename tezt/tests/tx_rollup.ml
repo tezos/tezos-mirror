@@ -341,12 +341,7 @@ module Regressions = struct
         submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
       in
       let* () =
-        let error =
-          match protocol with
-          | Jakarta -> "tx_rollup_no_commitment_to_remove"
-          | _ -> "tx_rollup_remove_commitment_too_early"
-        in
-        Process.check_error ~msg:(rex error) p
+        Process.check_error ~msg:(rex "tx_rollup_remove_commitment_too_early") p
       in
 
       Log.info "Step 8. Last_removed_commitments_hashes is None before removing" ;
@@ -472,7 +467,9 @@ module Regressions = struct
     type limits = {batch_limit : int; inbox_limit : int}
 
     let get_limits client =
-      let* json = RPC.get_constants client in
+      let* json =
+        RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+      in
       let batch_limit =
         JSON.(json |-> "tx_rollup_hard_size_limit_per_message" |> as_int)
       in
@@ -835,6 +832,8 @@ let test_submit_batches_in_several_blocks =
   let*! _state = Rollup.get_state ~hooks ~rollup client in
   unit
 
+(* This test may make more sense as a unit test; consider removing it.
+   See issue https://gitlab.com/tezos/tezos/-/issues/3546. *)
 let test_submit_from_originated_source =
   let open Tezt_tezos in
   Protocol.register_test
@@ -876,12 +875,13 @@ let test_submit_from_originated_source =
       ~src:originated_contract
       client
   in
-  let* () =
-    Process.check_error
-      ~exit_code:1
-      ~msg:(rex "Only implicit accounts can submit transaction rollup batches")
-      process
+  let msg =
+    match protocol with
+    | Lima | Alpha -> rex "Erroneous command line argument"
+    | Kathmandu ->
+        rex "Only implicit accounts can submit transaction rollup batches"
   in
+  let* () = Process.check_error ~exit_code:1 ~msg process in
   unit
 
 let test_rollup_with_two_commitments =
@@ -930,7 +930,7 @@ let test_rollup_with_two_commitments =
   Check.(inbox = None)
     (Check.option Rollup.Check.inbox)
     ~error_msg:"Expected no inbox" ;
-  let* json = RPC.get_operations client in
+  let* json = RPC.Client.call client @@ RPC.get_chain_block_operations () in
   let manager_operations = JSON.(json |=> 3 |> as_list) in
   Check.(List.length manager_operations = 2)
     Check.int
@@ -1375,10 +1375,12 @@ let test_rollup_wrong_rejection_long_path =
   Process.check_error ~msg:(rex "tx_rollup_wrong_message_path") process
 
 let check_bond_is ~src client ~expected =
-  let*! bond = RPC.Contracts.get_frozen_bonds ~contract_id:src client in
-  let given = JSON.as_int bond in
-  Check.(given = expected)
-    Check.int
+  let* given =
+    RPC.Client.call client
+    @@ RPC.get_chain_block_context_contract_frozen_bonds ~id:src ()
+  in
+  Check.(given = Tez.of_mutez_int expected)
+    Tez.typ
     ~error_msg:"Unexpected frozen bond for tx rollup. Expected %R. Got %L" ;
   unit
 
@@ -1393,7 +1395,9 @@ let attempt_return_bond ~(expected : [`Ok | `Ko]) ~src state client =
       (fun _exn ->
         if expected = `Ok then
           Test.fail "Return bond expected to succeed but failed" ;
-        let* constants = RPC.get_constants client in
+        let* constants =
+          RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+        in
         return JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int))
   in
   check_bond_is ~src state.client ~expected:expected_bond_after_op
@@ -1411,7 +1415,9 @@ let test_rollup_bond_return =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let src = Constant.bootstrap2.public_key_hash in
-  let* constants = RPC.get_constants client in
+  let* constants =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let commit_bond =
     JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int)
   in
@@ -1501,7 +1507,9 @@ let test_deposit_withdraw_max_big_tickets =
   let* ({rollup; client; _} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
-  let* constants = RPC.get_constants client in
+  let* constants =
+    RPC.Client.call client @@ RPC.get_chain_block_context_constants ()
+  in
   let max_ticket_payload_size =
     (* [overhead] is the number of bytes introduced by the wrapping of a
        string in a ticket. This encompasses the ticketer, amount and ty
@@ -1531,7 +1539,12 @@ let test_deposit_withdraw_max_big_tickets =
       ~alias:"deposit_contract"
       ~amount:Tez.zero
       ~src:account
-      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+      ~prg:
+        (match protocol with
+        | Lima | Alpha ->
+            "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+        | _ ->
+            "file:./tezt/tests/contracts/proto_current_mainnet/tx_rollup_deposit.tz")
       ~init:"Unit"
       ~burn_cap:Tez.one
       client

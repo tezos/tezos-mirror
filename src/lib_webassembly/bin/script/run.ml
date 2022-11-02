@@ -156,7 +156,7 @@ let input_binary_file file run =
         let* () = trace_lwt "Decoding..." in
         input_binary file (Bytes.to_string buf) run))
 
-let input_js_file file run =
+let input_js_file file _run =
   raise (Sys_error (file ^ ": unrecognized input file type"))
 
 let input_file file run =
@@ -175,45 +175,9 @@ let input_string string run =
   let* () = trace_lwt "Parsing..." in
   input_script Parse.Script "string" lexbuf run
 
-(* Interactive *)
-
-let continuing = ref false
-
-let lexbuf_stdin buf len =
-  let prompt = if !continuing then "  " else "> " in
-  print_string prompt ;
-  flush_all () ;
-  continuing := true ;
-  let rec loop i =
-    if i = len then i
-    else
-      let ch = input_char stdin in
-      Bytes.set buf i ch ;
-      if ch = '\n' then i + 1 else loop (i + 1)
-  in
-  let n = loop 0 in
-  if n = 1 then continuing := false else trace "Parsing..." ;
-  n
-
-let input_stdin run =
-  (* TODO (#3334): Remove the unused REPL. *)
-  let lexbuf = Lexing.from_function lexbuf_stdin in
-  let rec loop () =
-    let* success = input_script Parse.Script1 "stdin" lexbuf run in
-    if not success then Lexing.flush_input lexbuf ;
-    if Lexing.(lexbuf.lex_curr_pos >= lexbuf.lex_buffer_len - 1) then
-      continuing := false ;
-    loop ()
-  in
-  Lwt.catch loop (function
-      | End_of_file ->
-          let* () = Lwt_io.printf "\n%!" in
-          trace_lwt "Bye."
-      | exn -> raise exn)
-
 (* Printing *)
 
-let map_to_list m = List.map snd (Lazy_vector.LwtInt32Vector.loaded_bindings m)
+let map_to_list m = List.map snd (Lazy_vector.Int32Vector.loaded_bindings m)
 
 let print_import m im =
   let open Types in
@@ -292,7 +256,7 @@ let string_of_num_pat (p : num_pat) =
 
 let string_of_vec_pat (p : vec_pat) =
   match p with
-  | VecPat (Values.V128 (shape, ns)) ->
+  | VecPat (Values.V128 (_, ns)) ->
       String.concat " " (List.map string_of_num_pat ns)
 
 let string_of_ref_pat (p : ref_pat) =
@@ -320,6 +284,8 @@ let print_results rs =
 
 (* Configuration *)
 
+let host_funcs_registry = Host_funcs.empty ()
+
 module Map = Map.Make (String)
 
 let quote : script ref = ref []
@@ -328,9 +294,45 @@ let scripts : script Map.t ref = ref Map.empty
 
 let modules : Ast.module_ Map.t ref = ref Map.empty
 
-let instances : Instance.module_inst Map.t ref = ref Map.empty
+(* NOTE: See [instantiate_module] below on why this exists. *)
+let unnamed_instance_counter = ref 0
+
+let instances : Instance.module_reg =
+  let module_reg = Instance.ModuleMap.create () in
+  Instance.ModuleMap.set "__empty" Instance.empty_module_inst module_reg ;
+  module_reg
 
 let registry : Instance.module_inst Map.t ref = ref Map.empty
+
+let instantiate_module x_opt m imports =
+  let self =
+    match x_opt with
+    | None ->
+        (* The WASM REPL allows you to create modules without a name. The
+           intended use case is to define a module without a name and then
+           register it under one or more names later.
+           This mechanism used a slot "" for the temporary module.
+           Unfortunately, this doesn't work super well with our module
+           references because they require module keys (their names) to be
+           stable. E.g. multiple modules temporarily assigned as "" will
+           conflict given their module key will statically be "" regardless of
+           how many times it was rebound.
+           The solution is to bind to a unique temporary module each time the
+           module in question has no name.
+        *)
+        let index = !unnamed_instance_counter in
+        unnamed_instance_counter := !unnamed_instance_counter + 1 ;
+        Instance.Module_key (Printf.sprintf "__unnamed_%i" index)
+    | Some name -> Instance.Module_key name.it
+  in
+  let buffers = Eval.buffers () in
+  Eval.init ~module_reg:instances ~self buffers host_funcs_registry m imports
+
+let bind_lazy module_reg name instance =
+  Option.iter
+    (fun name -> Instance.ModuleMap.set name.it instance module_reg)
+    name ;
+  Instance.ModuleMap.set "" instance module_reg
 
 let bind map x_opt y =
   let map' = match x_opt with None -> !map | Some x -> Map.add x.it y !map in
@@ -349,10 +351,20 @@ let lookup_script = lookup "script" scripts
 
 let lookup_module = lookup "module" modules
 
-let lookup_instance = lookup "module" instances
+let lookup_instance name at =
+  let category = "instance" in
+  let key = match name with Some name -> name.it | None -> "" in
+  Lwt.catch
+    (fun () -> Instance.ModuleMap.get key instances)
+    (function
+      | Lazy_map.UnexpectedAccess ->
+          IO.error
+            at
+            (if key = "" then "no " ^ category ^ " defined"
+            else "unknown " ^ category ^ " " ^ key)
+      | exn -> raise exn)
 
-let lookup_registry module_name item_name _t =
-  let* item_name = Lazy_vector.LwtInt32Vector.to_list item_name in
+let lookup_registry module_name item_name =
   let+ value = Instance.export (Map.find module_name !registry) item_name in
   match value with Some ext -> ext | None -> raise Not_found
 
@@ -363,7 +375,7 @@ let rec run_definition def : Ast.module_ Lwt.t =
   | Textual m -> Lwt.return m
   | Encoded (name, bytes) ->
       let* () = trace_lwt "Decoding..." in
-      Decode.decode ~name ~bytes
+      Decode.decode ~name ~bytes:(Chunked_byte_vector.of_string bytes)
   | Quoted (_, s) ->
       let* () = trace_lwt "Parsing quote..." in
       let def' = Parse.string_to_module s in
@@ -375,13 +387,12 @@ let run_action act : Values.value list Lwt.t =
       let* () =
         trace_lwt ("Invoking function \"" ^ Ast.string_of_name name ^ "\"...")
       in
-      let inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.LwtInt32Vector.to_list name in
+      let* inst = lookup_instance x_opt act.at in
       let* export = Instance.export inst name in
       match export with
       | Some (Instance.ExternFunc f) ->
-          let (Types.FuncType (ins, out)) = Func.type_of f in
-          let* ins_l = Lazy_vector.LwtInt32Vector.to_list ins in
+          let (Types.FuncType (ins, _)) = Func.type_of f in
+          let* ins_l = Lazy_vector.Int32Vector.to_list ins in
           if List.length vs <> List.length ins_l then
             Script.error act.at "wrong number of arguments" ;
           List.iter2
@@ -390,7 +401,14 @@ let run_action act : Values.value list Lwt.t =
                 Script.error v.at "wrong type of argument")
             vs
             ins_l ;
-          let+ _, result = Eval.invoke f (List.map (fun v -> v.it) vs) in
+          let+ _, result =
+            Eval.invoke
+              ~module_reg:instances
+              ~caller:(Module_key "__empty")
+              host_funcs_registry
+              f
+              (List.map (fun v -> v.it) vs)
+          in
           result
       | Some _ -> Assert.error act.at "export is not a function"
       | None -> Assert.error act.at "undefined export")
@@ -398,8 +416,7 @@ let run_action act : Values.value list Lwt.t =
       let* () =
         trace_lwt ("Getting global \"" ^ Ast.string_of_name name ^ "\"...")
       in
-      let inst = lookup_instance x_opt act.at in
-      let* name = Lazy_vector.LwtInt32Vector.to_list name in
+      let* inst = lookup_instance x_opt act.at in
       let+ export = Instance.export inst name in
       match export with
       | Some (Instance.ExternGlobal gl) -> [Global.load gl]
@@ -509,7 +526,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init m imports)
+          instantiate_module None m imports)
         (fun _ -> Assert.error ass.at "expected linking error")
         (function
           | Import.Unknown (_, msg) | Eval.Link (_, msg) ->
@@ -524,7 +541,7 @@ let run_assertion ass : unit Lwt.t =
       Lwt.try_bind
         (fun () ->
           let* imports = Import.link m in
-          Eval.init m imports)
+          instantiate_module None m imports)
         (fun _ -> Assert.error ass.at "expected instantiation error")
         (function
           | Eval.Trap (_, msg) -> assert_message ass.at "instantiation" msg re
@@ -572,17 +589,16 @@ let rec run_command cmd : unit Lwt.t =
       if not !Flags.dry then
         let* () = trace_lwt "Initializing..." in
         let* imports = Import.link m in
-        let+ inst = Eval.init m imports in
-        bind instances x_opt inst
+        let+ inst = instantiate_module x_opt m imports in
+        bind_lazy instances x_opt inst
       else Lwt.return_unit
   | Register (name, x_opt) ->
       quote := cmd :: !quote ;
       if not !Flags.dry then (
         trace ("Registering module \"" ^ Ast.string_of_name name ^ "\"...") ;
-        let inst = lookup_instance x_opt cmd.at in
-        let* utf8_name = Utf8.encode name in
-        registry := Map.add utf8_name inst !registry ;
-        Import.register name (lookup_registry utf8_name))
+        let+ inst = lookup_instance x_opt cmd.at in
+        registry := Map.add name inst !registry ;
+        Import.register ~module_name:name (lookup_registry name))
       else Lwt.return_unit
   | Action act ->
       quote := cmd :: !quote ;
@@ -601,7 +617,7 @@ and run_meta cmd =
       let+ () = run_quote_script script in
       bind scripts x_opt (lookup_script None cmd.at)
   | Input (x_opt, file) ->
-      let+ () =
+      let* () =
         Lwt.catch
           (fun () ->
             let+ res = input_file file run_quote_script in
@@ -612,7 +628,10 @@ and run_meta cmd =
       if x_opt <> None then (
         bind modules x_opt (lookup_module None cmd.at) ;
         if not !Flags.dry then
-          bind instances x_opt (lookup_instance None cmd.at))
+          let+ inst = lookup_instance None cmd.at in
+          bind_lazy instances x_opt inst
+        else Lwt.return_unit)
+      else Lwt.return_unit
   | Output (x_opt, Some file) ->
       Lwt.catch
         (fun () ->
@@ -644,5 +663,3 @@ and run_quote_script script =
 let run_file file = input_file file run_script
 
 let run_string string = input_string string run_script
-
-let run_stdin () = input_stdin run_script

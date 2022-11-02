@@ -4,6 +4,7 @@
 (executable
  (name main)
  (libraries
+  tezt
   tezos-context
   alcotest-lwt
   tezos-base
@@ -25,4 +26,5 @@
 (rule
  (alias runtest)
  (package tezos-protocol-alpha-tests)
+ (deps (glob_files wasm_kernel/*.wasm))
  (action (run %{dep:./main.exe})))
