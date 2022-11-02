@@ -1,0 +1,3 @@
+include:
+  # Stage: publish_release
+  - .gitlab/ci/jobs/publish/docker_promote_to_latest_release.yml

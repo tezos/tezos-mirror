@@ -1,0 +1,10 @@
+include: .gitlab/ci/jobs/build/common.yml
+
+build_x86_64:
+  extends:
+    - .build
+    # This job is the main bottleneck since a lot of tests depend on it.
+    # So we start it even before sanity_ci.
+  needs: [trigger]
+  variables:
+    ARCH: "x86_64"

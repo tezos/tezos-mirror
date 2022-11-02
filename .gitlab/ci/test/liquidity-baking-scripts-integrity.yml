@@ -1,5 +1,0 @@
-test-liquidity-baking-scripts:
-  extends: .integration_template
-  stage: test
-  script:
-    - make -C ${CI_PROJECT_DIR}/.gitlab/ci integration-test-liquidity-baking-scripts

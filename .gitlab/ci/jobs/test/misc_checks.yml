@@ -1,0 +1,8 @@
+misc_checks:
+  extends:
+    - .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  needs: [trigger]
+  retry: 1
+  script:
+    - make -C ${CI_PROJECT_DIR}/.gitlab/ci lint-misc-check

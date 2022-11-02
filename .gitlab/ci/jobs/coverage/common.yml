@@ -1,0 +1,19 @@
+.template__coverage_report:
+  extends: .template__coverage
+  stage: test_coverage
+  before_script:
+    # Load the environment poetry previously created in the docker image
+    # Give access to the Python dependencies/executables
+    - . "$HOME/.venv/bin/activate"
+  coverage: '/Coverage: ([^%]+%)/'
+  artifacts:
+    expose_as: 'Coverage report'
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: _coverage_report/cobertura.xml
+    paths:
+      - _coverage_report/
+      - $BISECT_FILE
+    expire_in: 15 days
+    when: always

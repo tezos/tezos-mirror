@@ -1,0 +1,78 @@
+---
+# This job fetches coverage files by precedent test stage. It creates the html,
+# summary and cobertura reports. It also provide a coverage % for the merge request.
+
+include: .gitlab/ci/jobs/coverage/common.yml
+
+unified_coverage:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage_report
+  # This job requires all bisect_ppx artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` with a list of jobs.
+  # Each new job in the stage test needs to be manually added to this list.
+  dependencies:
+    - "integration:pytest 1/20"
+    - "integration:pytest 2/20"
+    - "integration:pytest 3/20"
+    - "integration:pytest 4/20"
+    - "integration:pytest 5/20"
+    - "integration:pytest 6/20"
+    - "integration:pytest 7/20"
+    - "integration:pytest 8/20"
+    - "integration:pytest 9/20"
+    - "integration:pytest 10/20"
+    - "integration:pytest 11/20"
+    - "integration:pytest 12/20"
+    - "integration:pytest 13/20"
+    - "integration:pytest 14/20"
+    - "integration:pytest 15/20"
+    - "integration:pytest 16/20"
+    - "integration:pytest 17/20"
+    - "integration:pytest 18/20"
+    - "integration:pytest 19/20"
+    - "integration:pytest 20/20"
+    - "test-liquidity-baking-scripts"
+    - "tezt 1/30"
+    - "tezt 2/30"
+    - "tezt 3/30"
+    - "tezt 4/30"
+    - "tezt 5/30"
+    - "tezt 6/30"
+    - "tezt 7/30"
+    - "tezt 8/30"
+    - "tezt 9/30"
+    - "tezt 10/30"
+    - "tezt 11/30"
+    - "tezt 12/30"
+    - "tezt 13/30"
+    - "tezt 14/30"
+    - "tezt 15/30"
+    - "tezt 16/30"
+    - "tezt 17/30"
+    - "tezt 18/30"
+    - "tezt 19/30"
+    - "tezt 20/30"
+    - "tezt 21/30"
+    - "tezt 22/30"
+    - "tezt 23/30"
+    - "tezt 24/30"
+    - "tezt 25/30"
+    - "tezt 26/30"
+    - "tezt 27/30"
+    - "tezt 28/30"
+    - "tezt 29/30"
+    - "tezt 30/30"
+    - "unit:alpha: [proto_alpha]"
+    - "unit:alpha: [proto_alpha__lib_protocol__1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__3]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt1]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt2]"
+    - "unit:alpha: [proto_alpha__lib_protocol__pbt3]"
+    - "unit:non-proto-x86_64"
+
+  script:
+    # On the development branches, we compute coverage
+    - ./scripts/ci/report_coverage.sh
