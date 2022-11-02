@@ -25,7 +25,31 @@
 
 open Protocol.Alpha_context.Sc_rollup
 
-module Make (PVM : Pvm.S) = struct
+module type S = sig
+  type state
+
+  (** [transition_pvm inbox_level hash n] emits the event that a PVM
+   transition is leading to the state of the given [hash] by
+   processing [n] messages. *)
+  val transitioned_pvm :
+    Protocol.Alpha_context.Raw_level.t -> state -> Z.t -> unit Lwt.t
+
+  (** [intended_failure level message_index message_tick internal] emits
+   the event that an intended failure has been injected at some given
+   [level], during the processing of a given [message_index] and at
+   tick [message_tick] during this message processing. [internal] is
+   [true] if the failure is injected in a PVM internal
+   step. [internal] is [false] if the failure is injected in the input
+   to the PVM. *)
+  val intended_failure :
+    level:int ->
+    message_index:int ->
+    message_tick:int64 ->
+    internal:bool ->
+    unit Lwt.t
+end
+
+module Make (PVM : Pvm.S) : S with type state := PVM.state = struct
   module Simple = struct
     include Internal_event.Simple
 
