@@ -25,12 +25,18 @@
 
 type neighbor = {addr : string; port : int}
 
+type dac = {
+  addresses : Aggregate_signature.public_key_hash list;
+  threshold : int;
+}
+
 type t = {
   use_unsafe_srs : bool;
   data_dir : string;
   rpc_addr : string;
   rpc_port : int;
   neighbors : neighbor list;
+  dac : dac;
 }
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
@@ -47,6 +53,13 @@ let default_rpc_port = 10732
 
 let default_neighbors = []
 
+let default_dac_threshold = 0
+
+let default_dac_addresses = []
+
+let default_dac =
+  {addresses = default_dac_addresses; threshold = default_dac_threshold}
+
 let default_use_unsafe_srs = false
 
 let neighbor_encoding : neighbor Data_encoding.t =
@@ -56,14 +69,23 @@ let neighbor_encoding : neighbor Data_encoding.t =
     (fun (addr, port) -> {addr; port})
     (obj2 (req "rpc-addr" string) (req "rpc-port" int16))
 
+let dac_encoding : dac Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {addresses; threshold} -> (addresses, threshold))
+    (fun (addresses, threshold) -> {addresses; threshold})
+    (obj2
+       (req "addresses" (list Aggregate_signature.Public_key_hash.encoding))
+       (req "threshold" uint8))
+
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors} ->
-      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors))
-    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors) ->
-      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors})
-    (obj5
+    (fun {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors; dac} ->
+      (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors, dac))
+    (fun (use_unsafe_srs, data_dir, rpc_addr, rpc_port, neighbors, dac) ->
+      {use_unsafe_srs; data_dir; rpc_addr; rpc_port; neighbors; dac})
+    (obj6
        (dft
           "use_unsafe_srs"
           ~description:"use unsafe srs for tests"
@@ -80,7 +102,12 @@ let encoding : t Data_encoding.t =
           "neighbors"
           ~description:"DAL Neighbors"
           (list neighbor_encoding)
-          default_neighbors))
+          default_neighbors)
+       (dft
+          "dac"
+          ~description:"Data Availability Committee"
+          dac_encoding
+          default_dac))
 
 type error += DAL_node_unable_to_write_configuration_file of string
 

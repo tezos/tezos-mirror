@@ -86,7 +86,14 @@ let config_init_command =
     (fun (data_dir, rpc_addr, rpc_port, use_unsafe_srs) cctxt ->
       let open Configuration in
       let config =
-        {data_dir; rpc_addr; rpc_port; use_unsafe_srs; neighbors = []}
+        {
+          data_dir;
+          rpc_addr;
+          rpc_port;
+          use_unsafe_srs;
+          neighbors = [];
+          dac = default_dac;
+        }
       in
       let* () = save config in
       let*! _ =
