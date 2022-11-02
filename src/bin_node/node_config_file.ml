@@ -411,7 +411,7 @@ and p2p = {
   limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
 }
 
 and rpc = {
@@ -436,7 +436,7 @@ let default_p2p =
     limits = Tezos_p2p_services.P2p_limits.default;
     disable_mempool = false;
     enable_testchain = false;
-    reconnection_config = P2p_point_state.Info.default_reconnection_config;
+    reconnection_config = Tezos_p2p_services.Point_reconnection_config.default;
   }
 
 let default_rpc =
@@ -582,14 +582,14 @@ let p2p =
              blocks."
           bool
           false)
-       (let open P2p_point_state.Info in
+       (let open Tezos_p2p_services.Point_reconnection_config in
        dft
          "greylisting_config"
          ~description:
            "The reconnection policy regulates the frequency with which the \
             node tries to reconnect to an old known peer."
-         reconnection_config_encoding
-         default_reconnection_config))
+         encoding
+         default))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in

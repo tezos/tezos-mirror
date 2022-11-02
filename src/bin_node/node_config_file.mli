@@ -81,7 +81,7 @@ and p2p = {
   limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
 }
 
 and rpc = {

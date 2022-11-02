@@ -38,7 +38,7 @@ type config = {
   identity : P2p_identity.t;
   proof_of_work_target : Crypto_box.pow_target;
   trust_discovered_peers : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Point_reconnection_config.t;
 }
 
 let create_scheduler limits =

@@ -105,7 +105,7 @@ type config = {
       (** Expected level of proof of work of peers' identity. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Point_reconnection_config.t;
       (** The reconnection delat configuration. *)
 }
 
