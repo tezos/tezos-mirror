@@ -26,19 +26,12 @@
 
 type t
 
-type limits = {
-  new_head_request_timeout : Time.System.Span.t;
-  block_header_timeout : Time.System.Span.t;
-  block_operations_timeout : Time.System.Span.t;
-  protocol_timeout : Time.System.Span.t;
-}
-
 val peer_id : t -> P2p_peer.Id.t
 
 val create :
   ?notify_new_block:(Store.Block.t -> unit) ->
   ?notify_termination:(unit -> unit) ->
-  limits ->
+  Shell_limits.peer_validator_limits ->
   Block_validator.t ->
   Distributed_db.chain_db ->
   P2p_peer.Id.t ->

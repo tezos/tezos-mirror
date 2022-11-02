@@ -62,10 +62,6 @@ module Request = struct
     | Disconnection peer_id -> PeerId peer_id
 end
 
-type synchronisation_limits = {latency : int; threshold : int}
-
-type limits = {synchronisation : synchronisation_limits}
-
 module Types = struct
   type parameters = {
     parent : Name.t option;
@@ -77,9 +73,9 @@ module Types = struct
     global_valid_block_input : Store.Block.t Lwt_watcher.input;
     global_chains_input : (Chain_id.t * bool) Lwt_watcher.input;
     start_prevalidator : bool;
-    prevalidator_limits : Prevalidator.limits;
-    peer_validator_limits : Peer_validator.limits;
-    limits : limits;
+    prevalidator_limits : Shell_limits.prevalidator_limits;
+    peer_validator_limits : Shell_limits.peer_validator_limits;
+    limits : Shell_limits.chain_validator_limits;
     metrics : Shell_metrics.Chain_validator.t;
   }
 
@@ -804,8 +800,9 @@ let on_launch w _ parameters =
 let metrics = Shell_metrics.Chain_validator.init Name.base
 
 let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
-    start_prevalidator (peer_validator_limits : Peer_validator.limits)
-    (prevalidator_limits : Prevalidator.limits) block_validator
+    start_prevalidator
+    (peer_validator_limits : Shell_limits.peer_validator_limits)
+    (prevalidator_limits : Shell_limits.prevalidator_limits) block_validator
     global_valid_block_input global_chains_input db chain_store limits =
   let open Lwt_result_syntax in
   let spawn_child ~parent enable_prevalidator peer_validator_limits

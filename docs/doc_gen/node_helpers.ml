@@ -62,10 +62,10 @@ let with_node f =
       Node.create
         ~singleprocess:true
         node_config
-        Node.default_peer_validator_limits
-        Node.default_block_validator_limits
-        Node.default_prevalidator_limits
-        Node.default_chain_validator_limits
+        Tezos_shell_services.Shell_limits.default_peer_validator_limits
+        Tezos_shell_services.Shell_limits.default_block_validator_limits
+        Tezos_shell_services.Shell_limits.default_prevalidator_limits
+        Tezos_shell_services.Shell_limits.default_chain_validator_limits
         None
     in
     f node

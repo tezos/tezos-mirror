@@ -117,9 +117,6 @@ type apply_environment = {
       (** size limit for operation metadata that should be written on disk *)
 }
 
-(** Default size limit for operation metadata *)
-val default_operation_metadata_size_limit : int option
-
 (** [apply env header ops] gets the protocol [P] of the context of the
     predecessor block and calls successively:
     1. [P.begin_application]

@@ -26,35 +26,19 @@
 
 type t
 
-(** Constants parameterizing the bootstrap heuristics. *)
-type synchronisation_limits = {
-  latency : int;
-      (** [latency] is the time interval (seconds) used to determine
-          if a node is synchronized with a chain. For instance, a node that
-          knows head with timestamp T is synchronized if T >= now -
-          max_latency. This parameter depends on the baking rate and the
-          latency of the network. *)
-  threshold : int;
-      (** [threshold] determines the number of peers the synchronization
-     heuristic looks at to determine if the node is synchronized or
-     not.  *)
-}
-
-type limits = {synchronisation : synchronisation_limits}
-
 val create :
   start_prevalidator:bool ->
   start_testchain:bool ->
   active_chains:t Chain_id.Table.t ->
   block_validator_process:Block_validator_process.t ->
-  Peer_validator.limits ->
-  Prevalidator.limits ->
+  Shell_limits.peer_validator_limits ->
+  Shell_limits.prevalidator_limits ->
   Block_validator.t ->
   Store.Block.t Lwt_watcher.input ->
   (Chain_id.t * bool) Lwt_watcher.input ->
   Distributed_db.t ->
   Store.chain_store ->
-  limits ->
+  Shell_limits.chain_validator_limits ->
   t tzresult Lwt.t
 
 val chain_id : t -> Chain_id.t

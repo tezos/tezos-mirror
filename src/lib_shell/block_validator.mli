@@ -28,11 +28,6 @@
 
 type t
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
-}
-
 (** [create limits ddb bvp start_testchain] creates a
    [Block_validator].
 
@@ -51,7 +46,7 @@ type limits = {
     This function is not supposed to fail. It is implemented this way
    because of the interface implemented by the [Worker] module. *)
 val create :
-  limits ->
+  Shell_limits.block_validator_limits ->
   Distributed_db.t ->
   Block_validator_process.t ->
   start_testchain:bool ->

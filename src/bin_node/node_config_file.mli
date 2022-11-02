@@ -65,7 +65,7 @@ type t = {
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
   internal_events : Internal_event_config.t;
-  shell : shell;
+  shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
   dal : dal;
@@ -94,14 +94,6 @@ and rpc = {
 }
 
 and tls = {cert : string; key : string}
-
-and shell = {
-  block_validator_limits : Block_validator.limits;
-  prevalidator_limits : Prevalidator.limits;
-  peer_validator_limits : Peer_validator.limits;
-  chain_validator_limits : Chain_validator.limits;
-  history_mode : History_mode.t option;
-}
 
 val data_dir_env_name : string
 

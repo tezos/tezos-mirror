@@ -137,13 +137,13 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       config
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in
@@ -171,13 +171,13 @@ let node_initialization_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in
@@ -211,13 +211,13 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in

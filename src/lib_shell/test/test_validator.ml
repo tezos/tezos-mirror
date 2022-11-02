@@ -66,11 +66,11 @@ let init_validator
       Validator.create
         store
         db
-        Node.default_peer_validator_limits
-        Node.default_block_validator_limits
+        Shell_limits.default_peer_validator_limits
+        Shell_limits.default_block_validator_limits
         block_validator
-        Node.default_prevalidator_limits
-        Node.default_chain_validator_limits
+        Shell_limits.default_prevalidator_limits
+        Shell_limits.default_chain_validator_limits
         ~start_testchain:false
     in
     Lwt.return_ok (block_validator, validator, Store.main_chain_store store)
