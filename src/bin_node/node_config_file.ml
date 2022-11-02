@@ -408,7 +408,7 @@ and p2p = {
   advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
-  limits : P2p.limits;
+  limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : P2p_point_state.Info.reconnection_config;
@@ -425,37 +425,6 @@ and rpc = {
 
 and tls = {cert : string; key : string}
 
-let default_p2p_limits : P2p.limits =
-  let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) in
-  {
-    connection_timeout = Time.System.Span.of_seconds_exn 10.;
-    authentication_timeout = Time.System.Span.of_seconds_exn 5.;
-    greylist_timeout;
-    maintenance_idle_time =
-      Time.System.Span.of_seconds_exn 120. (* two minutes *);
-    min_connections = 10;
-    expected_connections = 50;
-    max_connections = 100;
-    backlog = 20;
-    max_incoming_connections = 20;
-    max_download_speed = None;
-    max_upload_speed = None;
-    read_buffer_size = 1 lsl 14;
-    read_queue_size = None;
-    write_queue_size = None;
-    incoming_app_message_queue_size = None;
-    incoming_message_queue_size = None;
-    outgoing_message_queue_size = None;
-    max_known_points = Some (400, 300);
-    max_known_peer_ids = Some (400, 300);
-    peer_greylist_size = 1023 (* historical value *);
-    ip_greylist_size_in_kilobytes =
-      2 * 1024 (* two megabytes has shown good properties in simulation *);
-    ip_greylist_cleanup_delay = greylist_timeout;
-    swap_linger = Time.System.Span.of_seconds_exn 30.;
-    binary_chunks_size = None;
-  }
-
 let default_p2p =
   {
     expected_pow = 26.;
@@ -464,7 +433,7 @@ let default_p2p =
     advertised_net_port = None;
     discovery_addr = None;
     private_mode = false;
-    limits = default_p2p_limits;
+    limits = Tezos_p2p_services.P2p_limits.default;
     disable_mempool = false;
     enable_testchain = false;
     reconnection_config = P2p_point_state.Info.default_reconnection_config;
@@ -497,223 +466,6 @@ let default_config =
     metrics_addr = [];
     dal = default_dal;
   }
-
-let limit : P2p.limits Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {
-           P2p.connection_timeout;
-           authentication_timeout;
-           greylist_timeout;
-           maintenance_idle_time;
-           min_connections;
-           expected_connections;
-           max_connections;
-           backlog;
-           max_incoming_connections;
-           max_download_speed;
-           max_upload_speed;
-           read_buffer_size;
-           read_queue_size;
-           write_queue_size;
-           incoming_app_message_queue_size;
-           incoming_message_queue_size;
-           outgoing_message_queue_size;
-           max_known_points;
-           max_known_peer_ids;
-           peer_greylist_size;
-           ip_greylist_size_in_kilobytes;
-           ip_greylist_cleanup_delay;
-           swap_linger;
-           binary_chunks_size;
-         } ->
-      ( ( ( connection_timeout,
-            authentication_timeout,
-            min_connections,
-            expected_connections,
-            max_connections,
-            backlog,
-            max_incoming_connections,
-            max_download_speed,
-            max_upload_speed,
-            swap_linger ),
-          ( binary_chunks_size,
-            read_buffer_size,
-            read_queue_size,
-            write_queue_size,
-            incoming_app_message_queue_size,
-            incoming_message_queue_size,
-            outgoing_message_queue_size,
-            max_known_points ) ),
-        ( max_known_peer_ids,
-          peer_greylist_size,
-          ip_greylist_size_in_kilobytes,
-          ip_greylist_cleanup_delay,
-          greylist_timeout,
-          maintenance_idle_time ) ))
-    (fun ( ( ( connection_timeout,
-               authentication_timeout,
-               min_connections,
-               expected_connections,
-               max_connections,
-               backlog,
-               max_incoming_connections,
-               max_download_speed,
-               max_upload_speed,
-               swap_linger ),
-             ( binary_chunks_size,
-               read_buffer_size,
-               read_queue_size,
-               write_queue_size,
-               incoming_app_message_queue_size,
-               incoming_message_queue_size,
-               outgoing_message_queue_size,
-               max_known_points ) ),
-           ( max_known_peer_ids,
-             peer_greylist_size,
-             ip_greylist_size_in_kilobytes,
-             ip_greylist_cleanup_delay,
-             greylist_timeout,
-             maintenance_idle_time ) ) ->
-      {
-        connection_timeout;
-        authentication_timeout;
-        greylist_timeout;
-        maintenance_idle_time;
-        min_connections;
-        expected_connections;
-        max_connections;
-        backlog;
-        max_incoming_connections;
-        max_download_speed;
-        max_upload_speed;
-        read_buffer_size;
-        read_queue_size;
-        write_queue_size;
-        incoming_app_message_queue_size;
-        incoming_message_queue_size;
-        outgoing_message_queue_size;
-        max_known_points;
-        max_known_peer_ids;
-        peer_greylist_size;
-        ip_greylist_size_in_kilobytes;
-        ip_greylist_cleanup_delay;
-        swap_linger;
-        binary_chunks_size;
-      })
-    (merge_objs
-       (merge_objs
-          (obj10
-             (dft
-                "connection-timeout"
-                ~description:
-                  "Delay acceptable when initiating a connection to a new \
-                   peer, in seconds."
-                Time.System.Span.encoding
-                default_p2p_limits.authentication_timeout)
-             (dft
-                "authentication-timeout"
-                ~description:
-                  "Delay granted to a peer to perform authentication, in \
-                   seconds."
-                Time.System.Span.encoding
-                default_p2p_limits.authentication_timeout)
-             (dft
-                "min-connections"
-                ~description:
-                  "Strict minimum number of connections (triggers an urgent \
-                   maintenance)."
-                uint16
-                default_p2p_limits.min_connections)
-             (dft
-                "expected-connections"
-                ~description:
-                  "Targeted number of connections to reach when bootstrapping \
-                   / maintaining."
-                uint16
-                default_p2p_limits.expected_connections)
-             (dft
-                "max-connections"
-                ~description:
-                  "Maximum number of connections (exceeding peers are \
-                   disconnected)."
-                uint16
-                default_p2p_limits.max_connections)
-             (dft
-                "backlog"
-                ~description:
-                  "Number above which pending incoming connections are \
-                   immediately rejected."
-                uint8
-                default_p2p_limits.backlog)
-             (dft
-                "max-incoming-connections"
-                ~description:
-                  "Number above which pending incoming connections are \
-                   immediately rejected."
-                uint8
-                default_p2p_limits.max_incoming_connections)
-             (opt
-                "max-download-speed"
-                ~description:"Max download speeds in KiB/s."
-                int31)
-             (opt
-                "max-upload-speed"
-                ~description:"Max upload speeds in KiB/s."
-                int31)
-             (dft
-                "swap-linger"
-                Time.System.Span.encoding
-                default_p2p_limits.swap_linger))
-          (obj8
-             (opt "binary-chunks-size" uint8)
-             (dft
-                "read-buffer-size"
-                ~description:"Size of the buffer passed to read(2)."
-                int31
-                default_p2p_limits.read_buffer_size)
-             (opt "read-queue-size" int31)
-             (opt "write-queue-size" int31)
-             (opt "incoming-app-message-queue-size" int31)
-             (opt "incoming-message-queue-size" int31)
-             (opt "outgoing-message-queue-size" int31)
-             (opt
-                "max_known_points"
-                ~description:
-                  "The max and target size for the known address table."
-                (tup2 uint16 uint16))))
-       (obj6
-          (opt
-             "max_known_peer_ids"
-             ~description:"The max and target size for the known peers table."
-             (tup2 uint16 uint16))
-          (dft
-             "peer_greylist_size"
-             ~description:"The number of peer_ids kept in the peer_id greylist."
-             uint16
-             default_p2p_limits.peer_greylist_size)
-          (dft
-             "ip_greylist_size_in_kilobytes"
-             ~description:"The size of the IP address greylist (in kilobytes)."
-             uint16
-             default_p2p_limits.ip_greylist_size_in_kilobytes)
-          (dft
-             "ip_greylist_cleanup_delay"
-             ~description:"The time an IP address is kept in the greylist."
-             Time.System.Span.encoding
-             default_p2p_limits.ip_greylist_cleanup_delay)
-          (dft
-             "greylist-timeout"
-             ~description:"GC delay for the greylists tables, in seconds."
-             Time.System.Span.encoding
-             default_p2p_limits.greylist_timeout)
-          (dft
-             "maintenance-idle-time"
-             ~description:
-               "How long to wait at most, in seconds, before running a \
-                maintenance loop."
-             Time.System.Span.encoding
-             default_p2p_limits.maintenance_idle_time)))
 
 let p2p =
   let open Data_encoding in
@@ -806,7 +558,11 @@ let p2p =
              the identity and the address of the private node secret."
           bool
           false)
-       (dft "limits" ~description:"Network limits" limit default_p2p_limits)
+       (dft
+          "limits"
+          ~description:"Network limits"
+          Tezos_p2p_services.P2p_limits.encoding
+          Tezos_p2p_services.P2p_limits.default)
        (dft
           "disable_mempool"
           ~description:
@@ -1127,7 +883,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   let* () = Node_data_version.ensure_data_dir ~mode:Exists data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
-  let limits : P2p.limits =
+  let limits : Tezos_p2p_services.P2p_limits.t =
     {
       cfg.p2p.limits with
       min_connections =

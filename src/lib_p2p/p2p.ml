@@ -41,34 +41,8 @@ type config = {
   reconnection_config : P2p_point_state.Info.reconnection_config;
 }
 
-type limits = {
-  connection_timeout : Time.System.Span.t;
-  authentication_timeout : Time.System.Span.t;
-  greylist_timeout : Time.System.Span.t;
-  maintenance_idle_time : Time.System.Span.t;
-  min_connections : int;
-  expected_connections : int;
-  max_connections : int;
-  backlog : int;
-  max_incoming_connections : int;
-  max_download_speed : int option;
-  max_upload_speed : int option;
-  read_buffer_size : int;
-  read_queue_size : int option;
-  write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
-  incoming_message_queue_size : int option;
-  outgoing_message_queue_size : int option;
-  max_known_peer_ids : (int * int) option;
-  max_known_points : (int * int) option;
-  peer_greylist_size : int;
-  ip_greylist_size_in_kilobytes : int;
-  ip_greylist_cleanup_delay : Time.System.Span.t;
-  swap_linger : Time.System.Span.t;
-  binary_chunks_size : int option;
-}
-
 let create_scheduler limits =
+  let open P2p_limits in
   let max_upload_speed = Option.map (( * ) 1024) limits.max_upload_speed in
   let max_download_speed = Option.map (( * ) 1024) limits.max_download_speed in
   P2p_io_scheduler.create
@@ -80,6 +54,7 @@ let create_scheduler limits =
     ()
 
 let create_connection_pool config limits meta_cfg log triggers =
+  let open P2p_limits in
   let pool_cfg =
     {
       P2p_pool.identity = config.identity;
@@ -97,6 +72,7 @@ let create_connection_pool config limits meta_cfg log triggers =
 
 let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
     triggers log answerer =
+  let open P2p_limits in
   let connect_handler_cfg =
     {
       P2p_connect_handler.identity = config.identity;
@@ -142,6 +118,7 @@ let may_create_discovery_worker _limits config pool =
   | _, _, _ -> None
 
 let create_maintenance_worker limits pool connect_handler config triggers log =
+  let open P2p_limits in
   let maintenance_config =
     {
       P2p_maintenance.maintenance_idle_time = limits.maintenance_idle_time;
@@ -171,7 +148,7 @@ let may_create_welcome_worker config limits connect_handler =
   config.listening_port
   |> Option.map_es (fun port ->
          P2p_welcome.create
-           ~backlog:limits.backlog
+           ~backlog:limits.P2p_limits.backlog
            connect_handler
            ?addr:config.listening_addr
            port)
@@ -182,7 +159,7 @@ type ('msg, 'peer_meta, 'conn_meta) connection =
 module Real = struct
   type ('msg, 'peer_meta, 'conn_meta) net = {
     config : config;
-    limits : limits;
+    limits : P2p_limits.t;
     io_sched : P2p_io_scheduler.t;
     pool : ('msg, 'peer_meta, 'conn_meta) P2p_pool.t;
     connect_handler : ('msg, 'peer_meta, 'conn_meta) P2p_connect_handler.t;
@@ -212,7 +189,7 @@ module Real = struct
           in
           let proto_conf =
             {
-              P2p_protocol.swap_linger = limits.swap_linger;
+              P2p_protocol.swap_linger = limits.P2p_limits.swap_linger;
               pool;
               log;
               connect;
@@ -481,6 +458,7 @@ let connect_handler net = net.connect_handler
 
 let check_limits =
   let open Result_syntax in
+  let open P2p_limits in
   let fail_1 v orig =
     if not (Ptime.Span.compare v Ptime.Span.zero <= 0) then return_unit
     else

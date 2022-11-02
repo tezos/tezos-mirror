@@ -78,7 +78,7 @@ and p2p = {
   advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
-  limits : P2p.limits;
+  limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
   reconnection_config : P2p_point_state.Info.reconnection_config;
