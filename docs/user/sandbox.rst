@@ -56,7 +56,7 @@ preconfigured for communicating with the same-numbered node.
 When you bootstrap a new network, the network is initialized with a
 dummy economic protocol, called `genesis`. If you want to run the whole implemented
 protocol, ``init-sandboxed-client`` also defines an
-alias ``tezos-activate-alpha``, that you need to execute once for
+alias ``octez-activate-alpha``, that you need to execute once for
 activating the whole network.
 For instance:
 
@@ -64,7 +64,7 @@ For instance:
 
     $ octez-client rpc get /chains/main/blocks/head/metadata
       "next_protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-    $ tezos-activate-alpha
+    $ octez-activate-alpha
       Injected BMV9KnSPE1yw
     $ octez-client rpc get /chains/main/blocks/head/metadata
       "protocol": "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
@@ -115,7 +115,7 @@ binary.
 Tune protocol Alpha parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``tezos-activate-alpha`` alias uses parameters from
+The ``octez-activate-alpha`` alias uses parameters from
 ``src/proto_alpha/parameters/sandbox-parameters.json`` to activate protocol
 Alpha. It can be useful to tune these parameters when you need to debug
 something, for example, change the number of blocks per cycle, the time between
