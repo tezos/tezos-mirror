@@ -175,9 +175,9 @@ module Parameters = struct
     | Failed error -> (
         match op with
         | Tx_rollup_remove_commitment _ | Tx_rollup_finalize_commitment _ ->
-            (* We can keep these operations as there will be at most one of them
-               in the queue at any given time. *)
-            return Retry
+            (* We can ignore these operations as they are injected
+               preemptively. *)
+            return Forget
         | _ -> return (Abort error))
 
   let operation_tag (type kind) (operation : kind manager_operation) =
