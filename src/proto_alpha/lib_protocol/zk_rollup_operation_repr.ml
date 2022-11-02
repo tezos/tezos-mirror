@@ -49,7 +49,7 @@ let to_scalar_array {op_code; price; l1_dst; rollup_id; payload} =
       [|
         int_to_scalar op_code;
         ticket_hash_to_scalar price.id;
-        Zk_rollup_scalar.of_z price.amount;
+        Zk_rollup_scalar.of_z @@ Z.abs price.amount;
         pkh_to_scalar l1_dst;
         Zk_rollup_repr.to_scalar rollup_id;
       |];
