@@ -274,75 +274,84 @@ module Confirmed_slots_history = struct
     in
     return @@ Option.value slots_list_opt ~default:Dal.Slots_history.genesis
 
-  let slots_history_of_hash node_ctxt
-      Layer1.{hash = block_hash; level = block_level} =
-    let open Lwt_result_syntax in
+  (** Depending on the rollup's origination level and on the DAL's endorsement
+      lag, the rollup node should start processing confirmed slots and update its
+      slots_history and slots_history's cache entries in the store after
+      [origination_level + endorsement_lag] blocks. This function checks if
+      that level is reached or not.  *)
+  let should_process_dal_slots node_ctxt block_level =
     let open Node_context in
-    let*! confirmed_slots_history_opt =
-      Store.Dal_confirmed_slots_history.find node_ctxt.store block_hash
+    let lag =
+      Int32.of_int
+        node_ctxt.Node_context.protocol_constants.parametric.dal.endorsement_lag
     in
-    match confirmed_slots_history_opt with
-    | Some confirmed_dal_slots -> return confirmed_dal_slots
-    | None ->
-        let block_level = Raw_level.of_int32_exn block_level in
-        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
-          (* We won't find "dal slots history" for blocks before the
-             rollup origination level in the node's store. In this case, we get
-             the value of the skip list form L1 in case DAL is enabled, or the
-             genesis DAL skip list otherwise. *)
-          read_slots_history_from_l1 node_ctxt block_hash
-        else
-          (* We won't find "dal slots history" for blocks after the rollup
-             origination level. This should not happen in normal circumstances. *)
-          failwith
-            "The confirmed DAL slots history for block hash %a (level = %a) is \
-             missing."
-            Block_hash.pp
-            block_hash
-            Raw_level.pp
-            block_level
+    let block_level = Raw_level.to_int32 block_level in
+    let genesis_level = Raw_level.to_int32 node_ctxt.genesis_info.level in
+    Int32.(block_level >= add lag genesis_level)
 
-  let slots_history_cache_of_hash node_ctxt
-      Layer1.{hash = block_hash; level = block_level} =
+  let dal_entry_of_block_hash node_ctxt
+      Layer1.{hash = block_hash; level = block_level} ~entry_kind ~find ~default
+      =
     let open Lwt_result_syntax in
     let open Node_context in
-    let*! confirmed_slots_history_cache_opt =
-      Store.Dal_confirmed_slots_histories.find node_ctxt.store block_hash
+    let*! confirmed_slots_history_opt = find node_ctxt.store block_hash in
+    let block_level = Raw_level.of_int32_exn block_level in
+    let should_process_dal_slots =
+      should_process_dal_slots node_ctxt block_level
     in
-    match confirmed_slots_history_cache_opt with
-    | Some cache -> return cache
-    | None ->
-        let block_level = Raw_level.of_int32_exn block_level in
-        if Raw_level.(block_level <= node_ctxt.genesis_info.level) then
-          (* We won't find "dal slots history cache" for blocks before the
-             rollup origination level. In this case, we initialize with the
-             empty cache. *)
-          let num_slots =
-            node_ctxt.Node_context.protocol_constants.parametric.dal
-              .number_of_slots
-          in
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
-             Put an accurate value for capacity. The value
-                    `num_slots * 60000` below is chosen based on:
-                 - The number of remembered L1 inboxes in their corresponding
-                   cache (60000),
-                 - The (max) number of slots (num_slots) that could be attested
-                   per L1 block,
-                 - The way the Slots_history.t skip list is implemented (one slot
-                   per cell). *)
-          return
-          @@ Dal.Slots_history.History_cache.empty
-               ~capacity:(Int64.of_int @@ (num_slots * 60000))
-        else
-          (* We won't find "dal slots history cache" for blocks after the rollup
-             origination level. This should not happen in normal circumstances. *)
-          failwith
-            "The confirmed DAL slots history cache for block hash %a (level = \
-             %a) is missing."
-            Block_hash.pp
-            block_hash
-            Raw_level.pp
-            block_level
+    match (confirmed_slots_history_opt, should_process_dal_slots) with
+    | Some confirmed_dal_slots, true -> return confirmed_dal_slots
+    | None, false -> default node_ctxt block_hash
+    | Some _confirmed_dal_slots, false ->
+        failwith
+          "The confirmed DAL %S for block hash %a (level = %a) is not expected \
+           to be found in the store, but is exists."
+          entry_kind
+          Block_hash.pp
+          block_hash
+          Raw_level.pp
+          block_level
+    | None, true ->
+        failwith
+          "The confirmed DAL %S for block hash %a (level = %a) is expected to \
+           be found in the store, but is missing."
+          entry_kind
+          Block_hash.pp
+          block_hash
+          Raw_level.pp
+          block_level
+
+  let slots_history_of_hash node_ctxt block =
+    dal_entry_of_block_hash
+      node_ctxt
+      block
+      ~entry_kind:"slots history"
+      ~find:Store.Dal_confirmed_slots_history.find
+      ~default:read_slots_history_from_l1
+
+  let slots_history_cache_of_hash node_ctxt block =
+    dal_entry_of_block_hash
+      node_ctxt
+      block
+      ~entry_kind:"slots history cache"
+      ~find:Store.Dal_confirmed_slots_histories.find
+      ~default:(fun node_ctxt _block ->
+        let num_slots =
+          node_ctxt.Node_context.protocol_constants.parametric.dal
+            .number_of_slots
+        in
+        (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3788
+           Put an accurate value for capacity. The value
+                  `num_slots * 60000` below is chosen based on:
+               - The number of remembered L1 inboxes in their corresponding
+                 cache (60000),
+               - The (max) number of slots (num_slots) that could be attested
+                 per L1 block,
+               - The way the Slots_history.t skip list is implemented (one slot
+                 per cell). *)
+        return
+        @@ Dal.Slots_history.History_cache.empty
+             ~capacity:(Int64.of_int @@ (num_slots * 60000)))
 
   let update (Node_context.{store; l1_ctxt; _} as node_ctxt)
       Layer1.({hash = head_hash; _} as head) confirmation_info =
