@@ -1033,6 +1033,8 @@ struct
   module Lift (P : Updater.PROTOCOL) = struct
     let environment_version = Protocol.V5
 
+    let expected_context_hash = Resulting_context
+
     include P
 
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp

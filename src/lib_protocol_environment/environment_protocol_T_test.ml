@@ -54,6 +54,8 @@ module Mock_all_unit :
 
   let environment_version = Protocol.V0
 
+  let expected_context_hash = Environment_context.Resulting_context
+
   let init _ = assert false
 
   type nonrec validation_state = unit
