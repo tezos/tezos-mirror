@@ -112,33 +112,49 @@ module LinearModel = struct
       Scikit_matrix.of_numpy res
 end
 
-let r2_score ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t)
+let score
+    ~(score_func :
+       length:int ->
+       output:Pytypes.pyobject ->
+       prediction:Pytypes.pyobject ->
+       float) ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t)
     ~(weights : Scikit_matrix.t) =
   let weights = Scikit_matrix.to_numpy weights in
   let input = Scikit_matrix.to_numpy input in
   let len = Scikit_matrix.dim1 output in
-  if len <= 1 then
-    (* The following warning will be raised from `r2_score` of Python. *)
-    (* `R^2 score is not well-defined with less than two samples.` *)
+  let output = Scikit_matrix.to_numpy output in
+  let output =
+    Py.Module.get_function
+      (Pyinit.numpy ())
+      "reshape"
+      [|output; Py.Int.of_int len|]
+  in
+  let prediction =
+    Py.Module.get_function (Pyinit.numpy ()) "matmul" [|input; weights|]
+  in
+  score_func ~length:len ~output ~prediction
 
-    (* For this case, we use `1.0 (perfect predictions)` as the score. *)
-    (* see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.r2_score.html#sklearn.metrics.r2_score *)
-    1.0
-  else
-    let output = Scikit_matrix.to_numpy output in
-    let output =
-      Py.Module.get_function
-        (Pyinit.numpy ())
-        "reshape"
-        [|output; Py.Int.of_int len|]
-    in
-    let prediction =
-      Py.Module.get_function (Pyinit.numpy ()) "matmul" [|input; weights|]
-    in
-    let score =
-      Py.Module.get_function
+let r2_score =
+  score ~score_func:(fun ~length ~output ~prediction ->
+      if length <= 1 then
+        (* The following warning will be raised from `r2_score` of Python. *)
+        (* `R^2 score is not well-defined with less than two samples.` *)
+
+        (* For this case, we use `1.0 (perfect predictions)` as the score. *)
+        (* see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.r2_score.html#sklearn.metrics.r2_score *)
+        1.0
+      else
+        Py.Module.get_function
+          (Pyinit.sklearn_metrics ())
+          "r2_score"
+          [|output; prediction|]
+        |> Py.Float.to_float)
+
+let rmse_score =
+  score ~score_func:(fun ~length:_ ~output ~prediction ->
+      Py.Module.get_function_with_keywords
         (Pyinit.sklearn_metrics ())
-        "r2_score"
+        "mean_squared_error"
         [|output; prediction|]
-    in
-    Py.Float.to_float score
+        [("squared", Py.Bool.f)]
+      |> Py.Float.to_float)

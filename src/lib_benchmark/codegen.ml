@@ -202,8 +202,8 @@ type solution = {
   (* The data required to perform code generation is a map from variables to
      (floating point) coefficients. *)
   map : float Free_variable.Map.t;
-  (* R^2 score of the models. Higher score is better and 1.0 is the best. *)
-  scores : (string * float) list;
+  (* The scores of the models with the estimated coefficients. *)
+  scores_list : (string * Inference.scores) list;
 }
 
 let load_solution (fn : string) : solution =

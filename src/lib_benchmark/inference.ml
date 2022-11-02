@@ -41,10 +41,20 @@ type problem =
     }
   | Degenerate of {predicted : matrix; measured : matrix}
 
+type scores = {r2_score : float; rmse_score : float}
+
+let best_scores = {r2_score = 1.0; rmse_score = 0.0}
+
+let scores_to_csv_column scores bench_name =
+  [
+    ["R2_score_" ^ bench_name; "RMSE_score_" ^ bench_name];
+    [Float.to_string scores.r2_score; Float.to_string scores.rmse_score];
+  ]
+
 type solution = {
   mapping : (Free_variable.t * float) list;
   weights : matrix;
-  score : float;
+  scores : scores;
 }
 
 type solver =
@@ -326,10 +336,15 @@ let r2_score ~input ~output ~weights =
   wrap_python_function ~input ~output (fun input output ->
       Scikit.r2_score ~input ~output ~weights)
 
+let rmse_score ~input ~output ~weights =
+  let weights = to_scipy weights in
+  wrap_python_function ~input ~output (fun input output ->
+      Scikit.rmse_score ~input ~output ~weights)
+
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
-  | Degenerate _ -> {mapping = []; weights = empty_matrix; score = 0.0}
+  | Degenerate _ -> {mapping = []; weights = empty_matrix; scores = best_scores}
   | Non_degenerate {input; output; nmap; _} ->
       let weights =
         match solver with
@@ -337,7 +352,9 @@ let solve_problem : problem -> solver -> solution =
         | Lasso {alpha; positive} -> lasso ~alpha ~positive ~input ~output
         | NNLS -> nnls ~input ~output
       in
-      let score = r2_score ~input ~output ~weights in
+      let r2_score = r2_score ~input ~output ~weights in
+      let rmse_score = rmse_score ~input ~output ~weights in
+      let scores = {r2_score; rmse_score} in
       let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
         let cols = Maths.col_dim weights in
@@ -358,4 +375,4 @@ let solve_problem : problem -> solver -> solution =
             nmap
             []
         in
-        {mapping; weights; score}
+        {mapping; weights; scores}
