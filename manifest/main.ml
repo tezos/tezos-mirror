@@ -389,6 +389,20 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
+(* The main module [Octez_alcotest] is [open_] so that one can replace
+   the [alcotest] dependency with [alcotezt] and it just works.
+   If we use [~internal_name:"alcotest"] here, it would also work,
+   except in cases where the real Alcotest is also a dependency. *)
+let _alcotezt =
+  public_lib
+    "octez-alcotezt"
+    ~path:"tezt/lib_alcotezt"
+    ~synopsis:
+      "Provide the interface of Alcotest for Octez, but with Tezt as backend"
+    ~js_compatible:true
+    ~deps:[tezt_core_lib]
+  |> open_
+
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
     ?synopsis ?opam_with_test l =
   tezt_without_tezt_lib_dependency

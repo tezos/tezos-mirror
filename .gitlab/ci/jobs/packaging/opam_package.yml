@@ -215,6 +215,8 @@ opam:octez-accuser-PtMumbai:
 
 # Ignoring unreleased package octez-accuser-alpha.
 
+# Ignoring unreleased package octez-alcotezt.
+
 opam:octez-baker-PtLimaPt:
   extends:
     - .opam_template
