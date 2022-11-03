@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "15.0~rc1"
+    "version": "15.0"
   },
   "paths": {
     "/ban_operation": {
