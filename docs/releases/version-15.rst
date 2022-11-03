@@ -1,7 +1,7 @@
-Version 15.0~rc1
-================
+Version 15.0
+============
 
-The first release candidate of version 15.0 contains a new version (V7)
+Version 15.0 contains a new version (V7)
 of the protocol environment, which is the set of functions that a
 protocol can call. This new version is used by protocol :doc:`Lima<../protocols/015_lima>`,
 which is a proposal for the successor of Kathmandu. This release also
@@ -36,12 +36,13 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout v15.0-rc1
+  git checkout v15.0
+  rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v15.0-rc1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v15.0`` Docker images of Tezos.
 
 Then upgrade your storage by following the instructions in `Context Pruning Requirements`_.
 
@@ -64,4 +65,5 @@ for the first time, to ensure that the context can be pruned.
 Changelog
 ---------
 
+- `Version 15.0 <../CHANGES.html#version-15-0>`_
 - `Version 15.0-rc1 <../CHANGES.html#version-15-0-rc1>`_

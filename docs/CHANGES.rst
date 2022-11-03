@@ -3,6 +3,46 @@
 Changelog
 '''''''''
 
+Version 15.0
+============
+
+General
+-------
+
+- Fixed the warning that was added in 15.0~rc1 about using deprecated
+  ``tezos-`` names. This warning gave the wrong new name for executables
+  that contained the protocol number.
+
+Node
+----
+
+- Fixed the restoration of the protocol table when restoring from an
+  inconsistent data directory.
+
+- Improved the response time of RPCs computing the baking and endorsing
+  rights of delegates.
+
+- Added the built-in network alias for Limanet (``--network limanet``).
+
+- Fixed a bug that caused the ``snapshot import`` command to fail when
+  used on data directories configured with an explicit number
+  additional cycles.
+
+- Improved cleanup of leftover files when starting a node.
+
+Client
+------
+
+- Fixed a regression in 15.0~rc1 that caused ``make build-deps`` to not
+  install the ``ledgerwallet-tezos`` opam package by default, which in turn
+  caused the client to be built without Ledger commands. Docker images
+  and static executables were not affected.
+
+Baker
+-----
+
+- Fixed a file permission issue when running in Docker.
+
 Version 15.0~rc1
 ================
 
