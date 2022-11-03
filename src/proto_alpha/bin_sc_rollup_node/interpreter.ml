@@ -49,8 +49,9 @@ end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
-  module Accounted_pvm = Fueled_pvm.Make (PVM) (Fuel.Accounted)
-  module Free_pvm = Fueled_pvm.Make (PVM) (Fuel.Free)
+  module Fueled_pvm = Fueled_pvm.Make (PVM)
+  module Accounted_pvm = Fueled_pvm.Accounted
+  module Free_pvm = Fueled_pvm.Free
 
   (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
       stored in [node_ctxt]. *)
