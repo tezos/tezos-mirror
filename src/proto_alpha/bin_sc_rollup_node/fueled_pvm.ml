@@ -44,10 +44,8 @@ module type S = sig
     (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult Lwt.t
 end
 
-module Make
-    (PVM : Pvm.S)
-    (Interpreter_event : Interpreter_event.S with type state := PVM.state)
-    (F : Fuel.S) : S with type state = PVM.state and type fuel = F.t = struct
+module Make (PVM : Pvm.S) (F : Fuel.S) :
+  S with type state = PVM.state and type fuel = F.t = struct
   type state = PVM.state
 
   type fuel = F.t

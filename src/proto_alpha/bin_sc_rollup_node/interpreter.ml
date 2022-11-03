@@ -49,13 +49,8 @@ end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module PVM = PVM
-
-  module Interpreter_event : Interpreter_event.S with type state := PVM.state =
-    Interpreter_event.Make (PVM)
-
-  module Accounted_pvm =
-    Fueled_pvm.Make (PVM) (Interpreter_event) (Fuel.Accounted)
-  module Free_pvm = Fueled_pvm.Make (PVM) (Interpreter_event) (Fuel.Free)
+  module Accounted_pvm = Fueled_pvm.Make (PVM) (Fuel.Accounted)
+  module Free_pvm = Fueled_pvm.Make (PVM) (Fuel.Free)
 
   (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
       stored in [node_ctxt]. *)
@@ -189,8 +184,13 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         {num_messages; num_ticks; initial_tick}
     in
     (* Produce events. *)
+    let*! state_hash = PVM.state_hash state in
     let*! () =
-      Interpreter_event.transitioned_pvm inbox_level state num_messages
+      Interpreter_event.transitioned_pvm
+        inbox_level
+        state_hash
+        last_tick
+        num_messages
     in
 
     return_unit
