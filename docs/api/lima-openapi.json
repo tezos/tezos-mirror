@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "15.0~rc1"
+    "version": "15.0"
   },
   "paths": {
     "/": {
@@ -6390,8 +6390,8 @@
                       },
                       "round": {
                         "type": "integer",
-                        "minimum": 0,
-                        "maximum": 65535
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
                       },
                       "estimated_time": {
                         "$ref": "#/components/schemas/timestamp.protocol"

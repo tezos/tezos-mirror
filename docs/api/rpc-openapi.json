@@ -3,7 +3,7 @@
   "info": {
     "title": "Tezos RPC",
     "description": "Tezos client RPC API.",
-    "version": "15.0~rc1"
+    "version": "15.0"
   },
   "paths": {
     "/chains/{chain_id}": {
@@ -1216,6 +1216,13 @@
                           "type": "string",
                           "enum": [
                             "kathmandunet"
+                          ]
+                        },
+                        {
+                          "title": "limanet",
+                          "type": "string",
+                          "enum": [
+                            "limanet"
                           ]
                         },
                         {
