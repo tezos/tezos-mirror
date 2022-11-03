@@ -2837,6 +2837,8 @@ module Dal : sig
   module Endorsement : sig
     type t
 
+    type operation = {endorser : public_key_hash; slot_availability : t}
+
     type shard_index = int
 
     module Shard_map : Map.S with type key = shard_index
@@ -4318,7 +4320,7 @@ and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
   | Dal_slot_availability :
-      public_key_hash * Dal.Endorsement.t
+      Dal.Endorsement.operation
       -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;

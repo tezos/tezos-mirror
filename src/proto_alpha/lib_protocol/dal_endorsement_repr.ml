@@ -43,6 +43,8 @@ type t = Bitset.t
 
 type available_slots = t
 
+type operation = {endorser : Signature.Public_key_hash.t; slot_availability : t}
+
 let encoding = Bitset.encoding
 
 let empty = Bitset.empty

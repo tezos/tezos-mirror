@@ -44,6 +44,9 @@ type t
 
 type available_slots = t
 
+(** The shape of Dal endorsement operations injected by delegates. *)
+type operation = {endorser : Signature.Public_key_hash.t; slot_availability : t}
+
 val encoding : t Data_encoding.t
 
 (** [empty] returns an empty [slot_endorsement] which commits that

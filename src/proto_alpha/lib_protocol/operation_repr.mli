@@ -265,7 +265,7 @@ and _ contents =
 
      Temporary operation to avoid modifying endorsement encoding. *)
   | Dal_slot_availability :
-      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      Dal_endorsement_repr.operation
       -> Kind.dal_slot_availability contents
   (* Seed_nonce_revelation: Nonces are created by bakers and are
      combined to create pseudo-random seeds. Bakers are urged to reveal their

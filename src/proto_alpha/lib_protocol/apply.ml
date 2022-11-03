@@ -2159,7 +2159,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
       record_preendorsement ctxt mode consensus_content |> Lwt.return
   | Single (Endorsement consensus_content) ->
       record_endorsement ctxt mode consensus_content
-  | Single (Dal_slot_availability (endorser, slot_availability)) ->
+  | Single (Dal_slot_availability {endorser; slot_availability}) ->
       (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3115
 
          This is a temporary operation. We do no check for the

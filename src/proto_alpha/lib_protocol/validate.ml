@@ -1059,7 +1059,7 @@ module Consensus = struct
        operation should be merged with an endorsement or at least
        refined. *)
     let open Lwt_tzresult_syntax in
-    let (Single (Dal_slot_availability (_endorser, slot_availability))) =
+    let (Single (Dal_slot_availability {endorser = _; slot_availability})) =
       operation.protocol_data.contents
     in
     let*? () =
@@ -1070,7 +1070,7 @@ module Consensus = struct
 
   let check_dal_slot_availability_conflict vs oph
       (operation : Kind.dal_slot_availability operation) =
-    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+    let (Single (Dal_slot_availability {endorser; slot_availability = _})) =
       operation.protocol_data.contents
     in
     match
@@ -1092,7 +1092,7 @@ module Consensus = struct
 
   let add_dal_slot_availability vs oph
       (operation : Kind.dal_slot_availability operation) =
-    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+    let (Single (Dal_slot_availability {endorser; slot_availability = _})) =
       operation.protocol_data.contents
     in
     {
@@ -1110,7 +1110,7 @@ module Consensus = struct
 
   let remove_dal_slot_availability vs
       (operation : Kind.dal_slot_availability operation) =
-    let (Single (Dal_slot_availability (endorser, _slot_availability))) =
+    let (Single (Dal_slot_availability {endorser; slot_availability = _})) =
       operation.protocol_data.contents
     in
     let dal_slot_availability_seen =

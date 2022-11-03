@@ -272,7 +272,7 @@ and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
   | Dal_slot_availability :
-      Signature.Public_key_hash.t * Dal_endorsement_repr.t
+      Dal_endorsement_repr.operation
       -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
@@ -1382,11 +1382,13 @@ module Encoding = struct
           (function
           | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
         proj =
-          (fun (Dal_slot_availability (endorser, endorsement)) ->
-            (endorser, endorsement));
+          (fun (Dal_slot_availability
+                 Dal_endorsement_repr.{endorser; slot_availability}) ->
+            (endorser, slot_availability));
         inj =
-          (fun (endorser, endorsement) ->
-            Dal_slot_availability (endorser, endorsement));
+          (fun (endorser, slot_availability) ->
+            Dal_slot_availability
+              Dal_endorsement_repr.{endorser; slot_availability});
       }
 
   let seed_nonce_revelation_case =
@@ -2351,12 +2353,14 @@ let weight_of : packed_operation -> operation_weight =
         ( Consensus,
           Weight_endorsement
             (endorsement_infos_from_consensus_content consensus_content) )
-  | Single (Dal_slot_availability (endorser, endorsements)) ->
+  | Single
+      (Dal_slot_availability Dal_endorsement_repr.{endorser; slot_availability})
+    ->
       W
         ( Consensus,
           Weight_dal_slot_availability
-            (Dal_endorsement_repr.occupied_size_in_bits endorsements, endorser)
-        )
+            ( Dal_endorsement_repr.occupied_size_in_bits slot_availability,
+              endorser ) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
