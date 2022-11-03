@@ -279,45 +279,43 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
               ()
               (Printexc.to_string e))
 
-  let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
-      ?(section = Internal_event.Section.empty) (v : unit -> a) =
+  let should_handle (type a) ?(section = Internal_event.Section.empty)
+      {event_filter; _} m =
+    let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
+    Event_filter.run ~section ~level:M.level ~name:M.name event_filter
+
+  let handle (type a) {path; lwt_bad_citizen_hack; _} m
+      ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
     let date, time = Micro_seconds.date_string now in
-    let forced = v () in
-    let level = M.level forced in
-    match Event_filter.run ~section ~level ~name:M.name event_filter with
-    | true ->
-        let event_json =
-          Data_encoding.Json.construct
-            (wrapped_encoding M.encoding)
-            (wrap now section forced)
-        in
-        let tag =
-          let hash =
-            Marshal.to_string event_json [] |> Digest.string |> Digest.to_hex
-          in
-          String.sub hash 0 8
-        in
-        let section_dir = Section_dir.of_section section in
-        let dir_path =
-          List.fold_left Filename.concat path [section_dir; M.name; date; time]
-        in
-        let file_path =
-          Filename.concat
-            dir_path
-            (Printf.sprintf "%s_%s_%s.json" date time tag)
-        in
-        lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
-        let* () =
-          output_json file_path event_json ~pp:(fun fmt () ->
-              M.pp ~short:false fmt forced)
-        in
-        lwt_bad_citizen_hack :=
-          List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
-        return_unit
-    | false -> return_unit
+    let event_json =
+      Data_encoding.Json.construct
+        (wrapped_encoding M.encoding)
+        (wrap now section event)
+    in
+    let tag =
+      let hash =
+        Marshal.to_string event_json [] |> Digest.string |> Digest.to_hex
+      in
+      String.sub hash 0 8
+    in
+    let section_dir = Section_dir.of_section section in
+    let dir_path =
+      List.fold_left Filename.concat path [section_dir; M.name; date; time]
+    in
+    let file_path =
+      Filename.concat dir_path (Printf.sprintf "%s_%s_%s.json" date time tag)
+    in
+    lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
+    let* () =
+      output_json file_path event_json ~pp:(fun fmt () ->
+          M.pp ~short:false fmt event)
+    in
+    lwt_bad_citizen_hack :=
+      List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
+    return_unit
 
   let close {lwt_bad_citizen_hack; _} =
     List.iter_es

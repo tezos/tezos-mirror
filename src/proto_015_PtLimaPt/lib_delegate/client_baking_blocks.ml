@@ -85,7 +85,7 @@ module Block_seen_event = struct
     occurrence : [`Valid_blocks of Chain_id.t | `Heads];
   }
 
-  let make hash header occurrence () = {hash; header; occurrence}
+  let make hash header occurrence = {hash; header; occurrence}
 
   module Definition = struct
     let section = None
@@ -99,7 +99,7 @@ module Block_seen_event = struct
       let v0_encoding =
         conv
           (function {hash; header; occurrence} -> (hash, occurrence, header))
-          (fun (hash, occurrence, header) -> make hash header occurrence ())
+          (fun (hash, occurrence, header) -> make hash header occurrence)
           (obj3
              (req "hash" Block_hash.encoding)
              (* Occurrence has to come before header, because:
@@ -137,7 +137,7 @@ module Block_seen_event = struct
 
     let doc = "Block observed while monitoring a blockchain."
 
-    let level _ = Internal_event.Info
+    let level = Internal_event.Info
   end
 
   module Event = Internal_event.Make (Definition)

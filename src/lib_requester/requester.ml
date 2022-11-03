@@ -406,7 +406,7 @@ end = struct
     state.worker <-
       Lwt_utils.worker
         "db_request_scheduler"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop state)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions state.canceler) ;
     state

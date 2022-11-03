@@ -89,7 +89,7 @@ let create db =
   bv.worker <-
     Lwt_utils.worker
       "block_validator"
-      ~on_event:Internal_event.Lwt_worker_event.on_event
+      ~on_event:Internal_event.Lwt_worker_logger.on_event
       ~run:(fun () -> worker_loop bv)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions bv.canceler) ;
   bv

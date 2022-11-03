@@ -49,7 +49,7 @@ let () =
       description = "Measurements from tests in tezt/long_tests.";
       panels =
         Prt_client.grafana_panels @ Block_validation.grafana_panels
-        @ Tenderbake.grafana_panels;
+        @ Tenderbake.grafana_panels @ Logging.grafana_panels;
     }
 
 (* Executor for tests that don't take that long to run.
@@ -68,5 +68,6 @@ let () =
     ~executors:[Long_test.block_replay_executor]
     () ;
   Tenderbake.register ~executors:default_executors () ;
+  Logging.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()

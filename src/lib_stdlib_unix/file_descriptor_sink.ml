@@ -207,69 +207,65 @@ end) : Internal_event.SINK with type t = t = struct
         @@ Lwt_mutex.with_lock write_mutex (fun () ->
                Lwt_utils_unix.write_string output to_write))
 
-  let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
-      ?(section = Internal_event.Section.empty) (v : unit -> a) =
+  let should_handle (type a) ?(section = Internal_event.Section.empty)
+      {filter; _} m =
+    let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
+    match filter with
+    | `Level_at_least level_at_least ->
+        Internal_event.Level.compare M.level level_at_least >= 0
+    | `Per_section_prefix kvl ->
+        List.exists
+          (fun (prefix, lvl) ->
+            Internal_event.(
+              Section.is_prefix ~prefix section
+              && Level.compare M.level lvl >= 0))
+          kvl
+
+  let handle (type a) {output; lwt_bad_citizen_hack; format; _} m
+      ?(section = Internal_event.Section.empty) (event : a) =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Unix.gettimeofday () in
-    let forced_event = v () in
-    let level = M.level forced_event in
-    let filter_run =
-      match filter with
-      | `Level_at_least level_at_least ->
-          Internal_event.Level.compare level level_at_least >= 0
-      | `Per_section_prefix kvl ->
-          List.exists
-            (fun (prefix, lvl) ->
-              Internal_event.(
-                Section.is_prefix ~prefix section
-                && Level.compare level lvl >= 0))
-            kvl
-    in
-    if filter_run then (
-      let wrapped_event = wrap now section forced_event in
-      let to_write =
-        let json () =
-          Data_encoding.Json.construct
-            (wrapped_encoding M.encoding)
-            wrapped_event
-        in
-        match format with
-        | `Pp ->
-            let s =
-              String.map
-                (function '\n' -> ' ' | c -> c)
-                (Format.asprintf "%a" (M.pp ~short:false) forced_event)
-            in
-            (* See https://tools.ietf.org/html/rfc5424#section-6 *)
-            Format.asprintf
-              "%a [%s%s] %s\n"
-              (Ptime.pp_rfc3339 ~frac_s:3 ())
-              (match Ptime.of_float_s wrapped_event.time_stamp with
-              | Some s -> s
-              | None -> Ptime.min)
-              (Internal_event.Section.to_string_list wrapped_event.section
-              |> String.concat ".")
-              M.name
-              s
-        | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
-        | `Netstring ->
-            let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
-            Format.asprintf "%d:%s," (String.length bytes) bytes
+    let wrapped_event = wrap now section event in
+    let to_write =
+      let json () =
+        Data_encoding.Json.construct (wrapped_encoding M.encoding) wrapped_event
       in
-      lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
-      let*! r = output_one output to_write in
-      match r with
-      | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
-          (* The file descriptor was closed before the event arrived,
-             ignore it. *)
-          return_unit
-      | Error _ as err -> Lwt.return err
-      | Ok () ->
-          lwt_bad_citizen_hack :=
-            List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
-          return_unit)
-    else return_unit
+      match format with
+      | `Pp ->
+          let s =
+            String.map
+              (function '\n' -> ' ' | c -> c)
+              (Format.asprintf "%a" (M.pp ~short:false) event)
+          in
+          (* See https://tools.ietf.org/html/rfc5424#section-6 *)
+          Format.asprintf
+            "%a [%s%s] %s\n"
+            (Ptime.pp_rfc3339 ~frac_s:3 ())
+            (match Ptime.of_float_s wrapped_event.time_stamp with
+            | Some s -> s
+            | None -> Ptime.min)
+            (Internal_event.Section.to_string_list wrapped_event.section
+            |> String.concat ".")
+            M.name
+            s
+      | `One_per_line -> Ezjsonm.value_to_string ~minify:true (json ()) ^ "\n"
+      | `Netstring ->
+          let bytes = Ezjsonm.value_to_string ~minify:true (json ()) in
+          Format.asprintf "%d:%s," (String.length bytes) bytes
+    in
+    lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
+    let*! r = output_one output to_write in
+    match r with
+    | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
+        (* The file descriptor was closed before the event arrived,
+           ignore it. *)
+        return_unit
+    | Error _ as err -> Lwt.return err
+    | Ok () ->
+        lwt_bad_citizen_hack :=
+          List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
+        return_unit
 
   let close {lwt_bad_citizen_hack; output; _} =
     let open Lwt_result_syntax in

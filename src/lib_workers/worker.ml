@@ -716,7 +716,7 @@ struct
       w.worker <-
         Lwt_utils.worker
           full_name
-          ~on_event:Internal_event.Lwt_worker_event.on_event
+          ~on_event:Internal_event.Lwt_worker_logger.on_event
           ~run:(fun () -> worker_loop (module Handlers) w)
           ~cancel:(fun () -> Error_monad.cancel_with_exceptions w.canceler) ;
       return w

@@ -348,7 +348,7 @@ module Internal = struct
     t.maintain_worker <-
       Lwt_utils.worker
         "maintenance"
-        ~on_event:Internal_event.Lwt_worker_event.on_event
+        ~on_event:Internal_event.Lwt_worker_logger.on_event
         ~run:(fun () -> worker_loop ~rng t)
         ~cancel:(fun () -> Error_monad.cancel_with_exceptions t.canceler) ;
     Option.iter P2p_discovery.activate t.discovery

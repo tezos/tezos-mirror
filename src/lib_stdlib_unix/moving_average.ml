@@ -80,7 +80,7 @@ let fresh_state ~id ~refresh_interval =
   Lwt.ignore_result
     (Lwt_utils.worker
        (Format.asprintf "counter(%s)" id)
-       ~on_event:Internal_event.Lwt_worker_event.on_event
+       ~on_event:Internal_event.Lwt_worker_logger.on_event
        ~run:(worker_loop state)
        ~cancel:(fun _ -> Lwt.return_unit)) ;
   state
