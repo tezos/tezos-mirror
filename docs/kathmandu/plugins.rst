@@ -137,11 +137,11 @@ by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
 Concretely, a user can replace a successfully prechecked manager operation in the
-mempool, with the help of ``tezos-client``, using two methods :
+mempool, with the help of ``octez-client``, using two methods :
 
 - manually provide a higher fee to bump the "fee/gas limit" ratio by at least 5% for the new
   operation,
-- via option ``--replace``: In this case, ``tezos-client`` will automatically
+- via option ``--replace``: In this case, ``octez-client`` will automatically
   compute the minimal amount of fee for the second operation to be able to
   replace the one in the mempool.
 
@@ -227,9 +227,9 @@ The following parameters can be thus inspected and modified:
 For example, each command below modifies the provided parameter and resets all
 the others to their default values::
 
-   tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
-   tezos-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
+   octez-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
 
 Changing filters default configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

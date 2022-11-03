@@ -14,7 +14,7 @@ It contains the following python packages.
 - ``process`` defining utility functions for interacting with processes
 - ``daemons`` defines classes to run Tezos node and daemons,
 - ``client`` mainly defines the ``Client`` class, that provides a programmatic interface to a client,
-- ``codec`` defines a ``Codec`` class, that provides a interface for ``tezos-codec`` binary,
+- ``codec`` defines a ``Codec`` class, that provides a interface for ``octez-codec`` binary,
 - ``launcher`` defines classes used to launch a nodes and daemons with specific settings,
 - ``tools`` contains utility functions and constants shared by the tests,
 - ``examples`` contains example of tests and scripts that run scenarios of interactions between tezos nodes and clients,
@@ -236,8 +236,8 @@ The ``sandbox`` object allows users to add nodes or bakers
 running in tezos sandboxed mode. Whenever a node has been added, one can
 access it using a client object.
 
-The client object is a wrapper on the ``tezos-client`` command. It runs
-``tezos-client`` with "administrative" parameters, plus the parameters determined
+The client object is a wrapper on the ``octez-client`` command. It runs
+``octez-client`` with "administrative" parameters, plus the parameters determined
 by the  method called by the user.
 
 For instance
@@ -250,10 +250,10 @@ will run something like
 
 ::
 
-    tezos-client -base-dir /tmp/tezos-client.be22ya16 -addr 127.0.0.1 -port 18730 transfer 500 from bootstrap1 to bootstrap3
+    octez-client -base-dir /tmp/octez-client.be22ya16 -addr 127.0.0.1 -port 18730 transfer 500 from bootstrap1 to bootstrap3
 
 ``receipt`` is an object of type ``client_output.TransferResult`` which gives
-access to some data of the ``tezos-client`` output.
+access to some data of the ``octez-client`` output.
 
 Alternatively, one can always construct the command manually:
 
@@ -495,8 +495,8 @@ Testing on a production branch (``zeronet``, ``mainnet``,...)
 
 On ``master``, protocol Alpha is named
 ``ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK``, and daemons binary
-name are suffixed with ``alpha`` (``tezos-baker-alpha``,
-``tezos-accuser-alpha``...). However, on *production* branches, an actual
+name are suffixed with ``alpha`` (``octez-baker-alpha``,
+``octez-accuser-alpha``...). However, on *production* branches, an actual
 hash of the protocol is used, and a shortened string is used to specify
 daemons.
 
@@ -525,7 +525,7 @@ match. We apply regression testing using the `pytest-regtest
 
 To simplify the writing of regression tests, we provide a
 specialized version of the ``client`` fixture, ``client_regtest``. It
-registers all output of the ``tezos-client``.
+registers all output of the ``octez-client``.
 
 Output conversion
 ~~~~~~~~~~~~~~~~~
@@ -559,13 +559,13 @@ that they are as expected.
 Writing regression tests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-To write regression tests targeting the ``tezos-client``, write a test
+To write regression tests targeting the ``octez-client``, write a test
 as usual, but request the ``client_regtest`` (or
 ``client_regtest_scrubbed`` to enable output conversion) fixture
 instead of the ``client`` fixture.
 
 In this example test, we test the output of the `hash data` command of
-`tezos-client`:
+`octez-client`:
 
 .. code-block:: python
 
@@ -599,7 +599,7 @@ We find the generated test log in ``tests_python/tests/_regtest_outputs/test_reg
     Gas remaining: 799862 units remaining
 
 This is exactly the output of the command that was executed by the
-test, namely ``tezos-client hash data '(Pair 1 "foo")' of type '(pair
+test, namely ``octez-client hash data '(Pair 1 "foo")' of type '(pair
 nat string)'``.
 
 As discussed below in the section :ref:`Pitfalls to regression testing

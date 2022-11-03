@@ -26,12 +26,12 @@ The new ``register_global_constant`` operation includes an object with a
 single key ``"value"``, the value of which is the Micheline expression
 to be registered.
 
-You can submit this operation conveniently through a new :doc:`tezos-client <cli-commands>` command.
+You can submit this operation conveniently through a new :doc:`octez-client <cli-commands>` command.
 For example, the command:
 
 .. code:: sh
 
-    tezos-client register global constant "999" from bootstrap1 --burn-cap 0.017
+    octez-client register global constant "999" from bootstrap1 --burn-cap 0.017
 
 would result in the output:
 
@@ -44,7 +44,7 @@ would result in the output:
    Operation hash is 'onsFknW5iWa6eiTYqAghY4peQZ7JYQUJg5fR8MwAQkMKjXfNqGf'
    NOT waiting for the operation to be included.
    Use command
-     tezos-client wait for onsFknW5iWa6eiTYqAghY4peQZ7JYQUJg5fR8MwAQkMKjXfNqGf to be included --confirmations 5 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+     octez-client wait for onsFknW5iWa6eiTYqAghY4peQZ7JYQUJg5fR8MwAQkMKjXfNqGf to be included --confirmations 5 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
    and/or an external block explorer to make sure that it has been included.
    This sequence of operations was run:
      Manager signed operations:

@@ -8,7 +8,7 @@ using shell commands such as (:ref:`indicating the appropriate protocol <tezos_c
 
 ::
 
-   tezos-client -protocol <protocol_hash> man -verbosity 3
+   octez-client -protocol <protocol_hash> man -verbosity 3
 
 The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
@@ -21,7 +21,7 @@ Client manual
 =============
 
 .. raw:: html
-         :file: tezos-client.html
+         :file: octez-client.html
 
 
 .. _baker_manual:
@@ -31,7 +31,7 @@ Baker manual
 ============
 
 .. raw:: html
-         :file: tezos-baker.html
+         :file: octez-baker.html
 
 
 .. _accuser_manual:
@@ -41,4 +41,4 @@ Accuser manual
 ==============
 
 .. raw:: html
-         :file: tezos-accuser.html
+         :file: octez-accuser.html

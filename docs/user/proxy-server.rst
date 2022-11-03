@@ -1,7 +1,7 @@
 Proxy server
 ------------
 
-This page describes the *proxy server*, a readonly frontend to ``tezos-node``
+This page describes the *proxy server*, a readonly frontend to ``octez-node``
 which is designed to lower the load of full nodes. It can be run separately from
 a node and will handle some RPC requests by itself. It is named after two
 things:
@@ -62,9 +62,9 @@ In a terminal, start a sandboxed node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
       April 21 11:05:32.789 - node.config.validation: the node configuration has been successfully validated.
-      Created /tmp/tezos-node.Uzq5aGAN/config.json for network: sandbox.
+      Created /tmp/octez-node.Uzq5aGAN/config.json for network: sandbox.
       ...
 
 Leave that terminal running. In a second terminal, prepare the appropriate
@@ -72,14 +72,14 @@ environment for using a proxy server:
 
 ::
 
-    $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+    $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Then upgrade the node to protocol alpha:
 
 ::
 
     $ tezos-activate-alpha
-    $ tezos-client bake for bootstrap1
+    $ octez-client bake for bootstrap1
 
 To avoid warnings being printed in upcoming commands (optional):
 
@@ -95,7 +95,7 @@ is doing (see the :doc:`proxy mode<proxy>` page for more details).
 ::
 
     $ export TEZOS_LOG="proxy_rpc_ctxt->debug; alpha.proxy_rpc->debug; proxy_server_run->debug; proxy_getter->debug; proxy_services->debug"
-    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732
+    $ ./octez-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
 
@@ -104,7 +104,7 @@ Now, start a fourth terminal, and make a client request data from the proxy serv
 ::
 
     $ export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=y
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       [ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
@@ -145,13 +145,13 @@ Now, in the fourth terminal, retrieve the contracts again, but twice in a row:
 
 ::
 
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       [ "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU",
         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
         "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv" ]
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       # ... same output ...
 
 In the meantime, in the proxy server's terminal, you should see:
@@ -194,12 +194,12 @@ and restart it as follows:
 
 ::
 
-    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/tezos-node.Uzq5aGAN
+    $ ./octez-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/octez-node.Uzq5aGAN
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
 
 The value of the ``--data-dir`` argument was obtained by looking at the
-output of the terminal where ``tezos-node`` was launched
+output of the terminal where ``octez-node`` was launched
 (see :ref:`above <sandbox_example>`).
 
 Now, in the fourth terminal (the client's terminal), redo the request
@@ -207,7 +207,7 @@ to retrieve contracts:
 
 ::
 
-    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+    $ ./octez-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
       # ... same output as above ...
 
 Now the output in the proxy server terminal should be:
@@ -227,7 +227,7 @@ Additional arguments
 ~~~~~~~~~~~~~~~~~~~~
 
 We describe the entire list of arguments of the proxy server. This
-documentation is also available with ``./tezos-proxy-server --help``.
+documentation is also available with ``./octez-proxy-server --help``.
 Here is the list of possible arguments:
 
 * ``-c`` and ``--config`` specify the JSON file to use an input
@@ -285,7 +285,7 @@ Because computations done by the proxy server are protocol dependent, the proxy 
 does not support all protocols. However, it is expected that, at any
 given time, the proxy server supports ``Alpha``, the current protocol
 of Mainnet and the current protocol proposal on Mainnet at the time of release.
-In doubt, execute ``tezos-client list proxy protocols`` to see the supported protocols.
+In doubt, execute ``octez-client list proxy protocols`` to see the supported protocols.
 
 .. _unsupported_rpcs:
 

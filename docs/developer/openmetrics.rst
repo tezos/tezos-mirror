@@ -35,7 +35,7 @@ The address defaults to localhost.
 When the option is not supplied at all, no metrics are produced.
 Ex.::
 
-  tezos-node run --metrics-addr=:9091
+  octez-node run --metrics-addr=:9091
 
 To query the open metrics server the user can simply query the node.
 

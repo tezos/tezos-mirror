@@ -11,35 +11,35 @@ Tools
 
 For performing serialization/deserialization of data structures into binary form within OCaml code, refer to the documentation of the :doc:`data encoding library <data_encoding>`.
 
-For studying and understanding all the different encodings, the definitive source of truth is the ``tezos-codec`` tool.
+For studying and understanding all the different encodings, the definitive source of truth is the ``octez-codec`` tool.
 It is a command-line tool allowing users and developers to:
 
 - describe the binary and JSON encoding schemas for all the supported data structures (see :ref:`codec_describe`)
 - encode and decode data into/from binary or JSON form, using a specific encoding (see :ref:`codec_encode`)
 
-You may refer to the ``tezos-codec`` :ref:`online manual <codec_manual>` for more details.
+You may refer to the ``octez-codec`` :ref:`online manual <codec_manual>` for more details.
 The rest of this page gives a gentle introduction to this tool by showing on some examples how to perform the two tasks above.
 
-Note that for the particular case of Micheline expressions, the ``tezos-client`` tool can also be used to convert between several data representations, covering not only the binary and JSON representations, but also OCaml and Michelson notations (see :ref:`client_convert`).
+Note that for the particular case of Micheline expressions, the ``octez-client`` tool can also be used to convert between several data representations, covering not only the binary and JSON representations, but also OCaml and Michelson notations (see :ref:`client_convert`).
 
 .. _codec_describe:
 
-How to read the output of ``tezos-codec``
+How to read the output of ``octez-codec``
 -----------------------------------------
 
 The list of data structures that can be encoded/decoded may be obtained as follows::
 
-  $ tezos-codec list encodings
+  $ octez-codec list encodings
 
 The binary encoding of any supported data structure can be described using the following command::
 
-  $ tezos-codec describe <id> binary schema
+  $ octez-codec describe <id> binary schema
 
 Similarly, the JSON encoding of any supported data structure can be described using the following command::
 
-  $ tezos-codec describe <id> json schema
+  $ octez-codec describe <id> json schema
 
-However, the output of the above commands is rather verbose, so here is a short introduction for how to read the schemas produced by ``tezos-codec``.
+However, the output of the above commands is rather verbose, so here is a short introduction for how to read the schemas produced by ``octez-codec``.
 
 JSON schemas
 ~~~~~~~~~~~~
@@ -47,7 +47,7 @@ JSON schemas
 The descriptions of JSON schemas are rather self-explaining.
 For instance, the encoding of a Micheline expression is done according to a few simple :ref:`JSON encoding principles <micheline_json>`, that can be retrieved by doing::
 
-  $ tezos-codec describe alpha.script.expr json schema
+  $ octez-codec describe alpha.script.expr json schema
 
 The schema output by this command is as follows (slightly abbreviated and reformatted for better readability):
 
@@ -99,7 +99,7 @@ The descriptions of binary schemas are more complex to some extent, mainly for t
 
 To illustrate these differences, let us consider the same example as above, that of a Micheline expression::
 
-  $ tezos-codec describe alpha.script.expr binary schema
+  $ octez-codec describe alpha.script.expr binary schema
 
 The binary schema produced by this command is as follows (abbreviated and reformatted for better readability)::
 
@@ -197,7 +197,7 @@ For instance:
 How to encode/decode values
 ---------------------------
 
-Beyond examining the various available encodings, the ``tezos-codec`` tool can also be used to encode and decode data.
+Beyond examining the various available encodings, the ``octez-codec`` tool can also be used to encode and decode data.
 This can be useful for developers when debugging, but also for end users when trying to understand the contents of a block or transaction, for instance.
 
 Let us consider a few examples of encoding and decoding some commonly used types.
@@ -207,7 +207,7 @@ Strings
 
 To encode a string as a Micheline expression, proceed as follows::
 
-  $ tezos-codec encode alpha.script.expr from '{"string":"Hello world!"}'
+  $ octez-codec encode alpha.script.expr from '{"string":"Hello world!"}'
   010000000c48656c6c6f20776f726c6421
 
 As can be seen, strings are serialized as follows:
@@ -218,7 +218,7 @@ As can be seen, strings are serialized as follows:
 
 The same tool can be used in the other direction, to decode a byte sequence representing a serialized string expression::
 
-  $ tezos-codec decode alpha.script.expr from '010000000c48656c6c6f20776f726c6421'
+  $ octez-codec decode alpha.script.expr from '010000000c48656c6c6f20776f726c6421'
   { "string": "Hello world!" }
 
 Integers
@@ -232,7 +232,7 @@ There are various encoding for integers, including:
 
 which can be detailed by describing their schemas, e.g.::
 
-  $ tezos-codec describe ground.Z binary schema
+  $ octez-codec describe ground.Z binary schema
   ...
   A variable length sequence of bytes, encoding a Zarith number. Each byte has
   a running unary size bit: the most significant bit of each byte tells is this
@@ -243,7 +243,7 @@ which can be detailed by describing their schemas, e.g.::
 
 To illustrate the Zarith representation, let us encode the Micheline representation of the number ``1,000,000`` (one million)::
 
-  $ tezos-codec encode alpha.script.expr from '{"int":"1000000"}'
+  $ octez-codec encode alpha.script.expr from '{"int":"1000000"}'
   0080897a
 
 Here:
@@ -265,7 +265,7 @@ Pairs
 
 Let us see how an OCaml pair is encoded::
 
-  $ tezos-codec encode alpha.script.expr from '{"prim":"Pair","args":[{"int":"1"},{"int":"2"}]}'
+  $ octez-codec encode alpha.script.expr from '{"prim":"Pair","args":[{"int":"1"},{"int":"2"}]}'
   070700010002
 
 Here:
@@ -277,7 +277,7 @@ Here:
 
 Let's try another example, the encoding of the value ``Left 1`` of type ``or nat bool``::
 
-  $ tezos-codec encode alpha.script.expr from '{"prim":"Left","args":[{"int":"1"}]}'
+  $ octez-codec encode alpha.script.expr from '{"prim":"Left","args":[{"int":"1"}]}'
   05050001
 
 Here:
@@ -293,7 +293,7 @@ Finally, let us consider a more complex example.
 Assume that we try to understand an operation included in a block.
 We can decode the binary string as follows::
 
-  $ tezos-codec decode alpha.operation from '008f1d96e2783258ff663f03dacfe946c026a5d194c73d1987b3da73fadea7d46c008cb5baedee4dc3ec261dfcf57a9600bb0a8e26c0f00bdd85a0018452ac02e0a712000153957451d3cc83a71e26b65ea2391a1b16713d2d009595facf847a72b4c3fe231c0e4185e68e9b2875aa3c639382c86bcf0af23699f47fe66a6550ade936a5b59d5919ad20703885750314e0c368b277de39e7d10a'
+  $ octez-codec decode alpha.operation from '008f1d96e2783258ff663f03dacfe946c026a5d194c73d1987b3da73fadea7d46c008cb5baedee4dc3ec261dfcf57a9600bb0a8e26c0f00bdd85a0018452ac02e0a712000153957451d3cc83a71e26b65ea2391a1b16713d2d009595facf847a72b4c3fe231c0e4185e68e9b2875aa3c639382c86bcf0af23699f47fe66a6550ade936a5b59d5919ad20703885750314e0c368b277de39e7d10a'
   { "branch": "BKiXcfN1ZTXnNNbTWSRArSWzVFc6om7radWq5mTqGX6rY4P2Uhe",
     "contents":
       [ { "kind": "transaction",
@@ -306,7 +306,7 @@ We can decode the binary string as follows::
 
 In order to understand how the transaction has been decoded from the binary sequence, we have to examine the encoding schema of a block operation::
 
-  $ tezos-codec describe alpha.operation binary schema
+  $ octez-codec describe alpha.operation binary schema
   +-----------+----------+---------------------------------------------+
   | Name      | Size     | Contents                                    |
   +===========+==========+=============================================+
@@ -374,27 +374,27 @@ Using the above information, the sample binary sequence can be broken down as fo
   = 0x9595facf847a72b4c3fe231c0e4185e68e9b2875aa3c639382c86bcf0af23699f47fe66a6550ade936a5b59d5919ad20703885750314e0c368b277de39e7d10a
   = sighZMqWz5G8drK1VTsmTnQBFEQ9kxQQxL88NFh8UaqDEJ3R3mzgR3g81azadZ9saPwsWga3kEPsyfbzrXm6ueuDvx3pQ5Q9
 
-As usual, ``tezos-codec`` can be used the other way around, to encode the same transaction::
+As usual, ``octez-codec`` can be used the other way around, to encode the same transaction::
 
-  $ tezos-codec encode alpha.operation from '{ "branch": "BKiXcfN1ZTXnNNbTWSRArSWzVFc6om7radWq5mTqGX6rY4P2Uhe", "contents": [ { "kind": "transaction", "source": "tz1YU2zoyCkXPKEA4jknSpCpMs7yUndVNe3S", "fee": "1520", "counter": "2622173", "gas_limit": "10500", "storage_limit": "300", "amount": "300000", "destination": "tz2FwBnXhuXvPAUcr1aF3uX84Z6JELxrdYxD" } ], "signature": "sighZMqWz5G8drK1VTsmTnQBFEQ9kxQQxL88NFh8UaqDEJ3R3mzgR3g81azadZ9saPwsWga3kEPsyfbzrXm6ueuDvx3pQ5Q9" }'
+  $ octez-codec encode alpha.operation from '{ "branch": "BKiXcfN1ZTXnNNbTWSRArSWzVFc6om7radWq5mTqGX6rY4P2Uhe", "contents": [ { "kind": "transaction", "source": "tz1YU2zoyCkXPKEA4jknSpCpMs7yUndVNe3S", "fee": "1520", "counter": "2622173", "gas_limit": "10500", "storage_limit": "300", "amount": "300000", "destination": "tz2FwBnXhuXvPAUcr1aF3uX84Z6JELxrdYxD" } ], "signature": "sighZMqWz5G8drK1VTsmTnQBFEQ9kxQQxL88NFh8UaqDEJ3R3mzgR3g81azadZ9saPwsWga3kEPsyfbzrXm6ueuDvx3pQ5Q9" }'
 
 .. COMMENT:
   We could also very well publish encodings, as this has proved useful to guiding developers in the past.
 
 .. _client_convert:
 
-How to convert Micheline with ``tezos-client``
+How to convert Micheline with ``octez-client``
 ----------------------------------------------
 
-The ``tezos-client`` can be used to convert Micheline expressions between the following forms: binary, JSON, Michelson, and OCaml.
+The ``octez-client`` can be used to convert Micheline expressions between the following forms: binary, JSON, Michelson, and OCaml.
 
 Note that the client has to be run in conjunction to a running node for the following commands to work (unless option ``--protocol`` is specified)::
 
-  $ tezos-client convert data '(Pair 1 2)' from michelson to binary
+  $ octez-client convert data '(Pair 1 2)' from michelson to binary
   0x070700010002
-  $ tezos-client convert data 0x070700010002 from binary to michelson
+  $ octez-client convert data 0x070700010002 from binary to michelson
   (Pair 1 2)
-  $ tezos-client convert data 0x070700010002 from binary to json
+  $ octez-client convert data 0x070700010002 from binary to json
   { "prim": "Pair", "args": [ { "int": "1" }, { "int": "2" } ] }
-  $ tezos-client convert data 0x070700010002 from binary to ocaml
+  $ octez-client convert data 0x070700010002 from binary to ocaml
   Prim (0, D_Pair, [Int (1, Z.one); Int (2, Z.of_int 2)], [])

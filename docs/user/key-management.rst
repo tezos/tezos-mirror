@@ -33,19 +33,19 @@ Tezos Wallet app
 Now on the client we can import the keys (make sure the device is
 in the Tezos Wallet app)::
 
-   ./tezos-client list connected ledgers
+   ./octez-client list connected ledgers
 
 You can follow the instructions to import the ledger private key and
 you can choose between the root or a derived address.
 We can confirm the addition by listing known addresses::
 
-   ./tezos-client import secret key my_ledger ledger://tz1XXXXXXXXXX
-   ./tezos-client list known addresses
+   ./octez-client import secret key my_ledger ledger://tz1XXXXXXXXXX
+   ./octez-client list known addresses
 
 Optional: we can check that our ledger signs correctly using the
 following command and confirming on the device::
 
-   tezos-client show ledger path ledger://tz1XXXXXXXXXX
+   octez-client show ledger path ledger://tz1XXXXXXXXXX
 
 The address can now be used as any other with the exception that
 during an operation the device will prompt you to confirm when it's
@@ -69,7 +69,7 @@ block signed.
 If you have tried the app on some network and want to
 use it on another network you might need to reset this level with the command::
 
-   tezos-client setup ledger to bake for my_ledger
+   octez-client setup ledger to bake for my_ledger
 
 More details can be found on the `Tezos Ledger app
 <https://github.com/obsidiansystems/ledger-app-tezos>`_.
@@ -82,16 +82,16 @@ Signer
 Another solution to decouple the node from the signing process is to
 use the *remote signer*.
 Among the signing scheme supported by the client, that we can list
-with ``tezos-client list signing schemes``, there are ``unix``,
+with ``octez-client list signing schemes``, there are ``unix``,
 ``tcp``, ``http`` and ``https``.
 These schemes send signing requests over their respective
-communication channel towards the ``tezos-signer``, which can run on a
+communication channel towards the ``octez-signer``, which can run on a
 different machine that stores the secret key.
 
 Signer requests
 ~~~~~~~~~~~~~~~
 
-The ``tezos-signer`` handles signing requests with the following format::
+The ``octez-signer`` handles signing requests with the following format::
 
     <magic_byte><data>
 
@@ -133,19 +133,19 @@ In our home server we can generate a new key pair (or import one from a
 :ref:`Ledger<ledger>`) and launch a signer that signs operations using these
 keys.
 The new keys are store in ``$HOME/.tezos-signer`` in the same format
-as ``tezos-client``.
+as ``octez-client``.
 On our internet facing vps we can then import a key with the address
 of the signer.
 
 ::
 
-   home~$ tezos-signer gen keys alice
+   home~$ octez-signer gen keys alice
    home~$ cat ~/.tezos-signer/public_key_hashs
    [ { "name": "alice", "value": "tz1abc..." } ]
-   home~$ tezos-signer launch socket signer -a home
+   home~$ octez-signer launch socket signer -a home
 
-   vps~$ tezos-client import secret key alice tcp://home:7732/tz1abc...
-   vps~$ tezos-client sign bytes 0x03 for alice
+   vps~$ octez-client import secret key alice tcp://home:7732/tz1abc...
+   vps~$ octez-client sign bytes 0x03 for alice
 
 Every time the client on *vps* needs to sign an operation for
 *alice*, it sends a signature request to the remote signer on
@@ -155,30 +155,30 @@ However, with the above method, the address of the signer is hard-coded into the
 Consequently, if we ever have to move the signer to another machine or access it using another protocol, we will have to change all the remote keys.
 A more flexible method is to only register a key as being remote, and separately supply the address of the signer uisng the `-R` option::
 
-   vps~$ tezos-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
-   vps~$ tezos-client -R 'tcp://home:7732' sign bytes 0x03 for alice
+   vps~$ octez-client -R 'tcp://home:7732' import secret key alice remote:tz1abc...
+   vps~$ octez-client -R 'tcp://home:7732' sign bytes 0x03 for alice
 
 Alternatively, the address of the signer can be recorded in environment variables::
 
    vps~$ export TEZOS_SIGNER_TCP_HOST=home
    vps~$ export TEZOS_SIGNER_TCP_PORT=7732
-   vps~$ tezos-client import secret key alice remote:tz1abc...
-   vps~$ tezos-client sign bytes 0x03 for alice
+   vps~$ octez-client import secret key alice remote:tz1abc...
+   vps~$ octez-client sign bytes 0x03 for alice
 
 All the above methods can be retargeted to the other signing schemes, for instance, ``http``::
 
-   home~$ tezos-signer launch http signer -a home
+   home~$ octez-signer launch http signer -a home
 
-   vps~$ tezos-client import secret key alice http://home:7732/tz1abc...
-   vps~$ tezos-client sign bytes 0x03 for alice
+   vps~$ octez-client import secret key alice http://home:7732/tz1abc...
+   vps~$ octez-client sign bytes 0x03 for alice
 
-   vps~$ tezos-client -R 'http://home:7732' import secret key alice remote:tz1abc...
-   vps~$ tezos-client -R 'http://home:7732' sign bytes 0x03 for alice
+   vps~$ octez-client -R 'http://home:7732' import secret key alice remote:tz1abc...
+   vps~$ octez-client -R 'http://home:7732' sign bytes 0x03 for alice
 
    vps~$ export TEZOS_SIGNER_HTTP_HOST=home
    vps~$ export TEZOS_SIGNER_HTTP_PORT=7732
-   vps~$ tezos-client import secret key alice remote:tz1abc...
-   vps~$ tezos-client sign bytes 0x03 for alice
+   vps~$ octez-client import secret key alice remote:tz1abc...
+   vps~$ octez-client sign bytes 0x03 for alice
 
 The complete list of environment variables for connecting to the remote signer is:
 
@@ -212,14 +212,14 @@ signer and it is not used as a Tezos account.
 
 ::
 
-   vps~$ tezos-client gen keys vps
+   vps~$ octez-client gen keys vps
    vps~$ cat ~/.tezos-client/public_keys
    [ { "name": "vps",
        "value":
           "unencrypted:edpk123456789" } ]
 
-   home~$ tezos-signer add authorized key edpk123456789 --name vps
-   home~$ tezos-signer --require-authentication launch socket signer -a home-ip
+   home~$ octez-signer add authorized key edpk123456789 --name vps
+   home~$ octez-signer --require-authentication launch socket signer -a home-ip
 
 All request are now signed with the *vps* key thus you are
 guaranteed authenticity and integrity.
@@ -240,7 +240,7 @@ This feature is also included in some wallets.
 If you have any questions or issues, refer to that page or to the `Tezos
 foundation <https://tezos.foundation/>`_ for support.
 
-You may also use ``tezos-client`` to activate your account, **be
+You may also use ``octez-client`` to activate your account, **be
 warned that you should have a very good understanding of key
 management in Tezos and be familiar with the command-line.**
 The first step is to recover your private key using the following
@@ -252,7 +252,7 @@ command which will ask for:
 
 ::
 
-   tezos-client import fundraiser key alice
+   octez-client import fundraiser key alice
 
 Once you insert all the required information, the client computes
 your secret key and it asks to create a new password to store your
@@ -264,7 +264,7 @@ foundation.
 
 ::
 
-   tezos-client activate fundraiser account alice with <code>
+   octez-client activate fundraiser account alice with <code>
 
 Like explained above, your keys are stored under ``~/.tezos-client``.
 We strongly advice you to first **make a backup** and then
@@ -273,4 +273,4 @@ transfer your tokens to a new pair of keys imported from a ledger (see
 
 Check the balance with::
 
-    tezos-client get balance for alice
+    octez-client get balance for alice

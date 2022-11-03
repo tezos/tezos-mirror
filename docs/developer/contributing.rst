@@ -22,7 +22,7 @@ to search the existing issues before reporting a new one.
 Some information that are probably important to include in the description:
 the architecture (e.g. *ARM64*), the operating system (e.g. *Debian
 Stretch*), the network you are connected to (e.g. *Carthagenet*), the
-binary or component (e.g. *tezos-node crashes* or *rpc X returns Y
+binary or component (e.g. *octez-node crashes* or *rpc X returns Y
 while Z was expected*).
 
 Fixing typos

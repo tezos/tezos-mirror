@@ -41,22 +41,22 @@ full: odoc
 	${MAKE} html
 
 # Build the manuals for a given protocol
-%/tezos-client.html:
-	@../tezos-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-baker.html:
-	@../tezos-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
-%/tezos-accuser.html:
-	@../tezos-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-client.html:
+	@../octez-client -protocol $($(@D)_long) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-baker.html:
+	@../octez-baker-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
+%/octez-accuser.html:
+	@../octez-accuser-$($(@D)_short) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > $@
 
 manuals: \
-	 $(PROTOCOLS:%=%/tezos-client.html) \
-	 $(PROTOCOLS:%=%/tezos-baker.html) \
-	 $(PROTOCOLS:%=%/tezos-accuser.html)
+	 $(PROTOCOLS:%=%/octez-client.html) \
+	 $(PROTOCOLS:%=%/octez-baker.html) \
+	 $(PROTOCOLS:%=%/octez-accuser.html)
 	# generic
-	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
-	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
-	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
-	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
+	@../octez-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-admin-client.html
+	@../octez-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-signer.html
+	@../octez-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-codec.html
+	@../octez-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/octez-snoop.html
 
 # artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
@@ -120,7 +120,7 @@ docexes:
 	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
 developer/metrics.csv:
-	../tezos-node dump-metrics > developer/metrics.csv
+	../octez-node dump-metrics > developer/metrics.csv
 
 $(ERRDOCEXE): docexes
 $(RPCDOCEXE): docexes

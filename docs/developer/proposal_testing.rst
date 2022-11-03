@@ -36,8 +36,8 @@ latest code and run unit tests::
 
 We can run a node and a client in sandboxed mode by invoking::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 By default, the sandbox starts from the `genesis` block at level 0, and the
 sandbox's active protocol is the `Genesis protocol`. Once the sandbox is
@@ -51,7 +51,7 @@ because the sandbox contains accounts ``bootstrap1`` to ``bootstrap5`` with
 implicit credentials that allow them to bake blocks by using the usual RPCs in
 the shell (see :doc:`../user/sandbox`)::
 
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 Adding New Protocol Tests in OCaml
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,10 +369,10 @@ For instance, the following commands import a context from the snapshot file
 into the folder ``/tmp/mainnet``,
 and generate an identity in the same folder::
 
-  $ ./tezos-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node snapshot import ~/snapshot-mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
 
-The ``./tezos-node snapshot import`` command accepts an option
+The ``./octez-node snapshot import`` command accepts an option
 ``--block <block_hash>`` that instructs the command to check that the hash of
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
@@ -418,7 +418,7 @@ stake of at least 75 percent can be kept with::
 
 By restricting the accumulated stake to 75% as in the command above,
 the wallet is both "lighter" (it may contain around 30-40 keys and
-therefore some commands like ``tezos-client bake for`` will execute
+therefore some commands like ``octez-client bake for`` will execute
 faster) and its keys will represent more than the 2/3rds of the
 endorsing power for any given level.
 
@@ -475,7 +475,7 @@ In case we opted for not snapshotting the Alpha protocol, we could batch steps
 
 The script ``scripts/prepare_migration_test.sh`` receives an optional
 ``<block_hash>`` as the last argument which, if passed, will be used for the
-option ``--block <block_hash>`` to the ``./tezos-node snapshot import`` command
+option ``--block <block_hash>`` to the ``./octez-node snapshot import`` command
 when importing the context form Mainnet.
 
 After performing the steps 1--7, the migration will be ready to be tested. The
@@ -489,14 +489,14 @@ Run the Migration on the Sandbox
 If we run the migration on an empty context, then we would start a sandboxed
 node as usual. In our example we can run the following::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
 
 We can also start the client::
 
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Instead of command ``tezos-activate-alpha``, the sandboxed client script
-``src/bin_client/tezos-init-sandboxed-client.sh`` now accepts a command
+``src/bin_client/octez-init-sandboxed-client.sh`` now accepts a command
 ``tezos-activate-XXX-<short_hash>`` that activates the predecessor protocol with
 version number ``XXX`` and short hash ``<short_hash>``. In our example, the
 predecessor protocol is ``011`` with short hash ``PtHangz2``. (Check the folder
@@ -515,15 +515,15 @@ which migration will be triggered, which in our example is ``3``. Since
 activating the predecessor protocol increases the level by one, we need to bake
 two more blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) the command above
    requires a specific account to bake for. Any of ``bootstrap[0-9]`` accounts
    can be used to do it:
 
-   ``$ tezos-client bake for bootstrap1 --minimal-timestamp``
+   ``$ octez-client bake for bootstrap1 --minimal-timestamp``
 
 At this moment migration will be triggered and the protocol
 ``proto_012_<short_hash>`` will become active, and we will see the log message
@@ -552,12 +552,12 @@ environment variable ``test-directory`` to the path of the test folder, such
 that we can run the node in the test folder later. Then it copies the contents
 of the original context folder into the test folder.
 
-Now, we can run the ``tezos-node`` command by specifying the test folder
+Now, we can run the ``octez-node`` command by specifying the test folder
 ``$test-directory`` as the data directory. We will also specify the RPC address
 ``localhost``, such that the RPCs will be available at the url
 ``localhost:8732``. In our example, by invoking the following::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 We will now trigger the migration by baking blocks until the level reaches the
 one specified when setting the user-activated upgrades. The blocks can be baked
@@ -565,14 +565,14 @@ with the yes-wallet created in step 5 above, and with any of the accounts
 ``foundation1`` to ``foundation8``. In our example, we can bake one block by
 running the following command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
    a specific account to bake for. Any of ``foundation[1-8]`` accounts can be
    used to do it.
 
-   ``$ tezos-client bake for foundation1 --minimal-timestamp``
+   ``$ octez-client bake for foundation1 --minimal-timestamp``
 
    If the chosen account ``foundation1`` ceases to have the priority to bake, we
    can switch to any of the remaining accounts ``foundation2`` to
@@ -597,12 +597,12 @@ copy the context of the original folder into the test folder. In our example::
 
 Now we run the node in the test folder by invoking::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And finally, we bake the numbers of blocks specified by the user-activated
 upgrade, with the command::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 
 Wrap up the Manual Migration Procedure
@@ -644,8 +644,8 @@ the following fur commands)::
 
 Run sandboxed node and client::
 
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol and move chain one level forward::
 
@@ -653,18 +653,18 @@ Activate predecessor of the Alpha protocol and move chain one level forward::
 
 Bake two more blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message!
 
 To test again, restart the sandboxed node and client::
 
   $ fg
-  ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0
+  ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0
   ^C
-  $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0 &
-  $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+  $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 0 &
+  $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Activate predecessor of the Alpha protocol::
 
@@ -672,8 +672,8 @@ Activate predecessor of the Alpha protocol::
 
 Bake two blocks::
 
-  $ tezos-client bake for --minimal-timestamp
-  $ tezos-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
+  $ octez-client bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -713,8 +713,8 @@ invoking the following eight commands)::
   $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
   $ ./scripts/patch-yes_node.sh
   $ make
-  $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
-  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./octez-node identity generate --data-dir /tmp/tezos-node-mainnet
   $ dune exec devtools/yes_wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 Copy original folder into test folder::
@@ -723,13 +723,13 @@ Copy original folder into test folder::
 
 Run the node`::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 Bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 .. note::
    Prior to Tenderbake activation (i.e. to the Protocol I) this command requires
@@ -741,7 +741,7 @@ You should see the ``STITCHING!`` message!
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost
   ^C
 
 Clean up by removing test folder and copying original folder into fresh
@@ -753,13 +753,13 @@ test folder, and by removing files ``/tmp/yes-wallet/wallet_lock`` and
 
 Run the node::
 
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir "$test_directory" --rpc-addr localhost &
 
 And bake three blocks::
 
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
-  $ ./tezos-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/yes-wallet bake for --minimal-timestamp
 
 You should see the ``STITCHING!`` message again!
 
@@ -826,7 +826,7 @@ file ``~/mainnet.rolling`` into it. As explained in Section
 `Batch steps 1--7 above`_, the script ``scripts/prepare_migration_test.sh`` may
 receive an optional ``<block_hash>`` parameter as the last argument which, if
 present, will be used for the option ``--block <block_hash>`` of the command
-``./tezos-node snapshot import`` when importing the context form Mainnet.
+``./octez-node snapshot import`` when importing the context form Mainnet.
 
 If we opt for not snapshotting the Alpha protocol, we can prepare the automatic
 migration with the same command as above, but omitting the optional name
@@ -861,13 +861,13 @@ developer to be able to inspect the storage after the migration has been
 performed. Assume the temporary folder in our example is ``/tmp/tezt-526039``,
 the developer can start the node with the migrated context by invoking::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Once the node is up, it is possible to inspect the storage by using the Tezos
 client and/or the RPCs. New blocks can be baked with any of the accounts
 ``foundation1`` to ``foundation8`` by using the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 If the developer wishes not to start the node that results after the migration,
 the parameter ``--keep-temp`` can be omitted and the Tezt's temp folder will be
@@ -912,17 +912,17 @@ Run the migration test::
 
 Run the resulting node (assuming temp folder ``/tmp/tezt-526039``)::
 
-  $ ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
+  $ ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost &
 
 Use the client, to manually inspect the storage, or for example to bake new
 blocks with the following command::
 
-  $ ./tezos-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
+  $ ./octez-client -d /tmp/tezt-526039/yes-wallet bake for --minimal-timestamp
 
 To test again, kill the node::
 
   $ fg
-  ./tezos-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
+  ./octez-node run --synchronisation-threshold 0 --connections 0 --data-dir /tmp/tezt-526039/tezos-node-test --rpc-addr localhost
   ^C
 
 And run the migration test::

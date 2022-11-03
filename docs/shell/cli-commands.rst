@@ -8,7 +8,7 @@ obtain similar pages using shell commands such as:
 
 ::
 
-   tezos-admin-client man -verbosity 3
+   octez-admin-client man -verbosity 3
 
 The rest of this page documents the protocol-independent tools.
 The protocol-dependent tools are documented :doc:`here <../active/cli-commands>`.
@@ -20,7 +20,7 @@ Admin-client manual
 ===================
 
 .. raw:: html
-         :file: ../api/tezos-admin-client.html
+         :file: ../api/octez-admin-client.html
 
 
 .. _signer_manual:
@@ -29,7 +29,7 @@ Signer manual
 =============
 
 .. raw:: html
-         :file: ../api/tezos-signer.html
+         :file: ../api/octez-signer.html
 
 
 .. _benchmark_tool_manual:
@@ -38,7 +38,7 @@ Benchmark tool manual
 =====================
 
 .. raw:: html
-         :file: ../api/tezos-snoop.html
+         :file: ../api/octez-snoop.html
 
 
 .. _codec_manual:
@@ -47,7 +47,7 @@ Codec manual
 ============
 
 .. raw:: html
-         :file: ../api/tezos-codec.html
+         :file: ../api/octez-codec.html
 
 
 .. _node_manual:
@@ -58,7 +58,7 @@ Node manual
 The command line of the Tezos node is not currently documented as a web page, but
 you can obtain it in Unix manual format by running the node with no arguments::
 
-  tezos-node
+  octez-node
 
 The above command briefly shows the available node commands.
 Each command accepts its own set of options and arguments, see :doc:`../user/node-configuration`.

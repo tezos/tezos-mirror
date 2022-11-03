@@ -6,23 +6,23 @@ self-documenting command-line argument parsers. Clic is similar to
 `cmdliner <https://erratique.ch/software/cmdliner>`__, but (unlike cmdliner)
 ``tezos-clic`` allows to define a domain-specific
 language as a subset of a natural language, by mixing keyword and
-positional arguments. For example, in ``tezos-client``, commands look
+positional arguments. For example, in ``octez-client``, commands look
 like this, thanks to ``tezos-clic``:
 
 .. code-block::
 
-    tezos-client list understood protocols
-    tezos-client compute chain id from block hash <hash>
-    tezos-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script>
+    octez-client list understood protocols
+    octez-client compute chain id from block hash <hash>
+    octez-client originate contract <contract_alias> transferring <initial_balance> from <originator> running <script>
 
 
 ``clic`` is used for most of the binaries distributed with Octez, such
-as ``tezos-client`` and ``tezos-codec``. A notable exception is
-``tezos-node`` which uses ``cmdliner``.
+as ``octez-client`` and ``octez-codec``. A notable exception is
+``octez-node`` which uses ``cmdliner``.
 
 In this tutorial, we will give a gentle introduction to ``clic`` by
 demonstrating how to implement a wallet command inspired by those of
-``tezos-client``. Impatient readers will find the full example
+``octez-client``. Impatient readers will find the full example
 :src:`in this file<src/lib_clic/examples/clic_example.ml>`.
 
 Wallet example
@@ -30,9 +30,9 @@ Wallet example
 
 Command-line parsing in ``clic`` is centered around *commands*. A command
 roughly corresponds to one action of the command-line application. For
-instance, ``tezos-client get balance`` and ``tezos-client run script
+instance, ``octez-client get balance`` and ``octez-client run script
 <script>`` are two different commands.
-To demonstrate the use of ``clic``, we will add the following command to a dummy tezos-client: ``list
+To demonstrate the use of ``clic``, we will add the following command to a dummy octez-client: ``list
 known contracts``. As the name indicates, this command outputs
 the contracts known to the wallet.
 
@@ -85,7 +85,7 @@ Commands are defined through the ``Tezos_clic.command`` function. It has the fol
 First, commands have a group and description that are used to
 generate documentation.
 Groups are used to organize commands of related functionality. This is
-convenient for applications such as ``tezos-client`` that defines a
+convenient for applications such as ``octez-client`` that defines a
 large number of commands which are grouped on themes such as
 querying, testing, and address management. You can see the documentation
 :ref:`online <client_manual_alpha>`.
@@ -107,10 +107,10 @@ value of type ``'b``.
 The command is specified through a sequence of *params*, given as the
 fourth argument to ``Tezos_clic.command``. Params can be *prefixes*: fixed
 strings that must be given when calling the command. Above, we
-mentioned the ``get balance`` command of ``tezos-client``. The
+mentioned the ``get balance`` command of ``octez-client``. The
 sequence ``get balance`` is an example of such a prefix. A param can
 also define a *hole* to be filled by the user on the command line. An example is given by
-``tezos-client get balance for <contract>``. Here, the command
+``octez-client get balance for <contract>``. Here, the command
 consists of a sequence of prefixes ``get balance for`` followed by the
 hole ``<contract>``, filled by the user on the command-line. No matter how the params
 specification is constructed, it is terminated by the combinator ``Tezos_clic.stop``.

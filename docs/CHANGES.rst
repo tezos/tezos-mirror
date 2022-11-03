@@ -275,7 +275,7 @@ Node
 
 - Added a store metric to expose the number of blocks considered as invalid.
 
-- Fixed the ``tezos-node config reset`` command which did not actually reset
+- Fixed the ``octez-node config reset`` command which did not actually reset
   the configuration file to its default values.
 
 - Added metrics to observe the bootstrapped and synchronisation status.
@@ -310,7 +310,7 @@ Node
   upgraded. To this end, a new storage version was introduced: 1.0
   (previously 0.8). Backward compatibility is preserved: upgrading
   from 0.6, 0.7 (Octez 12.x) or 0.8 (Octez 13.0) is done through the
-  ``tezos-node upgrade storage`` command. This upgrade is
+  ``octez-node upgrade storage`` command. This upgrade is
   instantaneous. However, be careful that there is no forward
   compatibility: previous versions of Octez will refuse to run on an
   upgraded data directory.
@@ -330,7 +330,7 @@ Client
 - Client now allows to simulate failing operations with ``--simulation
   --force``, and report errors without specifying limits.
 
-- Added ``--ignore-case`` option to the ``tezos-client gen vanity keys`` command
+- Added ``--ignore-case`` option to the ``octez-client gen vanity keys`` command
   to allow case-insensitive search for the given pattern.
 
 Proxy Server
@@ -353,7 +353,7 @@ Docker Images
   since version 13.0. It is recommended to write your own docker-compose file instead.
   ``scripts/docker/docker-compose-generic.yml`` is an example of such file.
 
-- ``tezos-codec`` is now included in Docker images.
+- ``octez-codec`` is now included in Docker images.
 
 Rollups
 -------
@@ -416,10 +416,10 @@ Node
   must be used for RPC requests to the node. The value can be ``json``,
   ``binary`` or ``any``. By default, the value is set to ``any``.
 
-- Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``tezos-node`` to
+- Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``octez-node`` to
   expose some metrics using the Prometheus format.
 
-- Added command ``tezos-node storage head-commmit`` which prints the commit hash
+- Added command ``octez-node storage head-commmit`` which prints the commit hash
   of the current context head.
 
 - Added a history mode check when importing a snapshot to ensure the consistency between the
@@ -461,7 +461,7 @@ Node
   limit, and therefore not stored. The re-computed metadata are not
   stored on disk after this call, but rather just returned by the RPC call.
 
-- Added ``--progress-display-mode`` option to the ``tezos-node`` commands
+- Added ``--progress-display-mode`` option to the ``octez-node`` commands
   that display progress animation. This option allows to redirect progress
   animation to non-TTY file descriptors.
 
@@ -494,9 +494,9 @@ Baker
 -----
 
 The following breaking changes affect the Octez v13.0~rc1 baker daemon
-for the Jakarta 2 protocol ``tezos-baker-013-PtJakart``, but **not** the
+for the Jakarta 2 protocol ``octez-baker-013-PtJakart``, but **not** the
 corresponding one for the the Ithaca 2 protocol,
-``tezos-baker-012-Psithaca``.
+``octez-baker-012-Psithaca``.
 
 - **Breaking change**:
   The ``--liquidity-baking-escape-vote`` command-line option has been renamed
@@ -654,14 +654,14 @@ Version 12.0
 Node
 ----
 
-- The tezos-node configuration file parameter
+- The octez-node configuration file parameter
   ``shell.prevalidator.limits.max_refused_operations`` is now
   deprecated and may be removed starting from version 13.0.
 
 - Fixed missing removal of replaced operation in the plugin when another better
   one takes its place (when the mempool is full).
 
-- The output of ``tezos-client get ledger high watermark for <ledger>``
+- The output of ``octez-client get ledger high watermark for <ledger>``
   now also displays the high-water mark for the round, if available.
   Rounds are introduced in Tenderbake.
 
@@ -867,13 +867,13 @@ Node
 - The prevalidator (which handles operations which have been received but not
   yet included in a block) was made more restrictive: it now accepts a single
   manager operation from a given manager for a given block. This limitation
-  was already present implicitly if you were using the ``tezos-client`` commands.
+  was already present implicitly if you were using the ``octez-client`` commands.
   Batches of operations can be used to get around this restriction, see the
   ``multiple transfers`` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
 
 - Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
-  It is no longer possible to run ``tezos-node upgrade storage`` to upgrade
+  It is no longer possible to run ``octez-node upgrade storage`` to upgrade
   from those older versions. It is also no longer possible to import
   snapshots that were exported using this version.
 
@@ -1061,7 +1061,7 @@ Node
 
    - ``shell.block_validator.limits.worker_backlog_level``
 
--  The ``tezos-admin-client show current checkpoint`` command now only
+-  The ``octez-admin-client show current checkpoint`` command now only
    outputs the current checkpoint. It no longer outputs the savepoint,
    caboose and history mode.
 
@@ -1146,9 +1146,9 @@ Node
 Client
 ------
 
--  Disabled indentation checking by default in the ``tezos-client
-   convert script`` and ``tezos-client hash script`` commands. In
-   particular, ``tezos-client convert script <script> from Michelson
+-  Disabled indentation checking by default in the ``octez-client
+   convert script`` and ``octez-client hash script`` commands. In
+   particular, ``octez-client convert script <script> from Michelson
    to Michelson`` can now be used as a Michelson script formatter. To
    force the indentation check, the new ``--enforce-indentation``
    command line switch can be used.
@@ -1166,7 +1166,7 @@ Client
 -  Fix gas simulation for operation batches for Granada, Hangzhou and Alpha
 
 -  Added timestamp display of the snapshot's block target when running
-   the ``tezos-node snapshot info`` command.
+   the ``octez-node snapshot info`` command.
 
 Baker / Endorser / Accuser
 --------------------------
@@ -1230,7 +1230,7 @@ Docker Images
 -------------
 
 -  The ``--force-history-mode-switch`` option is now available for
-   ``tezos-node`` entrypoint. It allows the user to switch the history
+   ``octez-node`` entrypoint. It allows the user to switch the history
    mode of the node's storage.
 
 Version 10.2
@@ -1268,13 +1268,13 @@ Node
    If you were previously using Octez 10.0~rc1 or 10.0~rc2, you were using
    store version 0.0.5. If you were previously using Octez 9.x, you were
    using store version 0.0.4. In both cases, use command
-   ``tezos-node upgrade storage`` to upgrade to 0.0.6.
+   ``octez-node upgrade storage`` to upgrade to 0.0.6.
 
 -  Added an upgrade procedure to upgrade from ``v0.0.5`` to ``v0.0.6``. The
-   procedure is implemented through the ``tezos-node upgrade storage``
+   procedure is implemented through the ``octez-node upgrade storage``
    command.
 
--  Added an ``integrity-check-index`` subcommand to ``tezos-node
+-  Added an ``integrity-check-index`` subcommand to ``octez-node
    storage``, which can be used to check for corruptions (missing
    entries) in the index of the store. This command also accepts an
    optional flag ``--auto-repair`` to fix those specific corruptions
@@ -1341,7 +1341,7 @@ Node
 
 -  Added an upgrade procedure to upgrade from the previous store to the
    new one. The procedure is implemented through the
-   ``tezos-node upgrade storage`` command. This command is
+   ``octez-node upgrade storage`` command. This command is
    non-destructive: the previous store is preserved at
    ``<data_dir>/lmdb_store_to_be_removed`` and needs to be manually
    removed when the user made sure the upgrade process went well.
@@ -1359,12 +1359,12 @@ Node
          suitable for IPFS sharing
 
    -  The argument ``[output_file]`` in
-      ``tezos-node export snapshot [output_file]`` becomes optional and
+      ``octez-node export snapshot [output_file]`` becomes optional and
       defaults to a file whose name follows this pattern
       ``<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_HISTORY_MODE>``
    -  Improved the metadata of snapshots which can be displayed using
-      ``tezos-node snapshot info``
-   -  The ``tezos-node snapshot import`` command is retro-compatible
+      ``octez-node snapshot info``
+   -  The ``octez-node snapshot import`` command is retro-compatible
       with the previous snapshot format (v1) but legacy snapshots cannot
       be exported anymore
 
@@ -1378,7 +1378,7 @@ Node
    two modes were maintaining a window of ``<preserved cycles>`` cycles
    of metadata (``5`` on mainnet). These modes may now be configured to
    keep a larger window of metadata. E.g.
-   ``tezos-node run --history-mode full+2`` will maintain 2 extra cycles
+   ``octez-node run --history-mode full+2`` will maintain 2 extra cycles
    of metadata, in addition to the network’s preserved cycles. This may
    become useful for users that want to keep more data from the past:
    for instance, to compute rewards payouts. The default number of extra
@@ -1446,7 +1446,7 @@ Client
    it uses Merkle proofs to make the light mode super safe.
 
 -  Added commands to display the hash of Michelson script from files
-   (``tezos-client hash script``) and from addresses (``tezos-client
+   (``octez-client hash script``) and from addresses (``octez-client
    get contract script hash``).
 
 -  Added support for a new generic version of the multisig contract.
@@ -1477,7 +1477,7 @@ Baker / Endorser / Accuser
 Proxy server
 ------------
 
--  Added a new binary: ``tezos-proxy-server``, a read-only frontend to a node.
+-  Added a new binary: ``octez-proxy-server``, a read-only frontend to a node.
    It is designed to lower the load of nodes, by being capable
    of serving `protocol RPCs <https://tezos.gitlab.io/alpha/rpc.html>`__.
    An instance of a proxy server is protocol-specific: it automatically picks
@@ -1955,7 +1955,7 @@ Node
    significance are detailed in `the user
    documentation <http://tezos.gitlab.io/user/various.html#tezos_binaries_signals_and_exit_codes>`__.
 
--  Command ``tezos-node --version`` now exits with exit code 0 instead
+-  Command ``octez-node --version`` now exits with exit code 0 instead
    of 1.
 
 -  Fixed the synchronisation threshold which was wrongly capped with an
@@ -2031,8 +2031,8 @@ Node
 -  Fixed an issue which prevented using ports higher than 32767 in the
    client configuration file.
 
--  The ``tezos-node run`` command now automatically generates an
-   identity file as if you had run ``tezos-node identity generate`` if
+-  The ``octez-node run`` command now automatically generates an
+   identity file as if you had run ``octez-node identity generate`` if
    its data directory contains no identity file.
 
 -  Improved various log messages and errors.
@@ -2084,7 +2084,7 @@ Node
 -  Improved the performance of the progress indicator when importing
    snapshots.
 
--  Improved performance of ``tezos-node snapshot export``.
+-  Improved performance of ``octez-node snapshot export``.
 
 -  Fixed the node which sent too many “get current branch” messages to
    its peers on testchain activation.
@@ -2093,11 +2093,11 @@ Node
 Client
 ------
 
--  The ``tezos-client config show`` command now takes into account the
+-  The ``octez-client config show`` command now takes into account the
    command line arguments.
 
--  Fixed an issue which caused ``tezos-client rpc get /errors`` as well
-   as ``tezos-codec dump encodings`` to fail because of duplicate
+-  Fixed an issue which caused ``octez-client rpc get /errors`` as well
+   as ``octez-codec dump encodings`` to fail because of duplicate
    encodings. As a result, some protocol encodings whose name was not
    prefixed by the protocol name are now prefixed by it. If you have
    tools which rely on encoding names you may have to update them.
@@ -2116,8 +2116,8 @@ Client
    understand an error from the node.
 
 -  Added client commands
-   ``tezos-client convert script <script> from <input> to <output>`` and
-   ``tezos-client convert data <data> from <input> to <output>`` to
+   ``octez-client convert script <script> from <input> to <output>`` and
+   ``octez-client convert data <data> from <input> to <output>`` to
    convert to and from michelson, JSON, binary and OCaml with
    type-checking.
 
@@ -2195,7 +2195,7 @@ Protocol Compiler And Environment
 Codec
 -----
 
--  Fixed ``tezos-codec dump encodings`` which failed due to two
+-  Fixed ``octez-codec dump encodings`` which failed due to two
    encodings having the same name.
 
 Version 7.5
@@ -2295,14 +2295,14 @@ Multinetwork
 -  Node and client now come with all current and past protocols that are
    still in use on Mainnet or some active test networks.
 
--  Added option ``--network`` to ``tezos-node config init`` to select
+-  Added option ``--network`` to ``octez-node config init`` to select
    which network to connect to from a list of built-in networks (e.g.
    ``carthagenet``). If you do not run ``config init`` or run it without
    the ``--network`` option, the node will use the default network
    (Mainnet).
 
--  Added option ``--network`` to ``tezos-node run`` and
-   ``tezos-node snapshot import`` which causes the node to check that it
+-  Added option ``--network`` to ``octez-node run`` and
+   ``octez-node snapshot import`` which causes the node to check that it
    is configured to use the given network.
 
 -  Added ``network`` configuration field to select which network to
@@ -2419,7 +2419,7 @@ Client
 -  Added protocol command ``expand macros in`` to expand macros in
    Michelson code.
 
--  Added command ``tezos-admin-client protocol environment`` which
+-  Added command ``octez-admin-client protocol environment`` which
    displays the version of the environment used by a given protocol.
 
 -  Greatly reduce the time the client takes to load.

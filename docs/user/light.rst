@@ -1,7 +1,7 @@
 Light mode
 ----------
 
-The ``tezos-client`` described in
+The ``octez-client`` described in
 :ref:`its own tutorial <howtouse_tezos_client>` forwards all RPCs to a node.
 This page describes the *light* mode, a mode where the client
 performs protocol RPCs locally; like the :doc:`proxy mode<proxy>`.
@@ -24,7 +24,7 @@ Executing commands in light mode
 
 The CLI interface of the client in light mode (the *light client* in short)
 is the same as the default client. To turn light mode ON, you must
-pass two arguments to ``tezos-client``:
+pass two arguments to ``octez-client``:
 
 * ``--mode light``, and
 * ``--sources sources.json``.
@@ -59,14 +59,14 @@ Here is an example valid ``--sources`` file:
 Because computations done locally are protocol dependent, the light mode
 does not support all protocols. However, at any given time, it should
 support the protocol being developed (``alpha``) and the three most
-recent protocols. Execute ``tezos-client list light protocols``
+recent protocols. Execute ``octez-client list light protocols``
 to see the supported protocols.
 
 If ``--protocol`` is omitted when calling the light client, it
 tries to match the node's protocol. On the one hand, this is handy when
 testing. On the other hand, in a production environment, it is recommended
 to specify ``--protocol`` if the protocol is known, to avoid an extra
-RPC at **every** call ``tezos-client --mode light ...``.
+RPC at **every** call ``octez-client --mode light ...``.
 
 Examples with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,7 +79,7 @@ start a sandboxed node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 1 --connections 1
       # This node listens to p2p events on localhost:19731
       # RPC server of the node is reachable at localhost:18731
 
@@ -88,7 +88,7 @@ Leave that terminal running. In a second terminal, start another node:
 
 ::
 
-    $ ./src/bin_node/tezos-sandboxed-node.sh 2 --connections 1
+    $ ./src/bin_node/octez-sandboxed-node.sh 2 --connections 1
       # This node listens to p2p events on localhost:19732
       # RPC server of the node is reachable at localhost:18732
 
@@ -98,14 +98,14 @@ in this terminal):
 
 ::
 
-    $ eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
+    $ eval `./src/bin_client/octez-init-sandboxed-client.sh 1`
 
 Then upgrade the node to protocol alpha:
 
 ::
 
     $ tezos-activate-alpha  # Triggers output in terminal of first node
-    $ tezos-client bake for bootstrap1  # Triggers output in terminal of first node
+    $ octez-client bake for bootstrap1  # Triggers output in terminal of first node
 
 To avoid warnings being printed in upcoming commands (optional):
 
@@ -125,7 +125,7 @@ You're now ready to use the light client. For example, bake a block:
 
 ::
 
-    $ tezos-client --endpoint http://localhost:18731 --mode light --sources sources.json bake for bootstrap1
+    $ octez-client --endpoint http://localhost:18731 --mode light --sources sources.json bake for bootstrap1
     protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
     Apr  8 16:42:24.202 - alpha.baking.forge: found 0 valid operations (0 refused) for timestamp 2021-04-08T14:42:24.000-00:00 (fitness 01::0000000000000004)
     Injected block BMAHozsNCos2
@@ -147,7 +147,7 @@ keystrokes and the ``protocol of light mode unspecified`` warning:
 
 ::
 
-    $ alias light-client="tezos-client --endpoint http://localhost:18731 --mode light --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --sources sources.json"
+    $ alias light-client="octez-client --endpoint http://localhost:18731 --mode light --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK --sources sources.json"
 
 And then bake a new block:
 
@@ -178,7 +178,7 @@ Here's the meaning of these lines:
 * Line ``integrated data for key v1 ...`` indicates that the light mode
   obtained data for ``v1`` from a single endpoint and that it is about
   to fetch Merkle proofs for this key from other endpoints.
-* Lines ``API call: get ...`` indicate that ``tezos-client`` is requesting
+* Lines ``API call: get ...`` indicate that ``octez-client`` is requesting
   data from the light mode's cache. In this snippet, after the light mode
   gathered data for key ``v1``; the client is requesting data for the children
   keys ``v1;constants`` and ``v1;first_level`` (the ``;`` indicates  nesting).

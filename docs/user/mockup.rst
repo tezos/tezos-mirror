@@ -2,7 +2,7 @@
  Mockup mode
 =============
 
-By default the ``tezos-client`` described in the
+By default the ``octez-client`` described in the
 :doc:`sandboxed node <sandbox>` needs a node running.
 This page describes the *mockup* mode, a mode that works without
 connecting to a node. For the moment, its features are more
@@ -29,10 +29,10 @@ Mockup mode can run in three ways:
 
 - Stateless mode.
 
-  In this mode, tezos-client operates on its inputs and returns a value. Nothing is written to disk, and no state is preserved between calls to the client. This is the default.
+  In this mode, octez-client operates on its inputs and returns a value. Nothing is written to disk, and no state is preserved between calls to the client. This is the default.
 - Stateful mode.
 
-  In this mode, tezos-client creates or manipulates a state on disk. The switch for this is ``--base-dir <directory_name>``.
+  In this mode, octez-client creates or manipulates a state on disk. The switch for this is ``--base-dir <directory_name>``.
 - Stateful asynchronous mode.
 
   This mode adds baking. The command-line switch for this is ``--base-dir <directory_name> --asynchronous``.
@@ -65,13 +65,13 @@ typecheck scripts. Let's typecheck for example the script :src:`tests_python/con
 
 .. code-block:: shell-session
 
-    $ tezos-client --mode mockup typecheck script tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
+    $ octez-client --mode mockup typecheck script tests_python/contracts_alpha/mini_scenarios/hardlimit.tz
 
 The script can also be executed:
 
 .. code-block:: shell-session
 
-   $ tezos-client --mode mockup run script <filename> on storage <storage> and input <input>
+   $ octez-client --mode mockup run script <filename> on storage <storage> and input <input>
 
 where ``<storage>`` and ``<input>`` are some :ref:`Michelson expression
 <michelson_type_system>` describing the contract's storage and script input
@@ -82,7 +82,7 @@ For example:
 
 .. code-block:: shell-session
 
-  $ tezos-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
+  $ octez-client --mode mockup run script tests_python/contracts_alpha/attic/id.tz on storage '"hello"' and input '"world"'
   # Ignore warnings about the missing/wrong base directory, they do not apply to "run script"
   storage
     "world"
@@ -97,7 +97,7 @@ following command:
 
 .. code-block:: shell-session
 
-    $ tezos-client list mockup protocols
+    $ octez-client list mockup protocols
 
 At any given time, it should return ``Alpha`` and at least the two protocols before that.
 
@@ -105,7 +105,7 @@ To create the mockup client state, issue the following command:
 
 .. code-block:: shell-session
 
-    $ tezos-client \
+    $ octez-client \
       --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
       --base-dir /tmp/mockup \
       --mode mockup \
@@ -118,7 +118,7 @@ do the following in the local shell running the session:
 
 .. code-block:: shell-session
 
-    $ alias mockup-client='tezos-client --mode mockup --base-dir /tmp/mockup'
+    $ alias mockup-client='octez-client --mode mockup --base-dir /tmp/mockup'
 
 You can now use standard commands, such as:
 
@@ -141,7 +141,7 @@ You can now use standard commands, such as:
     Operation hash is 'ooMyN7FDmDGyNk8CLdSFwcdxcQea5KLXYqrgzu6CEYB7G2xYbth'
     NOT waiting for the operation to be included.
     Use command
-      tezos-client wait for ooMyN7FDmDGyNk8CLdSFwcdxcQea5KLXYqrgzu6CEYB7G2xYbth to be included --confirmations 30 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+      octez-client wait for ooMyN7FDmDGyNk8CLdSFwcdxcQea5KLXYqrgzu6CEYB7G2xYbth to be included --confirmations 30 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
     and/or an external block explorer to make sure that it has been included.
     This sequence of operations was run:
       Manager signed operations:
@@ -199,7 +199,7 @@ The examples so far have used mockup mode’s default settings. Some use cases n
 
 For simplicity, the mockup mode - like the sandboxed mode - uses
 default values for the :ref:`protocol constants <protocol_constants>`. Such values are visible as follows (we recall
-that ``mockup-client`` is an alias for ``tezos-client``, see previous
+that ``mockup-client`` is an alias for ``octez-client``, see previous
 section):
 
 .. code-block:: shell-session
@@ -296,13 +296,13 @@ Besides usual protocol constants, there are 2 additional fields supported in Moc
 
 .. code-block:: shell-session
 
-   $ tezos-client compute chain id from seed <string>
+   $ octez-client compute chain id from seed <string>
 
 For instance, the following command:
 
 .. code-block:: shell-session
 
-   $ tezos-client compute chain id from seed strudel
+   $ octez-client compute chain id from seed strudel
 
 yields the chain id ``NetXwWbjfCqBTLV``.
 

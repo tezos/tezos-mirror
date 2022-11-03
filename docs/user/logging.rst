@@ -237,7 +237,7 @@ Node-Specific Configuration
 Configuration File
 ~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node config --help`` for the full schema of the node’s JSON
+See ``octez-node config --help`` for the full schema of the node’s JSON
 configuration file.
 
 In particular the fields:
@@ -251,7 +251,7 @@ In particular the fields:
 Command Line Options
 ~~~~~~~~~~~~~~~~~~~~
 
-See ``tezos-node run --help``, the ``lwt-log://`` sink configuration can
+See ``octez-node run --help``, the ``lwt-log://`` sink configuration can
 be also changed with 2 options:
 
 -  ``-v`` / ``-vv``: set the global log level to ``Info`` or ``Debug``
@@ -274,13 +274,13 @@ events) this call adds a sink to suddenly start pretty-printing all
 
 ::
 
-   tezos-client rpc put /config/logging with \
+   octez-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
 Client and Baking Daemons
 -------------------------
 
-For now, ``tezos-client``, ``tezos-{baker,accuser}-*``, etc.
+For now, ``octez-client``, ``octez-{baker,accuser}-*``, etc.
 can only be configured using the environment variables.
 
 There is one common option ``--log-requests`` which can be used to trace
@@ -292,12 +292,12 @@ Processing Structured Events
 
 This is work-in-progress, see:
 
--  ``tezos-admin-client show event-logging`` outputs the configuration
-   currently understood by ``tezos-admin-client`` (hence through the
+-  ``octez-admin-client show event-logging`` outputs the configuration
+   currently understood by ``octez-admin-client`` (hence through the
    ``TEZOS_EVENTS_CONFIG`` variable) and lists all the events it knows
    about.
--  ``tezos-admin-client output schema of <Event-Name> to <File-path>``
+-  ``octez-admin-client output schema of <Event-Name> to <File-path>``
    get the JSON-Schema for an event.
 
 Example:
-``tezos-admin-client output schema of block-seen-alpha to block-seen-alpha.json``
+``octez-admin-client output schema of block-seen-alpha to block-seen-alpha.json``
