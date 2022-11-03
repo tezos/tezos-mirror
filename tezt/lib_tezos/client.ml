@@ -2398,3 +2398,216 @@ let spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
 let config_init ?protocol ?bootstrap_accounts ?protocol_constants client =
   spawn_config_init ?protocol ?bootstrap_accounts ?protocol_constants client
   |> Process.check
+
+let spawn_check_contract_implements_fa1_2 ~contract client =
+  spawn_command client @@ ["check"; "contract"; contract; "implements"; "fa1.2"]
+
+let check_contract_implements_fa1_2 ~contract client =
+  let* output =
+    spawn_check_contract_implements_fa1_2 ~contract client
+    |> Process.check_and_read_stdout
+  in
+  if output =~ rex "has an FA1\\.2 interface" then return ()
+  else
+    Test.fail
+      "fa12_check_contract_implements_fa1_2: could not parse client output: %s"
+      output
+
+let spawn_from_fa1_2_contract_get_balance ~contract ~from client =
+  spawn_command client
+  @@ ["from"; "fa1.2"; "contract"; contract; "get"; "balance"; "for"; from]
+
+let from_fa1_2_contract_get_balance ~contract ~from client =
+  let* output =
+    spawn_from_fa1_2_contract_get_balance ~contract ~from client
+    |> Process.check_and_read_stdout
+  in
+  return @@ int_of_string (String.trim output)
+
+let spawn_from_fa1_2_contract_get_allowance ~contract ~owner ~operator client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "get";
+       "allowance";
+       "on";
+       owner;
+       "as";
+       operator;
+     ]
+
+let from_fa1_2_contract_get_allowance ~contract ~owner ~operator client =
+  let* output =
+    spawn_from_fa1_2_contract_get_allowance ~contract ~owner ~operator client
+    |> Process.check_and_read_stdout
+  in
+  return (int_of_string (String.trim output))
+
+let spawn_from_fa1_2_contract_get_total_supply ~contract client =
+  spawn_command client
+  @@ ["from"; "fa1.2"; "contract"; contract; "get"; "total"; "supply"]
+
+let from_fa1_2_contract_get_total_supply ~contract client =
+  let* output =
+    spawn_from_fa1_2_contract_get_total_supply ~contract client
+    |> Process.check_and_read_stdout
+  in
+  return (int_of_string (String.trim output))
+
+let spawn_from_fa1_2_contract_get_balance_callback ?burn_cap ~contract ~from
+    ~callback client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "get";
+       "balance";
+       "for";
+       from;
+       "callback";
+       "on";
+       callback;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_fa1_2_contract_get_balance_callback ?burn_cap ~contract ~from ~callback
+    client =
+  spawn_from_fa1_2_contract_get_balance_callback
+    ?burn_cap
+    ~contract
+    ~from
+    ~callback
+    client
+  |> Process.check
+
+let spawn_from_fa1_2_contract_get_allowance_callback ?burn_cap ~contract ~from
+    ~to_ ~callback client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "get";
+       "allowance";
+       "on";
+       from;
+       "as";
+       to_;
+       "callback";
+       "on";
+       callback;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_fa1_2_contract_get_allowance_callback ?burn_cap ~contract ~from ~to_
+    ~callback client =
+  spawn_from_fa1_2_contract_get_allowance_callback
+    ?burn_cap
+    ~contract
+    ~from
+    ~to_
+    ~callback
+    client
+  |> Process.check
+
+let spawn_from_fa1_2_contract_get_total_supply_callback ?burn_cap ~contract
+    ~from ~callback client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "get";
+       "total";
+       "supply";
+       "as";
+       from;
+       "callback";
+       "on";
+       callback;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_fa1_2_contract_get_total_supply_callback ?burn_cap ~contract ~from
+    ~callback client =
+  spawn_from_fa1_2_contract_get_total_supply_callback
+    ?burn_cap
+    ~contract
+    ~from
+    ~callback
+    client
+  |> Process.check
+
+let spawn_from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_
+    ?as_ client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "transfer";
+       string_of_int amount;
+       "from";
+       from;
+       "to";
+       to_;
+     ]
+  @ optional_arg "as" Fun.id as_
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_fa1_2_contract_transfer ?burn_cap ~contract ~amount ~from ~to_ ?as_
+    client =
+  spawn_from_fa1_2_contract_transfer
+    ?burn_cap
+    ~contract
+    ~amount
+    ~from
+    ~to_
+    ?as_
+    client
+  |> Process.check
+
+let spawn_from_fa1_2_contract_approve ?burn_cap ~contract ~as_ ~amount ~from
+    client =
+  spawn_command client
+  @@ [
+       "from";
+       "fa1.2";
+       "contract";
+       contract;
+       "as";
+       as_;
+       "approve";
+       string_of_int amount;
+       "from";
+       from;
+     ]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+
+let from_fa1_2_contract_approve ?burn_cap ~contract ~as_ ~amount ~from client =
+  spawn_from_fa1_2_contract_approve
+    ?burn_cap
+    ~contract
+    ~as_
+    ~amount
+    ~from
+    client
+  |> Process.check
+
+let spawn_multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client =
+  spawn_command client
+  @@ ["multiple"; "fa1.2"; "transfers"; "from"; src; "using"; transfers_json]
+  @ optional_arg "burn-cap" Tez.to_string burn_cap
+  @ optional_arg "as" Fun.id as_
+
+let multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client =
+  spawn_multiple_fa1_2_transfers ?burn_cap ~src ~transfers_json ?as_ client
+  |> Process.check
