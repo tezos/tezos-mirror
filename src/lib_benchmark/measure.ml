@@ -448,58 +448,12 @@ let set_gc_increment () =
   if ratio < 0.15 then Gc.set {(Gc.get ()) with major_heap_increment = 15}
   else Gc.set {(Gc.get ()) with major_heap_increment = minimal_increment}
 
-let parse_config (type c t) ((module Bench) : (c, t) Benchmark.poly)
-    (options : options) =
-  let default_config () =
-    Format.eprintf "Using default configuration for benchmark %s@." Bench.name ;
-    Data_encoding.Json.construct Bench.config_encoding Bench.default_config
-  in
-  let try_load_custom_config directory =
-    let config_file = Format.asprintf "%s.json" Bench.name in
-    let path = Filename.concat directory config_file in
-    let json =
-      match Benchmark_helpers.load_json path with
-      | Ok json ->
-          Format.eprintf
-            "Using custom configuration %s for benchmark %s@."
-            path
-            Bench.name ;
-          json
-      | Error (Sys_error err) ->
-          Format.eprintf "Failed loading json %s (Ignoring)@." err ;
-          default_config ()
-      | Error exn -> raise exn
-    in
-    (json, path)
-  in
-  let decode json =
-    try Data_encoding.Json.destruct Bench.config_encoding json
-    with Data_encoding.Json.Cannot_destruct (_, _) as exn ->
-      Format.eprintf
-        "Json deserialization error: %a@."
-        (Data_encoding.Json.print_error ?print_unknown:None)
-        exn ;
-      exit 1
-  in
-  match options.config_dir with
-  | None ->
-      let json = default_config () in
-      Format.eprintf "%a@." Data_encoding.Json.pp json ;
-      Bench.default_config
-  | Some directory ->
-      let json, path = try_load_custom_config directory in
-      let config = decode json in
-      Format.eprintf
-        "Loaded configuration from %s for benchmark %s@."
-        path
-        Bench.name ;
-      Format.eprintf "%a@." Data_encoding.Json.pp json ;
-      config
-
 let perform_benchmark (type c t) (options : options)
     (bench : (c, t) Benchmark.poly) : t workload_data =
   let (module Bench) = bench in
-  let config = parse_config bench options in
+  let config =
+    Config.parse_config ~print:Stdlib.stderr bench options.config_file
+  in
   let rng_state = seed_init_from_options options in
   let buffer =
     (* holds all samples; avoids allocating an array at each bench *)
