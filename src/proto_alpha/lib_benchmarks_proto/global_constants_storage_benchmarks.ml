@@ -39,6 +39,8 @@ open Tezos_benchmark
 open Tezos_micheline
 open Protocol
 
+let ns = Namespace.make Registration_helpers.ns "global_constants_storage"
+
 let assert_ok_lwt x =
   match Lwt_main.run x with
   | Ok x -> x
@@ -287,7 +289,7 @@ end
     in the protocol, but we include the benchmarks to validate our
     assumptions about functions that use this. *)
 module Set_add : Benchmark.S = struct
-  let name = "Set_add"
+  let name = ns "Set_add"
 
   let info =
     "Benchmarks and cost model for set element addition from OCaml stdlib."
@@ -345,7 +347,7 @@ let () =
     in the protocol, but we include the benchmarks to validate our
     assumptions about functions that use this. *)
 module Set_elements : Benchmark.S = struct
-  let name = "Set_elements"
+  let name = ns "Set_elements"
 
   let info = "Benchmarks and cost model for set elements from OCaml stdlib."
 
@@ -404,7 +406,7 @@ let () =
     in the protocol, but we include the benchmarks to validate our
     assumptions about functions that use this. *)
 module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
-  let name = "Script_expr_hash_of_b58check_opt"
+  let name = ns "Script_expr_hash_of_b58check_opt"
 
   let info = "Benchmark for Script_expr_hash.of_b58check_opt"
 
@@ -477,7 +479,7 @@ let () =
 
 module Global_constants_storage_expr_to_address_in_context : Benchmark.S =
 struct
-  let name = "Global_constants_storage_expr_to_address_in_context"
+  let name = ns "Global_constants_storage_expr_to_address_in_context"
 
   let info =
     "Benchmark for the  \
@@ -566,7 +568,7 @@ let () =
     *)
 module Global_constants_storage_expand_models = struct
   module Global_constants_storage_expand_constant_branch : Benchmark.S = struct
-    let name = "Global_constants_storage_expand_constant_branch"
+    let name = ns "Global_constants_storage_expand_constant_branch"
 
     let info =
       "Benchmark for the constant branch Global_constants_storage.expand \
@@ -647,7 +649,7 @@ module Global_constants_storage_expand_models = struct
 
   module Global_constants_storage_expand_no_constant_branch : Benchmark.S =
   struct
-    let name = "Global_constants_storage_expand_no_constant_branch"
+    let name = ns "Global_constants_storage_expand_no_constant_branch"
 
     let info =
       "Benchmark for the Global_constants_storage.expand function on the case \

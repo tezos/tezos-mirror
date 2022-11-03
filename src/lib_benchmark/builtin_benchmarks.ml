@@ -25,6 +25,8 @@
 
 (* A "benchmark" for the timer itself. *)
 
+let ns = Namespace.make Namespace.root "builtin"
+
 let timer_variable = Free_variable.of_string "Timer_latency"
 
 let timer_model =
@@ -39,7 +41,7 @@ module Timer_latency_bench : Benchmark.S = struct
 
   let config_encoding = Data_encoding.unit
 
-  let name = "TIMER_LATENCY"
+  let name = ns "TIMER_LATENCY"
 
   let info = "Measuring timer latency"
 

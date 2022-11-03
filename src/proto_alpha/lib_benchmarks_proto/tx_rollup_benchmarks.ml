@@ -23,10 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Registration_helpers.ns "tx_rollup"
+
 module Inbox_add_message : Benchmark.S = struct
   open Tx_rollup_inbox_repr
 
-  let name = "Inbox_add_message"
+  let name = ns "Inbox_add_message"
 
   let info = "Benchmark for Merkle.add_message"
 
@@ -110,7 +112,7 @@ end
 module Commitment_full_compact_bench : Benchmark.S = struct
   open Tx_rollup_commitment_repr
 
-  let name = "Commitment_full_compact_bench"
+  let name = ns "Commitment_full_compact_bench"
 
   let info = "Benchmark for Tx_rollup_commitment_repr.Full.compact"
 
@@ -539,7 +541,7 @@ let create_proof store max_withdrawals msg =
   return proof
 
 module Verify_proof_compute_bench : Benchmark.S = struct
-  let name = "Tx_rollup_verify_proof"
+  let name = ns "Tx_rollup_verify_proof"
 
   let info = "Benchmark for Tx_rollup.verify_proof"
 

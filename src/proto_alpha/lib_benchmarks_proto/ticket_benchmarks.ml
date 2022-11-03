@@ -26,6 +26,8 @@
 open Protocol
 open Alpha_context
 
+let ns = Namespace.make Registration_helpers.ns "tickets"
+
 module Ticket_type_shared = struct
   type config = {max_size : int}
 
@@ -55,7 +57,7 @@ end
 
 exception
   Ticket_benchmark_error of {
-    benchmark_name : string;
+    benchmark_name : Namespace.t;
     trace : Tezos_base.TzPervasives.tztrace;
   }
 
@@ -75,7 +77,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let workload_to_vector () = Sparse_vec.String.of_list []
 
-  let name = "COMPARE_TICKET_HASH"
+  let name = ns "COMPARE_TICKET_HASH"
 
   let info = "Compare cost for Ticket_hash"
 
@@ -106,7 +108,7 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen compare_model)
 end
 
@@ -134,7 +136,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let tags = ["tickets"]
 
-  let name = "COMPARE_CONTRACT"
+  let name = ns "COMPARE_CONTRACT"
 
   let info = "Compare cost for Contracts"
 
@@ -164,7 +166,7 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen compare_model)
 end
 
@@ -200,7 +202,7 @@ let rec dummy_type_generator ~rng_state size =
 module Has_tickets_type_benchmark : Benchmark.S = struct
   include Ticket_type_shared
 
-  let name = "TYPE_HAS_TICKETS"
+  let name = ns "TYPE_HAS_TICKETS"
 
   let info = "Benchmarking type_has_tickets"
 
@@ -230,8 +232,11 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:
+             (Free_variable.of_string
+                (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_has_tickets_model", size_model)]
 
@@ -240,7 +245,7 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_model)
 end
 
@@ -257,7 +262,7 @@ let ticket_sampler rng_state =
 module Collect_tickets_benchmark : Benchmark.S = struct
   include Ticket_type_shared
 
-  let name = "COLLECT_TICKETS_STEP"
+  let name = ns "COLLECT_TICKETS_STEP"
 
   let info = "Benchmarking tickets_of_value"
 
@@ -302,8 +307,11 @@ module Collect_tickets_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:
+             (Free_variable.of_string
+                (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_collect_tickets_step_model", size_model)]
 
@@ -312,7 +320,7 @@ module Collect_tickets_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_model)
 end
 

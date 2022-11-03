@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Shell_namespace.ns "bloomer"
+
 (* We use the same Bloom filter configuration as used in P2p_acl *)
 
 let const_time_model name =
@@ -45,7 +47,7 @@ let make_bench name info model generator make_bench :
 
     let workload_to_vector () = Sparse_vec.String.of_list [("encoding", 1.)]
 
-    let name = name
+    let name = ns name
 
     let info = info
 

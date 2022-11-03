@@ -31,8 +31,10 @@ open Tezos_benchmark
   First step: defining the benchmark.
 *)
 
+let ns = Namespace.make Namespace.root "example"
+
 module Blake2b_bench : Benchmark.S = struct
-  let name = "Blake2b_example"
+  let name = ns "Blake2b_example"
 
   let info = "Illustrating tezos-benchmark by benchmarking blake2b"
 

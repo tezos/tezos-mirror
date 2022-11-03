@@ -34,14 +34,14 @@ let bench_opts =
     (* Percentile 50 = Median *)
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
-    config_dir = None;
+    config_file = None;
   }
 
 let test_parse_config () =
   let opts = bench_opts in
   match Benchmark.ex_unpack (module Blake2b.Blake2b_bench : Benchmark.S) with
   | Ex bench ->
-      let _bench = Measure.parse_config bench opts in
+      let _bench = Config.parse_config bench opts.config_file in
       ()
 
 let tests =

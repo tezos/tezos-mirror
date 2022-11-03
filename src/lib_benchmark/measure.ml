@@ -52,7 +52,10 @@ type packed_measurement =
 
 (* We can't deserialize the bytes before knowing the benchmark, which
    contains the workload encoding. *)
-type serialized_workload = {bench_name : string; measurement_bytes : Bytes.t}
+type serialized_workload = {
+  bench_name : Namespace.t;
+  measurement_bytes : Bytes.t;
+}
 
 type workloads_stats = {
   max_time : float;
@@ -188,7 +191,9 @@ let serialized_workload_encoding =
   @@ conv
        (fun {bench_name; measurement_bytes} -> (bench_name, measurement_bytes))
        (fun (bench_name, measurement_bytes) -> {bench_name; measurement_bytes})
-       (obj2 (req "bench_name" string) (req "measurement_bytes" bytes))
+       (obj2
+          (req "bench_name" Namespace.encoding)
+          (req "measurement_bytes" bytes))
 
 (* ------------------------------------------------------------------------- *)
 (* Pp *)
@@ -289,23 +294,18 @@ let load : filename:string -> packed_measurement =
   Format.eprintf "Measure.load: loaded %s\n" filename ;
   match Data_encoding.Binary.of_string serialized_workload_encoding str with
   | Ok {bench_name; measurement_bytes} -> (
-      match Registration.find_benchmark bench_name with
-      | None ->
-          Format.eprintf
-            "Measure.load: workload file requires unregistered benchmark %s, \
-             aborting@."
-            bench_name ;
-          exit 1
-      | Some bench -> (
-          match Benchmark.ex_unpack bench with
-          | Ex ((module Bench) as bench) -> (
-              match
-                Data_encoding.Binary.of_bytes
-                  (measurement_encoding Bench.workload_encoding)
-                  measurement_bytes
-              with
-              | Error err -> cant_load err
-              | Ok m -> Measurement (bench, m))))
+      let bench =
+        Registration.find_benchmark_exn (Namespace.to_string bench_name)
+      in
+      match Benchmark.ex_unpack bench with
+      | Ex ((module Bench) as bench) -> (
+          match
+            Data_encoding.Binary.of_bytes
+              (measurement_encoding Bench.workload_encoding)
+              measurement_bytes
+          with
+          | Error err -> cant_load err
+          | Ok m -> Measurement (bench, m)))
   | Error err -> cant_load err
 
 let to_csv :

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +23,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ns = Namespace.make Namespace.root "proto"
-
-let ns = Namespace.make ns Protocol.name
-
-let register ((module Bench) : Benchmark.t) =
-  let module B : Benchmark.S = struct
-    include Bench
-
-    let tags = Protocol.name :: tags
-  end in
-  Registration.register (module B)
-
-let register_for_codegen name model =
-  Registration.register_for_codegen (name ^ "__" ^ Protocol.name) model
+let ns = Namespace.make Namespace.root "shell"

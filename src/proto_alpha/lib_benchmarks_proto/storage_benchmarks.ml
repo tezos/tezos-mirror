@@ -34,6 +34,8 @@ open Tezos_benchmark
 open Storage_functors
 open Protocol
 
+let ns = Namespace.make Registration_helpers.ns "storage"
+
 (** Creates a dummy raw-context value. *)
 let default_raw_context () =
   let open Lwt_result_syntax in
@@ -136,7 +138,7 @@ module Table =
 module List_key_values_benchmark_boilerplate = struct
   type config = {max_size : int}
 
-  let name = "List_key_values"
+  let name = ns "List_key_values"
 
   let info = "List key values"
 
@@ -212,7 +214,7 @@ end
 module List_key_values_benchmark_intercept = struct
   include List_key_values_benchmark_boilerplate
 
-  let name = name ^ "_intercept"
+  let name = Namespace.make ns (Namespace.basename name) "intercept"
 
   let benchmark _rng_state _config () =
     let ctxt =

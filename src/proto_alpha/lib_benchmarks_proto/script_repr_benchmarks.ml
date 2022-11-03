@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.make Registration_helpers.ns "script_repr"
+
 (** {2 [Script_repr] benchmarks} *)
 
 module Script_repr_shared_config = struct
@@ -70,7 +72,7 @@ end)
 module Micheline_nodes_benchmark : Benchmark.S = struct
   include Script_repr_shared_config
 
-  let name = "MICHELINE_NODES"
+  let name = ns "MICHELINE_NODES"
 
   let info =
     "Benchmarking the time it takes to compute the number of nodes of a \
@@ -82,14 +84,17 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
              (Free_variable.of_string
-                (Format.asprintf "%s_ns_per_node_coeff" name)))
+                (Format.asprintf
+                   "%s_ns_per_node_coeff"
+                   (Namespace.basename name))))
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_based_model)
 
   let models = [("size_translator_model", size_based_model)]
@@ -113,7 +118,7 @@ let () = Registration_helpers.register (module Micheline_nodes_benchmark)
 module Script_repr_strip_annotations : Benchmark.S = struct
   include Script_repr_shared_config
 
-  let name = "strip_annotations"
+  let name = ns "strip_annotations"
 
   let info = "Benchmarking Script_repr.strip_annotations"
 
@@ -125,7 +130,7 @@ module Script_repr_strip_annotations : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen strip_annotations_model)
 
   let models = [("strip_annotations_model", strip_annotations_model)]

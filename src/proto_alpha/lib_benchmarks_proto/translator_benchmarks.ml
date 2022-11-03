@@ -26,6 +26,8 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.make Registration_helpers.ns "translator"
+
 (** {2 [Script_ir_translator] benchmarks} *)
 
 module Config = struct
@@ -77,17 +79,17 @@ type phase = Workload_production | In_protocol | Global
 
 type error_kind =
   | Global_error of {
-      benchmark_name : string;
+      benchmark_name : Namespace.t;
       workload : Tezos_base.TzPervasives.tztrace;
     }
   | Bad_data of {
-      benchmark_name : string;
+      benchmark_name : Namespace.t;
       micheline : Alpha_context.Script.expr;
       expected_type : Alpha_context.Script.expr;
       phase : phase;
     }
   | Bad_code of {
-      benchmark_name : string;
+      benchmark_name : Namespace.t;
       micheline : Alpha_context.Script.expr;
       expected_stack_type : Alpha_context.Script.expr list;
       phase : phase;
@@ -114,14 +116,14 @@ let pp_error_kind fmtr (error_kind : error_kind) =
   | Global_error {benchmark_name; workload} ->
       Format.open_vbox 1 ;
       Format.fprintf fmtr "Global error:@," ;
-      Format.fprintf fmtr "benchmark = %s@," benchmark_name ;
+      Format.fprintf fmtr "benchmark = %a@," Namespace.pp benchmark_name ;
       Format.fprintf fmtr "workload:@," ;
       report_michelson_errors fmtr workload ;
       Format.close_box ()
   | Bad_data {benchmark_name; micheline; expected_type; phase} ->
       Format.open_vbox 1 ;
       Format.fprintf fmtr "Bad data:@," ;
-      Format.fprintf fmtr "benchmark = %s@," benchmark_name ;
+      Format.fprintf fmtr "benchmark = %a@," Namespace.pp benchmark_name ;
       Format.fprintf
         fmtr
         "expression = @[<v 1>%a@]@,"
@@ -137,7 +139,7 @@ let pp_error_kind fmtr (error_kind : error_kind) =
   | Bad_code {benchmark_name; micheline; expected_stack_type; phase} ->
       Format.open_vbox 1 ;
       Format.fprintf fmtr "Bad code:@," ;
-      Format.fprintf fmtr "benchmark = %s@," benchmark_name ;
+      Format.fprintf fmtr "benchmark = %a@," Namespace.pp benchmark_name ;
       Format.fprintf
         fmtr
         "expression = @[<v 1>%a@]@,"
@@ -187,7 +189,7 @@ module Typechecking_data : Benchmark.S = struct
 
   let models = make_models Translator_workload.Parsing Translator_workload.Data
 
-  let name = "TYPECHECKING_DATA"
+  let name = ns "TYPECHECKING_DATA"
 
   let info = "Benchmarking typechecking of data"
 
@@ -259,7 +261,7 @@ module Unparsing_data : Benchmark.S = struct
   let models =
     make_models Translator_workload.Unparsing Translator_workload.Data
 
-  let name = "UNPARSING_DATA"
+  let name = ns "UNPARSING_DATA"
 
   let info = "Benchmarking unparsing of data"
 
@@ -338,7 +340,7 @@ module Typechecking_code : Benchmark.S = struct
 
   let models = make_models Translator_workload.Parsing Translator_workload.Code
 
-  let name = "TYPECHECKING_CODE"
+  let name = ns "TYPECHECKING_CODE"
 
   let info = "Benchmarking typechecking of code"
 
@@ -414,7 +416,7 @@ module Unparsing_code : Benchmark.S = struct
   let models =
     make_models Translator_workload.Unparsing Translator_workload.Code
 
-  let name = "UNPARSING_CODE"
+  let name = ns "UNPARSING_CODE"
 
   let info = "Benchmarking unparsing of code"
 
@@ -542,15 +544,19 @@ module Ty_eq : Benchmark.S = struct
         Sparse_vec.String.of_list
           [("nodes", float_of_int nodes); ("consumed", float_of_int consumed)]
 
-  let name = "TY_EQ"
+  let name = ns "TY_EQ"
 
   let info = "Benchmarking equating types"
 
   let tags = [Tags.translator]
 
-  let intercept_var = Free_variable.of_string (Format.asprintf "%s_const" name)
+  let intercept_var =
+    Free_variable.of_string
+      (Format.asprintf "%s_const" (Namespace.basename name))
 
-  let coeff_var = Free_variable.of_string (Format.asprintf "%s_coeff" name)
+  let coeff_var =
+    Free_variable.of_string
+      (Format.asprintf "%s_coeff" (Namespace.basename name))
 
   let size_model =
     Model.make
@@ -568,7 +574,7 @@ module Ty_eq : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen codegen_model)
 
   let models =
@@ -702,7 +708,7 @@ let unparse_ty ctxt ty = Script_ir_unparser.unparse_ty ~loc:(-1) ctxt ty
 module Parse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
 
-  let name = "PARSE_TYPE"
+  let name = ns "PARSE_TYPE"
 
   let info = "Benchmarking parse_ty"
 
@@ -739,8 +745,11 @@ module Parse_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:
+             (Free_variable.of_string
+                (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 
@@ -753,7 +762,7 @@ let () = Registration_helpers.register (module Parse_type_benchmark)
 module Unparse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
 
-  let name = "UNPARSE_TYPE"
+  let name = ns "UNPARSE_TYPE"
 
   let info = "Benchmarking unparse_ty"
 
@@ -787,8 +796,11 @@ module Unparse_type_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
-           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
+           ~coeff:
+             (Free_variable.of_string
+                (Format.asprintf "%s_coeff" (Namespace.basename name))))
 
   let models = [("size_translator_model", size_model)]
 
@@ -797,7 +809,7 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_model)
 end
 

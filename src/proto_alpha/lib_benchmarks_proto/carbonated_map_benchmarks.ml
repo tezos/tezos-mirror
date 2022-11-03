@@ -25,12 +25,12 @@
 
 open Tezos_benchmark
 
+let ns = Namespace.make Registration_helpers.ns "carbonated_map"
+
 let make_context ~rng_state =
   match Lwt_main.run @@ Execution_context.make ~rng_state with
   | Ok (ctxt, _) -> ctxt
   | Error _ -> assert false
-
-let carbonated_map_cost_name = Printf.sprintf "Carbonated_map_%s"
 
 module Config_and_workload = struct
   type config = {size : int}
@@ -57,7 +57,7 @@ let register (module BM : Benchmark.S) =
   BM.models
   |> List.iter (fun (_, model) ->
          Registration_helpers.register_for_codegen
-           BM.name
+           (Namespace.basename BM.name)
            (Model.For_codegen model))
 
 module Alpha_context_gas = struct
@@ -80,7 +80,7 @@ module Fold_benchmark : Benchmark.S = struct
     let compare_cost _ = Saturation_repr.safe_int 0
   end
 
-  let name = carbonated_map_cost_name "fold"
+  let name = ns "fold"
 
   let info = "Carbonated map to list"
 
@@ -163,8 +163,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let workload_to_vector () = Sparse_vec.String.of_list []
 
-    let name =
-      carbonated_map_cost_name @@ Printf.sprintf "compare_%s" CS.type_name
+    let name = ns @@ Printf.sprintf "compare_%s" CS.type_name
 
     let info =
       Printf.sprintf "Carbonated map compare cost for %s keys" CS.type_name
@@ -203,7 +202,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
           let compare_cost _ = Saturation_repr.safe_int 0
         end)
 
-    let name = carbonated_map_cost_name "find"
+    let name = ns "find"
 
     let info = Printf.sprintf "Carbonated find model"
 
@@ -303,7 +302,7 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
           let compare_cost _ = Saturation_repr.safe_int 0
         end)
 
-    let name = carbonated_map_cost_name "find_intercept"
+    let name = ns "find_intercept"
 
     let info = Printf.sprintf "Carbonated find model (intercept case)"
 
