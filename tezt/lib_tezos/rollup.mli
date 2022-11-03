@@ -223,7 +223,11 @@ module Dal : sig
       number_of_shards : int;
     }
 
-    type t = {cryptobox : cryptobox; number_of_slots : int}
+    type t = {
+      cryptobox : cryptobox;
+      number_of_slots : int;
+      endorsement_lag : int;
+    }
 
     val parameter_file : Protocol.t -> string Lwt.t
 
