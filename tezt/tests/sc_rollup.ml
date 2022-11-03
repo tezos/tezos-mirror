@@ -2605,7 +2605,11 @@ let test_timeout =
 *)
 let test_late_rollup_node =
   test_full_scenario
-    {tags = []; variant = None; description = "a late rollup should catch up"}
+    {
+      tags = ["late"];
+      variant = None;
+      description = "a late rollup should catch up";
+    }
   @@ fun sc_rollup_node _rollup_client _sc_rollup_address _node client ->
   let* () = bake_levels 65 client in
   let* () = Sc_rollup_node.run sc_rollup_node in
@@ -2618,7 +2622,7 @@ let test_late_rollup_node =
 let test_interrupt_rollup_node =
   test_full_scenario
     {
-      tags = [];
+      tags = ["interrupt"];
       variant = None;
       description = "a rollup should recover on interruption before first inbox";
     }
@@ -2924,7 +2928,7 @@ let test_rpcs ~kind =
   test_full_scenario
     ~kind
     {
-      tags = ["rpc"];
+      tags = ["rpc"; "api"];
       variant = None;
       description = "RPC API should work and be stable";
     }
