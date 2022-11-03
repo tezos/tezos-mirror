@@ -97,6 +97,20 @@ let test_config_update () =
   @@ Check.((metrics_addr = ":1234") string)
        ~error_msg:"config.metrics-addrs[0] contains %L but should contain %R."
 
+let test_config_update_network () =
+  let* node, client =
+    Client.init_with_protocol ~protocol:Protocol.Alpha `Client ()
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Node.terminate node in
+  let* () =
+    Node.spawn_config_update node [Network "mainnet"]
+    |> Process.check_error ~exit_code:124
+  in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/context") in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/store") in
+  Node.config_update node [Network "mainnet"]
+
 let test_config_reset () =
   let node = Node.create [] in
   let* config = config_reset node [Metrics_addr ":1234"] in
