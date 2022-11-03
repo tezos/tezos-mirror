@@ -1059,12 +1059,12 @@ module Consensus = struct
        operation should be merged with an endorsement or at least
        refined. *)
     let open Lwt_tzresult_syntax in
-    let (Single (Dal_slot_availability {endorser = _; slot_availability})) =
+    let (Single (Dal_slot_availability op)) =
       operation.protocol_data.contents
     in
     let*? () =
       (* Note that this function checks the dal feature flag. *)
-      Dal_apply.validate_data_availability vi.ctxt slot_availability
+      Dal_apply.validate_data_availability vi.ctxt op
     in
     return_unit
 
