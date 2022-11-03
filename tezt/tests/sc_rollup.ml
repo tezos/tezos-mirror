@@ -194,8 +194,8 @@ type test = {variant : string option; tags : string list; description : string}
     bakes to include the origination in a block. It returns the address of the
     originated rollup *)
 let originate_sc_rollup ?(hooks = hooks) ?(burn_cap = Tez.(of_int 9999999))
-    ?(src = Constant.bootstrap1.alias) ?(kind = "arith")
-    ?(parameters_ty = "string") ?(boot_sector = boot_sector_of kind) client =
+    ?(src = Constant.bootstrap1.alias) ~kind ?(parameters_ty = "string")
+    ?(boot_sector = boot_sector_of kind) client =
   let* sc_rollup =
     Client.Sc_rollup.(
       originate ~hooks ~burn_cap ~src ~kind ~parameters_ty ~boot_sector client)
@@ -213,10 +213,10 @@ let originate_sc_rollups ~kind n client =
 
    A rollup node has a configuration file that must be initialized.
 *)
-let with_fresh_rollup ?kind ?boot_sector ?(operator = Constant.bootstrap1.alias)
+let with_fresh_rollup ~kind ?boot_sector ?(operator = Constant.bootstrap1.alias)
     f tezos_node tezos_client =
   let* sc_rollup =
-    originate_sc_rollup ?kind ?boot_sector ~src:operator tezos_client
+    originate_sc_rollup ~kind ?boot_sector ~src:operator tezos_client
   in
   let sc_rollup_node =
     Sc_rollup_node.create
