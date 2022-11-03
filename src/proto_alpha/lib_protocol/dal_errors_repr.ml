@@ -40,6 +40,14 @@ type error +=
       endorser : Signature.Public_key_hash.t;
       level : Level_repr.t;
     }
+  | Dal_operation_for_old_level of {
+      current : Raw_level_repr.t;
+      given : Raw_level_repr.t;
+    }
+  | Dal_operation_for_future_level of {
+      current : Raw_level_repr.t;
+      given : Raw_level_repr.t;
+    }
 
 let () =
   let open Data_encoding in
@@ -167,6 +175,48 @@ let () =
       | Dal_publish_slot_header_duplicate {slot_header} -> Some slot_header
       | _ -> None)
     (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
+  register_error_kind
+    `Outdated
+    ~id:"Dal_operation_for_old_level"
+    ~title:"Dal operation for an old level"
+    ~description:"The Dal operation targets an old level"
+    ~pp:(fun ppf (current_lvl, given_lvl) ->
+      Format.fprintf
+        ppf
+        "Dal operation targets an old level %a. Current level is %a."
+        Raw_level_repr.pp
+        given_lvl
+        Raw_level_repr.pp
+        current_lvl)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "given_level" Raw_level_repr.encoding))
+    (function
+      | Dal_operation_for_old_level {current; given} -> Some (current, given)
+      | _ -> None)
+    (fun (current, given) -> Dal_operation_for_old_level {current; given}) ;
+  register_error_kind
+    `Temporary
+    ~id:"Dal_operation_for_future_level"
+    ~title:"Dal operation for a future level"
+    ~description:"The Dal operation target a future level"
+    ~pp:(fun ppf (current_lvl, given_lvl) ->
+      Format.fprintf
+        ppf
+        "Dal operation targets a future level %a. Current level is %a."
+        Raw_level_repr.pp
+        given_lvl
+        Raw_level_repr.pp
+        current_lvl)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "given_level" Raw_level_repr.encoding))
+    (function
+      | Dal_operation_for_future_level {current; given} -> Some (current, given)
+      | _ -> None)
+    (fun (current, given) -> Dal_operation_for_future_level {current; given}) ;
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_endorser_not_in_committee"

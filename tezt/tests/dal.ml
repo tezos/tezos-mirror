@@ -243,12 +243,15 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
       ~msg:(rex "Data-availability layer will be enabled in a future proposal")
       process
   in
+  let level = Node.get_level node + 1 in
   let* (`OpHash oph1) =
     Operation.Consensus.(
       inject
         ~force:true
         ~signer:Constant.bootstrap1
-        (slot_availability ~endorsement:(Array.make number_of_slots false))
+        (slot_availability
+           ~level
+           ~endorsement:(Array.make number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
@@ -309,7 +312,10 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
 let slot_availability ~signer ~nb_slots availability client =
   let endorsement = Array.make nb_slots false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
-  Operation.Consensus.(inject ~signer (slot_availability ~endorsement) client)
+  let* level = Client.level client in
+  let level = level + 1 in
+  Operation.Consensus.(
+    inject ~signer (slot_availability ~level ~endorsement) client)
 
 type status = Applied | Failed of {error_id : string}
 

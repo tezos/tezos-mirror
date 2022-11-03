@@ -1368,9 +1368,10 @@ module Encoding = struct
                (varopt "signature" Signature.encoding)))
 
   let dal_slot_availability_encoding =
-    obj2
+    obj3
       (req "endorser" Signature.Public_key_hash.encoding)
       (req "endorsement" Dal_endorsement_repr.encoding)
+      (req "level" Raw_level_repr.encoding)
 
   let dal_slot_availability_case =
     Case
@@ -1383,12 +1384,12 @@ module Encoding = struct
           | Contents (Dal_slot_availability _ as op) -> Some op | _ -> None);
         proj =
           (fun (Dal_slot_availability
-                 Dal_endorsement_repr.{endorser; slot_availability}) ->
-            (endorser, slot_availability));
+                 Dal_endorsement_repr.{endorser; slot_availability; level}) ->
+            (endorser, slot_availability, level));
         inj =
-          (fun (endorser, slot_availability) ->
+          (fun (endorser, slot_availability, level) ->
             Dal_slot_availability
-              Dal_endorsement_repr.{endorser; slot_availability});
+              Dal_endorsement_repr.{endorser; slot_availability; level});
       }
 
   let seed_nonce_revelation_case =
@@ -2253,7 +2254,8 @@ type _ weight =
   | Weight_endorsement : endorsement_infos -> consensus_pass_type weight
   | Weight_preendorsement : endorsement_infos -> consensus_pass_type weight
   | Weight_dal_slot_availability :
-      int * Signature.Public_key_hash.t
+      (* endorser * num_attestations * level *)
+      (Signature.Public_key_hash.t * int * int32)
       -> consensus_pass_type weight
   | Weight_proposals :
       int32 * Signature.Public_key_hash.t
@@ -2354,13 +2356,14 @@ let weight_of : packed_operation -> operation_weight =
           Weight_endorsement
             (endorsement_infos_from_consensus_content consensus_content) )
   | Single
-      (Dal_slot_availability Dal_endorsement_repr.{endorser; slot_availability})
-    ->
+      (Dal_slot_availability
+        Dal_endorsement_repr.{endorser; slot_availability; level}) ->
       W
         ( Consensus,
           Weight_dal_slot_availability
-            ( Dal_endorsement_repr.occupied_size_in_bits slot_availability,
-              endorser ) )
+            ( endorser,
+              Dal_endorsement_repr.occupied_size_in_bits slot_availability,
+              Raw_level_repr.to_int32 level ) )
   | Single (Proposals {period; source; _}) ->
       W (Voting, Weight_proposals (period, source))
   | Single (Ballot {period; source; _}) ->
@@ -2490,13 +2493,16 @@ let compare_baking_infos infos1 infos2 =
 (** Two valid {!Dal_slot_availability} are compared in the
    lexicographic order of their pairs of bitsets size and endorser
    hash. *)
-let compare_dal_slot_availability (endorsements1, endorser1)
-    (endorsements2, endorser2) =
+let compare_dal_slot_availability (endorser1, endorsements1, level1)
+    (endorser2, endorsements2, level2) =
   compare_pair_in_lexico_order
-    ~cmp_fst:Compare.Int.compare
+    ~cmp_fst:
+      (compare_pair_in_lexico_order
+         ~cmp_fst:Compare.Int32.compare
+         ~cmp_snd:Compare.Int.compare)
     ~cmp_snd:Signature.Public_key_hash.compare
-    (endorsements1, endorser1)
-    (endorsements2, endorser2)
+    ((level1, endorsements1), endorser1)
+    ((level2, endorsements2), endorser2)
 
 (** {4 Comparison of valid operations of the same validation pass} *)
 
@@ -2519,9 +2525,11 @@ let compare_consensus_weight w1 w2 =
       compare_endorsement_infos ~prioritized_position:Fstpos infos1 infos2
   | Weight_preendorsement infos1, Weight_endorsement infos2 ->
       compare_endorsement_infos ~prioritized_position:Sndpos infos1 infos2
-  | ( Weight_dal_slot_availability (size1, endorser1),
-      Weight_dal_slot_availability (size2, endorser2) ) ->
-      compare_dal_slot_availability (size1, endorser1) (size2, endorser2)
+  | ( Weight_dal_slot_availability (endorser1, size1, lvl1),
+      Weight_dal_slot_availability (endorser2, size2, lvl2) ) ->
+      compare_dal_slot_availability
+        (endorser1, size1, lvl1)
+        (endorser2, size2, lvl2)
   | ( Weight_dal_slot_availability _,
       (Weight_endorsement _ | Weight_preendorsement _) ) ->
       -1

@@ -47,19 +47,33 @@ let slot_of_int_e n =
 let validate_data_availability ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Tzresult_syntax in
-  let Dal.Endorsement.{endorser = _; slot_availability} = op in
+  (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4163
+     check the signature of the endorser as well *)
+  let Dal.Endorsement.{endorser = _; slot_availability; level = given} = op in
   let* max_index =
     slot_of_int_e @@ ((Constants.parametric ctxt).dal.number_of_slots - 1)
   in
   let maximum_size = Dal.Endorsement.expected_size_in_bits ~max_index in
   let size = Dal.Endorsement.occupied_size_in_bits slot_availability in
-  error_unless
-    Compare.Int.(size <= maximum_size)
-    (Dal_endorsement_size_limit_exceeded {maximum_size; got = size})
+  let* () =
+    error_unless
+      Compare.Int.(size <= maximum_size)
+      (Dal_endorsement_size_limit_exceeded {maximum_size; got = size})
+  in
+  let current = Level.(current ctxt).level in
+  let delta_levels = Raw_level.diff current given in
+  let* () =
+    error_when
+      Compare.Int32.(delta_levels > 0l)
+      (Dal_operation_for_old_level {current; given})
+  in
+  error_when
+    Compare.Int32.(delta_levels < 0l)
+    (Dal_operation_for_future_level {current; given})
 
 let apply_data_availability ctxt op =
   assert_dal_feature_enabled ctxt >>? fun () ->
-  let Dal.Endorsement.{endorser; slot_availability} = op in
+  let Dal.Endorsement.{endorser; slot_availability; level = _} = op in
   match Dal.Endorsement.shards_of_endorser ctxt ~endorser with
   | None ->
       let level = Level.current ctxt in

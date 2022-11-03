@@ -43,7 +43,14 @@ type t = Bitset.t
 
 type available_slots = t
 
-type operation = {endorser : Signature.Public_key_hash.t; slot_availability : t}
+type operation = {
+  endorser : Signature.Public_key_hash.t;
+      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4165
+         Compute this from the endorsed slots in [slot_availability] below,
+         or provide a field `min_endorser_slot : int / int32` *)
+  slot_availability : t;
+  level : Raw_level_repr.t;
+}
 
 let encoding = Bitset.encoding
 

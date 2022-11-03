@@ -651,8 +651,9 @@ let dal_slot_availibility ctxt delegate =
   | Some _interval ->
       (* The content of the endorsement does not matter for covalidity. *)
       let slot_availability = Dal.Endorsement.empty in
+      let level = Raw_level.succ level.Level.level in
       return_some
-        (Dal_slot_availability {endorser = delegate; slot_availability})
+        (Dal_slot_availability {endorser = delegate; slot_availability; level})
 
 let dal_slot_availability_descriptor =
   let open Lwt_result_syntax in
