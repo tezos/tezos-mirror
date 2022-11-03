@@ -30,11 +30,11 @@ open Protocol
 open Alpha_context
 
 module type S = sig
-  type state
+  module PVM : Pvm.S
 
   type fuel
 
-  type eval_result = {state : state; remaining_fuel : fuel; num_ticks : Z.t}
+  type eval_result = {state : PVM.state; remaining_fuel : fuel; num_ticks : Z.t}
 
   (** [eval_block_inbox ~fuel node_ctxt block_hash state] evaluates the
       [messages] for the inbox of block [block_hash] in the given [state] of the
@@ -44,8 +44,9 @@ module type S = sig
     fuel:fuel ->
     _ Node_context.t ->
     Tezos_crypto.Block_hash.t ->
-    state ->
-    (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult Lwt.t
+    PVM.state ->
+    (PVM.state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
+    Lwt.t
 
   (** [eval_messages ~fuel node_ctxt state inbox_level messages] evaluates the
       [messages] for inbox level [inbox_level] in the given [state] of the PVM
@@ -55,7 +56,7 @@ module type S = sig
   val eval_messages :
     fuel:fuel ->
     _ Node_context.t ->
-    state ->
+    PVM.state ->
     Raw_level.t ->
     Sc_rollup.Inbox_message.t list ->
     eval_result Node_context.delayed_write tzresult Lwt.t
@@ -63,12 +64,16 @@ end
 
 module Make (PVM : Pvm.S) = struct
   module Make_fueled (F : Fuel.S) :
-    S with type state = PVM.state and type fuel = F.t = struct
-    type state = PVM.state
+    S with module PVM = PVM and type fuel = F.t = struct
+    module PVM = PVM
 
     type fuel = F.t
 
-    type eval_result = {state : state; remaining_fuel : fuel; num_ticks : Z.t}
+    type eval_result = {
+      state : PVM.state;
+      remaining_fuel : fuel;
+      num_ticks : Z.t;
+    }
 
     let continue_with_fuel consumption initial_fuel state f =
       let open Delayed_write_monad.Lwt_result_syntax in
@@ -288,8 +293,9 @@ module Make (PVM : Pvm.S) = struct
         messages
 
     let eval_block_inbox ~fuel (Node_context.{store; _} as node_ctxt) hash
-        (state : state) :
-        (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
+        (state : PVM.state) :
+        (PVM.state * Z.t * Raw_level.t * fuel) Node_context.delayed_write
+        tzresult
         Lwt.t =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in

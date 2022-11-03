@@ -229,15 +229,45 @@ module Common = struct
     state.num_ticks
 end
 
-module Make (PVM : Pvm.S) = struct
-  module PVM = PVM
+module Make (Interpreter : Interpreter.S) = struct
+  module PVM = Interpreter.PVM
   module Outbox = Outbox.Make (PVM)
+  module Free_pvm = Interpreter.Free_pvm
 
   let get_state (node_ctxt : _ Node_context.t) block_hash =
     let open Lwt_result_syntax in
     let* ctxt = Node_context.checkout_context node_ctxt block_hash in
     let*! state = PVM.State.find ctxt in
     match state with None -> failwith "No state" | Some state -> return state
+
+  let simulate_messages node_ctxt block messages =
+    let open Lwt_result_syntax in
+    let open Alpha_context in
+    let messages =
+      List.map (fun m -> Sc_rollup.Inbox_message.External m) messages
+    in
+    let* state = get_state node_ctxt block in
+    let* level = State.level_of_hash node_ctxt.store block in
+    let inbox_level = Raw_level.of_int32_exn (Int32.succ level) in
+    let* Free_pvm.{state; num_ticks; _} =
+      Free_pvm.eval_messages
+        ~fuel:(Fuel.Free.of_ticks 0L)
+        node_ctxt
+        state
+        inbox_level
+        messages
+    in
+    let*! outbox = PVM.get_outbox state in
+    let output =
+      List.filter
+        (fun Sc_rollup.{outbox_level; _} -> outbox_level = inbox_level)
+        outbox
+    in
+    let*! state_hash = PVM.state_hash state in
+    let*! status = PVM.get_status state in
+    let status = PVM.string_of_status status in
+    return
+      Sc_rollup_services.{state_hash; status; output; inbox_level; num_ticks}
 
   let () =
     Block_directory.register0 Sc_rollup_services.Global.Block.total_ticks
@@ -342,6 +372,11 @@ module Make (PVM : Pvm.S) = struct
     Proof_helpers_directory.register0
       Sc_rollup_services.Global.Helpers.outbox_proof
     @@ fun node_ctxt output () -> Outbox.proof_of_output node_ctxt output
+
+  let () =
+    Block_directory.register0 Sc_rollup_services.Global.Block.simulate
+    @@ fun (node_ctxt, block) () messages ->
+    simulate_messages node_ctxt block messages
 
   let register node_ctxt =
     List.fold_left

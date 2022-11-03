@@ -48,6 +48,14 @@ open Alpha_context
    See below for a more detailed explanation.
 *)
 
+type eval_result = {
+  state_hash : Sc_rollup.State_hash.t;
+  status : string;
+  output : Sc_rollup.output list;
+  inbox_level : Raw_level.t;
+  num_ticks : Z.t;
+}
+
 module Encodings = struct
   open Data_encoding
 
@@ -58,6 +66,33 @@ module Encodings = struct
       (opt "published_at_level" Raw_level.encoding)
 
   let hex_string = conv Bytes.of_string Bytes.to_string bytes
+
+  let eval_result =
+    conv
+      (fun {state_hash; status; output; inbox_level; num_ticks} ->
+        (state_hash, status, output, inbox_level, num_ticks))
+      (fun (state_hash, status, output, inbox_level, num_ticks) ->
+        {state_hash; status; output; inbox_level; num_ticks})
+    @@ obj5
+         (req
+            "state_hash"
+            Sc_rollup.State_hash.encoding
+            ~description:
+              "Hash of the state after execution of the PVM on the input \
+               messages")
+         (req "status" string ~description:"Status of the PVM after evaluation")
+         (req
+            "output"
+            (list Sc_rollup.output_encoding)
+            ~description:"Output produced by evaluation of the messages")
+         (req
+            "inbox_level"
+            Raw_level.encoding
+            ~description:"Level of the inbox that would contain these messages")
+         (req
+            "num_ticks"
+            z
+            ~description:"Ticks taken by the PVM for evaluating the messages")
 end
 
 module Arg = struct
@@ -302,6 +337,19 @@ module Global = struct
         ~query:Tezos_rpc.Query.empty
         ~output:Data_encoding.(list Sc_rollup.output_encoding)
         (path / "outbox")
+
+    let simulate =
+      Tezos_rpc.Service.post_service
+        ~description:"Simulate messages evaluation by the PVM"
+        ~query:Tezos_rpc.Query.empty
+        ~input:
+          Data_encoding.(
+            def
+              "messages"
+              ~description:"Input messages for simulation"
+              (list Encodings.hex_string))
+        ~output:Encodings.eval_result
+        (path / "simulate")
 
     let dal_slots =
       Tezos_rpc.Service.get_service

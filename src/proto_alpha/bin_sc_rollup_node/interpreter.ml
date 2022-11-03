@@ -29,6 +29,12 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
+  module Accounted_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Accounted.t
+
+  module Free_pvm :
+    Fueled_pvm.S with module PVM = PVM and type fuel = Fuel.Free.t
+
   (** [process_head node_ctxt head] interprets the messages associated
       with a [head] from a chain [event]. This requires the inbox to be updated
       beforehand. *)

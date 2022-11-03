@@ -28,7 +28,7 @@ module Make (PVM : Pvm.S) = struct
   module PVM = PVM
   module Interpreter = Interpreter.Make (PVM)
   module Commitment = Commitment.Make (PVM)
-  module RPC_server = RPC_server.Make (PVM)
+  module RPC_server = RPC_server.Make (Interpreter)
   module Refutation_game = Refutation_game.Make (Interpreter)
 end
 
