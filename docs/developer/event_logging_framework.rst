@@ -10,7 +10,7 @@ the so called sinks.  This is done by using the `tezos-event-logging` library.
 
 We use two levels of abstraction to define these events. Heavy events are
 defined using the most generic API and have the full expressive power and
-structure while being 100% lazy.  Simple events are record-like structures which
+structure. Simple events are record-like structures which
 are constructed on top of the generic event api, and are meant to be less
 verbose and more developer friendly.
 
@@ -23,9 +23,7 @@ Simple Events
 
 Simple events are record-like structures which are constructed directly
 (i.e. there is no high-level OCaml type, and parsing events is not accessible
-programmatically). The API is a bit less lazy than with the generic API (the
-fields of the events are still evaluated every time, which is usually not an
-issue since they are evaluated anyway by the application code itself).
+programmatically). The API is less generic than the “Heavy” Events'.
 
 See for instance
 :src:`src/bin_node/node_config_file.ml` (search for the string `declare_`):
@@ -41,8 +39,9 @@ Please read the guidelines that are documented in
 
 “Heavy” Events
 ^^^^^^^^^^^^^^
+
 The most generic API for defining events ``Internal_event.Make`` gives full
-expressive power and structure while being 100% lazy.
+expressive power and structure.
 
 See for instance:
 :src:`src/proto_alpha/lib_delegate/client_baking_blocks.ml` (module
@@ -52,7 +51,7 @@ See for instance:
    ``module Event = Internal_event.Make(Definition)`` where
    ``Definition: Internal_event.EVENT_DEFINITION``;
 -  this provides
-   ``val Event.emit: ?section:Section.t -> (unit -> Block_seen_event.t) -> (unit, trace) result Lwt.t``.
+   ``val Event.emit: ?section:Section.t -> Block_seen_event.t -> (unit, trace) result Lwt.t``.
 
 Creating Sinks
 ~~~~~~~~~~~~~~

@@ -22,8 +22,7 @@ Events have:
   for human readers.
 
 Events are by default “lazy”: if no active sink accepts their section and level,
-they are not evaluated at all (i.e. in OCaml, the ``unit -> event`` argument of
-``Event.emit`` is never called). This means that outputting *more* events
+they are not emitted at all. This means that outputting *more* events
 implies more CPU and memory usage.
 
 *“Legacy events”* are the events that use the old & deprecated logging API;
