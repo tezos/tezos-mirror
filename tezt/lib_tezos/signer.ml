@@ -38,7 +38,8 @@ module Parameters = struct
 
   let base_default_name = "signer"
 
-  let default_uri = Uri.make ~scheme:"http" ~host:"localhost" ~port:17732 ()
+  let default_uri () =
+    Uri.make ~scheme:"http" ~host:"localhost" ~port:(Port.fresh ()) ()
 
   let default_colors =
     Log.Color.
@@ -61,8 +62,8 @@ let set_ready signer =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready signer (Some ())
 
-let handle_raw_stdout signer line =
-  if line =~ rex "^.*accepting HTTP requests on port$" then set_ready signer
+let handle_readiness signer (event : event) =
+  if event.name = "signer_listening.v0" then set_ready signer
 
 let base_dir_arg client = ["--base-dir"; client.base_dir]
 
@@ -89,11 +90,14 @@ let spawn_import_secret_key signer (key : Account.key) =
 let import_secret_key signer (key : Account.key) =
   spawn_import_secret_key signer key |> Process.check
 
-let create ?name ?color ?event_pipe ?base_dir ?(uri = Parameters.default_uri)
-    ?runner ?(keys = [Constant.bootstrap1]) () =
+let create ?name ?color ?event_pipe ?base_dir ?uri ?runner
+    ?(keys = [Constant.bootstrap1]) () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
+  in
+  let uri =
+    match uri with None -> Parameters.default_uri () | Some uri -> uri
   in
   let signer =
     create
@@ -104,7 +108,7 @@ let create ?name ?color ?event_pipe ?base_dir ?(uri = Parameters.default_uri)
       ?runner
       {runner; base_dir; uri; keys; pending_ready = []}
   in
-  on_stdout signer (handle_raw_stdout signer) ;
+  on_event signer (handle_readiness signer) ;
   let* () = Lwt_list.iter_s (import_secret_key signer) keys in
   return signer
 
@@ -116,8 +120,10 @@ let run signer =
   let host =
     Option.value ~default:"localhost" (Uri.host signer.persistent_state.uri)
   in
-  let port =
-    Option.value ~default:7732 (Uri.port signer.persistent_state.uri)
+  let port_args =
+    match Uri.port signer.persistent_state.uri with
+    | None -> []
+    | Some port -> ["--port"; Int.to_string port]
   in
   let arguments =
     [
@@ -128,9 +134,8 @@ let run signer =
       "signer";
       "--address";
       host;
-      "--port";
-      Int.to_string port;
     ]
+    @ port_args
   in
   let arguments =
     if !passfile = "" then arguments
@@ -165,6 +170,7 @@ let init ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys () =
     create ?name ?color ?event_pipe ?base_dir ?uri ?runner ?keys ()
   in
   let* () = run signer in
+  let* () = wait_for_ready signer in
   return signer
 
 let restart signer =
