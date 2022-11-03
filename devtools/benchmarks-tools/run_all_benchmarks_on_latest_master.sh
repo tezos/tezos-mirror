@@ -34,7 +34,11 @@ set -x -e
 
 TODAY=$(date +"%Y%m%d_%H%M")
 
-date +"[%Y-%m-%d %T] Starting benchmarks processes."
+dated_log() {
+  date +"[%Y-%m-%d %T] $1."
+}
+
+dated_log "Starting benchmarks processes"
 
 # Clean _opam to have a fresh dependencies environment and fetch the latest
 # commit.
@@ -58,20 +62,20 @@ mkdir "$SNOOP_RESULT_DIR"
 # However, this can lead to zcash_params not being properly installed; in this
 # case, we copy the files directly.
 cd tezos
-date +"[%Y-%m-%d %T] Compiling dependencies."
+dated_log "Compiling dependencies"
 . "/home/mclaren/.cargo/env"
 make BLST_PORTABLE=y build-dev-deps || true
 if [ -d _opam/share/zcash-params ]; then echo "zcash params found"; else cp -r ../zcash-params _opam/share/; fi
 eval $(opam env)
 
 # Build Tezos
-date +"[%Y-%m-%d %T] Make."
+dated_log "Make"
 make
 
 # Run benchmarks.
-date +"[%Y-%m-%d %T] Running benchmarks."
+dated_log "Running benchmarks"
 time dune exec tezt/snoop/main.exe -- --verbose
-date +"[%Y-%m-%d %T] End of benchmarks run."
+dated_log "End of benchmarks run"
 
 # Move results from tezos to their dedicated directory.
 cd ..
@@ -83,4 +87,4 @@ chmod +rx "$SNOOP_RESULT_DIR"/*_results
 # benchmarks being run (current_run_dir) or finished (last_run_dir).
 mv current_run_dir last_run_dir
 
-date +"[%Y-%m-%d %T] End of benchmarks processes."
+dated_log "End of benchmarks processes"
