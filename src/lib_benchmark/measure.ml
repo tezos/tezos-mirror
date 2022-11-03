@@ -31,7 +31,7 @@ type options = {
   nsamples : int;
   bench_number : int;
   minor_heap_size : [`words of int];
-  config_dir : string option;
+  config_file : string option;
 }
 
 type 'workload timed_workload = {
@@ -96,10 +96,10 @@ let options_encoding =
   let open Data_encoding in
   def "benchmark_options_encoding"
   @@ conv
-       (fun {seed; nsamples; bench_number; minor_heap_size; config_dir} ->
-         (seed, nsamples, bench_number, minor_heap_size, config_dir))
-       (fun (seed, nsamples, bench_number, minor_heap_size, config_dir) ->
-         {seed; nsamples; bench_number; minor_heap_size; config_dir})
+       (fun {seed; nsamples; bench_number; minor_heap_size; config_file} ->
+         (seed, nsamples, bench_number, minor_heap_size, config_file))
+       (fun (seed, nsamples, bench_number, minor_heap_size, config_file) ->
+         {seed; nsamples; bench_number; minor_heap_size; config_file})
        (tup5
           (option Benchmark_helpers.int_encoding)
           Benchmark_helpers.int_encoding
@@ -205,7 +205,7 @@ let pp_options fmtr (options : options) =
     | Some seed -> string_of_int seed
   in
   let nsamples = string_of_int options.nsamples in
-  let config_dir = Option.value options.config_dir ~default:"None" in
+  let config_file = Option.value options.config_file ~default:"None" in
   let bench_number = string_of_int options.bench_number in
   let minor_heap_size = match options.minor_heap_size with `words n -> n in
   Format.fprintf
@@ -219,7 +219,7 @@ let pp_options fmtr (options : options) =
     bench_number
     nsamples
     minor_heap_size
-    config_dir
+    config_file
 
 let pp_stats : Format.formatter -> workloads_stats -> unit =
  fun fmtr {max_time; min_time; mean_time; variance} ->
