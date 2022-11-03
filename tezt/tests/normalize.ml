@@ -78,16 +78,17 @@ let test_normalize_script =
     ~tags:["client"; "normalize"]
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
+  let script =
+    sf
+      "file:./tests_python/contracts_%s/opcodes/comb-literals.tz"
+      (match protocol with
+      | Protocol.Alpha -> "alpha"
+      | _ -> sf "%03d" @@ Protocol.number protocol)
+  in
   let* () =
     modes
     |> Lwt_list.iter_s @@ fun mode ->
-       let* _ =
-         Client.normalize_script
-           client
-           ~hooks
-           ?mode
-           ~script:"file:./tezt/tests/contracts/proto_alpha/comb-literals.tz"
-       in
+       let* _ = Client.normalize_script client ~hooks ?mode ~script in
        unit
   in
   unit
