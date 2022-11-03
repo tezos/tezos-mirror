@@ -79,13 +79,11 @@ Editing the configuration file
 
 All blockchain data is stored under ``$HOME/.tezos-node/`` by default.
 You can
-change this by doing ``./octez-node config update --data-dir
-</somewhere/in/your/disk>``.
+change this by doing ``./octez-node config update --data-dir </somewhere/in/your/disk>``.
 
 To run multiple nodes on the same machine, you can duplicate and edit
 ``$HOME/.tezos-node/config.json`` while making sure they don't share
-the same ``data-dir``. Then run your node with ``./octez-node
-run --config-file=</path/to/alternate_cfg>``.
+the same ``data-dir``. Then run your node with ``./octez-node run --config-file=</path/to/alternate_cfg>``.
 
 Here is an example configuration file with several parameters specified.
 Incidentally, it is exactly the one resulting from the command sequence above.
