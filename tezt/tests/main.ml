@@ -105,6 +105,7 @@ let register_protocol_tests_that_use_supports_correctly () =
   Cache_cache.register protocols ;
   Client_commands.register ~protocols ;
   Client_config.register ~protocols ;
+  Client_fa12.register ~protocols ;
   Client_run_view.register ~protocols ;
   Comparable_datatype.register ~protocols ;
   Contract_big_map_to_self.register ~protocols ;
