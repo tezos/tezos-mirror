@@ -243,7 +243,7 @@ module Make (Interpreter : Interpreter.S) :
         let page_info = page_info
       end
     end in
-    let metadata = Interpreter.metadata node_ctxt in
+    let metadata = Node_context.metadata node_ctxt in
     let* proof =
       trace
         (Sc_rollup_node_errors.Cannot_produce_proof

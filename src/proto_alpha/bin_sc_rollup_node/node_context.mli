@@ -105,6 +105,10 @@ val init :
 val checkout_context :
   'a t -> Tezos_crypto.Block_hash.t -> 'a Context.t tzresult Lwt.t
 
+(** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
+    stored in [node_ctxt]. *)
+val metadata : _ t -> Sc_rollup.Metadata.t
+
 (** [readonly node_ctxt] returns a read only version of the node context
     [node_ctxt].  *)
 val readonly : _ t -> ro

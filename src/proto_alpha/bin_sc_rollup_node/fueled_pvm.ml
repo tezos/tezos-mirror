@@ -34,14 +34,31 @@ module type S = sig
 
   type fuel
 
+  type eval_result = {state : state; remaining_fuel : fuel; num_ticks : Z.t}
+
+  (** [eval_block_inbox ~fuel node_ctxt block_hash state] evaluates the
+      [messages] for the inbox of block [block_hash] in the given [state] of the
+      PVM and returns the evaluation results containing the new state, the
+      number of messages, the inbox level and the remaining fuel. *)
   val eval_block_inbox :
-    metadata:Sc_rollup.Metadata.t ->
-    dal_attestation_lag:int ->
     fuel:fuel ->
     _ Node_context.t ->
     Tezos_crypto.Block_hash.t ->
     state ->
     (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult Lwt.t
+
+  (** [eval_messages ~fuel node_ctxt state inbox_level messages] evaluates the
+      [messages] for inbox level [inbox_level] in the given [state] of the PVM
+      and returns the evaluation results containing the new state, the remaining
+      fuel, and the number of ticks for the evaluation
+      of this message. *)
+  val eval_messages :
+    fuel:fuel ->
+    _ Node_context.t ->
+    state ->
+    Raw_level.t ->
+    Sc_rollup.Inbox_message.t list ->
+    eval_result Node_context.delayed_write tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) = struct
@@ -51,6 +68,8 @@ module Make (PVM : Pvm.S) = struct
 
     type fuel = F.t
 
+    type eval_result = {state : state; remaining_fuel : fuel; num_ticks : Z.t}
+
     let continue_with_fuel consumption initial_fuel state f =
       let open Delayed_write_monad.Lwt_result_syntax in
       match F.consume consumption initial_fuel with
@@ -59,17 +78,20 @@ module Make (PVM : Pvm.S) = struct
 
     exception Error_wrapper of tztrace
 
-    (** [eval_until_input ~metadata level message_index ~fuel start_tick
-    failing_ticks state] advances a PVM [state] until it wants more
-    inputs or there are no more [fuel] (if [Some fuel] is
-    specified). The evaluation is running under the processing of
-    some [message_index] at a given [level] and this is the
-    [start_tick] of this message processing. If some [failing_ticks]
-    are planned by the loser mode, they will be made. *)
-    let eval_until_input ~metadata ~dal_attestation_lag data_dir store level
-        message_index ~fuel start_tick failing_ticks state =
+    (** [eval_until_input node_ctxt level message_index ~fuel start_tick
+        failing_ticks state] advances a PVM [state] until it wants more inputs or
+        there are no more [fuel] (if [Some fuel] is specified). The evaluation is
+        running under the processing of some [message_index] at a given [level]
+        and this is the [start_tick] of this message processing. If some
+        [failing_ticks] are planned by the loser mode, they will be made. *)
+    let eval_until_input node_ctxt level message_index ~fuel start_tick
+        failing_ticks state =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
+      let metadata = Node_context.metadata node_ctxt in
+      let dal_attestation_lag =
+        node_ctxt.protocol_constants.parametric.dal.attestation_lag
+      in
       let module Builtins = struct
         let reveal_preimage hash =
           let hash =
@@ -137,7 +159,12 @@ module Make (PVM : Pvm.S) = struct
                 failing_ticks
                 next_state
           | Needs_reveal (Reveal_raw_data hash) -> (
-              let* data = Reveals.get ~data_dir ~pvm_name:PVM.name ~hash in
+              let* data =
+                Reveals.get
+                  ~data_dir:node_ctxt.data_dir
+                  ~pvm_name:PVM.name
+                  ~hash
+              in
               let*! next_state = PVM.set_input (Reveal (Raw_data data)) state in
               match F.consume F.one_tick_consumption fuel with
               | None -> return (state, fuel, current_tick, failing_ticks)
@@ -155,7 +182,7 @@ module Make (PVM : Pvm.S) = struct
               let>* content_opt =
                 Dal_pages_request.page_content
                   ~dal_attestation_lag
-                  store
+                  node_ctxt
                   page_id
               in
               let*! next_state =
@@ -175,22 +202,19 @@ module Make (PVM : Pvm.S) = struct
       let payload = Sc_rollup.Inbox_message.unsafe_of_string "0xC4C4" in
       {input with Sc_rollup.payload}
 
-    (** [feed_input ~metadata level message_index ~fuel ~failing_ticks state
-  input] feeds [input] (that has a given [message_index] in inbox
-  of [level]) to the PVM in order to advance [state] to the next
-  step that requires an input. This function is controlled by
-  some [fuel] and may introduce intended failures at some given
-  [failing_ticks]. *)
-    let feed_input ~metadata ~dal_attestation_lag data_dir store level
-        message_index ~fuel ~failing_ticks state input =
+    (** [feed_input node_ctxt level message_index ~fuel ~failing_ticks state
+        input] feeds [input] (that has a given [message_index] in inbox
+        of [level]) to the PVM in order to advance [state] to the next
+        step that requires an input. This function is controlled by
+        some [fuel] and may introduce intended failures at some given
+        [failing_ticks]. *)
+    let feed_input node_ctxt level message_index ~fuel ~failing_ticks state
+        input =
       let open Lwt_result_syntax in
       let open Delayed_write_monad.Lwt_result_syntax in
       let>* state, fuel, tick, failing_ticks =
         eval_until_input
-          ~metadata
-          ~dal_attestation_lag
-          data_dir
-          store
+          node_ctxt
           level
           message_index
           ~fuel
@@ -218,10 +242,7 @@ module Make (PVM : Pvm.S) = struct
       let*! state = PVM.set_input (Inbox_message input) state in
       let>* state, _fuel, tick, _failing_ticks =
         eval_until_input
-          ~metadata
-          ~dal_attestation_lag
-          data_dir
-          store
+          node_ctxt
           level
           message_index
           ~fuel
@@ -231,8 +252,43 @@ module Make (PVM : Pvm.S) = struct
       in
       return (state, tick)
 
-    let eval_block_inbox ~metadata ~dal_attestation_lag ~fuel
-        Node_context.{data_dir; store; loser_mode; _} hash (state : state) :
+    let eval_messages ~fuel node_ctxt state inbox_level messages =
+      let open Lwt_result_syntax in
+      let open Delayed_write_monad.Lwt_result_syntax in
+      let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
+      (* Iterate the PVM state with all the messages. *)
+      list_fold_left_i_es
+        (fun message_counter (state, fuel) message ->
+          let*? payload =
+            Sc_rollup.Inbox_message.(
+              message |> serialize |> Environment.wrap_tzresult)
+          in
+          let input =
+            Sc_rollup.
+              {inbox_level; message_counter = Z.of_int message_counter; payload}
+          in
+          let failing_ticks =
+            Loser_mode.is_failure
+              node_ctxt.Node_context.loser_mode
+              ~level
+              ~message_index:message_counter
+          in
+          let>* state, executed_ticks =
+            feed_input
+              node_ctxt
+              level
+              message_counter
+              ~fuel
+              ~failing_ticks
+              state
+              input
+          in
+          return (state, F.of_ticks executed_ticks))
+        (state, fuel)
+        messages
+
+    let eval_block_inbox ~fuel (Node_context.{store; _} as node_ctxt) hash
+        (state : state) :
         (state * Z.t * Raw_level.t * fuel) Node_context.delayed_write tzresult
         Lwt.t =
       let open Lwt_result_syntax in
@@ -251,49 +307,22 @@ module Make (PVM : Pvm.S) = struct
              The length of messages here can potentially overflow the [int] returned from [List.length].
           *)
           let num_messages = List.length messages |> Z.of_int in
-
-          let feed_message (message_counter : int) (state, fuel)
-              (message : Sc_rollup.Inbox_message.t) =
-            let*? payload =
-              Sc_rollup.Inbox_message.(
-                message |> serialize |> Environment.wrap_tzresult)
-            in
-            let input =
-              Sc_rollup.
-                {
-                  inbox_level;
-                  message_counter = Z.of_int message_counter;
-                  payload;
-                }
-            in
-            let level = Raw_level.to_int32 inbox_level |> Int32.to_int in
-
-            let failing_ticks =
-              Loser_mode.is_failure
-                loser_mode
-                ~level
-                ~message_index:message_counter
-            in
-            let>* state, executed_ticks =
-              feed_input
-                ~metadata
-                ~dal_attestation_lag
-                data_dir
-                store
-                level
-                message_counter
-                ~fuel
-                ~failing_ticks
-                state
-                input
-            in
-            return (state, F.of_ticks executed_ticks)
-          in
-          (* Iterate the PVM state with all the messages for this level. *)
+          (* Evaluate all the messages for this level. *)
           let>* state, fuel =
-            list_fold_left_i_es feed_message (state, fuel) messages
+            eval_messages ~fuel node_ctxt state inbox_level messages
           in
           return (state, num_messages, inbox_level, fuel)
+
+    let eval_messages ~fuel node_ctxt state inbox_level messages =
+      let open Lwt_result_syntax in
+      let open Delayed_write_monad.Lwt_result_syntax in
+      let*! initial_tick = PVM.get_tick state in
+      let>* state, remaining_fuel =
+        eval_messages ~fuel node_ctxt state inbox_level messages
+      in
+      let*! final_tick = PVM.get_tick state in
+      let num_ticks = Sc_rollup.Tick.distance initial_tick final_tick in
+      return {state; remaining_fuel; num_ticks}
   end
 
   module Free = Make_fueled (Fuel.Free)

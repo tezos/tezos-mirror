@@ -29,8 +29,6 @@ open Alpha_context
 module type S = sig
   module PVM : Pvm.S
 
-  val metadata : _ Node_context.t -> Sc_rollup.Metadata.t
-
   (** [process_head node_ctxt head] interprets the messages associated
       with a [head] from a chain [event]. This requires the inbox to be updated
       beforehand. *)
@@ -52,13 +50,6 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   module Fueled_pvm = Fueled_pvm.Make (PVM)
   module Accounted_pvm = Fueled_pvm.Accounted
   module Free_pvm = Fueled_pvm.Free
-
-  (** [metadata node_ctxt] creates a {Sc_rollup.Metadata.t} using the information
-      stored in [node_ctxt]. *)
-  let metadata (node_ctxt : _ Node_context.t) =
-    let address = node_ctxt.rollup_address in
-    let origination_level = node_ctxt.genesis_info.Sc_rollup.Commitment.level in
-    Sc_rollup.Metadata.{address; origination_level}
 
   (** [get_boot_sector block_hash node_ctxt] fetches the operations in the
       [block_hash] and looks for the bootsector used to originate the rollup
@@ -133,14 +124,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let* ctxt, predecessor_state = state_of_head node_ctxt ctxt predecessor in
-    let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.protocol_constants.parametric.dal.attestation_lag
-    in
     let* eval_result =
       Free_pvm.eval_block_inbox
-        ~metadata
-        ~dal_attestation_lag
         ~fuel:(Fuel.Free.of_ticks 0L)
         node_ctxt
         hash
@@ -241,14 +226,8 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
         ctxt
         Layer1.{hash = predecessor_hash; level = pred_level}
     in
-    let metadata = metadata node_ctxt in
-    let dal_attestation_lag =
-      node_ctxt.protocol_constants.parametric.dal.attestation_lag
-    in
     let>* state, _counter, _level, _fuel =
       Accounted_pvm.eval_block_inbox
-        ~metadata
-        ~dal_attestation_lag
         ~fuel:(Fuel.Accounted.of_ticks tick_distance)
         node_ctxt
         hash
