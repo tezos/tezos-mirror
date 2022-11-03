@@ -31,7 +31,9 @@ let link_finished (ast : Wasm.Ast.module_) offset =
 
 let eval_has_finished = function
   | Eval {config = {step_kont = Wasm.Eval.(SK_Result _); _}; _} -> true
-  | _ -> false
+  | Padding -> true
+  (* explicit pattern matching to avoid new states introducing silent bugs *)
+  | Decode _ | Link _ | Init _ | Eval _ | Snapshot | Stuck _ -> false
 
 let ticks_to_snapshot {current_tick; last_top_level_call; max_nb_ticks; _} =
   let open Z in
