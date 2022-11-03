@@ -36,10 +36,6 @@ type error +=
     }
   | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
-  | Dal_rollup_already_registered_to_slot_index of
-      (Sc_rollup_repr.t * Dal_slot_repr.Index.t)
-  | Dal_requested_subscriptions_at_future_level of
-      (Raw_level_repr.t * Raw_level_repr.t)
   | Dal_data_availibility_endorser_not_in_committee of {
       endorser : Signature.Public_key_hash.t;
       level : Level_repr.t;
@@ -171,57 +167,6 @@ let () =
       | Dal_publish_slot_header_duplicate {slot_header} -> Some slot_header
       | _ -> None)
     (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
-  register_error_kind
-    `Permanent
-    ~id:"Dal_rollup_already_subscribed_to_slot"
-    ~title:"DAL rollup already subscribed to slot"
-    ~description
-    ~pp:(fun ppf (rollup, slot_index) ->
-      Format.fprintf
-        ppf
-        "Rollup %a is already subscribed to data availability slot index %a"
-        Sc_rollup_repr.pp
-        rollup
-        Dal_slot_repr.Index.pp
-        slot_index)
-    Data_encoding.(
-      obj2
-        (req "rollup" Sc_rollup_repr.encoding)
-        (req "slot_index" Dal_slot_repr.Index.encoding))
-    (function
-      | Dal_rollup_already_registered_to_slot_index (rollup, slot_index) ->
-          Some (rollup, slot_index)
-      | _ -> None)
-    (fun (rollup, slot_index) ->
-      Dal_rollup_already_registered_to_slot_index (rollup, slot_index)) ;
-  let description =
-    "Requested List of subscribed rollups to slot at a future level"
-  in
-  register_error_kind
-    `Temporary
-    ~id:"Dal_requested_subscriptions_at_future_level"
-    ~title:"Requested list of subscribed dal slots at a future level"
-    ~description
-    ~pp:(fun ppf (current_level, future_level) ->
-      Format.fprintf
-        ppf
-        "The list of subscribed dal slot indices has been requested for level \
-         %a, but the current level is %a"
-        Raw_level_repr.pp
-        future_level
-        Raw_level_repr.pp
-        current_level)
-    Data_encoding.(
-      obj2
-        (req "current_level" Raw_level_repr.encoding)
-        (req "future_level" Raw_level_repr.encoding))
-    (function
-      | Dal_requested_subscriptions_at_future_level (current_level, future_level)
-        ->
-          Some (current_level, future_level)
-      | _ -> None)
-    (fun (current_level, future_level) ->
-      Dal_requested_subscriptions_at_future_level (current_level, future_level)) ;
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_endorser_not_in_committee"
