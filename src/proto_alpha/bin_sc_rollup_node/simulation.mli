@@ -1,0 +1,55 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+open Protocol.Alpha_context
+
+module type S = sig
+  module PVM : Pvm.S
+
+  (** Type of the state for a simulation. *)
+  type t = {
+    ctxt : Context.ro;
+    inbox_level : Raw_level.t;
+    nb_messages : int64;
+    state : PVM.state;
+  }
+
+  (** [start_simulation node_ctxt block] starts a new simulation {e on top} of
+      [block], i.e. for an hypothetical new inbox (level).  *)
+  val start_simulation : Node_context.ro -> Layer1.head -> t tzresult Lwt.t
+
+  (**  [simulate_messages node_ctxt ?fuel sim messages] runs a simulation of new
+       [messages] in the given simulation (state) [sim] and returns a new
+       simulation state, the remaining fuel (when [?fuel] is provided) and the
+       number of ticks that happened. *)
+  val simulate_messages :
+    Node_context.ro ->
+    t ->
+    Sc_rollup.Inbox_message.t list ->
+    (t * Z.t) tzresult Lwt.t
+end
+
+(** Functor to construct a simulator for a given PVM with interpreter. *)
+module Make (Interpreter : Interpreter.S) : S with module PVM = Interpreter.PVM

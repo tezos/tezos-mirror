@@ -49,6 +49,15 @@ module type S = sig
     Sc_rollup.Tick.t ->
     Raw_level.t ->
     (PVM.state * PVM.hash) option tzresult Lwt.t
+
+  (** [state_of_head node_ctxt ctxt head] returns the state corresponding to the
+      block [head], or the state at rollup genesis if the block is before the
+      rollup origination. *)
+  val state_of_head :
+    'a Node_context.t ->
+    'a Context.t ->
+    Layer1.head ->
+    ('a Context.t * PVM.state) tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) : S with module PVM = PVM = struct

@@ -241,4 +241,8 @@ let history_of_hash node_ctxt hash =
   let* level = State.level_of_hash node_ctxt.Node_context.store hash in
   State.history_of_head node_ctxt {hash; level}
 
+let inbox_of_head = State.inbox_of_head
+
+let history_of_head = State.history_of_head
+
 let start () = Inbox_event.starting ()
