@@ -1,5 +1,5 @@
 Missing config file prints
-  $ ./main_snoop.exe benchmark N_IBlake2b_alpha and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
+  $ ./main_snoop.exe benchmark proto/alpha/interpreter/N_IBlake2b and save to output.json -c __nosuchdir --bench-num 1 2>&1 | sed s'/stats over all benchmarks:.*/stats <hidden>/'
   Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
   Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
@@ -16,9 +16,9 @@ Missing config file prints
                 config directory=__nosuchdir };
      save_file = output.json;
      storage = Mem }
-  Failed loading json __nosuchdir/N_IBlake2b_alpha.json: No such file or directory (Ignoring)
-  Using default configuration for benchmark N_IBlake2b_alpha
-  Loaded configuration from __nosuchdir/N_IBlake2b_alpha.json for benchmark N_IBlake2b_alpha
+  Failed loading json __nosuchdir: No such file or directory (Ignoring)
+  Using default configuration for benchmark proto/alpha/interpreter/N_IBlake2b
+  Loaded configuration from __nosuchdir for benchmark proto/alpha/interpreter/N_IBlake2b
   { "sampler":
       { "int_size": { "min": 8, "max": 100000 },
         "string_size": { "min": 1024, "max": 131072 },
@@ -32,4 +32,424 @@ Missing config file prints
   benchmarking 1/1
   stats <hidden>
 
-benchmarking 1/1
+Generate empty config
+  $ ./main_snoop.exe config generate empty in empty.json; jq . empty.json
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  {
+    "namespace": ".",
+    "config": null,
+    "children": []
+  }
+
+Generate default config
+  $ ./main_snoop.exe config generate default in dft.json for proto/alpha/interpreter/N_IBlake2b; jq . dft.json
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  {
+    "namespace": ".",
+    "config": null,
+    "children": [
+      {
+        "namespace": "proto",
+        "config": null,
+        "children": [
+          {
+            "namespace": "alpha",
+            "config": null,
+            "children": [
+              {
+                "namespace": "interpreter",
+                "config": null,
+                "children": [
+                  {
+                    "namespace": "N_IBlake2b",
+                    "config": {
+                      "sampler": {
+                        "int_size": {
+                          "min": 8,
+                          "max": 100000
+                        },
+                        "string_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "bytes_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "list_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "set_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "map_size": {
+                          "min": 10,
+                          "max": 1000
+                        }
+                      },
+                      "sapling": {
+                        "sapling_txs_file": "/no/such/file",
+                        "seed": null
+                      },
+                      "comb": {
+                        "max_depth": 1000
+                      },
+                      "compare": {
+                        "type_size": {
+                          "min": 1,
+                          "max": 15
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "namespace": "intercept",
+                        "config": {
+                          "sampler": {
+                            "int_size": {
+                              "min": 8,
+                              "max": 100000
+                            },
+                            "string_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "bytes_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "list_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "set_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "map_size": {
+                              "min": 10,
+                              "max": 1000
+                            }
+                          },
+                          "sapling": {
+                            "sapling_txs_file": "/no/such/file",
+                            "seed": null
+                          },
+                          "comb": {
+                            "max_depth": 1000
+                          },
+                          "compare": {
+                            "type_size": {
+                              "min": 1,
+                              "max": 15
+                            }
+                          }
+                        },
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+Modify empty config
+  $ ./main_snoop.exe config edit dft.json for proto/alpha/interpreter -j '{"a":123}'; jq . dft.json
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  {
+    "namespace": ".",
+    "config": null,
+    "children": [
+      {
+        "namespace": "proto",
+        "config": null,
+        "children": [
+          {
+            "namespace": "alpha",
+            "config": null,
+            "children": [
+              {
+                "namespace": "interpreter",
+                "config": {
+                  "a": 123
+                },
+                "children": [
+                  {
+                    "namespace": "N_IBlake2b",
+                    "config": {
+                      "sampler": {
+                        "int_size": {
+                          "min": 8,
+                          "max": 100000
+                        },
+                        "string_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "bytes_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "list_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "set_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "map_size": {
+                          "min": 10,
+                          "max": 1000
+                        }
+                      },
+                      "sapling": {
+                        "sapling_txs_file": "/no/such/file",
+                        "seed": null
+                      },
+                      "comb": {
+                        "max_depth": 1000
+                      },
+                      "compare": {
+                        "type_size": {
+                          "min": 1,
+                          "max": 15
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "namespace": "intercept",
+                        "config": {
+                          "sampler": {
+                            "int_size": {
+                              "min": 8,
+                              "max": 100000
+                            },
+                            "string_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "bytes_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "list_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "set_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "map_size": {
+                              "min": 10,
+                              "max": 1000
+                            }
+                          },
+                          "sapling": {
+                            "sapling_txs_file": "/no/such/file",
+                            "seed": null
+                          },
+                          "comb": {
+                            "max_depth": 1000
+                          },
+                          "compare": {
+                            "type_size": {
+                              "min": 1,
+                              "max": 15
+                            }
+                          }
+                        },
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+
+Check config edition
+  $ ./main_snoop.exe config check dft.json for proto/alpha/interpreter/N_IBlake2b
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Looking for custom configuration for benchmark proto/alpha/interpreter/N_IBlake2b
+  Config file successfully parsed
+  Loaded configuration from dft.json for benchmark proto/alpha/interpreter/N_IBlake2b
+  { "sampler":
+      { "int_size": { "min": 8, "max": 100000 },
+        "string_size": { "min": 1024, "max": 131072 },
+        "bytes_size": { "min": 1024, "max": 131072 },
+        "list_size": { "min": 10, "max": 1000 },
+        "set_size": { "min": 10, "max": 1000 },
+        "map_size": { "min": 10, "max": 1000 } },
+    "sapling": { "sapling_txs_file": "/no/such/file", "seed": null },
+    "comb": { "max_depth": 1000 },
+    "compare": { "type_size": { "min": 1, "max": 15 } } }
+
+Test merge
+  $ ./main_snoop.exe config merge dft.json in empty.json; jq . empty.json
+  Model N_IOpt_map__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ILambda__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_ISapling_verify_update__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KIter__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KList_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  Model N_KMap_enter_body__alpha already registered for code generation! (overloaded instruction?) Ignoring.
+  {
+    "namespace": ".",
+    "config": null,
+    "children": [
+      {
+        "namespace": "proto",
+        "config": null,
+        "children": [
+          {
+            "namespace": "alpha",
+            "config": null,
+            "children": [
+              {
+                "namespace": "interpreter",
+                "config": {
+                  "a": 123
+                },
+                "children": [
+                  {
+                    "namespace": "N_IBlake2b",
+                    "config": {
+                      "sampler": {
+                        "int_size": {
+                          "min": 8,
+                          "max": 100000
+                        },
+                        "string_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "bytes_size": {
+                          "min": 1024,
+                          "max": 131072
+                        },
+                        "list_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "set_size": {
+                          "min": 10,
+                          "max": 1000
+                        },
+                        "map_size": {
+                          "min": 10,
+                          "max": 1000
+                        }
+                      },
+                      "sapling": {
+                        "sapling_txs_file": "/no/such/file",
+                        "seed": null
+                      },
+                      "comb": {
+                        "max_depth": 1000
+                      },
+                      "compare": {
+                        "type_size": {
+                          "min": 1,
+                          "max": 15
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "namespace": "intercept",
+                        "config": {
+                          "sampler": {
+                            "int_size": {
+                              "min": 8,
+                              "max": 100000
+                            },
+                            "string_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "bytes_size": {
+                              "min": 1024,
+                              "max": 131072
+                            },
+                            "list_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "set_size": {
+                              "min": 10,
+                              "max": 1000
+                            },
+                            "map_size": {
+                              "min": 10,
+                              "max": 1000
+                            }
+                          },
+                          "sapling": {
+                            "sapling_txs_file": "/no/such/file",
+                            "seed": null
+                          },
+                          "comb": {
+                            "max_depth": 1000
+                          },
+                          "compare": {
+                            "type_size": {
+                              "min": 1,
+                              "max": 15
+                            }
+                          }
+                        },
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
