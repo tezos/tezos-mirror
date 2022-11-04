@@ -42,8 +42,9 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
     The function returns [Dal_slot_not_found_in_store] if no entry is found in
     the store for the given ID (i.e. no page is registered with or without content).
 
-    If the returned list is not empty, the slot whose ID is given is supposed to
-    be confirmed.
+    If the returned value is [Some pages]], the slot whose ID is given is
+    supposed to be confirmed and [pages] correspond to the pages of the slot.
+    Otherwise [None] is returned.
 
     The function relies on {!Store.Dal_slot_pages}'s invariants to guarantee that:
     - the pages are returned in increasing order w.r.t. their indexes in the slot;
@@ -54,9 +55,9 @@ type error += Dal_slot_not_found_in_store of Dal.Slot.Header.id
 *)
 val slot_pages :
   dal_endorsement_lag:int ->
-  Store.t ->
+  Node_context.t ->
   Dal.slot_id ->
-  Dal.Page.content list tzresult Lwt.t
+  Dal.Page.content list option tzresult Lwt.t
 
 (** Retrieve the content of the page identified by the given ID from the store.
 
@@ -70,6 +71,6 @@ val slot_pages :
 *)
 val page_content :
   dal_endorsement_lag:int ->
-  Store.t ->
+  Node_context.t ->
   Dal.Page.t ->
   Dal.Page.content option tzresult Lwt.t
