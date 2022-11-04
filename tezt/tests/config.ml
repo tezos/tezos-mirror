@@ -95,24 +95,44 @@ let test_config_update () =
   in
   return
   @@ Check.((metrics_addr = ":1234") string)
-       ~error_msg:
-         "config.rpc.listen-addrs[0] contains %L but should contain %R."
+       ~error_msg:"config.metrics-addrs[0] contains %L but should contain %R."
+
+let test_config_update_network () =
+  let* node, client =
+    Client.init_with_protocol ~protocol:Protocol.Alpha `Client ()
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Node.terminate node in
+  let* () =
+    Node.spawn_config_update node [Network "mainnet"]
+    |> Process.check_error ~exit_code:124
+  in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/context") in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/store") in
+  Node.config_update node [Network "mainnet"]
 
 let test_config_reset () =
   let node = Node.create [] in
+  let* config = config_reset node [Metrics_addr ":1234"] in
+  check_config_keys config ["data-dir"; "network"; "p2p"; "metrics_addr"] ;
+  check_p2p_config
+    config
+    ["bootstrap-peers"; "expected-proof-of-work"; "listen-addr"] ;
+  let network = JSON.(config |-> "network" |> as_string) in
+  return
+  @@ Check.((network = "sandbox") string)
+       ~error_msg:"config.network is %L but should be %R."
+
+let test_config_reset_consistency () =
+  let node = Node.create [] in
   let* initial_config = config_init node [] in
   let* reset_config = config_reset node [Metrics_addr ":1234"] in
-  (* Checks the consistency of the reset config *)
-  check_config_keys reset_config ["data-dir"; "network"; "p2p"; "metrics_addr"] ;
-  check_p2p_config
-    reset_config
-    ["bootstrap-peers"; "expected-proof-of-work"; "listen-addr"] ;
   (* Checks the new value *)
   let metrics_addr =
     JSON.(reset_config |-> "metrics_addr" |=> 0 |> as_string)
   in
   Check.((metrics_addr = ":1234") string)
-    ~error_msg:"config.rpc.listen-addrs[0] contains %L but should contain %R." ;
+    ~error_msg:"config.metrics-addrs[0] contains %L but should contain %R." ;
   (* Reset again and and check the equality with initial config *)
   let* final_config = config_reset node [] in
   return
@@ -120,10 +140,57 @@ let test_config_reset () =
        ~error_msg:
          "Configs after reset should be identical. Was %L before, and now %R."
 
+let test_config_reset_network () =
+  let node = Node.create [Network "mainnet"] in
+  let* () = Node.config_reset node [Network "sandbox"] in
+  let* () = Node.identity_generate node in
+  let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () =
+    Client.activate_protocol_and_wait
+      ~endpoint:(Node node)
+      ~protocol:Protocol.Alpha
+      ~node
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* () = Node.terminate node in
+  let* () =
+    Node.spawn_config_reset node [Network "mainnet"] |> Process.check_error
+  in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/context") in
+  let* _ = Lwt_unix.system ("rm -r " ^ Node.data_dir node ^ "/store") in
+  Node.config_reset node [Network "mainnet"]
+
 let register () =
-  Test.register ~__FILE__ ~title:"config init" ~tags:["config"; "init"]
-  @@ test_config_init ;
-  Test.register ~__FILE__ ~title:"config update" ~tags:["config"; "update"]
-  @@ test_config_update ;
-  Test.register ~__FILE__ ~title:"config reset" ~tags:["config"; "reset"]
-  @@ test_config_reset
+  Test.register
+    ~__FILE__
+    ~title:"config init"
+    ~tags:["config"; "init"]
+    test_config_init ;
+  Test.register
+    ~__FILE__
+    ~title:"config update"
+    ~tags:["config"; "update"]
+    test_config_update ;
+  Test.register
+    ~__FILE__
+    ~title:"config update network"
+    ~tags:["config"; "update"]
+    test_config_update_network ;
+  Test.register
+    ~__FILE__
+    ~title:"config reset"
+    ~tags:["config"; "reset"]
+    test_config_reset ;
+  Test.register
+    ~__FILE__
+    ~title:"config reset consistency"
+    ~tags:["config"; "reset"]
+    test_config_reset_consistency ;
+  Test.register
+    ~__FILE__
+    ~title:"config reset network"
+    ~tags:["config"; "reset"; "network"]
+    test_config_reset_network
