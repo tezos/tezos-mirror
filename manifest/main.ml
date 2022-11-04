@@ -389,7 +389,7 @@ let tezt_core_lib =
 
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
-let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
+let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
     ?opam_with_test ?synopsis l =
   tezt_without_tezt_lib_dependency
     ~opam
@@ -401,6 +401,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs
     ~exe_deps:[tezt_lib]
     ~js_deps:[tezt_js_lib]
     ?dep_globs
+    ?dep_files
     ?opam_with_test
     l
 
@@ -1185,7 +1186,7 @@ let octez_base_unix =
       ]
 
 let _octez_base_tests =
-  tests
+  tezt
     [
       "test_bounded"; "test_time"; "test_protocol"; "test_p2p_addr"; "test_sized";
     ]
@@ -1196,8 +1197,9 @@ let _octez_base_tests =
         octez_base |> open_;
         octez_error_monad |> open_;
         data_encoding;
-        qcheck_alcotest;
         octez_test_helpers |> open_;
+        qcheck_alcotest;
+        alcotezt;
       ]
     ~dep_files:
       [

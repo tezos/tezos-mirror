@@ -22,7 +22,8 @@
   src_lib_p2p_tezt_tezt_lib
   src_lib_lwt_result_stdlib_test_tezt_lib
   src_lib_error_monad_test_tezt_lib
-  src_lib_benchmark_test_tezt_lib)
+  src_lib_benchmark_test_tezt_lib
+  src_lib_base_test_tezt_lib)
  (flags
   (:standard)
   -open Tezt

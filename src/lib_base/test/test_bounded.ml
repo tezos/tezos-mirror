@@ -266,7 +266,7 @@ end = struct
     in
     let* ety = oneofl values in
     match ety with
-    | E (type a) (ty : a Bounded.Internal_for_tests.t) ->
+    | E ty ->
         let* (module S : S) = gen_from_ty ty in
         let* element = S.gen in
         return (E' {bounded = (module S); element})
