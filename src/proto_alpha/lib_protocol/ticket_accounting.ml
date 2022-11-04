@@ -64,7 +64,7 @@ module Ticket_token_map = struct
   let add ctxt = Ticket_token_map.merge ctxt ~merge_overlap
 
   let sub ctxt m1 m2 =
-    map
+    map_e
       ctxt
       (fun ctxt _ amount ->
         Gas.consume ctxt (Ticket_costs.negate_cost amount) >|? fun ctxt ->

@@ -259,7 +259,7 @@ let ticket_token_map_of_operations ctxt ops =
 (** Traverses a list of operations and scans for tickets. *)
 let ticket_diffs_of_operations ctxt operations =
   ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
-  Ticket_token_map.fold
+  Ticket_token_map.fold_e
     ctxt
     (fun ctxt acc ticket_token destination_map ->
       (* Calculate the total amount of outgoing units for the current
