@@ -3182,8 +3182,9 @@ let octez_benchmark_examples =
       ]
 
 let _octez_benchmark_tests =
-  tests
+  tezt
     [
+      "test";
       "test_sparse_vec";
       "test_costlang";
       "test_probe";
@@ -3195,7 +3196,7 @@ let _octez_benchmark_tests =
     ~synopsis:"Tezos: tests for lib-benchmarks"
     ~deps:
       [
-        alcotest_lwt;
+        alcotezt;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_stdlib_unix;
