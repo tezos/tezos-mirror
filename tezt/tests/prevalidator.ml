@@ -3354,7 +3354,7 @@ let force_operation_injection =
     ~tags:["force"; "mempool"]
   @@ fun protocol ->
   Log.info "%s" step1_msg ;
-  let node1 = Node.create [] in
+  let node1 = Node.create ~allow_all_rpc:false [] in
   let* () = Node.config_init node1 [] in
   let address =
     Node.rpc_host node1 ^ ":" ^ string_of_int (Node.rpc_port node1)

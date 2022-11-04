@@ -124,6 +124,7 @@ module Parameters = struct
     advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
+    allow_all_rpc : bool;
     default_expected_pow : int;
     mutable default_arguments : argument list;
     mutable arguments : argument list;
@@ -578,7 +579,7 @@ let wait_for_request ~request node =
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port arguments =
+    ?rpc_port ?(allow_all_rpc = true) arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -607,6 +608,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         advertised_net_port;
         rpc_host;
         rpc_port;
+        allow_all_rpc;
         default_arguments = arguments;
         arguments;
         default_expected_pow;
@@ -674,6 +676,13 @@ let runlike_command_arguments node command arguments =
     match node.persistent_state.advertised_net_port with
     | None -> command_args
     | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
+  in
+  let command_args =
+    if node.persistent_state.allow_all_rpc then
+      "--allow-all-rpc"
+      :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
+      :: command_args
+    else command_args
   in
   command :: "--data-dir" :: node.persistent_state.data_dir :: "--net-addr"
   :: (net_addr ^ string_of_int node.persistent_state.net_port)
