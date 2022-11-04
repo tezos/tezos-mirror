@@ -27,21 +27,6 @@ exception Rpc_dir_creation_failure of tztrace
 
 module Directory = Resto_directory.Make (RPC_encoding)
 
-module Events = struct
-  include Internal_event.Simple
-
-  let section = ["proxy_services"]
-
-  let clearing_data =
-    declare_2
-      ~section
-      ~name:"clearing_data"
-      ~msg:"clearing data for chain {chain} and block {block}"
-      ~level:Info
-      ("chain", Data_encoding.string)
-      ("block", Data_encoding.string)
-end
-
 let hash_of_block ?cache (rpc_context : #RPC_context.simple)
     (chain : Tezos_shell_services.Shell_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
@@ -111,63 +96,6 @@ module Env_cache =
     (Env_cache_key_hashed_type)
 
 module Env_cache_lwt = Ringo_lwt.Functors.Make_result (Env_cache)
-
-let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
-    (rpc_context : RPC_context.generic)
-    (proxy_env : Registration.proxy_environment) (mode : mode) envs_cache key
-    chain block =
-  let open Lwt_syntax in
-  match (mode, block) with
-  | Light_client _, _ | Proxy_client, _ ->
-      (* If octez-client executes: don't clear anything, because the
-         client is short-lived and should not observe chain
-         reorganization *)
-      Lwt.return_unit
-  | _, `Hash (_, n) when n >= 0 ->
-      (* If block is identified by a hash in its future, don't clear
-         anything as it doesn't deprecate.  Remember that contexts are
-         kept in an LRU cache though, so clearing will eventually
-         happen; but we don't schedule it. *)
-      Lwt.return_unit
-  | Proxy_server {sleep; sym_block_caching_time; _}, _ ->
-      let chain_string, block_string =
-        Tezos_shell_services.Block_services.
-          (chain_to_string chain, to_string block)
-      in
-      let* time_between_blocks =
-        match sym_block_caching_time with
-        | Some sym_block_caching_time ->
-            Lwt.return @@ Ptime.Span.to_float_s sym_block_caching_time
-        | None -> (
-            let (module Proxy_environment) = proxy_env in
-            let* ro =
-              Proxy_environment.time_between_blocks rpc_context chain block
-            in
-            match ro with
-            | Error _ | Ok None ->
-                (* While this looks like hardcoding an important value, it's not.
-                   This block is entered if and only if: 1/ the RPC retrieving
-                   the constants fail (see [Proxy_environment.time_between_blocks]
-                   implementation that relies on this RPC). Or 2/ the
-                   protocol doesn't specify the constant time_between_blocks,
-                   which ought to be impossible. *)
-                let* () =
-                  printer#warning
-                    "time_between_blocks for chain %s and block %s cannot be \
-                     determined. Using 60 seconds."
-                    chain_string
-                    block_string
-                in
-                Lwt.return 60.0
-            | Ok (Some x) -> Lwt.return (Int64.to_float x))
-      in
-      let schedule () : _ Lwt.t =
-        let* () = sleep time_between_blocks in
-        Env_cache_lwt.remove envs_cache key ;
-        Events.(emit clearing_data (chain_string, block_string))
-      in
-      Lwt.dont_wait schedule (fun exc -> ignore exc) ;
-      Lwt.return_unit
 
 let build_directory (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : RPC_context.generic) (mode : mode) force_protocol :
@@ -255,17 +183,6 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
       in
       let* initial_context =
         Proxy_environment.initial_context ctx block_header.context
-      in
-      let*! () =
-        schedule_clearing
-          printer
-          rpc_context
-          proxy_env
-          mode
-          envs_cache
-          key
-          chain
-          block
       in
       let mapped_directory =
         RPC_directory.map
