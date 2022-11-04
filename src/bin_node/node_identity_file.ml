@@ -184,7 +184,7 @@ let write file identity =
   if Sys.file_exists file then tzfail (Existent_identity_file file)
   else
     let* () =
-      Node_data_version.ensure_data_dir ~mode:Exists (Filename.dirname file)
+      Data_version.ensure_data_dir ~mode:Exists (Filename.dirname file)
     in
     Lwt_utils_unix.Json.write_file
       file

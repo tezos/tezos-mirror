@@ -117,7 +117,7 @@ type error += Invalid_node_configuration
 let () =
   register_error_kind
     `Permanent
-    ~id:"node_config_validation.invalid_node_configuration"
+    ~id:"config_validation.invalid_node_configuration"
     ~title:"Invalid node configuration"
     ~description:"The node configuration is invalid."
     ~pp:(fun ppf () ->
@@ -145,7 +145,7 @@ module Event = struct
   let disabled_event =
     declare_0
       ~section
-      ~name:"node_config_validation_disabled"
+      ~name:"config_validation_disabled"
       ~msg:"the node configuration validation is disabled."
       ~level:Notice
       ()
@@ -153,7 +153,7 @@ module Event = struct
   let success_event =
     declare_0
       ~section
-      ~name:"node_config_validation_success"
+      ~name:"config_validation_success"
       ~msg:"the node configuration has been successfully validated."
       ~level:Notice
       ()
@@ -161,7 +161,7 @@ module Event = struct
   let error_event =
     declare_0
       ~section
-      ~name:"node_config_validation_error"
+      ~name:"config_validation_error"
       ~msg:
         "found the following error(s) while validating the node configuration."
       ~level:Error
@@ -170,7 +170,7 @@ module Event = struct
   let warning_event =
     declare_0
       ~section
-      ~name:"node_config_validation_warning"
+      ~name:"config_validation_warning"
       ~msg:
         "found the following warning(s) while validating the node \
          configuration."
@@ -223,8 +223,7 @@ let invalid_pow =
          "p2p.expected-proof-of-work")
     ("proof-of-work", Data_encoding.float)
 
-let validate_expected_pow (config : Node_config_file.t) :
-    (t, 'error) result Lwt.t =
+let validate_expected_pow (config : Config_file.t) : (t, 'error) result Lwt.t =
   unless
     (0. <= config.p2p.expected_pow && config.p2p.expected_pow <= 256.)
     ~event:invalid_pow
@@ -264,7 +263,7 @@ let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   let open Lwt_result_syntax in
   let*! r = resolver addr in
   match r with
-  | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
+  | Error [Config_file.Failed_to_parse_address (addr, why)] ->
       return_some
         (mk_alert
            ~event:(Option.value e_parse ~default:cannot_parse_addr)
@@ -283,26 +282,26 @@ let validate_addr_opt ?e_resolve ?e_parse ~field ~addr resolver =
     (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
     addr
 
-let validate_rpc_listening_addrs (config : Node_config_file.t) =
+let validate_rpc_listening_addrs (config : Config_file.t) =
   let aux addr =
     validate_addr
       ~field:"rpc.listen-addrs"
       ~addr
-      Node_config_file.resolve_rpc_listening_addrs
+      Config_file.resolve_rpc_listening_addrs
   in
   List.filter_map_ep aux config.rpc.listen_addrs
 
-let validate_p2p_listening_addrs (config : Node_config_file.t) =
+let validate_p2p_listening_addrs (config : Config_file.t) =
   validate_addr_opt
     ~field:"p2p.listen-addr"
     ~addr:config.p2p.listen_addr
-    Node_config_file.resolve_listening_addrs
+    Config_file.resolve_listening_addrs
 
-let validate_p2p_discovery_addr (config : Node_config_file.t) =
+let validate_p2p_discovery_addr (config : Config_file.t) =
   validate_addr_opt
     ~field:"p2p.discovery-addr"
     ~addr:config.p2p.discovery_addr
-    Node_config_file.resolve_discovery_addrs
+    Config_file.resolve_discovery_addrs
 
 let validate_p2p_bootstrap_addrs ~field peers =
   let aux addr =
@@ -310,11 +309,11 @@ let validate_p2p_bootstrap_addrs ~field peers =
       ~e_resolve:cannot_resolve_bootstrap_peer_addr
       ~field
       ~addr
-      (fun x -> Node_config_file.resolve_bootstrap_addrs [x])
+      (fun x -> Config_file.resolve_bootstrap_addrs [x])
   in
   List.filter_map_ep aux peers
 
-let validate_p2p_bootstrap_peers (config : Node_config_file.t) =
+let validate_p2p_bootstrap_peers (config : Config_file.t) =
   match config.p2p.bootstrap_peers with
   | None ->
       validate_p2p_bootstrap_addrs
@@ -415,7 +414,7 @@ let target_number_of_known_points_lower_than_maximum_conn =
     ("target", Data_encoding.int16)
     ("maximum", Data_encoding.int16)
 
-let validate_connections (config : Node_config_file.t) =
+let validate_connections (config : Config_file.t) =
   let validated_connections =
     let limits = config.p2p.limits in
     when_
@@ -462,7 +461,7 @@ let testchain_is_deprecated =
     ~msg:"The option `p2p.enable_testchain` is deprecated."
     ()
 
-let warn_deprecated_fields (config : Node_config_file.t) =
+let warn_deprecated_fields (config : Config_file.t) =
   when_ config.p2p.enable_testchain ~event:testchain_is_deprecated ~payload:()
   |> Lwt_result.return
 
@@ -481,7 +480,7 @@ let validate_passes ?(ignore_testchain_warning = false) config =
 
 let check ?ignore_testchain_warning config =
   let open Lwt_result_syntax in
-  if config.Node_config_file.disable_config_validation then
+  if config.Config_file.disable_config_validation then
     let*! () = Event.(emit disabled_event ()) in
     return_unit
   else

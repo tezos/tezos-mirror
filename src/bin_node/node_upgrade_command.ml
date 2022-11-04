@@ -63,9 +63,7 @@ module Term = struct
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       match subcommand with
       | Storage -> (
-          let* config =
-            Node_config_file.read args.Node_shared_arg.config_file
-          in
+          let* config = Config_file.read args.Shared_arg.config_file in
           (* Use the command-line argument data-dir if present: the
              configuration data-dir may be inconsistent if the
              directory was moved. *)
@@ -77,10 +75,10 @@ module Term = struct
                   "Failed to lock the data directory '%s'. Is a `tezos-node` \
                    running?"
                   data_dir)
-              ~filename:(Node_data_version.lock_file data_dir)
+              ~filename:(Data_version.lock_file data_dir)
               (fun () ->
                 let genesis = config.blockchain_network.genesis in
-                if status then Node_data_version.upgrade_status data_dir
+                if status then Data_version.upgrade_status data_dir
                 else
                   let* sandbox_parameters =
                     match
@@ -98,7 +96,7 @@ module Term = struct
                               (Node_run_command.Invalid_sandbox_file filename)
                         | Ok json -> return_some ("sandbox_parameter", json))
                   in
-                  Node_data_version.upgrade_data_dir
+                  Data_version.upgrade_data_dir
                     ~data_dir
                     genesis
                     ~chain_name:config.blockchain_network.chain_name
@@ -135,7 +133,7 @@ module Term = struct
       value
       & opt (some non_dir_file) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"FILE.json"
           ["sandbox"])
@@ -143,7 +141,7 @@ module Term = struct
   let term =
     Cmdliner.Term.(
       ret
-        (const process $ subcommand_arg $ Node_shared_arg.Term.args $ status
+        (const process $ subcommand_arg $ Shared_arg.Term.args $ status
        $ sandbox))
 end
 
@@ -162,7 +160,7 @@ module Manpage = struct
   let man =
     description
     @ (* [ `S misc_docs ] @ *)
-    Node_shared_arg.Manpage.bugs
+    Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage node upgrades" ~man "upgrade"
 end

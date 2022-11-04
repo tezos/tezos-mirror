@@ -48,9 +48,9 @@ module Term = struct
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* node_config = Node_shared_arg.read_and_patch_config_file args in
+      let* node_config = Shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
-      let ({genesis; _} : Node_config_file.blockchain_network) =
+      let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
       let* sandbox_parameters =
@@ -69,10 +69,10 @@ module Term = struct
       in
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () -> tzfail Locked_directory)
-        ~filename:(Node_data_version.lock_file data_dir)
+        ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
-      let context_dir = Node_data_version.context_dir data_dir in
-      let store_dir = Node_data_version.store_dir data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
       in
@@ -107,7 +107,7 @@ module Term = struct
       value
       & opt (some non_dir_file) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"FILE.json"
           ["sandbox"])
@@ -125,16 +125,14 @@ module Term = struct
       value
       & opt (enum Animation.progress_display_mode_enum) Animation.Auto
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"<auto|always|never>"
           ["progress-display-mode"])
 
   let term =
     let open Cmdliner.Term in
-    ret
-      (const process $ Node_shared_arg.Term.args $ sandbox
-     $ progress_display_mode)
+    ret (const process $ Shared_arg.Term.args $ sandbox $ progress_display_mode)
 end
 
 module Manpage = struct
@@ -155,7 +153,7 @@ module Manpage = struct
           "./tezos-node reconstruct" );
     ]
 
-  let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
+  let man = description @ options @ examples @ Shared_arg.Manpage.bugs
 
   let info =
     Cmdliner.Cmd.info ~doc:"Manage storage reconstruction" ~man "reconstruct"

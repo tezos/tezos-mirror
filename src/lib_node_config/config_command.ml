@@ -26,7 +26,7 @@
 
 (** Commands *)
 
-let show (args : Node_shared_arg.t) =
+let show (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -35,13 +35,13 @@ let show (args : Node_shared_arg.t) =
         "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
          displaying the default configuration@]@]@."
         args.config_file ;
-    let* config = Node_shared_arg.read_and_patch_config_file args in
-    print_endline @@ Node_config_file.to_string config ;
+    let* config = Shared_arg.read_and_patch_config_file args in
+    print_endline @@ Config_file.to_string config ;
     return_unit
   in
-  Node_shared_arg.process_command run
+  Shared_arg.process_command run
 
-let reset (args : Node_shared_arg.t) =
+let reset (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -49,19 +49,19 @@ let reset (args : Node_shared_arg.t) =
       Format.eprintf
         "Ignoring previous configuration file: %s.@."
         args.config_file ;
-    let* current_config = Node_shared_arg.read_config_file args in
+    let* current_config = Shared_arg.read_config_file args in
     (* Here we set the network of the default config to the current network
        to prevent overriding it. *)
     let* default_config =
-      Node_shared_arg.patch_network current_config.blockchain_network
+      Shared_arg.patch_network current_config.blockchain_network
     in
-    let* config = Node_shared_arg.patch_config ~cfg:default_config args in
-    let* () = Node_config_validation.check config in
-    Node_config_file.write args.config_file config
+    let* config = Shared_arg.patch_config ~cfg:default_config args in
+    let* () = Config_validation.check config in
+    Config_file.write args.config_file config
   in
-  Node_shared_arg.process_command run
+  Shared_arg.process_command run
 
-let init (args : Node_shared_arg.t) =
+let init (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -71,12 +71,10 @@ let init (args : Node_shared_arg.t) =
         args.config_file
     else
       let* config =
-        Node_shared_arg.read_and_patch_config_file
-          ~may_override_network:true
-          args
+        Shared_arg.read_and_patch_config_file ~may_override_network:true args
       in
-      let* () = Node_config_validation.check config in
-      let* () = Node_config_file.write args.config_file config in
+      let* () = Config_validation.check config in
+      let* () = Config_file.write args.config_file config in
       let default = if args.network = None then " default" else "" in
       let alias =
         match config.blockchain_network.alias with
@@ -92,9 +90,9 @@ let init (args : Node_shared_arg.t) =
         alias ;
       return_unit
   in
-  Node_shared_arg.process_command run
+  Shared_arg.process_command run
 
-let update (args : Node_shared_arg.t) =
+let update (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -105,13 +103,13 @@ let update (args : Node_shared_arg.t) =
         args.config_file
         Sys.argv.(0)
     else
-      let* config = Node_shared_arg.read_and_patch_config_file args in
-      let* () = Node_config_validation.check config in
-      Node_config_file.write args.config_file config
+      let* config = Shared_arg.read_and_patch_config_file args in
+      let* () = Config_validation.check config in
+      Config_file.write args.config_file config
   in
-  Node_shared_arg.process_command run
+  Shared_arg.process_command run
 
-let validate (args : Node_shared_arg.t) =
+let validate (args : Shared_arg.t) =
   let run =
     let open Lwt_result_syntax in
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -120,16 +118,16 @@ let validate (args : Node_shared_arg.t) =
         "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
          validating the default configuration@]@]@."
         args.config_file ;
-    let* config = Node_shared_arg.read_and_patch_config_file args in
-    let*! r = Node_config_validation.check config in
+    let* config = Shared_arg.read_and_patch_config_file args in
+    let*! r = Config_validation.check config in
     match r with
     (* Here we do not consider the node configuration file
        being invalid as a failure. *)
-    | Error (Node_config_validation.Invalid_node_configuration :: _) | Ok () ->
+    | Error (Config_validation.Invalid_node_configuration :: _) | Ok () ->
         return_unit
     | err -> Lwt.return err
   in
-  Node_shared_arg.process_command run
+  Shared_arg.process_command run
 
 (** Main *)
 module Term = struct
@@ -145,7 +143,7 @@ module Term = struct
               configuration will be amended accordingly. This is the default \
               operation"
            "show")
-        Term.(ret (const show $ Node_shared_arg.Term.args));
+        Term.(ret (const show $ Shared_arg.Term.args));
       Cmd.v
         (Cmd.info
            ~doc:
@@ -154,14 +152,14 @@ module Term = struct
               they will amend the generated file. It assumes that a \
               configuration file already exists and will abort otherwise"
            "reset")
-        Term.(ret (const reset $ Node_shared_arg.Term.args));
+        Term.(ret (const reset $ Shared_arg.Term.args));
       Cmd.v
         (Cmd.info
            ~doc:
              "is like reset but assumes that no configuration file is present \
               and will abort otherwise"
            "init")
-        Term.(ret (const init $ Node_shared_arg.Term.args));
+        Term.(ret (const init $ Shared_arg.Term.args));
       Cmd.v
         (Cmd.info
            ~doc:
@@ -169,14 +167,14 @@ module Term = struct
               will parse command line arguments and add or replace \
               corresponding entries in the Tezos configuration file"
            "update")
-        Term.(ret (const update $ Node_shared_arg.Term.args));
+        Term.(ret (const update $ Shared_arg.Term.args));
       Cmd.v
         (Cmd.info
            ~doc:
              "verifies that the configuration file parses correctly and \
               performs some sanity checks on its values"
            "validate")
-        Term.(ret (const validate $ Node_shared_arg.Term.args));
+        Term.(ret (const validate $ Shared_arg.Term.args));
     ]
 end
 
@@ -188,13 +186,12 @@ module Manpage = struct
      command ones."
 
   let options =
-    let schema = Data_encoding.Json.schema Node_config_file.encoding in
+    let schema = Data_encoding.Json.schema Config_file.encoding in
     let schema = Format.asprintf "@[%a@]" Json_schema.pp schema in
     let schema = String.concat "\\$" (String.split_no_empty '$' schema) in
     [`S "OPTIONS"; `P "All options available in the config file"; `Pre schema]
 
-  let man =
-    Node_shared_arg.Manpage.args @ options @ Node_shared_arg.Manpage.bugs
+  let man = Shared_arg.Manpage.args @ options @ Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage node configuration" ~man "config"
 end

@@ -30,7 +30,7 @@ module S = struct
         "Return the runtime node configuration (this takes into account the \
          command-line arguments and the on-disk configuration file)"
       ~query:Tezos_rpc.Query.empty
-      ~output:Node_config_file.encoding
+      ~output:Config_file.encoding
       Tezos_rpc.Path.(root / "config")
 end
 

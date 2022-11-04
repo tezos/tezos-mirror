@@ -110,7 +110,7 @@ val default_config : t
 (** Update the given configuration. This is mostly used to apply the CLI
     arguments to the default config when starting or configuring the node.
     Arguments to this function roughly reflect the options in
-    [Node_shared_arg.t]. *)
+    [Shared_arg.t]. *)
 val update :
   ?disable_config_validation:bool ->
   ?data_dir:string ->

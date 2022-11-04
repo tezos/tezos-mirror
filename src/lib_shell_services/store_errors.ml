@@ -93,7 +93,7 @@ let () =
     (fun block_hash -> Block_metadata_not_found block_hash) ;
   register_error_kind
     `Permanent
-    ~id:"node_config_file.cannot_switch_history_mode"
+    ~id:"config_file.cannot_switch_history_mode"
     ~title:"Cannot switch history mode"
     ~description:"Cannot switch history mode."
     ~pp:(fun ppf (prev, next) ->

@@ -41,7 +41,7 @@ let () =
 
 module Term = struct
   open Cmdliner
-  open Node_shared_arg.Term
+  open Shared_arg.Term
 
   let ( let+ ) t f = Term.(const f $ t)
 
@@ -51,9 +51,9 @@ module Term = struct
     let open Lwt_result_syntax in
     let+ config =
       Option.filter Sys.file_exists config_file
-      |> Option.map_es Node_config_file.read
+      |> Option.map_es Config_file.read
     in
-    Option.value ~default:Node_config_file.default_config config
+    Option.value ~default:Config_file.default_config config
 
   let ensure_context_dir context_dir =
     let open Lwt_result_syntax in
@@ -62,20 +62,19 @@ module Term = struct
         let*! b = Lwt_unix.file_exists context_dir in
         if not b then
           tzfail
-            (Node_data_version.Invalid_data_dir
-               {data_dir = context_dir; msg = None})
+            (Data_version.Invalid_data_dir {data_dir = context_dir; msg = None})
         else
           let pack = context_dir // "store.0.suffix" in
           let*! b = Lwt_unix.file_exists pack in
           if not b then
             tzfail
-              (Node_data_version.Invalid_data_dir
+              (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
           else return_unit)
       (function
         | Unix.Unix_error _ ->
             tzfail
-              (Node_data_version.Invalid_data_dir
+              (Data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
         | exc -> raise exc)
 
@@ -83,26 +82,26 @@ module Term = struct
     let open Lwt_result_syntax in
     let* cfg = read_config_file config_file in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let context_dir = Node_data_version.context_dir data_dir in
+    let context_dir = Data_version.context_dir data_dir in
     let* () = ensure_context_dir context_dir in
     return context_dir
 
   let integrity_check config_file data_dir auto_repair =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let*! () = Context.Checks.Pack.Integrity_check.run ~root ~auto_repair in
       return_unit)
 
   let stat_index config_file data_dir =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       Context.Checks.Index.Stat.run ~root ;
       return_unit)
 
   let stat_pack config_file data_dir =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let*! () = Context.Checks.Pack.Stat.run ~root in
@@ -115,7 +114,7 @@ module Term = struct
     if not b then return_unit else tzfail (Existing_index_dir index_dir)
 
   let reconstruct_index config_file data_dir output index_log_size =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let* () = index_dir_exists root output in
@@ -130,12 +129,12 @@ module Term = struct
   let current_head config_file data_dir block =
     let open Lwt_result_syntax in
     let* cfg = read_config_file config_file in
-    let ({genesis; _} : Node_config_file.blockchain_network) =
+    let ({genesis; _} : Config_file.blockchain_network) =
       cfg.blockchain_network
     in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
-    let store_dir = Node_data_version.store_dir data_dir in
-    let context_dir = Node_data_version.context_dir data_dir in
+    let store_dir = Data_version.store_dir data_dir in
+    let context_dir = Data_version.context_dir data_dir in
     let* store =
       Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
     in
@@ -155,7 +154,7 @@ module Term = struct
     return (Tezos_crypto.Context_hash.to_b58check context_hash)
 
   let integrity_check_inodes config_file data_dir block =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       let* head = current_head config_file data_dir block in
@@ -167,14 +166,14 @@ module Term = struct
       return_unit)
 
   let check_index config_file data_dir auto_repair =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* root = root config_file data_dir in
       Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
       return_unit)
 
   let find_head config_file data_dir head =
-    Node_shared_arg.process_command
+    Shared_arg.process_command
       (let open Lwt_result_syntax in
       let* head = current_head config_file data_dir head in
       (* This output isn't particularly useful for most users,
@@ -313,7 +312,7 @@ module Manpage = struct
          versions.";
     ]
 
-  let man = commands @ Node_shared_arg.Manpage.bugs
+  let man = commands @ Shared_arg.Manpage.bugs
 
   let info =
     Cmdliner.Cmd.info

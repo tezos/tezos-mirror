@@ -28,7 +28,7 @@ open Cmdliner
 open Filename.Infix
 
 type net_config =
-  | BuiltIn of Node_config_file.blockchain_network
+  | BuiltIn of Config_file.blockchain_network
   | Url of Uri.t
   | Filename of string
 
@@ -55,7 +55,7 @@ type t = {
   enable_testchain : bool;
   cors_origins : string list;
   cors_headers : string list;
-  rpc_tls : Node_config_file.tls option;
+  rpc_tls : Config_file.tls option;
   log_output : Lwt_log_sink_unix.Output.t option;
   bootstrap_threshold : int option;
   history_mode : History_mode.t option;
@@ -111,9 +111,7 @@ let () =
 let decode_net_config source json =
   let open Result_syntax in
   match
-    Data_encoding.Json.destruct
-      Node_config_file.blockchain_network_encoding
-      json
+    Data_encoding.Json.destruct Config_file.blockchain_network_encoding json
   with
   | net_cfg -> return net_cfg
   | exception Json_encoding.Cannot_destruct (path, exn) ->
@@ -158,15 +156,15 @@ let wrap data_dir config_file network connections max_download_speed
     disable_config_validation allow_all_rpc media_type metrics_addr
     operation_metadata_size_limit =
   let actual_data_dir =
-    Option.value ~default:Node_config_file.default_data_dir data_dir
+    Option.value ~default:Config_file.default_data_dir data_dir
   in
   let config_file =
     Option.value
-      ~default:(actual_data_dir // Node_data_version.default_config_file_name)
+      ~default:(actual_data_dir // Data_version.default_config_file_name)
       config_file
   in
   let rpc_tls =
-    Option.map (fun (cert, key) -> {Node_config_file.cert; key}) rpc_tls
+    Option.map (fun (cert, key) -> {Config_file.cert; key}) rpc_tls
   in
   {
     disable_config_validation;
@@ -260,8 +258,8 @@ module Term = struct
       pp )
 
   let network_printer ppf = function
-    | BuiltIn ({alias; _} : Node_config_file.blockchain_network) ->
-        (* Should not fail by construction of Node_config_file.block_chain_network *)
+    | BuiltIn ({alias; _} : Config_file.blockchain_network) ->
+        (* Should not fail by construction of Config_file.block_chain_network *)
         let alias = WithExceptions.Option.get ~loc:__LOC__ alias in
         Format.fprintf ppf "built-in network: %s" alias
     | Url url -> Format.fprintf ppf "URL network: %s" (Uri.to_string url)
@@ -272,7 +270,7 @@ module Term = struct
       List.assoc_opt
         ~equal:String.equal
         (String.lowercase_ascii s)
-        Node_config_file.builtin_blockchain_networks
+        Config_file.builtin_blockchain_networks
       |> Option.map (fun net -> Result.ok (BuiltIn net))
     in
     let parse_network_url s =
@@ -295,7 +293,7 @@ module Term = struct
              (Format.pp_print_list
                 ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
                 Format.pp_print_string)
-             (List.map fst Node_config_file.builtin_blockchain_networks)))
+             (List.map fst Config_file.builtin_blockchain_networks)))
     in
     let parser s =
       let ( <||> ) = Option.either_f
@@ -352,7 +350,7 @@ module Term = struct
       "The directory where the Tezos node will store all its data. Parent \
        directories are created if necessary."
     in
-    let env = Cmd.Env.info ~doc Node_config_file.data_dir_env_name in
+    let env = Cmd.Env.info ~doc Config_file.data_dir_env_name in
     Arg.(
       value
       & opt (some string) None
@@ -371,7 +369,7 @@ module Term = struct
       "Select which network to run. Possible values are: "
       ^ String.concat
           ", "
-          (List.map fst Node_config_file.builtin_blockchain_networks)
+          (List.map fst Config_file.builtin_blockchain_networks)
       ^ ". Default is mainnet. You can also specify custom networks by passing \
          a path to a file containing the custom network configuration, or by \
          passing a URL from which such a file can be downloaded. If you have a \
@@ -679,9 +677,8 @@ end
 
 let read_config_file args =
   let open Lwt_result_syntax in
-  if Sys.file_exists args.config_file then
-    Node_config_file.read args.config_file
-  else return Node_config_file.default_config
+  if Sys.file_exists args.config_file then Config_file.read args.config_file
+  else return Config_file.default_config
 
 let read_data_dir args =
   let open Lwt_result_syntax in
@@ -766,13 +763,12 @@ module Event = struct
       ()
 end
 
-let patch_network ?(cfg = Node_config_file.default_config) blockchain_network =
+let patch_network ?(cfg = Config_file.default_config) blockchain_network =
   let open Lwt_result_syntax in
   return {cfg with blockchain_network}
 
 let patch_config ?(may_override_network = false) ?(emit = Event.emit)
-    ?(ignore_bootstrap_peers = false) ?(cfg = Node_config_file.default_config)
-    args =
+    ?(ignore_bootstrap_peers = false) ?(cfg = Config_file.default_config) args =
   let open Lwt_result_syntax in
   let {
     data_dir;
@@ -842,11 +838,11 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
              the data directory was never used to run an node.
              Thus, the network configuration can be reset. *)
           let*! context_dir =
-            Lwt_unix.file_exists @@ Node_data_version.context_dir
+            Lwt_unix.file_exists @@ Data_version.context_dir
             @@ Option.value ~default:cfg.data_dir args.data_dir
           in
           let*! store_dir =
-            Lwt_unix.file_exists @@ Node_data_version.store_dir
+            Lwt_unix.file_exists @@ Data_version.store_dir
             @@ Option.value ~default:cfg.data_dir args.data_dir
           in
           if context_dir || store_dir then
@@ -860,7 +856,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
           else patch_network ~cfg network_arg
   in
   (* Update bootstrap peers must take into account the updated config file
-     with the [--network] argument, so we cannot use [Node_config_file]. *)
+     with the [--network] argument, so we cannot use [Config_file]. *)
   let* bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers then
       let*! () = emit Event.disabled_bootstrap_peers () in
@@ -929,7 +925,7 @@ let patch_config ?(may_override_network = false) ?(emit = Event.emit)
     if enable_testchain then emit Event.testchain_is_deprecated ()
     else Lwt.return_unit
   in
-  Node_config_file.update
+  Config_file.update
     ~disable_config_validation
     ?data_dir
     ?min_connections

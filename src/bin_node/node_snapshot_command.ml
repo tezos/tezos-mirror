@@ -134,19 +134,19 @@ module Term = struct
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* data_dir = Node_shared_arg.read_data_dir args in
+      let* data_dir = Shared_arg.read_data_dir args in
       let* () =
         fail_unless
           (Sys.file_exists data_dir)
           (Data_dir_not_found {path = data_dir})
       in
-      let* node_config = Node_shared_arg.read_and_patch_config_file args in
-      let ({genesis; chain_name; _} : Node_config_file.blockchain_network) =
+      let* node_config = Shared_arg.read_and_patch_config_file args in
+      let ({genesis; chain_name; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      let* () = Node_data_version.ensure_data_dir data_dir in
-      let context_dir = Node_data_version.context_dir data_dir in
-      let store_dir = Node_data_version.store_dir data_dir in
+      let* () = Data_version.ensure_data_dir data_dir in
+      let context_dir = Data_version.context_dir data_dir in
+      let store_dir = Data_version.store_dir data_dir in
       let* block =
         match block with
         | None ->
@@ -169,25 +169,25 @@ module Term = struct
         ~progress_display_mode
         genesis
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
   let import args snapshot_path block disable_check reconstruct in_memory_index
       sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
-      let* config_file = Node_shared_arg.read_config_file args in
+      let* config_file = Shared_arg.read_config_file args in
       let* data_dir =
         (* The --data-dir argument overrides the potentially given
            configuration file. *)
-        match args.Node_shared_arg.data_dir with
+        match args.Shared_arg.data_dir with
         | Some data_dir ->
             let*! () =
               if
                 not
                   (String.equal
                      config_file.data_dir
-                     Node_config_file.default_data_dir)
+                     Config_file.default_data_dir)
               then Event.(emit overriding_config_file_arg) data_dir
               else Lwt.return_unit
             in
@@ -195,8 +195,8 @@ module Term = struct
         | None -> return config_file.data_dir
       in
       let*! existing_data_dir = Lwt_unix.file_exists data_dir in
-      let* node_config = Node_shared_arg.read_and_patch_config_file args in
-      let ({genesis; _} : Node_config_file.blockchain_network) =
+      let* node_config = Shared_arg.read_and_patch_config_file args in
+      let ({genesis; _} : Config_file.blockchain_network) =
         node_config.blockchain_network
       in
       let* snapshot_path = check_snapshot_path snapshot_path in
@@ -207,21 +207,21 @@ module Term = struct
             (* Remove only context and store if the import directory
                    was previously existing. *)
             let*! () =
-              Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
+              Lwt_utils_unix.remove_dir (Data_version.store_dir data_dir)
             in
-            Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
+            Lwt_utils_unix.remove_dir (Data_version.context_dir data_dir)
           else Lwt_utils_unix.remove_dir data_dir
         in
-        let lock_file = Node_data_version.lock_file data_dir in
+        let lock_file = Data_version.lock_file data_dir in
         let*! lock_file_exists = Lwt_unix.file_exists lock_file in
         if lock_file_exists then Lwt_unix.unlink lock_file else Lwt.return_unit
       in
-      let* () = Node_data_version.ensure_data_dir ~mode:Is_bare data_dir in
+      let* () = Data_version.ensure_data_dir ~mode:Is_bare data_dir in
       (* Lock only on snapshot import *)
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () ->
           failwith "Data directory is locked by another process")
-        ~filename:(Node_data_version.lock_file data_dir)
+        ~filename:(Data_version.lock_file data_dir)
       @@ fun () ->
       let* sandbox_parameters =
         match
@@ -237,8 +237,8 @@ module Term = struct
                 tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
-      let context_root = Node_data_version.context_dir data_dir in
-      let store_root = Node_data_version.store_dir data_dir in
+      let context_root = Data_version.context_dir data_dir in
+      let store_root = Data_version.store_dir data_dir in
       let patch_context =
         Patch_context.patch_context genesis sandbox_parameters
       in
@@ -294,7 +294,7 @@ module Term = struct
           ~progress_display_mode
       else return_unit
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
   let get_info snapshot_path =
     let run =
@@ -308,7 +308,7 @@ module Term = struct
         snapshot_header ;
       return_unit
     in
-    Node_shared_arg.process_command run
+    Shared_arg.process_command run
 
   let file_arg =
     let open Cmdliner.Arg in
@@ -410,7 +410,7 @@ module Term = struct
       value
       & opt (some non_dir_file) None
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"FILE.json"
           ["sandbox"])
@@ -428,7 +428,7 @@ module Term = struct
       value
       & opt (enum Animation.progress_display_mode_enum) Animation.Auto
       & info
-          ~docs:Node_shared_arg.Manpage.misc_section
+          ~docs:Shared_arg.Manpage.misc_section
           ~doc
           ~docv:"<auto|always|never>"
           ["progress-display-mode"])
@@ -443,14 +443,14 @@ module Term = struct
            "export")
         Term.(
           ret
-            (const export $ Node_shared_arg.Term.args $ file_arg $ block
+            (const export $ Shared_arg.Term.args $ file_arg $ block
            $ export_format $ export_rolling $ on_disk_index
            $ progress_display_mode));
       Cmd.v
         (Cmd.info ~doc:"allows to import a snapshot from a given file" "import")
         Term.(
           ret
-            (const import $ Node_shared_arg.Term.args $ file_arg $ block
+            (const import $ Shared_arg.Term.args $ file_arg $ block
            $ disable_check $ reconstruct $ in_memory_index $ sandbox
            $ progress_display_mode));
       Cmd.v
@@ -495,7 +495,7 @@ module Manpage = struct
           "$(mname) snapshot import file.full --in-memory)" );
     ]
 
-  let man = examples @ Node_shared_arg.Manpage.bugs
+  let man = examples @ Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage snapshots" ~man "snapshot"
 end
