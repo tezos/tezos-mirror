@@ -135,6 +135,18 @@ let slots_info node_ctxt (Layer1.{hash; _} as head) =
       in
       return @@ Some {published_block_hash; confirmed_slots_indexes}
 
+let is_slot_confirmed node_ctxt (Layer1.{hash; _} as head) slot_index =
+  let open Lwt_result_syntax in
+  let* slots_info_opt = slots_info node_ctxt head in
+  match slots_info_opt with
+  | None -> tzfail @@ Cannot_read_block_metadata hash
+  | Some {confirmed_slots_indexes; _} ->
+      let*? is_confirmed =
+        Environment.wrap_tzresult
+        @@ Bitset.mem confirmed_slots_indexes (Dal.Slot_index.to_int slot_index)
+      in
+      return is_confirmed
+
 (* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/3884
    avoid going back and forth between bitsets and lists of slot indexes. *)
 let to_slot_index_list (constants : Constants.Parametric.t) bitset =
@@ -148,7 +160,12 @@ let to_slot_index_list (constants : Constants.Parametric.t) bitset =
   *)
   List.filter_map Dal.Slot_index.of_int filtered
 
-let save_unconfirmed_slot store current_block_hash slot_index =
+(* DAL/FIXME: https://gitlab.com/tezos/tezos/-/issues/4139.
+   Use a shared storage between dal and rollup node to store slots data.
+*)
+
+let save_unconfirmed_slot {Node_context.store; _} current_block_hash slot_index
+    =
   (* No page is actually saved *)
   Store.Dal_processed_slots.add
     store
@@ -156,7 +173,8 @@ let save_unconfirmed_slot store current_block_hash slot_index =
     ~secondary_key:slot_index
     `Unconfirmed
 
-let save_confirmed_slot store current_block_hash slot_index pages =
+let save_confirmed_slot {Node_context.store; _} current_block_hash slot_index
+    pages =
   (* Adding multiple entries with the same primary key amounts to updating the
      contents of an in-memory map, hence pages must be added sequentially. *)
   let open Lwt_syntax in
@@ -177,8 +195,8 @@ let save_confirmed_slot store current_block_hash slot_index pages =
     `Confirmed
 
 let download_and_save_slots
-    {Node_context.store; dal_cctxt; protocol_constants; _} ~current_block_hash
-    {published_block_hash; confirmed_slots_indexes} =
+    ({Node_context.store; dal_cctxt; protocol_constants; _} as node_context)
+    ~current_block_hash {published_block_hash; confirmed_slots_indexes} =
   let open Lwt_result_syntax in
   let*? all_slots =
     Bitset.fill ~length:protocol_constants.parametric.dal.number_of_slots
@@ -189,7 +207,7 @@ let download_and_save_slots
     @@ to_slot_index_list protocol_constants.parametric
     @@ Bitset.diff all_slots confirmed_slots_indexes
   in
-  let*? confirmed =
+  let*? _confirmed =
     Environment.wrap_tzresult
     @@ to_slot_index_list protocol_constants.parametric confirmed_slots_indexes
   in
@@ -202,11 +220,12 @@ let download_and_save_slots
      be parallelized. *)
   let*! () =
     List.iter_p
-      (fun s_slot -> save_unconfirmed_slot store current_block_hash s_slot)
+      (fun s_slot ->
+        save_unconfirmed_slot node_context current_block_hash s_slot)
       not_confirmed
   in
   let* () =
-    confirmed
+    [] (* Preparing for the pre-fetching logic. *)
     |> List.iter_ep (fun s_slot ->
            (* slot_header is missing but the slot with index s_slot has been
                 confirmed. This scenario should not be possible. *)
@@ -230,7 +249,7 @@ let download_and_save_slots
                 in the store. *)
              let* pages = Dal_node_client.get_slot_pages dal_cctxt commitment in
              let*! () =
-               save_confirmed_slot store current_block_hash s_slot pages
+               save_confirmed_slot node_context current_block_hash s_slot pages
              in
              let*! () =
                Dal_slots_tracker_event.slot_has_been_confirmed

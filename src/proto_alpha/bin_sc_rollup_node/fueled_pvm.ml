@@ -201,8 +201,9 @@ module Make
     return (state, tick)
 
   let eval_block_inbox ~metadata ~dal_endorsement_lag ~fuel
-      Node_context.{data_dir; store; loser_mode; _} hash (state : state) :
-      (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t =
+      (Node_context.{data_dir; store; loser_mode; _} as node_context) hash
+      (state : state) : (state * Z.t * Raw_level.t * fuel, tztrace) result Lwt.t
+      =
     let open Lwt_result_syntax in
     (* Obtain inbox and its messages for this block. *)
     let*! inbox = Store.Inboxes.find store hash in
@@ -242,7 +243,7 @@ module Make
               ~metadata
               ~dal_endorsement_lag
               data_dir
-              store
+              node_context
               level
               message_counter
               ~fuel

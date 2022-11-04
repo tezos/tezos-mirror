@@ -119,7 +119,7 @@ module Make (Interpreter : Interpreter.S) :
       be unconfirmed on L1, this function returns [None]. If the data of the
       slot are not saved to the store, the function returns a failure
       in the error monad. *)
-  let page_info_from_pvm_state store ~dal_endorsement_lag
+  let page_info_from_pvm_state node_ctxt ~dal_endorsement_lag
       (dal_params : Dal.parameters) start_state =
     let open Lwt_result_syntax in
     let*! input_request = PVM.is_input_state start_state in
@@ -127,30 +127,30 @@ module Make (Interpreter : Interpreter.S) :
     | Sc_rollup.(Needs_reveal (Request_dal_page page_id)) -> (
         let Dal.Page.{slot_id; page_index} = page_id in
         let* pages =
-          Dal_pages_request.slot_pages ~dal_endorsement_lag store slot_id
+          Dal_pages_request.slot_pages ~dal_endorsement_lag node_ctxt slot_id
         in
-        if List.is_empty pages then (* The slot is not confirmed *)
-          return_none
-        else
-          let pages_per_slot = dal_params.slot_size / dal_params.page_size in
-          (* check invariant that pages' length is correct. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4031
-             It's better to do the check when the slots are saved into disk. *)
-          (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
-             This check is not resilient to dal parameters change. *)
-          match List.nth_opt pages page_index with
-          | Some content ->
-              let* page_proof =
-                page_membership_proof dal_params page_index
-                @@ Bytes.concat Bytes.empty pages
-              in
-              return_some (content, page_proof)
-          | None ->
-              failwith
-                "Page index %d too big or negative.\n\
-                 Number of pages in a slot is %d."
-                page_index
-                pages_per_slot)
+        match pages with
+        | None -> return_none (* The slot is not confirmed. *)
+        | Some pages -> (
+            let pages_per_slot = dal_params.slot_size / dal_params.page_size in
+            (* check invariant that pages' length is correct. *)
+            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/4031
+               It's better to do the check when the slots are saved into disk. *)
+            (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3997
+               This check is not resilient to dal parameters change. *)
+            match List.nth_opt pages page_index with
+            | Some content ->
+                let* page_proof =
+                  page_membership_proof dal_params page_index
+                  @@ Bytes.concat Bytes.empty pages
+                in
+                return_some (content, page_proof)
+            | None ->
+                failwith
+                  "Page index %d too big or negative.\n\
+                   Number of pages in a slot is %d."
+                  page_index
+                  pages_per_slot))
     | _ -> return_none
 
   let generate_proof node_ctxt game start_state =
@@ -204,7 +204,7 @@ module Make (Interpreter : Interpreter.S) :
     let* page_info =
       page_info_from_pvm_state
         ~dal_endorsement_lag
-        node_ctxt.store
+        node_ctxt
         dal_parameters
         start_state
     in

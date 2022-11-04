@@ -22,6 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol
+open Alpha_context
 
 (** The rollup node keeps the list of dal slots for each block it needs to
     process.  This is to determine whether the inbox for a given block will need
@@ -32,6 +34,27 @@
     The state of slots per block is persistent.  *)
 
 type error += Cannot_read_block_metadata of Block_hash.t
+
+(** [is_slot_confirmed node_ctxt head slot_index] checks whether the slot
+    with index [slot_index] has been confirmed in [head]. *)
+val is_slot_confirmed :
+  Node_context.t -> Layer1.head -> Dal.Slot_index.t -> bool tzresult Lwt.t
+
+(** [save_unconfirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
+    that [slot_index] is unconfirmed in the block with hash in [node_ctxt.store].
+*)
+val save_unconfirmed_slot :
+  Node_context.t -> Block_hash.t -> Dal.Slot_index.t -> unit Lwt.t
+
+(** [save_confirmed_slot node_ctxt hash slot_index] saves in [node_ctxt.store]
+    that [slot_index] is confirmed in the block with hashin [node_ctxt.store].
+    The contents of the slot are set to [pages] in [node_ctxt.store]. *)
+val save_confirmed_slot :
+  Node_context.t ->
+  Block_hash.t ->
+  Dal.Slot_index.t ->
+  Dal.Page.content list ->
+  unit Lwt.t
 
 (** [process_head node_ctxt head] performs the following operations:
     {ul
