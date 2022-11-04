@@ -85,7 +85,7 @@ val log_events : t -> unit
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Add a callback to be called whenever the node emits an event.
 

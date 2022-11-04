@@ -86,7 +86,7 @@ module Make (X : PARAMETERS) = struct
       }
         -> event_handler
 
-  type event = {name : string; value : JSON.t}
+  type event = {name : string; value : JSON.t; timestamp : float}
 
   type t = {
     name : string;
@@ -172,6 +172,7 @@ module Make (X : PARAMETERS) = struct
 
       {[{
         "fd-sink-item.v0": {
+          "time_stamp":<timestamp>
           [...]
           "event": { <name>:<value> }
         }
@@ -183,9 +184,12 @@ module Make (X : PARAMETERS) = struct
       None. *)
   let get_event_from_full_event json =
     let event = JSON.(json |-> "fd-sink-item.v0" |-> "event") in
+    let timestamp =
+      JSON.(json |-> "fd-sink-item.v0" |-> "time_stamp" |> as_float)
+    in
     match JSON.as_object_opt event with
     | None | Some ([] | _ :: _ :: _) -> None
-    | Some [(name, value)] -> Some {name; value}
+    | Some [(name, value)] -> Some {name; value; timestamp}
 
   let read_json_event daemon even_input =
     let max_event_size = 1024 * 1024 (* 1MB *) in

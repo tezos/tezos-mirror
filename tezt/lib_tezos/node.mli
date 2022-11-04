@@ -428,7 +428,7 @@ val wait_for_full :
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit

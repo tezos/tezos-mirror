@@ -25,7 +25,7 @@
 
 type t
 
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 val create :
   protocol:Protocol.t ->

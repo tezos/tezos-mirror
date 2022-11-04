@@ -179,7 +179,7 @@ let wait_for_ready dal_node =
         resolver :: dal_node.persistent_state.pending_ready ;
       check_event dal_node "dal_node_is_ready.v0" promise
 
-let handle_event dal_node {name; value = _} =
+let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_node_is_ready.v0" -> set_ready dal_node | _ -> ()
 
 let create ?(path = Constant.dal_node) ?name ?color ?data_dir ?event_pipe

@@ -76,7 +76,7 @@ val init :
   t Lwt.t
 
 (** Raw events. *)
-type event = {name : string; value : JSON.t}
+type event = {name : string; value : JSON.t; timestamp : float}
 
 (** Add a callback to be called whenever the proxy_server emits an event.
 

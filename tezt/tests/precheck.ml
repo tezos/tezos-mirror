@@ -34,7 +34,7 @@ open Lwt.Infix
 
 type state = Prechecked | Validated
 
-let on_validation_event state node Node.{name; value} =
+let on_validation_event state node Node.{name; value; timestamp = _} =
   match name with
   | "prechecked_block.v0" -> (
       let hash = JSON.(value |> as_string) in

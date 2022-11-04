@@ -241,7 +241,7 @@ let wait_for_level ?timeout sc_node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
-let handle_event sc_node {name; value} =
+let handle_event sc_node {name; value; timestamp = _} =
   match name with
   | "sc_rollup_node_is_ready.v0" -> set_ready sc_node
   | "sc_rollup_node_layer_1_new_head_processed.v0" ->
