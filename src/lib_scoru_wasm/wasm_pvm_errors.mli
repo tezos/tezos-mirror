@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,6 +53,14 @@ type interpreter_error = {
   explanation : explanation option;
 }
 
+type fallback_cause =
+  | Decode_cause of interpreter_error
+      (** Wraps exceptions raised during parsing. *)
+  | Link_cause of explanation
+      (** Errors or possible raw exceptions raised during linking. *)
+  | Init_cause of interpreter_error
+      (** Wraps exceptions raised during initialization. *)
+
 type t =
   | Decode_error of interpreter_error
       (** Wraps exceptions raised during parsing. *)
@@ -69,6 +78,8 @@ type t =
       (** The maximum number of ticks was reached before the end of current top level call *)
   | Too_many_reboots
       (** The maximum number of reboots was reached before the next inputs *)
+  | No_fallback_kernel of fallback_cause
+      (** No fallback kernel was available - recovering from invalid kernel module not possible. *)
 
 (* [invalid_state msg] builds an `Invalid_state` error out of a message. *)
 val invalid_state : string -> t

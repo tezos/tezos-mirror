@@ -503,9 +503,27 @@ let build_snapshot_wasm_state_from_set_input
       tree
   in
   let* tree = Wasm.Internal_for_tests.reset_reboot_counter tree in
+  let* tree =
+    Test_encodings_util.Tree_encoding_runner.encode
+      (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
+      snapshot_tick
+      tree
+  in
+  (* The kernel will have been set as the fallback kernel. *)
+  let* durable =
+    Test_encodings_util.Tree_encoding_runner.decode
+      (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
+      tree
+  in
+  let* durable =
+    Durable.copy_tree_exn
+      durable
+      Constants.kernel_key
+      Constants.kernel_fallback_key
+  in
   Test_encodings_util.Tree_encoding_runner.encode
-    (Tezos_tree_encoding.value ["pvm"; "last_top_level_call"] Data_encoding.n)
-    snapshot_tick
+    (Tezos_tree_encoding.scope ["durable"] Durable.encoding)
+    durable
     tree
 
 let test_snapshotable_state () =
@@ -793,6 +811,240 @@ let test_durable_store_io () =
   assert (expected = value) ;
   return_unit
 
+let reveal_upgrade_kernel () =
+  let path = "/kernel/boot.wasm" in
+  let path_start = 23 in
+  let path_len = String.length path in
+  let hash_start = path_start + path_len in
+  let buffer_start = hash_start + 32 in
+  (* 32 bytes for reveal hash *)
+  Format.sprintf
+    {|
+(module
+  (import "rollup_safe_core" "store_write"
+    (func $store_write (param i32 i32 i32 i32 i32) (result i32)))
+  (import "rollup_safe_core" "store_delete"
+    (func $store_delete (param i32 i32) (result i32)))
+  (import "rollup_safe_core" "reveal_preimage"
+    (func $reveal_preimage (param i32 i32 i32) (result i32)))
+  (func (export "kernel_next")
+    (local $preimage_size i32)
+
+    (local $hash_start i32)
+    (local $buffer_start i32)
+    (local $path_start i32)
+    (local $path_len i32)
+
+    (local.set $path_start (i32.const %s))
+    (local.set $path_len (i32.const %s))
+    (local.set $hash_start (i32.const %s))
+    (local.set $buffer_start (i32.const %s))
+
+    (local.set $preimage_size
+     (call $reveal_preimage (local.get $hash_start)
+                            (local.get $buffer_start)
+                            ;; buffer size
+                            (i32.const 4096)))
+
+    (call $store_delete (local.get $path_start)
+                        (local.get $path_len))
+
+    (call $store_write (local.get $path_start)
+                       (local.get $path_len)
+                       ;; write offset in store
+                       (i32.const 0)
+                       (local.get $buffer_start)
+                       (local.get $preimage_size)))
+  (table 1 1 funcref)
+  (memory 17)
+  (export "memory" (memory 0))
+  (data (i32.const %s) "%s"))
+|}
+    (* locals *)
+    (Int.to_string path_start)
+    (Int.to_string path_len)
+    (Int.to_string hash_start)
+    (Int.to_string buffer_start)
+    (* data *)
+    (Int.to_string path_start)
+    path
+
+let assert_fallback_kernel tree expected_kernel =
+  let open Lwt.Syntax in
+  let* durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let* value = Durable.find_value durable Constants.kernel_fallback_key in
+  let+ value =
+    Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_string value
+  in
+  assert (Option.equal String.equal value expected_kernel)
+
+let assert_kernel tree expected_kernel =
+  let open Lwt.Syntax in
+  let* durable = wrap_as_durable_storage tree in
+  let durable = Durable.of_storage_exn durable in
+  let* value = Durable.find_value durable Constants.kernel_key in
+  let+ value =
+    Option.map_s Tezos_lazy_containers.Chunked_byte_vector.to_string value
+  in
+  assert (Option.equal String.equal value expected_kernel)
+
+let test_reveal_upgrade_kernel_ok () =
+  let open Lwt_result_syntax in
+  let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
+  (* Let's first init the tree to compute. *)
+  let*! tree = initial_tree ~from_binary:true modul in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_before_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_before_first_message) ;
+  (* At this point, the kernel should be installed, but not as fallback *)
+  let*! () = assert_kernel tree @@ Some modul in
+  let*! () = assert_fallback_kernel tree None in
+  (* Run the kernel, it should request a preimage reveal *)
+  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  (* At this point, the kernel should be installed, including as fallback *)
+  let*! () = assert_kernel tree @@ Some modul in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* Check that reveal is requested *)
+  let*! state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_after_first_message) ;
+  let*! info = Wasm.get_info tree in
+  let* () =
+    let open Wasm_pvm_state in
+    match info.Wasm_pvm_state.input_request with
+    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
+        (* The PVM has reached a point where it’s asking for some
+           preimage. Since the memory is left blank, we are looking
+           for the zero hash *)
+        let zero_hash =
+          Tezos_webassembly_interpreter.Reveal.reveal_hash_from_string_exn
+            (String.make 32 '\000')
+        in
+        assert (hash = zero_hash) ;
+        return_unit
+    | No_input_required | Input_required | Reveal_required _ -> assert false
+  in
+  let new_kernel =
+    {|
+(module
+ (memory 1)
+ (export "mem" (memory 0))
+ (func (export "kernel_next")
+       (nop)
+       )
+ )
+|}
+  in
+  let*! preimage = wat2wasm new_kernel in
+  let*! tree = Wasm.reveal_step (Bytes.of_string preimage) tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state_after_reveal) ;
+  (* At this point, the new_kernel should be installed, the old as fallback *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* run until proper input requested *)
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state_after_reveal) ;
+  (* At this point, the new_kernel should be installed, including as fallback *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* run with new input, this should be the new kernel *)
+  let*! tree = set_input_step "test" 2 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_second_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_after_second_message) ;
+  (* There should have been no issues decoding the new kernel *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some preimage in
+  return_unit
+
+let test_reveal_upgrade_kernel_fallsback_on_error ~binary ~error invalid_kernel
+    () =
+  let open Lwt_result_syntax in
+  let*! modul = wat2wasm @@ reveal_upgrade_kernel () in
+  (* Let's first init the tree to compute. *)
+  let*! tree = initial_tree ~from_binary:true modul in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_before_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_before_first_message) ;
+  (* At this point, the kernel should be installed, but not as fallback *)
+  let*! () = assert_kernel tree @@ Some modul in
+  let*! () = assert_fallback_kernel tree None in
+  (* Run the kernel, it should request a preimage reveal *)
+  let*! tree = set_input_step "test" 0 tree in
+  let*! tree = eval_until_input_requested tree in
+  (* At this point, the kernel should be installed, including as fallback *)
+  let*! () = assert_kernel tree @@ Some modul in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* Check that reveal is requested *)
+  let*! state_after_first_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  assert (not @@ is_stuck state_after_first_message) ;
+  let*! info = Wasm.get_info tree in
+  let* () =
+    let open Wasm_pvm_state in
+    match info.Wasm_pvm_state.input_request with
+    | Wasm_pvm_state.Reveal_required (Reveal_raw_data hash) ->
+        (* The PVM has reached a point where it’s asking for some
+           preimage. Since the memory is left blank, we are looking
+           for the zero hash *)
+        let zero_hash =
+          Tezos_webassembly_interpreter.Reveal.reveal_hash_from_string_exn
+            (String.make 32 '\000')
+        in
+        assert (hash = zero_hash) ;
+        return_unit
+    | No_input_required | Input_required | Reveal_required _ -> assert false
+  in
+  let*! preimage =
+    if binary then Lwt.return invalid_kernel else wat2wasm invalid_kernel
+  in
+  let*! tree = Wasm.reveal_step (Bytes.of_string preimage) tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state_after_reveal) ;
+  (* At this point, the new_kernel should be installed, the old as fallback *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* run until proper input requested *)
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_reveal = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck state_after_reveal) ;
+  (* At this point, the new_kernel should be installed, including as fallback *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* run with new input, this should be the new kernel *)
+  let*! tree = set_input_step "test" 2 tree in
+  let*! tree = eval_until_input_requested tree in
+  let*! state_after_second_message =
+    Wasm.Internal_for_tests.get_tick_state tree
+  in
+  (* The pvm should be temporarily stuck *)
+  assert (is_stuck ~step:error state_after_second_message) ;
+  (* The kernel is set to the invalid one *)
+  let*! () = assert_kernel tree @@ Some preimage in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  (* Running the kernel one more tick should result in fallback *)
+  let*! tree = Wasm.compute_step tree in
+  let*! post_stuck_state = Wasm.Internal_for_tests.get_tick_state tree in
+  assert (not @@ is_stuck post_stuck_state) ;
+  (* The kernel is set to the invalid one *)
+  let*! () = assert_kernel tree @@ Some modul in
+  let*! () = assert_fallback_kernel tree @@ Some modul in
+  return_unit
+
 let test_kernel_reboot_gen ~reboots ~expected_reboots ~pvm_max_reboots =
   let open Lwt_result_syntax in
   (* Extracted from the kernel, these are the constant values used to build the
@@ -1030,4 +1282,30 @@ let tests =
       "Test reboot takes too many reboots"
       `Quick
       test_kernel_reboot_failing;
+    tztest "Test kernel upgrade ok" `Quick test_reveal_upgrade_kernel_ok;
+    tztest
+      "Test kernel upgrade fallsback on decoding error"
+      `Quick
+      (test_reveal_upgrade_kernel_fallsback_on_error
+         ~binary:true
+         ~error:`Decode
+         "INVALID WASM!!!");
+    tztest
+      "Test kernel upgrade fallsback on linking error"
+      `Quick
+      (test_reveal_upgrade_kernel_fallsback_on_error
+         ~binary:false
+         ~error:`Link
+         {|
+(module
+ (import "invalid_module" "write_debug"
+         (func $write_debug (param i32 i32))))
+|});
+    tztest
+      "Test kernel upgrade fallsback on initing error"
+      `Quick
+      (test_reveal_upgrade_kernel_fallsback_on_error
+         ~binary:false
+         ~error:`Init
+         "(module (memory 1))");
   ]
