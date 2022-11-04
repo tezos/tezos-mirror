@@ -64,7 +64,9 @@ let post_private_injection_operations ?(force = false) ?(async = false) ~ops ()
   let query_string =
     [("async", string_of_bool async); ("force", string_of_bool force)]
   in
-  let data = `A (List.map (fun (`Hex op) -> `String op) ops) in
+  let data : RPC_core.data =
+    Data (`A (List.map (fun (`Hex op) -> `String op) ops))
+  in
   make ~data ~query_string POST ["private"; "injection"; "operations"]
   @@ fun json ->
   JSON.(json |> as_list |> List.map (fun json -> `OpHash (JSON.as_string json)))
@@ -283,7 +285,7 @@ let patch_chain_bootstrapped ?(chain = "main") bootstrapped =
   make
     PATCH
     ["chains"; chain]
-    ~data:(`O [("bootstrapped", `Bool bootstrapped)])
+    ~data:(Data (`O [("bootstrapped", `Bool bootstrapped)]))
     ignore
 
 type sync_state = Synced | Unsynced | Stuck

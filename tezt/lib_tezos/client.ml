@@ -219,19 +219,23 @@ let string_of_query_string = function
       let qs' = List.map (fun (k, v) -> (url_encode k, url_encode v)) qs in
       "?" ^ String.concat "&" @@ List.map (fun (k, v) -> k ^ "=" ^ v) qs'
 
+type data = Data of JSON.u | File of string
+
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth
-      path client : JSON.t Runnable.process =
+      ?endpoint ?hooks ?env ?data ?query_string ?protocol_hash meth path client
+      : JSON.t Runnable.process =
     let process =
       let data =
-        Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
-      in
-      let filename =
-        Option.fold ~none:[] ~some:(fun x -> ["with"; "file:" ^ x]) filename
+        Option.fold
+          ~none:[]
+          ~some:(function
+            | Data data -> ["with"; JSON.encode_u data]
+            | File file -> ["with"; "file:" ^ file])
+          data
       in
       let query_string =
         Option.fold ~none:"" ~some:string_of_query_string query_string
@@ -248,9 +252,7 @@ module Spawn = struct
         ?env
         ?protocol_hash
         client
-        (better_error
-        @ ["rpc"; string_of_meth meth; full_path]
-        @ data @ filename)
+        (better_error @ ["rpc"; string_of_meth meth; full_path] @ data)
     in
     let parse process =
       let* output = Process.check_and_read_stdout process in
@@ -260,8 +262,7 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path
-    client =
+    ?endpoint ?hooks ?env ?data ?query_string ?protocol_hash meth path client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -272,7 +273,6 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?hooks
       ?env
       ?data
-      ?filename
       ?query_string
       ?protocol_hash
       meth
@@ -282,7 +282,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?filename ?query_string ?protocol_hash meth path client =
+    ?hooks ?env ?data ?query_string ?protocol_hash meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -293,7 +293,6 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?hooks
       ?env
       ?data
-      ?filename
       ?query_string
       ?protocol_hash
       meth

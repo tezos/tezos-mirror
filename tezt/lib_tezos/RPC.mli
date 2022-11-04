@@ -236,10 +236,10 @@ val post_private_injection_operations :
   [`OpHash of string] list t
 
 (** RPC: [POST /injection/operation] *)
-val post_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+val post_injection_operation : ?async:bool -> data -> JSON.t t
 
 (** RPC: [POST /private/injection/operation] *)
-val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
+val post_private_injection_operation : ?async:bool -> data -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/run_operation]
 
@@ -251,7 +251,7 @@ val post_private_injection_operation : ?async:bool -> JSON.u -> JSON.t t
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val post_chain_block_helpers_scripts_run_operation :
-  ?chain:string -> ?block:string -> ?async:bool -> JSON.u -> JSON.t t
+  ?chain:string -> ?block:string -> ?async:bool -> data -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/chain_id]
 
@@ -376,7 +376,7 @@ val get_stats_gc : JSON.t t
 val get_stats_memory : JSON.t t
 
 (** RPC: [POST /injection/block] *)
-val post_injection_block : data:JSON.u -> JSON.t t
+val post_injection_block : data:data -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/header/protocol_data/raw]
 
@@ -450,14 +450,14 @@ val post_chain_mempool_request_operations :
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_ban_operation :
-  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+  ?chain:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/mempool/unban_operation]
 
     [chain] defaults to ["main"].
 *)
 val post_chain_mempool_unban_operation :
-  ?chain:string -> data:JSON.u -> unit -> JSON.t t
+  ?chain:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/mempool/unban_all_operations]
 
@@ -476,7 +476,7 @@ val get_chain_mempool_filter :
 
     [chain] defaults to ["main"].
 *)
-val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
+val post_chain_mempool_filter : ?chain:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/preapply/block]
 
@@ -484,7 +484,7 @@ val post_chain_mempool_filter : ?chain:string -> data:JSON.u -> unit -> JSON.t t
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_preapply_block :
-  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/operations]
 
@@ -492,7 +492,7 @@ val post_chain_block_helpers_preapply_block :
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_forge_operations :
-  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/simulate_operation]
 
@@ -500,7 +500,7 @@ val post_chain_block_helpers_forge_operations :
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_scripts_simulate_operation :
-  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/scripts/event_address]
 
@@ -508,7 +508,7 @@ val post_chain_block_helpers_scripts_simulate_operation :
     [block] defaults to ["head"].
 *)
 val post_chain_block_helpers_scripts_event_address :
-  ?chain:string -> ?block:string -> data:Ezjsonm.value -> unit -> JSON.t t
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
 type ctxt_type = Bytes | Json
 
@@ -689,12 +689,7 @@ val get_chain_block_context_contract_balance_and_frozen_bonds :
     [block] defaults to ["head"].
 *)
 val post_chain_block_context_contract_big_map_get :
-  ?chain:string ->
-  ?block:string ->
-  id:string ->
-  data:Ezjsonm.value ->
-  unit ->
-  JSON.t t
+  ?chain:string -> ?block:string -> id:string -> data:data -> unit -> JSON.t t
 
 (** RPC [GET /chains/<chain>/blocks/<block>/context/contracts/<id>/counter]
 
@@ -750,7 +745,7 @@ val get_chain_block_context_contract_storage :
     [block] defaults to ["head"].
 *)
 val post_chain_block_context_contract_ticket_balance :
-  ?chain:string -> ?block:string -> id:string -> data:JSON.u -> unit -> int t
+  ?chain:string -> ?block:string -> id:string -> data:data -> unit -> int t
 
 (** RPC [POST /chains/<chain>/blocks/<block>/context/contracts/<id>/all_ticket_balances]
 

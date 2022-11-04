@@ -52,7 +52,9 @@ let raw ?protocol t client =
       | None ->
           let* raw =
             RPC.Client.call client
-            @@ RPC.post_chain_block_helpers_forge_operations ~data:(json t) ()
+            @@ RPC.post_chain_block_helpers_forge_operations
+                 ~data:(Data (json t))
+                 ()
             |> Lwt.map JSON.as_string
           in
           t.raw <- Some (`Hex raw) ;
@@ -127,7 +129,7 @@ let inject ?(request = `Inject) ?(force = false) ?protocol ?signature ?error t
           "Operation.inject: Node endpoint expected instead of proxy server"
     | Some (Node node) -> Node.wait_for_request ~request node
   in
-  let runnable = RPC.Client.spawn client @@ inject_rpc (`String op) in
+  let runnable = RPC.Client.spawn client @@ inject_rpc (Data (`String op)) in
   match error with
   | None ->
       let* () = waiter in

@@ -154,6 +154,9 @@ type query_string = (string * string) list
 (** HTTP methods for RPCs. *)
 type meth = GET | PUT | POST | PATCH | DELETE
 
+(** Data type for RPCs. *)
+type data = Data of JSON.u | File of string
+
 (** A lowercase string of the method. *)
 val string_of_meth : meth -> string
 
@@ -174,7 +177,11 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     [log_*], [hooks] and [env] arguments.
 
     In particular, [env] can be used to pass [TEZOS_LOG], e.g.
-    [("TEZOS_LOG", "proxy_rpc->debug")] to enable logging. *)
+    [("TEZOS_LOG", "proxy_rpc->debug")] to enable logging.
+
+    The [data] argument allows to add data to the RPC call either with JSON
+    value or with a filename containing a JSON value.
+*)
 val rpc :
   ?log_command:bool ->
   ?log_status_on_exit:bool ->
@@ -183,8 +190,7 @@ val rpc :
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
-  ?data:JSON.u ->
-  ?filename:string ->
+  ?data:data ->
   ?query_string:query_string ->
   ?protocol_hash:string ->
   meth ->
@@ -201,8 +207,7 @@ val spawn_rpc :
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
-  ?data:JSON.u ->
-  ?filename:string ->
+  ?data:data ->
   ?query_string:query_string ->
   ?protocol_hash:string ->
   meth ->
@@ -221,8 +226,7 @@ module Spawn : sig
     ?endpoint:endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
-    ?data:JSON.u ->
-    ?filename:string ->
+    ?data:data ->
     ?query_string:query_string ->
     ?protocol_hash:string ->
     meth ->
