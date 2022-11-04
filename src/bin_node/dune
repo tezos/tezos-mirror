@@ -10,6 +10,7 @@
   tezos-base
   tezos-base.unix
   tezos-version
+  octez-node-config
   tezos-stdlib-unix
   tezos-shell-services
   tezos-rpc-http
@@ -125,6 +126,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
+  -open Octez_node_config
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_rpc_http

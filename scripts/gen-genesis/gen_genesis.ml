@@ -56,7 +56,7 @@ let sandboxed_chain_name = "SANDBOXED_TEZOS"
 let () =
   echo
     "Here is the configuration that you can add to \
-     src/bin_node/node_config_file.ml:" ;
+     src/lib_node_config/node_config_file.ml:" ;
   echo "" ;
   echo "let blockchain_network_%s =" (String.lowercase_ascii network_name) ;
   echo "  make_blockchain_network" ;

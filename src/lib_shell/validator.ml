@@ -28,10 +28,10 @@ type t = {
   state : Store.t;
   db : Distributed_db.t;
   block_validator : Block_validator.t;
-  chain_validator_limits : Chain_validator.limits;
-  peer_validator_limits : Peer_validator.limits;
-  block_validator_limits : Block_validator.limits;
-  prevalidator_limits : Prevalidator.limits;
+  chain_validator_limits : Shell_limits.chain_validator_limits;
+  peer_validator_limits : Shell_limits.peer_validator_limits;
+  block_validator_limits : Shell_limits.block_validator_limits;
+  prevalidator_limits : Shell_limits.prevalidator_limits;
   start_testchain : bool;
   valid_block_input : Store.Block.t Lwt_watcher.input;
   chains_input : (Chain_id.t * bool) Lwt_watcher.input;

@@ -81,14 +81,14 @@ let wrap
       in
       let*! block_validator =
         Block_validator.create
-          Node.default_block_validator_limits
+          Shell_limits.default_block_validator_limits
           db
           block_validator_processs
           ~start_testchain:false
       in
       let*! pv =
         Peer_validator.create
-          Node.default_peer_validator_limits
+          Shell_limits.default_peer_validator_limits
           block_validator
           chain_db
           Crypto_box.Public_key_hash.zero

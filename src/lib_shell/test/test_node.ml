@@ -75,37 +75,16 @@ let default_p2p : P2p.config =
     identity = P2p_identity.generate_with_pow_target_0 ();
     proof_of_work_target = Crypto_box.default_pow_target;
     trust_discovered_peers = false;
-    reconnection_config = P2p_point_state.Info.default_reconnection_config;
+    reconnection_config = Point_reconnection_config.default;
   }
 
-let default_p2p_limits : P2p.limits =
-  {
-    connection_timeout = Time.System.Span.of_seconds_exn 10.;
-    authentication_timeout = Time.System.Span.of_seconds_exn 5.;
-    greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *);
-    maintenance_idle_time =
-      Time.System.Span.of_seconds_exn 120. (* two minutes *);
-    min_connections = 10;
-    expected_connections = 50;
-    max_connections = 100;
-    backlog = 20;
-    max_incoming_connections = 20;
-    max_download_speed = None;
-    max_upload_speed = None;
-    read_buffer_size = 1 lsl 14;
-    read_queue_size = None;
-    write_queue_size = None;
-    incoming_app_message_queue_size = None;
-    incoming_message_queue_size = None;
-    outgoing_message_queue_size = None;
-    max_known_points = Some (400, 300);
-    max_known_peer_ids = Some (400, 300);
-    swap_linger = Time.System.Span.of_seconds_exn 30.;
-    binary_chunks_size = None;
-    peer_greylist_size = 1023;
-    ip_greylist_size_in_kilobytes = 256;
-    ip_greylist_cleanup_delay = Ptime.Span.of_int_s 3600;
-  }
+let default_p2p_limits =
+  P2p_limits.
+    {
+      default with
+      ip_greylist_size_in_kilobytes = 256 (* default/8 *);
+      ip_greylist_cleanup_delay = Ptime.Span.of_int_s 3600 (* default/24 *);
+    }
 
 let default_p2p = Some (default_p2p, default_p2p_limits)
 
@@ -137,13 +116,13 @@ let node_sandbox_initialization_events sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       config
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in
@@ -171,13 +150,13 @@ let node_initialization_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in
@@ -211,13 +190,13 @@ let node_store_known_protocol_events _sandbox_parameters config _switch () =
       (* Tezos_shell.Node.config *)
       {config with p2p = default_p2p}
       (* Tezos_shell.Node.peer_validator_limits *)
-      Node.default_peer_validator_limits
+      Shell_limits.default_peer_validator_limits
       (* Tezos_shell.Node.block_validator_limits *)
-      Node.default_block_validator_limits
+      Shell_limits.default_block_validator_limits
       (* Tezos_shell.Node.prevalidator_limits *)
-      Node.default_prevalidator_limits
+      Shell_limits.default_prevalidator_limits
       (* Tezos_shell.Node.chain_validator_limits *)
-      Node.default_chain_validator_limits
+      Shell_limits.default_chain_validator_limits
       (* Tezos_shell_services.History_mode.t option *)
       None
   in

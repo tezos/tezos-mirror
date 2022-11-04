@@ -27,21 +27,6 @@
 open Prevalidator_worker_state
 module Events = Prevalidator_events
 
-type limits = {
-  max_refused_operations : int;
-  operation_timeout : Time.System.Span.t;
-  operations_batch_size : int;
-  disable_precheck : bool;
-}
-
-let default_limits =
-  {
-    operation_timeout = Time.System.Span.of_seconds_exn 10.;
-    max_refused_operations = 1000;
-    operations_batch_size = 50;
-    disable_precheck = false;
-  }
-
 (* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
@@ -146,7 +131,10 @@ module Tools = struct
   }
 end
 
-type 'a parameters = {limits : limits; tools : 'a Tools.tools}
+type 'a parameters = {
+  limits : Shell_limits.prevalidator_limits;
+  tools : 'a Tools.tools;
+}
 
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
@@ -1059,7 +1047,7 @@ module Make_s
 end
 
 module type ARG = sig
-  val limits : limits
+  val limits : Shell_limits.prevalidator_limits
 
   val chain_db : Distributed_db.chain_db
 
@@ -1095,7 +1083,7 @@ module Make
   module Types = struct
     type state = types_state
 
-    type parameters = limits * Distributed_db.chain_db
+    type parameters = Shell_limits.prevalidator_limits * Distributed_db.chain_db
   end
 
   module Worker :
@@ -1533,7 +1521,7 @@ module Make
       let classification_parameters =
         Classification.
           {
-            map_size_limit = limits.max_refused_operations;
+            map_size_limit = limits.Shell_limits.max_refused_operations;
             on_discarded_operation =
               Distributed_db.Operation.clear_or_cancel chain_db;
           }
@@ -1816,7 +1804,9 @@ module Internal_for_tests = struct
 
   let mk_types_state_shell ~(predecessor : Store.Block.t) ~(tools : 'a tools)
       ~(worker : worker_tools) : (_, 'a) types_state_shell =
-    let parameters = {limits = default_limits; tools} in
+    let parameters =
+      {limits = Shell_limits.default_prevalidator_limits; tools}
+    in
     let c_parameters : Classification.parameters =
       {map_size_limit = 32; on_discarded_operation = Fun.const ()}
     in

@@ -64,8 +64,8 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_config.t;
-  shell : shell;
+  internal_events : Tezos_base.Internal_event_config.t;
+  shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
   dal : dal;
@@ -78,10 +78,10 @@ and p2p = {
   advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
-  limits : P2p.limits;
+  limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
 }
 
 and rpc = {
@@ -94,14 +94,6 @@ and rpc = {
 }
 
 and tls = {cert : string; key : string}
-
-and shell = {
-  block_validator_limits : Block_validator.limits;
-  prevalidator_limits : Prevalidator.limits;
-  peer_validator_limits : Peer_validator.limits;
-  chain_validator_limits : Chain_validator.limits;
-  history_mode : History_mode.t option;
-}
 
 val data_dir_env_name : string
 

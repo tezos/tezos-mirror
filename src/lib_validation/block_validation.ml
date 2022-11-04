@@ -85,10 +85,6 @@ let validation_store_encoding =
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
-(* [default_operation_metadata_size_limit] is used to filter and
-   potentially discard a given metadata if its size exceed the cap. *)
-let default_operation_metadata_size_limit = Some 10_000_000
-
 let operation_metadata_encoding =
   let open Data_encoding in
   def

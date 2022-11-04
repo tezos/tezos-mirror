@@ -105,56 +105,8 @@ type config = {
       (** Expected level of proof of work of peers' identity. *)
   trust_discovered_peers : bool;
       (** If [true], peers discovered on the local network will be trusted. *)
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Point_reconnection_config.t;
       (** The reconnection delat configuration. *)
-}
-
-(** Network capacities *)
-type limits = {
-  connection_timeout : Time.System.Span.t;
-      (** Maximum time allowed to the establishment of a connection. *)
-  authentication_timeout : Time.System.Span.t;
-      (** Delay granted to a peer to perform authentication. *)
-  greylist_timeout : Time.System.Span.t;
-      (** GC delay for the greylists tables. *)
-  maintenance_idle_time : Time.System.Span.t;
-      (** How long to wait at most before running a maintenance loop. *)
-  min_connections : int;
-      (** Strict minimum number of connections (triggers an urgent maintenance) *)
-  expected_connections : int;
-      (** Targeted number of connections to reach when bootstrapping / maintaining *)
-  max_connections : int;
-      (** Maximum number of connections (exceeding peers are disconnected) *)
-  backlog : int;  (** Argument of [Lwt_unix.accept].*)
-  max_incoming_connections : int;
-      (** Maximum not-yet-authenticated incoming connections. *)
-  max_download_speed : int option;
-      (** Hard-limit in the number of bytes received per second. *)
-  max_upload_speed : int option;
-      (** Hard-limit in the number of bytes sent per second. *)
-  read_buffer_size : int;
-      (** Size in bytes of the buffer passed to [Lwt_unix.read]. *)
-  read_queue_size : int option;
-  write_queue_size : int option;
-  incoming_app_message_queue_size : int option;
-  incoming_message_queue_size : int option;
-  outgoing_message_queue_size : int option;
-      (** Various bounds for internal queues. *)
-  max_known_peer_ids : (int * int) option;
-  max_known_points : (int * int) option;
-      (** Optional limitation of internal hashtables (max, target) *)
-  peer_greylist_size : int;
-      (** The number of peer_ids kept in the peer_id greylist. *)
-  ip_greylist_size_in_kilobytes : int;
-      (** The size of the IP address greylist in kilobytes. *)
-  ip_greylist_cleanup_delay : Time.System.Span.t;
-      (** The time an IP address is kept in the greylist. *)
-  swap_linger : Time.System.Span.t;
-      (** Peer swapping does not occur more than once during a timespan of
-      [swap_linger]. *)
-  binary_chunks_size : int option;
-      (** Size (in bytes) of binary blocks that are sent to other
-      peers. Default value is 64 kB. Max value is 64kB. *)
 }
 
 (** Type of a P2P layer instance *)
@@ -183,7 +135,7 @@ val faked_network :
 (** Main network initialization function *)
 val create :
   config:config ->
-  limits:limits ->
+  limits:Tezos_p2p_services.P2p_limits.t ->
   'peer_meta P2p_params.peer_meta_config ->
   'conn_meta P2p_params.conn_meta_config ->
   'msg P2p_params.message_config ->

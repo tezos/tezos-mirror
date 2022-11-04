@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "3.0" }
   "tezos-base"
   "tezos-version"
+  "octez-node-config"
   "tezos-stdlib-unix"
   "tezos-shell-services"
   "tezos-rpc-http"

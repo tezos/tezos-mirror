@@ -58,13 +58,6 @@ module Request = struct
           (locator.head_hash, Block_locator.estimated_length seed locator)
 end
 
-type limits = {
-  new_head_request_timeout : Time.System.Span.t;
-  block_header_timeout : Time.System.Span.t;
-  block_operations_timeout : Time.System.Span.t;
-  protocol_timeout : Time.System.Span.t;
-}
-
 module Types = struct
   type parameters = {
     chain_db : Distributed_db.chain_db;
@@ -72,7 +65,7 @@ module Types = struct
     (* callback to chain_validator *)
     notify_new_block : Store.Block.t -> unit;
     notify_termination : unit -> unit;
-    limits : limits;
+    limits : Shell_limits.peer_validator_limits;
   }
 
   type state = {

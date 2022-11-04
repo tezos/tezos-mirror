@@ -413,7 +413,10 @@ module Term = struct
     in
     let doc =
       let default =
-        match Block_validation.default_operation_metadata_size_limit with
+        match
+          Shell_limits.default_limits.block_validator_limits
+            .operation_metadata_size_limit
+        with
         | None -> "$(i,unlimited)"
         | Some i -> Format.sprintf "$(i,%d) bytes" i
       in

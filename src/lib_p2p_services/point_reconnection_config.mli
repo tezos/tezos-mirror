@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,56 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let genesis : Genesis.t =
-  {
-    time = Time.Protocol.of_notation_exn "2018-04-17T11:46:23Z";
-    block =
-      Block_hash.of_b58check_exn
-        "BLockGenesisGenesisGenesisGenesisGenesisa52f8bUWPcg";
-    protocol =
-      Protocol_hash.of_b58check_exn
-        "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im";
-  }
+(** Parameters of the heuristic determining waiting time between
+   reconnection to a neighbour that misbehaved *)
 
-let with_node f =
-  let open Lwt_result_syntax in
-  let run dir =
-    let ( / ) = Filename.concat in
-    let node_config : Node.config =
-      {
-        genesis;
-        chain_name = Distributed_db_version.Name.of_string "TEZOS_DOCGEN";
-        sandboxed_chain_name =
-          Distributed_db_version.Name.of_string "SANDBOXED_TEZOS_DOCGEN";
-        user_activated_upgrades = [];
-        user_activated_protocol_overrides = [];
-        operation_metadata_size_limit = None;
-        patch_context = None;
-        data_dir = dir;
-        store_root = dir / "store";
-        context_root = dir / "context";
-        protocol_root = dir / "protocol";
-        p2p = None;
-        target = None;
-        disable_mempool = true;
-        enable_testchain = false;
-      }
-    in
-    let* node =
-      Node.create
-        ~singleprocess:true
-        node_config
-        Tezos_shell_services.Shell_limits.default_peer_validator_limits
-        Tezos_shell_services.Shell_limits.default_block_validator_limits
-        Tezos_shell_services.Shell_limits.default_prevalidator_limits
-        Tezos_shell_services.Shell_limits.default_chain_validator_limits
-        None
-    in
-    f node
-  in
-  let*! r = Lwt_utils_unix.with_tempdir "tezos_rpcdoc_" run in
-  match r with
-  | Ok () -> Lwt.return_unit
-  | Error err ->
-      Format.eprintf "%a@." pp_print_trace err ;
-      Stdlib.exit 1
+type t = {
+  factor : float;
+  initial_delay : Time.System.Span.t;
+  disconnection_delay : Time.System.Span.t;
+  increase_cap : Time.System.Span.t;
+}
+
+val default : t
+
+val encoding : t Data_encoding.encoding

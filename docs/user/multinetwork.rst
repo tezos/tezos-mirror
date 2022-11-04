@@ -228,7 +228,7 @@ you can configure a custom network.
 Development
 -----------
 
-The list of built-in networks is in ``src/bin_node/node_config_file.ml``.
+The list of built-in networks is in ``src/lib_node_config/node_config_file.ml``.
 Edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
 add or remove built-in networks.
 

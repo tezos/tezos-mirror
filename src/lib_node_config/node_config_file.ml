@@ -395,7 +395,7 @@ type t = {
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
   internal_events : Internal_event_config.t;
-  shell : shell;
+  shell : Shell_limits.limits;
   blockchain_network : blockchain_network;
   metrics_addr : string list;
   dal : dal;
@@ -408,10 +408,10 @@ and p2p = {
   advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
-  limits : P2p.limits;
+  limits : Tezos_p2p_services.P2p_limits.t;
   disable_mempool : bool;
   enable_testchain : bool;
-  reconnection_config : P2p_point_state.Info.reconnection_config;
+  reconnection_config : Tezos_p2p_services.Point_reconnection_config.t;
 }
 
 and rpc = {
@@ -425,45 +425,6 @@ and rpc = {
 
 and tls = {cert : string; key : string}
 
-and shell = {
-  block_validator_limits : Block_validator.limits;
-  prevalidator_limits : Prevalidator.limits;
-  peer_validator_limits : Peer_validator.limits;
-  chain_validator_limits : Chain_validator.limits;
-  history_mode : History_mode.t option;
-}
-
-let default_p2p_limits : P2p.limits =
-  let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) in
-  {
-    connection_timeout = Time.System.Span.of_seconds_exn 10.;
-    authentication_timeout = Time.System.Span.of_seconds_exn 5.;
-    greylist_timeout;
-    maintenance_idle_time =
-      Time.System.Span.of_seconds_exn 120. (* two minutes *);
-    min_connections = 10;
-    expected_connections = 50;
-    max_connections = 100;
-    backlog = 20;
-    max_incoming_connections = 20;
-    max_download_speed = None;
-    max_upload_speed = None;
-    read_buffer_size = 1 lsl 14;
-    read_queue_size = None;
-    write_queue_size = None;
-    incoming_app_message_queue_size = None;
-    incoming_message_queue_size = None;
-    outgoing_message_queue_size = None;
-    max_known_points = Some (400, 300);
-    max_known_peer_ids = Some (400, 300);
-    peer_greylist_size = 1023 (* historical value *);
-    ip_greylist_size_in_kilobytes =
-      2 * 1024 (* two megabytes has shown good properties in simulation *);
-    ip_greylist_cleanup_delay = greylist_timeout;
-    swap_linger = Time.System.Span.of_seconds_exn 30.;
-    binary_chunks_size = None;
-  }
-
 let default_p2p =
   {
     expected_pow = 26.;
@@ -472,10 +433,10 @@ let default_p2p =
     advertised_net_port = None;
     discovery_addr = None;
     private_mode = false;
-    limits = default_p2p_limits;
+    limits = Tezos_p2p_services.P2p_limits.default;
     disable_mempool = false;
     enable_testchain = false;
-    reconnection_config = P2p_point_state.Info.default_reconnection_config;
+    reconnection_config = Tezos_p2p_services.Point_reconnection_config.default;
   }
 
 let default_rpc =
@@ -486,15 +447,6 @@ let default_rpc =
     tls = None;
     acl = RPC_server.Acl.empty_policy;
     media_type = Media_type.Command_line.Any;
-  }
-
-let default_shell =
-  {
-    block_validator_limits = Node.default_block_validator_limits;
-    prevalidator_limits = Node.default_prevalidator_limits;
-    peer_validator_limits = Node.default_peer_validator_limits;
-    chain_validator_limits = Node.default_chain_validator_limits;
-    history_mode = None;
   }
 
 let default_disable_config_validation = false
@@ -508,229 +460,12 @@ let default_config =
     rpc = default_rpc;
     log = Lwt_log_sink_unix.default_cfg;
     internal_events = Internal_event_config.default;
-    shell = default_shell;
+    shell = Shell_limits.default_limits;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
     metrics_addr = [];
     dal = default_dal;
   }
-
-let limit : P2p.limits Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun {
-           P2p.connection_timeout;
-           authentication_timeout;
-           greylist_timeout;
-           maintenance_idle_time;
-           min_connections;
-           expected_connections;
-           max_connections;
-           backlog;
-           max_incoming_connections;
-           max_download_speed;
-           max_upload_speed;
-           read_buffer_size;
-           read_queue_size;
-           write_queue_size;
-           incoming_app_message_queue_size;
-           incoming_message_queue_size;
-           outgoing_message_queue_size;
-           max_known_points;
-           max_known_peer_ids;
-           peer_greylist_size;
-           ip_greylist_size_in_kilobytes;
-           ip_greylist_cleanup_delay;
-           swap_linger;
-           binary_chunks_size;
-         } ->
-      ( ( ( connection_timeout,
-            authentication_timeout,
-            min_connections,
-            expected_connections,
-            max_connections,
-            backlog,
-            max_incoming_connections,
-            max_download_speed,
-            max_upload_speed,
-            swap_linger ),
-          ( binary_chunks_size,
-            read_buffer_size,
-            read_queue_size,
-            write_queue_size,
-            incoming_app_message_queue_size,
-            incoming_message_queue_size,
-            outgoing_message_queue_size,
-            max_known_points ) ),
-        ( max_known_peer_ids,
-          peer_greylist_size,
-          ip_greylist_size_in_kilobytes,
-          ip_greylist_cleanup_delay,
-          greylist_timeout,
-          maintenance_idle_time ) ))
-    (fun ( ( ( connection_timeout,
-               authentication_timeout,
-               min_connections,
-               expected_connections,
-               max_connections,
-               backlog,
-               max_incoming_connections,
-               max_download_speed,
-               max_upload_speed,
-               swap_linger ),
-             ( binary_chunks_size,
-               read_buffer_size,
-               read_queue_size,
-               write_queue_size,
-               incoming_app_message_queue_size,
-               incoming_message_queue_size,
-               outgoing_message_queue_size,
-               max_known_points ) ),
-           ( max_known_peer_ids,
-             peer_greylist_size,
-             ip_greylist_size_in_kilobytes,
-             ip_greylist_cleanup_delay,
-             greylist_timeout,
-             maintenance_idle_time ) ) ->
-      {
-        connection_timeout;
-        authentication_timeout;
-        greylist_timeout;
-        maintenance_idle_time;
-        min_connections;
-        expected_connections;
-        max_connections;
-        backlog;
-        max_incoming_connections;
-        max_download_speed;
-        max_upload_speed;
-        read_buffer_size;
-        read_queue_size;
-        write_queue_size;
-        incoming_app_message_queue_size;
-        incoming_message_queue_size;
-        outgoing_message_queue_size;
-        max_known_points;
-        max_known_peer_ids;
-        peer_greylist_size;
-        ip_greylist_size_in_kilobytes;
-        ip_greylist_cleanup_delay;
-        swap_linger;
-        binary_chunks_size;
-      })
-    (merge_objs
-       (merge_objs
-          (obj10
-             (dft
-                "connection-timeout"
-                ~description:
-                  "Delay acceptable when initiating a connection to a new \
-                   peer, in seconds."
-                Time.System.Span.encoding
-                default_p2p_limits.authentication_timeout)
-             (dft
-                "authentication-timeout"
-                ~description:
-                  "Delay granted to a peer to perform authentication, in \
-                   seconds."
-                Time.System.Span.encoding
-                default_p2p_limits.authentication_timeout)
-             (dft
-                "min-connections"
-                ~description:
-                  "Strict minimum number of connections (triggers an urgent \
-                   maintenance)."
-                uint16
-                default_p2p_limits.min_connections)
-             (dft
-                "expected-connections"
-                ~description:
-                  "Targeted number of connections to reach when bootstrapping \
-                   / maintaining."
-                uint16
-                default_p2p_limits.expected_connections)
-             (dft
-                "max-connections"
-                ~description:
-                  "Maximum number of connections (exceeding peers are \
-                   disconnected)."
-                uint16
-                default_p2p_limits.max_connections)
-             (dft
-                "backlog"
-                ~description:
-                  "Number above which pending incoming connections are \
-                   immediately rejected."
-                uint8
-                default_p2p_limits.backlog)
-             (dft
-                "max-incoming-connections"
-                ~description:
-                  "Number above which pending incoming connections are \
-                   immediately rejected."
-                uint8
-                default_p2p_limits.max_incoming_connections)
-             (opt
-                "max-download-speed"
-                ~description:"Max download speeds in KiB/s."
-                int31)
-             (opt
-                "max-upload-speed"
-                ~description:"Max upload speeds in KiB/s."
-                int31)
-             (dft
-                "swap-linger"
-                Time.System.Span.encoding
-                default_p2p_limits.swap_linger))
-          (obj8
-             (opt "binary-chunks-size" uint8)
-             (dft
-                "read-buffer-size"
-                ~description:"Size of the buffer passed to read(2)."
-                int31
-                default_p2p_limits.read_buffer_size)
-             (opt "read-queue-size" int31)
-             (opt "write-queue-size" int31)
-             (opt "incoming-app-message-queue-size" int31)
-             (opt "incoming-message-queue-size" int31)
-             (opt "outgoing-message-queue-size" int31)
-             (opt
-                "max_known_points"
-                ~description:
-                  "The max and target size for the known address table."
-                (tup2 uint16 uint16))))
-       (obj6
-          (opt
-             "max_known_peer_ids"
-             ~description:"The max and target size for the known peers table."
-             (tup2 uint16 uint16))
-          (dft
-             "peer_greylist_size"
-             ~description:"The number of peer_ids kept in the peer_id greylist."
-             uint16
-             default_p2p_limits.peer_greylist_size)
-          (dft
-             "ip_greylist_size_in_kilobytes"
-             ~description:"The size of the IP address greylist (in kilobytes)."
-             uint16
-             default_p2p_limits.ip_greylist_size_in_kilobytes)
-          (dft
-             "ip_greylist_cleanup_delay"
-             ~description:"The time an IP address is kept in the greylist."
-             Time.System.Span.encoding
-             default_p2p_limits.ip_greylist_cleanup_delay)
-          (dft
-             "greylist-timeout"
-             ~description:"GC delay for the greylists tables, in seconds."
-             Time.System.Span.encoding
-             default_p2p_limits.greylist_timeout)
-          (dft
-             "maintenance-idle-time"
-             ~description:
-               "How long to wait at most, in seconds, before running a \
-                maintenance loop."
-             Time.System.Span.encoding
-             default_p2p_limits.maintenance_idle_time)))
 
 let p2p =
   let open Data_encoding in
@@ -823,7 +558,11 @@ let p2p =
              the identity and the address of the private node secret."
           bool
           false)
-       (dft "limits" ~description:"Network limits" limit default_p2p_limits)
+       (dft
+          "limits"
+          ~description:"Network limits"
+          Tezos_p2p_services.P2p_limits.encoding
+          Tezos_p2p_services.P2p_limits.default)
        (dft
           "disable_mempool"
           ~description:
@@ -843,14 +582,14 @@ let p2p =
              blocks."
           bool
           false)
-       (let open P2p_point_state.Info in
+       (let open Tezos_p2p_services.Point_reconnection_config in
        dft
          "greylisting_config"
          ~description:
            "The reconnection policy regulates the frequency with which the \
             node tries to reconnect to an old known peer."
-         reconnection_config_encoding
-         default_reconnection_config))
+         encoding
+         default))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -930,232 +669,6 @@ let rpc : rpc Data_encoding.t =
           ~description:"The media types supported by the server."
           Media_type.Command_line.encoding
           default_rpc.media_type))
-
-let timeout_encoding = Time.System.Span.encoding
-
-let block_validator_limits_encoding =
-  let open Data_encoding in
-  conv
-    (fun {Block_validator.protocol_timeout; operation_metadata_size_limit} ->
-      (protocol_timeout, operation_metadata_size_limit))
-    (fun (protocol_timeout, operation_metadata_size_limit) ->
-      {protocol_timeout; operation_metadata_size_limit})
-    (obj2
-       (dft
-          "protocol_request_timeout"
-          timeout_encoding
-          default_shell.block_validator_limits.protocol_timeout)
-       (dft
-          "operation_metadata_size_limit"
-          (union
-             [
-               case
-                 ~title:"unlimited"
-                 (Tag 0)
-                 (constant "unlimited")
-                 (function None -> Some () | _ -> None)
-                 (fun () -> None);
-               case
-                 ~title:"limited"
-                 (Tag 1)
-                 int31
-                 (function Some i -> Some i | None -> None)
-                 (fun i -> Some i);
-             ])
-          default_shell.block_validator_limits.operation_metadata_size_limit))
-
-let prevalidator_limits_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           Prevalidator.operation_timeout;
-           max_refused_operations;
-           operations_batch_size;
-           disable_precheck;
-         } ->
-      ( operation_timeout,
-        max_refused_operations,
-        operations_batch_size,
-        disable_precheck ))
-    (fun ( operation_timeout,
-           max_refused_operations,
-           operations_batch_size,
-           disable_precheck ) ->
-      {
-        operation_timeout;
-        max_refused_operations;
-        operations_batch_size;
-        disable_precheck;
-      })
-    (obj4
-       (dft
-          "operations_request_timeout"
-          timeout_encoding
-          default_shell.prevalidator_limits.operation_timeout)
-       (dft
-          "max_refused_operations"
-          uint16
-          default_shell.prevalidator_limits.max_refused_operations)
-       (dft
-          "operations_batch_size"
-          int31
-          default_shell.prevalidator_limits.operations_batch_size)
-       (dft
-          "disable_precheck"
-          bool
-          default_shell.prevalidator_limits.disable_precheck))
-
-let peer_validator_limits_encoding =
-  let open Data_encoding in
-  let default_limits = default_shell.peer_validator_limits in
-  conv
-    (fun {
-           Peer_validator.block_header_timeout;
-           block_operations_timeout;
-           protocol_timeout;
-           new_head_request_timeout;
-         } ->
-      ( block_header_timeout,
-        block_operations_timeout,
-        protocol_timeout,
-        new_head_request_timeout ))
-    (fun ( block_header_timeout,
-           block_operations_timeout,
-           protocol_timeout,
-           new_head_request_timeout ) ->
-      {
-        block_header_timeout;
-        block_operations_timeout;
-        protocol_timeout;
-        new_head_request_timeout;
-      })
-    (obj4
-       (dft
-          "block_header_request_timeout"
-          timeout_encoding
-          default_limits.block_header_timeout)
-       (dft
-          "block_operations_request_timeout"
-          timeout_encoding
-          default_limits.block_operations_timeout)
-       (dft
-          "protocol_request_timeout"
-          timeout_encoding
-          default_limits.protocol_timeout)
-       (dft
-          "new_head_request_timeout"
-          timeout_encoding
-          default_limits.new_head_request_timeout))
-
-let synchronisation_heuristic_encoding default_latency default_threshold =
-  let open Data_encoding in
-  conv
-    (fun {Chain_validator.latency; threshold} -> (latency, threshold))
-    (fun (latency, threshold) -> {latency; threshold})
-    (obj2
-       (dft
-          "latency"
-          ~description:
-            "[latency] is the time interval (in seconds) used to determine if \
-             a peer is synchronized with a chain. For instance, a peer whose \
-             known head has a timestamp T is considered synchronized if T >= \
-             now - latency. This parameter depends on the baking rate and the \
-             latency of the network."
-          uint16
-          default_latency)
-       (dft
-          "synchronisation_threshold"
-          ~description:
-            "The minimal number of peers this peer should be synchronized with \
-             in order to be bootstrapped."
-          uint8
-          default_threshold))
-
-let chain_validator_limits_encoding =
-  let open Data_encoding in
-  conv
-    (fun {Chain_validator.synchronisation} -> synchronisation)
-    (fun synchronisation -> {synchronisation})
-    (* Use a union to support both the deprecated
-       bootstrap_threshold and the new synchronisation_threshold
-       options when parsing.  When printing, use the new
-       synchronisation_threshold option. *)
-    (union
-       [
-         case
-           ~title:"synchronisation_heuristic_encoding"
-           Json_only
-           (synchronisation_heuristic_encoding
-              default_shell.chain_validator_limits.synchronisation.latency
-              default_shell.chain_validator_limits.synchronisation.threshold)
-           (fun x -> Some x)
-           (fun x -> x);
-         case
-           ~title:"legacy_bootstrap_threshold_encoding"
-           Json_only
-           (obj1
-              (dft
-                 "bootstrap_threshold"
-                 ~description:
-                   "[DEPRECATED] Set the number of peers with whom a chain \
-                    synchronisation must be completed to bootstrap the node."
-                 uint8
-                 4))
-           (fun _ -> None) (* This is used for legacy *)
-           (fun x ->
-             Chain_validator.
-               {
-                 threshold = x;
-                 latency =
-                   default_shell.chain_validator_limits.synchronisation.latency;
-               });
-       ])
-
-let shell =
-  let open Data_encoding in
-  conv
-    (fun {
-           peer_validator_limits;
-           block_validator_limits;
-           prevalidator_limits;
-           chain_validator_limits;
-           history_mode;
-         } ->
-      ( peer_validator_limits,
-        block_validator_limits,
-        prevalidator_limits,
-        chain_validator_limits,
-        history_mode ))
-    (fun ( peer_validator_limits,
-           block_validator_limits,
-           prevalidator_limits,
-           chain_validator_limits,
-           history_mode ) ->
-      {
-        peer_validator_limits;
-        block_validator_limits;
-        prevalidator_limits;
-        chain_validator_limits;
-        history_mode;
-      })
-    (obj5
-       (dft
-          "peer_validator"
-          peer_validator_limits_encoding
-          default_shell.peer_validator_limits)
-       (dft
-          "block_validator"
-          block_validator_limits_encoding
-          default_shell.block_validator_limits)
-       (dft
-          "prevalidator"
-          prevalidator_limits_encoding
-          default_shell.prevalidator_limits)
-       (dft
-          "chain_validator"
-          chain_validator_limits_encoding
-          default_shell.chain_validator_limits)
-       (opt "history_mode" History_mode.encoding))
 
 let encoding =
   let open Data_encoding in
@@ -1239,8 +752,8 @@ let encoding =
        (dft
           "shell"
           ~description:"Configuration of network parameters"
-          shell
-          default_shell)
+          Shell_limits.limits_encoding
+          Shell_limits.default_limits)
        (dft
           "network"
           ~description:"Configuration of which network/blockchain to connect to"
@@ -1353,7 +866,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(metrics_addr = []) ?operation_metadata_size_limit ?(private_mode = false)
     ?(disable_mempool = false)
     ?(disable_mempool_precheck =
-      default_shell.prevalidator_limits.disable_precheck)
+      Shell_limits.default_limits.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
@@ -1370,7 +883,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   let* () = Node_data_version.ensure_data_dir ~mode:Exists data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
-  let limits : P2p.limits =
+  let limits : Tezos_p2p_services.P2p_limits.t =
     {
       cfg.p2p.limits with
       min_connections =
@@ -1427,43 +940,44 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}
-  and shell : shell =
-    {
-      peer_validator_limits = cfg.shell.peer_validator_limits;
-      block_validator_limits =
-        {
-          cfg.shell.block_validator_limits with
-          operation_metadata_size_limit =
-            Option.value
-              ~default:
-                cfg.shell.block_validator_limits.operation_metadata_size_limit
-              operation_metadata_size_limit;
-        };
-      prevalidator_limits =
-        {
-          cfg.shell.prevalidator_limits with
-          disable_precheck =
-            cfg.shell.prevalidator_limits.disable_precheck
-            || disable_mempool_precheck;
-        };
-      chain_validator_limits =
-        (let synchronisation : Chain_validator.synchronisation_limits =
-           {
-             latency =
-               Option.value
-                 ~default:
-                   cfg.shell.chain_validator_limits.synchronisation.latency
-                 latency;
-             threshold =
-               Option.value
-                 ~default:
-                   cfg.shell.chain_validator_limits.synchronisation.threshold
-                 synchronisation_threshold;
-           }
-         in
-         {synchronisation});
-      history_mode = Option.either history_mode cfg.shell.history_mode;
-    }
+  and shell =
+    Shell_limits.
+      {
+        peer_validator_limits = cfg.shell.peer_validator_limits;
+        block_validator_limits =
+          {
+            cfg.shell.block_validator_limits with
+            operation_metadata_size_limit =
+              Option.value
+                ~default:
+                  cfg.shell.block_validator_limits.operation_metadata_size_limit
+                operation_metadata_size_limit;
+          };
+        prevalidator_limits =
+          {
+            cfg.shell.prevalidator_limits with
+            disable_precheck =
+              cfg.shell.prevalidator_limits.disable_precheck
+              || disable_mempool_precheck;
+          };
+        chain_validator_limits =
+          (let synchronisation : synchronisation_limits =
+             {
+               latency =
+                 Option.value
+                   ~default:
+                     cfg.shell.chain_validator_limits.synchronisation.latency
+                   latency;
+               threshold =
+                 Option.value
+                   ~default:
+                     cfg.shell.chain_validator_limits.synchronisation.threshold
+                   synchronisation_threshold;
+             }
+           in
+           {synchronisation});
+        history_mode = Option.either history_mode cfg.shell.history_mode;
+      }
   in
   (* If --network is specified it overrides the "network" entry of the
      configuration file, which itself defaults to mainnet. *)

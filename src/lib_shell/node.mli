@@ -41,7 +41,7 @@ type config = {
     (Tezos_protocol_environment.Context.t ->
     Tezos_protocol_environment.Context.t tzresult Lwt.t)
     option;
-  p2p : (P2p.config * P2p.limits) option;
+  p2p : (P2p.config * P2p_limits.t) option;
   target : (Block_hash.t * int32) option;
   disable_mempool : bool;
       (** If [true], all non-empty mempools will be ignored. *)
@@ -49,23 +49,15 @@ type config = {
       (** If [false], testchain related messages will be ignored. *)
 }
 
-val default_peer_validator_limits : Peer_validator.limits
-
-val default_prevalidator_limits : Prevalidator.limits
-
-val default_block_validator_limits : Block_validator.limits
-
-val default_chain_validator_limits : Chain_validator.limits
-
 val create :
   ?sandboxed:bool ->
   ?sandbox_parameters:Data_encoding.json ->
   singleprocess:bool ->
   config ->
-  Peer_validator.limits ->
-  Block_validator.limits ->
-  Prevalidator.limits ->
-  Chain_validator.limits ->
+  Shell_limits.peer_validator_limits ->
+  Shell_limits.block_validator_limits ->
+  Shell_limits.prevalidator_limits ->
+  Shell_limits.chain_validator_limits ->
   History_mode.t option ->
   t tzresult Lwt.t
 

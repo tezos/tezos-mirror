@@ -28,11 +28,6 @@
 open Block_validator_worker_state
 open Block_validator_errors
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
-}
-
 type validation_result =
   | Already_commited
   | Outdated_block
@@ -63,12 +58,16 @@ module Types = struct
   type state = {
     protocol_validator : Protocol_validator.t;
     validation_process : Block_validator_process.t;
-    limits : limits;
+    limits : Shell_limits.block_validator_limits;
     start_testchain : bool;
     invalid_blocks_after_precheck : error trace Block_hash_ring.t;
   }
 
-  type parameters = limits * bool * Distributed_db.t * Block_validator_process.t
+  type parameters =
+    Shell_limits.block_validator_limits
+    * bool
+    * Distributed_db.t
+    * Block_validator_process.t
 end
 
 module Request = struct

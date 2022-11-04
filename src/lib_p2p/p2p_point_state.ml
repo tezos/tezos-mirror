@@ -43,13 +43,6 @@ let pp ppf = function
   | Disconnected -> Format.fprintf ppf "disconnected"
 
 module Info = struct
-  type reconnection_config = {
-    factor : float;
-    initial_delay : Time.System.Span.t;
-    disconnection_delay : Time.System.Span.t;
-    increase_cap : Time.System.Span.t;
-  }
-
   type reconnection_info = {
     delay : Time.System.Span.t;
     end_time : Time.System.t;
@@ -76,56 +69,6 @@ module Info = struct
   let compare pi1 pi2 = Id.compare pi1.point pi2.point
 
   let log_size = 100
-
-  let default_reconnection_config =
-    {
-      factor = 1.2;
-      initial_delay = Ptime.Span.of_int_s 1;
-      disconnection_delay = Ptime.Span.of_int_s 60;
-      increase_cap = Ptime.Span.of_int_s 172800 (* 2 days *);
-    }
-
-  let reconnection_config_encoding =
-    let open Data_encoding in
-    conv
-      (fun {factor; initial_delay; disconnection_delay; increase_cap} ->
-        (factor, initial_delay, disconnection_delay, increase_cap))
-      (fun (factor, initial_delay, disconnection_delay, increase_cap) ->
-        {factor; initial_delay; disconnection_delay; increase_cap})
-      (obj4
-         (dft
-            "factor"
-            ~description:
-              "The factor by which the reconnection delay is increased when a \
-               peer that was previously disconnected is disconnected again. \
-               This value should be set to 1 for a linear back-off and to >1 \
-               for an exponential back-off."
-            float
-            default_reconnection_config.factor)
-         (dft
-            "initial-delay"
-            ~description:
-              "The span of time a peer is disconnected for when it is first \
-               disconnected."
-            Time.System.Span.encoding
-            default_reconnection_config.initial_delay)
-         (dft
-            "disconnection-delay"
-            ~description:
-              "The span of time a peer is disconnected for when it is \
-               disconnected as the result of an error."
-            Time.System.Span.encoding
-            default_reconnection_config.disconnection_delay)
-         (dft
-            "increase-cap"
-            ~description:
-              "The maximum amount by which the reconnection is extended. This \
-               limits the rate of the exponential back-off, which eventually \
-               becomes linear when it reaches this limit. This limit is set to \
-               avoid reaching the End-of-Time when repeatedly reconnection a \
-               peer."
-            Time.System.Span.encoding
-            default_reconnection_config.increase_cap))
 
   let create ?(trusted = false) ?expected_peer_id addr port =
     {
@@ -251,27 +194,28 @@ let set_running ~timestamp point_info peer_id data =
 let maxed_time_add t s =
   match Ptime.add_span t s with Some t -> t | None -> Ptime.max
 
-let set_reconnection_delay reconnection_config timestamp point_info =
+let set_reconnection_delay (reconnection_config : Point_reconnection_config.t)
+    timestamp point_info =
   let disconnection_delay =
     match point_info.Info.reconnection_info with
-    | None -> reconnection_config.Info.initial_delay
+    | None -> reconnection_config.initial_delay
     | Some gr -> gr.delay
   in
   let end_time = maxed_time_add timestamp disconnection_delay in
   let delay =
     let new_delay =
       Time.System.Span.multiply_exn
-        reconnection_config.Info.factor
+        reconnection_config.factor
         disconnection_delay
     in
-    if Ptime.Span.compare reconnection_config.Info.increase_cap new_delay > 0
-    then new_delay
-    else reconnection_config.Info.increase_cap
+    if Ptime.Span.compare reconnection_config.increase_cap new_delay > 0 then
+      new_delay
+    else reconnection_config.increase_cap
   in
   point_info.Info.reconnection_info <- Some {delay; end_time}
 
-let set_disconnected ~timestamp ?(requested = false) reconnection_config
-    point_info =
+let set_disconnected ~timestamp ?(requested = false)
+    (reconnection_config : Point_reconnection_config.t) point_info =
   let event : Pool_event.kind =
     match point_info.Info.state with
     | Requested _ ->
@@ -283,9 +227,9 @@ let set_disconnected ~timestamp ?(requested = false) reconnection_config
         point_info.last_rejected_connection <- Some (current_peer_id, timestamp) ;
         Request_rejected (Some current_peer_id)
     | Running {current_peer_id; _} ->
-        let delay = reconnection_config.Info.initial_delay in
+        let delay = reconnection_config.initial_delay in
         let end_time =
-          maxed_time_add timestamp reconnection_config.Info.disconnection_delay
+          maxed_time_add timestamp reconnection_config.disconnection_delay
         in
         point_info.reconnection_info <- Some {delay; end_time} ;
         point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
