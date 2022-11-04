@@ -75,7 +75,8 @@ type t = {
           access should be granted *)
   media_type : Media_type.Command_line.t;
   metrics_addr : string list;
-  operation_metadata_size_limit : int option option;
+  operation_metadata_size_limit :
+    Shell_limits.operation_metadata_size_limit option;
       (** maximum operation metadata size allowed to be stored on disk *)
 }
 

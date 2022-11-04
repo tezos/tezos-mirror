@@ -461,8 +461,8 @@ module Make (Proto : Registered_protocol.T) = struct
                  in
                  let metadata =
                    match operation_metadata_size_limit with
-                   | None -> Metadata bytes
-                   | Some size_limit ->
+                   | Shell_limits.Unlimited -> Metadata bytes
+                   | Limited size_limit ->
                        if Bytes.length bytes < size_limit then Metadata bytes
                        else Too_large_metadata
                  in
@@ -774,7 +774,7 @@ module Make (Proto : Registered_protocol.T) = struct
         validation_result
     in
     compute_metadata
-      ~operation_metadata_size_limit:None
+      ~operation_metadata_size_limit:Unlimited
       new_protocol_env_version
       block_metadata
       ops_metadata
@@ -1217,7 +1217,7 @@ type apply_environment = {
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
 }
 
 let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context

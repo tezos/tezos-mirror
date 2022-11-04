@@ -73,7 +73,7 @@ let wrap
         {
           Block_validator_process.user_activated_upgrades = [];
           user_activated_protocol_overrides = [];
-          operation_metadata_size_limit = None;
+          operation_metadata_size_limit = Unlimited;
         }
       in
       let* block_validator_processs =

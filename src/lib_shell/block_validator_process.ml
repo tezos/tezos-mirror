@@ -28,7 +28,7 @@
 type validator_environment = {
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
 }
 
 type validator_kind =
@@ -149,7 +149,7 @@ module Internal_validator_process = struct
     chain_store : Store.chain_store;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : int option;
+    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
     (*
        The cache must be updated by the component that owns the
        context, i.e., the component that has the writing permissions
@@ -521,7 +521,7 @@ module External_validator_process = struct
     protocol_root : string;
     user_activated_upgrades : User_activated.upgrades;
     user_activated_protocol_overrides : User_activated.protocol_overrides;
-    operation_metadata_size_limit : int option;
+    operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
     process_path : string;
     mutable validator_process : process_status;
     lock : Lwt_mutex.t;

@@ -64,7 +64,8 @@ type t = {
   allow_all_rpc : P2p_point.Id.addr_port_id list;
   media_type : Media_type.Command_line.t;
   metrics_addr : string list;
-  operation_metadata_size_limit : int option option;
+  operation_metadata_size_limit :
+    Shell_limits.operation_metadata_size_limit option;
 }
 
 type error +=
@@ -399,15 +400,16 @@ module Term = struct
   let operation_metadata_size_limit =
     let converter =
       let parse s =
-        if String.(equal (lowercase_ascii s) "unlimited") then `Ok None
+        if String.(equal (lowercase_ascii s) "unlimited") then
+          `Ok Shell_limits.Unlimited
         else
           match int_of_string_opt s with
           | None -> `Error s
-          | Some i -> `Ok (Some i)
+          | Some i -> `Ok (Limited i)
       in
       let pp fmt = function
-        | None -> Format.fprintf fmt "unlimited"
-        | Some i -> Format.pp_print_int fmt i
+        | Shell_limits.Unlimited -> Format.fprintf fmt "unlimited"
+        | Limited i -> Format.pp_print_int fmt i
       in
       ((fun arg -> parse arg), pp)
     in
@@ -417,8 +419,8 @@ module Term = struct
           Shell_limits.default_limits.block_validator_limits
             .operation_metadata_size_limit
         with
-        | None -> "$(i,unlimited)"
-        | Some i -> Format.sprintf "$(i,%d) bytes" i
+        | Shell_limits.Unlimited -> "$(i,unlimited)"
+        | Limited i -> Format.sprintf "$(i,%d) bytes" i
       in
       Format.sprintf
         "Size limit (in bytes) for operation's metadata to be stored on disk. \

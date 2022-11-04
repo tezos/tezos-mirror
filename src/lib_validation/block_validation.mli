@@ -113,7 +113,7 @@ type apply_environment = {
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
       (** user activated protocol overrides *)
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : Shell_limits.operation_metadata_size_limit;
       (** size limit for operation metadata that should be written on disk *)
 }
 
@@ -159,7 +159,7 @@ val preapply :
   chain_id:Chain_id.t ->
   user_activated_upgrades:Tezos_base.User_activated.upgrades ->
   user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
-  operation_metadata_size_limit:int option ->
+  operation_metadata_size_limit:Shell_limits.operation_metadata_size_limit ->
   timestamp:Time.Protocol.t ->
   protocol_data:bytes ->
   live_blocks:Block_hash.Set.t ->

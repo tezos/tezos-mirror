@@ -46,7 +46,7 @@ let with_node f =
           Distributed_db_version.Name.of_string "SANDBOXED_TEZOS_DOCGEN";
         user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
-        operation_metadata_size_limit = None;
+        operation_metadata_size_limit = Unlimited;
         patch_context = None;
         data_dir = dir;
         store_root = dir / "store";

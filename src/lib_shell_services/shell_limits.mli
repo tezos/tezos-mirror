@@ -26,16 +26,23 @@
 (** The configurable constants used by shell components as maximum,
     with their encodings and default values. *)
 
+(** States whether or not the operation metadata size must be caped
+    and potentially discard if the given size limit is exceeded. *)
+type operation_metadata_size_limit = Unlimited | Limited of int
+
+val operation_metadata_size_limit_encoding :
+  operation_metadata_size_limit Data_encoding.t
+
 type block_validator_limits = {
   protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : operation_metadata_size_limit;
 }
 
 val default_block_validator_limits : block_validator_limits
 
 val block_validator_limits_encoding : block_validator_limits Data_encoding.t
 
-(** This record contains the differents limits and settings that can be updated
+(** This record contains the different limits and settings that can be updated
     from a node configuration for a prevalidator *)
 type prevalidator_limits = {
   max_refused_operations : int;

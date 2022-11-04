@@ -25,14 +25,43 @@
 
 let timeout_encoding = Time.System.Span.encoding
 
+type operation_metadata_size_limit = Unlimited | Limited of int
+
+let operation_metadata_size_limit_encoding =
+  let open Data_encoding in
+  def
+    "operation_metadata_size_limit"
+    ~title:"operation_metadata_size_limit"
+    ~description:"The operation metadata size limit"
+    (union
+       ~tag_size:`Uint8
+       [
+         case
+           ~title:"unlimited"
+           ~description:"The metadata size is unlimited."
+           (Tag 0)
+           (constant "unlimited")
+           (function Unlimited -> Some () | _ -> None)
+           (fun () -> Unlimited);
+         case
+           ~title:"limited"
+           ~description:
+             "The metadata size is limited to the given integer's value (in \
+              bytes)."
+           (Tag 1)
+           int31
+           (function Limited i -> Some i | _ -> None)
+           (fun i -> Limited i);
+       ])
+
 type block_validator_limits = {
   protocol_timeout : Time.System.Span.t;
-  operation_metadata_size_limit : int option;
+  operation_metadata_size_limit : operation_metadata_size_limit;
 }
 
 (* [default_operation_metadata_size_limit] is used to filter and
    potentially discard a given metadata if its size exceed the cap. *)
-let default_operation_metadata_size_limit = Some 10_000_000
+let default_operation_metadata_size_limit = Limited 10_000_000
 
 let default_block_validator_limits =
   {
@@ -54,21 +83,7 @@ let block_validator_limits_encoding =
           default_block_validator_limits.protocol_timeout)
        (dft
           "operation_metadata_size_limit"
-          (union
-             [
-               case
-                 ~title:"unlimited"
-                 (Tag 0)
-                 (constant "unlimited")
-                 (function None -> Some () | _ -> None)
-                 (fun () -> None);
-               case
-                 ~title:"limited"
-                 (Tag 1)
-                 int31
-                 (function Some i -> Some i | None -> None)
-                 (fun i -> Some i);
-             ])
+          operation_metadata_size_limit_encoding
           default_block_validator_limits.operation_metadata_size_limit))
 
 type prevalidator_limits = {
