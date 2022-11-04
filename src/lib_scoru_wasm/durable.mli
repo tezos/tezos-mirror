@@ -93,6 +93,11 @@ val subtree_name_at : t -> key -> int -> string Lwt.t
 (** [delete durable key] deletes the value at and/or subtrees of [key]. *)
 val delete : t -> key -> t Lwt.t
 
+(** [hash durable key] retrieves the tree hash of the value at the given [key].
+    This is not the same as the hash of the value.
+*)
+val hash : t -> key -> Context_hash.t option Lwt.t
+
 (** [hash_exn durable key] retrieves the tree hash of the value at the given [key].
     This is not the same as the hash of the value.
 

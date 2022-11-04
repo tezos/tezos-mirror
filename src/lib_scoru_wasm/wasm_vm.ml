@@ -65,6 +65,14 @@ let mark_for_reboot reboot_counter durable =
     let+ has_reboot_flag = has_reboot_flag durable in
     if has_reboot_flag then Reboot else Restarting
 
+(* Returns true is a fallback kernel is available, and it's different to
+   the currently running kernel. *)
+let has_fallback_kernel durable =
+  let open Lwt_syntax in
+  let* kernel_hash = Durable.hash durable Constants.kernel_key in
+  let+ fallback_hash = Durable.hash durable Constants.kernel_fallback_key in
+  Option.is_some fallback_hash && kernel_hash <> fallback_hash
+
 let initial_boot_state () =
   Decode
     (Tezos_webassembly_interpreter.Decode.initial_decode_kont
@@ -76,6 +84,24 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
     Lwt.return (durable, state, status)
   in
   match tick_state with
+  | Stuck ((Decode_error _ | Init_error _ | Link_error _) as e) ->
+      let cause =
+        match e with
+        | Decode_error e -> Wasm_pvm_errors.Decode_cause e
+        | Link_error e -> Wasm_pvm_errors.Link_cause e
+        | Init_error e -> Wasm_pvm_errors.Init_cause e
+        | _ -> assert false
+      in
+      let* has_fallback = has_fallback_kernel durable in
+      if has_fallback then
+        let* durable =
+          Durable.copy_tree_exn
+            durable
+            Constants.kernel_fallback_key
+            Constants.kernel_key
+        in
+        return ~durable Padding
+      else return ~status:Failing (Stuck (No_fallback_kernel cause))
   | Stuck e -> return ~status:Failing (Stuck e)
   | Snapshot ->
       let* has_reboot_flag = has_reboot_flag durable in
@@ -159,7 +185,21 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
               (Tezos_lazy_containers.Lazy_vector.Int32Vector.singleton
                  admin_instr)
           in
-          return ~status:Starting (Eval {config; module_reg})
+          (* Set kernel - now known to be valid - as fallback kernel,
+             if it is not already *)
+          let* kernel_hash = Durable.hash durable Constants.kernel_key in
+          let* kernel_fallback_hash =
+            Durable.hash durable Constants.kernel_fallback_key
+          in
+          let* durable =
+            if kernel_hash <> kernel_fallback_hash then
+              Durable.copy_tree_exn
+                durable
+                Constants.kernel_key
+                Constants.kernel_fallback_key
+            else Lwt.return durable
+          in
+          return ~durable ~status:Starting (Eval {config; module_reg})
       | _ ->
           (* We require a function with the name [main] to be exported
              rather than any other structure. *)

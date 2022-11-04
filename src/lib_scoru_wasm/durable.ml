@@ -135,10 +135,15 @@ let move_tree_exn tree from_key to_key =
   let* tree = delete tree from_key in
   T.add_tree tree to_key move_tree
 
+let hash tree key =
+  let open Lwt.Syntax in
+  let+ opt = T.find_tree tree @@ to_value_key key in
+  Option.map (fun subtree -> T.hash subtree) opt
+
 let hash_exn tree key =
   let open Lwt.Syntax in
-  let+ opt = T.find_tree tree (to_value_key key) in
-  match opt with None -> raise Not_found | Some subtree -> T.hash subtree
+  let+ opt = hash tree key in
+  match opt with None -> raise Not_found | Some hash -> hash
 
 (* The maximum size of bytes allowed to be read/written at once. *)
 let max_store_io_size = 4096L
