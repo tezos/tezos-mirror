@@ -36,6 +36,8 @@ On the reference machine, the benchmarks directory should look like this:
       - everything else we have in the Octez git repo
   - cron_res
   - cron_res_errors
+  - current_run_dir
+  - last_run_dir
 ```
 
 - `cronjob.sh` is the main script run by Cron. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
@@ -46,5 +48,8 @@ On the reference machine, the benchmarks directory should look like this:
   - `michelson_data` and `sapling_data` contain data that are very long to generate but rarely change between two benchmarks runs. For now, we decided not to regenerate them, and keep the same data from one run to the other. When to update them is under discussion.
   - Also note that in this directory, `benchmark_results` and `inference_results` only exist during a run of the benchmarks. They are moved to `snoop_results` at the end.
 - `cron_res` and `cron_res_errors` are the log files of a benchmarks run. They are only present during a run, and moved to `snoop_results` at the end.
+- `current_run_dir` and `last_run_dir` are marker files each containing the name of a benchmarks results directory:
+  - `current_run_dir` is present as long as benchmarks are running, or when they failed for some reason;
+  - `last_run_dir` records the last benchmarks process that completed successfully.
 
 `cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but only know their final destination after fetching the most recent `master` commit.
