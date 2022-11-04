@@ -4,8 +4,8 @@ Development Changelog
 **NB:** The changelog for releases can be found at: https://tezos.gitlab.io/CHANGES.html
 
 
-This file lists the changes added to each version of tezos-node,
-tezos-client, and the other Octez executables. The changes to the economic
+This file lists the changes added to each version of octez-node,
+octez-client, and the other Octez executables. The changes to the economic
 protocol are documented in the ``docs/protocols/`` directory; in
 particular in ``docs/protocols/alpha.rst``.
 
@@ -48,6 +48,9 @@ Signer
 
 Proxy Server
 ------------
+
+- The proxy server can now serve endpoints about blocks of all known economic
+  protocols instead of only one chosen at boot time.
 
 Protocol Compiler And Environment
 ---------------------------------
