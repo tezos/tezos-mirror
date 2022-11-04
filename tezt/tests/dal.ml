@@ -690,6 +690,11 @@ let test_dal_node_startup =
   let* () = Dal_node.terminate dal_node in
   return ()
 
+let send_messages ?(src = Constant.bootstrap2.alias) client msgs =
+  let msg = Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs) in
+  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
+  Client.bake_for_and_wait client
+
 let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     sc_rollup_address node client =
   (* Check that the rollup node stores the slots published in a block, along with slot headers:
@@ -700,9 +705,14 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
      4. Publish the three slot headers for slots 0, 1, 2
      5. Check that the rollup node fetched the slot headers from L1
      6. After lag levels, endorse only slots 1 and 2
-     7. Wait for the rollup node to download the slots
-     8. Verify that rollup node has downloaded slots 1 and 2. Slot 0 is
-        unconfirmed.
+     7. Check that no slots are downloaded by the rollup node if
+        the PVM does not request them
+     8. Send external messages to trigger the request of dal pages for
+        slots 0 and 1
+     9. Wait for the rollup node PVM to process the input and request
+        the slots
+     10. Check that requested confirmed slots (slot 1) is downloaded from
+        dal node, while unconfirmed slot (slot 0) is not downloaded
   *)
 
   (* 0. run dl node. *)
@@ -792,19 +802,50 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     slot_availability ~nb_slots ~signer:Constant.bootstrap5 [2; 1] client
   in
   let* () = Client.bake_for_and_wait client in
-  let* level =
+  let* slot_confirmed_level =
     Sc_rollup_node.wait_for_level sc_rollup_node (slots_published_level + 1)
   in
-  Check.(level = slots_published_level + 1)
+  Check.(slot_confirmed_level = slots_published_level + 1)
     Check.int
     ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
-  (* 7. Wait for the rollup node to download the endorsed slots. *)
+  (* 7. Check that no slots have been downloaded *)
   let* downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
   in
-  (* 8. Verify that rollup node has downloaded slots 1 and 2. Slot 0 is
-        unconfirmed. *)
-  let expected_number_of_downloaded_or_unconfirmed_slots = 2 in
+  let expected_number_of_downloaded_or_unconfirmed_slots = 0 in
+  Check.(
+    List.length downloaded_confirmed_slots
+    = expected_number_of_downloaded_or_unconfirmed_slots)
+    Check.int
+    ~error_msg:
+      "Unexpected number of slots that have been either downloaded or \
+       unconfirmed (%L = %R)" ;
+  (* 8 Sends message to import dal pages from slots 0 and 1 of published_level
+     to the PVM. *)
+  let published_level_as_string = Int.to_string slots_published_level in
+  let messages =
+    [
+      "dal:" ^ published_level_as_string ^ ":0:0";
+      "dal:" ^ published_level_as_string ^ ":1:0";
+    ]
+  in
+  let* () = send_messages client messages in
+  let* level =
+    Sc_rollup_node.wait_for_level sc_rollup_node (slot_confirmed_level + 1)
+  in
+  Check.(level = slot_confirmed_level + 1)
+    Check.int
+    ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
+  (* 9. Wait for the rollup node to download the endorsed slots. *)
+  let confirmed_level_as_string = Int.to_string slot_confirmed_level in
+  let* downloaded_confirmed_slots =
+    Sc_rollup_client.dal_downloaded_confirmed_slot_pages
+      ~block:confirmed_level_as_string
+      sc_rollup_client
+  in
+  (* 10. Verify that rollup node has downloaded slot 1, slot 0 is
+        unconfirmed, and slot 2 has not been downloaded *)
+  let expected_number_of_downloaded_or_unconfirmed_slots = 1 in
   Check.(
     List.length downloaded_confirmed_slots
     = expected_number_of_downloaded_or_unconfirmed_slots)
@@ -832,15 +873,10 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       Check.(message = confirmed_slot_content)
         Check.string
         ~error_msg:"unexpected message in slot (%L = %R)")
-    [0; 1] ;
+    [0] ;
   match expand_test with
   | None -> return ()
   | Some f -> f client sc_rollup_address sc_rollup_node
-
-let send_messages ?(src = Constant.bootstrap2.alias) client msgs =
-  let msg = Ezjsonm.(to_string ~minify:true @@ list Ezjsonm.string msgs) in
-  let* () = Client.Sc_rollup.send_message ~hooks ~src ~msg client in
-  Client.bake_for_and_wait client
 
 let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
   let* genesis_info =
@@ -860,7 +896,7 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
      Only slot 1 is confirmed. Below, we expect to have value = 302. *)
   let expected_value = 302 in
   (* The code should be adapted if the current level changes. *)
-  assert (level = 4) ;
+  assert (level = 5) ;
   let* () =
     send_messages
       client
