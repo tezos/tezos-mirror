@@ -1,7 +1,7 @@
-Monitoring a Tezos Node
-=======================
+Monitoring an Octez Node
+========================
 
-Monitoring the behavior of a Tezos node can be partially achieved by exploring the logs or,
+Monitoring the behavior of an Octez node can be partially achieved by exploring the logs or,
 more efficiently, through the RPC server. The use of RPCs is detailed in :doc:`the RPC documentation <../developer/rpc>`
 and :doc:`the RPC references <../shell/rpc>`.
 
@@ -25,7 +25,7 @@ By default, ``<ADDR>`` is ``localhost`` and ``<PORT>`` is ``9932``.
 
 .. code-block:: shell
 
-   tezos-node run --metrics-addr=<ADDR>:<PORT> …
+   octez-node run --metrics-addr=<ADDR>:<PORT> …
 
 Note that it is possible to serve metrics on several addresses by using the option more than once.
 
@@ -36,10 +36,10 @@ You can also add this configuration to your persistent configuration file throug
 
 .. code-block:: shell
 
-   tezos-node config init --metrics-addr=<ADDR>:<PORT> ...
+   octez-node config init --metrics-addr=<ADDR>:<PORT> ...
 
    #Or if the configuration file already exists
-   tezos-node config update --metrics-addr=<ADDR>:<PORT> ...
+   octez-node config update --metrics-addr=<ADDR>:<PORT> ...
 
 See :doc:`the documentation of the node configuration<./node-configuration>` for more information.
 
@@ -79,7 +79,7 @@ The metrics that can be exposed by the node can be listed with the command:
 
 .. code-block:: shell
 
-   tezos-node dump-metrics
+   octez-node dump-metrics
 
 
 Version 14 of Octez exports metrics from various components of the node, namely:
@@ -133,7 +133,7 @@ Once installed, you need to add the scraping job to the configuration file.
 
 ::
 
-   - job_name: 'tezos-exporter'
+   - job_name: 'octez-exporter'
      scrape_interval: interval s
      metrics_path: "/metrics"
      static_configs:
@@ -164,7 +164,7 @@ Add the following at the end of ``/etc/netdata/app_groups.conf``
 
 .. code-block:: shell
 
-  tezos: tezos-node tezos-validator
+  octez: octez-node octez-validator
 
 .. _filecheck:
 
