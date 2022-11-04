@@ -100,7 +100,8 @@ let set_input_step message message_counter tree =
 let pp_state fmt state =
   let pp_s s = Format.fprintf fmt "%s" s in
   match state with
-  | Wasm_pvm_state.Internal_state.Decode _ -> pp_s "Decode"
+  | Wasm_pvm_state.Internal_state.Start -> pp_s "Start"
+  | Decode _ -> pp_s "Decode"
   | Eval _ -> pp_s "Eval"
   | Stuck e ->
       Format.fprintf fmt "Stuck (%a)" Test_wasm_pvm_encodings.pp_error_state e

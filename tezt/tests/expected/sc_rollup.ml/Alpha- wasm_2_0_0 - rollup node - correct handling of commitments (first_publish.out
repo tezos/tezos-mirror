@@ -43,7 +43,7 @@ This sequence of operations was run:
         "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": "61" },
+      "number_of_ticks": "62" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]" }
 
 ./octez-sc-rollup-client-alpha rpc get /local/last_published_commitment
@@ -52,7 +52,7 @@ This sequence of operations was run:
         "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": "61" },
+      "number_of_ticks": "62" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }
 
@@ -62,6 +62,6 @@ This sequence of operations was run:
         "[SC_ROLLUP_PVM_STATE_HASH]",
       "inbox_level": 32,
       "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-      "number_of_ticks": "61" },
+      "number_of_ticks": "62" },
   "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
   "published_at_level": 35 }

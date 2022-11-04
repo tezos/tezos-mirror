@@ -565,7 +565,7 @@ let test_snapshotable_state () =
   let*! tree = set_input_step "test" 1 tree in
   let*! state = Wasm.Internal_for_tests.get_tick_state tree in
   match state with
-  | Decode _ -> return_unit
+  | Start -> return_unit
   | _ ->
       failwith
         "Unexpected state after set_input_step: %a"

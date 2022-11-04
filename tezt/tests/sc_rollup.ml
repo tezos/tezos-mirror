@@ -1612,7 +1612,7 @@ let commitments_reorgs ~kind protocol sc_rollup_node sc_rollup node client =
    let additional_ticks =
      match kind with
      | "arith" -> 1 (* boot sector *) + 1 (* metadata *)
-     | "wasm_2_0_0" -> 1 (* boot_sector *)
+     | "wasm_2_0_0" -> 1 (* boot_sector *) + 1 (* moving through start state *)
      | _ -> assert false
    in
    Check.(

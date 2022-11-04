@@ -66,7 +66,25 @@ type info = {
 (** This module type defines the state for the PVM.
     For use in lib_scoru_wasm only. *)
 module Internal_state = struct
+  (** General state of the PVM
+
+    The following describes the general state transitions.
+
+    {[
+      stateDiagram
+      Snapshot --> Restarting the machine
+      Start --> Decode
+      Decode --> Link
+      Link --> Init
+      Init --> Eval
+
+      Eval --> Padding : Evaluation succeeded
+      Padding --> Snapshot : End of top-level cycle
+      Eval --> Stuck : Evaluation failed
+    ]}
+  *)
   type tick_state =
+    | Start
     | Decode of Tezos_webassembly_interpreter.Decode.decode_kont
     | Link of {
         ast_module : Tezos_webassembly_interpreter.Ast.module_;

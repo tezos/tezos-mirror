@@ -35,6 +35,11 @@ let tick_state_encoding =
     (value [] Data_encoding.string)
     [
       case
+        "start"
+        (return ())
+        (function Start -> Some () | _ -> None)
+        (fun () -> Start);
+      case
         "decode"
         Parsing.Decode.encoding
         (function Decode m -> Some m | _ -> None)
