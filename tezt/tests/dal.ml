@@ -309,13 +309,19 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
           ]
           client)
 
-let slot_availability ~signer ~nb_slots availability client =
+let slot_availability ?level ?(force = false) ~signer ~nb_slots availability
+    client =
   let endorsement = Array.make nb_slots false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
-  let* level = Client.level client in
-  let level = level + 1 in
+  let* level =
+    match level with
+    | Some level -> return level
+    | None ->
+        let* level = Client.level client in
+        return @@ (level + 1)
+  in
   Operation.Consensus.(
-    inject ~signer (slot_availability ~level ~endorsement) client)
+    inject ~force ~signer (slot_availability ~level ~endorsement) client)
 
 type status = Applied | Failed of {error_id : string}
 
