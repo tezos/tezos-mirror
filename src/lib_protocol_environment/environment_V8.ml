@@ -275,6 +275,26 @@ struct
 
     let def name ?title ?description encoding =
       def (Param.name ^ "." ^ name) ?title ?description encoding
+
+    (* TODO: https://gitlab.com/nomadic-labs/data-encoding/-/issues/58
+       Remove when fix is integrated in data-encoding. *)
+    let splitted ~json ~binary =
+      let open Data_encoding__.Encoding in
+      let e = splitted ~json ~binary in
+      {
+        e with
+        encoding =
+          (match e.encoding with
+          | Splitted {encoding; json_encoding; _} ->
+              Splitted
+                {
+                  encoding;
+                  json_encoding;
+                  is_obj = is_obj json && is_obj binary;
+                  is_tup = is_tup json && is_tup binary;
+                }
+          | desc -> desc);
+      }
   end
 
   module Time = Time.Protocol
