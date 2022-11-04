@@ -321,3 +321,16 @@ let test_with_kernel kernel (test : string -> (unit, _) result Lwt.t) () =
         test kernel)
   in
   return_unit
+
+let read_test_messages names =
+  let open Tezt.Base in
+  (* Reading files using `Tezt_lib` can be fragile and not future-proof, see
+     issue https://gitlab.com/tezos/tezos/-/issues/3746. *)
+  let locate_file name =
+    project_root // Filename.dirname __FILE__ // "../messages" // name
+  in
+  List.map_s
+    (fun name ->
+      let message_file = locate_file name in
+      Lwt_io.with_file ~mode:Lwt_io.Input message_file Lwt_io.read)
+    names

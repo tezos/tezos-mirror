@@ -197,8 +197,17 @@ let test_store_read_write () =
   in
   test_against_both ~from_binary:false ~kernel ~messages:(List.repeat 100 "")
 
+let test_tx =
+  let open Lwt.Syntax in
+  Wasm_utils.test_with_kernel "tx-kernel-no-verif" (fun kernel ->
+      let* messages =
+        Wasm_utils.read_test_messages ["deposit.out"; "withdrawal.out"]
+      in
+      test_against_both ~from_binary:true ~kernel ~messages)
+
 let tests =
   [
     tztest "Computation kernel" `Quick test_computation;
     tztest "Store read/write kernel" `Quick test_store_read_write;
+    tztest "TX kernel" `Quick test_tx;
   ]
