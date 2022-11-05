@@ -61,8 +61,7 @@ let test_cache_at_most_once ?query_string path =
   @@ fun protocol ->
   let* _, client = init ~protocol () in
   let env =
-    [("TEZOS_LOG", Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")]
-    |> List.to_seq |> String_map.of_seq
+    [("TEZOS_LOG", "proxy_rpc->debug")] |> List.to_seq |> String_map.of_seq
   in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
@@ -73,13 +72,33 @@ let test_cache_at_most_once ?query_string path =
     Re.Str.regexp
       {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block \([a-zA-Z0-9]*\)|}
   in
-  let extract_chain_block line =
-    (* Groups are 1-based (0 is for the whole match). *)
-    if Re.Str.string_match proxy_cache_regexp line 0 then
-      Some (Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)
-    else None
+  let proxy_cache_multi_regexp1 =
+    Re.Str.regexp
+      {|^.*proxy_rpc: proxy cache created for chain \([a-zA-Z0-9]*\) and block|}
   in
-  let chain_block_list = lines |> List.filter_map extract_chain_block in
+  let proxy_cache_multi_regexp2 =
+    Re.Str.regexp {|^.*proxy_rpc: *\([a-zA-Z0-9]*\)|}
+  in
+  let rec extract_chain_block = function
+    | [] -> []
+    | [line] ->
+        (* Groups are 1-based (0 is for the whole match). *)
+        if Re.Str.string_match proxy_cache_regexp line 0 then
+          [(Re.Str.matched_group 1 line, Re.Str.matched_group 2 line)]
+        else []
+    | l1 :: (l2 :: acc' as acc) ->
+        if Re.Str.string_match proxy_cache_regexp l1 0 then
+          let out = (Re.Str.matched_group 1 l1, Re.Str.matched_group 2 l1) in
+          out :: extract_chain_block acc
+        else if Re.Str.string_match proxy_cache_multi_regexp1 l1 0 then
+          let chain = Re.Str.matched_group 1 l1 in
+          if Re.Str.string_match proxy_cache_multi_regexp2 l2 0 then
+            let block = Re.Str.matched_group 1 l2 in
+            (chain, block) :: extract_chain_block acc'
+          else extract_chain_block acc
+        else extract_chain_block acc
+  in
+  let chain_block_list = extract_chain_block lines in
   let find_duplicate l =
     let rec go with_duplicates without_duplicates =
       match (with_duplicates, without_duplicates) with
@@ -150,18 +169,18 @@ let starts_with ~(prefix : string) (s : string) : bool =
     In this scenario, the proxy client should look directly in the data within the tree received by the first request.
 
     For this, this test inspects the debug output produced by
-    setting TEZOS_LOG to alpha.proxy_rpc->debug. This causes the client
+    setting TEZOS_LOG to proxy_rpc->debug. This causes the client
     to print the RPCs done to get pieces of the context:
 
-    alpha.proxy_rpc: P/v1/constants
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/v1/first_level
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/random_seed
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/stake_snapshot
-    alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/last_roll/0
+    proxy_rpc: P/v1/constants
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/v1/first_level
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/random_seed
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/stake_snapshot
+    proxy_rpc: Received tree of size 1
+    proxy_rpc: P/cycle/0/last_roll/0
 
     where [P] is [/chains/<main>/blocks/<head>/context/raw/bytes]
  *)
@@ -176,11 +195,7 @@ let test_context_suffix_no_rpc ?query_string path =
     ~tags:["proxy"; "rpc"; "get"]
   @@ fun protocol ->
   let* _, client = init ~protocol () in
-  let env =
-    String_map.singleton
-      "TEZOS_LOG"
-      (Protocol.encoding_prefix protocol ^ ".proxy_rpc->debug")
-  in
+  let env = String_map.singleton "TEZOS_LOG" "proxy_rpc->debug" in
   let* stderr =
     Client.spawn_rpc ~env ?query_string Client.GET path client
     |> Process.check_and_read_stderr
@@ -188,15 +203,22 @@ let test_context_suffix_no_rpc ?query_string path =
   let lines = String.split_on_char '\n' stderr in
   let rpc_path_regexp =
     Re.Str.regexp
-      {|.*proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/\(.*\)|}
+      {|.*proxy_rpc: /chains/<main>/blocks/<\([a-zA-Z0-9]*\)>/context/raw/bytes/\(.*\)|}
   in
-  let extract_rpc_path line =
+  let extract_rpc_path acc line =
     (* Groups are 1-based (0 is for the whole match). *)
     if Re.Str.string_match rpc_path_regexp line 0 then
-      Some (Re.Str.matched_group 1 line)
-    else None
+      let block = Re.Str.matched_group 1 line in
+      let l, r =
+        match List.partition (fun (b, _) -> String.equal block b) acc with
+        | _ :: _ :: _, _ -> assert false
+        | [(_, l)], r -> (l, r)
+        | [], _ -> ([], acc)
+      in
+      (block, Re.Str.matched_group 2 line :: l) :: r
+    else acc
   in
-  let context_queries = lines |> List.filter_map extract_rpc_path in
+  let context_queries = List.fold_left extract_rpc_path [] lines in
   let rec test_no_overlap_rpc = function
     | [] -> ()
     | query_after :: queries_before ->
@@ -213,8 +235,11 @@ let test_context_suffix_no_rpc ?query_string path =
           queries_before ;
         test_no_overlap_rpc queries_before
   in
-  assert (List.compare_length_with context_queries 2 >= 0) ;
-  Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
+  List.iter
+    (fun (_, l) -> assert (List.compare_length_with l 2 >= 0))
+    context_queries ;
+  Lwt.return
+  @@ List.iter (fun (_, l) -> test_no_overlap_rpc (List.rev l)) context_queries
 
 let paths =
   [
@@ -255,18 +280,22 @@ let wrong_proto protocol client =
         Test.fail
           "No other protocol than %s is available."
           (Protocol.name protocol)
-    | Some other_proto -> other_proto
+    | Some other_proto -> Protocol.hash other_proto
   in
   let* stderr =
-    Client.spawn_bake_for ~protocol:other_proto client
-    |> Process.check_and_read_stderr ~expect_failure:true
+    Client.spawn_rpc
+      ~protocol_hash:other_proto
+      Client.GET
+      ["chains"; "main"; "chain_id"]
+      client
+    |> Process.check_and_read_stderr ~expect_failure:false
   in
   let regexp =
     Re.Str.regexp
     @@ Format.sprintf
          ".*Protocol passed to the proxy (%s) and protocol of the node (%s) \
           differ."
-         (Protocol.hash other_proto)
+         other_proto
          (Protocol.hash protocol)
   in
   if matches regexp stderr then return ()

@@ -253,8 +253,8 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context
     method verbose_rpc_error_diagnostics = true
   end
 
-class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
-  ~rpc_config ~mode ~proxy_env : Client_context.full =
+class unix_proxy ~base_dir ?protocol ~chain ~block ~confirmations
+  ~password_filename ~rpc_config ~mode () : Client_context.full =
   object
     inherit unix_logger ~base_dir
 
@@ -269,7 +269,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
            rpc_config
            (Media_type.Command_line.of_command_line rpc_config.media_type))
         mode
-        proxy_env
+        protocol
 
     inherit unix_ui
 

@@ -214,11 +214,6 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~verbose_rpc_error_diagnostics
   | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
-      let rpc_context =
-        new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
-          rpc_config
-          Media_type.all_media_types
-      in
       let get_mode () =
         match (mode, sources) with
         | `Mode_proxy, _ -> return Tezos_proxy.Proxy_services.Proxy_client
@@ -242,18 +237,10 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             in
             return (Tezos_proxy.Proxy_services.Light_client sources)
       in
-      let* proxy_env =
-        Tezos_proxy.Registration.get_registered_proxy
-          printer
-          rpc_context
-          mode
-          ~chain
-          ~block
-          protocol
-      in
       let* mode = get_mode () in
       return
       @@ new unix_proxy
+           ?protocol
            ~chain
            ~block
            ~confirmations
@@ -261,7 +248,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~base_dir
            ~rpc_config
            ~mode
-           ~proxy_env
+           ()
 
 let setup_mockup_rpc_client_config
     (cctxt : Tezos_client_base.Client_context.printer)

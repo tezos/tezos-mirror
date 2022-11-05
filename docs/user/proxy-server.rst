@@ -94,7 +94,7 @@ is doing (see the :doc:`proxy mode<proxy>` page for more details).
 
 ::
 
-    $ export TEZOS_LOG="proxy_rpc_ctxt->debug; alpha.proxy_rpc->debug; proxy_server_run->debug; proxy_getter->debug; proxy_services->debug"
+    $ export TEZOS_LOG="proxy_rpc_ctxt->debug; proxy_rpc->debug; proxy_server_run->debug; proxy_getter->debug; proxy_services->debug"
     $ ./octez-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732
       protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
       Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
@@ -115,22 +115,22 @@ In the proxy server's terminal, you should see this output (tree sizes may vary)
 
 ::
 
-    Apr 21 11:10:07.474 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
-    Apr 21 11:10:07.474 - alpha.proxy_rpc: proxy cache created for chain main and block head
+    Apr 21 11:10:07.474 - proxy_rpc: chains/<main>/blocks/<head>/header
+    Apr 21 11:10:07.474 - proxy_rpc: proxy cache created for chain main and block head
     Apr 21 11:10:07.476 - proxy_getter: Cache miss: (v1/constants)
     Apr 21 11:10:07.476 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
-    Apr 21 11:10:07.476 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
-    Apr 21 11:10:07.477 - alpha.proxy_rpc: received tree of size 2
+    Apr 21 11:10:07.476 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
+    Apr 21 11:10:07.477 - proxy_rpc: received tree of size 2
     Apr 21 11:10:07.477 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_balance_updates)
-    Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
+    Apr 21 11:10:07.477 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:10:07.477 - proxy_getter: Cache miss: (pending_migration_operation_results)
-    Apr 21 11:10:07.477 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
+    Apr 21 11:10:07.477 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
     Apr 21 11:10:07.478 - proxy_getter: Cache miss: (contracts/index)
-    Apr 21 11:10:07.478 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
-    Apr 21 11:10:07.479 - alpha.proxy_rpc: received tree of size 115
+    Apr 21 11:10:07.478 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
+    Apr 21 11:10:07.479 - proxy_rpc: received tree of size 115
 
-Lines of the form ``alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/...``
+Lines of the form ``proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/...``
 show requests that the proxy server does to the node to obtain data.
 
 ``15`` seconds after the previous command, the proxy server should clear
@@ -158,20 +158,20 @@ In the meantime, in the proxy server's terminal, you should see:
 
 ::
 
-    Apr 21 11:14:04.262 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
-    Apr 21 11:14:04.263 - alpha.proxy_rpc: proxy cache created for chain main and block head
+    Apr 21 11:14:04.262 - proxy_rpc: chains/<main>/blocks/<head>/header
+    Apr 21 11:14:04.263 - proxy_rpc: proxy cache created for chain main and block head
     Apr 21 11:14:04.266 - proxy_getter: Cache miss: (v1/constants)
     Apr 21 11:14:04.266 - proxy_getter: split_key heuristic triggers, getting v1 instead of v1/constants
-    Apr 21 11:14:04.266 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
-    Apr 21 11:14:04.266 - alpha.proxy_rpc: received tree of size 2
+    Apr 21 11:14:04.266 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/v1
+    Apr 21 11:14:04.266 - proxy_rpc: received tree of size 2
     Apr 21 11:14:04.267 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_balance_updates)
-    Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
+    Apr 21 11:14:04.267 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_balance_updates
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (pending_migration_operation_results)
-    Apr 21 11:14:04.267 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
+    Apr 21 11:14:04.267 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/pending_migration_operation_results
     Apr 21 11:14:04.267 - proxy_getter: Cache miss: (contracts/index)
-    Apr 21 11:14:04.268 - alpha.proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
-    Apr 21 11:14:04.269 - alpha.proxy_rpc: received tree of size 115
+    Apr 21 11:14:04.268 - proxy_rpc: /chains/<main>/blocks/<head>/context/raw/bytes/contracts/index
+    Apr 21 11:14:04.269 - proxy_rpc: received tree of size 115
     Apr 21 11:14:06.511 - proxy_getter: Cache hit: (v1/constants)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (v1/cycle_eras)
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (pending_migration_balance_updates)
@@ -179,7 +179,7 @@ In the meantime, in the proxy server's terminal, you should see:
     Apr 21 11:14:06.512 - proxy_getter: Cache hit: (contracts/index)
 
 The last four lines show that the proxy server is answering the request
-without delegating anything to the node: there is no ``alpha.proxy_rpc`` line.
+without delegating anything to the node: there is no ``proxy_rpc`` line.
 The proxy server is reusing the data it obtained for ``<head>`` from
 the first request, because less than ``time_between_block`` (``15`` seconds)
 have passed.
@@ -214,11 +214,11 @@ Now the output in the proxy server terminal should be:
 
 ::
 
-    Apr 21 11:22:44.359 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
-    Apr 21 11:22:44.360 - alpha.proxy_rpc: proxy cache created for chain main and block head
+    Apr 21 11:22:44.359 - proxy_rpc: chains/<main>/blocks/<head>/header
+    Apr 21 11:22:44.360 - proxy_rpc: proxy cache created for chain main and block head
     Apr 21 11:22:59.362 - proxy_services: clearing data for chain main and block head
 
-There are far fewer ``alpha.proxy_rpc`` lines! That is because the proxy
+There are far fewer ``proxy_rpc`` lines! That is because the proxy
 server obtained its data by reading the node's data-dir, instead of performing RPC calls.
 
 .. _additional_arguments:
