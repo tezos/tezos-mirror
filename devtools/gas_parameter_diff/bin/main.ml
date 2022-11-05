@@ -23,8 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* The input CSV files have only two rows: one for the parameter name
+   and one for the inferred value. *)
 type csv_input_column = string * string
 
+(* But they can have any number of columns. *)
 type csv_input_table = csv_input_column list
 
 let parse_input_csv file : csv_input_table =
@@ -34,28 +37,27 @@ let parse_input_csv file : csv_input_table =
   assert (List.length first_line = List.length second_line) ;
   List.combine first_line second_line
 
+(* Returns names1 @ List.map fst table2 but without the duplicates *)
+let merge_params names1 table2 =
+  names1
+  @ List.filter_map
+      (fun (name, _value) -> if List.mem name names1 then None else Some name)
+      table2
+
 let () =
-  assert (Array.length Sys.argv = 3) ;
-  let file1 = Sys.argv.(1) in
-  let file2 = Sys.argv.(2) in
-  let table1 = parse_input_csv file1 in
-  let table2 = parse_input_csv file2 in
-  if List.length table1 <> List.length table2 then
-    Printf.eprintf
-      "%s has %d entries but %s has %d entries\n"
-      file1
-      (List.length table1)
-      file2
-      (List.length table2) ;
+  let len = Array.length Sys.argv - 1 in
+  let tables = Array.init len (fun i -> parse_input_csv Sys.argv.(i + 1)) in
+  let all_param_names = Array.fold_left merge_params [] tables in
   List.iter
-    (fun (name, _value2) ->
-      if not (List.mem_assoc name table1) then
-        Printf.eprintf "%s not found in %s\n" name file1)
-    table2 ;
-  List.iter
-    (fun (name, value1) ->
-      let value2 = List.assoc_opt name table2 in
-      match value2 with
-      | None -> Printf.eprintf "%s not found in %s\n" name file2
-      | Some value2 -> Printf.printf "%s,%s,%s\n" name value1 value2)
-    table1
+    (fun name ->
+      Printf.printf "%s," name ;
+      Array.iter
+        (fun table ->
+          let value = List.assoc_opt name table in
+          (match value with
+          | None -> ()
+          | Some value -> Printf.printf "%s" value) ;
+          Printf.printf ",")
+        tables ;
+      Printf.printf "\n")
+    all_param_names
