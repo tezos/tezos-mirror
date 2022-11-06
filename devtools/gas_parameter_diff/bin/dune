@@ -1,0 +1,7 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name gas_parameter_diff)
+ (package internal-devtools))
