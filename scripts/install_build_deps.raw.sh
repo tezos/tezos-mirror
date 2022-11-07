@@ -41,7 +41,7 @@ OPAMASSUMEDEPEXTS=true opam install conf-rust
 # will be intepreted as a string and not as a list of strings leading to
 # an error.
 # shellcheck disable=SC2086
-opam install opam/octez-deps.opam --deps-only --criteria="-notuptodate,-changed,-removed"
+opam install opam/virtual/octez-deps.opam --deps-only --criteria="-notuptodate,-changed,-removed"
 
 if [ "$1" = "--tps" ]; then
     opam install caqti-driver-postgresql

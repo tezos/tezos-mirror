@@ -642,7 +642,7 @@ type with_test = Always | Never | Only_on_64_arch
       library interface. They are not part of the toplevel module of the library.
 
     - [profile]: the name of the profile to which the target belongs.
-      For each profile, a file [opam/<PROFILE_NAME>.opam] is generated.
+      For each profile, a file [opam/virtual/<PROFILE_NAME>.opam] is generated.
       This file depends on all external dependencies on which targets that belong
       to this profile depend on, and contains no build instructions.
       It is thus a good basis for [opam lock] to generate a [<PROFILE_NAME>.opam.locked] file.
@@ -1051,7 +1051,7 @@ val open_if : ?m:string -> bool -> target -> target
     more information about profiles.
 
     Use [add_dep_to_profile profile dep] to add [dep] as a dependency to the
-    [opam/profile.opam] file without having to add it as a dependency of an
+    [opam/virtual/profile.opam] file without having to add it as a dependency of an
     actual package. *)
 val add_dep_to_profile : string -> target -> unit
 

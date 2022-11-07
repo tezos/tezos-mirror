@@ -7,11 +7,11 @@ script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 echo "## Checking installed dependencies..."
 echo
 
-if ! opam install opam/octez-deps.opam --deps-only --with-test --show-actions | grep "Nothing to do." > /dev/null 2>&1 ; then
+if ! opam install opam/virtual/octez-deps.opam --deps-only --with-test --show-actions | grep "Nothing to do." > /dev/null 2>&1 ; then
     echo
     echo 'Failure! Missing actions:'
     echo
-    opam install opam/octez-deps.opam --deps-only --with-test --show-actions
+    opam install opam/virtual/octez-deps.opam --deps-only --with-test --show-actions
     echo
     echo 'Failed! Please read the doc in `./scripts/update_opam_repo.sh` and act accordingly.'
     echo

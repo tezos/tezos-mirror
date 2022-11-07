@@ -27,6 +27,7 @@ depends: [
   "conf-libev"
   "conf-rust"
   "ctypes" { >= "0.18.0" }
+  "ctypes-foreign" { >= "0.18.0" }
   "ctypes_stubs_js"
   "data-encoding" { >= "0.6" & < "0.7" }
   "digestif" { >= "0.7.3" }
@@ -92,7 +93,7 @@ depends: [
   "tezos-bls12-381-polynomial" { >= "0.1.0" }
   "tezos-plompiler" { >= "0.1.2" }
   "tezos-plonk" { >= "0.1.2" }
-  "tezos-rust-libs" { = "1.1" }
+  "tezos-rust-libs" { = "1.2" }
   "tls" { >= "0.10" }
   "uri" { >= "2.2.0" }
   "uutf"
