@@ -41,6 +41,14 @@ let error fmt =
       Format.eprintf "Error: %s" s)
     fmt
 
+let pp_do_not_edit ~comment_start fmt () =
+  Format.fprintf
+    fmt
+    "%s This file was automatically generated, do not edit.@.%s Edit file \
+     manifest/main.ml instead.@."
+    comment_start
+    comment_start
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -1843,10 +1851,10 @@ let profile_deps : Target.t list String_map.t ref = ref String_map.empty
 let add_dep_to_profile profile = function
   | None -> ()
   | Some dep ->
-     let old =
-       String_map.find_opt profile !profile_deps |> Option.value ~default:[]
-     in
-     profile_deps := String_map.add profile (dep :: old) !profile_deps
+      let old =
+        String_map.find_opt profile !profile_deps |> Option.value ~default:[]
+      in
+      profile_deps := String_map.add profile (dep :: old) !profile_deps
 
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
@@ -2153,10 +2161,7 @@ let generate_dune_files () =
   in
   let dunes = List.map generate_dune internals in
   write (path // "dune") @@ fun fmt ->
-  Format.fprintf
-    fmt
-    "; This file was automatically generated, do not edit.@.; Edit file \
-     manifest/main.ml instead.@.@." ;
+  Format.fprintf fmt "%a@." (pp_do_not_edit ~comment_start:";") () ;
   let env = Env.empty in
   let env =
     match node_preload with
@@ -2459,12 +2464,8 @@ let generate_opam_files () =
   Target.iter_internal_by_opam @@ fun package internals ->
   let opam = generate_opam package internals in
   write ("opam/" ^ package ^ ".opam") @@ fun fmt ->
-  Format.fprintf
-    fmt
-    "# This file was automatically generated, do not edit.@.# Edit file \
-     manifest/main.ml instead.@.%a"
-    Opam.pp
-    opam
+  pp_do_not_edit ~comment_start:"#" fmt () ;
+  Opam.pp fmt opam
 
 let generate_opam_files_for_release packages_dir release =
   Target.iter_internal_by_opam @@ fun package internal_pkgs ->
@@ -2499,8 +2500,7 @@ let generate_dune_project_files () =
     in
     let allow_empty = if not has_public_target then "(allow_empty)" else "" in
     Format.fprintf fmt "(package (name %s)%s)@." package allow_empty ) ;
-  Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
-  Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
+  pp_do_not_edit ~comment_start:";" fmt ()
 
 let generate_package_json_file () =
   let l = ref [] in
@@ -2622,8 +2622,7 @@ let generate_workspace env dune =
   pp_dune fmt Dune.[Env.to_s_expr env] ;
   pp_dune fmt dune ;
   Format.fprintf fmt "@." ;
-  Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
-  Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
+  pp_do_not_edit ~comment_start:";" fmt ()
 
 let find_opam_and_dune_files =
   let root = "." in
@@ -2960,8 +2959,7 @@ let generate_opam_ci () =
       let (_ : int) = compute_rank package_name in
       ()) ;
   write ".gitlab/ci/opam-ci.yml" @@ fun fmt ->
-  Format.fprintf fmt "# This file was automatically generated, do not edit.@." ;
-  Format.fprintf fmt "# Edit file manifest/manifest.ml instead.@." ;
+  pp_do_not_edit ~comment_start:"#" fmt () ;
   (* Decide whether an opam package should be tested in the CI or
      not. If not, remove it from [rank] so that we do not consider it in
      the later stage. *)
@@ -3141,12 +3139,8 @@ let generate_profiles ~default_profile =
       }
     in
     write ("opam/virtual/" ^ profile ^ ".opam") @@ fun fmt ->
-    Format.fprintf
-      fmt
-      "# This file was automatically generated, do not edit.@.# Edit file \
-       manifest/main.ml instead.@.%a"
-      Opam.pp
-      opam
+    pp_do_not_edit ~comment_start:"#" fmt () ;
+    Opam.pp fmt opam
   in
   let merged =
     let merge _profile m1 m2 =

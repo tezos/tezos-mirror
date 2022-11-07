@@ -15,4 +15,4 @@
 (context (default (paths (ORIGINAL_PATH :standard))))
 
 ; This file was automatically generated, do not edit.
-; Edit file manifest/manifest.ml instead.
+; Edit file manifest/main.ml instead.
