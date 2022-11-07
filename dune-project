@@ -220,4 +220,4 @@
 (package (name tezt-self-tests))
 (package (name tezt-tezos))
 ; This file was automatically generated, do not edit.
-; Edit file manifest/manifest.ml instead.
+; Edit file manifest/main.ml instead.
