@@ -389,7 +389,7 @@ let tezt_core_lib =
 let tezt_js_lib = external_sublib tezt_lib ~js_compatible:true "tezt.js"
 
 let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
-    ?synopsis l =
+    ?synopsis ?opam_with_test l =
   tezt_without_tezt_lib_dependency
     ~opam
     ~path
@@ -401,6 +401,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(deps = []) ?dep_globs ?dep_files
     ~js_deps:[tezt_js_lib]
     ?dep_globs
     ?dep_files
+    ?opam_with_test
     l
 
 let octez_test_helpers =

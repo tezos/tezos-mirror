@@ -1787,12 +1787,14 @@ type tezt_target = {
   js_compatible : bool option;
   modes : Dune.mode list option;
   synopsis : string option;
+  opam_with_test : with_test option;
 }
 
 let tezt_targets_by_path : tezt_target String_map.t ref = ref String_map.empty
 
 let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
-    ?(js_deps = []) ?(dep_globs = []) ?(dep_files = []) ?synopsis modules =
+    ?(js_deps = []) ?(dep_globs = []) ?(dep_files = []) ?synopsis
+    ?opam_with_test modules =
   if String_map.mem path !tezt_targets_by_path then
     invalid_arg
       ("cannot call Manifest.tezt twice for the same directory: " ^ path) ;
@@ -1808,6 +1810,7 @@ let tezt ~opam ~path ?js_compatible ?modes ?(lib_deps = []) ?(exe_deps = [])
       js_compatible;
       modes;
       synopsis;
+      opam_with_test;
     }
   in
   tezt_targets_by_path := String_map.add path tezt_target !tezt_targets_by_path
@@ -1826,6 +1829,7 @@ let register_tezt_targets ~make_tezt_exe =
         js_compatible;
         modes;
         synopsis;
+        opam_with_test;
       } =
     let path_with_underscores =
       String.map (function '-' | '/' -> '_' | c -> c) path
@@ -1857,6 +1861,7 @@ let register_tezt_targets ~make_tezt_exe =
           ~dep_globs
           ~dep_files
           ~modules:[exe_name]
+          ?opam_with_test
           ~dune:
             Dune.
               [
