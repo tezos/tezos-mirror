@@ -61,7 +61,7 @@ let parse_size = function
 let parse_typ json =
   match Ezjsonm.get_string json with
   | "void" -> Void
-  | "int" -> Int
+  | "uint32" -> Int
   | "buffer" -> Buffer
   | "bool" -> Bool
   | _ -> assert false
@@ -94,13 +94,21 @@ let parse_entry ~js_mod_name ~js_fun_name json =
   let return = parse_typ (field "type" (field "return" json)) in
   {js_mod_name; js_fun_name; wasm_fun_name; args; return}
 
+(* The generator does not currently support the format used to define these
+ * modules in api.json. They are not used in lib_hacl, so no bindings are
+ * required for them. *)
+let exclude_modules = ["Bignum_64"; "Bignum_Montgomery_64"; "EverCrypt_Hash"]
+
 let parse_file file : t list =
   let ic = open_in file in
   let json = Ezjsonm.from_channel ic in
   close_in ic ;
   List.concat_map
     (fun (js_mod_name, json) ->
-      List.map
-        (fun (js_fun_name, json) -> parse_entry ~js_mod_name ~js_fun_name json)
-        (Ezjsonm.get_dict json))
+      if List.mem js_mod_name exclude_modules then []
+      else
+        List.map
+          (fun (js_fun_name, json) ->
+            parse_entry ~js_mod_name ~js_fun_name json)
+          (Ezjsonm.get_dict json))
     (Ezjsonm.get_dict json)

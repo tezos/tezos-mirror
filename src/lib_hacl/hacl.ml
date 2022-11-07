@@ -203,11 +203,12 @@ module Secretbox = struct
   let genkey () = Rand.gen 32
 
   let secretbox ~key ~nonce ~msg ~cmsg =
-    if Hacl.NaCl.Noalloc.Easy.secretbox ~pt:msg ~n:nonce ~key ~ct:cmsg then ()
+    if Hacl.NaCl.Noalloc.Easy.secretbox ~pt:msg ~n:nonce ~key ~ct:cmsg () then
+      ()
     else failwith "Secretbox encryption failed"
 
   let secretbox_open ~key ~nonce ~cmsg ~msg =
-    Hacl.NaCl.Noalloc.Easy.secretbox_open ~ct:cmsg ~n:nonce ~key ~pt:msg
+    Hacl.NaCl.Noalloc.Easy.secretbox_open ~ct:cmsg ~n:nonce ~key ~pt:msg ()
 end
 
 module Box = struct
@@ -297,30 +298,20 @@ module Box = struct
     | None -> failwith "Error computing box_beforenm"
 
   let box ~k:(Ck k) ~nonce ~msg ~cmsg =
-    if not @@ Hacl.NaCl.Noalloc.Easy.box_afternm ~pt:msg ~n:nonce ~ck:k ~ct:cmsg
+    if
+      not
+      @@ Hacl.NaCl.Noalloc.Easy.box_afternm ~pt:msg ~n:nonce ~ck:k ~ct:cmsg ()
     then failwith "Box: encryption error"
 
   let box_open ~k:(Ck k) ~nonce ~cmsg ~msg =
-    Hacl.NaCl.Noalloc.Easy.box_open_afternm ~ct:cmsg ~n:nonce ~ck:k ~pt:msg
+    Hacl.NaCl.Noalloc.Easy.box_open_afternm ~ct:cmsg ~n:nonce ~ck:k ~pt:msg ()
 
   let box_noalloc ~k:(Ck k) ~nonce ~tag ~buf =
-    if
-      not
-      @@ Hacl.NaCl.Noalloc.Detached.box_afternm
-           ~pt:buf
-           ~n:nonce
-           ~ck:k
-           ~ct:buf
-           ~tag
+    if not @@ Hacl.NaCl.Noalloc.Detached.box_afternm ~buf ~n:nonce ~ck:k ~tag ()
     then failwith "Box: encryption error"
 
   let box_open_noalloc ~k:(Ck k) ~nonce ~tag ~buf =
-    Hacl.NaCl.Noalloc.Detached.box_open_afternm
-      ~pt:buf
-      ~n:nonce
-      ~ck:k
-      ~ct:buf
-      ~tag
+    Hacl.NaCl.Noalloc.Detached.box_open_afternm ~buf ~n:nonce ~ck:k ~tag ()
 end
 
 module type SIGNATURE = sig
