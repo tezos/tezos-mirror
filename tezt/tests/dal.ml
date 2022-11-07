@@ -125,7 +125,7 @@ let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
-  let* () = Client.bake_for tezos_client in
+  let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
 let with_dal_node tezos_node f key =
