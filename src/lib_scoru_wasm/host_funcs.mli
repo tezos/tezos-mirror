@@ -69,6 +69,8 @@ module Error : sig
             exceeds the authorized limit. Has code `-7`. *)
     | Generic_invalid_access
         (** Generic error code for unexpected errors. Has code `-8`. *)
+    | Store_readonly_value
+        (** A value cannot be modified if it is readonly. Has code `-9`. *)
 
   (** [code error] returns the error code associated to the error. *)
   val code : t -> int32

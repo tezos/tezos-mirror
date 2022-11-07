@@ -40,6 +40,8 @@ exception Durable_empty = Storage.Durable_empty
 
 exception Out_of_bounds of (int64 * int64)
 
+exception Readonly_value
+
 let encoding = E.wrapped_tree
 
 let of_storage ~default s =
@@ -49,7 +51,7 @@ let of_storage_exn s = T.select @@ Storage.to_tree_exn s
 
 let to_storage d = Storage.of_tree @@ T.wrap d
 
-type key = string list
+type key = Writeable of string list | Readonly of string list
 
 (* A key is bounded to 250 bytes, including the implicit '/durable' prefix.
    Additionally, values are implicitly appended with '_'. **)
@@ -73,7 +75,9 @@ let key_of_string_exn s =
         (String.iter assert_valid_char x ;
          true))
   in
-  if all_steps_valid key then key else raise (Invalid_key s)
+  if all_steps_valid key then
+    match key with "readonly" :: _ | [] -> Readonly key | _ -> Writeable key
+  else raise (Invalid_key s)
 
 let key_of_string_opt s =
   try Some (key_of_string_exn s) with Invalid_key _ -> None
@@ -88,8 +92,15 @@ let key_of_string_opt s =
 *)
 let to_value_key k = List.append k ["_"]
 
+let assert_key_writeable = function
+  | Readonly _ -> raise Readonly_value
+  | Writeable _ -> ()
+
+let key_contents = function Readonly k | Writeable k -> k
+
 let find_value tree key =
   let open Lwt.Syntax in
+  let key = key_contents key in
   let* opt = T.find_tree tree @@ to_value_key key in
   match opt with
   | None -> Lwt.return_none
@@ -99,25 +110,28 @@ let find_value tree key =
 
 let find_value_exn tree key =
   let open Lwt.Syntax in
-  let* opt = T.find_tree tree @@ to_value_key key in
-  match opt with
-  | None -> raise Not_found
-  | Some subtree -> Runner.decode E.chunked_byte_vector subtree
+  let+ opt = find_value tree key in
+  match opt with None -> raise Not_found | Some value -> value
 
 (** helper function used in the copy/move *)
 let find_tree_exn tree key =
   let open Lwt.Syntax in
-  let* opt = T.find_tree tree key in
-  match opt with None -> raise Not_found | Some subtree -> Lwt.return subtree
+  let key = key_contents key in
+  let+ opt = T.find_tree tree key in
+  match opt with None -> raise Not_found | Some subtree -> subtree
 
-let copy_tree_exn tree from_key to_key =
+let copy_tree_exn tree ?(edit_readonly = false) from_key to_key =
   let open Lwt.Syntax in
+  if not edit_readonly then assert_key_writeable to_key ;
   let* move_tree = find_tree_exn tree from_key in
+  let to_key = key_contents to_key in
   T.add_tree tree to_key move_tree
 
-let count_subtrees tree key = T.length tree key
+let count_subtrees tree key = T.length tree @@ key_contents key
 
-let delete tree key = T.remove tree key
+let delete tree key =
+  assert_key_writeable key ;
+  T.remove tree @@ key_contents key
 
 let subtree_name_at tree key index =
   let open Lwt.Syntax in
@@ -131,13 +145,15 @@ let subtree_name_at tree key index =
 
 let move_tree_exn tree from_key to_key =
   let open Lwt.Syntax in
+  assert_key_writeable from_key ;
+  assert_key_writeable to_key ;
   let* move_tree = find_tree_exn tree from_key in
   let* tree = delete tree from_key in
-  T.add_tree tree to_key move_tree
+  T.add_tree tree (key_contents to_key) move_tree
 
 let hash tree key =
   let open Lwt.Syntax in
-  let+ opt = T.find_tree tree @@ to_value_key key in
+  let+ opt = T.find_tree tree @@ to_value_key @@ key_contents key in
   Option.map (fun subtree -> T.hash subtree) opt
 
 let hash_exn tree key =
@@ -149,12 +165,14 @@ let hash_exn tree key =
 let max_store_io_size = 4096L
 
 let write_value_exn tree key offset bytes =
+  assert_key_writeable key ;
+
   let open Lwt.Syntax in
   let open Tezos_lazy_containers in
   let num_bytes = Int64.of_int @@ String.length bytes in
   assert (num_bytes <= max_store_io_size) ;
 
-  let key = to_value_key key in
+  let key = to_value_key @@ key_contents key in
   let* opt = T.find_tree tree key in
   let encoding = E.scope key E.chunked_byte_vector in
   let* value =
@@ -187,3 +205,7 @@ let read_value_exn tree key offset num_bytes =
   in
   let+ bytes = Chunked_byte_vector.load_bytes value offset num_bytes in
   Bytes.to_string bytes
+
+module Internal_for_tests = struct
+  let key_is_readonly = function Readonly _ -> true | Writeable _ -> false
+end

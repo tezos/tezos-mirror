@@ -40,6 +40,9 @@ exception Out_of_bounds of (int64 * int64)
 (** [Durable_storage.t] was empty. *)
 exception Durable_empty
 
+(** Cannot modify a readonly value. *)
+exception Readonly_value
+
 (** [encoding] is a [Tezos_tree_encoding] for [t]. *)
 val encoding : t Tezos_tree_encoding.t
 
@@ -76,11 +79,19 @@ val find_value_exn :
   t -> key -> Tezos_lazy_containers.Chunked_byte_vector.t Lwt.t
 
 (** [copy_tree_exn tree from_key to_key] produces a new tree in which a copy of
-    the entire subtree at from_key is copied to to_key.*)
-val copy_tree_exn : t -> key -> key -> t Lwt.t
+    the entire subtree at from_key is copied to to_key.
+
+    [~edit_readonly:true] allows a a tree to be copied into a readonly location.
+
+    @raise Readonly_value
+*)
+val copy_tree_exn : t -> ?edit_readonly:bool -> key -> key -> t Lwt.t
 
 (** [move_tree_exn tree from_key to_key] produces a new tree in which
-    the entire subtree at from_key is moved to to_key.*)
+    the entire subtree at from_key is moved to to_key.
+
+    @raise Readonly_value
+*)
 val move_tree_exn : t -> key -> key -> t Lwt.t
 
 (** [count_subtrees durable key] returns the number of subtrees under [key]. *)
@@ -90,7 +101,10 @@ val count_subtrees : t -> key -> int Lwt.t
     under [key]. *)
 val subtree_name_at : t -> key -> int -> string Lwt.t
 
-(** [delete durable key] deletes the value at and/or subtrees of [key]. *)
+(** [delete durable key] deletes the value at and/or subtrees of [key].
+
+    @raise Readonly_value
+*)
 val delete : t -> key -> t Lwt.t
 
 (** [hash durable key] retrieves the tree hash of the value at the given [key].
@@ -111,6 +125,7 @@ val hash_exn : t -> key -> Context_hash.t Lwt.t
     If no value at [key] exists, it is created.
 
     @raise Out_of_bounds
+    @raise Readonly_value
 *)
 val write_value_exn : t -> key -> int64 -> string -> t Lwt.t
 
@@ -121,3 +136,7 @@ val write_value_exn : t -> key -> int64 -> string -> t Lwt.t
     @raise Out_of_bounds when [offset] is larger than the value.
 *)
 val read_value_exn : t -> key -> int64 -> int64 -> string Lwt.t
+
+module Internal_for_tests : sig
+  val key_is_readonly : key -> bool
+end
