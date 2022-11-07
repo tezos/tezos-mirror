@@ -8,8 +8,8 @@ These are the scripts used to run on a regular basis all the benchmarks for the 
 
 The actual script being run by Cron can be displayed with `crontab -l` from `mclaren`, and edited with `crontab -e`. Right now, it is:
 ```
-* 20 * * fri bash /data/tezos-benchmarks/cronjob.sh
-* 20 * * tue bash /data/tezos-benchmarks/cronjob.sh
+0 20 * * fri bash /data/tezos-benchmarks/cronjob.sh
+0 20 * * tue bash /data/tezos-benchmarks/cronjob.sh
 ```
 
 ## Directory structure
