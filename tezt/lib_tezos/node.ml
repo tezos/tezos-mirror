@@ -670,7 +670,12 @@ let runlike_command_arguments node command arguments =
         (* FIXME spawn an ssh tunnel in case of remote host *)
         ("0.0.0.0:", "0.0.0.0:")
   in
-  let arguments = node.persistent_state.arguments @ arguments in
+  let arguments =
+    List.fold_left
+      add_missing_argument
+      arguments
+      node.persistent_state.arguments
+  in
   let command_args = make_arguments arguments in
   let command_args =
     match node.persistent_state.advertised_net_port with
