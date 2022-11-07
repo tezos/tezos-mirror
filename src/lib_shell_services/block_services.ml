@@ -1209,7 +1209,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           [
             case
               ~title:"new_encoding_pending_operations"
-              Json_only
+              (Tag 1)
               version_1_encoding
               (function
                 | Version_1 pending_operations -> Some pending_operations
