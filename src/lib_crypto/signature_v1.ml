@@ -551,12 +551,7 @@ type signature =
   | Bls of Bls.t
   | Unknown of Bytes.t
 
-type prefix =
-  | Ed25519_prefix
-  | Secp256k1_prefix
-  | P256_prefix
-  | Bls_prefix of Bytes.t
-  | Unknown_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t
 
 type splitted = {prefix : prefix option; suffix : Bytes.t}
 
@@ -723,43 +718,25 @@ let of_bls s = Bls s
 
 let zero = of_ed25519 Ed25519.zero
 
+(* NOTE: At the moment, only BLS signatures can be encoded with a tag. We impose
+   this restriction so that there is only one valid binary representation for a
+   same signature (modulo malleability).
+
+   We reserve the tags 0, 1, 2 and 255 for tags of the other signatures if we
+   decide to unify signature representation one day.*)
 let prefix_encoding =
   let open Data_encoding in
   def
-    "signature_prefix"
-    ~description:"The prefix of a signature, if it is more that 64 bytes long"
+    "bls_signature_prefix"
+    ~description:"The prefix of a BLS signature, i.e. the first 32 bytes."
   @@ union
        [
-         case
-           (Tag 0)
-           ~title:"Ed25519_prefix"
-           unit
-           (function Ed25519_prefix -> Some () | _ -> None)
-           (function () -> Ed25519_prefix);
-         case
-           (Tag 1)
-           ~title:"Secp256k1_prefix"
-           unit
-           (function Secp256k1_prefix -> Some () | _ -> None)
-           (function () -> Secp256k1_prefix);
-         case
-           (Tag 2)
-           ~title:"P256_prefix"
-           unit
-           (function P256_prefix -> Some () | _ -> None)
-           (function () -> P256_prefix);
          case
            (Tag 3)
            ~title:"Bls_prefix"
            (Fixed.bytes (Bls.size - Ed25519.size))
-           (function Bls_prefix x -> Some x | _ -> None)
+           (function Bls_prefix x -> Some x)
            (function x -> Bls_prefix x);
-         case
-           (Tag 255)
-           ~title:"Unknown_prefix"
-           bytes
-           (function Unknown_prefix x -> Some x | _ -> None)
-           (function x -> Unknown_prefix x);
        ]
 
 let split_signature = function
@@ -771,30 +748,16 @@ let split_signature = function
       let suffix = Bytes.sub s 32 64 in
       {prefix = Some (Bls_prefix prefix); suffix}
   | Unknown s ->
-      let prefix_len = Bytes.length s - 64 in
-      if Compare.Int.(prefix_len <= 0) then {prefix = None; suffix = s}
-      else
-        let prefix = Bytes.sub s 0 prefix_len in
-        let suffix = Bytes.sub s prefix_len 64 in
-        {prefix = Some (Unknown_prefix prefix); suffix}
+      assert (Compare.Int.(Bytes.length s = 64)) ;
+      {prefix = None; suffix = s}
 
 let of_splitted {prefix; suffix} =
   let open Option_syntax in
   match prefix with
   | None -> of_bytes_opt suffix
-  | Some Ed25519_prefix ->
-      let+ s = Ed25519.of_bytes_opt suffix in
-      Ed25519 s
-  | Some Secp256k1_prefix ->
-      let+ s = Secp256k1.of_bytes_opt suffix in
-      Secp256k1 s
-  | Some P256_prefix ->
-      let+ s = P256.of_bytes_opt suffix in
-      P256 s
   | Some (Bls_prefix prefix) ->
       let+ s = Bls.of_bytes_opt (Bytes.cat prefix suffix) in
       Bls s
-  | Some (Unknown_prefix prefix) -> Some (Unknown (Bytes.cat prefix suffix))
 
 let bytes_of_watermark = function
   | Block_header chain_id ->

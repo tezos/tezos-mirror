@@ -1958,9 +1958,9 @@ module Encoding = struct
      | 6C |  ... | 00 | ff |   03 (BLS)    | (96 bytes BLS signature) |
      +----+------+----+----+---------------+--------------------------+
 
-     NOTE: Both formats (tagged and untagged) are supported for Ed25519,
-     Secp256k1 and P256 signatures. (We can write the previous data for
-     Ed25519 as |6C|...|00|ff|00|signature|).
+     NOTE: BLS only supports the tagged format and Ed25519, Secp256k1 and P256
+     signatures only support the untagged one. The latter restriction is only
+     here to guarantee unicity of the binary representation for signatures.
   *)
   let protocol_data_encoding =
     def "operation.alpha.contents_and_signature"

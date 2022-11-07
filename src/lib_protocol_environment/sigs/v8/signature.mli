@@ -49,12 +49,7 @@ type signature =
   | Bls of Bls.t
   | Unknown of Bytes.t
 
-type prefix =
-  | Ed25519_prefix
-  | Secp256k1_prefix
-  | P256_prefix
-  | Bls_prefix of Bytes.t
-  | Unknown_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t
 
 include
   S.SPLIT_SIGNATURE

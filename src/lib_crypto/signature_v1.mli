@@ -61,12 +61,7 @@ type signature =
 
 (** A signature prefix holds data only for signature that are more than 64 bytes
     long.  *)
-type prefix =
-  | Ed25519_prefix
-  | Secp256k1_prefix
-  | P256_prefix
-  | Bls_prefix of Bytes.t
-  | Unknown_prefix of Bytes.t
+type prefix = Bls_prefix of Bytes.t
 
 include
   S.SPLIT_SIGNATURE
