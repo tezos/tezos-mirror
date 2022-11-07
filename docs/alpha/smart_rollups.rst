@@ -310,6 +310,7 @@ This can be checked by:
 that must return:
 
 ::
+
    { "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
      "next_protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 
@@ -492,7 +493,6 @@ processes the inbox of each level.
 
 Sending an external inbox message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 
 .. _sending_internal_inbox_message:
 
