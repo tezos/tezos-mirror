@@ -25,20 +25,23 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
 
 (** Testing
     -------
-    Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
-    Subject:      Unit tests for [Prevalidation]
+    Component:    Legacy_prevalidation
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidation.exe
+    Subject:      Unit tests for [Legacy_prevalidation]
 *)
+
+module Prevalidation = Legacy_prevalidation
 
 let test_safe_decode () =
   let exception Custom_exception of string in
@@ -61,7 +64,7 @@ let test_safe_decode () =
       true)
 
 open Tezos_requester
-module Classification = Prevalidator_classification
+module Classification = Legacy_prevalidator_classification
 
 module Parameters :
   Requester_impl.PARAMETERS

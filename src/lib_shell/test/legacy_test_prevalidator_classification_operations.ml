@@ -25,13 +25,14 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
 
 (** Testing
     -------
@@ -43,7 +44,10 @@
 
 open Lib_test.Qcheck2_helpers
 module Op_map = Operation_hash.Map
-module Classification = Prevalidator_classification
+module Prevalidation = Legacy_prevalidation
+module Classification = Legacy_prevalidator_classification
+module Generators = Legacy_generators
+module Generators_tree = Legacy_generators_tree
 module Tree = Generators_tree.Tree
 module List_extra = Generators_tree.List_extra
 module Block = Generators_tree.Block
@@ -335,7 +339,7 @@ module Recyle_operations = struct
       to be distinct from the one in the tree of blocks). This
       generator generates classifications that contains all the
       given operations and hashes, spreading them among the different
-      classes of {!Prevalidator_classification.t}. This generator is NOT
+      classes of {!Legacy_prevalidator_classification.t}. This generator is NOT
       a fully random generator like {!Prevalidator_generators.t_gen}. *)
   let classification_of_ops_gen (ops : unit Prevalidation.operation Op_map.t) :
       unit Classification.t QCheck2.Gen.t =
@@ -353,7 +357,7 @@ module Recyle_operations = struct
     in
     let* classes = list_repeat length Generators.classification_gen in
     assert (List.compare_length_with classes length = 0) ;
-    let t = Prevalidator_classification.create parameters in
+    let t = Classification.create parameters in
     List.iter
       (fun (classification, op) ->
         Generators.add_if_not_present classification op t)
@@ -580,7 +584,7 @@ end
 
 let () =
   Alcotest.run
-    "Prevalidator"
+    "Legacy_prevalidator"
     [
       (* Run only those tests with:
          dune exec src/lib_shell/test/test_prevalidator_classification_operations.exe -- test 'handle_operations' *)

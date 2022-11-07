@@ -25,23 +25,26 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
 
 (** Testing
     -------
-    Component:    Shell (Prevalidator pending operations)
-    Invocation:   dune exec src/lib_shell/test/test_prevalidator_pending_operations.exe
+    Component:    Shell (Legacy prevalidator pending operations)
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidator_pending_operations.exe
     Subject:      Unit tests the Prevalidator pending operations APIs
 *)
 
 open Lib_test.Qcheck2_helpers
-module Pending_ops = Prevalidator_pending_operations
+module Prevalidation = Legacy_prevalidation
+module Pending_ops = Legacy_prevalidator_pending_operations
+module Generators = Legacy_generators
 module CompareListQ = Compare.List (Q)
 
 let pending_of_list =

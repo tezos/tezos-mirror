@@ -25,18 +25,20 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
 
 (** Generators building on top of {!Generators}, that are capable of
     producing trees of blocks. *)
 
-module Classification = Prevalidator_classification
+module Prevalidation = Legacy_prevalidation
+module Classification = Legacy_prevalidator_classification
 
 (** Various functions about {!list} *)
 module List_extra = struct
@@ -289,7 +291,7 @@ module Block = struct
   let set_to_list s = Set.to_seq s |> List.of_seq
 end
 
-module External_generators = Generators
+module External_generators = Legacy_generators
 
 (** [block_gen ?proto_gen ()] generates a block. [proto_gen] is used
     to generate protocol bytes of operations. *)
@@ -419,7 +421,7 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
       list_gen
 
 (** Function to implement
-    {!Prevalidator_classification.chain_tools.new_blocks} *)
+    {!Legacy_prevalidator_classification.chain_tools.new_blocks} *)
 let new_blocks (type a) ~(equal : a -> a -> bool) (tree : a Tree.tree)
     ~from_block ~to_block =
   match Tree.find_ancestor ~equal tree from_block to_block with
@@ -451,7 +453,7 @@ let new_blocks (type a) ~(equal : a -> a -> bool) (tree : a Tree.tree)
           Lwt.return (ancestor, List.rev path))
 
 (** Function to implement
-  {!Prevalidator_classification.chain_tools.read_predecessor_opt} *)
+  {!Legacy_prevalidator_classification.chain_tools.read_predecessor_opt} *)
 let read_predecessor_opt (type a) ~(compare : a -> a -> int)
     (tree : a Tree.tree) (a : a) : a option Lwt.t =
   let module Ord = struct
@@ -466,7 +468,7 @@ let read_predecessor_opt (type a) ~(compare : a -> a -> int)
   Map.find a predecessors_map |> Lwt.return
 
 (** Function providing the instance of
-    {!Prevalidator_classification.chain_tools} for a given {!Tree.tree} *)
+    {!Legacy_prevalidator_classification.chain_tools} for a given {!Tree.tree} *)
 let generic_classification_chain_tools (type a) ~(compare : a -> a -> int)
     (tree : a Tree.tree) : a Classification.chain_tools =
   let equal a b = compare a b = 0 in

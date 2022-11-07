@@ -27,13 +27,14 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the implementation of the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the implementation of the legacy mempool,
+   which is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the files that implement the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the files that implement the more recent mempool for Lima and newer
+   protocols. *)
 
 open Validation_errors
 
@@ -49,7 +50,7 @@ type error += Endorsement_branch_not_live
 let () =
   register_error_kind
     `Permanent
-    ~id:"prevalidation.endorsement_branch_not_live"
+    ~id:"legacy_prevalidation.endorsement_branch_not_live"
     ~title:"Endorsement branch not live"
     ~description:"Endorsement's branch is not in the live blocks"
     ~pp:(fun ppf () ->

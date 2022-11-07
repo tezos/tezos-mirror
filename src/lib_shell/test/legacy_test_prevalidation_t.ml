@@ -25,20 +25,23 @@
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4113
 
-   This file is part of the test suite for the new mempool, which
-   uses features of the protocol that only exist since Lima.
+   This file is part of the test suite for the legacy mempool, which
+   is compatible with Kathmandu and therefore usable on Mainnet.
+
+   This file should be removed once Lima has been activated on Mainnet.
 
    When you modify this file, consider whether you should also change
-   the ones that test the legacy mempool for Kathmandu. They all
-   start with the "legacy" prefix and will be removed when Lima is
-   activated on Mainnet. *)
+   the ones that test the more recent mempool for Lima and newer
+   protocols. *)
 
 (** Testing
     -------
-    Component:    Prevalidation
-    Invocation:   dune exec src/lib_shell/test/test_prevalidation_t.exe
-    Subject:      Unit tests for {!Prevalidation.T}
+    Component:    Legacy_prevalidation
+    Invocation:   dune exec src/lib_shell/test/legacy_test_prevalidation_t.exe
+    Subject:      Unit tests for {!Legacy_prevalidation.T}
 *)
+
+module Prevalidation = Legacy_prevalidation
 
 module Mock_protocol :
   Tezos_protocol_environment.PROTOCOL
@@ -50,7 +53,7 @@ module Mock_protocol :
   include Environment_protocol_T_test.Mock_all_unit
 
   (* We need to override these functions so that they're not [assert
-     false], because the tests below use [Prevalidation.create] which
+     false], because the tests below use [Legacy_prevalidation.create] which
      calls them. *)
 
   let begin_validation _ctxt _chain_id _mode ~predecessor:_ ~cache:_ =
