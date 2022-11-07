@@ -60,6 +60,19 @@ module Mock_protocol :
     Lwt_result_syntax.return_unit
 end
 
+module MakeFilter (Proto : Tezos_protocol_environment.PROTOCOL) :
+  Shell_plugin.FILTER
+    with type Proto.operation_data = Proto.operation_data
+     and type Proto.operation = Proto.operation = Shell_plugin.No_filter (struct
+  let hash = Protocol_hash.zero
+
+  include Proto
+
+  let complete_b58prefix _ = assert false
+end)
+
+module Mock_filter = MakeFilter (Mock_protocol)
+
 module Init = struct
   let genesis_protocol =
     Tezos_crypto.Protocol_hash.of_b58check_exn
@@ -123,8 +136,7 @@ module MakePrevalidation = Prevalidation.Internal_for_tests.Make
 
 let make_prevalidation_mock_protocol ctxt =
   let (module Chain_store) = make_chain_store ctxt in
-  let module Prevalidation_t = MakePrevalidation (Chain_store) (Mock_protocol)
-  in
+  let module Prevalidation_t = MakePrevalidation (Chain_store) (Mock_filter) in
   (module Prevalidation_t : Prevalidation.T
     with type protocol_operation = Mock_protocol.operation
      and type chain_store = unit)
@@ -238,6 +250,8 @@ module Proto_random_apply :
     Lwt.return (if b then Ok ((), ()) else error_with "Operation doesn't apply")
 end
 
+module Filter_random_apply = MakeFilter (Proto_random_apply)
+
 (** Test that [Prevalidation.apply_operations] returns [Outdated]
     for operations in [live_operations] *)
 let test_apply_operation_live_operations ctxt =
@@ -252,7 +266,7 @@ let test_apply_operation_live_operations ctxt =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
   let (module Chain_store) = make_chain_store ctxt in
-  let module P = MakePrevalidation (Chain_store) (Proto_random_apply) in
+  let module P = MakePrevalidation (Chain_store) (Filter_random_apply) in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let op_in_live_operations op =
     Tezos_crypto.Operation_hash.Set.mem
@@ -289,7 +303,7 @@ let test_apply_operation_applied ctxt =
     Init.genesis_block @@ Context_ops.hash ~time:timestamp ctxt
   in
   let (module Chain_store) = make_chain_store ctxt in
-  let module P = MakePrevalidation (Chain_store) (Proto_random_apply) in
+  let module P = MakePrevalidation (Chain_store) (Filter_random_apply) in
   let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let to_applied = P.Internal_for_tests.to_applied in
   let apply_op pv op =

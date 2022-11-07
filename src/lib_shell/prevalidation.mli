@@ -105,11 +105,11 @@ module type T = sig
 end
 
 (** How-to obtain an instance of this module's main module type: {!T} *)
-module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
+module Make : functor (Filter : Shell_plugin.FILTER) ->
   T
-    with type protocol_operation = Proto.operation
-     and type operation_receipt = Proto.operation_receipt
-     and type validation_state = Proto.validation_state
+    with type protocol_operation = Filter.Proto.operation
+     and type operation_receipt = Filter.Proto.operation_receipt
+     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Store.chain_store
 
 (**/**)
@@ -136,11 +136,11 @@ module Internal_for_tests : sig
       for mocking purposes. *)
   module Make : functor
     (Chain_store : CHAIN_STORE)
-    (Proto : Tezos_protocol_environment.PROTOCOL)
+    (Filter : Shell_plugin.FILTER)
     ->
     T
-      with type protocol_operation = Proto.operation
-       and type operation_receipt = Proto.operation_receipt
-       and type validation_state = Proto.validation_state
+      with type protocol_operation = Filter.Proto.operation
+       and type operation_receipt = Filter.Proto.operation_receipt
+       and type validation_state = Filter.Proto.validation_state
        and type chain_store = Chain_store.chain_store
 end

@@ -102,14 +102,14 @@ module type T = sig
   end
 end
 
-module MakeAbstract
-    (Chain_store : CHAIN_STORE)
-    (Proto : Tezos_protocol_environment.PROTOCOL) :
+module MakeAbstract (Chain_store : CHAIN_STORE) (Filter : Shell_plugin.FILTER) :
   T
-    with type protocol_operation = Proto.operation
-     and type operation_receipt = Proto.operation_receipt
-     and type validation_state = Proto.validation_state
+    with type protocol_operation = Filter.Proto.operation
+     and type operation_receipt = Filter.Proto.operation_receipt
+     and type validation_state = Filter.Proto.validation_state
      and type chain_store = Chain_store.chain_store = struct
+  module Proto = Filter.Proto
+
   type protocol_operation = Proto.operation
 
   type operation_receipt = Proto.operation_receipt
@@ -240,13 +240,13 @@ module Production_chain_store :
   let chain_id = Store.Chain.chain_id
 end
 
-module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
+module Make (Filter : Shell_plugin.FILTER) :
   T
-    with type protocol_operation = Proto.operation
-     and type operation_receipt = Proto.operation_receipt
-     and type validation_state = Proto.validation_state
-     and type chain_store = Production_chain_store.chain_store =
-  MakeAbstract (Production_chain_store) (Proto)
+    with type protocol_operation = Filter.Proto.operation
+     and type operation_receipt = Filter.Proto.operation_receipt
+     and type validation_state = Filter.Proto.validation_state
+     and type chain_store = Store.chain_store =
+  MakeAbstract (Production_chain_store) (Filter)
 
 module Internal_for_tests = struct
   module type CHAIN_STORE = CHAIN_STORE

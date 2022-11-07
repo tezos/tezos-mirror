@@ -1645,7 +1645,7 @@ module Make
 end
 
 let make limits chain_db chain_id (module Filter : Shell_plugin.FILTER) : t =
-  let module Prevalidation_t = Prevalidation.Make (Filter.Proto) in
+  let module Prevalidation_t = Prevalidation.Make (Filter) in
   let module Prevalidator =
     Make
       (Filter)
