@@ -88,7 +88,7 @@
                 $('#submit_').mouseup(async function (e) {
                     let location_web = String(window.location.href).split('?')[0]
                     if ((!(isNaN(document.getElementById('selectedLevel_begin').value))) && (!(isNaN(document.getElementById('selectedLevel_end').value))) && (!(isNaN(document.getElementById('selectedThreshold').value)))) {
-                        window.location = location_web + "?threshold=" + document.getElementById('selectedThreshold').value + "&threshold_high=" + "&first_block=" + document.getElementById('selectedLevel_begin').value + "&last_block=" + document.getElementById('selectedLevel_end').value;
+                        window.location = location_web + "?threshold=" + document.getElementById('selectedThreshold').value + "&first_block=" + document.getElementById('selectedLevel_begin').value + "&last_block=" + document.getElementById('selectedLevel_end').value;
                     }
                 });
             } catch (e) {

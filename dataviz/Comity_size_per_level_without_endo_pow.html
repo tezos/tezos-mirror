@@ -59,10 +59,10 @@
                     let dict_data = populate_v1(server_adress, first_bloc, last_bloc).then(dict_data => {
                         console.log(dict_data)
                         let endorsing_power = get_endorsing_power(dict_data)
-                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations(dict_data);
                         console.log("endorsing_power", endorsing_power)
                         console.log("t_op_valide_dict", t_op_valide_dict)
-                        let results = percIntegration_w_endorsing_power(threshold, t_op_valide_dict[0], endorsing_power)
+                        let results = percIntegration(threshold, t_op_valide_dict[0])
                         chart_preendorsement_inclusion_based_on_threshold_time(results)
                     });
                 } else {
@@ -77,10 +77,10 @@
                     document.getElementById("selectedThreshold").value = threshold; 
 
                         let endorsing_power = get_endorsing_power(dict_data)
-                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations(dict_data);
                         console.log("endorsing_power", endorsing_power)
                         console.log("t_op_valide_dict", t_op_valide_dict)
-                        let results = percIntegration_w_endorsing_power(threshold, t_op_valide_dict[0], endorsing_power)
+                        let results = percIntegration(threshold, t_op_valide_dict[0])
                         chart_preendorsement_inclusion_based_on_threshold_time(results)
                     });
 

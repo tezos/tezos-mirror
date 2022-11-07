@@ -44,7 +44,8 @@
                 });
                 // Get the value of "some_key" in eg "https://example.com/?some_key=some_value"
                 let block_value; // "some_value"
-                if (!(isNaN(parseInt(params.block)))) {
+                let most_recent_bloc = getHead(server_adress);
+                if (!(isNaN(parseInt(params.block)))&& most_recent_bloc>=parseInt(params.block)) {
                     block_value = parseInt(params.block);
                     document.getElementById("selectedLevel").value = block_value;
                     let dict_data = populate_v1(server_adress, block_value, block_value).then(dict_data => {

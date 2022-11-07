@@ -67,10 +67,10 @@
                     console.log("ok", range_t)
                     let dict_data = populate_v1(server_adress, first_bloc, last_bloc).then(dict_data => {
                         let endorsing_power = get_endorsing_power(dict_data);
-                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations(dict_data);
                         console.log("endorsing_power", endorsing_power)
                         console.log("t_op_valide_dict", t_op_valide_dict)
-                        let results = SeriesPercIntegration_w_endorsing_power(range_t, t_op_valide_dict[0], endorsing_power)
+                        let results = SeriesPercIntegration(range_t, t_op_valide_dict[0])
                         chart_preendorsement_inclusion_based_on_multiple_threshold_time(results)
 
                     });
@@ -92,10 +92,10 @@
                         document.getElementById("selectedThreshold_end").value = 8;
 
                         let endorsing_power = get_endorsing_power(dict_data);
-                        let t_op_valide_dict = delays_distribution_of_operations_w_delegate(dict_data);
+                        let t_op_valide_dict = delays_distribution_of_operations(dict_data);
                         console.log("endorsing_power", endorsing_power)
                         console.log("t_op_valide_dict", t_op_valide_dict)
-                        let results = SeriesPercIntegration_w_endorsing_power(range_t, t_op_valide_dict[0], endorsing_power)
+                        let results = SeriesPercIntegration(range_t, t_op_valide_dict[0])
                         chart_preendorsement_inclusion_based_on_multiple_threshold_time(results)
                     });
 
@@ -103,7 +103,7 @@
                 $('#submit_').mouseup(async function (e) {
                     let location_web = String(window.location.href).split('?')[0]
                     if ((!(isNaN(document.getElementById('selectedLevel_begin').value))) && (!(isNaN(document.getElementById('selectedLevel_end').value))) && (!(isNaN(document.getElementById('selectedThreshold_beg').value))) && (!(isNaN(document.getElementById('selectedThreshold_end').value)))) {
-                        window.location = location_web + "?threshold_low=" + document.getElementById('selectedThreshold_beg').value + document.getElementById('selectedThreshold_end').value + "&first_bloc=" + document.getElementById('selectedLevel_begin').value + "&last_bloc=" + document.getElementById('selectedLevel_end').value;
+                        window.location = location_web + "?threshold_low=" + document.getElementById('selectedThreshold_beg').value + "&threshold_high=" + document.getElementById('selectedThreshold_end').value + "&first_bloc=" + document.getElementById('selectedLevel_begin').value + "&last_bloc=" + document.getElementById('selectedLevel_end').value;
                     }
                 });
             } catch (e) {

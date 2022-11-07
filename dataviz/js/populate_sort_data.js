@@ -356,18 +356,17 @@ function classify_operations(dict_data, delegate = "", msec = false) {
 
 
 const percIntegration = function (threshold, t_op_pre_valid) {
-    console.log(t_op_pre_valid[2412550])
     let t_cible = threshold;
     var pI_level = {};
     var d3_pI_level = [];
     Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
         pI_level[block] = {};
         try {
-            console.log(typeof (v_block))
             Object.entries(v_block).forEach(([level, v_level]) => {
                 var card_valid_tcible = 0;
                 Object.entries(v_level).forEach(element => {
-                    if (element <= t_cible) {
+                    if (element[1] <= t_cible) {
+                        
                         card_valid_tcible += 1;
                     }
                 });
@@ -411,7 +410,6 @@ const percIntegration_w_endorsing_power = function (threshold, t_op_pre_valid, e
 
 const TimeForPercIntegration = function (threshold, t_op_pre_valid) {
     let l_ = threshold / 100;
-    const qd_ = 25; // number of slots for this block, before including endorsing power
     var t_min_ = {};
     var d3_t_min_ = [];
     Object.entries(t_op_pre_valid).forEach(([block, v_block]) => {
@@ -428,7 +426,7 @@ const TimeForPercIntegration = function (threshold, t_op_pre_valid) {
             block_fin.sort(function (a, b) {
                 return a - b;
             });// sort the receipt delay vector, in ascending order
-            seuil_validation = block_fin[Math.ceil(qd_ * l_)]; // Date on which we have the minimum number of pre endo for the round to be valid
+            seuil_validation = block_fin[Math.ceil(block_fin.length * l_)]; // Date on which we have the minimum number of pre endo for the round to be valid
             t_min_[block] = seuil_validation;
             if (isNaN(seuil_validation) == false) {
                 d3_t_min_.push({ block: (+block), t: (+seuil_validation) });
@@ -1157,7 +1155,7 @@ function chart_time_required(data) {
 
         } catch (e) { console.log(e) }
     } else {
-        alert("erreur")
+        alert("Invalid parameters. Please insert valid block range and threshold included between 0 and 100")
     }
 }
 
@@ -1235,7 +1233,7 @@ function chart_time_required_endorsments(data) {
 
         } catch (e) { console.log(e) }
     } else {
-        alert("erreur")
+        alert("Invalid parameters. Please insert valid block range and threshold included between 0 and 100")
     }
 }
 
