@@ -106,6 +106,8 @@ type t
     so if you do not call [config_init] or generate the configuration file
     through some other means, your node will not listen.
 
+    Default value for [allow_all_rpc] is [true].
+
     The argument list is a list of configuration options that the node
     should run with. It is passed to the first run of [octez-node config init].
     It is also passed to all runs of [octez-node run] that occur before
@@ -125,6 +127,7 @@ val create :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?allow_all_rpc:bool ->
   argument list ->
   t
 
