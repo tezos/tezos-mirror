@@ -124,10 +124,13 @@ val hash_exn : t -> key -> Context_hash.t Lwt.t
 
     If no value at [key] exists, it is created.
 
+    [~edit_readonly:true] allows a value to be written into a readonly location.
+
     @raise Out_of_bounds
     @raise Readonly_value
 *)
-val write_value_exn : t -> key -> int64 -> string -> t Lwt.t
+val write_value_exn :
+  t -> ?edit_readonly:bool -> key -> int64 -> string -> t Lwt.t
 
 (** [read_value durable key offset max_bytes] reads up to [max_bytes]
     bytes from the value at [key], starting at the given [offset].

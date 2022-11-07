@@ -164,8 +164,8 @@ let hash_exn tree key =
 (* The maximum size of bytes allowed to be read/written at once. *)
 let max_store_io_size = 4096L
 
-let write_value_exn tree key offset bytes =
-  assert_key_writeable key ;
+let write_value_exn tree ?(edit_readonly = false) key offset bytes =
+  if not edit_readonly then assert_key_writeable key ;
 
   let open Lwt.Syntax in
   let open Tezos_lazy_containers in

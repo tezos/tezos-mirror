@@ -234,7 +234,12 @@ let unsafe_next_tick_state ({buffers; durable; tick_state; _} as pvm_state) =
       else return Padding
   | Eval {config = {step_kont = Wasm.Eval.(SK_Trapped _msg); _}; _} ->
       let* durable =
-        Durable.write_value_exn durable Constants.stuck_flag_key 0L ""
+        Durable.write_value_exn
+          durable
+          ~edit_readonly:true
+          Constants.stuck_flag_key
+          0L
+          ""
       in
       return ~durable Padding
   | Padding -> return Padding
