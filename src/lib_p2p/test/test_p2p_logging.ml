@@ -207,7 +207,7 @@ module P2p_net = struct
         identity;
         proof_of_work_target = P2p_test_utils.proof_of_work_target;
         trust_discovered_peers = false;
-        reconnection_config = P2p_point_state.Info.default_reconnection_config;
+        reconnection_config = Point_reconnection_config.default;
       }
 
   let p2p_conf =
@@ -230,7 +230,7 @@ module P2p_net = struct
       }
 
   let limits =
-    P2p.
+    P2p_limits.
       {
         connection_timeout = Ptime.Span.zero;
         authentication_timeout = Ptime.Span.of_int_s 60;
