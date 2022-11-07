@@ -3140,7 +3140,7 @@ let generate_profiles ~default_profile =
         x_opam_monorepo_opam_provided = [];
       }
     in
-    write ("opam/" ^ profile ^ ".opam") @@ fun fmt ->
+    write ("opam/virtual/" ^ profile ^ ".opam") @@ fun fmt ->
     Format.fprintf
       fmt
       "# This file was automatically generated, do not edit.@.# Edit file \
