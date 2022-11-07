@@ -168,11 +168,14 @@ let test_inclusion_proof_production (list_of_messages, n) =
              versions of the same inbox.";
         ]
   | Some proof ->
+      let*? found_old_levels_messages =
+        verify_inclusion_proof proof (old_levels_messages inbox)
+        |> Environment.wrap_tzresult
+      in
       fail_unless
-        (verify_inclusion_proof
-           proof
-           (old_levels_messages old_inbox)
-           (old_levels_messages inbox))
+        (Sc_rollup_inbox_repr.equal_history_proof
+           found_old_levels_messages
+           (old_levels_messages old_inbox))
         (err "The produced inclusion proof is invalid.")
 
 let test_inclusion_proof_verification (list_of_messages, n) =
@@ -197,18 +200,21 @@ let test_inclusion_proof_verification (list_of_messages, n) =
             "It should be possible to produce an inclusion proof between two \
              versions of the same inbox.";
         ]
-  | Some proof ->
-      let old_inbox' = Stdlib.List.nth inboxes (Random.int (1 + n)) in
-      fail_unless
-        (equal old_inbox old_inbox'
-        || not
-             (verify_inclusion_proof
-                proof
-                (old_levels_messages old_inbox')
-                (old_levels_messages inbox)))
-        (err
-           "Verification should rule out a valid proof which is not about the \
-            given inboxes.")
+  | Some proof -> (
+      let other_inbox = Stdlib.List.nth inboxes 1 in
+      let res =
+        verify_inclusion_proof proof (old_levels_messages other_inbox)
+        |> Environment.wrap_tzresult
+      in
+      match res with
+      | Error _ -> return_unit
+      | Ok _found_old_levels_messages ->
+          fail
+            [
+              err
+                "It should not be possible to verify an inclusion proof with a \
+                 different inbox.";
+            ])
 
 module Tree = struct
   open Tezos_context_memory.Context
@@ -619,8 +625,10 @@ let test_inclusion_proofs_depending_on_history_capacity
          "Should not be able to get inbox inclusion proofs without a history \
           (i.e., a history with no capacity). ")
   in
+  let*? hp' = verify_inclusion_proof ip1 hp |> Environment.wrap_tzresult in
+  let*? hp'' = verify_inclusion_proof ip2 hp |> Environment.wrap_tzresult in
   fail_unless
-    (I.verify_inclusion_proof ip1 hp hp && I.verify_inclusion_proof ip2 hp hp)
+    (hp = hp' && hp = hp'')
     (err "Inclusion proofs are expected to be valid.")
 
 (** In this test, we make sure that the snapshot of an inbox is taken

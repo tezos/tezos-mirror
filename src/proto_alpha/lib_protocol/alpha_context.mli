@@ -3201,7 +3201,7 @@ module Sc_rollup : sig
       val number_of_proof_steps : inclusion_proof -> int
 
       val verify_inclusion_proof :
-        inclusion_proof -> history_proof -> history_proof -> bool
+        inclusion_proof -> history_proof -> history_proof tzresult
 
       type proof
 

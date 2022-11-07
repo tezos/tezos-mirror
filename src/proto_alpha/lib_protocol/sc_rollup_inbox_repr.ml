@@ -415,7 +415,7 @@ module type Merkelized_operations = sig
   val number_of_proof_steps : inclusion_proof -> int
 
   val verify_inclusion_proof :
-    inclusion_proof -> history_proof -> history_proof -> bool
+    inclusion_proof -> history_proof -> history_proof tzresult
 
   type proof
 
@@ -670,22 +670,35 @@ struct
     in
     aux [] ptr_path
 
-  let verify_inclusion_proof proof a b =
-    let assoc = List.map (fun c -> (hash_history_proof c, c)) proof in
-    let path = List.split assoc |> fst in
-    let deref =
-      let open Hash.Map in
-      let map = of_seq (List.to_seq assoc) in
-      fun ptr -> find_opt ptr map
+  let verify_inclusion_proof inclusion_proof snapshot_history_proof =
+    let open Tzresult_syntax in
+    let rec aux (hash_map, ptr_list) = function
+      | [] -> error (Inbox_proof_error "inclusion proof is empty")
+      | [target] ->
+          let target_ptr = hash_history_proof target in
+          let hash_map = Hash.Map.add target_ptr target hash_map in
+          let ptr_list = target_ptr :: ptr_list in
+          ok (hash_map, List.rev ptr_list, target, target_ptr)
+      | history_proof :: tail ->
+          let ptr = hash_history_proof history_proof in
+          aux (Hash.Map.add ptr history_proof hash_map, ptr :: ptr_list) tail
     in
-    let cell_ptr = hash_history_proof b in
-    let target_ptr = hash_history_proof a in
-    Skip_list.valid_back_path
-      ~equal_ptr:Hash.equal
-      ~deref
-      ~cell_ptr
-      ~target_ptr
-      path
+    let* hash_map, ptr_list, target, target_ptr =
+      aux (Hash.Map.empty, []) inclusion_proof
+    in
+    let deref ptr = Hash.Map.find ptr hash_map in
+    let cell_ptr = hash_history_proof snapshot_history_proof in
+    let* () =
+      error_unless
+        (Skip_list.valid_back_path
+           ~equal_ptr:Hash.equal
+           ~deref
+           ~cell_ptr
+           ~target_ptr
+           ptr_list)
+        (Inbox_proof_error "invalid inclusion proof")
+    in
+    return target
 
   type proof =
     (* See the main docstring for this type (in the mli file) for
@@ -706,51 +719,27 @@ struct
        value at the index [n]; in this case we also must check that
        [history_proof] equals [snapshot] (otherwise, we'd need a [Next_level]
        proof instead. *)
-    | Single_level of {
-        history_proof : history_proof;
-        inc : inclusion_proof;
-        message_proof : P.proof;
-      }
+    | Single_level of {inc : inclusion_proof; message_proof : P.proof}
     (* See the main docstring for this type (in the mli file) for
        definitions of the three proof parameters [starting_point],
        [message] and [snapshot]. In the below we deconstruct
        [starting_point] as [(l, n)] where [l] is a level and [n] is a
        message index.
 
-       In a [Next_level] proof, we prove that:
-
-       - There is no message at [(l, n)] with [lower_message_proof].
-       - [lower_history_proof] belongs to the snapshot with [inc]
+       In a [Next_level] proof, [lower_history_proof] is the skip list cell for
+       the level [l], [inc] is an inclusion proof of [lower_history_proof] into
+       [snapshot] and [lower_message_proof] is a tree proof showing that there
+       is no message at [(l, n)] with [lower_message_proof].
 
        The first message to read at the next level of [l] is the
        first input [Start_of_level].
     *)
-    | Next_level of {
-        lower_message_proof : P.proof;
-        lower_history_proof : history_proof;
-        inc : inclusion_proof;
-      }
+    | Next_level of {lower_message_proof : P.proof; inc : inclusion_proof}
 
   let pp_proof fmt proof =
     match proof with
-    | Single_level {history_proof; _} ->
-        let {hash; level} = Skip_list.content history_proof in
-        Format.fprintf
-          fmt
-          "Single_level inbox proof at %a for level %a"
-          Hash.pp
-          hash
-          Raw_level_repr.pp
-          level
-    | Next_level {lower_history_proof; _} ->
-        let lower_level_proof = Skip_list.content lower_history_proof in
-        Format.fprintf
-          fmt
-          "Next_level of lower %a and level %a"
-          Hash.pp
-          lower_level_proof.hash
-          Raw_level_repr.pp
-          lower_level_proof.level
+    | Single_level _ -> Format.fprintf fmt "Single_level inbox proof"
+    | Next_level _ -> Format.fprintf fmt "Next_level inbox proof"
 
   let proof_encoding =
     let open Data_encoding in
@@ -760,29 +749,25 @@ struct
         case
           ~title:"Single_level"
           (Tag 0)
-          (obj3
-             (req "history_proof" history_proof_encoding)
+          (obj2
              (req "inclusion_proof" inclusion_proof_encoding)
              (req "message_proof" P.proof_encoding))
           (function
-            | Single_level {history_proof; inc; message_proof} ->
-                Some (history_proof, inc, message_proof)
+            | Single_level {inc; message_proof} -> Some (inc, message_proof)
             | _ -> None)
-          (fun (history_proof, inc, message_proof) ->
-            Single_level {history_proof; inc; message_proof});
+          (fun (inc, message_proof) -> Single_level {inc; message_proof});
         case
           ~title:"Next_level"
           (Tag 1)
-          (obj3
+          (obj2
              (req "lower_message_proof" P.proof_encoding)
-             (req "lower_history_proof" history_proof_encoding)
              (req "inclusion_proof" inclusion_proof_encoding))
           (function
-            | Next_level {lower_message_proof; lower_history_proof; inc} ->
-                Some (lower_message_proof, lower_history_proof, inc)
+            | Next_level {lower_message_proof; inc} ->
+                Some (lower_message_proof, inc)
             | _ -> None)
-          (fun (lower_message_proof, lower_history_proof, inc) ->
-            Next_level {lower_message_proof; lower_history_proof; inc});
+          (fun (lower_message_proof, inc) ->
+            Next_level {lower_message_proof; inc});
       ]
 
   let of_serialized_proof = Data_encoding.Binary.of_bytes_opt proof_encoding
@@ -794,24 +779,6 @@ struct
     fail (Inbox_proof_error reason)
 
   let check p reason = unless p (fun () -> proof_error reason)
-
-  (** Utility function that checks the inclusion proof [inc] for any
-      inbox proof.
-
-      In the case of a [Single_level] proof this is just an inclusion proof
-      between [history_proof] and the inbox snapshot targeted the proof.
-
-      In the case of a [Next_level] proof [inc] must be an inclusion
-      proof between [lower_history_proof] and the inbox snapshot.
-  *)
-  let check_inclusions proof snapshot =
-    check
-      (match proof with
-      | Single_level {inc; history_proof; message_proof = _} ->
-          verify_inclusion_proof inc history_proof snapshot
-      | Next_level {inc; lower_history_proof; lower_message_proof = _} ->
-          verify_inclusion_proof inc lower_history_proof snapshot)
-      "invalid inclusions"
 
   (** To construct or verify a tree proof we need a function of type
 
@@ -850,9 +817,9 @@ struct
   let verify_proof (l, n) snapshot proof =
     assert (Z.(geq n zero)) ;
     let open Lwt_tzresult_syntax in
-    let* () = check_inclusions proof snapshot in
     match proof with
-    | Single_level {history_proof; inc = _; message_proof} -> (
+    | Single_level {inc; message_proof} -> (
+        let*? history_proof = verify_inclusion_proof inc snapshot in
         let level_proof = Skip_list.content history_proof in
         let* payload_opt =
           check_message_proof message_proof level_proof.hash n "single level"
@@ -864,7 +831,8 @@ struct
         | Some payload ->
             return_some
               Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload})
-    | Next_level {lower_message_proof; lower_history_proof; inc = _} -> (
+    | Next_level {inc; lower_message_proof} -> (
+        let*? lower_history_proof = verify_inclusion_proof inc snapshot in
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/3975
            We could prove that the last message to read is SOL, and is
            before [n]. *)
@@ -928,16 +896,15 @@ struct
     match payload_opt with
     | Some payload ->
         return
-          ( Single_level {history_proof; inc; message_proof},
+          ( Single_level {inc; message_proof},
             Some
               Sc_rollup_PVM_sig.{inbox_level = l; message_counter = n; payload}
           )
     | None ->
         if equal_history_proof inbox history_proof then
-          return (Single_level {history_proof; inc; message_proof}, None)
+          return (Single_level {inc; message_proof}, None)
         else
           let lower_message_proof = message_proof in
-          let lower_history_proof = history_proof in
           let* input_given =
             let inbox_level = Raw_level_repr.succ l in
             let message_counter = Z.zero in
@@ -947,9 +914,7 @@ struct
             return_some
               Sc_rollup_PVM_sig.{inbox_level; message_counter; payload}
           in
-          return
-            ( Next_level {lower_message_proof; lower_history_proof; inc},
-              input_given )
+          return (Next_level {inc; lower_message_proof}, input_given)
 
   let empty context level =
     let open Lwt_syntax in
