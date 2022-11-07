@@ -56,7 +56,7 @@ Remove Testnet From ``bin_node``
 --------------------------------
 
 Mentions of the protocol's testnets should be removed from the node executable.
-In particular the file :src:`src/lib_node_config/node_config_file.ml` should be
+In particular the file :src:`src/lib_node_config/config_file.ml` should be
 amended.
 
 The protocol plugin registration module should be removed from
