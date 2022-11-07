@@ -286,9 +286,17 @@ As a consequence, the consensus key should be treated with equal care as the man
 Registering a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A consensus key can be changed at any point. This may be done with the command::
+A consensus key can be changed at any point.
 
-   tezos-client set consensus key for <mgr> to <key>
+The operation is signed by the manager key and does not require the consensus private key to be accessible by the client.
+
+However the public key must be known by the client. It can be imported with the command::
+
+   tezos-client import public key consensus unencrypted:edpk...
+
+The command to update the consensus key is::
+
+   tezos-client set consensus key for <mgr> to consensus
 
 The update becomes active after `PRESERVED_CYCLES + 1` cycles. We therefore distinguish
 the active consensus key and the pending consensus keys.
