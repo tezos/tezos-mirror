@@ -219,25 +219,35 @@ let get_dac_address_keys cctxt address =
   | Some alias -> (
       let* keys_opt = alias_aggregate_keys cctxt alias in
       match keys_opt with
-      | None -> return_none
+      | None ->
+          (* DAC/TODO: https://gitlab.com/tezos/tezos/-/issues/4193
+             Revisit this once the Dac committee will be spread across
+             multiple dal nodes.*)
+          let*! () = Event.(emit dac_account_not_available address) in
+          return_none
       | Some (pkh, pk, sk_uri_opt) -> (
           match sk_uri_opt with
-          | None -> return_none
+          | None ->
+              let*! () = Event.(emit dac_account_cannot_sign address) in
+              return_none
           | Some sk_uri -> return_some (pkh, pk, sk_uri)))
 
 let get_dac_keys cctxt {Configuration.dac = {addresses; threshold; _}; _} =
   let open Lwt_result_syntax in
   let* keys = List.map_es (get_dac_address_keys cctxt) addresses in
   let recovered_keys = List.length @@ List.filter Option.is_some keys in
-  if recovered_keys < threshold then
-    failwith
-      "Only %d out of %d required aggregate keys can be used for aggregate \
-       signatures"
-      recovered_keys
-      threshold
-  else
-    let*! () = Event.(emit dac_is_ready) () in
-    return keys
+  let*! () =
+    (* We emit a warning if the threshold of dac accounts needed to sign a
+       root page hash is not reached. We also emit a warning for each DAC
+       account whose secret key URI was not recovered.
+       We do not stop the dal node at this stage, as it can still serve
+       any request that is related to DAL.
+    *)
+    if recovered_keys < threshold then
+      Event.(emit dac_threshold_not_reached (recovered_keys, threshold))
+    else Event.(emit dac_is_ready) ()
+  in
+  return keys
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/3605
 
