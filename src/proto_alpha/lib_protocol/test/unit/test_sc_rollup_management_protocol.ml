@@ -100,7 +100,7 @@ let assert_encoding_failure ~loc res =
     res
     "Failed to encode a rollup management protocol inbox message value"
 
-let test_encode_decode_internal_inbox_message () =
+let test_encode_decode_internal_inbox_message_transfer () =
   let open WithExceptions in
   let open Lwt_result_syntax in
   let* ctxt = init_ctxt () in
@@ -152,6 +152,14 @@ let test_encode_decode_internal_inbox_message () =
   in
   let*! res = check_encode_decode_inbox_message deposit in
   assert_encoding_failure ~loc:__LOC__ res
+
+let test_encode_decode_internal_inbox_message_sol () =
+  let sol = Sc_rollup.Inbox_message.(Internal Start_of_level) in
+  check_encode_decode_inbox_message sol
+
+let test_encode_decode_internal_inbox_message_eol () =
+  let eol = Sc_rollup.Inbox_message.(Internal End_of_level) in
+  check_encode_decode_inbox_message eol
 
 let test_encode_decode_external_inbox_message () =
   let open Lwt_result_syntax in
@@ -308,9 +316,17 @@ let test_encode_decode_outbox_message () =
 let tests =
   [
     Tztest.tztest
-      "Encode/decode internal inbox message"
+      "Encode/decode internal inbox message transfer"
       `Quick
-      test_encode_decode_internal_inbox_message;
+      test_encode_decode_internal_inbox_message_transfer;
+    Tztest.tztest
+      "Encode/decode internal inbox message start of level"
+      `Quick
+      test_encode_decode_internal_inbox_message_sol;
+    Tztest.tztest
+      "Encode/decode internal inbox message end of level"
+      `Quick
+      test_encode_decode_internal_inbox_message_eol;
     Tztest.tztest
       "Encode/decode external inbox message"
       `Quick
