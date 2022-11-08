@@ -3120,8 +3120,10 @@ let generate_profiles ~default_profile =
         url = None;
         description =
           Some
-            "Install this package to install all dependencies needed to build \
-             Octez.";
+            (Printf.sprintf
+               "Install this package to install all dependencies needed to \
+                build the subset of Octez denoted by profile %s."
+               profile);
         x_opam_monorepo_opam_provided = [];
       }
     in

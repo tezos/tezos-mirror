@@ -18,4 +18,4 @@ depends: [
 ]
 build: []
 synopsis: "Virtual package depending on Octez dependencies (profile: octez-dev-deps)"
-description: "Install this package to install all dependencies needed to build Octez."
+description: "Install this package to install all dependencies needed to build the subset of Octez denoted by profile octez-dev-deps."
