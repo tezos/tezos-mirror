@@ -3239,6 +3239,10 @@ module Sc_rollup : sig
 
     type history_proof
 
+    val equal_history_proof : history_proof -> history_proof -> bool
+
+    val pp_history_proof : Format.formatter -> history_proof -> unit
+
     module Hash : sig
       include S.HASH
 
