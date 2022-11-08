@@ -54,11 +54,15 @@ let regression_test ~__FILE__ ?(tags = []) title f =
 let dal_enable_param dal_enable =
   make_bool_parameter ["dal_parametric"; "feature_enable"] dal_enable
 
-let setup ?commitment_period ?challenge_window ?dal_enable f ~protocol =
+let setup ?(endorsement_lag = 1) ?commitment_period ?challenge_window
+    ?dal_enable f ~protocol =
   let parameters =
     make_int_parameter
-      ["sc_rollup_commitment_period_in_blocks"]
-      commitment_period
+      ["dal_parametric"; "endorsement_lag"]
+      (Some endorsement_lag)
+    @ make_int_parameter
+        ["sc_rollup_commitment_period_in_blocks"]
+        commitment_period
     @ make_int_parameter
         ["sc_rollup_challenge_window_in_blocks"]
         challenge_window
@@ -125,7 +129,7 @@ let with_fresh_rollup ?dal_node f tezos_node tezos_client bootstrap1_key =
   let* configuration_filename =
     Sc_rollup_node.config_init sc_rollup_node rollup_address
   in
-  let* () = Client.bake_for tezos_client in
+  let* () = Client.bake_for_and_wait tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
 let with_dal_node tezos_node f key =
@@ -243,12 +247,15 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
       ~msg:(rex "Data-availability layer will be enabled in a future proposal")
       process
   in
+  let level = Node.get_level node + 1 in
   let* (`OpHash oph1) =
     Operation.Consensus.(
       inject
         ~force:true
         ~signer:Constant.bootstrap1
-        (slot_availability ~endorsement:(Array.make number_of_slots false))
+        (slot_availability
+           ~level
+           ~endorsement:(Array.make number_of_slots false))
         client)
   in
   let* (`OpHash oph2) =
@@ -306,10 +313,19 @@ let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
           ]
           client)
 
-let slot_availability ~signer ~nb_slots availability client =
+let slot_availability ?level ?(force = false) ~signer ~nb_slots availability
+    client =
   let endorsement = Array.make nb_slots false in
   List.iter (fun i -> endorsement.(i) <- true) availability ;
-  Operation.Consensus.(inject ~signer (slot_availability ~endorsement) client)
+  let* level =
+    match level with
+    | Some level -> return level
+    | None ->
+        let* level = Client.level client in
+        return @@ (level + 1)
+  in
+  Operation.Consensus.(
+    inject ~force ~signer (slot_availability ~level ~endorsement) client)
 
 type status = Applied | Failed of {error_id : string}
 
@@ -482,6 +498,146 @@ let test_slot_management_logic =
       bool
       ~error_msg:"Expected slot 1 to be available") ;
   check_dal_raw_context node
+
+(** This test tests various situations related to DAL slots attestation. It's
+    many made of two parts (A) and (B). See the step inside the test.
+*)
+let test_slots_attestation_operation_behavior =
+  Protocol.register_test
+    ~__FILE__
+    ~title:(sf "Slots attestation operation behavior")
+    ~tags:["dal"]
+    ~supports:Protocol.(From_protocol (Protocol.number Alpha))
+  @@ fun protocol ->
+  setup ~endorsement_lag:5 ~dal_enable:true ~protocol
+  @@ fun parameters cryptobox node client _bootstrap ->
+  (* Some helpers *)
+  let nb_slots = parameters.number_of_slots in
+  let lag = parameters.endorsement_lag in
+  assert (lag > 1) ;
+  let attest ~level =
+    slot_availability
+      ~force:true
+      ~nb_slots
+      ~level
+      ~signer:Constant.bootstrap2
+      [0]
+      client
+  in
+  let mempool_is ~__LOC__ expected_mempool =
+    let* mempool = Mempool.get_mempool client in
+    Check.(
+      (mempool = expected_mempool)
+        Mempool.classified_typ
+        ~error_msg:(__LOC__ ^ " : Bad mempool !!!. Got %L")) ;
+    unit
+  in
+  let check_slots_availability ~__LOC__ ~attested =
+    let* metadata = RPC.call node (RPC.get_chain_block_metadata ()) in
+    let dal_slot_availability =
+      (* Field is part of the encoding when the feature flag is true *)
+      Option.get metadata.dal_slot_availability
+    in
+    List.iter
+      (fun i ->
+        Check.(
+          (Array.get dal_slot_availability i = true)
+            bool
+            ~error_msg:
+              (Format.sprintf
+                 "%s : Slot %d is expected to be confirmed."
+                 __LOC__
+                 i)))
+      attested
+    |> return
+  in
+  (* Just bake some blocks before starting publishing. *)
+  let* () = repeat (2 * lag) (fun () -> Client.bake_for_and_wait client) in
+
+  (* Part A.
+     - No header published yet, just play with attestations with various levels;
+     - Initially, only [h3] is applied, [h1; h2] are outdated, and [h4] is
+       branch_delayed. After baking a block, [h3] is included in a block and
+       [h4] becomes applied;
+     - No slot is confirmed as no slot header is published.
+  *)
+  let now = Node.get_level node in
+  let* (`OpHash h1) = attest ~level:1 in
+  let outdated = [h1] in
+  let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
+  let* (`OpHash h2) = attest ~level:(now - 1) in
+  let outdated = [h1; h2] in
+  let* () = mempool_is ~__LOC__ Mempool.{empty with outdated} in
+  let* (`OpHash h3) = attest ~level:(now + 1) in
+  let applied = [h3] in
+  let* () = mempool_is ~__LOC__ Mempool.{empty with outdated; applied} in
+  let* (`OpHash h4) = attest ~level:(now + 2) in
+  let branch_delayed = [h4] in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  let* () = Client.bake_for_and_wait client in
+  let applied = [h4] in
+  let branch_delayed = [] in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  let* () = check_slots_availability ~__LOC__ ~attested:[] in
+  (* Part B.
+     - Publish a slot header (index 10) and bake;
+     - All delegates attest the slot, but the operation is injected too early.
+       The operation is branch_delayed;
+     - We bake sufficiently many blocks to get the attestation applied and
+       included in a block;
+     - We check in the metadata that the slot with index 10 is attested.
+  *)
+  let* (`OpHash h5) =
+    publish_dummy_slot
+      ~source:Constant.bootstrap1
+      ~fee:1_200
+      ~index:10
+      ~message:" TEST!!! "
+      parameters
+      cryptobox
+      node
+      client
+  in
+  let applied = h5 :: applied in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  let* () = Client.bake_for_and_wait client in
+  let now = Node.get_level node in
+  let* attestation_ops =
+    let open Constant in
+    let level = now + lag in
+    Lwt_list.map_s
+      (fun signer ->
+        let* (`OpHash h) =
+          slot_availability ~force:true ~nb_slots ~level ~signer [10] client
+        in
+        return h)
+      [bootstrap1; bootstrap2; bootstrap3; bootstrap4; bootstrap5]
+  in
+  let applied = [] in
+  let branch_delayed = attestation_ops in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  let* () = repeat (lag - 1) (fun () -> Client.bake_for_and_wait client) in
+  let applied = attestation_ops in
+  let branch_delayed = [] in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  let* () = check_slots_availability ~__LOC__ ~attested:[] in
+  let* () = Client.bake_for_and_wait client in
+  let applied = [] in
+  let branch_delayed = [] in
+  let* () =
+    mempool_is ~__LOC__ Mempool.{empty with outdated; applied; branch_delayed}
+  in
+  check_slots_availability ~__LOC__ ~attested:[10]
 
 let init_dal_node protocol =
   let* node, client =
@@ -972,4 +1128,5 @@ let register ~protocols =
     ~dal_enable:true
     "rollup_node_applies_dal_pages"
     (rollup_node_stores_dal_slots ~expand_test:rollup_node_interprets_dal_pages)
-    protocols
+    protocols ;
+  test_slots_attestation_operation_behavior protocols

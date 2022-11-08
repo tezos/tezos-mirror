@@ -507,7 +507,11 @@ module Dal = struct
       number_of_shards : int;
     }
 
-    type t = {cryptobox : cryptobox; number_of_slots : int}
+    type t = {
+      cryptobox : cryptobox;
+      number_of_slots : int;
+      endorsement_lag : int;
+    }
 
     let parameter_file protocol =
       let args = [(["dal_parametric"; "feature_enable"], `Bool true)] in
@@ -523,12 +527,14 @@ module Dal = struct
       let slot_size = JSON.(json |-> "slot_size" |> as_int) in
       let page_size = JSON.(json |-> "page_size" |> as_int) in
       let number_of_slots = JSON.(json |-> "number_of_slots" |> as_int) in
+      let endorsement_lag = JSON.(json |-> "endorsement_lag" |> as_int) in
       return
         {
           cryptobox =
             Tezos_crypto_dal.Cryptobox.Verifier.
               {number_of_shards; redundancy_factor; slot_size; page_size};
           number_of_slots;
+          endorsement_lag;
         }
   end
 

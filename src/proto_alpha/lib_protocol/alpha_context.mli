@@ -2837,6 +2837,12 @@ module Dal : sig
   module Endorsement : sig
     type t
 
+    type operation = {
+      endorser : public_key_hash;
+      slot_availability : t;
+      level : Raw_level.t;
+    }
+
     type shard_index = int
 
     module Shard_map : Map.S with type key = shard_index
@@ -2989,6 +2995,14 @@ module Dal_errors : sig
     | Dal_data_availibility_endorser_not_in_committee of {
         endorser : Signature.Public_key_hash.t;
         level : Level.t;
+      }
+    | Dal_operation_for_old_level of {
+        current : Raw_level.t;
+        given : Raw_level.t;
+      }
+    | Dal_operation_for_future_level of {
+        current : Raw_level.t;
+        given : Raw_level.t;
       }
 end
 
@@ -4318,7 +4332,7 @@ and _ contents =
   | Preendorsement : consensus_content -> Kind.preendorsement contents
   | Endorsement : consensus_content -> Kind.endorsement contents
   | Dal_slot_availability :
-      public_key_hash * Dal.Endorsement.t
+      Dal.Endorsement.operation
       -> Kind.dal_slot_availability contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;

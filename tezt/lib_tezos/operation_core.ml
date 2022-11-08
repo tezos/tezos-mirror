@@ -173,12 +173,13 @@ let make_run_operation_input ?chain_id t client =
       ])
 
 module Consensus = struct
-  type t = Slot_availability of {endorsement : bool array}
+  type t = Slot_availability of {endorsement : bool array; level : int}
 
-  let slot_availability ~endorsement = Slot_availability {endorsement}
+  let slot_availability ~endorsement ~level =
+    Slot_availability {endorsement; level}
 
   let json signer = function
-    | Slot_availability {endorsement} ->
+    | Slot_availability {endorsement; level} ->
         let string_of_bool_vector endorsement =
           let aux (acc, n) b =
             let bit = if b then 1 else 0 in
@@ -191,6 +192,7 @@ module Consensus = struct
             ("kind", Ezjsonm.string "dal_slot_availability");
             ("endorser", Ezjsonm.string signer.Account.public_key_hash);
             ("endorsement", Ezjsonm.string (string_of_bool_vector endorsement));
+            ("level", Ezjsonm.int level);
           ]
 
   let operation ?branch ?chain_id ~signer consensus_operation client =

@@ -28,17 +28,16 @@
 
 open Alpha_context
 
-(** [validate_data_availability ctxt endorsement] ensures the
-   [endorsement] is valid and cannot prevent an operation containing
-   [endorsement] to be refused on top of [ctxt]. If an [Error _] is
-   returned, the [endorsement] is not valid. *)
-val validate_data_availability : t -> Dal.Endorsement.t -> unit tzresult
+(** [validate_data_availability ctxt op] ensures that
+   [op.slot_availability] is valid and cannot prevent an operation containing
+   [op.slot_availability] to be refused on top of [ctxt]. If an [Error _] is
+   returned, the [op.slot_availability] is not valid. *)
+val validate_data_availability : t -> Dal.Endorsement.operation -> unit tzresult
 
-(** [apply_data_availability ctxt endorsement ~endorser] applies
-   [endorsement] into the [ctxt] assuming [endorser] issued those
+(** [apply_data_availability ctxt op] applies
+   [op.slot_availability] into the [ctxt] assuming [op.endorser] issued those
    endorsements. *)
-val apply_data_availability :
-  t -> Dal.Endorsement.t -> endorser:Signature.Public_key_hash.t -> t tzresult
+val apply_data_availability : t -> Dal.Endorsement.operation -> t tzresult
 
 (** [validate_publish_slot_header ctxt slot] ensures that [slot_header] is
    valid and cannot prevent an operation containing [slot_header] to be

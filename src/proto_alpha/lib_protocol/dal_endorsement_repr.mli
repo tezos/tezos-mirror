@@ -44,6 +44,17 @@ type t
 
 type available_slots = t
 
+(** The shape of Dal endorsement operations injected by delegates. *)
+type operation = {
+  endorser : Signature.Public_key_hash.t;
+      (** The endorser who attests the availability of the slots. *)
+  slot_availability : t;
+      (** The bitset of slots that are attested to be available. *)
+  level : Raw_level_repr.t;
+      (** The level at which the operation is valid. It should be equal to the
+          attested slot's published level plus the DAL endorsement lag. *)
+}
+
 val encoding : t Data_encoding.t
 
 (** [empty] returns an empty [slot_endorsement] which commits that

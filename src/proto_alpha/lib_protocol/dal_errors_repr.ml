@@ -36,13 +36,17 @@ type error +=
     }
   | Dal_endorsement_size_limit_exceeded of {maximum_size : int; got : int}
   | Dal_publish_slot_header_duplicate of {slot_header : Dal_slot_repr.Header.t}
-  | Dal_rollup_already_registered_to_slot_index of
-      (Sc_rollup_repr.t * Dal_slot_repr.Index.t)
-  | Dal_requested_subscriptions_at_future_level of
-      (Raw_level_repr.t * Raw_level_repr.t)
   | Dal_data_availibility_endorser_not_in_committee of {
       endorser : Signature.Public_key_hash.t;
       level : Level_repr.t;
+    }
+  | Dal_operation_for_old_level of {
+      current : Raw_level_repr.t;
+      given : Raw_level_repr.t;
+    }
+  | Dal_operation_for_future_level of {
+      current : Raw_level_repr.t;
+      given : Raw_level_repr.t;
     }
 
 let () =
@@ -172,56 +176,47 @@ let () =
       | _ -> None)
     (fun slot_header -> Dal_publish_slot_header_duplicate {slot_header}) ;
   register_error_kind
-    `Permanent
-    ~id:"Dal_rollup_already_subscribed_to_slot"
-    ~title:"DAL rollup already subscribed to slot"
-    ~description
-    ~pp:(fun ppf (rollup, slot_index) ->
+    `Outdated
+    ~id:"Dal_operation_for_old_level"
+    ~title:"Dal operation for an old level"
+    ~description:"The Dal operation targets an old level"
+    ~pp:(fun ppf (current_lvl, given_lvl) ->
       Format.fprintf
         ppf
-        "Rollup %a is already subscribed to data availability slot index %a"
-        Sc_rollup_repr.pp
-        rollup
-        Dal_slot_repr.Index.pp
-        slot_index)
-    Data_encoding.(
-      obj2
-        (req "rollup" Sc_rollup_repr.encoding)
-        (req "slot_index" Dal_slot_repr.Index.encoding))
-    (function
-      | Dal_rollup_already_registered_to_slot_index (rollup, slot_index) ->
-          Some (rollup, slot_index)
-      | _ -> None)
-    (fun (rollup, slot_index) ->
-      Dal_rollup_already_registered_to_slot_index (rollup, slot_index)) ;
-  let description =
-    "Requested List of subscribed rollups to slot at a future level"
-  in
-  register_error_kind
-    `Temporary
-    ~id:"Dal_requested_subscriptions_at_future_level"
-    ~title:"Requested list of subscribed dal slots at a future level"
-    ~description
-    ~pp:(fun ppf (current_level, future_level) ->
-      Format.fprintf
-        ppf
-        "The list of subscribed dal slot indices has been requested for level \
-         %a, but the current level is %a"
+        "Dal operation targets an old level %a. Current level is %a."
         Raw_level_repr.pp
-        future_level
+        given_lvl
         Raw_level_repr.pp
-        current_level)
+        current_lvl)
     Data_encoding.(
       obj2
         (req "current_level" Raw_level_repr.encoding)
-        (req "future_level" Raw_level_repr.encoding))
+        (req "given_level" Raw_level_repr.encoding))
     (function
-      | Dal_requested_subscriptions_at_future_level (current_level, future_level)
-        ->
-          Some (current_level, future_level)
+      | Dal_operation_for_old_level {current; given} -> Some (current, given)
       | _ -> None)
-    (fun (current_level, future_level) ->
-      Dal_requested_subscriptions_at_future_level (current_level, future_level)) ;
+    (fun (current, given) -> Dal_operation_for_old_level {current; given}) ;
+  register_error_kind
+    `Temporary
+    ~id:"Dal_operation_for_future_level"
+    ~title:"Dal operation for a future level"
+    ~description:"The Dal operation target a future level"
+    ~pp:(fun ppf (current_lvl, given_lvl) ->
+      Format.fprintf
+        ppf
+        "Dal operation targets a future level %a. Current level is %a."
+        Raw_level_repr.pp
+        given_lvl
+        Raw_level_repr.pp
+        current_lvl)
+    Data_encoding.(
+      obj2
+        (req "current_level" Raw_level_repr.encoding)
+        (req "given_level" Raw_level_repr.encoding))
+    (function
+      | Dal_operation_for_future_level {current; given} -> Some (current, given)
+      | _ -> None)
+    (fun (current, given) -> Dal_operation_for_future_level {current; given}) ;
   register_error_kind
     `Permanent
     ~id:"Dal_data_availibility_endorser_not_in_committee"

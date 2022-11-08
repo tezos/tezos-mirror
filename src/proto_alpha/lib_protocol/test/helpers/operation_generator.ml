@@ -400,8 +400,14 @@ let generate_endorsement =
 
 let generate_dal_slot =
   let open QCheck2.Gen in
-  let+ pkh = random_pkh in
-  Dal_slot_availability (pkh, Dal.Endorsement.empty)
+  let+ endorser = random_pkh in
+  Dal_slot_availability
+    Dal.Endorsement.
+      {
+        endorser;
+        slot_availability = Dal.Endorsement.empty;
+        level = Raw_level.root;
+      }
 
 let generate_vdf_revelation =
   let open QCheck2.Gen in
