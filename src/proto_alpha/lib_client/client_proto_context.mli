@@ -126,7 +126,7 @@ val get_balance :
   Contract.t ->
   Tez.t tzresult Lwt.t
 
-(** Calls {!Tezos_protocol_alpha.Protocol.Ticket_services.ticket_balance}. *)
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_ticket_balance}. *)
 val get_contract_ticket_balance :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
