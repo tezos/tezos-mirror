@@ -118,17 +118,21 @@ val get_peer_metadata : chain_db -> P2p_peer.Id.t -> Peer_metadata.t
 (** {1 Sending messages} *)
 
 module Request : sig
-  (** [current_branch chain_db ?peer ()] sends a [Get_current_branch chain_id]
-       message to [peer], or if [peer] isn't specified, to all known active
-       peers for this chain. [chain_id] is the identifier for
+  (** [current_branch chain_db peer] sends a [Get_current_branch
+      chain_id] message to [peer]. [chain_id] is the identifier for
       [chain_db]. Expected answer is a [Current_branch] message. *)
-  val current_branch : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
+  val current_branch : chain_db -> P2p_peer.Id.t -> unit
 
-  (** [current_header chain_db ?peer ()] sends  a [Get_Current_head chain_id]
-      to a given peer, or to all known active peers for this chain.
-      [chain_id] is the identifier for [chain_db]. Expected answer is a
-      [Get_current_head] message *)
-  val current_head : chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
+  (** [current_head_from_peer chain_db peer] sends a [Get_Current_head
+      chain_id] to a given peer. Expected answer is a
+      [Get_current_head] message. *)
+  val current_head_from_peer : chain_db -> P2p_peer.Id.t -> unit
+
+  (** [current_head_from_all chain_db] sends a [Get_Current_head
+      chain_id] message to all known active peers for this chain.
+      [chain_id] is the identifier for [chain_db]. Expected answer is
+      a [Get_current_head] message *)
+  val current_head_from_all : chain_db -> unit
 end
 
 module Advertise : sig

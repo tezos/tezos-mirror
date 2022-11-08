@@ -1466,7 +1466,10 @@ module Make
         Store.Block.read_block chain_store bh
       in
       let send_get_current_head ?peer () =
-        Distributed_db.Request.current_head chain_db ?peer ()
+        match peer with
+        | None -> Distributed_db.Request.current_head_from_all chain_db
+        | Some peer ->
+            Distributed_db.Request.current_head_from_peer chain_db peer
       in
       let set_mempool ~head mempool =
         let chain_store = Distributed_db.chain_store chain_db in

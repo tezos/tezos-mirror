@@ -417,29 +417,27 @@ let try_send chain_db peer_id msg =
   | None -> ()
   | Some conn -> ignore (P2p.try_send chain_db.global_db.p2p conn msg : bool)
 
-let send chain_db ?peer msg =
-  match peer with
-  | Some peer -> try_send chain_db peer msg
-  | None -> broadcast chain_db msg
+let send chain_db peer msg = try_send chain_db peer msg
 
 module Request = struct
-  let current_head chain_db ?peer () =
+  let current_head_from_peer chain_db peer =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
-    (match peer with
-    | Some peer ->
-        let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-        Peer_metadata.incr meta (Sent_request Head)
-    | None -> ()) ;
-    send chain_db ?peer @@ Get_current_head chain_id
+    let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+    Peer_metadata.incr meta (Sent_request Head) ;
+    send chain_db peer @@ Get_current_head chain_id
 
-  let current_branch chain_db ?peer () =
+  let current_head_from_all chain_db =
     let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
-    (match peer with
-    | Some peer ->
-        let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
-        Peer_metadata.incr meta (Sent_request Head)
-    | None -> ()) ;
-    send chain_db ?peer @@ Get_current_branch chain_id
+    ignore
+      (P2p.broadcast
+         chain_db.reader_chain_db.active_connections
+         (Get_current_head chain_id))
+
+  let current_branch chain_db peer =
+    let chain_id = Store.Chain.chain_id chain_db.reader_chain_db.chain_store in
+    let meta = P2p.get_peer_metadata chain_db.global_db.p2p peer in
+    Peer_metadata.incr meta (Sent_request Head) ;
+    try_send chain_db peer @@ Get_current_branch chain_id
 end
 
 module Advertise = struct
@@ -448,7 +446,7 @@ module Advertise = struct
     let msg_mempool =
       Message.Current_head (chain_id, Store.Block.header head, mempool)
     in
-    if mempool = Mempool.empty then send chain_db msg_mempool
+    if mempool = Mempool.empty then broadcast chain_db msg_mempool
     else
       let msg_disable_mempool =
         Message.Current_head (chain_id, Store.Block.header head, Mempool.empty)
