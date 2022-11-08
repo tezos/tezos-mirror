@@ -152,6 +152,8 @@ module Apply_diff_bench : Benchmark.S = struct
         List.map
           (fun (_filename, tx) -> benchmark_apply_diff seed tx)
           transitions
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Apply_diff_bench)

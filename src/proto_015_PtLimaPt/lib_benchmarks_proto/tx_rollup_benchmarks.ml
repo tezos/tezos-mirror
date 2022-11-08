@@ -105,6 +105,8 @@ module Inbox_add_message : Benchmark.S = struct
     let tree = List.fold_left Merkle.add_message Merkle.empty messages in
     let closure () = ignore (Merkle.add_message tree message : Merkle.tree) in
     Generator.Plain {workload; closure}
+
+  let name = Namespace.of_string name
 end
 
 module Commitment_full_compact_bench : Benchmark.S = struct
@@ -178,6 +180,8 @@ module Commitment_full_compact_bench : Benchmark.S = struct
           : Tx_rollup_commitment_repr.Compact.t)
     in
     Generator.Plain {workload; closure}
+
+  let name = Namespace.of_string name
 end
 
 module Irmin_context = Tezos_context_memory.Context_binary
@@ -633,6 +637,8 @@ module Verify_proof_compute_bench : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (bench_verify_proof rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Inbox_add_message)

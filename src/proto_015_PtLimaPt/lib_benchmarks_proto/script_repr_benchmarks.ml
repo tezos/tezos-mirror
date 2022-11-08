@@ -106,6 +106,8 @@ module Micheline_nodes_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Micheline_nodes_benchmark)
@@ -138,6 +140,8 @@ module Script_repr_strip_annotations : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num _cfg =
     List.repeat bench_num (create_benchmark rng_state)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Script_repr_strip_annotations)

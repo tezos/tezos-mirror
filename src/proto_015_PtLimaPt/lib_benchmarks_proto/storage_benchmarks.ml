@@ -137,7 +137,7 @@ module Table =
 module List_key_values_benchmark_boilerplate = struct
   type config = {max_size : int}
 
-  let name = "List_key_values"
+  let name = Namespace.of_string "List_key_values"
 
   let info = "List key values"
 
@@ -213,7 +213,7 @@ end
 module List_key_values_benchmark_intercept = struct
   include List_key_values_benchmark_boilerplate
 
-  let name = name ^ "_intercept"
+  let name = Namespace.of_string @@ Namespace.to_string name ^ "_intercept"
 
   let benchmark _rng_state _config () =
     let ctxt =

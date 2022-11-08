@@ -328,6 +328,8 @@ module Set_add : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (create_benchmark rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () =
@@ -386,6 +388,8 @@ module Set_elements : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (create_benchmark rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () =
@@ -462,6 +466,8 @@ module Script_expr_hash_of_b58check_opt : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (create_benchmark rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () =
@@ -523,6 +529,8 @@ struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (create_benchmark rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () =
@@ -631,6 +639,8 @@ module Global_constants_storage_expand_models = struct
 
     let create_benchmarks ~rng_state ~bench_num config =
       List.repeat bench_num (create_benchmark rng_state config)
+
+    let name = Namespace.of_string name
   end
 
   let () =
@@ -711,6 +721,8 @@ module Global_constants_storage_expand_models = struct
 
     let create_benchmarks ~rng_state ~bench_num config =
       List.repeat bench_num (create_benchmark rng_state config)
+
+    let name = Namespace.of_string name
   end
 
   let () =

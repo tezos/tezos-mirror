@@ -57,7 +57,7 @@ let register (module BM : Benchmark.S) =
   BM.models
   |> List.iter (fun (_, model) ->
          Registration_helpers.register_for_codegen
-           BM.name
+           (Namespace.to_string BM.name)
            (Model.For_codegen model))
 
 module Alpha_context_gas = struct
@@ -127,6 +127,8 @@ module Fold_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (benchmark rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 (** Module type that consists of a comparable type along with a sampler
@@ -188,6 +190,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let create_benchmarks ~rng_state ~bench_num config =
       List.repeat bench_num (benchmark rng_state config)
+
+    let name = Namespace.of_string name
   end
 
   module Find = struct
@@ -276,6 +280,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let create_benchmarks ~rng_state ~bench_num config =
       List.repeat bench_num (benchmark rng_state config)
+
+    let name = Namespace.of_string name
   end
 
   module Find_intercept = struct
@@ -328,6 +334,8 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let create_benchmarks ~rng_state ~bench_num config =
       List.repeat bench_num (benchmark rng_state config)
+
+    let name = Namespace.of_string name
   end
 end
 
