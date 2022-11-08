@@ -56,8 +56,6 @@ type error += Inbox_proof_error of string
 
 type error += Tried_to_add_zero_messages
 
-type error += Empty_upper_level of Raw_level_repr.t
-
 let () =
   let open Data_encoding in
   register_error_kind
@@ -92,17 +90,7 @@ let () =
     ~pp:(fun ppf _ -> Format.fprintf ppf "Tried to add zero messages")
     empty
     (function Tried_to_add_zero_messages -> Some () | _ -> None)
-    (fun () -> Tried_to_add_zero_messages) ;
-
-  register_error_kind
-    `Permanent
-    ~id:"sc_rollup_inbox.empty_upper_level"
-    ~title:"Internal error: No payload found in a [Next_level] proof"
-    ~description:
-      "Failed to find any message in the [upper_level] of a [Next_level] proof"
-    (obj1 (req "upper_level" Raw_level_repr.encoding))
-    (function Empty_upper_level upper_level -> Some upper_level | _ -> None)
-    (fun upper_level -> Empty_upper_level upper_level)
+    (fun () -> Tried_to_add_zero_messages)
 
 module Int64_map = Map.Make (Int64)
 
