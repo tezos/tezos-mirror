@@ -29,7 +29,7 @@ type 'config parameters = {bench_number : int; config : 'config}
 (* The module type of benchmarks *)
 module type S = sig
   (** Name of the benchmark *)
-  val name : string
+  val name : Namespace.t
 
   (** Description of the benchmark *)
   val info : string

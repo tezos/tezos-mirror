@@ -26,6 +26,8 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.make Registration_helpers.ns "encoding"
+
 module Micheline_common = struct
   let make_printable node =
     Micheline_printer.printable
@@ -36,7 +38,7 @@ module Micheline_common = struct
 
   type error =
     | Bad_micheline of {
-        benchmark_name : string;
+        benchmark_name : Namespace.t;
         micheline : Alpha_context.Script.node;
         phase : phase;
       }
@@ -53,7 +55,7 @@ module Micheline_common = struct
     | Bad_micheline {benchmark_name; micheline; phase} ->
         Format.open_vbox 1 ;
         Format.fprintf fmtr "Bad micheline:@," ;
-        Format.fprintf fmtr "benchmark = %s@," benchmark_name ;
+        Format.fprintf fmtr "benchmark = %a@," Namespace.pp benchmark_name ;
         Format.fprintf
           fmtr
           "expression = @[<v 1>%a@]@,"
@@ -127,7 +129,7 @@ module Encoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
   include Micheline_common
 
-  let name = "ENCODING_MICHELINE"
+  let name = ns "ENCODING_MICHELINE"
 
   let info = "Benchmarking strip_location + encoding of Micheline to bytes"
 
@@ -184,7 +186,7 @@ module Encoding_micheline : Benchmark.S = struct
           terms
     | None -> List.repeat bench_num (make_bench rng_state config)
 
-  let models = models name
+  let models = models (Namespace.basename name)
 end
 
 let () = Registration_helpers.register (module Encoding_micheline)
@@ -193,7 +195,7 @@ module Decoding_micheline : Benchmark.S = struct
   include Translator_benchmarks.Config
   include Micheline_common
 
-  let name = "DECODING_MICHELINE"
+  let name = ns "DECODING_MICHELINE"
 
   let info = "Decoding of bytes to Micheline"
 
@@ -254,7 +256,7 @@ module Decoding_micheline : Benchmark.S = struct
           terms
     | None -> List.repeat bench_num (make_bench rng_state config)
 
-  let models = models name
+  let models = models (Namespace.basename name)
 end
 
 let () = Registration_helpers.register (module Decoding_micheline)

@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.make Registration_helpers.ns "script_typed_ir_size"
+
 (** {2 [Script_typed_ir_size]-related benchmarks} *)
 
 (** Benchmarking {!Script_typed_ir_size.value_size}. *)
@@ -67,9 +69,9 @@ module Value_size_benchmark : sig
 end = struct
   include Size_benchmarks_shared_config
 
-  let name = "VALUE_SIZE"
+  let name = ns "VALUE_SIZE"
 
-  let models = [(model_name, size_based_model name)]
+  let models = [(model_name, size_based_model (Namespace.basename name))]
 
   let info = "Benchmarking Script_typed_ir_size.value_size"
 
@@ -139,12 +141,12 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let default_config = ()
 
-  let name = "TYPE_SIZE"
+  let name = ns "TYPE_SIZE"
 
   let info =
     "Benchmarking the time it takes to compute Script_typed_ir_size.ty_size"
 
-  let models = [(model_name, size_based_model name)]
+  let models = [(model_name, size_based_model (Namespace.basename name))]
 
   let type_size_benchmark (Script_typed_ir.Ex_ty ty) =
     let open Script_typed_ir_size.Internal_for_tests in
@@ -180,9 +182,9 @@ module Kinstr_size_benchmark : sig
 end = struct
   include Size_benchmarks_shared_config
 
-  let name = "KINSTR_SIZE"
+  let name = ns "KINSTR_SIZE"
 
-  let models = [(model_name, size_based_model name)]
+  let models = [(model_name, size_based_model (Namespace.basename name))]
 
   let info = "Benchmarking Script_typed_ir_size.kinstr_size"
 
@@ -258,7 +260,7 @@ let () = Registration_helpers.register (module Kinstr_size_benchmark)
 module Node_size_benchmark : Benchmark.S = struct
   include Script_repr_benchmarks.Script_repr_shared_config
 
-  let name = "NODE_SIZE"
+  let name = ns "NODE_SIZE"
 
   let info =
     "Benchmarking the time it takes to compute Script_typed_ir_size.node_size"
@@ -269,14 +271,17 @@ module Node_size_benchmark : Benchmark.S = struct
       ~model:
         (Model.affine
            ~intercept:
-             (Free_variable.of_string (Format.asprintf "%s_const" name))
+             (Free_variable.of_string
+                (Format.asprintf "%s_const" (Namespace.basename name)))
            ~coeff:
              (Free_variable.of_string
-                (Format.asprintf "%s_ns_per_node_coeff" name)))
+                (Format.asprintf
+                   "%s_ns_per_node_coeff"
+                   (Namespace.basename name))))
 
   let () =
     Registration_helpers.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen size_based_model)
 
   let models = [(model_name, size_based_model)]

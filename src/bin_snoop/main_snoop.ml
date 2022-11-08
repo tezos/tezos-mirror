@@ -65,28 +65,26 @@ let list_solvers formatter =
   Format.fprintf formatter "lasso --lasso-alpha=<float> --lasso-positive@." ;
   Format.fprintf formatter "nnls@."
 
-let list_all_benchmarks formatter =
+let list_benchmarks formatter list =
   List.iter
     (fun (module Bench : Benchmark.S) ->
-      Format.fprintf formatter "%s: %s\n" Bench.name Bench.info)
-    (Registration.all_benchmarks ())
+      Format.fprintf formatter "%a: %s\n" Namespace.pp Bench.name Bench.info)
+    list
+
+let list_all_benchmarks formatter =
+  list_benchmarks formatter (Registration.all_benchmarks ())
 
 (* -------------------------------------------------------------------------- *)
 (* Built-in commands implementations *)
 
-let benchmark_assoc name = Registration.find_benchmark name
-
-let benchmark_cmd (bench_name : string) (bench_opts : Cmdline.benchmark_options)
-    =
+let benchmark_cmd (bench_pattern : string)
+    (bench_opts : Cmdline.benchmark_options) =
   let bench =
-    match benchmark_assoc bench_name with
-    | None ->
-        Format.eprintf
-          "Benchmark <%s> is unknown. Available benchmarks:@."
-          bench_name ;
-        list_all_benchmarks Format.err_formatter ;
-        exit 1
-    | Some b -> b
+    try Registration.find_benchmark_exn bench_pattern
+    with Registration.Benchmark_not_found _ ->
+      Format.eprintf "Available benchmarks:@." ;
+      list_all_benchmarks Format.err_formatter ;
+      exit 1
   in
   Format.eprintf
     "Benchmarking with the following options:@.%s@."

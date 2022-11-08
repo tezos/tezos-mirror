@@ -26,11 +26,13 @@
 open Protocol
 module Size = Gas_input_size
 
+let ns = Namespace.make Registration_helpers.ns "sapling"
+
 module Apply_diff_bench : Benchmark.S = struct
   include Interpreter_benchmarks.Default_config
   include Interpreter_benchmarks.Default_boilerplate
 
-  let name = "SAPLING_APPLY_DIFF"
+  let name = ns "SAPLING_APPLY_DIFF"
 
   let info = "Benchmarking SAPLING_APPLY_DIFF"
 

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let ns = Namespace.make Registration_helpers.ns "interpreter"
+
 module Timelock_samplers = Timelock
 open Protocol
 
@@ -56,8 +58,9 @@ let eos = Script_typed_ir.(EmptyCell, EmptyCell)
 
 let info_and_name ~intercept ?(salt = "") s =
   let s = s ^ salt in
-  if intercept then (sf "Benchmark %s (intercept case)" s, s ^ "_intercept")
-  else (sf "Benchmark %s" s, s)
+  if intercept then
+    (sf "Benchmark %s (intercept case)" s, Namespace.make ns s "intercept")
+  else (sf "Benchmark %s" s, ns s)
 
 module Default_boilerplate = struct
   type workload = Interpreter_workload.t
@@ -642,7 +645,7 @@ module Registration_section = struct
 
   module Amplification = struct
     module Loop : Benchmark.S = struct
-      let name = "amplification_loop"
+      let name = ns "amplification_loop"
 
       let info = "Benchmarking the cost of an empty loop"
 

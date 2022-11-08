@@ -31,7 +31,7 @@ type options = {
   nsamples : int;
   bench_number : int;
   minor_heap_size : [`words of int];
-  config_dir : string option;
+  config_file : string option;
 }
 
 type 'workload timed_workload = {
@@ -52,7 +52,10 @@ type packed_measurement =
 
 (* We can't deserialize the bytes before knowing the benchmark, which
    contains the workload encoding. *)
-type serialized_workload = {bench_name : string; measurement_bytes : Bytes.t}
+type serialized_workload = {
+  bench_name : Namespace.t;
+  measurement_bytes : Bytes.t;
+}
 
 type workloads_stats = {
   max_time : float;
@@ -93,10 +96,10 @@ let options_encoding =
   let open Data_encoding in
   def "benchmark_options_encoding"
   @@ conv
-       (fun {seed; nsamples; bench_number; minor_heap_size; config_dir} ->
-         (seed, nsamples, bench_number, minor_heap_size, config_dir))
-       (fun (seed, nsamples, bench_number, minor_heap_size, config_dir) ->
-         {seed; nsamples; bench_number; minor_heap_size; config_dir})
+       (fun {seed; nsamples; bench_number; minor_heap_size; config_file} ->
+         (seed, nsamples, bench_number, minor_heap_size, config_file))
+       (fun (seed, nsamples, bench_number, minor_heap_size, config_file) ->
+         {seed; nsamples; bench_number; minor_heap_size; config_file})
        (tup5
           (option Benchmark_helpers.int_encoding)
           Benchmark_helpers.int_encoding
@@ -188,7 +191,9 @@ let serialized_workload_encoding =
   @@ conv
        (fun {bench_name; measurement_bytes} -> (bench_name, measurement_bytes))
        (fun (bench_name, measurement_bytes) -> {bench_name; measurement_bytes})
-       (obj2 (req "bench_name" string) (req "measurement_bytes" bytes))
+       (obj2
+          (req "bench_name" Namespace.encoding)
+          (req "measurement_bytes" bytes))
 
 (* ------------------------------------------------------------------------- *)
 (* Pp *)
@@ -200,7 +205,7 @@ let pp_options fmtr (options : options) =
     | Some seed -> string_of_int seed
   in
   let nsamples = string_of_int options.nsamples in
-  let config_dir = Option.value options.config_dir ~default:"None" in
+  let config_file = Option.value options.config_file ~default:"None" in
   let bench_number = string_of_int options.bench_number in
   let minor_heap_size = match options.minor_heap_size with `words n -> n in
   Format.fprintf
@@ -214,7 +219,7 @@ let pp_options fmtr (options : options) =
     bench_number
     nsamples
     minor_heap_size
-    config_dir
+    config_file
 
 let pp_stats : Format.formatter -> workloads_stats -> unit =
  fun fmtr {max_time; min_time; mean_time; variance} ->
@@ -289,23 +294,18 @@ let load : filename:string -> packed_measurement =
   Format.eprintf "Measure.load: loaded %s\n" filename ;
   match Data_encoding.Binary.of_string serialized_workload_encoding str with
   | Ok {bench_name; measurement_bytes} -> (
-      match Registration.find_benchmark bench_name with
-      | None ->
-          Format.eprintf
-            "Measure.load: workload file requires unregistered benchmark %s, \
-             aborting@."
-            bench_name ;
-          exit 1
-      | Some bench -> (
-          match Benchmark.ex_unpack bench with
-          | Ex ((module Bench) as bench) -> (
-              match
-                Data_encoding.Binary.of_bytes
-                  (measurement_encoding Bench.workload_encoding)
-                  measurement_bytes
-              with
-              | Error err -> cant_load err
-              | Ok m -> Measurement (bench, m))))
+      let bench =
+        Registration.find_benchmark_exn (Namespace.to_string bench_name)
+      in
+      match Benchmark.ex_unpack bench with
+      | Ex ((module Bench) as bench) -> (
+          match
+            Data_encoding.Binary.of_bytes
+              (measurement_encoding Bench.workload_encoding)
+              measurement_bytes
+          with
+          | Error err -> cant_load err
+          | Ok m -> Measurement (bench, m)))
   | Error err -> cant_load err
 
 let to_csv :
@@ -448,58 +448,12 @@ let set_gc_increment () =
   if ratio < 0.15 then Gc.set {(Gc.get ()) with major_heap_increment = 15}
   else Gc.set {(Gc.get ()) with major_heap_increment = minimal_increment}
 
-let parse_config (type c t) ((module Bench) : (c, t) Benchmark.poly)
-    (options : options) =
-  let default_config () =
-    Format.eprintf "Using default configuration for benchmark %s@." Bench.name ;
-    Data_encoding.Json.construct Bench.config_encoding Bench.default_config
-  in
-  let try_load_custom_config directory =
-    let config_file = Format.asprintf "%s.json" Bench.name in
-    let path = Filename.concat directory config_file in
-    let json =
-      match Benchmark_helpers.load_json path with
-      | Ok json ->
-          Format.eprintf
-            "Using custom configuration %s for benchmark %s@."
-            path
-            Bench.name ;
-          json
-      | Error (Sys_error err) ->
-          Format.eprintf "Failed loading json %s (Ignoring)@." err ;
-          default_config ()
-      | Error exn -> raise exn
-    in
-    (json, path)
-  in
-  let decode json =
-    try Data_encoding.Json.destruct Bench.config_encoding json
-    with Data_encoding.Json.Cannot_destruct (_, _) as exn ->
-      Format.eprintf
-        "Json deserialization error: %a@."
-        (Data_encoding.Json.print_error ?print_unknown:None)
-        exn ;
-      exit 1
-  in
-  match options.config_dir with
-  | None ->
-      let json = default_config () in
-      Format.eprintf "%a@." Data_encoding.Json.pp json ;
-      Bench.default_config
-  | Some directory ->
-      let json, path = try_load_custom_config directory in
-      let config = decode json in
-      Format.eprintf
-        "Loaded configuration from %s for benchmark %s@."
-        path
-        Bench.name ;
-      Format.eprintf "%a@." Data_encoding.Json.pp json ;
-      config
-
 let perform_benchmark (type c t) (options : options)
     (bench : (c, t) Benchmark.poly) : t workload_data =
   let (module Bench) = bench in
-  let config = parse_config bench options in
+  let config =
+    Config.parse_config ~print:Stdlib.stderr bench options.config_file
+  in
   let rng_state = seed_init_from_options options in
   let buffer =
     (* holds all samples; avoids allocating an array at each bench *)

@@ -325,7 +325,9 @@ let report ~(measure : Measure.packed_measurement)
   (* let pp_step_model = model (module Pp) in *)
   let open Latex_syntax in
   let preamble : section_content =
-    let text = Format.asprintf "Results for benchmark %s." Bench.name in
+    let text =
+      Format.asprintf "Results for benchmark %a." Namespace.pp Bench.name
+    in
     Text [normal_text text; normal_text "Options used:"]
   in
   let overrides_table : section_content =
@@ -345,7 +347,7 @@ let report ~(measure : Measure.packed_measurement)
     List.map
       (fun figs_file ->
         Figure
-          ( [normal_text Bench.name],
+          ( [normal_text (Namespace.basename Bench.name)],
             {filename = Filename.basename figs_file; size = Some (Width_cm 17)}
           ))
       figs_files
@@ -379,7 +381,7 @@ let report ~(measure : Measure.packed_measurement)
             [Text [normal_text "Recorded workloads:"]; Table contents])
           (workloads_table (module Bench) workload_data)
   in
-  Section (Bench.name, sections @ figure)
+  Section (Namespace.basename Bench.name, sections @ figure)
 
 type t = Latex_syntax.t
 

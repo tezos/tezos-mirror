@@ -57,7 +57,7 @@ module Benchmark_cmd = struct
   let set_minor_heap_size minor_heap_size options =
     {options with minor_heap_size}
 
-  let set_config_dir config_dir options = {options with config_dir}
+  let set_config_file config_file options = {options with config_file}
 
   let default_benchmark_options =
     let options =
@@ -66,7 +66,7 @@ module Benchmark_cmd = struct
         nsamples = 3000;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
-        config_dir = None;
+        config_file = None;
       }
     in
     {
@@ -103,7 +103,7 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      (nsamples, seed, bench_number, minor_heap_size, config_dir, csv_export)
+      (nsamples, seed, bench_number, minor_heap_size, config_file, csv_export)
       bench_name save_file () =
     let options =
       default_benchmark_options.options
@@ -111,7 +111,7 @@ module Benchmark_cmd = struct
       |> lift_opt set_seed seed
       |> lift_opt set_bench_number bench_number
       |> lift_opt set_minor_heap_size minor_heap_size
-      |> set_config_dir config_dir
+      |> set_config_file config_file
     in
     let options =
       {default_benchmark_options with options}
@@ -182,17 +182,16 @@ module Benchmark_cmd = struct
         ~placeholder:"strictly positive int"
         minor_heap_size_param
 
-    let config_dir_arg =
-      let config_dir_arg_param =
+    let config_file_arg =
+      let config_file_arg_param =
         Tezos_clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Tezos_clic.arg
-        ~doc:
-          "Specify directory where to search for benchmark configuration files"
+        ~doc:"Specify a benchmark configuration file"
         ~short:'c'
-        ~long:"config-dir"
-        ~placeholder:"directory"
-        config_dir_arg_param
+        ~long:"config-file"
+        ~placeholder:"file"
+        config_file_arg_param
   end
 
   let options =
@@ -202,7 +201,7 @@ module Benchmark_cmd = struct
       seed_arg
       bench_number_arg
       minor_heap_size_arg
-      config_dir_arg
+      config_file_arg
       dump_csv_arg
 
   let benchmark_param =
@@ -213,7 +212,8 @@ module Benchmark_cmd = struct
          ~autocomplete:(fun _ ->
            let res =
              List.map
-               (fun (module Bench : Benchmark.S) -> Bench.name)
+               (fun (module Bench : Benchmark.S) ->
+                 Namespace.to_string Bench.name)
                (Registration.all_benchmarks ())
            in
            Lwt.return_ok res)
@@ -683,9 +683,38 @@ module List_cmd = struct
          ~autocomplete:(fun _ -> Lwt.return_ok (Registration.all_tags ()))
          (fun _ s -> Lwt.return_ok s))
 
+  let benchmark_param () =
+    Tezos_clic.param
+      ~name:"BENCH-NAME"
+      ~desc:"Name of the benchmark"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (module Bench : Benchmark.S) ->
+                 Namespace.to_string Bench.name)
+               (Registration.all_benchmarks ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
+
+  let namespace_param () =
+    Tezos_clic.param
+      ~name:"NAMESPACE"
+      ~desc:"Namespace of a set of benchmarks"
+      (Tezos_clic.parameter
+         ~autocomplete:(fun _ ->
+           let res =
+             List.map
+               (fun (ns : Namespace.t) -> Namespace.to_string ns)
+               (Registration.all_namespaces ())
+           in
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
+
   let params_all_bench = Tezos_clic.fixed ["list"; "all"; "benchmarks"]
 
-  let option_show_tags =
+  let options =
     Tezos_clic.args1
       (Tezos_clic.switch
          ~long:"show-tags"
@@ -699,7 +728,8 @@ module List_cmd = struct
         (fun (module Bench : Benchmark.S) ->
           Format.fprintf
             Format.std_formatter
-            "%s: %s\n\tTags: %a\n"
+            "%a: %s\n\tTags: %a\n"
+            Namespace.pp
             Bench.name
             Bench.info
             (Format.pp_print_list
@@ -710,7 +740,12 @@ module List_cmd = struct
     else
       List.iter
         (fun (module Bench : Benchmark.S) ->
-          Format.fprintf Format.std_formatter "%s: %s\n" Bench.name Bench.info)
+          Format.fprintf
+            Format.std_formatter
+            "%a: %s\n"
+            Namespace.pp
+            Bench.name
+            Bench.info)
         bench_list ;
     Lwt_result_syntax.return_unit
 
@@ -749,6 +784,15 @@ module List_cmd = struct
   let handler_bench_tags_exact show_tags tags () =
     base_handler_bench (Registration.all_benchmarks_with_exactly tags) show_tags
 
+  let params_bench_match =
+    Tezos_clic.(
+      prefixes ["list"; "benchmarks"; "in"] @@ namespace_param () @@ stop)
+
+  let handler_bench_match show_tags pattern () =
+    base_handler_bench
+      (Registration.find_benchmarks_in_namespace pattern)
+      show_tags
+
   let group =
     {Tezos_clic.name = "list"; title = "Commands for displaying lists"}
 
@@ -756,7 +800,7 @@ module List_cmd = struct
     Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks"
-      option_show_tags
+      options
       params_all_bench
       handler_all_bench
 
@@ -772,7 +816,7 @@ module List_cmd = struct
     Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing any of the given tags"
-      option_show_tags
+      options
       params_bench_tags_any
       handler_bench_tags_any
 
@@ -780,7 +824,7 @@ module List_cmd = struct
     Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing all of the given tags"
-      option_show_tags
+      options
       params_bench_tags_all
       handler_bench_tags_all
 
@@ -788,9 +832,17 @@ module List_cmd = struct
     Tezos_clic.command
       ~group
       ~desc:"List all implemented benchmarks containing exactly the given tags"
-      option_show_tags
+      options
       params_bench_tags_exact
       handler_bench_tags_exact
+
+  let command_bench_match =
+    Tezos_clic.command
+      ~group
+      ~desc:"List all benchmarks in the given namespace"
+      options
+      params_bench_match
+      handler_bench_match
 
   let commands =
     [
@@ -799,6 +851,205 @@ module List_cmd = struct
       command_bench_tags_any;
       command_bench_tags_all;
       command_bench_tags_exact;
+      command_bench_match;
+    ]
+end
+
+module Config_cmd = struct
+  let config_file_param () =
+    Tezos_clic.param
+      ~name:"CONFIG-FILE"
+      ~desc:"Configuration file name"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let benchmark_param = List_cmd.benchmark_param
+
+  let namespace_param = List_cmd.namespace_param
+
+  let options_merge =
+    Tezos_clic.args1
+      (Tezos_clic.switch
+         ~long:"delete-source"
+         ~short:'d'
+         ~doc:"Deletes the source config file given as argument for merging"
+         ())
+
+  let options_edit =
+    Tezos_clic.args4
+      (Tezos_clic.arg
+         ~long:"use-editor"
+         ~short:'e'
+         ~placeholder:"EDITOR"
+         ~doc:
+           "Specify the prefered text editor used for editing the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+      (Tezos_clic.switch
+         ~long:"read-stdin"
+         ~short:'i'
+         ~doc:
+           "Read the standard input for a Json document to edit the config file"
+         ())
+      (Tezos_clic.arg
+         ~long:"read-file"
+         ~short:'f'
+         ~placeholder:"FILE"
+         ~doc:"Use the given Json document to edit the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+      (Tezos_clic.arg
+         ~long:"read-json"
+         ~short:'j'
+         ~placeholder:"JSON"
+         ~doc:"Use inlined Json to edit the config file"
+         (Tezos_clic.parameter (fun _ str -> Lwt.return_ok str)))
+
+  let params_check =
+    Tezos_clic.(
+      prefixes ["config"; "check"]
+      @@ config_file_param () @@ prefix "for" @@ benchmark_param () @@ stop)
+
+  let handler_check () config_file benchmark () =
+    let bench = Registration.find_benchmark_exn benchmark in
+    match Benchmark.ex_unpack bench with
+    | Benchmark.Ex bench ->
+        let _ =
+          Config.parse_config ~print:Stdlib.stdout bench (Some config_file)
+        in
+        Lwt_result_syntax.return_unit
+
+  let params_generate_default =
+    Tezos_clic.(
+      prefixes ["config"; "generate"; "default"; "in"]
+      @@ config_file_param () @@ prefix "for"
+      @@ seq_of_param (namespace_param ()))
+
+  let handler_generate_default () config_file namespaces () =
+    let benchmarks =
+      List.map Registration.find_benchmarks_in_namespace namespaces
+      |> List.flatten
+    in
+    let config = Config.generate_default benchmarks in
+    let str =
+      Data_encoding.Json.construct Config.encoding config
+      |> Data_encoding.Json.to_string
+    in
+    let open Lwt.Infix in
+    Tezos_stdlib_unix.Lwt_utils_unix.create_file config_file str >|= fun r ->
+    Error_monad.catch (fun () -> r)
+
+  let params_generate_empty =
+    Tezos_clic.(
+      prefixes ["config"; "generate"; "empty"; "in"]
+      @@ config_file_param () @@ stop)
+
+  let handler_generate_empty () config_file () =
+    let config = Config.empty in
+    let str =
+      Data_encoding.Json.construct Config.encoding config
+      |> Data_encoding.Json.to_string
+    in
+    let open Lwt.Infix in
+    Tezos_stdlib_unix.Lwt_utils_unix.create_file config_file str >|= fun r ->
+    Error_monad.catch (fun () -> r)
+
+  let config_file_param_dst =
+    Tezos_clic.param
+      ~name:"DST"
+      ~desc:"Configuration file path destination"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let config_file_param_src =
+    Tezos_clic.param
+      ~name:"SRC"
+      ~desc:"Configuration file path source"
+      (Tezos_clic.parameter (fun _ s -> Lwt.return_ok s))
+
+  let params_merge =
+    Tezos_clic.(
+      prefixes ["config"; "merge"]
+      @@ config_file_param_src @@ prefix "in" @@ config_file_param_dst @@ stop)
+
+  let handler_merge delete_flag src dst () =
+    let () = Config.merge_config_files ~delete_src:delete_flag ~dst ~src () in
+    Lwt_result_syntax.return_unit
+
+  let params_edit =
+    Tezos_clic.(
+      prefixes ["config"; "edit"]
+      @@ config_file_param () @@ prefix "for" @@ namespace_param () @@ stop)
+
+  let handler_edit (editor, stdin, file, json) config_path namespace () =
+    let input =
+      match (editor, stdin, file, json) with
+      | Some e, false, None, None -> `Edit e
+      | None, _, None, None -> `Stdin
+      | None, false, Some f, None -> `File f
+      | None, false, None, Some s -> `String s
+      | _ ->
+          Format.eprintf
+            "Config file edition failed: too many input methods given as \
+             options@." ;
+          exit 1
+    in
+    let () = Config.edit_config ~input config_path namespace in
+    Lwt_result_syntax.return_unit
+
+  let group =
+    {
+      Tezos_clic.name = "config";
+      title = "Commands for manipulating config files";
+    }
+
+  let command_check =
+    Tezos_clic.command
+      ~group
+      ~desc:
+        "Prints the configuration that would be used for a given benchmark, \
+         given a configuration file"
+      Tezos_clic.no_options
+      params_check
+      handler_check
+
+  let command_generate_default =
+    Tezos_clic.command
+      ~group
+      ~desc:
+        "Generates a configuration file for the given benchmarks using their \
+         default configuration"
+      Tezos_clic.no_options
+      params_generate_default
+      handler_generate_default
+
+  let command_generate_empty =
+    Tezos_clic.command
+      ~group
+      ~desc:"Generates an empty configuration file for the given benchmarks"
+      Tezos_clic.no_options
+      params_generate_empty
+      handler_generate_empty
+
+  let command_merge =
+    Tezos_clic.command
+      ~group
+      ~desc:"Merges multiple configuration files. Fails in case of conflict"
+      options_merge
+      params_merge
+      handler_merge
+
+  let command_edit =
+    Tezos_clic.command
+      ~group
+      ~desc:"Edit configuration file at the given point"
+      options_edit
+      params_edit
+      handler_edit
+
+  let commands =
+    [
+      command_check;
+      command_generate_default;
+      command_generate_empty;
+      command_merge;
+      command_edit;
     ]
 end
 
@@ -847,7 +1098,7 @@ let all_commands =
     Codegen_all_cmd.command;
     Generate_config_cmd.command;
   ]
-  @ List_cmd.commands
+  @ List_cmd.commands @ Config_cmd.commands
   @ Registration.all_custom_commands ()
 
 module Global_options = struct

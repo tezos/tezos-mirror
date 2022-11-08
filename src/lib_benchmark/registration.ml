@@ -24,18 +24,40 @@
 (*****************************************************************************)
 
 module String_table = String.Hashtbl
+module Name_table = Namespace.Hashtbl
 
-let bench_table : Benchmark.t String_table.t = String_table.create 51
+exception Benchmark_not_found of string
+
+let bench_table : Benchmark.t Name_table.t = Name_table.create 51
 
 let clic_table : unit Tezos_clic.command list ref = ref []
 
 let codegen_table : Model.for_codegen String_table.t = String_table.create 51
 
+let namespace_table : unit Name_table.t = Name_table.create 51
+
+let register_namespace (name : Namespace.t) =
+  let rec aux ns name_list =
+    match name_list with
+    | h :: t ->
+        Name_table.add namespace_table (ns h) () ;
+        aux (Namespace.make ns h) t
+    | [] -> ()
+  in
+  let name_list = Option.value ~default:[] (List.tl (Namespace.to_list name)) in
+  aux Namespace.root name_list
+
+let () = Name_table.add namespace_table Namespace.empty ()
+
 let register ((module Bench) : Benchmark.t) =
-  if String_table.mem bench_table Bench.name then (
-    Format.eprintf "Benchmark %s already registered! exiting@." Bench.name ;
+  register_namespace Bench.name ;
+  if Name_table.mem bench_table Bench.name then (
+    Format.eprintf
+      "Benchmark %a already registered! exiting@."
+      Namespace.pp
+      Bench.name ;
     exit 1)
-  else String_table.add bench_table Bench.name (module Bench)
+  else Name_table.add bench_table Bench.name (module Bench)
 
 let register_for_codegen name model =
   if String_table.mem codegen_table name then
@@ -47,28 +69,33 @@ let register_for_codegen name model =
 
 let add_command cmd = clic_table := cmd :: !clic_table
 
+let all_namespaces () : Namespace.t list =
+  Name_table.to_seq namespace_table
+  |> Seq.map fst |> List.of_seq
+  |> List.sort (fun b1 b2 -> Namespace.compare b1 b2)
+
 let all_benchmarks () : Benchmark.t list =
-  String_table.to_seq bench_table
+  Name_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.sort (fun b1 b2 ->
-         String.compare (Benchmark.name b1) (Benchmark.name b2))
+         Namespace.compare (Benchmark.name b1) (Benchmark.name b2))
 
 let all_tags () : string list =
-  String_table.to_seq bench_table
+  Name_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.map (fun b -> Benchmark.tags b)
   |> List.flatten
   |> List.sort_uniq (fun t1 t2 -> String.compare t1 t2)
 
 let all_benchmarks_with_all_of (tags : string list) : Benchmark.t list =
-  String_table.to_seq bench_table
+  Name_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
          List.for_all
            (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
            tags)
   |> List.sort (fun b1 b2 ->
-         String.compare (Benchmark.name b1) (Benchmark.name b2))
+         Namespace.compare (Benchmark.name b1) (Benchmark.name b2))
 
 let rec list_equal l1 l2 =
   match (l1, l2) with
@@ -78,23 +105,23 @@ let rec list_equal l1 l2 =
 
 let all_benchmarks_with_exactly (tags : string list) : Benchmark.t list =
   let sorted_requested_tags = List.sort String.compare tags in
-  String_table.to_seq bench_table
+  Name_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
          let benchmark_tags = List.sort String.compare (Benchmark.tags b) in
          list_equal sorted_requested_tags benchmark_tags)
   |> List.sort (fun b1 b2 ->
-         String.compare (Benchmark.name b1) (Benchmark.name b2))
+         Namespace.compare (Benchmark.name b1) (Benchmark.name b2))
 
 let all_benchmarks_with_any_of (tags : string list) : Benchmark.t list =
-  String_table.to_seq bench_table
+  Name_table.to_seq bench_table
   |> Seq.map snd |> List.of_seq
   |> List.filter (fun b ->
          List.exists
            (fun tag -> List.mem ~equal:String.equal tag (Benchmark.tags b))
            tags)
   |> List.sort (fun b1 b2 ->
-         String.compare (Benchmark.name b1) (Benchmark.name b2))
+         Namespace.compare (Benchmark.name b1) (Benchmark.name b2))
 
 let all_registered_models () =
   String_table.to_seq codegen_table
@@ -104,13 +131,30 @@ let all_registered_models () =
 let all_model_names () =
   let module String_set = String.Set in
   List.fold_left
-    (fun acc (name, _) -> String.Set.add name acc)
-    String.Set.empty
+    (fun acc (name, _) -> String_set.add name acc)
+    String_set.empty
     (all_registered_models ())
-  |> String.Set.to_seq |> List.of_seq
+  |> String_set.to_seq |> List.of_seq
 
 let all_custom_commands () = !clic_table
 
-let find_benchmark name = String_table.find bench_table name
+let find_benchmarks_in_namespace pattern =
+  let pattern = Namespace.of_string pattern in
+  (Name_table.fold (fun name bench acc ->
+       if Namespace.name_match pattern name then bench :: acc else acc))
+    bench_table
+    []
+
+let find_namespace (name : string) =
+  let name = Namespace.of_string name in
+  Option.map (fun () -> name) (Name_table.find namespace_table name)
+
+let find_benchmark_exn name =
+  let n = Namespace.of_string name in
+  match Name_table.find bench_table n with
+  | None ->
+      Format.eprintf "No benchmark named %s found.@." name ;
+      raise (Benchmark_not_found name)
+  | Some b -> b
 
 let find_model name = String_table.find codegen_table name

@@ -25,6 +25,8 @@
 
 open Protocol
 
+let ns = Namespace.make Registration_helpers.ns "sc_rollup"
+
 (** A benchmark for estimating the gas cost of
     {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
     value is used to consume the gas cost internally in
@@ -33,7 +35,7 @@ open Protocol
 *)
 
 module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
-  let name = "Sc_rollup_update_num_and_size_of_messages"
+  let name = ns "Sc_rollup_update_num_and_size_of_messages"
 
   let info =
     "Estimating the cost of updating the number and total size of messages \
@@ -123,7 +125,7 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
 
   let () =
     Registration.register_for_codegen
-      name
+      (Namespace.basename name)
       (Model.For_codegen cost_update_num_and_size_ofmessages_model)
 end
 
@@ -140,7 +142,7 @@ end
 *)
 
 module Sc_rollup_add_external_messages_benchmark = struct
-  let name = "Sc_rollup_inbox_add_external_message"
+  let name = ns "Sc_rollup_inbox_add_external_message"
 
   let info = "Estimating the costs of adding a single message to a rollup inbox"
 
@@ -295,7 +297,9 @@ module Sc_rollup_add_external_messages_benchmark = struct
     List.repeat bench_num (benchmark rng_state config)
 
   let () =
-    Registration.register_for_codegen name (Model.For_codegen add_message_model)
+    Registration.register_for_codegen
+      (Namespace.basename name)
+      (Model.For_codegen add_message_model)
 end
 
 let () =
