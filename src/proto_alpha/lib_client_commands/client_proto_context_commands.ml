@@ -556,6 +556,47 @@ let commands_ro () =
         let*! () = cctxt#answer "%a" Z.pp_print balance in
         return_unit);
     command
+      ~group
+      ~desc:"Get the complete list of tickets owned by a given contract."
+      no_options
+      (prefixes ["get"; "all"; "ticket"; "balances"; "for"]
+      @@ OriginatedContractAlias.destination_param
+           ~name:"src"
+           ~desc:"Source contract."
+      @@ stop)
+      (fun () contract (cctxt : Protocol_client_context.full) ->
+        let open Lwt_result_syntax in
+        let* ticket_balances =
+          get_contract_all_ticket_balances
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            contract
+        in
+        let pp_ticket_balance ppf
+            (Ticket_token.{ticketer; contents_type; contents}, amount) =
+          Format.fprintf
+            ppf
+            "@[<v 0>Ticketer: %a@,Content type: %a@,Content: %a@,Amount: %a@]"
+            Contract.pp
+            ticketer
+            Michelson_v1_printer.print_expr
+            contents_type
+            Michelson_v1_printer.print_expr
+            contents
+            Z.pp_print
+            amount
+        in
+        let*! () =
+          cctxt#answer
+            "%a"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.@.")
+               pp_ticket_balance)
+            ticket_balances
+        in
+        return_unit);
+    command
       ~desc:"Get receipt for past operation"
       (args1
          (default_arg
