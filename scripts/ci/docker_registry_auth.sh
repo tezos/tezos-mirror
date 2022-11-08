@@ -30,7 +30,7 @@ echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
 
 # CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
 # /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
-if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "master" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
+if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "tezos" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
 then
   # Docker Hub
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
