@@ -2314,6 +2314,15 @@ let contract_code ?unparsing_mode address client =
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode)
   |> Process.check_and_read_stdout
 
+let spawn_contract_entrypoint_type ~entrypoint ~contract client =
+  spawn_command
+    client
+    ["get"; "contract"; "entrypoint"; "type"; "of"; entrypoint; "for"; contract]
+
+let contract_entrypoint_type ~entrypoint ~contract client =
+  spawn_contract_entrypoint_type ~entrypoint ~contract client
+  |> Process.check_and_read_stdout
+
 let sign_bytes ~signer ~data client =
   let* output =
     spawn_command client ["sign"; "bytes"; data; "for"; signer]
