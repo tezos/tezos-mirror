@@ -81,18 +81,32 @@ let apply_data_availability ctxt op =
   | Some shards ->
       Ok (Dal.Endorsement.record_available_shards ctxt slot_availability shards)
 
-let validate_publish_slot_header ctxt Dal.Slot.Header.{id = {index; _}; _} =
+let validate_publish_slot_header ctxt
+    Dal.Slot.Header.{id = {index; published_level}; _} =
   assert_dal_feature_enabled ctxt >>? fun () ->
   let open Tzresult_syntax in
   let open Constants in
   let Parametric.{dal = {number_of_slots; _}; _} = parametric ctxt in
   let* number_of_slots = slot_of_int_e (number_of_slots - 1) in
-  error_unless
-    Compare.Int.(
-      Dal.Slot_index.compare index number_of_slots <= 0
-      && Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
-    (Dal_publish_slot_header_invalid_index
-       {given = index; maximum = number_of_slots})
+  let* () =
+    error_unless
+      Compare.Int.(
+        Dal.Slot_index.compare index number_of_slots <= 0
+        && Dal.Slot_index.compare index Dal.Slot_index.zero >= 0)
+      (Dal_publish_slot_header_invalid_index
+         {given = index; maximum = number_of_slots})
+  in
+  let current_level = (Level.current ctxt).level in
+  let* () =
+    error_when
+      Raw_level.(current_level < published_level)
+      (Dal_publish_slot_header_future_level
+         {provided = published_level; expected = current_level})
+  in
+  error_when
+    Raw_level.(current_level > published_level)
+    (Dal_publish_slot_header_past_level
+       {provided = published_level; expected = current_level})
 
 let apply_publish_slot_header ctxt slot_header =
   assert_dal_feature_enabled ctxt >>? fun () ->
