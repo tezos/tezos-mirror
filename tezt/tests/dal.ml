@@ -542,9 +542,11 @@ let test_dal_node_slots_headers_tracking =
   let* slot_headers =
     RPC.call dal_node (Rollup.Dal.RPC.stored_slot_headers block)
   in
-  Check.([slot0; slot1; slot2] = slot_headers)
+  Check.(slot_headers = [slot0; slot1; slot2])
     Check.(list (tuple2 int string))
-    ~error_msg:"Published header is different from stored header (%L = %R)" ;
+    ~error_msg:
+      "Published header is different from stored header (current = %L, \
+       expected = %R)" ;
   return ()
 
 let generate_dummy_slot slot_size =
@@ -606,7 +608,9 @@ let test_dal_node_rebuild_from_shards =
   in
   Check.(reformed_slot = slot_content)
     Check.(string)
-    ~error_msg:"Reconstructed slot is different from original slot (%L = %R)" ;
+    ~error_msg:
+      "Reconstructed slot is different from original slot (current = %L, \
+       expected = %R)" ;
   return ()
 
 let test_dal_node_test_slots_propagation =
@@ -729,7 +733,9 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
 
   Check.(level = init_level)
     Check.int
-    ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+    ~error_msg:
+      "Current level has moved past origination level (current = %L, expected \
+       = %R)" ;
 
   (* 3. (Rollup node is implicitely subscribed to all slots) *)
 
@@ -773,7 +779,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   let expected_commitments = [commitment_0; commitment_1; commitment_2] in
   Check.(commitments = expected_commitments)
     (Check.list Check.string)
-    ~error_msg:"Unexpected list of slot headers (%L = %R)" ;
+    ~error_msg:"Unexpected list of slot headers (current = %L, expected = %R)" ;
   (* 6. endorse only slots 1 and 2. *)
   let* parameters = Rollup.Dal.Parameters.from_client client in
   let nb_slots = parameters.number_of_slots in
@@ -798,7 +804,9 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   in
   Check.(slot_confirmed_level = slots_published_level + 1)
     Check.int
-    ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
+    ~error_msg:
+      "Current level has moved past slot endorsement level (current = %L, \
+       expected = %R)" ;
   (* 7. Check that no slots have been downloaded *)
   let* downloaded_confirmed_slots =
     Sc_rollup_client.dal_downloaded_confirmed_slot_pages ~hooks sc_rollup_client
@@ -810,7 +818,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     Check.int
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
-       unconfirmed (%L = %R)" ;
+       unconfirmed (current = %L, expected = %R)" ;
   (* 8 Sends message to import dal pages from slots 0 and 1 of published_level
      to the PVM. *)
   let published_level_as_string = Int.to_string slots_published_level in
@@ -826,7 +834,9 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
   in
   Check.(level = slot_confirmed_level + 1)
     Check.int
-    ~error_msg:"Current level has moved past slot endorsement level (%L = %R)" ;
+    ~error_msg:
+      "Current level has moved past slot endorsement level (current = %L, \
+       expected = %R)" ;
   (* 9. Wait for the rollup node to download the endorsed slots. *)
   let confirmed_level_as_string = Int.to_string slot_confirmed_level in
   let* downloaded_confirmed_slots =
@@ -843,7 +853,7 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
     Check.int
     ~error_msg:
       "Unexpected number of slots that have been either downloaded or \
-       unconfirmed (%L = %R)" ;
+       unconfirmed (current = %L, expected = %R)" ;
   let submitted_slots_contents =
     [slot_contents_0; slot_contents_1; slot_contents_2]
   in
@@ -860,10 +870,12 @@ let rollup_node_stores_dal_slots ?expand_test _protocol dal_node sc_rollup_node
       in
       Check.(confirmed_slot_index = index)
         Check.int
-        ~error_msg:"Index of confirmed slot is not as expected (%L = %R)" ;
+        ~error_msg:
+          "Index of confirmed slot is not as expected (current = %L, expected \
+           = %R)" ;
       Check.(message = confirmed_slot_content)
         Check.string
-        ~error_msg:"unexpected message in slot (%L = %R)")
+        ~error_msg:"unexpected message in slot (current = %L, expected = %R)")
     [0] ;
   match expand_test with
   | None -> return ()
@@ -939,7 +951,8 @@ let rollup_node_interprets_dal_pages client sc_rollup sc_rollup_node =
       Check.(
         (value = expected_value)
           int
-          ~error_msg:"Invalid value in rollup state (%L <> %R)") ;
+          ~error_msg:
+            "Invalid value in rollup state (current = %L, expected = %R)") ;
       return ()
 
 let register ~protocols =
