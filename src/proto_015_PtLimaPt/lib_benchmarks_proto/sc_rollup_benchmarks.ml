@@ -125,6 +125,8 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
     Registration.register_for_codegen
       name
       (Model.For_codegen cost_update_num_and_size_ofmessages_model)
+
+  let name = Namespace.of_string name
 end
 
 (** A benchmark for estimating the gas cost of
@@ -301,6 +303,8 @@ module Sc_rollup_add_external_messages_benchmark = struct
 
   let () =
     Registration.register_for_codegen name (Model.For_codegen add_message_model)
+
+  let name = Namespace.of_string name
 end
 
 let () =

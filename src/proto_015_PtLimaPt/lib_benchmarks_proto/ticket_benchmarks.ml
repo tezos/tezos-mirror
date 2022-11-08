@@ -108,6 +108,8 @@ module Compare_ticket_hash_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen compare_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Compare_ticket_hash_benchmark)
@@ -166,6 +168,8 @@ module Compare_key_contract_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen compare_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Compare_key_contract_benchmark)
@@ -242,6 +246,8 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen size_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Has_tickets_type_benchmark)
@@ -314,6 +320,8 @@ module Collect_tickets_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen size_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Collect_tickets_benchmark)

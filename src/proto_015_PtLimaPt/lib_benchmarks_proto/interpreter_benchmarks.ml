@@ -287,6 +287,8 @@ let make_benchmark :
           List.repeat
             bench_num
             (benchmark kinstr_and_stack_sampler ctxt step_constants)
+
+    let name = Namespace.of_string name
   end in
   (module B : Benchmark.S)
 
@@ -566,6 +568,8 @@ let make_continuation_benchmark :
           List.repeat
             bench_num
             (benchmark cont_and_stack_sampler ctxt step_constants)
+
+    let name = Namespace.of_string name
   end in
   (module B : Benchmark.S)
 
@@ -679,6 +683,8 @@ module Registration_section = struct
 
       let create_benchmarks ~rng_state ~bench_num (config : config) =
         List.repeat bench_num (benchmark rng_state config)
+
+      let name = Namespace.of_string name
     end
   end
 
@@ -2635,6 +2641,8 @@ module Registration_section = struct
                     step_constants
                     stack_instr)
                 transitions
+
+        let name = Namespace.of_string name
       end in
       Registration_helpers.register (module B)
   end

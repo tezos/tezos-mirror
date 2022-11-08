@@ -185,6 +185,8 @@ module Encoding_micheline : Benchmark.S = struct
     | None -> List.repeat bench_num (make_bench rng_state config)
 
   let models = models name
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Encoding_micheline)
@@ -255,6 +257,8 @@ module Decoding_micheline : Benchmark.S = struct
     | None -> List.repeat bench_num (make_bench rng_state config)
 
   let models = models name
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Decoding_micheline)

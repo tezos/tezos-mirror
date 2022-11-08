@@ -248,6 +248,8 @@ module Typechecking_data : Benchmark.S = struct
     | None ->
         Format.eprintf "No michelson_terms_file given, generating on-the-fly@." ;
         List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Typechecking_data)
@@ -328,6 +330,8 @@ module Unparsing_data : Benchmark.S = struct
     | None ->
         Format.eprintf "No michelson_terms_file given, generating on-the-fly@." ;
         List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Unparsing_data)
@@ -403,6 +407,8 @@ module Typechecking_code : Benchmark.S = struct
     | None ->
         Format.eprintf "No michelson_terms_file given, generating on-the-fly@." ;
         List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Typechecking_code)
@@ -485,6 +491,8 @@ module Unparsing_code : Benchmark.S = struct
             | _ -> None)
           terms
     | None -> List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Unparsing_code)
@@ -621,6 +629,8 @@ module Ty_eq : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Ty_eq)
@@ -746,6 +756,8 @@ module Parse_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Parse_type_benchmark)
@@ -799,6 +811,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
     Registration_helpers.register_for_codegen
       name
       (Model.For_codegen size_model)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)

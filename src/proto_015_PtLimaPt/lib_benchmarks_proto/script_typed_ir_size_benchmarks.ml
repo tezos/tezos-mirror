@@ -124,6 +124,8 @@ end = struct
     | None ->
         Format.eprintf "No michelson_terms_file given, generating on-the-fly@." ;
         List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Value_size_benchmark)
@@ -167,6 +169,8 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Type_size_benchmark)
@@ -251,6 +255,8 @@ end = struct
     | None ->
         Format.eprintf "No michelson_terms_file given, generating on-the-fly@." ;
         List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Kinstr_size_benchmark)
@@ -294,6 +300,8 @@ module Node_size_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Node_size_benchmark)

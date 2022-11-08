@@ -45,7 +45,7 @@ let bench_opts =
     nsamples = 3000;
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
-    config_dir = None;
+    config_file = None;
   }
 
 (* Perform timing measurements, existentially pack it *)

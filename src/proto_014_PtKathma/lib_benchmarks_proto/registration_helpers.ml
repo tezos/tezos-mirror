@@ -27,8 +27,6 @@ let register ((module Bench) : Benchmark.t) =
   let module B : Benchmark.S = struct
     include Bench
 
-    let name = name ^ "_" ^ Protocol.name
-
     let tags = Protocol.name :: tags
   end in
   Registration.register (module B)

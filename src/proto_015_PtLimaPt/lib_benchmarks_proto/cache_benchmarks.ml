@@ -188,6 +188,8 @@ module Cache_update_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let name = Namespace.of_string name
 end
 
 let () = Registration_helpers.register (module Cache_update_benchmark)
