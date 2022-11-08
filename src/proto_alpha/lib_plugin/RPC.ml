@@ -1881,6 +1881,15 @@ module Contract = struct
 
   let get_ticket_balance ctxt block contract key =
     RPC_context.make_call1 S.ticket_balance ctxt block contract () key
+
+  let get_all_ticket_balances ctxt block contract =
+    RPC_context.make_call1
+      S.all_ticket_balances
+      ctxt
+      block
+      (Contract.Originated contract)
+      ()
+      ()
 end
 
 module Big_map = struct

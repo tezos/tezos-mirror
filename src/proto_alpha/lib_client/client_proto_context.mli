@@ -135,6 +135,14 @@ val get_contract_ticket_balance :
   Ticket_token.unparsed_token ->
   Z.t tzresult Lwt.t
 
+(** Calls {!Tezos_protocol_plugin_alpha.Plugin.RPC.Contract.get_all_ticket_balances}. *)
+val get_contract_all_ticket_balances :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  Contract_hash.t ->
+  (Ticket_token.unparsed_token * Z.t) list tzresult Lwt.t
+
 (** Calls {!Tezos_protocol_alpha.Protocol.Delegate_services.frozen_deposits_limit}. *)
 val get_frozen_deposits_limit :
   #Protocol_client_context.rpc_context ->

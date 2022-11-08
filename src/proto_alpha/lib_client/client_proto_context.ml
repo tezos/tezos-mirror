@@ -89,6 +89,10 @@ let get_contract_ticket_balance (rpc : #rpc_context) ~chain ~block contract key
     =
   Plugin.RPC.Contract.get_ticket_balance rpc (chain, block) contract key
 
+let get_contract_all_ticket_balances (rpc : #rpc_context) ~chain ~block contract
+    =
+  Plugin.RPC.Contract.get_all_ticket_balances rpc (chain, block) contract
+
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
