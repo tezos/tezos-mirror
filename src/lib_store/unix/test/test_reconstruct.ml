@@ -83,7 +83,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
+            ~operation_metadata_size_limit:Unlimited
             ~progress_display_mode:Animation.Auto
         in
         return_false)
@@ -227,7 +227,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~configured_history_mode:None
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
+            ~operation_metadata_size_limit:Unlimited
             ~in_memory:true
             ~progress_display_mode:Animation.Auto
             genesis
@@ -240,7 +240,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             genesis
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
-            ~operation_metadata_size_limit:None
+            ~operation_metadata_size_limit:Unlimited
             ~progress_display_mode:Animation.Auto
         in
         return_false)
