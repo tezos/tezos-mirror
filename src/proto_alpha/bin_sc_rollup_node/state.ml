@@ -30,6 +30,8 @@
 let reorganization_window_length = 10
 
 module Store = struct
+  (** Table from blocks hashes to unit. The entry is present iff the block
+      identified by that hash is fully processed by the rollup node. *)
   module ProcessedHashes =
     Store.Make_append_only_map
       (struct
@@ -43,11 +45,11 @@ module Store = struct
         let to_path_representation = Block_hash.to_b58check
       end)
       (struct
-        type value = int32
+        type value = unit
 
-        let name = "level"
+        let name = "processed"
 
-        let encoding = Data_encoding.int32
+        let encoding = Data_encoding.unit
       end)
 
   module LastProcessedHead =
@@ -80,6 +82,7 @@ module Store = struct
         let encoding = Layer1.head_encoding
       end)
 
+  (** Table from L1 levels to blocks hashes. *)
   module Levels =
     Store.Make_updatable_map
       (struct
@@ -99,21 +102,41 @@ module Store = struct
 
         let encoding = Block_hash.encoding
       end)
+
+  (** Table from L1 blocks hashes to levels. *)
+  module Hashes =
+    Store.Make_append_only_map
+      (struct
+        let path = ["tezos"; "blocks_hashes"]
+
+        let keep_last_n_entries_in_memory = Some reorganization_window_length
+      end)
+      (struct
+        type key = Block_hash.t
+
+        let to_path_representation = Block_hash.to_b58check
+      end)
+      (struct
+        type value = int32
+
+        let name = "level"
+
+        let encoding = Data_encoding.int32
+      end)
 end
 
 let hash_of_level store level = Store.Levels.get store level
 
 let level_of_hash store hash =
   let open Lwt_result_syntax in
-  let*! level = Store.ProcessedHashes.find store hash in
+  let*! level = Store.Hashes.find store hash in
   match level with
   | None -> failwith "No level known for block %a" Block_hash.pp hash
   | Some l -> return l
 
-let mark_processed_head store Layer1.({hash; level} as head) =
+let mark_processed_head store Layer1.({hash; level = _} as head) =
   let open Lwt_syntax in
-  let* () = Store.ProcessedHashes.add store hash level in
-  let* () = Store.Levels.add store level hash in
+  let* () = Store.ProcessedHashes.add store hash () in
   Store.LastProcessedHead.set store head
 
 let is_processed store head = Store.ProcessedHashes.mem store head
@@ -123,3 +146,8 @@ let last_processed_head_opt store = Store.LastProcessedHead.find store
 let mark_finalized_head store head = Store.LastFinalizedHead.set store head
 
 let get_finalized_head_opt store = Store.LastFinalizedHead.find store
+
+let set_block_level_and_hash store Layer1.{hash; level} =
+  let open Lwt_syntax in
+  let* () = Store.Hashes.add store hash level in
+  Store.Levels.add store level hash
