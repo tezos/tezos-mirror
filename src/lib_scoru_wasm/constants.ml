@@ -46,7 +46,7 @@ let wasm_max_tick = Z.of_int 11_000_000_000
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/3157
    Find an appropriate number of reboots per inputs.
 *)
-let maximum_reboots_per_input = Z.of_int 10
+let maximum_reboots_per_input = Z.of_int 1_000
 
 (* Flag used in the durable storage by the kernel to ask a reboot from the PVM
    without consuming an input. *)
