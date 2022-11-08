@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Inbox_proof_error of string
+
 (** Merkelizing inbox for smart-contract rollups.
 
    {1 Overview}

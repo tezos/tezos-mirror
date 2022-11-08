@@ -342,6 +342,23 @@ let next_inbox_message levels_and_messages l n =
           in
           inbox_message_of_input input)
 
+let fail_with_proof_error_msg errors fail_msg =
+  let msg =
+    List.find_map
+      (function
+        | Environment.Ecoproto_error
+            (Sc_rollup_inbox_repr.Inbox_proof_error msg) ->
+            Some msg
+        | Environment.Ecoproto_error
+            (Sc_rollup_inbox_merkelized_payload_hashes_repr
+             .Merkelized_payload_hashes_proof_error msg) ->
+            Some msg
+        | _ -> None)
+      errors
+  in
+  let msg = Option.(msg |> map (fun s -> ": " ^ s) |> value ~default:"") in
+  fail (err (fail_msg ^ msg))
+
 let test_inbox_proof_production (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
   let exp_input = next_inbox_message levels_and_messages l n in
@@ -373,7 +390,9 @@ let test_inbox_proof_production (levels_and_messages, l, n) =
       setup_inbox_with_messages (list_of_payloads @ [[make_payload "foo"]])
       @@ fun _ctxt _ _history inbox _inboxes ->
       let snapshot = take_snapshot inbox in
-      let verification = verify_proof (l, n) snapshot proof in
+      let verification =
+        verify_proof (l, n) snapshot proof |> Environment.wrap_tzresult
+      in
       match verification with
       | Ok v_input ->
           Alcotest.(check (option inbox_message_testable))
@@ -385,8 +404,9 @@ let test_inbox_proof_production (levels_and_messages, l, n) =
             exp_input
             v_input ;
           return_unit
-      | Error _ -> fail [err "Proof verification failed"])
-  | Error _ -> fail [err "Proof production failed"]
+      | Error errors ->
+          fail_with_proof_error_msg errors "Proof verification failed")
+  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
 
 let test_inbox_proof_verification (levels_and_messages, l, n) =
   (* We begin with a Node inbox so we can produce a proof. *)
@@ -424,7 +444,7 @@ let test_inbox_proof_verification (levels_and_messages, l, n) =
           | Ok _ -> fail [err "Proof should not be valid"]
           | Error _ -> return (ok ()))
       | None -> fail [err "inboxes was empty"])
-  | Error _ -> fail [err "Proof production failed"]
+  | Error errors -> fail_with_proof_error_msg errors "Proof production failed"
 
 (** This helper function initializes inboxes and histories with different
     capacities and populates them. *)
