@@ -143,6 +143,9 @@ val get_contract_all_ticket_balances :
   Contract_hash.t ->
   (Ticket_token.unparsed_token * Z.t) list tzresult Lwt.t
 
+val ticket_balances_encoding :
+  (Ticket_token.unparsed_token * Z.t) list Data_encoding.t
+
 (** Calls {!Tezos_protocol_alpha.Protocol.Delegate_services.frozen_deposits_limit}. *)
 val get_frozen_deposits_limit :
   #Protocol_client_context.rpc_context ->
