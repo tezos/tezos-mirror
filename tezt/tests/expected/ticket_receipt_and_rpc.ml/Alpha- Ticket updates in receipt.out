@@ -114,15 +114,38 @@ This sequence of operations was run:
     "content_type": { "prim": "string" }, "content": { "string": "red" },
     "amount": "1" } ]
 
-./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/all_ticket_balances'
-[ { "ticketer": "[CONTRACT_HASH]",
-    "content_type": { "prim": "string" }, "content": { "string": "blue" },
-    "amount": "1" } ]
+./octez-client --mode mockup get all ticket balances for '[CONTRACT_HASH]'
+Ticketer: [CONTRACT_HASH]
+Content type: string
+Content: "green"
+Amount: 2
+
+Ticketer: [CONTRACT_HASH]
+Content type: string
+Content: "red"
+Amount: 1
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/all_ticket_balances'
 [ { "ticketer": "[CONTRACT_HASH]",
     "content_type": { "prim": "string" }, "content": { "string": "blue" },
     "amount": "1" } ]
+
+./octez-client --mode mockup get all ticket balances for '[CONTRACT_HASH]'
+Ticketer: [CONTRACT_HASH]
+Content type: string
+Content: "blue"
+Amount: 1
+
+./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/all_ticket_balances'
+[ { "ticketer": "[CONTRACT_HASH]",
+    "content_type": { "prim": "string" }, "content": { "string": "blue" },
+    "amount": "1" } ]
+
+./octez-client --mode mockup get all ticket balances for '[CONTRACT_HASH]'
+Ticketer: [CONTRACT_HASH]
+Content type: string
+Content: "blue"
+Amount: 1
 
 ./octez-client --mode mockup rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/all_ticket_balances'
 Fatal error:

@@ -177,7 +177,7 @@ let test_ticket_receipt_and_rpc =
        unit
   in
   let* () =
-    (* Check regressions for the [all_ticket_balances] RPC when called for
+    (* Check regressions for the [all_ticket_balances] RPC and CLI when called for
        originated. *)
     [kt_a; kt_b; kt_c]
     |> Lwt_list.iter_s @@ fun contract ->
@@ -187,6 +187,7 @@ let test_ticket_receipt_and_rpc =
               ~id:contract
               ()
        in
+       let*! _ = Client.all_ticket_balances ~hooks ~contract client in
        unit
   in
   let* () =
