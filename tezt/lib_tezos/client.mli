@@ -777,6 +777,10 @@ val spawn_ticket_balance :
   t ->
   Process.t
 
+(** Run [octez-client get all ticket balances for contract]. *)
+val all_ticket_balances :
+  ?hooks:Process.hooks -> contract:string -> t -> string Runnable.process
+
 (** Run [octez-client create mockup]. *)
 val create_mockup :
   ?sync_mode:mockup_sync_mode ->

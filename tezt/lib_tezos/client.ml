@@ -1001,6 +1001,16 @@ let ticket_balance ?hooks ~contract ~ticketer ~content_type ~content client =
   spawn_ticket_balance ?hooks ~contract ~ticketer ~content_type ~content client
   |> Process.check_and_read_stdout
 
+let all_ticket_balances ?hooks ~contract client =
+  let value =
+    spawn_command
+      ?hooks
+      client
+      ["get"; "all"; "ticket"; "balances"; "for"; contract]
+  in
+  let run = Process.check_and_read_stdout in
+  {value; run}
+
 let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file
     ?bootstrap_accounts_file ~protocol client =
   let cmd =
