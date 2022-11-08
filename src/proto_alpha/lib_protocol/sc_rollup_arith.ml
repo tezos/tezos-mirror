@@ -923,18 +923,20 @@ module Make (Context : P) :
 
   let set_inbox_message_monadic {PS.inbox_level; message_counter; payload} =
     let open Monad.Syntax in
-    let payload =
+    let* payload =
       match Sc_rollup_inbox_message_repr.deserialize payload with
-      | Error _ -> None
-      | Ok (External payload) -> Some payload
-      | Ok (Internal internal_inbox_message) -> (
-          match internal_inbox_message with
-          | Transfer {payload; _} -> (
+      | Error _ -> return None
+      | Ok (External payload) -> return (Some payload)
+      | Ok (Internal (Transfer {payload; destination; _})) -> (
+          let* (metadata : Sc_rollup_metadata_repr.t option) = Metadata.get in
+          match metadata with
+          | Some {address; _} when Address.(destination = address) -> (
               match Micheline.root payload with
-              | String (_, payload) -> Some payload
-              | _ -> None)
-          | Start_of_level -> None
-          | End_of_level -> None)
+              | String (_, payload) -> return (Some payload)
+              | _ -> return None)
+          | _ -> return None)
+      | Ok (Internal Start_of_level) -> return None
+      | Ok (Internal End_of_level) -> return None
     in
     match payload with
     | Some payload ->

@@ -438,6 +438,96 @@ let test_initial_state_hash_arith_pvm () =
       Sc_rollup.State_hash.pp
       hash
 
+let dummy_internal_transfer address =
+  let open Lwt_result_syntax in
+  let* ctxt =
+    let* block, _baker, _contract, _src2 = Contract_helpers.init () in
+    let+ incr = Incremental.begin_construction block in
+    Incremental.alpha_ctxt incr
+  in
+  let sender =
+    Contract_hash.of_b58check_exn "KT1BuEZtb68c1Q4yjtckcNjGELqWt56Xyesc"
+  in
+  let source =
+    WithExceptions.Result.get_ok
+      ~loc:__LOC__
+      (Signature.Public_key_hash.of_b58check
+         "tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w")
+  in
+  let*? payload = Environment.wrap_tzresult (Script_string.of_string "foo") in
+  let* payload, _ctxt =
+    Script_ir_translator.unparse_data
+      ctxt
+      Script_ir_unparser.Optimized
+      String_t
+      payload
+    >|= Environment.wrap_tzresult
+  in
+  let transfer =
+    Sc_rollup_inbox_message_repr.Internal
+      (Transfer {payload; sender; source; destination = address})
+  in
+  let*? serialized_transfer =
+    Environment.wrap_tzresult (Sc_rollup_inbox_message_repr.serialize transfer)
+  in
+  return serialized_transfer
+
+let test_filter_internal_message () =
+  let open Sc_rollup_PVM_sig in
+  let open Lwt_result_syntax in
+  boot "" @@ fun _ctxt state ->
+  let address = Sc_rollup_repr.Address.zero in
+  let metadata =
+    Sc_rollup_metadata_repr.{address; origination_level = Raw_level_repr.root}
+  in
+  let input = Reveal (Metadata metadata) in
+  let*! state = set_input input state in
+
+  (* We will set an input where the destination is the same as the one given
+     in the static metadata. The pvm should process the input. *)
+  let* () =
+    let* internal_transfer = dummy_internal_transfer address in
+    let input =
+      Inbox_message
+        {
+          inbox_level = Raw_level_repr.root;
+          message_counter = Z.zero;
+          payload = internal_transfer;
+        }
+    in
+    let*! state = set_input input state in
+    let*! input_state = is_input_state state in
+    match input_state with
+    | No_input_required -> return ()
+    | _ -> failwith "The arith pvm should be processing the internal transfer"
+  in
+
+  (* We will set an input where the destination is *not* the same as the
+     one given in the static metadata. The pvm should ignore the input. *)
+  let* () =
+    let dummy_address =
+      Sc_rollup_repr.Address.of_b58check_exn
+        "scr1HLXM32GacPNDrhHDLAssZG88eWqCUbyLF"
+    in
+    let* internal_transfer = dummy_internal_transfer dummy_address in
+    let input =
+      Inbox_message
+        {
+          inbox_level = Raw_level_repr.root;
+          message_counter = Z.zero;
+          payload = internal_transfer;
+        }
+    in
+    let*! state = set_input input state in
+    let*! input_state = is_input_state state in
+    match input_state with
+    | No_input_required ->
+        failwith "The arith pvm should avoid ignored the internal transfer"
+    | _ -> return ()
+  in
+
+  return ()
+
 let tests =
   [
     Tztest.tztest "PreBoot" `Quick test_preboot;
@@ -453,4 +543,5 @@ let tests =
       "Initial state hash for Arith"
       `Quick
       test_initial_state_hash_arith_pvm;
+    Tztest.tztest "Filter internal message" `Quick test_filter_internal_message;
   ]
