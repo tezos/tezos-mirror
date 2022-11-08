@@ -38,6 +38,7 @@ On the reference machine, the benchmarks directory should look like this:
   - cron_res_errors
   - current_run_dir
   - last_run_dir
+  - anomalies
 ```
 
 - `cronjob.sh` is the main script run by Cron. Its sources are in this repository and needs to be copied to the reference machine whenever it is updated.
@@ -51,5 +52,6 @@ On the reference machine, the benchmarks directory should look like this:
 - `current_run_dir` and `last_run_dir` are marker files each containing the name of a benchmarks results directory:
   - `current_run_dir` is present as long as benchmarks are running, or when they failed for some reason;
   - `last_run_dir` records the last benchmarks process that completed successfully.
+- `anomalies` logs the cases where the benchmarks could not be run at all. For instance if the processes are triggered while the previous haven't completed yet.
 
 `cronjob.sh` and `run_all_benchmarks_on_latest_master.sh` are two different scripts because we want to create log files early, but only know their final destination after fetching the most recent `master` commit.

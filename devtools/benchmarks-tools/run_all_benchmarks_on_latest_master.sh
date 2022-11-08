@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# Using bash so that we are able to use the time program.
 
 #############################################################################
 #                                                                           #
@@ -88,3 +89,4 @@ chmod +rx "$SNOOP_RESULT_DIR"/*_results
 mv current_run_dir last_run_dir
 
 dated_log "End of benchmarks processes"
+exit 0
