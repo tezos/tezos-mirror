@@ -46,12 +46,17 @@ function get_info_block(dict_data, msec = false) {
             v["blocks"].forEach((element) => {
                 let round = 0;
                 if ("round" in element) round = element["round"];
-                if (msec == false) {
-                    if (("reception_time" in element) && ("timestamp" in element)) t_delay_block[round] = new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds();
-                } else {
-                    if (("reception_time" in element) && ("timestamp" in element)) t_delay_block[round] = (new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getSeconds() * 1000) + new Date(new Date(element["reception_time"]) - new Date(element["timestamp"])).getMilliseconds();
-                }
-                if ("timestamp" in element) t_baker[round] = new Date(element["timestamp"]);
+                if ("timestamp" in element) {
+		    t_baker[round] = new Date(element["timestamp"]);
+		    if ("reception_time" in element) {
+			let block_delay = new Date(element["reception_time"]) - t_baker[round];
+			if (msec) {
+			    t_delay_block[round] = block_delay;
+			} else {
+			    t_delay_block[round] = block_delay/1000;
+			}
+		    }
+		}
                 if (round > max_round) {
                     max_round = round
                 }
@@ -580,7 +585,6 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
                 minValue = value;
             }
         }
-        new_data = (data[1].concat(data[0])).concat([recep_block_time])
 
         for (const [key, value] of Object.entries(data[1])) {
             if (value > maxValue) {
@@ -601,7 +605,6 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
         bins.shift(); //fix ticks
         bins2 = d3.bin().thresholds(ticks)(data[1].concat([-1])); //fix ticks
         bins2.shift(); //fix ticks
-        bins3 = d3.bin().thresholds(ticks)([recep_block_time, 0]); //fix ticks
 
         new_data = (data[1].concat(data[0])).concat([recep_block_time])
         bins_tot = d3.bin().thresholds(ticks)(new_data); //define size of paquet  
@@ -633,10 +636,10 @@ function chart_delays_for_a_block(dom, data, level, round, recep_block_time) {
             .style("fill", "#404080")
             .style("opacity", 0.6);
         graph.selectAll("rect3")//block
-            .data(bins3)
+            .data([recep_block_time])
             .join("rect")
-            .attr("x", d => x(d.x0) + 1)
-            .attr("width", d => Math.max(2, x(d.x1) - x(d.x0) - 1))
+            .attr("x", d => x(d) + 1)
+            .attr("width",2)
             .attr("y", margin.top)
             .attr("height", height - margin.bottom - margin.top)
             .style("fill", "rgba(198, 0, 0, 1)")
