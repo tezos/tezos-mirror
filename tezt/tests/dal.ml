@@ -280,14 +280,18 @@ let test_feature_flag _protocol _sc_rollup_node _sc_rollup_address node client =
     Test.fail "Unexpected entry dal in the context when DAL is disabled" ;
   unit
 
-let publish_slot ~source ?fee ~index ~commitment node client =
-  let level = Node.get_level node in
+let publish_slot ~source ?level ?fee ?error ~index ~commitment node client =
+  let level =
+    match level with Some level -> level | None -> 1 + Node.get_level node
+  in
   Operation.Manager.(
     inject
+      ?error
       [make ~source ?fee @@ dal_publish_slot_header ~index ~level ~commitment]
       client)
 
-let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
+let publish_dummy_slot ~source ?level ?error ?fee ~index ~message parameters
+    cryptobox =
   let commitment =
     Rollup.Dal.(
       Commitment.dummy_commitment
@@ -295,10 +299,10 @@ let publish_dummy_slot ~source ?fee ~index ~message parameters cryptobox =
         cryptobox
         message)
   in
-  publish_slot ~source ?fee ~index ~commitment
+  publish_slot ~source ?level ?fee ?error ~index ~commitment
 
 let publish_slot_header ~source ?(fee = 1200) ~index ~commitment node client =
-  let level = Node.get_level node in
+  let level = 1 + Node.get_level node in
   let commitment =
     Tezos_crypto_dal.Cryptobox.Commitment.of_b58check_opt commitment
   in
@@ -398,6 +402,38 @@ let test_slot_management_logic =
   @@ fun protocol ->
   setup ~dal_enable:true ~protocol
   @@ fun parameters cryptobox node client _bootstrap ->
+  let* (`OpHash _) =
+    let error =
+      rex ~opts:[`Dotall] "Unexpected level in the future in slot header"
+    in
+    publish_dummy_slot
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:3
+      ~index:2
+      ~message:"a"
+      ~error
+      parameters
+      cryptobox
+      node
+      client
+  in
+  let* (`OpHash _) =
+    let error =
+      rex ~opts:[`Dotall] "Unexpected level in the past in slot header"
+    in
+    publish_dummy_slot
+      ~source:Constant.bootstrap5
+      ~fee:3_000
+      ~level:1
+      ~index:2
+      ~message:"a"
+      ~error
+      parameters
+      cryptobox
+      node
+      client
+  in
   let* (`OpHash oph1) =
     publish_dummy_slot
       ~source:Constant.bootstrap1
