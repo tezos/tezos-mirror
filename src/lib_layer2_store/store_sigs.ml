@@ -105,11 +105,6 @@ module type STORAGE_INFO = sig
   (** [path] is a value of type path, it identifies the location of a piece of
       storage in the underlying store. *)
   val path : path
-
-  (** [keep_last_n_entries_in_memory] is an optional integer value. When
-      defined, it determines the number of entries for a piece of storage (such
-      as [Map]s) that must be cached in memory. *)
-  val keep_last_n_entries_in_memory : int option
 end
 
 (** [KEY] is a module type used to construct [Map]-like storage modules.

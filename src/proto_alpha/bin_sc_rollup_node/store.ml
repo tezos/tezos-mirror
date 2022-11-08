@@ -51,8 +51,6 @@ module StateInfo =
   Make_append_only_map
     (struct
       let path = ["state_info"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -117,8 +115,6 @@ module StateHistory = struct
     Make_mutable_value
       (struct
         let path = ["state_history"]
-
-        let keep_last_n_entries_in_memory = None
       end)
       (StateHistoryRepr)
 
@@ -152,8 +148,6 @@ module Messages =
   Make_append_only_map
     (struct
       let path = ["messages"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -174,8 +168,6 @@ module Inboxes =
   Make_append_only_map
     (struct
       let path = ["inboxes"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -195,8 +187,6 @@ module Histories =
   Make_append_only_map
     (struct
       let path = ["histories"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -215,8 +205,6 @@ module Commitments =
   Make_append_only_map
     (struct
       let path = ["commitments"; "computed"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Raw_level.t
@@ -239,8 +227,6 @@ module Last_stored_commitment_level =
   Make_mutable_value
     (struct
       let path = ["commitments"; "last_stored_level"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type value = Raw_level.t
@@ -254,8 +240,6 @@ module Last_published_commitment_level =
   Make_mutable_value
     (struct
       let path = ["commitments"; "last_published_level"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type value = Raw_level.t
@@ -269,8 +253,6 @@ module Last_cemented_commitment_level =
   Make_mutable_value
     (struct
       let path = ["commitments"; "last_cemented_commitment"; "level"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type value = Raw_level.t
@@ -284,8 +266,6 @@ module Last_cemented_commitment_hash =
   Make_mutable_value
     (struct
       let path = ["commitments"; "last_cemented_commitment"; "hash"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type value = Sc_rollup.Commitment.Hash.t
@@ -299,8 +279,6 @@ module Commitments_published_at_level =
   Make_updatable_map
     (struct
       let path = ["commitments"; "published_at_level"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Sc_rollup.Commitment.Hash.t
@@ -319,8 +297,6 @@ module Contexts =
   Make_append_only_map
     (struct
       let path = ["contexts"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -343,8 +319,6 @@ module Dal_slot_pages =
   Make_nested_map
     (struct
       let path = ["dal"; "slot_pages"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -377,8 +351,6 @@ module Dal_processed_slots =
   Make_nested_map
     (struct
       let path = ["dal"; "processed_slots"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -421,10 +393,6 @@ module Dal_slots_headers =
   Make_nested_map
     (struct
       let path = ["dal"; "slot_headers"]
-
-      (* FIXME/DAL: https://gitlab.com/tezos/tezos/-/issues/3527
-         This value is currently not used, but required by the module type. *)
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -461,8 +429,6 @@ module Dal_confirmed_slots_history =
   Make_append_only_map
     (struct
       let path = ["dal"; "confirmed_slots_history"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t
@@ -483,8 +449,6 @@ module Dal_confirmed_slots_histories =
   Make_append_only_map
     (struct
       let path = ["dal"; "confirmed_slots_histories_cache"]
-
-      let keep_last_n_entries_in_memory = None
     end)
     (struct
       type key = Block_hash.t

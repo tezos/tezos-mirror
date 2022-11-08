@@ -27,7 +27,7 @@
    Check what the actual value of `reorganization_window_length`
    should be, and if we want to make it configurable.
 *)
-let reorganization_window_length = 10
+(* let reorganization_window_length = 10 *)
 
 module Store = struct
   (** Table from blocks hashes to unit. The entry is present iff the block
@@ -36,8 +36,6 @@ module Store = struct
     Store.Make_append_only_map
       (struct
         let path = ["tezos"; "processed_blocks"]
-
-        let keep_last_n_entries_in_memory = Some reorganization_window_length
       end)
       (struct
         type key = Block_hash.t
@@ -56,8 +54,6 @@ module Store = struct
     Store.Make_mutable_value
       (struct
         let path = ["tezos"; "processed_head"]
-
-        let keep_last_n_entries_in_memory = None
       end)
       (struct
         type value = Layer1.head
@@ -71,8 +67,6 @@ module Store = struct
     Store.Make_mutable_value
       (struct
         let path = ["tezos"; "finalized_head"]
-
-        let keep_last_n_entries_in_memory = None
       end)
       (struct
         type value = Layer1.head
@@ -87,8 +81,6 @@ module Store = struct
     Store.Make_updatable_map
       (struct
         let path = ["tezos"; "levels"]
-
-        let keep_last_n_entries_in_memory = Some reorganization_window_length
       end)
       (struct
         type key = int32

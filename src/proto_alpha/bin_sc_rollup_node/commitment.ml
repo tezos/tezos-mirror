@@ -63,14 +63,6 @@ module Number_of_ticks :
   Store.Make_append_only_map
     (struct
       let path = ["commitments"; "in_progress"; "number_of_ticks"]
-
-      (* We only access the number of ticks for either the
-         current or previous level being processed by the
-         commitment module. Therefore, by keeping the
-         last two entries in memory, we ensure that
-         the information about ticks is always recovered
-         from the main memory. *)
-      let keep_last_n_entries_in_memory = Some 2
     end)
     (struct
       type key = Raw_level.t
