@@ -99,7 +99,7 @@ process.on('uncaughtException', function (error) {
 });
 
 var major = process.version.match(/^v?([0-9]+)\./)[1];
-var minimum_major = 14
+var minimum_major = 16
 if(parseInt(major) < minimum_major){
     console.error("Error: nodejs v" + minimum_major + " or greater is needed. Current version is " + process.version);
     process.exit(1);
