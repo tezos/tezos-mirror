@@ -50,4 +50,3 @@ complete -F _tezos-client_complete octez-client
 complete -F _tezos-client_complete octez-admin-client
 complete -F _tezos-client_complete octez-baker-alpha
 complete -F _tezos-client_complete octez-accuser-alpha
-complete -F _tezos-client_complete octez-snoop

@@ -12,6 +12,7 @@ scripts/snapshot_alpha.sh
 scripts/update_hashes.sh
 scripts/update_opam_repo.sh
 scripts/user_activated_upgrade.sh
+src/bin_snoop/bash-completion.sh
 src/bin_client/bash-completion.sh
 src/bin_client/octez-init-sandboxed-client.sh
 src/bin_node/octez-sandboxed-node.sh
