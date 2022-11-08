@@ -1879,7 +1879,7 @@ module Contract = struct
       ()
       ()
 
-  let ticket_balance ctxt block contract key =
+  let get_ticket_balance ctxt block contract key =
     RPC_context.make_call1 S.ticket_balance ctxt block contract () key
 end
 
