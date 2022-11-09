@@ -3256,7 +3256,7 @@ let octez_scoru_wasm_tests_helpers =
     "test_scoru_wasm_test_helpers"
     ~path:"src/lib_scoru_wasm/test/helpers"
     ~opam:"tezos-scoru-wasm-test-helpers"
-    ~synopsis:"helpers for testing for the scoru-wasm functionality"
+    ~synopsis:"Helpers for testing for the scoru-wasm functionality"
     ~deps:
       [
         octez_base |> open_ ~m:"TzPervasives";
