@@ -162,6 +162,8 @@ module Merkle_tree = struct
 
     val encoding : t Data_encoding.t
 
+    val to_b58check : t -> string
+
     val hash_bytes : ?key:bytes -> bytes list -> t
 
     val size : int
@@ -173,6 +175,8 @@ module Merkle_tree = struct
     let hash_encoding = Hashing_scheme.encoding
 
     let hashes_encoding = Data_encoding.list hash_encoding
+
+    let to_b58check = Hashing_scheme.to_b58check
 
     (* The preamble of a serialized page contains 1 byte denoting the version,
        and 4 bytes encoding the size of the rest of the page. In total, 5
@@ -216,7 +220,7 @@ module Merkle_tree = struct
           page
       with
       | Ok raw_page -> Ok raw_page
-      | Error _ -> Error [Cannot_serialize_page_payload]
+      | Error _ -> error Cannot_serialize_page_payload
 
     let split_hashes ~max_page_size hashes =
       (* 1 byte for the version size, 4 bytes for the length of the list. *)
@@ -228,7 +232,7 @@ module Merkle_tree = struct
          the number of pages at height `n-1` could be potentially equal to the number of
          pages at height `n`. *)
       if number_of_hashes < 2 then
-        Error [Merkle_tree_branching_factor_not_high_enough]
+        error Merkle_tree_branching_factor_not_high_enough
       else
         let rec go aux list =
           match list with
@@ -243,7 +247,7 @@ module Merkle_tree = struct
       let open Result_syntax in
       (* 1 byte for the version size, 4 bytes for the size of the payload. *)
       let actual_page_size = max_page_size - page_preamble_size in
-      if actual_page_size <= 0 then Error [Non_positive_size_of_payload]
+      if actual_page_size <= 0 then error Non_positive_size_of_payload
       else
         let+ pages = String.chunk_bytes actual_page_size page in
         List.map String.to_bytes pages
@@ -287,18 +291,30 @@ module Merkle_tree = struct
            preamble of 5 bytes followed by a page payload - a raw sequence
            of bytes from the original payload for Contents pages, and a
            a sequence of serialized hashes for hashes pages. The preamble
-           bytes is part of the sequence of bytes which is hashed. *)
+           bytes is part of the sequence of bytes which is hashed.
+
+           Hashes are stored in reverse order in memory for performance
+           reasons. They are reversed again before the recursive tailcall
+           is performed.*)
         let hashes_with_serialized_pages =
-          List.map
-            (fun serialized_page -> (hash serialized_page, serialized_page))
-            serialized_pages
+          List.rev_map (fun page -> (hash page, page)) serialized_pages
         in
 
-        let* () = List.iter_es for_each_page hashes_with_serialized_pages in
+        let* () =
+          List.iter_es
+            (fun (hash, page) -> for_each_page (hash, page))
+            hashes_with_serialized_pages
+        in
+
         match hashes_with_serialized_pages with
         | [(hash, _page)] -> return hash
         | hashes_with_raw_pages ->
-            let hashes = List.map fst hashes_with_raw_pages in
+            let hashes =
+              (* Hashes_with_raw_pages stores the hash of pages in reverse
+                 order. We use `List.rev_map` to recover the original order
+                 of hashes. *)
+              List.rev_map (fun (hash, _page) -> hash) hashes_with_raw_pages
+            in
             (go [@tailcall]) (Hashes hashes)
       in
       go (Contents payload)
@@ -308,7 +324,7 @@ module Merkle_tree = struct
     let deserialize_page raw_page =
       match Data_encoding.Binary.of_bytes page_encoding raw_page with
       | Ok page -> Ok page
-      | Error _ -> Error [Cannot_deserialize_page]
+      | Error _ -> error Cannot_deserialize_page
 
     (** Deserialization function for reconstructing the original payload from
         its Merkle tree root hash. The function [retrieve_page_from_hash]
@@ -347,7 +363,6 @@ module Merkle_tree = struct
                    their original order. *)
                 (go [@tailcall]) hashes (contents :: retrieved_contents))
       in
-
       go [root_hash] []
   end
 
