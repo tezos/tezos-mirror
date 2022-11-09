@@ -103,44 +103,43 @@ let display_answer (cctxt : #Configuration.sc_client_context) :
       cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
   | _ -> cctxt#error "Unexpected server answer\n%!"
 
-let get_output_proof () =
-  let parse_transactions transactions =
-    let json = Ezjsonm.from_string transactions in
-    let open Ezjsonm in
-    let open Sc_rollup.Outbox.Message in
-    let open Lwt_result_syntax in
-    let transaction json =
-      let destination =
-        find json ["destination"] |> get_string
-        |> Protocol.Contract_hash.of_b58check_exn
-      in
-      let entrypoint =
-        try
-          find json ["entrypoint"] |> get_string
-          |> Entrypoint.of_string_strict_exn
-        with Not_found -> Entrypoint.default
-      in
-      let*? parameters =
-        Tezos_micheline.Micheline_parser.no_parsing_error
-        @@ (find json ["parameters"] |> get_string
-          |> Michelson_v1_parser.parse_expression)
-      in
-      let unparsed_parameters = parameters.expanded in
-      return @@ {destination; entrypoint; unparsed_parameters}
+let parse_transactions transactions =
+  let json = Ezjsonm.from_string transactions in
+  let open Ezjsonm in
+  let open Sc_rollup.Outbox.Message in
+  let open Lwt_result_syntax in
+  let transaction json =
+    let destination =
+      find json ["destination"] |> get_string
+      |> Protocol.Contract_hash.of_b58check_exn
     in
-    match json with
-    | `A messages ->
-        let* transactions = List.map_es transaction messages in
-        return @@ Atomic_transaction_batch {transactions}
-    | `O _ ->
-        let* transaction = transaction json in
-        return @@ Atomic_transaction_batch {transactions = [transaction]}
-    | _ ->
-        failwith
-          "An outbox message must be either a single transaction or a list of \
-           transactions."
+    let entrypoint =
+      try
+        find json ["entrypoint"] |> get_string
+        |> Entrypoint.of_string_strict_exn
+      with Not_found -> Entrypoint.default
+    in
+    let*? parameters =
+      Tezos_micheline.Micheline_parser.no_parsing_error
+      @@ (find json ["parameters"] |> get_string
+        |> Michelson_v1_parser.parse_expression)
+    in
+    let unparsed_parameters = parameters.expanded in
+    return @@ {destination; entrypoint; unparsed_parameters}
   in
+  match json with
+  | `A messages ->
+      let* transactions = List.map_es transaction messages in
+      return @@ Atomic_transaction_batch {transactions}
+  | `O _ ->
+      let* transaction = transaction json in
+      return @@ Atomic_transaction_batch {transactions = [transaction]}
+  | _ ->
+      failwith
+        "An outbox message must be either a single transaction or a list of \
+         transactions."
 
+let get_output_proof () =
   Tezos_clic.command
     ~desc:"Ask the rollup node for an output proof."
     Tezos_clic.no_options
@@ -175,6 +174,27 @@ let get_output_proof () =
         (Hex.of_string proof)
         Protocol.Alpha_context.Sc_rollup.Commitment.Hash.pp
         commitment_hash
+      >>= fun () -> return_unit)
+
+let get_output_message_encoding () =
+  Tezos_clic.command
+    ~desc:"Get output message encoding."
+    Tezos_clic.no_options
+    (Tezos_clic.prefixes ["encode"; "outbox"; "message"]
+    @@ Tezos_clic.string
+         ~name:"transactions"
+         ~desc:"A JSON description of the transactions"
+    @@ Tezos_clic.stop)
+    (fun () transactions (cctxt : #Configuration.sc_client_context) ->
+      let open Lwt_result_syntax in
+      let open Protocol.Alpha_context.Sc_rollup.Outbox.Message in
+      let* message = parse_transactions transactions in
+      let encoded_message = serialize message in
+      (match encoded_message with
+      | Ok encoded_message ->
+          let encoded_message = unsafe_to_string encoded_message in
+          cctxt#message "%a" Hex.pp (Hex.of_string encoded_message)
+      | Error _ -> cctxt#message "Error while encoding outbox message.")
       >>= fun () -> return_unit)
 
 (** [call_get cctxt raw_url] executes a GET RPC call against the [raw_url]. *)
@@ -251,6 +271,7 @@ let all () =
     get_sc_rollup_addresses_command ();
     get_state_value_command ();
     get_output_proof ();
+    get_output_message_encoding ();
     rpc_get_command;
     Keys.generate_keys ();
     Keys.list_keys ();
