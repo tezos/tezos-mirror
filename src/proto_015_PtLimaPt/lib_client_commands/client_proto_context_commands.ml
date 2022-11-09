@@ -1718,7 +1718,7 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing) delegate_pkh consensus_pkh cctxt ->
         let open Lwt_result_syntax in
@@ -1746,9 +1746,11 @@ let commands_rw () =
       (prefixes ["drain"; "delegate"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["to"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the destination key"
+      @@ Public_key_hash.source_param ~name:"dest" ~desc:"the destination key"
       @@ prefixes ["with"]
-      @@ Public_key_hash.source_param ~name:"key" ~desc:"the consensus key"
+      @@ Public_key_hash.source_param
+           ~name:"consensus_key"
+           ~desc:"the consensus key"
       @@ stop)
       (fun (dry_run, verbose_signing)
            delegate_pkh
