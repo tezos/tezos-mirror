@@ -8,6 +8,7 @@ include:
   - .gitlab/ci/jobs/packaging/opam_package.yml
 
   # Stage: build
+  - .gitlab/ci/jobs/build/check.yml
   - .gitlab/ci/jobs/build/static_x86_64_linux_binaries.yml
   - .gitlab/ci/jobs/build/arm64.yml
   - .gitlab/ci/jobs/build/x86_64.yml
