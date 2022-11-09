@@ -744,6 +744,14 @@ val get_chain_block_context_contract_storage :
 val post_chain_block_context_contract_ticket_balance :
   ?chain:string -> ?block:string -> id:string -> data:JSON.u -> unit -> int t
 
+(** RPC [POST /chains/<chain>/blocks/<block>/context/contracts/<id>/all_ticket_balances]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val get_chain_block_context_contract_all_ticket_balances :
+  ?chain:string -> ?block:string -> id:string -> unit -> JSON.t t
+
 (** {2 Smart contract rollup RPC module} *)
 
 (** RPC: [GET chains/<chain>/blocks/<block>/context/sc_rollups] *)

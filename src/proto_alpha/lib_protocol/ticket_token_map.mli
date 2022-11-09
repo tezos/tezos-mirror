@@ -44,9 +44,9 @@ val update :
   'a t ->
   ('a t * context) tzresult Lwt.t
 
-(** [fold ctxt f z m] folds over the map [m] using the initial value [z] and
+(** [fold_e ctxt f z m] folds over the map [m] using the initial value [z] and
     the accumulator function [f]. [f] must account for its own gas costs.  *)
-val fold :
+val fold_e :
   context ->
   (context ->
   'state ->
@@ -56,6 +56,18 @@ val fold :
   'state ->
   'a t ->
   ('state * context) tzresult
+
+(** Lwt-aware variant of {!fold_e}. *)
+val fold_es :
+  context ->
+  (context ->
+  'state ->
+  Ticket_token.ex_token ->
+  'a ->
+  ('state * context) tzresult Lwt.t) ->
+  'state ->
+  'a t ->
+  ('state * context) tzresult Lwt.t
 
 (** [find ctxt k m] looks up the value with key [k] in the given map [m] and
     also accounts for the gas cost of finding the key. *)
@@ -81,10 +93,10 @@ val of_list :
 val to_list :
   context -> 'a t -> ((Ticket_token.ex_token * 'a) list * context) tzresult
 
-(** [map ctxt f m] maps over all key-value pairs in the map [m] using the
+(** [map_e ctxt f m] maps over all key-value pairs in the map [m] using the
     function [f]. It accounts for gas costs associated with traversing the
     elements. [f] must account for its own gas cost. *)
-val map :
+val map_e :
   context ->
   (context -> Ticket_token.ex_token -> 'a -> ('b * context) tzresult) ->
   'a t ->
